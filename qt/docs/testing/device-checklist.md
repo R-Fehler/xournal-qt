@@ -2529,3 +2529,7 @@ See qt/docs/curtain.md. On the 2-in-1 with pen and fingers, and with a mouse.
       Two fingers on the black zoom the page while its handles are hidden, and carry the hole while they are shown.
 - [ ] The pill's second button switches between curtain and spotlight; presenting, the spotlight stays at its place on
       each page.
+- [ ] Handles hidden: pen, mouse and finger pull the curtain's top edge down (a press on the black close to it) to
+      reveal the next line; the spotlight's hole is made wider from just outside its edge; writing just inside the
+      hole's edge still writes. Elsewhere on the black a finger still scrolls.
+- [ ] B, move the curtain, B (away), B: it is back where it was; the same for the spotlight; another tab has its own.

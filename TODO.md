@@ -485,10 +485,12 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
 - [ ] `qt/undo-redo`: in Markdown text documents redo is grayed out in the bottom-right pill while Ctrl+Shift+Z
   works (bug: failing test first). Undo and redo are hard to find: make them visible buttons in the tool bar and the
   phone chrome (their final place follows `qt/toolbox`).
-- [ ] `qt/curtain`: a **curtain** for teaching and presenting: a black area that hides part of the page, and its
+- [x] `qt/curtain`: a **curtain** for teaching and presenting: a black area that hides part of the page, and its
   inverse, a **spotlight** (only a rectangle stays visible). Placed and moved, turned and resized with handles like
   the setsquare (`GeometryToolLayer`); a tap on the black part shows the handles. Only on screen: never saved,
-  printed or exported. Works in full screen and the presentation mode.
+  printed or exported. Works in full screen and the presentation mode. *Built (qt/docs/curtain.md: B / Shift+B, the
+  setsquare button's list, ⋮ → View, the tool square; edges pushed with the handles hidden, its place remembered per
+  tab). Left: the device pass; QML overlays (selection pill, PDF text knobs, sticky note pill) still show over it.*
 - [ ] `qt/page-ops`: a long press on a page in the page grid or the sidebar starts the selection mode with that
   page selected; moving the finger after the long press still drags the pages, as today. **Rotate pages** by 90°
   left or right (current page, selected pages, all pages), undoable, in the page menu. Pages without a PDF

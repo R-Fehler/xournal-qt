@@ -14,6 +14,10 @@
  * thumbnails and previews. Nothing is drawn on it either: input that starts on the black writes nothing, erases
  * nothing and follows no link (only the handles act; a tap shows them).
  *
+ * With its handles hidden, its edges can still be pushed (a press on the black close to an edge): the curtain pulled
+ * back to reveal the next line. Taken away and put out again, it comes back where it was (each shape, for as long as
+ * the tab is open).
+ *
  * It lies on a page (page coordinates, so it scrolls and zooms with what it covers) and goes along to the page the view
  * is at, at the same place of that page, when the current page changes: flipping through the pages of a presentation
  * keeps the next one covered just as far.
@@ -24,6 +28,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -80,6 +85,7 @@ public:
     /// The handles (where they are in the view); none while they are hidden
     std::vector<std::pair<Handle, QPointF>> handles() const;
     /// What a press at this place takes (None: it is not on the curtain). `reach`: how far from a handle it may be.
+    /// With the handles hidden, the black within `reach` of an edge takes that edge (revealing by pushing an edge).
     Handle handleAt(QPointF viewPos, double reach) const;
 
     /// A drag of a handle (or of the black, `Body`), from this place
@@ -126,6 +132,8 @@ private:
     double zoom() const;
     QPointF pageOrigin() const;
     void changed();
+    /// Keep where it is, for the next time it is put out
+    void remember();
     /// It came or went, or its handles did: the window's controls follow
     void stateChanged();
 
@@ -155,6 +163,13 @@ private:
         double twist = 0;
     } gesture;
     bool inGesture = false;
+    struct Place {
+        QPointF middle;
+        QSizeF extent;
+        double turn = 0;
+    };
+    /// Where each shape was when it was last taken away (this view, while it is open)
+    std::map<Shape, Place> remembered;
 };
 
 }  // namespace xqt

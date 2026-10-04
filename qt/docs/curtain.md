@@ -32,7 +32,12 @@ takes hold of):
   it (the opposite side stays where it is); the **knob** above its top edge turns it (it stays straight within 4° of a
   right angle). **Two fingers** on the black carry it, turn it and size it (as the setsquare: only once the fingers
   clearly turn or spread).
-- While they are hidden, a finger on the black scrolls the page as usual, and the hand tool too.
+- While they are hidden, a finger on the black scrolls the page as usual, and the hand tool too. Only **close to an
+  edge** (within the reach of a handle: 14 pixels, 24 for a finger) a drag on the black **pushes that edge**: the
+  curtain is pulled back to reveal the next line, the spotlight's hole made wider, without showing the handles first.
+  For the spotlight that is the black just outside the hole: inside it, close to its edge, the pen still writes.
+- Taken away and put out again, it **comes back where it was** (the curtain and the spotlight each, on the page the
+  view is at), for as long as the tab is open.
 
 ## What it does not do
 

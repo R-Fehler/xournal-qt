@@ -44,8 +44,16 @@ void CurtainLayer::show(Shape wanted) {
     if (!page) {
         return;
     }
+    remember();  // (the other one, put out instead)
     shown = wanted;
-    placeDefault(*page);
+    if (const auto it = remembered.find(wanted); it != remembered.end()) {
+        // Where it was the last time, on the page the view is at (this tab, while it is open)
+        middle = it->second.middle;
+        extent = it->second.extent;
+        turn = it->second.turn;
+    } else {
+        placeDefault(*page);
+    }
     withHandles = true;  // (put out: it shows that it can be moved and sized)
     drag = {};
     inGesture = false;
@@ -53,10 +61,17 @@ void CurtainLayer::show(Shape wanted) {
     stateChanged();
 }
 
+void CurtainLayer::remember() {
+    if (shown) {
+        remembered[*shown] = {middle, extent, turn};
+    }
+}
+
 void CurtainLayer::hide() {
     if (!shown) {
         return;
     }
+    remember();
     shown.reset();
     onPage = nullptr;
     onDocumentPage.reset();
@@ -200,7 +215,31 @@ CurtainLayer::Handle CurtainLayer::handleAt(QPointF viewPos, double reach) const
     if (best != Handle::None) {
         return best;
     }
-    return covers(viewPos) ? Handle::Body : Handle::None;
+    if (!covers(viewPos)) {
+        return Handle::None;
+    }
+    // On the black close to an edge: that edge (also with the handles hidden: the curtain is pushed back to reveal
+    // more, the spotlight's hole made wider). The corners are the handles'.
+    if (!handlesShown()) {
+        const QPointF own = fromView(viewPos);
+        const double x = std::abs(own.x()), y = std::abs(own.y());
+        const double w = extent.width() / 2, h = extent.height() / 2;
+        const double z = zoom();
+        if (shown == Shape::Spotlight) {
+            if (y <= h && x > w && (x - w) * z <= reach) {
+                return own.x() < 0 ? Handle::Left : Handle::Right;
+            }
+            if (x <= w && y > h && (y - h) * z <= reach) {
+                return own.y() < 0 ? Handle::Top : Handle::Bottom;
+            }
+        } else if (std::min(w - x, h - y) * z <= reach) {
+            if (w - x < h - y) {
+                return own.x() < 0 ? Handle::Left : Handle::Right;
+            }
+            return own.y() < 0 ? Handle::Top : Handle::Bottom;
+        }
+    }
+    return Handle::Body;
 }
 
 void CurtainLayer::beginDrag(Handle handle, QPointF viewPos) {

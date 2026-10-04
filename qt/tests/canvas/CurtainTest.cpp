@@ -365,3 +365,63 @@ TEST_F(CurtainTest, theSpotlightShowsOnlyItsHole) {
     EXPECT_NEAR(curtain().centre().y(), 460, 0.5);
     EXPECT_EQ(elements(), 1u);
 }
+
+// With the handles hidden, the black close to an edge pushes that edge: the curtain pulled down to reveal the next
+// line, the spotlight's hole made wider. The handles stay hidden; a tap there still shows them. In the hole, close to
+// its edge, the pen still writes.
+TEST_F(CurtainTest, anEdgeIsPushedWithTheHandlesHidden) {
+    const double zoom = view->getViewController().zoom();
+    curtain().show(CurtainLayer::Shape::Curtain);
+    curtain().place(QPointF(300, 500), QSizeF(400, 200), 0);
+    curtain().setHandlesShown(false);
+    const QPointF nearTop = at(0, QPointF(250, 400)) + QPointF(0, 5);  // (5 pixels below its top edge)
+    ASSERT_EQ(curtain().handleAt(nearTop, CurtainLayer::REACH), CurtainLayer::Handle::Top);
+    penDrag(nearTop, nearTop + QPointF(0, 40 * zoom));
+    EXPECT_NEAR(curtain().centre().y() - curtain().size().height() / 2, 440, 0.5) << "revealed 40 points more";
+    EXPECT_NEAR(curtain().centre().y() + curtain().size().height() / 2, 600, 0.5) << "its bottom stays";
+    EXPECT_FALSE(curtain().handlesShown());
+    EXPECT_EQ(elements(), 0u);
+    const QPointF top = at(0, QPointF(250, 440)) + QPointF(0, 5);
+    penTap(top);
+    EXPECT_TRUE(curtain().handlesShown()) << "a tap close to the edge is a tap on the black";
+
+    curtain().show(CurtainLayer::Shape::Spotlight);
+    curtain().place(QPointF(300, 400), QSizeF(200, 100), 0);
+    curtain().setHandlesShown(false);
+    const QPointF outsideRight = at(0, QPointF(400, 400)) + QPointF(6, 0);
+    ASSERT_EQ(curtain().handleAt(outsideRight, CurtainLayer::REACH), CurtainLayer::Handle::Right);
+    penDrag(outsideRight, outsideRight + QPointF(30 * zoom, 0));
+    EXPECT_NEAR(curtain().size().width(), 230, 0.5) << "the hole wider";
+    const QPointF insideLeft = at(0, QPointF(200, 400)) + QPointF(6, 0);
+    EXPECT_EQ(curtain().handleAt(insideLeft, CurtainLayer::REACH), CurtainLayer::Handle::None) << "the hole is the page";
+    penDrag(insideLeft, insideLeft + QPointF(40, 10));
+    processEvents();
+    EXPECT_EQ(elements(), 1u) << "written close to the edge, inside the hole";
+}
+
+// Taken away and put out again, each comes back where it was (this tab, while it is open).
+TEST_F(CurtainTest, itComesBackWhereItWas) {
+    curtain().show(CurtainLayer::Shape::Curtain);
+    curtain().place(QPointF(250, 450), QSizeF(300, 150), 0.2);
+    curtain().toggle(CurtainLayer::Shape::Curtain);
+    ASSERT_FALSE(curtain().active());
+    curtain().toggle(CurtainLayer::Shape::Curtain);
+    EXPECT_EQ(curtain().centre(), QPointF(250, 450));
+    EXPECT_EQ(curtain().size(), QSizeF(300, 150));
+    EXPECT_DOUBLE_EQ(curtain().rotation(), 0.2);
+
+    // The spotlight instead, placed elsewhere, and the curtain again: each has its own place
+    curtain().toggle(CurtainLayer::Shape::Spotlight);
+    curtain().place(QPointF(100, 100), QSizeF(80, 60), 0);
+    curtain().toggle(CurtainLayer::Shape::Curtain);
+    EXPECT_EQ(curtain().centre(), QPointF(250, 450));
+    curtain().toggle(CurtainLayer::Shape::Spotlight);
+    EXPECT_EQ(curtain().centre(), QPointF(100, 100));
+    EXPECT_EQ(curtain().size(), QSizeF(80, 60));
+
+    // Another view (another tab) knows nothing of it
+    CanvasView other(*session);
+    other.getViewController().setViewSize(QSizeF(900, 1400));
+    other.curtain().toggle(CurtainLayer::Shape::Spotlight);
+    EXPECT_NE(other.curtain().centre(), QPointF(100, 100));
+}

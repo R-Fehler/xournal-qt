@@ -582,8 +582,8 @@ bool CanvasInput::actionStart(const Event& event) {
         if (handle != CurtainLayer::Handle::None) {
             this->curtainPress = handle;
             this->sequenceStartPage = nullptr;
-            if (curtain.handlesShown()) {
-                curtain.beginDrag(handle, event.viewPos);
+            if (curtain.handlesShown() || handle != CurtainLayer::Handle::Body) {
+                curtain.beginDrag(handle, event.viewPos);  // (an edge pushed also with the handles hidden)
             } else {
                 this->curtainScrolls = toolType == TOOL_HAND;
             }
@@ -897,6 +897,9 @@ bool CanvasInput::actionEnd(const Event& event) {
         // The curtain: a drag of it ends; a tap on the black shows its handles
         if (view.curtain().dragging()) {
             view.curtain().endDrag();
+            if (isClick(event)) {
+                view.curtain().setHandlesShown(true);  // (a tap close to an edge is a tap on the black)
+            }
         } else if (isClick(event)) {
             view.curtain().setHandlesShown(true);
         } else if (curtainScrolls && view.getViewController().snapping()) {
@@ -1258,7 +1261,7 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
                 CurtainLayer& curtain = view.curtain();
                 const CurtainLayer::Handle handle = curtain.handleAt(touchSessionStartPos, CurtainLayer::FINGER_REACH);
                 touchOnCurtain = handle != CurtainLayer::Handle::None;
-                if (touchOnCurtain && curtain.handlesShown()) {
+                if (touchOnCurtain && (curtain.handlesShown() || handle != CurtainLayer::Handle::Body)) {
                     curtain.beginDrag(handle, touchSessionStartPos);
                     touchCurtain = true;
                     touchCurtainId = e->points().first().id();
@@ -1419,6 +1422,7 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         if (touchCurtain) {
             if (auto it = touches.find(touchCurtainId); it != touches.end()) {
                 view.curtain().dragTo(it->second.pos);
+                lastCentroid = it->second.pos;  // (where the finger is: a tap if it stays close)
             }
             panning = false;
         } else if (curtainGesture) {
@@ -1506,7 +1510,14 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         return true;  // no tap, no double tap, no fling: that session belonged to the selection
     }
     if (touches.empty() && (touchCurtain || curtainGesture)) {
+        // A tap close to an edge (it pushed nothing): a tap on the black, its handles
+        const bool tap = touchCurtain && touchSessionMaxPoints == 1 && now - touchSessionStartMs <= TAP_MAX_MS &&
+                         std::hypot(lastCentroid.x() - touchSessionStartPos.x(),
+                                    lastCentroid.y() - touchSessionStartPos.y()) <= TAP_SLOP_PX;
         endCurtainTouch();
+        if (tap) {
+            view.curtain().setHandlesShown(true);
+        }
         touchOnCurtain = false;
         longPressTimer.stop();
         longPressFired = false;
