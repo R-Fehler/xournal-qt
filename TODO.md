@@ -665,7 +665,8 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   same process (both pass alone; found by `qt/undo-redo`, 2026-10-04). Restore the template in the test.
 - [ ] Under `-j3` load (cloud build, 2026-10-04) `PhoneChromeTest.theFold7FoldedAndUnfolded`,
   `AdaptiveLayoutTest.toolBarPlaceIsChosenPerSizeClass` and `SafeAreasKeyboardTest.theFormatBarDocksAboveTheKeyboardAndTheCursorStaysInView`
-  failed once each and passed alone; `CitationsTest.selectedTextIsSearchedInTheDocumentTheTabsAndTheLibrary` failed
+  failed once each and passed alone (also `ColorChooserTest.theHighlighterTakesHighlightColors`, 3 of 3 alone);
+  `CitationsTest.selectedTextIsSearchedInTheDocumentTheTabsAndTheLibrary` failed
   about 1 in 4. Wait for the state instead of time.
 - [ ] `Tabs.closingATabDoesNotWaitForQueuedWork` checks a fixed time limit for closing a tab: it failed once in the
   full suite at a load of about 15 and passed 6 of 6 alone. Make its limit relative (for example to one render's
