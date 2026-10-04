@@ -243,6 +243,9 @@ class AppController: public QObject {
     /// How documents are kept (session/DocumentMode.h): "xopp" (Xournal++ files) or "pdf" (PDF files: every document
     /// one PDF with notes). Written by the first-start question and Settings → Documents (stored at once).
     Q_PROPERTY(QString documentMode READ documentMode WRITE setDocumentMode NOTIFY documentModeChanged)
+    /// The introduction was shown (qt/docs/onboarding.md): finished or skipped, at the first start or later from Help.
+    /// The setting "introSeen" (stored at once).
+    Q_PROPERTY(bool introSeen READ introSeen WRITE setIntroSeen NOTIFY documentModeChanged)
     /// The mode in effect is "PDF files".
     Q_PROPERTY(bool pdfOnly READ pdfOnly NOTIFY documentModeChanged)
     /// New text documents are PDF text documents (the setting "newTextDocuments", qt/docs/md-pdf.md), not ".md" files.
@@ -796,6 +799,12 @@ public:
     bool pdfOnly() const;
     /// The first start (of the main window) asks which way to work: nothing chosen yet, and XQT_DOCUMENT_MODE unset.
     Q_INVOKABLE bool askDocumentMode() const;
+    // --- getting started (qt/docs/onboarding.md) ---
+    bool introSeen() const;
+    void setIntroSeen(bool seen);
+    /// The first start shows the introduction, which ends in the document mode question: that question is due
+    /// (askDocumentMode) and the introduction was not shown yet.
+    Q_INVOKABLE bool askIntro() const;
     /// Save as: the type the dialog starts on, "pdf" (PDF with notes) or "xopp". A hybrid PDF stays a PDF, a .xopp a
     /// .xopp; other documents (new ones, annotated PDFs, images) take the mode's: "pdf" in PDF files mode.
     Q_INVOKABLE QString saveFormat() const;

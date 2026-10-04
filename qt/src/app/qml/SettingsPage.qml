@@ -48,14 +48,17 @@ Popup {
     onAboutToShow: sectionShown = false
     onPhoneChanged: if (!phone) sectionShown = false
 
-    /// The sections, in the order of the tabs (Shortcuts last: it matters little without a keyboard)
+    /// The sections, in the order of the tabs (Shortcuts near the end: it matters little without a keyboard; Help last)
     readonly property var sectionNames: [qsTr("Pen"), qsTr("Touch"), qsTr("Stabilizer"), qsTr("Documents"),
-        qsTr("Display"), qsTr("Search"), qsTr("New pages"), qsTr("Storage"), qsTr("Shortcuts")]
+        qsTr("Display"), qsTr("Search"), qsTr("New pages"), qsTr("Storage"), qsTr("Shortcuts"), qsTr("Help")]
+    readonly property int shortcutsSection: 8
     function showSection(index) {
         sections.currentIndex = index
         sectionShown = true
     }
-    function showShortcuts() { showSection(sectionNames.length - 1) }
+    function showShortcuts() { showSection(shortcutsSection) }
+    /// Help (qt/docs/onboarding.md): the window shows the introduction (the sheet is closed first)
+    signal introRequested()
 
     readonly property var s: app.settings
     /// The cache was removed: the window closes (so the app does not build it again at once)
@@ -249,6 +252,7 @@ Popup {
             TabButton { text: qsTr("New pages"); width: implicitWidth }
             TabButton { objectName: "storageTab"; text: qsTr("Storage"); width: implicitWidth }
             TabButton { objectName: "shortcutsTab"; text: qsTr("Shortcuts"); width: implicitWidth }
+            TabButton { objectName: "helpTab"; text: qsTr("Help"); width: implicitWidth }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: "#e0e0e0"; visible: !sheet.phone || sheet.sectionShown }
 
@@ -1249,6 +1253,33 @@ Popup {
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // --- Help: the introduction of the first start, the keyboard shortcuts (qt/docs/onboarding.md) ---
+            ScrollView {
+                contentWidth: availableWidth
+                ColumnLayout {
+                    width: parent.width - 48
+                    x: 24
+                    spacing: 10
+                    SectionTitle { text: qsTr("Getting started") }
+                    Hint {
+                        text: qsTr("A few pages about what the app is for: notes and PDFs you write on, Markdown, "
+                                   + "libraries and search, and how documents are kept.")
+                    }
+                    Button {
+                        objectName: "showIntroButton"
+                        text: qsTr("Show the introduction")
+                        onClicked: { sheet.close(); sheet.introRequested() }
+                    }
+                    SectionTitle { text: qsTr("Keyboard shortcuts") }
+                    Hint { text: qsTr("F1 shows them over the page; Shortcuts here changes them.") }
+                    Button {
+                        objectName: "helpShortcutsButton"
+                        text: qsTr("Show the shortcuts")
+                        onClicked: sheet.showShortcuts()
                     }
                 }
             }

@@ -1138,7 +1138,8 @@ counts the pictures of the tool drawn; it should stay 0 while moving and turning
 
 ## PDF-only mode (qt/pdf-only)
 
-The question at the first start:
+The question at the first start (since qt/onboarding the last page of the introduction; alone only when the
+introduction was shown before without a way chosen):
 - [ ] Start the app on a device where it ran before (your own install): a dialog asks "How do you want to keep your
       documents?" once, with two cards. "PDF files (like Drawboard PDF, GoodNotes, Xodo)" is chosen to start with and
       says "Recommended for most people"; "Xournal++ files (like Xournal++)" says "Recommended if you also use
@@ -2489,7 +2490,8 @@ Installing:
       Activity Monitor → the process → Open Files and Ports lists only files inside the app).
 
 Using it:
-- [ ] The first start: the question how to keep documents, then the default library in ~/Documents/Xournal_Libraries.
+- [ ] The first start: the introduction, ending in the question how to keep documents, then the default library in
+      ~/Documents/Xournal_Libraries.
 - [ ] Open a .xopp with text, a PDF with text and a Markdown box with emoji and a formula: the text looks right (Helvetica
       for "Sans"), the emoji are Apple's, the formula is drawn.
 - [ ] Write with the trackpad / mouse; with a Wacom tablet or an iPad as Sidecar display with the Apple Pencil, if there
@@ -2504,3 +2506,22 @@ Finder:
 - [ ] Double-click a .xopp in Finder: it opens in Xournal Qt (also while Xournal Qt is running already).
 - [ ] Right-click a PDF and a .md file → Open With → Xournal Qt: it opens.
 - [ ] Drop a PDF on the Dock icon: it opens.
+
+## Introduction on the first start (qt/onboarding)
+
+Start with a fresh configuration: `XDG_CONFIG_HOME=$(mktemp -d) ./xournal-qt` (Linux; nothing of the real config is
+touched).
+- [ ] The introduction opens instead of the question how to keep documents: four short pages, a row of dots under them.
+- [ ] Next and Back step through the pages; a swipe with a finger (and a drag with the mouse) does the same. The
+      dialog keeps its size between pages (no jumping).
+- [ ] Skip is on every page but the last and jumps to the last page; Esc does nothing at the first start.
+- [ ] The last page is the question (the two cards, "PDF files" chosen); Continue stores the tapped card; the
+      recovery question (after a crash) or the libraries question (Android) comes after it as before.
+- [ ] Start again: no introduction, no question.
+- [ ] Phone (Fold closed, or a narrow window): the introduction takes the whole screen; × goes to the last page
+      at the first start; the buttons at the bottom are reachable with the thumb; the cards fit without sideways
+      scrolling.
+- [ ] Desktop and tablet: a dialog in the middle; the text is readable without scrolling on a 1080p screen.
+- [ ] ⋮ → Help → Introduction and Settings → Help → Show the introduction open it again; there Skip, Esc and ×
+      close it, the last page shows the way chosen now, and Done changes it only when another card was tapped.
+- [ ] ⋮ → Help → Keyboard shortcuts opens the shortcut sheet (as F1 does).

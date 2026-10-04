@@ -3174,6 +3174,23 @@ bool AppController::pdfOnly() const { return DocumentMode::pdfOnly(*app->getSett
 
 bool AppController::askDocumentMode() const { return !isSecondary() && DocumentMode::shouldAsk(*app->getSettings()); }
 
+bool AppController::introSeen() const {
+    bool seen = false;
+    app->getSettings()->getCustomElement("xournalQt").getBool("introSeen", seen);
+    return seen;
+}
+
+void AppController::setIntroSeen(bool seen) {
+    if (seen == introSeen()) {
+        return;
+    }
+    app->getSettings()->getCustomElement("xournalQt").setBool("introSeen", seen);
+    app->getSettings()->customSettingsChanged();  // (saved at once)
+    Q_EMIT app->settingsChanged();
+}
+
+bool AppController::askIntro() const { return askDocumentMode() && !introSeen(); }
+
 QString AppController::saveFormat() const {
     const DocumentSession* s = session();
     if (s && s->isHybrid()) {

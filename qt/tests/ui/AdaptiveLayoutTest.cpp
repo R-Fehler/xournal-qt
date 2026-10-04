@@ -960,6 +960,7 @@ std::vector<AdaptiveLayoutTest::DialogCase> AdaptiveLayoutTest::documentDialogs(
             {"unsavedDialog", "open", {}, "question"},
             {"webConfirm", "ask", {longUrl, QString("Search the web")}, "question"},
             {"messageDialog", "open", {}, "card"},
+            {"introDialog", "show", {}, "form"},  // (the first start: qt/docs/onboarding.md)
     };
     if (all) {
         const std::vector<DialogCase> more{
