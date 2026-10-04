@@ -356,6 +356,15 @@ ApplicationWindow {
     readonly property bool noToolbar: !fullChrome || (app.toolbarHidden && !phoneChrome)
     /// The document is a text file (a .md, a .txt): written with the keyboard, no ink tools (qt/docs/md-editor.md)
     readonly property bool textDoc: app.textDocument !== ""
+    /// Undo and redo lead the tool bar while it is shown (a row, two rows, a rail); the view pill has them while it is
+    /// not (the compact or reader chrome, the bar put away, a text document's tool bar merged into its format bar),
+    /// the dock in the phone chrome: one place at a time (qt/docs/adaptive-layout.md, "One place for each action")
+    readonly property bool undoInToolBar: !noToolbar && !toolsInFormatBar && !phoneChrome
+    /// A button's tip with the keys of its action as they are set ("Redo (Ctrl+Shift+Z, Ctrl+Y)")
+    function withKeys(text, id) {
+        const keys = keysOf(id)
+        return keys.length > 0 ? text + " (" + keys.join(", ") + ")" : text
+    }
     Connections {
         target: app
         function onHomeVisibleChanged() { if (app.homeVisible) win.fullScreenMode = false }
@@ -707,6 +716,38 @@ ApplicationWindow {
         onPagesRequested: pageGrid.open()
     }
     PhoneToolSheet { id: phoneToolSheet }
+    // The phone chrome with the soft keyboard open: the dock is gone, undo and redo stay one tap away at the end of the
+    // format bar right above the keyboard
+    Row {
+        id: keyboardUndo
+        objectName: "keyboardUndo"
+        parent: formatBar.trailing
+        readonly property bool shown: win.phoneChrome && formatBar.docked
+        visible: shown
+        width: shown ? implicitWidth : 0
+        anchors.verticalCenter: parent ? parent.verticalCenter : undefined
+        spacing: 0
+        IconButton {
+            objectName: "keyboardUndoButton"
+            implicitWidth: 40; implicitHeight: 40
+            icon.width: 22; icon.height: 22
+            iconName: "xopp-edit-undo"
+            label: qsTr("Undo")
+            tip: win.withKeys(qsTr("Undo"), "undo")
+            enabled: app.canUndo
+            onClicked: app.undo()
+        }
+        IconButton {
+            objectName: "keyboardRedoButton"
+            implicitWidth: 40; implicitHeight: 40
+            icon.width: 22; icon.height: 22
+            iconName: "xopp-edit-redo"
+            label: qsTr("Redo")
+            tip: win.withKeys(qsTr("Redo"), "redo")
+            enabled: app.canRedo
+            onClicked: app.redo()
+        }
+    }
     // The table editor of the formatting bar (the notes' canvas; the editor beside the page has its own)
     MarkdownTableEditor {
         id: tableEditor
@@ -758,15 +799,17 @@ ApplicationWindow {
         property var lastInput: null
         /// The buttons in "more tools", in their order
         property var overflowNames: []
-        /// The buttons by their names in the plan, in their order (tools, insert, view, file)
+        /// The buttons by their names in the plan, in their order (edit, tools, insert, view, file)
         readonly property var slots: ({
+            undo: undoTool, redo: redoTool,
             pen: penTool, eraser: eraserTool, hand: handTool, touchDrawing: touchDrawingTool, select: selectTool,
             text: textTool, write: writeButton, sticky: stickyTool, shape: shapeTool, geometry: geometryTool,
             pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, addPage: addPageTool, search: searchTool,
             fullScreen: fullScreenTool, present: presentTool, settings: settingsTool, new: newTool, open: openTool,
             save: saveTool, editAsNotes: editAsNotesTool, openExternally: openExternallyTool
         })
-        readonly property var order: ["pen", "eraser", "hand", "touchDrawing", "select", "text", "write", "sticky",
+        readonly property var order: ["undo", "redo",
+                                      "pen", "eraser", "hand", "touchDrawing", "select", "text", "write", "sticky",
                                       "shape", "geometry", "pdfText", "emoji", "image", "addPage", "search",
                                       "fullScreen", "present", "settings", "new", "open", "save", "editAsNotes",
                                       "openExternally"]
@@ -1173,6 +1216,29 @@ ApplicationWindow {
         }
 
         // --- the buttons (placed by relayout(); `offered`: there at all for this document) ---
+        // Undo and redo first, never in "more tools" (qt/undo-redo); where the bar is not shown the view pill has them
+        IconButton {
+            id: undoTool
+            objectName: "toolUndoButton"
+            parent: toolBank
+            property bool offered: win.undoInToolBar
+            iconName: "xopp-edit-undo"
+            label: qsTr("Undo")
+            tip: win.withKeys(qsTr("Undo"), "undo")
+            enabled: app.canUndo
+            onClicked: app.undo()
+        }
+        IconButton {
+            id: redoTool
+            objectName: "toolRedoButton"
+            parent: toolBank
+            property bool offered: win.undoInToolBar
+            iconName: "xopp-edit-redo"
+            label: qsTr("Redo")
+            tip: win.withKeys(qsTr("Redo"), "redo")
+            enabled: app.canRedo
+            onClicked: app.redo()
+        }
         ToolCycleButton { id: penTool; objectName: "penButton"; parent: toolBank; group: "pen"; property bool offered: !win.textDoc }
         ToolCycleButton { id: eraserTool; objectName: "eraserButton"; parent: toolBank; group: "eraser"; property bool offered: !win.textDoc }
         IconButton {
@@ -1765,7 +1831,8 @@ ApplicationWindow {
         // reader chrome
         visible: !pageGrid.visible && !contentsOverview.visible && !app.presenting && !win.hudHidden && !win.phoneChrome
         /// The compact pill, in a canvas under 520 px wide (a phone, a half beside the reference or the source): undo,
-        /// redo, the page number (a tap: all pages), the contents and the zoom; the page layout is in ⋮ → View then
+        /// redo (while the tool bar is not shown: win.undoInToolBar), the page number (a tap: all pages), the contents
+        /// and the zoom; the page layout is in ⋮ → View then
         readonly property bool compact: canvas.width < 520
         /// Narrower than the compact pill (a very small window): no redo (Ctrl+Y) and no separators
         readonly property bool tight: canvas.width < 360
@@ -1795,10 +1862,13 @@ ApplicationWindow {
         }
         RowLayout {
             spacing: 0
+            // Undo and redo while the tool bar is not shown (it leads with them otherwise: one place at a time)
             IconButton {
                 objectName: "undoButton"
+                visible: !win.undoInToolBar
                 iconName: "xopp-edit-undo"
-                tip: qsTr("Undo (Ctrl+Z)")
+                label: qsTr("Undo")
+                tip: win.withKeys(qsTr("Undo"), "undo")
                 implicitWidth: 40; implicitHeight: 40
                 icon.width: 22; icon.height: 22
                 enabled: app.canUndo
@@ -1806,15 +1876,16 @@ ApplicationWindow {
             }
             IconButton {
                 objectName: "redoButton"
-                visible: !viewPill.tight
+                visible: !win.undoInToolBar && !viewPill.tight
                 iconName: "xopp-edit-redo"
-                tip: qsTr("Redo (Ctrl+Y)")
+                label: qsTr("Redo")
+                tip: win.withKeys(qsTr("Redo"), "redo")
                 implicitWidth: 40; implicitHeight: 40
                 icon.width: 22; icon.height: 22
                 enabled: app.canRedo
                 onClicked: app.redo()
             }
-            ToolSeparator { visible: !viewPill.tight }
+            ToolSeparator { visible: !win.undoInToolBar && !viewPill.tight }
             IconButton {
                 objectName: "layoutButton"
                 visible: viewPill.layoutShown

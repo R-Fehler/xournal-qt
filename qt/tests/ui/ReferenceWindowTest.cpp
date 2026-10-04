@@ -633,8 +633,9 @@ TEST_F(ReferenceWindowTest, theEditSwitchLetsThePenWriteInTheReference) {
     // button stayed grey: it asked the notes, which have nothing to redo)
     EXPECT_TRUE(controller->canUndo());
     EXPECT_TRUE(controller->canRedo()) << "the stroke undone in the reference can be redone";
-    auto* redo = findItem("redoButton");
+    auto* redo = findItem("toolRedoButton");
     ASSERT_NE(redo, nullptr);
+    ASSERT_TRUE(redo->isVisible());
     EXPECT_TRUE(redo->isEnabled());
     click(redo);
     EXPECT_EQ(elements(1), 2u) << "redone in the reference";

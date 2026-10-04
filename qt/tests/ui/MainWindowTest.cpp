@@ -2264,7 +2264,8 @@ TEST_F(HomeScreenMarkdownTest, theUndoAndRedoButtonsFollowTheTextBeingWritten) {
     auto* redoButton = find<QQuickItem>("redoButton");
     ASSERT_NE(undoButton, nullptr);
     ASSERT_NE(redoButton, nullptr);
-    ASSERT_TRUE(redoButton->isVisible());
+    ASSERT_TRUE(redoButton->isVisible()) << "a text document: in the view pill (its tool bar is in the format bar)";
+    EXPECT_FALSE(find<QQuickItem>("toolUndoButton")->isVisible()) << "one place at a time";
     EXPECT_FALSE(controller->canRedo());
 
     type("Hello");
@@ -5225,8 +5226,8 @@ TEST_F(MainWindowTest, addingAPageIsUndoneLikeEverythingElse) {
     until([&] { return snackbarText->property("text").toString().startsWith(QStringLiteral("Redone:")); });
     EXPECT_TRUE(snackbarText->property("text").toString().startsWith(QStringLiteral("Redone:")));
 
-    // The undo button of the pill as well
-    click(find<QQuickItem>("undoButton"));
+    // The undo button of the tool bar as well
+    click(find<QQuickItem>("toolUndoButton"));
     EXPECT_EQ(controller->pageCount(), pages);
 }
 
@@ -5649,10 +5650,12 @@ TEST_F(MainWindowTest, theUndoAndRedoButtonsFollowAMarkdownBoxBeingWritten) {
                 ->mapToScene(view->pageViewRect(0).topLeft() + QPointF(x, y) * view->getViewController().zoom())
                 .toPoint();
     };
-    auto* undoButton = find<QQuickItem>("undoButton");
-    auto* redoButton = find<QQuickItem>("redoButton");
+    auto* undoButton = find<QQuickItem>("toolUndoButton");
+    auto* redoButton = find<QQuickItem>("toolRedoButton");
     ASSERT_NE(undoButton, nullptr);
     ASSERT_NE(redoButton, nullptr);
+    ASSERT_TRUE(undoButton->isVisible());
+    ASSERT_TRUE(redoButton->isVisible());
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(200, 300));
     wait(50);
     xqt::MarkdownEditor* editor = view->getMarkdownEditor();
@@ -6123,13 +6126,13 @@ TEST_F(MainWindowTest, textModeTypesThePageText) {
     click(find<QQuickItem>("textFlowDone"));
     EXPECT_FALSE(panel->isVisible());
     EXPECT_FALSE(controller->textFlowActive());
-    // One step for the whole text; undo / redo are in the page pill
-    auto* undoButton = find<QQuickItem>("undoButton");
+    // One step for the whole text; undo / redo lead the tool bar
+    auto* undoButton = find<QQuickItem>("toolUndoButton");
     ASSERT_NE(undoButton, nullptr);
-    EXPECT_TRUE(find<QQuickItem>("viewPill")->isAncestorOf(undoButton));
+    EXPECT_TRUE(find<QQuickItem>("toolRow")->isAncestorOf(undoButton));
     click(undoButton);
     EXPECT_TRUE(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).empty());
-    click(find<QQuickItem>("redoButton"));
+    click(find<QQuickItem>("toolRedoButton"));
     EXPECT_EQ(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).size(), 5u);
 
     // Cancel restores the page

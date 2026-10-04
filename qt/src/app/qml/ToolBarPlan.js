@@ -8,7 +8,8 @@
 //   4. low-priority buttons go into the "more tools" overflow, one by one (LADDER)
 //   5. the colors become one cycling color button (phone-sized rooms only)
 //   6. last resort (phones): the tools that are otherwise never hidden, into the overflow too
-// ⋮ (and "more tools" once something is in it) is pinned at the end, outside anything that scrolls.
+// ⋮ (and "more tools" once something is in it) is pinned at the end, outside anything that scrolls. Undo and redo (the
+// group "edit") lead the bar and are never in the ladder: they never go into "more tools".
 // Layouts: "row" (one row), "twoRows" (tools on the first row, colors, widths and the rest on the second), "rail"
 // (a column of two, at a side), "grid" (the tools of the compact chrome: six columns, nothing overflows) and
 // "merged" (a text document: everything in the overflow, ⋮ in the format bar).
@@ -23,10 +24,11 @@ var LADDER = [
     "sticky", "write", "text", "touchDrawing", "select", "hand"
 ]
 /// The groups in their order, and the row of each in "twoRows"
-var GROUPS = ["tools", "colors", "widths", "insert", "view", "file"]
-var ROW_OF = { tools: 0, view: 0, colors: 1, widths: 1, insert: 1, file: 1 }
+var GROUPS = ["edit", "tools", "colors", "widths", "insert", "view", "file"]
+var ROW_OF = { edit: 0, tools: 0, view: 0, colors: 1, widths: 1, insert: 1, file: 1 }
 /// The groups of the buttons (the colors and widths are strips of their own)
 var GROUP_OF = {
+    undo: "edit", redo: "edit",
     pen: "tools", eraser: "tools", hand: "tools", touchDrawing: "tools", select: "tools", text: "tools", write: "tools",
     sticky: "tools", shape: "tools", geometry: "tools", pdfText: "tools", emoji: "tools",
     image: "insert", addPage: "insert",

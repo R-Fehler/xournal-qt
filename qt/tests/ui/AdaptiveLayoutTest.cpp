@@ -420,6 +420,27 @@ protected:
             }
             EXPECT_FALSE(!shownInWindow(b) && !inOverflow(b)) << at << ": " << name << " neither shown nor in more tools";
         }
+        // Undo and redo lead the bar in every class above the phones, never in "more tools"; the view pill does not
+        // repeat them (qt/undo-redo)
+        {
+            auto* undo = named("toolUndoButton");
+            auto* redo = named("toolRedoButton");
+            ASSERT_NE(undo, nullptr);
+            ASSERT_NE(redo, nullptr);
+            EXPECT_TRUE(shownInWindow(undo)) << at << ": undo in the tool bar";
+            EXPECT_TRUE(shownInWindow(redo)) << at << ": redo in the tool bar";
+            EXPECT_FALSE(overflowNames().contains("undo") || overflowNames().contains("redo")) << at;
+            const QRectF u = sceneRect(undo);
+            const QRectF r = sceneRect(redo);
+            const QRectF pen = sceneRect(named("penButton"));
+            EXPECT_TRUE(u.top() < pen.top() - 1 || (std::abs(u.top() - pen.top()) < 1 && u.left() < pen.left()))
+                    << at << ": undo before the tools";
+            EXPECT_TRUE(r.top() < pen.top() - 1 || (std::abs(r.top() - pen.top()) < 1 && r.left() < pen.left()))
+                    << at << ": redo before the tools";
+            EXPECT_FALSE(named("undoButton")->isVisible()) << at << ": not in the view pill too";
+            EXPECT_FALSE(named("redoButton")->isVisible()) << at << ": not in the view pill too";
+            EXPECT_TRUE(undo->property("tip").toString().contains("Ctrl+Z")) << at << ": the keys in its tip";
+        }
         auto* colors = named("colorStrip");
         auto* widths = named("widthStrip");
         EXPECT_TRUE(shownInWindow(colors)) << at << ": the colors";
@@ -2327,6 +2348,35 @@ TEST_F(AdaptiveLayoutTest, compactViewPillOnAPhone) {
     QMetaObject::invokeMethod(panel, "close", Q_ARG(QVariant, false));
 }
 
+// Undo and redo have one place at a time (qt/undo-redo): the head of the tool bar while it is shown, the view pill
+// while it is put away or in the compact chrome (and for a text document, whose tool bar is in its format bar)
+TEST_F(AdaptiveLayoutTest, undoAndRedoHaveOnePlaceAtATime) {
+    openDocument();
+    resize(1280, 800);
+    auto* toolUndo = named("toolUndoButton");
+    auto* pillUndo = named("undoButton");
+    auto* pillRedo = named("redoButton");
+    ASSERT_TRUE(shownInWindow(toolUndo));
+    EXPECT_FALSE(pillUndo->isVisible());
+    controller->setToolbarHidden(true);
+    wait(150);
+    EXPECT_FALSE(toolUndo->isVisible() && shownInWindow(toolUndo)) << "the bar put away";
+    EXPECT_TRUE(shownInWindow(pillUndo)) << "the view pill has them then";
+    EXPECT_TRUE(shownInWindow(pillRedo));
+    controller->setToolbarHidden(false);
+    wait(150);
+    EXPECT_TRUE(shownInWindow(toolUndo));
+    EXPECT_FALSE(pillUndo->isVisible());
+    // The compact chrome: the pill
+    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
+    wait(150);
+    EXPECT_TRUE(shownInWindow(pillUndo)) << "the compact chrome";
+    EXPECT_TRUE(shownInWindow(pillRedo));
+    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
+    wait(150);
+    EXPECT_FALSE(pillUndo->isVisible());
+}
+
 // The drawer: slides in; Esc and the back key close it; on a phone up to 85 % of the width
 TEST_F(AdaptiveLayoutTest, sidebarDrawerKeysAndPhoneWidth) {
     openDocument();
@@ -3261,6 +3311,13 @@ TEST_F(SafeAreasKeyboardTest, theFormatBarDocksAboveTheKeyboardAndTheCursorStays
     EXPECT_FALSE(named("phoneDock")->isVisible()) << "the dock goes while the keyboard is open";
     ASSERT_TRUE(bar->isVisible());
     EXPECT_TRUE(bar->property("docked").toBool());
+    // Undo and redo one tap away: at the end of the format bar (the dock's are gone with it)
+    for (const char* name: {"keyboardUndoButton", "keyboardRedoButton"}) {
+        auto* b = findItem(name);
+        ASSERT_NE(b, nullptr) << name;
+        EXPECT_TRUE(shownInWindow(b)) << name;
+        EXPECT_TRUE(sceneRect(bar).adjusted(-1, -1, 1, 1).contains(sceneRect(b))) << name << " in the format bar";
+    }
     EXPECT_NEAR(sceneRect(bar).bottom(), kb, 1) << "the format bar right above the keyboard";
     EXPECT_LE(sceneRect(canvas).bottom(), sceneRect(bar).top() + 1) << "the page ends above it";
     expectClear(bar, "the docked format bar", kb);
@@ -3315,6 +3372,7 @@ TEST_F(SafeAreasKeyboardTest, theFormatBarDocksAboveTheKeyboardAndTheCursorStays
     // Without the keyboard: the dock again, the bar at the top
     setKeyboard(0);
     EXPECT_TRUE(named("phoneDock")->isVisible());
+    EXPECT_FALSE(findItem("keyboardUndoButton")->isVisible()) << "the dock's undo again";
     EXPECT_FALSE(bar->property("docked").toBool());
     EXPECT_LT(sceneRect(bar).top(), 200);
     controller->endMarkdownOnPage();

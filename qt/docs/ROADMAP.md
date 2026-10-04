@@ -721,6 +721,12 @@
   past that, never wider than the box or over the next cell. A research note on a two-column mode
   ([md-columns.md](md-columns.md)): feasible (about 8 to 9 days), not built; paired pages give two columns of
   reading today.
+- **Undo and redo, `qt/undo-redo` (2026-10-04).** The buttons ask what undo and redo act on: the steps of the Markdown
+  being written (a `.md`, a `.txt`, a PDF text document, a Markdown box on a page: step by step, as Ctrl+Z), else
+  the document with the keys (the edited reference too); redo was greyed out in text documents. Undo and redo lead
+  the tool bar (group "edit", never in "more tools"); the view pill has them only while the bar is not shown (put
+  away, compact chrome, a text document's format bar), the phone's dock as before and, with the soft keyboard open,
+  the end of the format bar. Tips show the keys as set. Their final place follows `qt/toolbox`.
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):

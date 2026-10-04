@@ -236,7 +236,8 @@ automatic place outside tablet portrait.
 
 `qt/src/app/qml/ToolBarPlan.js` is a pure function of the room (the bar's width, or a rail's height) and the buttons
 offered for the document. `toolArea` in `Main.qml` lays the buttons out by it (they are placed, not in a Layout), and
-again when the room, the buttons or the colors change. Groups, in order of use: **tools** (pen/highlighter, eraser,
+again when the room, the buttons or the colors change. Groups, in order of use: **edit** (undo and redo, at the head
+of the bar; never in "more tools", qt/undo-redo), **tools** (pen/highlighter, eraser,
 hand, the finger draws, select, text box, write on the page, sticky note, shapes, setsquare/compass, mark PDF text,
 the emoji while writing), **colors**, **widths**, **insert** (image, add a page), **view** (search, full screen,
 present, settings), **file** (new, open, save; a `.md`: edit as notes; a text file: open externally). ⋮ and "more
@@ -256,7 +257,7 @@ order of compression as the room runs short:
 6. on phones, last: Sticky note, Write on the page, Text box, The finger draws, Select, Hand. Pen/highlighter and the
    eraser always stay.
 
-Two rows: the first row (tools, view) and the second (colors, widths, insert, file) are fitted one after the other,
+Two rows: the first row (edit, tools, view) and the second (colors, widths, insert, file) are fitted one after the other,
 the second first; the end (⋮, "more tools") sits at the end of the first row. At 960 px (a Surface at 200 %) both rows
 show everything; at 720 px (a 2-in-1 at 125 %) the view buttons go into "more tools", the widths become one button and
 the colors the recent ones. The plan is deterministic; a bar that grows takes a richer plan only with 24 px to spare
@@ -331,8 +332,10 @@ layout (`xqt-page-single` / `xqt-book-open`), "more tools" (`xqt-tools-more`), a
 
 ### The view pill
 
-Undo, redo, the page layout, the page grid, **the contents** (moved here from the tool bar), the page number, and a
-small **zoom percentage** (no − / + any more):
+Undo and redo while the tool bar is not shown (it is put away, the compact or reader chrome, a text document whose tool
+bar is merged into its format bar; `win.undoInToolBar`: otherwise they lead the tool bar), the page layout, the page
+grid, **the contents** (moved here from the tool bar), the page number, and a small **zoom percentage** (no − / + any
+more):
 
 - a tap on the percentage: after the platform's double-click time (so a double tap does not flash it) a menu: Fit the
   width (Ctrl+0), Real size 100 % (Ctrl+1), Fit the height (the page's height fills the view), Fit the whole page;
@@ -385,7 +388,7 @@ The author's rule: only one way to do things, to reduce menu clutter. No ⋮ ent
 | Snap to the grid (was the shapes menu) | Settings | | | Settings |
 | Plain text box (removed) | – (T and the text box make Markdown text boxes; plain texts are still edited) | | | – |
 | All open documents | the tab strip's overview button, ⋮ → View | Ctrl+Shift+E | the tab dots (compact) | the tab count of the app bar (a tap; a double tap: the document used before; a long press: the ones used lately) |
-| Undo, redo | the view pill | Ctrl+Z, Ctrl+Y | the view pill | the dock |
+| Undo, redo | the head of the tool bar (never in "more tools"; qt/undo-redo, before: the view pill) | Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y (the tips show the keys set) | the view pill (also for a text document: its tool bar is in the format bar) | the dock; with the soft keyboard open, the end of the format bar above it |
 
 The reader chrome hides everything; its corner field brings the full chrome back (as before).
 
@@ -610,7 +613,7 @@ the title is the document behind the home screen (greyed; a tap goes back to it)
 | All tools (`dockToolsButton`) | the sheet of every tool (below) |
 | the color (`colorCycleButton`) | the tool bar's cycling color button: a tap the next of the first five colors, a long press the palette as a **sheet** |
 | the width (`widthButton`) | the cycling width button: a tap the next width, a long press the five as a **sheet** |
-| undo, redo (`dockUndoButton`, `dockRedoButton`) | as the view pill's |
+| undo, redo (`dockUndoButton`, `dockRedoButton`) | as the tool bar's; while the soft keyboard is open (the dock gone) at the end of the format bar above it (`keyboardUndoButton`, `keyboardRedoButton`) |
 | the page number (`dockPageButton`) | all pages (the page grid); its pill has the **contents** and the **zoom %** there (its fits as a sheet; a fit goes back to the page), and no − / + (the pinch sets the columns) |
 
 - Phone portrait: at the bottom, above the navigation bar (`win.safeBottom`), in the window's footer: the page ends

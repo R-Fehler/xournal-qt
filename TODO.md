@@ -482,9 +482,11 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
 - [ ] `qt/hover-cursors`: the pen's hover dot as fast as the crosshair (a cursor of its own instead of a drawn
   item, if that is the cause), the crosshair as a setting, and an **eraser preview**: a gray circle of the eraser's
   size and shape while hovering.
-- [ ] `qt/undo-redo`: in Markdown text documents redo is grayed out in the bottom-right pill while Ctrl+Shift+Z
+- [x] `qt/undo-redo`: in Markdown text documents redo is grayed out in the bottom-right pill while Ctrl+Shift+Z
   works (bug: failing test first). Undo and redo are hard to find: make them visible buttons in the tool bar and the
-  phone chrome (their final place follows `qt/toolbox`).
+  phone chrome (their final place follows `qt/toolbox`). Done: the buttons follow the editor's steps and the edited
+  reference; undo/redo lead the tool bar (the pill only while the bar is not shown; a text document keeps them in the
+  pill). Left: their final place in `qt/toolbox`'s docked toolbox; the device pass.
 - [ ] `qt/curtain`: a **curtain** for teaching and presenting: a black area that hides part of the page, and its
   inverse, a **spotlight** (only a rectangle stays visible). Placed and moved, turned and resized with handles like
   the setsquare (`GeometryToolLayer`); a tap on the black part shows the handles. Only on screen: never saved,
