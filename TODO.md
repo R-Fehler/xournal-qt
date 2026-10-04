@@ -578,6 +578,28 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   app may hand them to the system (calendars, reminders), and whether a script interpreter could ship (upstream
   has Lua plugins).
 
+### Ideas round 2 of 2026-10-04 (the author chose from [qt/docs/ideas-2026-10.md](qt/docs/ideas-2026-10.md))
+The other ideas (A3–A9, A15, B1–B8) stay in that file to decide later.
+- [ ] `qt/pen-gestures` (A1, A2): **hold to straighten** (finish a stroke and keep the pen still about 0.5 s: it
+  becomes a line, circle, ellipse, rectangle or triangle through upstream's shape recogniser, undoable in one step
+  back to the freehand stroke; a setting) and **scratch out to erase** (a quick zigzag over ink deletes what it
+  crosses, opt-in, one undo step; a zigzag over nothing stays a stroke).
+- [ ] `qt/md-find-replace` (A10): find and replace in `.md` files, text documents and Markdown boxes (case, whole
+  word, replace one / all, one undo step for "all"). After `qt/toolbox` (the Markdown bar).
+- [ ] `qt/quick-note` (A11): one tap (home screen, toolbox, tray/launcher shortcut on Android), a shortcut and
+  `xournal-qt --quick-note` make a new note in the library's `Inbox/` named by date and time, in the document mode
+  chosen (or append to today's `Inbox/<date>.md`, a setting).
+- [ ] `qt/templates` (A12): "Save page as template" (the page's content, and if wanted its background, a PDF page
+  included, so using it is the same as copying that page) into a `Templates/` folder of the library (and an app-wide
+  set), chosen when adding pages (the add-page button's list, Insert pages dialog, new document). After `qt/stickers`
+  (same folder model and picker).
+- [ ] `qt/tags` (A13): `#tag` in typed text, Markdown and sticky notes, XMP/Info keywords in PDFs; indexed per folder;
+  a Tags chip in the library like Favourites (list of tags with counts, filter), `tag:name` in the fuzzy syntax,
+  shown on cards. After `qt/todos` (both extend the index's notes pack).
+- [ ] `qt/presenter-view` (A14): while presenting on a second screen, the laptop shows the current slide with its
+  note space, the next slide, a timer and the page number; the audience screen shows only the slide. After
+  `qt/toolbox` (presenting chrome).
+
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
    when a save falls back to a full write, and a check in MuPDF and pdf.js).
