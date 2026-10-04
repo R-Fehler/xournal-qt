@@ -36,6 +36,7 @@
 #include "undo/UndoRedoHandler.h"
 
 #include "CanvasView.h"
+#include "DevicePixels.h"
 #include "DocumentCanvasItem.h"
 
 using namespace xqt;
@@ -121,8 +122,9 @@ protected:
     }
 
     void tablet(QPointF pos, Qt::MouseButtons buttons, double pressure) {
-        QWindowSystemInterface::handleTabletEvent(window, timestamp, &pen, pos, window->mapToGlobal(pos), buttons,
-                                                  pressure, 0, 0, 0, 0, 0, Qt::NoModifier);
+        QWindowSystemInterface::handleTabletEvent(window, timestamp, &pen, xqt::test::nativeLocal(window, pos),
+                                                  xqt::test::nativeGlobal(window, pos), buttons, pressure, 0, 0, 0, 0,
+                                                  0, Qt::NoModifier);
         timestamp += 5;
         QWindowSystemInterface::flushWindowSystemEvents();
     }

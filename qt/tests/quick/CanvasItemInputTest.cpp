@@ -39,6 +39,7 @@
 #include "session/DocumentSession.h"
 
 #include "CanvasView.h"
+#include "DevicePixels.h"
 #include "DocumentCanvasItem.h"
 #include "HoverPointer.h"
 #include "MarkdownBoxResize.h"
@@ -145,8 +146,9 @@ protected:
     }
 
     void tablet(QPointF pos, Qt::MouseButtons buttons, double pressure) {
-        QWindowSystemInterface::handleTabletEvent(window, timestamp, &pen, pos, window->mapToGlobal(pos), buttons,
-                                                  pressure, 0, 0, 0, 0, 0, Qt::NoModifier);
+        QWindowSystemInterface::handleTabletEvent(window, timestamp, &pen, xqt::test::nativeLocal(window, pos),
+                                                  xqt::test::nativeGlobal(window, pos), buttons, pressure, 0, 0, 0, 0,
+                                                  0, Qt::NoModifier);
         timestamp += 5;
         QWindowSystemInterface::flushWindowSystemEvents();
     }
@@ -347,9 +349,12 @@ TEST_F(CanvasItemInputTest, pagesFollowTheCanvasWhenItMoves) {
     ASSERT_GT(page.left(), 305.0);
     const int y = static_cast<int>(page.top()) + 40;
     for (int x = 0; x < static_cast<int>(page.left()) - 1; x += 5) {
-        ASSERT_EQ(QColor(shot.pixel(x, y)), QColor("#404040")) << "page drawn left of its position at x=" << x;
+        ASSERT_EQ(QColor(xqt::test::pixelAt(shot, window, QPointF(x, y))), QColor("#404040"))
+                << "page drawn left of its position at x=" << x;
     }
-    EXPECT_EQ(QColor(shot.pixel(static_cast<int>(page.left()) + 3, y)), QColor(Qt::white)) << "page missing";
+    EXPECT_EQ(QColor(xqt::test::pixelAt(shot, window, QPointF(static_cast<int>(page.left()) + 3, y))),
+              QColor(Qt::white))
+            << "page missing";
 }
 
 namespace {
@@ -424,8 +429,9 @@ TEST_F(CanvasItemInputTest, theMouseOverALinkShowsItsTargetAndAClickFollowsIt) {
 TEST_F(CanvasItemInputTest, theHoveringPenShowsALinksTargetToo) {
     const QPointF link = addWebLink(*session, *view, *canvas);
     wait(100);
-    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(window, timestamp++, &pen, true, link,
-                                                                 window->mapToGlobal(link));
+    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(window, timestamp++, &pen, true,
+                                                                 xqt::test::nativeLocal(window, link),
+                                                                 xqt::test::nativeGlobal(window, link));
     for (int i = 0; i <= 5; ++i) {
         tablet(link + QPointF(i, 0), Qt::NoButton, 0.0);  // (hovering: no button, no pressure)
     }
@@ -434,8 +440,9 @@ TEST_F(CanvasItemInputTest, theHoveringPenShowsALinksTargetToo) {
     EXPECT_EQ(canvas->hoveredLink().value("uri").toString(), "https://example.org/hover");
     EXPECT_EQ(canvas->cursor().shape(), Qt::BitmapCursor) << "the pen keeps its tool (it writes on a link)";
     // The pen goes away: nothing is shown
-    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(window, timestamp++, &pen, false, link,
-                                                                 window->mapToGlobal(link));
+    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(window, timestamp++, &pen, false,
+                                                                 xqt::test::nativeLocal(window, link),
+                                                                 xqt::test::nativeGlobal(window, link));
     QWindowSystemInterface::flushWindowSystemEvents();
     wait(20);
     EXPECT_TRUE(canvas->hoveredLink().isEmpty());
@@ -510,8 +517,8 @@ TEST_F(CanvasItemInputTest, thePointerIsADotCursorOrTheCrosshair) {
 TEST_F(CanvasItemInputTest, aPenWithoutACursorOfThePlatformGetsADrawnDotThatDrawsNoPage) {
     hover::setPlatformShowsPenCursorForTests(false);
     const QPointF at(300, 250);
-    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(window, timestamp++, &pen, true, at,
-                                                                 window->mapToGlobal(at));
+    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(
+            window, timestamp++, &pen, true, xqt::test::nativeLocal(window, at), xqt::test::nativeGlobal(window, at));
     tablet(at, Qt::NoButton, 0.0);
     wait(100);
     auto shown = canvas->hoverMarkShown();
@@ -534,8 +541,8 @@ TEST_F(CanvasItemInputTest, aPenWithoutACursorOfThePlatformGetsADrawnDotThatDraw
     EXPECT_EQ(canvas->frameStats().tiles, 0);
 
     // The pen goes away: so does the dot
-    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(window, timestamp++, &pen, false, at,
-                                                                 window->mapToGlobal(at));
+    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(
+            window, timestamp++, &pen, false, xqt::test::nativeLocal(window, at), xqt::test::nativeGlobal(window, at));
     QWindowSystemInterface::flushWindowSystemEvents();
     wait(20);
     EXPECT_FALSE(canvas->hoverMarkShown().visible) << "the pen went away";
@@ -548,16 +555,16 @@ TEST_F(CanvasItemInputTest, aPenWithACursorOfThePlatformShowsTheCanvassCursor) {
     hover::setPlatformShowsPenCursorForTests(true);
     window->setCursor(Qt::ArrowCursor);  // (as left by a control the mouse was over)
     const QPointF at(300, 250);
-    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(window, timestamp++, &pen, true, at,
-                                                                 window->mapToGlobal(at));
+    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(
+            window, timestamp++, &pen, true, xqt::test::nativeLocal(window, at), xqt::test::nativeGlobal(window, at));
     tablet(at, Qt::NoButton, 0.0);
     wait(20);
     EXPECT_FALSE(canvas->hoverMarkShown().visible) << "the platform shows it: nothing drawn";
     ASSERT_EQ(window->cursor().shape(), Qt::BitmapCursor) << "the window shows the canvas's dot for the pen";
     EXPECT_EQ(window->cursor().pixmap().cacheKey(), canvas->cursor().pixmap().cacheKey());
 
-    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(window, timestamp++, &pen, false, at,
-                                                                 window->mapToGlobal(at));
+    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(
+            window, timestamp++, &pen, false, xqt::test::nativeLocal(window, at), xqt::test::nativeGlobal(window, at));
     QWindowSystemInterface::flushWindowSystemEvents();
     wait(20);
     EXPECT_EQ(window->cursor().shape(), Qt::ArrowCursor) << "given back";
@@ -665,16 +672,18 @@ TEST_F(CanvasItemInputTest, thePensEraserEndAndSideButtonShowTheEraser) {
     QWindowSystemInterface::registerInputDevice(&eraserEnd);
     const QPointF at(300, 250);
     const auto hoverWith = [&](QPointingDevice* device, QPointF pos, Qt::MouseButtons buttons = Qt::NoButton) {
-        QWindowSystemInterface::handleTabletEvent(window, timestamp, device, pos, window->mapToGlobal(pos), buttons,
-                                                  0.0, 0, 0, 0, 0, 0, Qt::NoModifier);
+        QWindowSystemInterface::handleTabletEvent(window, timestamp, device, xqt::test::nativeLocal(window, pos),
+                                                  xqt::test::nativeGlobal(window, pos), buttons, 0.0, 0, 0, 0, 0, 0,
+                                                  Qt::NoModifier);
         timestamp += 5;
         QWindowSystemInterface::flushWindowSystemEvents();
     };
 
     // A platform with a cursor for the pen: the cursor is the eraser
     hover::setPlatformShowsPenCursorForTests(true);
-    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(window, timestamp++, &eraserEnd, true, at,
-                                                                 window->mapToGlobal(at));
+    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(window, timestamp++, &eraserEnd, true,
+                                                                 xqt::test::nativeLocal(window, at),
+                                                                 xqt::test::nativeGlobal(window, at));
     hoverWith(&eraserEnd, at);
     wait(20);
     EXPECT_GT(cursorSide(canvas->cursor()), hover::dotSide()) << "the eraser end: the eraser";
@@ -704,8 +713,8 @@ TEST_F(CanvasItemInputTest, thePensEraserEndAndSideButtonShowTheEraser) {
     shown = canvas->hoverMarkShown();
     ASSERT_TRUE(shown.visible);
     EXPECT_FALSE(shown.eraser) << "the dot";
-    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(window, timestamp++, &pen, false, at,
-                                                                 window->mapToGlobal(at));
+    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(
+            window, timestamp++, &pen, false, xqt::test::nativeLocal(window, at), xqt::test::nativeGlobal(window, at));
     QWindowSystemInterface::flushWindowSystemEvents();
     hover::setPlatformShowsPenCursorForTests(std::nullopt);
 }
