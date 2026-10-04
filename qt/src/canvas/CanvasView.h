@@ -88,6 +88,9 @@ public:
     const DocumentLayout& documentLayout() const { return layout; }
     /// Scrolling sideways comes to rest on whole pages (setting "snapPages" of ours, default on)
     static bool snapSetting(Settings& settings);
+    /// Snapping up and down too, while the view is read (qt/docs/toolbox.md, "Reading"): with the setting snapPages
+    /// a drag or a fling comes to rest on a row of pages
+    void setSnapVertically(bool on);
     /// Presenting: one page after the other, each filling the view, a swipe goes one page on; the layout and zoom
     /// from before come back afterwards.
     void setPresenting(bool on);
@@ -581,6 +584,7 @@ private:
     std::vector<std::unique_ptr<CanvasPage>> pages;
     bool shown = false;
     bool readingOnly = false;
+    bool snapVertically = false;
     std::pair<size_t, size_t> window{1, 0};
     /// The last plan trimmed this view (it was not the current one): it has no window of its own
     bool trimmed = false;

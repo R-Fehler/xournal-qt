@@ -112,7 +112,10 @@ public:
     /// Scrolling sideways, come to rest on whole pages (their group: a column, a pair) after a drag, a fling or a
     /// wheel. `maxStep`: a swipe goes at most this many pages on (0: as far as it flies).
     void setSnapping(bool snap, int maxStep = 0);
-    bool snapping() const { return snap && layout->horizontal(); }
+    /// Up and down too (reading, qt/docs/toolbox.md): a drag or a fling comes to rest on a row of pages: its top at
+    /// the view's top, or within it when it is taller than the view; a row that fits rests in the middle
+    void setSnappingVertically(bool on) { snapVertical = on; }
+    bool snapping() const { return snap && (layout->horizontal() || snapVertical); }
     /// A scroll delta (wheel, touchpad): sideways, what cannot scroll up or down scrolls left or right.
     QPointF scrollDelta(QPointF delta) const;
     /// A drag (finger, hand tool) or a touchpad scroll ended with this velocity (content px/ms): momentum, or when
@@ -156,6 +159,11 @@ private:
     /// Move to a scroll position in a short ease-out, starting with the velocity (scroll px/ms) it had
     void animateTo(QPointF target, QPointF startVelocity = {});
     std::pair<double, double> restRangeUnclamped(size_t group) const;
+    /// Up and down: the scroll positions a row of pages rests at, and the row closest to a position
+    std::pair<double, double> restRangeY(size_t group) const;
+    size_t groupNearY(double y) const;
+    /// endScroll up and down (snapping vertically)
+    void endScrollVertically(QPointF velocity);
     /// The scroll positions the view can take sideways (the first and the last page can rest in the middle)
     std::pair<double, double> scrollRangeX() const;
     /// Where a group rests up or down: presenting in the middle, else where the view is
@@ -169,6 +177,7 @@ private:
 
     Fit kept = Fit::None;
     bool snap = false;
+    bool snapVertical = false;
     int snapMaxStep = 0;
     bool animating = false;
     QPointF animFrom, animTo, animVelocity;

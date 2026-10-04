@@ -555,6 +555,10 @@ void ViewController::endScroll(QPointF v) {
         fling(v);
         return;
     }
+    if (!layout->horizontal()) {
+        endScrollVertically(v);
+        return;
+    }
     // Where the momentum would carry the view: the travel of the exponential decay is v / (1 - rate) per ms
     const double travel = 1.0 / (1.0 - DECELERATION_PER_MS);
     const QPointF projected = scrollPos - v * travel;
@@ -591,6 +595,78 @@ void ViewController::endScroll(QPointF v) {
     const double ty = kept == Fit::Page && target != g ? restY(target) : std::clamp(projected.y(), 0.0, maxY);
     animGroup.reset();
     animateTo(QPointF(tx, ty), -v);
+    if (animating) {
+        animGroup = target;
+    }
+}
+
+// --- snapping up and down (reading) ---------------------------------------------------------------------------------
+
+std::pair<double, double> ViewController::restRangeY(size_t group) const {
+    const QRectF r = layout->groupRect(group, z);
+    const double pad = layout->padding();
+    const double maxY = std::max(0.0, layout->contentSize(z).height() - view.height());
+    if (r.height() + 2 * pad <= view.height() + 0.5) {
+        // It fits: in the middle of the view (the rows before and after it peek in)
+        const double y = std::clamp(r.center().y() - view.height() / 2, 0.0, maxY);
+        return {y, y};
+    }
+    return {std::clamp(r.top() - pad, 0.0, maxY), std::clamp(r.bottom() + pad - view.height(), 0.0, maxY)};
+}
+
+size_t ViewController::groupNearY(double y) const {
+    const size_t count = layout->groupCount();
+    if (count == 0) {
+        return 0;
+    }
+    const QPointF middle(scrollPos.x() + view.width() / 2, y + view.height() / 2);
+    const size_t guess = layout->groupOf(layout->nearestPage(middle, z));
+    size_t best = guess;
+    double bestDistance = std::numeric_limits<double>::infinity();
+    for (size_t g = guess > 2 ? guess - 2 : 0; g < count && g <= guess + 2; ++g) {
+        const auto [lo, hi] = restRangeY(g);
+        const double d = y < lo ? lo - y : (y > hi ? y - hi : 0.0);
+        if (d < bestDistance) {
+            bestDistance = d;
+            best = g;
+        }
+    }
+    return best;
+}
+
+void ViewController::endScrollVertically(QPointF v) {
+    // As sideways (endScroll), along y: let go slowly, the closest resting place (within a tall row, where the view
+    // is); a fling within a tall row goes on within it first, else on to the next row (or as far as it carries)
+    const double travel = 1.0 / (1.0 - DECELERATION_PER_MS);
+    const QPointF projected = scrollPos - v * travel;
+    const double y = scrollPos.y();
+    const size_t count = layout->groupCount();
+    const size_t g = groupNearY(y);
+    const auto [lo, hi] = restRangeY(g);
+    size_t target = g;
+    double ty = 0;
+    if (std::abs(v.y()) < FLICK_VELOCITY) {
+        ty = std::clamp(y, lo, hi);
+    } else {
+        const int dir = v.y() < 0 ? 1 : -1;  // (content moving up: on to the next rows)
+        if (dir > 0 && y < hi - 0.5) {
+            ty = std::min(projected.y(), hi);
+        } else if (dir < 0 && y > lo + 0.5) {
+            ty = std::max(projected.y(), lo);
+        } else {
+            const auto next = static_cast<std::ptrdiff_t>(g) + dir;
+            target = static_cast<size_t>(std::clamp<std::ptrdiff_t>(next, 0, static_cast<std::ptrdiff_t>(count) - 1));
+            const size_t carried = groupNearY(projected.y());
+            if ((dir > 0 && carried > target) || (dir < 0 && carried < target)) {
+                target = carried;
+            }
+            const auto [tlo, thi] = restRangeY(target);
+            ty = dir > 0 ? tlo : thi;
+        }
+    }
+    const auto [minX, maxX] = scrollRangeX();
+    animGroup.reset();
+    animateTo(QPointF(std::clamp(projected.x(), minX, maxX), ty), -v);
     if (animating) {
         animGroup = target;
     }

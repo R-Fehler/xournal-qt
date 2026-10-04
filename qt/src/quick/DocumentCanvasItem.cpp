@@ -837,6 +837,7 @@ void DocumentCanvasItem::setView(QObject* object) {
         if (!shownByAnother(canvasView)) {
             canvasView->setShown(false);
             canvasView->setReadingOnly(false);
+            canvasView->setSnapVertically(false);
         }
     }
     endLinkHover();
@@ -850,6 +851,7 @@ void DocumentCanvasItem::setView(QObject* object) {
     if (canvasView) {
         canvasView->setShown(true);
         canvasView->setReadingOnly(reading);
+        canvasView->setSnapVertically(verticalSnap);
         // (a paste with the keys asks where the mouse rests: over a sticky note it goes into the note)
         canvasView->setMousePointerSource([this]() -> std::optional<QPointF> {
             if (!mouseOverWindow || !claims(hoverScenePos)) {
@@ -922,6 +924,17 @@ void DocumentCanvasItem::setReadingOnly(bool on) {
     }
     refreshPointer();  // (no eraser where nothing is erased)
     Q_EMIT readingOnlyChanged();
+}
+
+void DocumentCanvasItem::setSnapVertically(bool on) {
+    if (on == verticalSnap) {
+        return;
+    }
+    verticalSnap = on;
+    if (canvasView) {
+        canvasView->setSnapVertically(on);
+    }
+    Q_EMIT snapVerticallyChanged();
 }
 
 bool DocumentCanvasItem::shownByAnother(const xqt::CanvasView* v) const {

@@ -345,6 +345,12 @@ bool CanvasView::snapSetting(Settings& settings) {
 
 void CanvasView::applyScrolling() {
     viewController.setSnapping(presenting || snapSetting(*session.getSettings()), presenting ? 1 : 0);
+    viewController.setSnappingVertically(snapVertically && !presenting);
+}
+
+void CanvasView::setSnapVertically(bool on) {
+    snapVertically = on;
+    applyScrolling();
 }
 
 void CanvasView::setPresenting(bool on) {
