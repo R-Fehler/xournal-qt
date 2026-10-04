@@ -3,7 +3,8 @@
 // with the variant last used (remembered per group, in the settings); a long press lists all variants. The tool bar,
 // the tools of the compact chrome and the pen pill use the same groups, so they behave alike.
 //   pen       pen ↔ highlighter (freehand); the laser pointer and laser highlighter in the list only
-//   select    rectangle ↔ lasso (the multi-layer ones only in the list)
+//   select    rectangle ↔ lasso (the multi-layer ones and the snips only in the list: a snip copies the picture of a
+//             rectangle or lasso and gives the tool back, qt/docs/snip.md)
 //   shape     line, rectangle, ellipse, arrow, double arrow, coordinate system, recognized shapes (the pen draws them)
 //   geometry  setsquare ↔ compass (on the page; the geometry pill takes it away); curtain and spotlight only in the list (they are
 //             not tools of their own: they lie over the page whatever tool is in hand, qt/docs/curtain.md)
@@ -31,7 +32,9 @@ QtObject {
                 { key: "selectRect", icon: "xopp-select-rect", name: qsTr("Select a rectangle") },
                 { key: "selectRegion", icon: "xopp-select-lasso", name: qsTr("Lasso") },
                 { key: "selectMultiLayerRect", icon: "xopp-select-rect", name: qsTr("Rectangle on all layers"), listOnly: true },
-                { key: "selectMultiLayerRegion", icon: "xopp-select-lasso", name: qsTr("Lasso on all layers"), listOnly: true }
+                { key: "selectMultiLayerRegion", icon: "xopp-select-lasso", name: qsTr("Lasso on all layers"), listOnly: true },
+                { key: "snipRect", icon: "xqt-snip", name: qsTr("Snip a rectangle (copy its picture)"), listOnly: true, snip: "rect" },
+                { key: "snipLasso", icon: "xqt-snip", name: qsTr("Snip with the lasso (copy its picture)"), listOnly: true, snip: "lasso" }
             ]
         },
         "shape": {
@@ -70,6 +73,11 @@ QtObject {
     /// The variants a tap goes through (not the list-only ones)
     function cycle(group) { return defs[group].variants.filter(function(v) { return !v.listOnly }) }
     /// A variant that is the curtain (put out or taken away beside the group's tool, never remembered as its variant)
+    /// A variant that is a snip ("rect", "lasso"; "": none): one picture copied, then the tool before comes back
+    function snipOf(group, key) {
+        const v = defs[group].variants.filter(function(v) { return v.key === key })
+        return v.length > 0 && v[0].snip ? v[0].snip : ""
+    }
     function isCurtain(group, key) {
         const v = defs[group].variants.filter(function(v) { return v.key === key })
         return v.length > 0 && v[0].curtain === true
@@ -89,6 +97,7 @@ QtObject {
         if (group === "shape")
             return (tool === "pen" || tool === "highlighter") && type !== "default" && type !== "dontChange"
                    && type !== "spline" ? type : ""
+        if (group === "select" && app.snip !== "") return app.snip === "lasso" ? "snipLasso" : "snipRect"
         if (group === "select")
             return ["selectRect", "selectRegion", "selectMultiLayerRect", "selectMultiLayerRegion"].indexOf(tool) >= 0 ? tool : ""
         if (group === "geometry") return app.geometryTool
@@ -141,6 +150,10 @@ QtObject {
             app.toggleCurtain(key)
             return
         }
+        if (snipOf(group, key) !== "") {
+            app.startSnip(snipOf(group, key))  // (never remembered: the button stays the selection's)
+            return
+        }
         if (group === "pen") {
             app.selectTool(key)
             if (!isLaser(key)) app.drawingType = "default"  // (the pen keeps its shape: back to freehand)
@@ -187,7 +200,7 @@ QtObject {
         function onToolChanged() {
             ["pen", "shape", "select", "geometry"].forEach(function(g) {
                 const a = groups.activeKey(g)
-                if (a !== "") groups.remember(g, a)
+                if (a !== "" && groups.snipOf(g, a) === "") groups.remember(g, a)
             })
             if (["pen", "highlighter", "text"].indexOf(app.tool) >= 0) groups.noteColor(app.color)
         }

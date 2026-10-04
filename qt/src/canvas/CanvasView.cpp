@@ -1,6 +1,7 @@
 #include "CanvasView.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <shared_mutex>
 #include <limits>
@@ -49,6 +50,7 @@
 #include "model/Document.h"
 #include "model/MarkdownText.h"
 #include "model/DocumentChangeType.h"
+#include "render/RegionImage.h"
 #include "render/RenderService.h"
 
 #include "pdf/base/XojPdfDocument.h"
@@ -63,6 +65,7 @@
 #include "session/TextDocument.h"
 #include "PageNoteSpace.h"
 #include "Perf.h"
+#include "Snip.h"
 #include "StickyNotes.h"
 #include "TextEditor.h"
 #include "TextFlow.h"
@@ -197,6 +200,9 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
 }
 
 CanvasView::~CanvasView() {
+    if (snipJob.valid()) {
+        snipJob.wait();  // (it draws a page of this document)
+    }
     cancelRenders();  // (first: the workers start nothing of this view while it is taken down)
     CanvasMemory::instance().remove(this);
     geometry.hide();  // before its page goes
@@ -578,6 +584,18 @@ bool CanvasView::pasteLinkMarker(std::optional<QPointF> viewPos) {
         if (pNr >= doc->getPageCount()) {
             return false;
         }
+    }
+    return addLinkMarker(links::markerText(*copied, session.documentFile()), pNr, onPage);
+}
+
+bool CanvasView::addLinkMarker(const QString& markerText, size_t pNr, QPointF onPage) {
+    Document* doc = session.getDocument();
+    PageRef page;
+    {
+        std::shared_lock lock(*doc);
+        if (pNr >= doc->getPageCount()) {
+            return false;
+        }
         page = doc->getPage(pNr);
     }
     // The page's Markdown layer (made if needed: at the bottom, the selected layer stays selected)
@@ -599,7 +617,7 @@ bool CanvasView::pasteLinkMarker(std::optional<QPointF> viewPos) {
         page->setSelectedLayerId(selected > 0 ? selected + 1 : 0);
     }
     auto text = std::make_unique<Text>();
-    text->setText(links::markerText(*copied, session.documentFile()).toStdString());
+    text->setText(markerText.toStdString());
     const std::string family = session.getSettings()->getFont().getName();
     text->setFont(XojFont(family.empty() ? "Sans" : family, std::max(6.0, markdownTextSize * 0.85)));
     text->setColor(Color(0x1a, 0x5f, 0xd8));
@@ -671,6 +689,27 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
     if (mime && !mime->hasFormat(XOURNAL_MIME) && !mime->hasImage() && mime->hasText() &&
         !mime->text().trimmed().isEmpty()) {
         return pasteText(mime->text(), viewPos);
+    }
+    // A snip (Snip.h): the picture at the size it had on its page; a link to that page is offered
+    if (mime && mime->hasImage()) {
+        if (const auto source = snip::decode(mime)) {
+            QByteArray png = mime->data(QStringLiteral("image/png"));
+            if (png.isEmpty()) {
+                QBuffer buffer(&png);
+                buffer.open(QIODevice::WriteOnly);
+                qvariant_cast<QImage>(mime->imageData()).save(&buffer, "PNG");
+            }
+            const Image* image = nullptr;
+            const std::optional<QSizeF> size =
+                    source->area.isEmpty() ? std::nullopt : std::optional<QSizeF>(source->area.size());
+            if (!insertImage(png, viewPos, size, &image)) {
+                return false;
+            }
+            if (!source->link.isEmpty() && getSelection()) {
+                offerSnipLink(source->title, source->link, image, getSelection()->getSourcePage());
+            }
+            return true;
+        }
     }
     if (mime && !mime->hasFormat(XOURNAL_MIME) && mime->hasImage()) {
         // An image copied elsewhere (browser, screenshot tool): insert it as an image element.
@@ -772,7 +811,8 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
     }
 }
 
-bool CanvasView::insertImage(const QByteArray& data, std::optional<QPointF> viewPos) {
+bool CanvasView::insertImage(const QByteArray& data, std::optional<QPointF> viewPos, std::optional<QSizeF> size,
+                             const Image** inserted) {
     size_t pNr = viewPos ? layout.pageAt(viewController.viewToContent(*viewPos), viewController.zoom())
                                    .value_or(currentPageNo())
                          : currentPageNo();
@@ -818,7 +858,9 @@ bool CanvasView::insertImage(const QByteArray& data, std::optional<QPointF> view
     if (note) {
         area = QRectF(note->look.rect.x, note->look.rect.y, note->look.rect.width, note->look.rect.height);
     }
-    const double scale = std::min({1.0, area.width() * 0.8 / w, area.height() * 0.8 / h});
+    // (its own size on the page: a snip's, else a point a pixel)
+    const double natural = size && size->width() > 0 ? size->width() / w : 1.0;
+    const double scale = std::min({natural, area.width() * 0.8 / w, area.height() * 0.8 / h});
     const QPointF origin = area.center() - QPointF(w * scale / 2, h * scale / 2);
     img->setTransformation({scale, 0, 0, scale, {std::max(0.0, origin.x()), std::max(0.0, origin.y())}});
 
@@ -826,12 +868,132 @@ bool CanvasView::insertImage(const QByteArray& data, std::optional<QPointF> view
     Layer* layer = note ? note->note : page->getSelectedLayer();
     const Layer::Index before = note ? selectNoteLayer(page, layer) : 0;  // (dropped into the note)
     session.getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, layer, img.get()));
+    if (inserted) {
+        *inserted = img.get();
+    }
     auto sel = SelectionFactory::createFromFloatingElement(&session, page, layer, pages[pNr].get(), std::move(img));
     setSelection(sel.release());
     if (note) {
         noteSelectionMade(page, before, layer);
     }
     return true;
+}
+
+// --- the snip tool (Snip.h) ---------------------------------------------------------------------------------
+
+bool CanvasView::snipBusy() const {
+    return snipJob.valid() && snipJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready;
+}
+
+bool CanvasView::snip(CanvasPage& canvasPage, const std::vector<xoj::util::Point<double>>& outline, bool rectangle) {
+    const auto index = indexOf(&canvasPage);
+    if (!index || outline.size() < 2 || snipBusy()) {
+        return false;
+    }
+    double minX = outline.front().x, maxX = minX, minY = outline.front().y, maxY = minY;
+    for (const auto& p: outline) {
+        minX = std::min(minX, p.x);
+        maxX = std::max(maxX, p.x);
+        minY = std::min(minY, p.y);
+        maxY = std::max(maxY, p.y);
+    }
+    Document* doc = session.getDocument();
+    PageRef page = canvasPage.getPage();
+    region::Request request;
+    XojPdfPageSPtr pending;
+    {
+        std::shared_lock lock(*doc);
+        const auto area = region::onPage(xoj::util::Rectangle<double>(minX, minY, maxX - minX, maxY - minY),
+                                         page->getWidth(), page->getHeight());
+        if (!area) {
+            return false;
+        }
+        request.area = *area;
+        if (page->getBackgroundType().isPdfPage()) {
+            pending = rasterPendingPdfPage(page->getPdfPageNr());  // (a pasted page whose PDF is not merged yet)
+        }
+    }
+    if (!rectangle && outline.size() >= 3) {
+        request.outline = outline;
+    }
+    // At least what the screen shows, and 200 dpi (within the size limit)
+    request.scale = region::scaleFor(request.area, viewController.zoom() * dpr);
+    snipJob = std::async(std::launch::async, [this, doc, page, request, pending, index = static_cast<int>(*index)] {
+        QImage image = region::renderImage(*doc, page, request, pending);
+        const QRectF area(request.area.x, request.area.y, request.area.width, request.area.height);
+        // (the view waits for this when it goes, so it is there to take it)
+        QMetaObject::invokeMethod(
+                this, [this, image = std::move(image), index, area] { Q_EMIT snipped(image, index, area); },
+                Qt::QueuedConnection);
+    });
+    return true;
+}
+
+void CanvasView::offerSnipLink(const QString& title, const QString& link, const Image* image, const PageRef& page,
+                               const std::string& markdown) {
+    snipLink = SnipLink{title, link, image, page, markdown};
+    Q_EMIT snipLinkOffered(title);
+}
+
+bool CanvasView::addSnipLink() {
+    if (!snipLink) {
+        return false;
+    }
+    const SnipLink offer = std::move(*snipLink);
+    snipLink.reset();
+    const auto parsed = links::parse(offer.link);
+    if (!parsed) {
+        return false;
+    }
+    const links::Copied copied{offer.title, *parsed};
+    if (!offer.markdown.empty()) {
+        // In the Markdown being written: a Markdown link after the picture's (a paragraph of its own)
+        if (!markdownEditor) {
+            return false;
+        }
+        const size_t at = markdownEditor->text().find(offer.markdown);
+        if (at == std::string::npos) {
+            return false;
+        }
+        const size_t end = at + offer.markdown.size();
+        const std::string text = "\n\n" + links::markdownFor(copied, session.documentFile()).toStdString();
+        markdownEditor->applyEdit({end, end, text, end + text.size(), end + text.size()});
+        return true;
+    }
+    // The picture: selected (as pasted), or on its page
+    Document* doc = session.getDocument();
+    std::optional<xoj::util::Rectangle<double>> box;
+    if (const EditSelection* sel = getSelection(); sel && sel->getSourcePage() == offer.page) {
+        for (const Element* e: sel->getElementsView()) {
+            if (e == offer.image) {
+                box = e->getBoundingBox();  // (the selection's rectangle has a margin)
+            }
+        }
+    }
+    size_t pNr = npos;
+    double pageHeight = 0;
+    {
+        std::shared_lock lock(*doc);
+        pNr = doc->indexOf(offer.page);
+        if (pNr == npos) {
+            return false;
+        }
+        pageHeight = offer.page->getHeight();
+        for (const Layer* l: offer.page->getLayersView()) {
+            for (const Element* e: l->getElementsView()) {
+                if (!box && e == offer.image) {
+                    box = e->getBoundingBox();
+                }
+            }
+        }
+    }
+    if (!box) {
+        return false;
+    }
+    // Under it, else (no room below) at its top right
+    const QPointF onPage = box->y + box->height + 28 <= pageHeight ? QPointF(box->x, box->y + box->height + 4)
+                                                                    : QPointF(box->x + box->width + 4, box->y);
+    return addLinkMarker(links::markerText(copied, session.documentFile()), pNr, onPage);
 }
 
 std::optional<CanvasView::LinkTarget> CanvasView::linkAt(QPointF viewPos) const {

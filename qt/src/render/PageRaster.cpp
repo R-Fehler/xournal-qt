@@ -33,6 +33,9 @@ struct ScreenDrawing {
 
 bool PageRaster::drawingForScreen() { return forScreen; }
 
+PageRaster::ScreenScope::ScreenScope(): before(forScreen) { forScreen = true; }
+PageRaster::ScreenScope::~ScreenScope() { forScreen = before; }
+
 namespace {
 std::atomic<long long> statRenders{0}, statPixels{0}, statNanos{0};
 

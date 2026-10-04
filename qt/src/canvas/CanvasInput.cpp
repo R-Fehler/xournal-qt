@@ -34,6 +34,7 @@
 #include "StickyNotes.h"
 #include "MarkdownBoxResize.h"
 #include "MarkdownEditor.h"
+#include "Snip.h"
 #include "session/DocumentSession.h"
 
 namespace xqt {
@@ -592,7 +593,9 @@ bool CanvasInput::actionStart(const Event& event) {
         curtain.setHandlesShown(false);
     }
     // A text file edited: the pen and the mouse put the cursor into the text, whatever the tool (a drag selects)
-    if (view.textMode() && toolType != TOOL_HAND) {
+    // (the snip tool snips there too: Snip.h)
+    const bool snipping = snip::isArmed() && isSelectToolType(toolType);
+    if (view.textMode() && toolType != TOOL_HAND && !snipping) {
         this->textPress = true;
         if ((event.state & GDK_CONTROL_MASK) && view.tapAt(event.viewPos)) {
             return true;  // Ctrl + click: a link is followed (as in text editors)
@@ -609,7 +612,7 @@ bool CanvasInput::actionStart(const Event& event) {
     // The laser pointer changes nothing: it points on documents shown for reading too
     const bool laser = toolType == TOOL_LASER_POINTER_PEN || toolType == TOOL_LASER_POINTER_HIGHLIGHTER;
     this->readOnlyPress = (view.getSession().isReadOnly() || (view.isReadingOnly() && !readingTool)) &&
-                          toolType != TOOL_HAND && !laser;
+                          toolType != TOOL_HAND && !laser && !snipping;  // (a snip only reads)
     if (toolType == TOOL_HAND || this->readOnlyPress) {
         return true;  // the hand tool does not change the selection (scrolling keeps it)
     }

@@ -34,6 +34,7 @@
 #include "MdDocument.h"
 #include "MdTexDelimiters.h"
 #include "MdText.h"
+#include "Snip.h"
 #include "TextEditor.h"
 
 namespace xqt {
@@ -1119,6 +1120,11 @@ bool MarkdownEditor::keyPressed(const QKeyEvent* e, bool& finish) {
                             Q_EMIT view.messageRequested(QObject::tr("Paste picture"), error);
                         } else {
                             insert(*pictures, EditKind::Other);
+                            // A snip (Snip.h): a Markdown link to the page it came from is offered
+                            if (const auto source = snip::decode(QGuiApplication::clipboard()->mimeData());
+                                source && !source->link.isEmpty()) {
+                                view.offerSnipLink(source->title, source->link, nullptr, nullptr, *pictures);
+                            }
                         }
                         return true;
                     }

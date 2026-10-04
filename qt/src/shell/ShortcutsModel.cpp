@@ -77,6 +77,9 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"toolText", tr("Text box (Markdown)"), tools, {"T"}},
             {"toolSelect", tr("Select (rectangle)"), tools, {"S"}},
             {"toolLasso", tr("Select (lasso)"), tools, {"L"}},
+            // (the snip tool: one picture of a rectangle or lasso to the clipboard, then the tool before; snip.md)
+            {"snip", tr("Snip: copy the picture of a rectangle"), tools, {"Shift+S"}},
+            {"snipLasso", tr("Snip with the lasso"), tools, {"Shift+L"}},
             {"toolHand", tr("Hand (scroll)"), tools, {"A"}},
             {"insertImage", tr("Insert an image…"), tools, {"I"}},
             // (B as PowerPoint's black screen: a black sheet over part of the page)

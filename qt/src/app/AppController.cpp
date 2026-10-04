@@ -59,6 +59,7 @@
 #include "util/XojMsgBox.h"
 
 #include "CanvasView.h"
+#include "Snip.h"
 #include "PenHover.h"
 #include "StickyNotes.h"
 #include "session/PageMargins.h"
@@ -147,6 +148,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     });
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::selectMoreChanged);  // (available)
+    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followSnipTool);
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
     loadCustomWidths();
@@ -269,6 +271,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     connect(library, &LibraryModel::favouriteToggled, this, &AppController::favouriteChanged);
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::selectMoreChanged);  // (available)
+    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followSnipTool);
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
     pages = std::make_unique<PagesModel>();
@@ -306,6 +309,15 @@ void AppController::makeTabs() {
     // The reference written in: its text tool makes Markdown text as the notes' does, edited in the same panel
     connect(referenceMode.get(), &ReferenceMode::changed, this, &AppController::applyMarkdownText);
     connect(referenceMode.get(), &ReferenceMode::markdownRequested, this, &AppController::markdownRequested);
+    // A snip in the reference (it only reads), a snip pasted into it while it is written in
+    connect(referenceMode.get(), &ReferenceMode::snipped, this,
+            [this](CanvasView* v, const QImage& image, int page, const QRectF& area) {
+                snipped(v->getSession(), image, page, area);
+            });
+    connect(referenceMode.get(), &ReferenceMode::snipLinkOffered, this, [this](CanvasView* v, const QString& title) {
+        snipLinkView = v;
+        Q_EMIT snipLinkOffered(title);
+    });
     connect(referenceMode.get(), &ReferenceMode::markdownBoxRequested, this, &AppController::markdownBoxRequested);
     // Undo and redo act on the reference while it is written in and has the keys (editedReference): the buttons
     // follow its history then
@@ -831,6 +843,15 @@ void AppController::currentTabChanged() {
             Q_EMIT webImageRequested(url, QUrl(url).host(),
                                      access == "on" || access == "off" ? QString::fromStdString(access)
                                                                        : QStringLiteral("ask"));
+        }));
+        // The snip tool (AppSnip.cpp): its picture onto the clipboard; a pasted snip's link offered
+        currentConnections.push_back(connect(v, &CanvasView::snipped, this,
+                                             [this, v](const QImage& image, int page, const QRectF& area) {
+                                                 snipped(v->getSession(), image, page, area);
+                                             }));
+        currentConnections.push_back(connect(v, &CanvasView::snipLinkOffered, this, [this, v](const QString& title) {
+            snipLinkView = v;
+            Q_EMIT snipLinkOffered(title);
         }));
         currentConnections.push_back(connect(v, &CanvasView::messageRequested, this,
                                              [this](const QString& title, const QString& text) {
@@ -4419,6 +4440,9 @@ QString AppController::geometryTool() const {
 }
 
 void AppController::selectTool(const QString& name) {
+    if (snip::isArmed()) {
+        endSnip(false);  // (another tool chosen: the snip ends, that tool stays)
+    }
     ToolType type = toolTypeFromString(name.toStdString());
     if (type == TOOL_NONE) {
         type = TOOL_PEN;

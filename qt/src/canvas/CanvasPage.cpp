@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <shared_mutex>
+#include <utility>
 
 #include <cairo.h>
 
@@ -41,6 +42,7 @@
 #include "CanvasView.h"
 #include "MdBox.h"
 #include "MixedSelection.h"
+#include "Snip.h"
 #include "StickyNotes.h"
 #include "TextEditor.h"
 #include "render/RenderService.h"
@@ -150,6 +152,21 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
     // handle resizes it; anywhere else the rectangle or lasso starts, never in a note: a tap adds what is there or
     // takes it away, a drag adds what it encloses (onButtonReleaseEvent)
     const bool selectMore = areaTool && view.selectingMore();
+    // xournal-qt: the snip tool (Snip.h): the rectangle or lasso of the select tool, over notes and all, for its picture
+    if (areaTool && snip::isArmed()) {
+        if (!selector) {
+            if (toolType == TOOL_SELECT_RECT || toolType == TOOL_SELECT_MULTILAYER_RECT) {
+                this->selector = std::make_unique<RectangularSelector>(x, y, false);
+            } else {
+                this->selector = std::make_unique<LassoSelector>(x, y, false);
+            }
+            this->overlayViews.emplace_back(std::make_unique<xoj::view::SelectorView>(
+                    this->selector.get(), this, control.getSettings()->getSelectionColor()));
+            this->selectorNote = nullptr;
+            this->snipping = true;
+        }
+        return true;
+    }
     if (!view.isReadingOnly()) {
         bool deselected = false;
         if (selectMore ? view.notes().pressTouch(*this, x, y)
@@ -469,6 +486,20 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
         t == TOOL_SELECT_PDF_TEXT_LINEAR || t == TOOL_SELECT_PDF_TEXT_RECT) {
         view.pdfTextRelease(*this);
     }
+    if (this->selector && std::exchange(this->snipping, false)) {
+        // xournal-qt: a snip (Snip.h): the picture of what it encloses (a tap: nothing, the tool stays armed)
+        const bool tapped = this->selector->userTapped(getZoom());
+        const bool rectangle = dynamic_cast<RectangularSelector*>(this->selector.get()) != nullptr;
+        const auto outline = this->selector->getBoundary();  // (before finalize: it extends it at the page's edges)
+        (void)this->selector->finalize(this->page, true, control.getDocument());  // (its picture goes)
+        (void)this->selector->releaseElements();
+        this->selector.reset();
+        if (!tapped && view.snip(*this, outline, rectangle)) {
+            snip::disarm();
+        }
+        repaintPage();
+        return false;
+    }
     if (this->selector && this->selectorNote) {
         // xournal-qt: a rectangle or lasso started on a sticky note: the note's elements (a tap: the note)
         selectInNote(std::exchange(this->selectorNote, nullptr), this->selector->userTapped(getZoom()));
@@ -575,6 +606,7 @@ void CanvasPage::onSequenceCancelEvent(DeviceId deviceId) {
     }
     leaveNote();
     coverPress.reset();
+    this->snipping = false;
     this->selector.reset();  // (its view goes with it)
 }
 

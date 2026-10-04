@@ -150,6 +150,7 @@ private:
     std::unique_ptr<EraseHandler> eraser;
     bool inEraser = false;
     std::unique_ptr<Selector> selector;  ///< rectangle / lasso being drawn (select tools)
+    bool snipping = false;               ///< ... for a snip (Snip.h)
     /// Select the element under a tap (port of upstream's SelectObject). `aggregate`: add to the selection.
     bool selectObjectAt(double x, double y, bool multiLayer, bool aggregate);
     DeviceId currentSequenceDeviceId;

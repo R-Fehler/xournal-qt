@@ -2798,3 +2798,27 @@ letter words only where the recogniser is sure.
 - [ ] Without ONNX Runtime installed: Settings says it is not installed; the app works as before; nothing is read.
 - [ ] The library shows "Reading handwriting: N documents left" while it reads (wide window), "Handwriting: N left"
       on a phone-wide window.
+
+## Snip: a picture of part of a page (qt/snip)
+
+- [ ] Select button, press and hold: "Snip a rectangle (copy its picture)"; drag over ink on a PDF page: "Copied
+      picture" at the bottom, the pen (or the tool before) is back. Paste into another app (LibreOffice, a chat, an
+      image editor): the ink and the PDF as on the screen, sharp (not the screen's pixels at a low zoom), at about the
+      size it had on the page.
+- [ ] The lasso (select list, or Shift+L): the picture is cut to the lasso; pasted into an image editor the outside
+      is transparent.
+- [ ] Image button, press and hold (right-click with the mouse): "Snip from a page"; a tap on it still opens the
+      file picker. Shift+S snips a rectangle.
+- [ ] Nothing of the screen only is in the picture: the curtain, the hover dot, a selection's handles, the dashed
+      rectangle itself, the setsquare. A Markdown box and a sticky note (also one that peeks) are as shown.
+- [ ] Escape before dragging: the tool before is back. Another tool chosen: that tool stays. A tap: nothing, the snip
+      waits for a drag.
+- [ ] In the reference beside the notes (for reading): the snip works there, and in a `.md` document.
+- [ ] Paste (Ctrl+V) into another saved document: the picture at the size it had on its page, selected; the note
+      "Add a link to the source page (…)?" with "Add link"; Add link puts "🔗 name, page N" under the picture; a tap on
+      it opens the source page. Undo takes the link away, then the picture.
+- [ ] A snip from a new, unsaved document: pasted, no link offered.
+- [ ] Paste into a `.md` being written: `![](name.assets/…)` and, with Add link, a Markdown link after it.
+- [ ] A big area at a high zoom (a whole A3 poster at 400 %): it takes a moment at most, the UI does not freeze, the
+      picture is about 4 megapixels.
+- [ ] Windows, Android: the picture reaches other apps through the system clipboard (Android: paste into a messenger).

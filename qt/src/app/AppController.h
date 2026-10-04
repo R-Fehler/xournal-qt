@@ -19,6 +19,7 @@
 #include <QJSValue>
 #include <QMetaObject>
 #include <QFileSystemWatcher>
+#include <QImage>
 #include <QObject>
 #include <QPointer>
 #include <QQuickTextDocument>
@@ -34,6 +35,7 @@
 #include <memory>
 #include <vector>
 
+#include "control/ToolEnums.h"
 #include "filesystem.h"
 
 class QQuickTextDocument;
@@ -253,6 +255,9 @@ class AppController: public QObject {
     /// not for elements inside a note); while it is on (selectingMore), a tap adds a note or an element to the selection
     /// or takes it away. selectedCount: notes and elements selected.
     Q_PROPERTY(bool selectMoreOffered READ selectMoreOffered NOTIFY selectMoreChanged)
+    /// The snip tool (qt/docs/snip.md) is armed: "rect" or "lasso" ("": not). The next rectangle or lasso dragged on a
+    /// page copies its picture to the clipboard, then the tool used before comes back.
+    Q_PROPERTY(QString snip READ snipShape NOTIFY snipChanged)
     Q_PROPERTY(bool selectMoreAvailable READ selectMoreAvailable NOTIFY selectMoreChanged)
     Q_PROPERTY(bool selectingMore READ selectingMore WRITE setSelectingMore NOTIFY selectMoreChanged)
     Q_PROPERTY(int selectedCount READ selectedCount NOTIFY selectMoreChanged)
@@ -1101,6 +1106,13 @@ public:
     // --- tools (shared by all tabs) ---
     /// "pen", "highlighter", "eraser", "hand"
     Q_INVOKABLE void selectTool(const QString& tool);
+    /// The snip tool ("rect", "lasso"): one snip, then the tool in hand now comes back (also on any tool chosen, or
+    /// cancelSnip). The picture goes to the clipboard with where it came from (AppSnip.cpp); "Copied picture" says so.
+    Q_INVOKABLE void startSnip(const QString& shape);
+    Q_INVOKABLE void cancelSnip();
+    QString snipShape() const;
+    /// The link offered for a pasted snip (snipLinkOffered): a link to its source page next to the picture
+    Q_INVOKABLE bool addSnipLink();
     /// Put the setsquare ("setsquare") or the compass ("compass") on the page, or take it away again.
     Q_INVOKABLE void toggleGeometryTool(const QString& which);
     /// For the screenshot hook (it calls methods without arguments)
@@ -1308,6 +1320,9 @@ Q_SIGNALS:
     void selectionChanged();
     /// Select more became available or not, was switched on or off, or what is selected changed (its count)
     void selectMoreChanged();
+    void snipChanged();
+    /// A snip from a document with a file was pasted: the window offers to add a link to its page (addSnipLink)
+    void snipLinkOffered(const QString& title);
     void fontChanged();
     void navigationChanged();
     void pdfTextModeChanged();
@@ -1438,6 +1453,16 @@ private:
     std::vector<QJSValue> whenAllSavedCalls;
     /// The text tool of the current tab makes Markdown text or not (textMarkdown, markdownFontSize).
     void applyMarkdownText();
+    // --- the snip tool (AppSnip.cpp) ---
+    /// A view of `s` drew a snip's picture: onto the clipboard, the tool used before back
+    void snipped(xqt::DocumentSession& s, const QImage& image, int page, const QRectF& area);
+    /// The snip ends: disarmed, and (`restore`) the tool used before back
+    void endSnip(bool restore);
+    /// Follow the snip tool: armed, the tool changing to another one ends it
+    void followSnipTool();
+    QString snipPreviousTool;           ///< the tool before the snip ("": none)
+    ToolType snipTool = TOOL_NONE;      ///< the select tool the snip uses
+    QPointer<xqt::CanvasView> snipLinkView;  ///< the view a snip with a link was pasted into
     /// Editing beside the page: the page's text, or the text box at a point.
     QString startMarkdown(int page, std::optional<QPointF> at);
     /// After a change of the Markdown being edited: its pages and how far it goes below one.

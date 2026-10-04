@@ -34,3 +34,5 @@ rounded hole: the spotlight) are drawn in the same style.
 
 `xqt-rotate-left` and `xqt-rotate-right` are Lucide's `rotate-ccw-square` and `rotate-cw-square`: turning pages
 (qt/docs/page-rotation.md).
+
+`xqt-snip` is Lucide's `scissors`: the snip tool (copy the picture of a part of a page, qt/docs/snip.md).

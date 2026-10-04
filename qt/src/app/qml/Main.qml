@@ -1508,8 +1508,39 @@ ApplicationWindow {
             property bool offered: !win.textDoc
             iconName: "xopp-tool-image"
             label: qsTr("Image")
-            tip: qsTr("Insert an image")
+            tip: qsTr("Insert an image (hold: snip a picture from a page)")
+            ownHold: true
             onClicked: imageDialog.open()
+            onPressAndHold: Popups.openAt(imageMenu)
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
+                onTapped: function(point) { Popups.openAt(imageMenu, point.position) }
+            }
+            // A picture file, or a snip: the picture of a rectangle or lasso on any page (qt/docs/snip.md), to paste
+            AdaptiveMenu {
+                id: imageMenu
+                objectName: "imageMenu"
+                title: qsTr("Image")
+                AdaptiveMenuItem {
+                    objectName: "imageFromFileItem"
+                    text: qsTr("Insert a picture file…")
+                    icon.source: app.iconUrl("xopp-tool-image")
+                    onTriggered: imageDialog.open()
+                }
+                AdaptiveMenuItem {
+                    objectName: "snipItem"
+                    text: qsTr("Snip from a page (copy a picture)")
+                    icon.source: app.iconUrl("xqt-snip")
+                    onTriggered: app.startSnip("rect")
+                }
+                AdaptiveMenuItem {
+                    objectName: "snipLassoItem"
+                    text: qsTr("Snip with the lasso")
+                    icon.source: app.iconUrl("xqt-snip")
+                    onTriggered: app.startSnip("lasso")
+                }
+            }
         }
         IconButton {
             id: addPageTool
@@ -3713,6 +3744,11 @@ ApplicationWindow {
     Connections {
         target: app
         function onPageActionDone(text, undoable) { snackbar.show(text, undoable) }
+        // A snip pasted from a document with a file (qt/docs/snip.md): a link to its page, if wanted
+        function onSnipLinkOffered(title) {
+            snackbar.show(qsTr("Add a link to the source page (%1)?").arg(title), false, qsTr("Add link"),
+                          function() { app.addSnipLink() })
+        }
     }
     Connections {
         target: app
@@ -4142,12 +4178,15 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("toolText"); enabled: toolKeys; onActivated: win.takeTextBox() }  // (a Markdown text box)
     Shortcut { sequences: win.keysOf("toolSelect"); enabled: toolKeys; onActivated: app.selectTool("selectRect") }
     Shortcut { sequences: win.keysOf("toolLasso"); enabled: toolKeys; onActivated: app.selectTool("selectRegion") }
+    Shortcut { sequences: win.keysOf("snip"); enabled: toolKeys; onActivated: app.startSnip("rect") }
+    Shortcut { sequences: win.keysOf("snipLasso"); enabled: toolKeys; onActivated: app.startSnip("lasso") }
     Shortcut { sequences: win.keysOf("toolHand"); enabled: toolKeys; onActivated: app.selectTool("hand") }
     Shortcut { sequences: win.keysOf("insertImage"); enabled: toolKeys; onActivated: imageDialog.open() }
     // The curtain: out or away again (whatever is out); Esc hides its handles first
     Shortcut { sequences: win.keysOf("curtain"); enabled: toolKeys && !win.textDoc; onActivated: app.toggleCurtain(app.curtain !== "" ? "" : "curtain") }
     Shortcut { sequences: win.keysOf("spotlight"); enabled: toolKeys && !win.textDoc; onActivated: app.toggleCurtain("spotlight") }
     Shortcut { sequence: "Escape"; enabled: docKeys && app.curtainHandles; onActivated: app.curtainHandles = false }
+    Shortcut { sequence: "Escape"; enabled: app.snip !== "" && !app.curtainHandles; onActivated: app.cancelSnip() }
     Shortcut { sequences: win.keysOf("redo"); enabled: docKeys; onActivated: app.redo() }
     // (the reference, while it has the keys and is written in)
     Shortcut { sequences: win.keysOf("save"); enabled: docKeys; onActivated: if (!app.saveReferenceInHand()) saveOrAsk(null) }
