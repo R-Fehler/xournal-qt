@@ -166,6 +166,11 @@ private:
     QSGGeometry geometry;
 };
 
+/// A point on the nearest whole device pixel
+QPointF snapPoint(QPointF p, double dpr) {
+    return QPointF(std::round(p.x() * dpr) / dpr, std::round(p.y() * dpr) / dpr);
+}
+
 /// The setsquare or compass over its page: pictures of it under transforms (see GeometryToolPicture). Moving, turning
 /// and sizing it change the transforms; the pictures are drawn anew only for a new size or zoom, once that is stable.
 class GeometryNode final: public QSGTransformNode {
@@ -316,10 +321,18 @@ public:
             clip->removeChildNode(knob);
         }
     }
-    /// The knob that turns it: a white disc in a ring (a picture of its own, made once)
+    /// The knob that turns it: a white disc in a ring (a picture of its own, made once for each pixel ratio), on
+    /// whole device pixels
     void showKnob(QQuickWindow* window, QPointF at, double dpr) {
+        const int size = static_cast<int>(std::ceil(KNOB * dpr));
+        if (knob && knobDpr != dpr) {
+            if (knob->parent()) {
+                clip->removeChildNode(knob);
+            }
+            delete knob;
+            knob = nullptr;
+        }
         if (!knob) {
-            const int size = static_cast<int>(std::ceil(KNOB * std::max(1.0, dpr)));
             QImage image(size, size, QImage::Format_ARGB32_Premultiplied);
             image.fill(Qt::transparent);
             QPainter painter(&image);
@@ -332,8 +345,10 @@ public:
             knob = new TileNode;
             knob->setFiltering(QSGTexture::Linear);
             knob->setTexture(window->createTextureFromImage(image));
+            knobDpr = dpr;
         }
-        knob->setRect(QRectF(at - QPointF(KNOB / 2, KNOB / 2), QSizeF(KNOB, KNOB)));
+        const double side = size / dpr;
+        knob->setRect(QRectF(snapPoint(at - QPointF(side / 2, side / 2), dpr), QSizeF(side, side)));
         if (!knob->parent()) {
             clip->appendChildNode(knob);
         }
@@ -360,6 +375,7 @@ public:
     std::array<QSGSimpleRectNode*, HANDLES> frames{};
     std::array<QSGSimpleRectNode*, HANDLES> fills{};
     TileNode* knob = nullptr;
+    double knobDpr = 0;  ///< the pixel ratio its picture was made for
 };
 
 // Containers are (identity) transform nodes, not plain QSGNodes: Qt Quick's software backend re-resolves a changed
@@ -1623,9 +1639,12 @@ void DocumentCanvasItem::updateCurtainNode(QSGNode* rootNode, double zoom, doubl
             c->showKnob(window(), at, dpr);
             knob = true;
         } else if (square < CurtainNode::HANDLES) {
-            const double h = CurtainNode::HANDLE;
-            c->frames[square]->setRect(QRectF(at - QPointF(h / 2, h / 2), QSizeF(h, h)));
-            c->fills[square]->setRect(QRectF(at - QPointF(h / 2 - 2, h / 2 - 2), QSizeF(h - 4, h - 4)));
+            // Whole device pixels (at 125 % or 150 % a frame of 2 logical pixels was 2 or 3 pixels thick by side)
+            const double h = std::round(CurtainNode::HANDLE * dpr) / dpr;
+            const double frame = std::max(1.0, std::round(2 * dpr)) / dpr;
+            const QPointF corner = snapPoint(at - QPointF(h / 2, h / 2), dpr);
+            c->frames[square]->setRect(QRectF(corner, QSizeF(h, h)));
+            c->fills[square]->setRect(QRectF(corner + QPointF(frame, frame), QSizeF(h - 2 * frame, h - 2 * frame)));
             ++square;
         }
     }
@@ -1641,6 +1660,14 @@ void DocumentCanvasItem::updateCurtainNode(QSGNode* rootNode, double zoom, doubl
     curtainStats.sheet = QRectF(QPointF(-size.width() / 2, -size.height() / 2), size);
     curtainStats.spotlight = spotlight;
     curtainStats.handles = static_cast<int>(handles.size());
+    curtainStats.handleFrames.clear();
+    curtainStats.handleFills.clear();
+    for (int i = 0; i < square; ++i) {
+        curtainStats.handleFrames.push_back(c->frames[i]->rect());
+        curtainStats.handleFills.push_back(c->fills[i]->rect());
+    }
+    curtainStats.knob = knob ? c->knob->rect() : QRectF();
+    curtainStats.knobPixels = knob ? c->knob->texture()->textureSize() : QSize();
 }
 
 void DocumentCanvasItem::updateSearchHits(QSGNode* pageNode, size_t pageIndex, double scale) {

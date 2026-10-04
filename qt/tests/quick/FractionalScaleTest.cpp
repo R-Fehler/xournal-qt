@@ -6,6 +6,7 @@
  * @license GNU GPLv2 or later
  */
 #include <cmath>
+#include <functional>
 #include <memory>
 
 #include <QCoreApplication>
@@ -16,6 +17,8 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <gtest/gtest.h>
+#include <private/qhighdpiscaling_p.h>
+#include <qpa/qwindowsysteminterface.h>
 
 #include "control/tools/EditSelection.h"
 #include "model/Document.h"
@@ -29,6 +32,7 @@
 
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "CurtainLayer.h"
 #include "DevicePixels.h"
 #include "DocumentCanvasItem.h"
 
@@ -46,7 +50,13 @@ ApplicationWindow {
 }
 )";
 
-bool whole(double devicePixels) { return std::abs(devicePixels - std::round(devicePixels)) < 1e-6; }
+bool whole(double devicePixels) {
+    return std::abs(devicePixels - std::round(devicePixels)) < 1e-3;
+}  // (scene graph rects are floats)
+/// Its corners on whole device pixels
+bool onDevicePixels(QRectF r, double dpr) {
+    return whole(r.left() * dpr) && whole(r.top() * dpr) && whole(r.right() * dpr) && whole(r.bottom() * dpr);
+}
 
 class FractionalScaleCanvas: public ::testing::Test {
 protected:
@@ -169,4 +179,71 @@ TEST_F(FractionalScaleCanvas, theSelectionIsDrawnOnWholeDevicePixels) {
     const QPointF at = canvas->mapToScene(shown.rect.topLeft());
     EXPECT_TRUE(whole(at.x() * dpr) && whole(at.y() * dpr))
             << "at " << at.x() * dpr << ", " << at.y() * dpr << " device pixels";
+}
+
+// The curtain's handles (squares with a white inside) and its knob have whole device pixels: the squares' frames
+// are equally thick on all sides and the knob is not blurred, wherever the curtain is moved.
+TEST_F(FractionalScaleCanvas, theCurtainsHandlesAndKnobLieOnWholeDevicePixels) {
+    zoomToAnOddPlace();
+    CurtainLayer& curtain = view->curtain();
+    curtain.show(CurtainLayer::Shape::Curtain);
+    curtain.place(QPointF(300.37, 300.21), QSizeF(200.3, 120.7), 0);
+    curtain.setHandlesShown(true);
+    canvas->update();
+    settle(200);
+    const auto shown = canvas->curtainShown();
+    ASSERT_TRUE(shown.shown);
+    ASSERT_FALSE(shown.handleFrames.empty());
+    for (size_t i = 0; i < shown.handleFrames.size(); ++i) {
+        EXPECT_TRUE(onDevicePixels(shown.handleFrames[i], dpr))
+                << "handle " << i << " at " << shown.handleFrames[i].x() * dpr;
+        EXPECT_TRUE(onDevicePixels(shown.handleFills[i], dpr)) << "its inside";
+    }
+    ASSERT_FALSE(shown.knob.isEmpty());
+    EXPECT_TRUE(onDevicePixels(shown.knob, dpr)) << "the knob at " << shown.knob.x() * dpr;
+    EXPECT_NEAR(shown.knobPixels.width(), shown.knob.width() * dpr, 1e-6) << "one pixel of it for each of the screen";
+}
+
+// The window moves to a screen of another scale (Windows and Plasma with two monitors, a projector): the page, the
+// selection and the curtain's knob are drawn anew for its pixels. (The knob was made once, for the first screen.)
+TEST_F(FractionalScaleCanvas, aScreenOfAnotherScaleGetsPicturesForItsPixels) {
+    addStroke(QPointF(120, 140), QPointF(260, 210));
+    settle(100);
+    view->selectAllOnPage();
+    CurtainLayer& curtain = view->curtain();
+    curtain.show(CurtainLayer::Shape::Curtain);
+    curtain.place(QPointF(300, 450), QSizeF(200, 120), 0);
+    curtain.setHandlesShown(true);
+    canvas->update();
+    settle(200);
+    ASSERT_TRUE(canvas->selectionShown().shown);
+    ASSERT_FALSE(canvas->curtainShown().knob.isEmpty());
+
+#if QT_VERSION < QT_VERSION_CHECK(6, 6, 0)
+    GTEST_SKIP() << "Qt 6.6 tells windows about a new pixel ratio";
+#else
+    // As when the window goes to a screen at 175 % of this one (what the platform tells Qt then)
+    const auto rescale = [&](double factor) {
+        QHighDpiScaling::setScreenFactor(window->screen(), factor);
+        QWindowSystemInterface::handleWindowDevicePixelRatioChanged(window);
+        QWindowSystemInterface::flushWindowSystemEvents();
+    };
+    rescale(1.75);
+    struct Restore {
+        std::function<void(double)> rescale;
+        ~Restore() { rescale(1.0); }
+    } restore{rescale};
+    const double now = window->effectiveDevicePixelRatio();
+    ASSERT_NEAR(now, dpr * 1.75, 1e-9) << "the window got the new pixel ratio";
+    canvas->update();
+    settle(400);
+    const auto info = view->getPage(0)->bufferInfo();
+    EXPECT_TRUE(info.valid);
+    EXPECT_DOUBLE_EQ(info.dpiScale, now) << "the page is drawn for it";
+    const auto selection = canvas->selectionShown();
+    EXPECT_DOUBLE_EQ(selection.dpr, now) << "the selection";
+    EXPECT_NEAR(selection.pixels.width(), selection.rect.width() * now, 1e-6);
+    const auto shown = canvas->curtainShown();
+    EXPECT_NEAR(shown.knobPixels.width(), shown.knob.width() * now, 1e-6) << "the curtain's knob";
+#endif
 }

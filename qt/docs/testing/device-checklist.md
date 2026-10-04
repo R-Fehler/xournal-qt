@@ -2629,3 +2629,6 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
       and the frame sits exactly around the ink; moving and turning the selection keeps it crisp.
 - [ ] Windows (or Plasma with two screens of different scales): with a selection on the page, move the window from a
       100 % screen to a 150 % one: the selection is drawn anew for that screen (crisp), as are the pages.
+- [ ] Curtain (B) at 125 % and 150 %: its square handles have frames equally thick on all four sides, wherever it is
+      moved; the round knob above it is crisp. Move the window to a screen of another scale (Windows, two monitors):
+      the knob is still crisp there (it was drawn once, for the first screen).

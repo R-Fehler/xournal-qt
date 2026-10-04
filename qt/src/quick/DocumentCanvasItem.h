@@ -21,6 +21,7 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <vector>
 
 #include <QCursor>
 #include <QMatrix4x4>
@@ -157,6 +158,10 @@ public:
         QRectF sheet;  ///< (the spotlight: its hole)
         bool spotlight = false;
         int handles = 0;
+        std::vector<QRectF> handleFrames;  ///< the square handles (item coordinates)
+        std::vector<QRectF> handleFills;   ///< ... their white inside
+        QRectF knob;                       ///< the knob that turns it (item coordinates; empty: none)
+        QSize knobPixels;                  ///< its picture's pixels
     };
     CurtainShown curtainShown() const { return curtainStats; }
     /// The selection's picture in the last frame (tests): shown or not, where (item coordinates), its pixels and the
