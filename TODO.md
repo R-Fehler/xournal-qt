@@ -509,11 +509,12 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   canvas's pixels (ink and background, at a good resolution) to the clipboard as an image. In the selection tools'
   cycle and in the insert image entry. Pasting it into a xournal-qt document offers to add a link to the source
   page next to it (`qt/links`).
-- [ ] `qt/onboarding`: a short intro on the first start (what the document modes mean, that PDFs are editable here,
+- [x] `qt/onboarding`: a short intro on the first start (what the document modes mean, that PDFs are editable here,
   Markdown documents and turning them into PDFs to write on), ending in the existing document mode choice;
   reachable again from Settings / Help. A **tutorial document** that asks the user to try the tools, modes, search
   and menus, written in Markdown with marked placeholders for the author's ink and screenshots, opened from Help (a
-  copy, so it can be written on).
+  copy, so it can be written on). Built (qt/docs/onboarding.md); left: the author's screenshots and ink in place of
+  the `PLACEHOLDER` quotes of `qt/resources/help/tutorial.md`, and the device checks.
 
 **Designs first (a proposal goes to the author before anything is built)**
 - [?] `qt/toolbox`: user-defined tools as the tool bar (Drawboard-like), the default mode: each entry is a tool

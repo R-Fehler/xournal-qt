@@ -22,7 +22,9 @@
 
 #include <QElapsedTimer>
 #include <iostream>
+#include <QDateTime>
 #include <QFile>
+#include <QRegularExpression>
 #include <QFileInfo>
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
@@ -7886,24 +7888,151 @@ protected:
         MainWindowTest::SetUp();
     }
     void TearDown() override {
-        forget();
+        if (!restarting) {
+            forget();  // (a restart keeps what was stored)
+        }
         MainWindowTest::TearDown();
         qputenv("XQT_DOCUMENT_MODE", before);
     }
     void prepareController() override {
-        forget();  // (also an install that had the app before the question: nothing stored)
+        if (!restarting) {
+            forget();  // (also an install that had the app before the question: nothing stored)
+        }
         controller->newDocument();
     }
-    void forget() { xqt::DocumentMode::store(*controller->context().getSettings(), xqt::DocumentMode::Mode::Unset); }
+    void forget() {
+        xqt::DocumentMode::store(*controller->context().getSettings(), xqt::DocumentMode::Mode::Unset);
+        controller->setIntroSeen(false);
+    }
     xqt::DocumentMode::Mode stored() const { return xqt::DocumentMode::stored(*controller->context().getSettings()); }
+    /// The item named `name` inside `root` (an instance of a component that is also used elsewhere in the window)
+    static QQuickItem* inside(QQuickItem* root, const char* name) {
+        if (!root) {
+            return nullptr;
+        }
+        for (QQuickItem* c: root->childItems()) {
+            if (c->objectName() == name) {
+                return c;
+            }
+            if (QQuickItem* f = inside(c, name)) {
+                return f;
+            }
+        }
+        return nullptr;
+    }
     QByteArray before;
+};
+/// The introduction was shown already (or skipped by an older build), but no way to keep documents was chosen: the
+/// question comes alone.
+class ModeQuestionTest: public FirstStartTest {
+protected:
+    void prepareController() override {
+        FirstStartTest::prepareController();
+        controller->setIntroSeen(true);
+    }
 };
 }  // namespace
 
+// The first start shows the introduction (qt/docs/onboarding.md): pages stepped through with Next (or swiped), Skip
+// on every page but the last, and the last page is the question how to keep documents, with the recommendation
+// chosen. Nothing but Continue closes it; then the choice is stored, and the next start shows neither the
+// introduction nor the question.
+TEST_F(FirstStartTest, theIntroductionComesFirstAndEndsInTheChoice) {
+    QObject* intro = find("introDialog");
+    ASSERT_NE(intro, nullptr);
+    ASSERT_TRUE(waitOpened(intro, true)) << "shown at the first start";
+    EXPECT_TRUE(controller->askIntro());
+    EXPECT_FALSE(find("documentModeDialog")->property("visible").toBool()) << "the question is its last page";
+    auto* pages = findItem("introPages");
+    auto* skip = findItem("introSkip");
+    auto* back = findItem("introBack");
+    auto* next = findItem("introNext");
+    ASSERT_NE(pages, nullptr);
+    ASSERT_NE(skip, nullptr);
+    ASSERT_NE(next, nullptr);
+    const int last = pages->property("count").toInt() - 1;
+    EXPECT_GE(last, 3) << "a few pages before the choice";
+    EXPECT_LE(last, 5) << "a short introduction";
+    EXPECT_EQ(pages->property("currentIndex").toInt(), 0);
+    EXPECT_EQ(intro->property("title").toString(), "Write on notes and PDFs");
+    EXPECT_TRUE(skip->isVisible());
+    EXPECT_FALSE(back->isVisible()) << "nothing before the first page";
+    EXPECT_EQ(next->property("text").toString(), "Next");
+
+    key(Qt::Key_Escape);
+    wait(100);
+    EXPECT_TRUE(intro->property("visible").toBool()) << "the way to keep documents has to be chosen";
+    click(next);
+    until([&] { return pages->property("currentIndex").toInt() == 1; });
+    EXPECT_EQ(pages->property("currentIndex").toInt(), 1);
+    EXPECT_EQ(intro->property("title").toString(), "Markdown: text that stays text");
+    EXPECT_TRUE(skip->isVisible()) << "Skip on every page";
+    EXPECT_TRUE(back->isVisible());
+    click(back);
+    until([&] { return pages->property("currentIndex").toInt() == 0; });
+    EXPECT_EQ(pages->property("currentIndex").toInt(), 0);
+    click(skip);
+    until([&] { return pages->property("currentIndex").toInt() == last; });
+    ASSERT_EQ(pages->property("currentIndex").toInt(), last) << "Skip goes to the choice at the first start";
+    EXPECT_TRUE(intro->property("visible").toBool());
+    EXPECT_EQ(intro->property("title").toString(), "How do you want to keep your documents?");
+    EXPECT_FALSE(skip->isVisible());
+    EXPECT_EQ(next->property("text").toString(), "Continue");
+
+    // The cards of the first-start question, the recommendation chosen
+    auto* cards = findItem("introModeCards");
+    QQuickItem* pdf = inside(cards, "documentModePdfCard");
+    QQuickItem* xopp = inside(cards, "documentModeXoppCard");
+    ASSERT_NE(pdf, nullptr);
+    ASSERT_NE(xopp, nullptr);
+    EXPECT_EQ(pdf->property("badge").toString(), "Recommended for most people");
+    EXPECT_TRUE(pdf->property("chosen").toBool()) << "the recommendation, to start with";
+    until([&] { return QRectF(0, 0, window->width(), window->height()).contains(xopp->mapToScene(QPointF(1, 1))); });
+    wait(300);  // (the swipe settled)
+    click(xopp);
+    EXPECT_TRUE(xopp->property("chosen").toBool());
+    EXPECT_FALSE(pdf->property("chosen").toBool());
+    EXPECT_EQ(stored(), xqt::DocumentMode::Mode::Unset) << "stored on Continue";
+    EXPECT_FALSE(controller->introSeen());
+    click(next);
+    ASSERT_TRUE(waitOpened(intro, false));
+    EXPECT_EQ(stored(), xqt::DocumentMode::Mode::Xopp);
+    EXPECT_EQ(controller->documentMode(), "xopp");
+    EXPECT_TRUE(controller->introSeen());
+    EXPECT_FALSE(controller->askIntro());
+    EXPECT_FALSE(controller->askDocumentMode()) << "the question was answered by the introduction";
+    EXPECT_FALSE(find("documentModeDialog")->property("visible").toBool());
+
+    // The second start: neither the introduction nor the question
+    restart();
+    wait(300);
+    EXPECT_FALSE(find("introDialog")->property("visible").toBool()) << "shown once";
+    EXPECT_FALSE(find("documentModeDialog")->property("visible").toBool());
+    EXPECT_EQ(stored(), xqt::DocumentMode::Mode::Xopp);
+}
+
+// Continue on the last page without a card tapped takes the recommendation (PDF files), as the question did.
+TEST_F(FirstStartTest, theIntroductionTakesTheRecommendation) {
+    QObject* intro = find("introDialog");
+    ASSERT_TRUE(waitOpened(intro, true));
+    auto* pages = findItem("introPages");
+    const int last = pages->property("count").toInt() - 1;
+    for (int i = 0; i < last; ++i) {
+        click(findItem("introNext"));
+        until([&] { return pages->property("currentIndex").toInt() == i + 1; });
+    }
+    ASSERT_EQ(pages->property("currentIndex").toInt(), last);
+    click(findItem("introNext"));
+    ASSERT_TRUE(waitOpened(intro, false));
+    EXPECT_EQ(stored(), xqt::DocumentMode::Mode::Pdf);
+    EXPECT_TRUE(controller->pdfOnly());
+    EXPECT_TRUE(controller->introSeen());
+}
+
 // The first start asks how to keep documents: two cards (PDF files, Xournal++ files) with what each means, the
 // recommendation chosen to start with and marked, and a line that it can be changed later. Only "Continue" closes it;
-// then the choice is stored and not asked again.
-TEST_F(FirstStartTest, asksOnceHowToKeepDocuments) {
+// then the choice is stored and not asked again. (Alone when the introduction was shown already.)
+TEST_F(ModeQuestionTest, asksOnceHowToKeepDocuments) {
     QObject* dialog = find("documentModeDialog");
     ASSERT_NE(dialog, nullptr);
     ASSERT_TRUE(waitOpened(dialog, true)) << "asked at the first start";
@@ -7936,7 +8065,7 @@ TEST_F(FirstStartTest, asksOnceHowToKeepDocuments) {
     EXPECT_EQ(controller->documentMode(), "xopp");
 }
 
-TEST_F(FirstStartTest, continuingTakesTheRecommendation) {
+TEST_F(ModeQuestionTest, continuingTakesTheRecommendation) {
     QObject* dialog = find("documentModeDialog");
     ASSERT_TRUE(waitOpened(dialog, true));
     click(findItem("documentModeContinue"));
@@ -7987,6 +8116,163 @@ TEST_F(MainWindowTest, settingsChangeTheDocumentMode) {
     key(Qt::Key_Escape);
     ASSERT_TRUE(waitOpened(sheet, false));
     xqt::DocumentMode::store(s, xqt::DocumentMode::Mode::Unset);  // (the tests share the config folder)
+}
+
+// The introduction again, from Help (qt/docs/onboarding.md): ⋮ → Help → Introduction and Settings → Help. Not the first
+// start: Skip and Esc close it, and its last page shows the way documents are kept now; Done stores another one.
+TEST_F(MainWindowTest, theIntroductionIsInHelp) {
+    Settings& s = *controller->context().getSettings();
+    struct Restore {  // (the tests share the config folder)
+        Settings& s;
+        AppController& c;
+        ~Restore() {
+            xqt::DocumentMode::store(s, xqt::DocumentMode::Mode::Unset);
+            c.setIntroSeen(false);
+        }
+    } restore{s, *controller};
+    QObject* intro = find("introDialog");
+    ASSERT_NE(intro, nullptr);
+    EXPECT_FALSE(intro->property("visible").toBool()) << "not at the start when the way is chosen (the tests')";
+    EXPECT_FALSE(controller->askIntro());
+
+    // ⋮ → Help → Introduction
+    QQuickItem* entry = openMoreMenuAt("helpIntroItem");
+    ASSERT_NE(entry, nullptr);
+    EXPECT_NE(find<QQuickItem>("helpShortcutsItem"), nullptr) << "the keyboard shortcuts beside it";
+    click(entry);
+    ASSERT_TRUE(waitOpened(intro, true));
+    EXPECT_FALSE(intro->property("firstStart").toBool());
+    auto* pages = findItem("introPages");
+    EXPECT_EQ(pages->property("currentIndex").toInt(), 0);
+    click(findItem("introSkip"));
+    ASSERT_TRUE(waitOpened(intro, false)) << "Skip closes it";
+    EXPECT_TRUE(controller->introSeen());
+    EXPECT_EQ(xqt::DocumentMode::stored(s), xqt::DocumentMode::Mode::Unset) << "nothing chosen by skipping";
+
+    // Settings → Help → Show the introduction: the sheet closes, the introduction opens
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("helpTab"));
+    auto* show = findItem("showIntroButton");
+    ASSERT_NE(show, nullptr);
+    until([&] { return show->isVisible(); });
+    click(show);
+    ASSERT_TRUE(waitOpened(sheet, false));
+    ASSERT_TRUE(waitOpened(intro, true));
+    EXPECT_EQ(pages->property("currentIndex").toInt(), 0);
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(intro, false)) << "Esc closes it";
+
+    // Its last page: the way documents are kept now (the tests': Xournal++ files); Done stores another one
+    QMetaObject::invokeMethod(intro, "show");
+    ASSERT_TRUE(waitOpened(intro, true));
+    const int last = pages->property("count").toInt() - 1;
+    for (int i = 0; i < last; ++i) {
+        click(findItem("introNext"));
+        until([&] { return pages->property("currentIndex").toInt() == i + 1; });
+    }
+    ASSERT_EQ(pages->property("currentIndex").toInt(), last);
+    EXPECT_EQ(findItem("introNext")->property("text").toString(), "Done");
+    auto* cards = findItem("introModeCards");
+    ASSERT_NE(cards, nullptr);
+    EXPECT_EQ(cards->property("mode").toString(), "xopp");
+    cards->setProperty("mode", "pdf");  // (a tapped card; tapping is tested at the first start)
+    click(findItem("introNext"));
+    ASSERT_TRUE(waitOpened(intro, false));
+    EXPECT_EQ(xqt::DocumentMode::stored(s), xqt::DocumentMode::Mode::Pdf);
+}
+
+// The tutorial (qt/docs/onboarding.md): Markdown in the resources, with sections that ask the user to do something and
+// marked placeholders for the author's ink and screenshots. Help → Tutorial opens a copy to write on: a PDF text
+// document in the app's data folder (not in the library), the same file the next time, a fresh one on "start again".
+TEST_F(MainWindowTest, theTutorialOpensAsACopy) {
+    QFile resource(AppController::tutorialResource());
+    ASSERT_TRUE(resource.open(QIODevice::ReadOnly)) << "compiled into the program";
+    const QString text = QString::fromUtf8(resource.readAll());
+    EXPECT_TRUE(text.startsWith("# Tutorial"));
+    EXPECT_GE(text.count(QRegularExpression("^## ", QRegularExpression::MultilineOption)), 10) << "short sections";
+    EXPECT_TRUE(text.contains("> **PLACEHOLDER · INK:**"));
+    EXPECT_TRUE(text.contains("> **PLACEHOLDER · SCREENSHOT:**"));
+
+    const QString file = controller->tutorialFile();
+    const QString data = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    ASSERT_FALSE(data.isEmpty());
+    EXPECT_TRUE(file.startsWith(data)) << "in the app's data folder: " << file.toStdString();
+    if (const QString library = controller->libraryModel()->property("rootPath").toString(); !library.isEmpty()) {
+        EXPECT_FALSE(file.startsWith(library)) << "not in the library";
+    }
+    QFile::remove(file);
+    struct Remove {  // (the tests share the data folder)
+        QString f;
+        ~Remove() { QFile::remove(f); }
+    } remove{file};
+    EXPECT_FALSE(controller->tutorialExists());
+
+    // Help → Tutorial: the copy is made, saved and opened, a text document to write on
+    const int tabs = controller->tabManager().count();
+    QQuickItem* entry = openMoreMenuAt("helpTutorialItem");
+    ASSERT_NE(entry, nullptr);
+    EXPECT_EQ(find<QQuickItem>("helpRestartTutorialItem")->property("offered").toBool(), false) << "no copy yet";
+    click(entry);
+    until([&] { return controller->tabManager().count() == tabs + 1 && !controller->anySaving(); }, 20000);
+    ASSERT_EQ(controller->tabManager().count(), tabs + 1);
+    EXPECT_TRUE(controller->tutorialExists());
+    EXPECT_TRUE(QFileInfo(file).isWritable());
+    EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(file.toStdString()))) << "a PDF with notes";
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(QString::fromStdString(s->getFilePath().string()), file);
+    {
+        std::shared_lock lock(*s->getDocument());
+        EXPECT_TRUE(xqt::TextDocument::isTextDocument(*s->getDocument())) << "its text stays editable";
+        EXPECT_GE(s->getDocument()->getPageCount(), 10u) << "a page per section";
+    }
+    EXPECT_TRUE(controller->textNotes());
+    EXPECT_FALSE(controller->modified());
+
+    // Written on and saved: Help → Tutorial switches to it; closed, it opens the same file with what was written
+    drawStroke(*s, 1);
+    EXPECT_TRUE(controller->modified());
+    ASSERT_TRUE(controller->save());
+    until([&] { return !controller->anySaving(); }, 20000);
+    EXPECT_FALSE(controller->modified());
+    const QDateTime saved = QFileInfo(file).lastModified();
+    EXPECT_TRUE(controller->openTutorial());
+    EXPECT_EQ(controller->tabManager().count(), tabs + 1) << "its tab";
+    controller->closeTab(controller->tabManager().currentIndex());
+    ASSERT_EQ(controller->tabManager().count(), tabs);
+    EXPECT_TRUE(controller->openTutorial());  // (in place of the untouched new document: as any document opened)
+    s = controller->tabManager().currentSession();
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(QString::fromStdString(s->getFilePath().string()), file);
+    EXPECT_EQ(QFileInfo(file).lastModified(), saved) << "not made again";
+    auto strokes = [](xqt::DocumentSession& d) {
+        std::shared_lock lock(*d.getDocument());
+        return strokesOn(*d.getDocument(), 1);
+    };
+    EXPECT_EQ(strokes(*s), 1u) << "with what was written on it";
+
+    // Start again: asked first; a fresh copy, without the ink
+    const int open = controller->tabManager().count();
+    QSignalSpy changed(controller.get(), &AppController::tutorialChanged);
+    QSignalSpy messages(controller.get(), &AppController::message);
+    QObject* ask = find("restartTutorialDialog");
+    wait(300);  // (the tool bar laid out for the document opened in place of the other)
+    entry = openMoreMenuAt("helpRestartTutorialItem");
+    ASSERT_NE(entry, nullptr);
+    click(entry);
+    ASSERT_TRUE(waitOpened(ask, true));
+    click(findItem("restartTutorialConfirm"));
+    ASSERT_TRUE(waitOpened(ask, false));
+    until([&] { return changed.count() == 2 && !controller->anySaving(); }, 20000);
+    EXPECT_EQ(controller->tabManager().count(), open) << "the old tab closed, the new one open";
+    EXPECT_EQ(changed.count(), 2) << "removed, made again";
+    EXPECT_TRUE(messages.isEmpty());
+    s = controller->tabManager().currentSession();
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(QString::fromStdString(s->getFilePath().string()), file);
+    EXPECT_EQ(strokes(*s), 0u);
 }
 
 // PDF files mode in the window: Save as starts on "PDF with notes" for a new document; Ctrl+S on an annotated PDF

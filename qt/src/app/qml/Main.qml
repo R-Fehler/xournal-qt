@@ -1091,6 +1091,17 @@ ApplicationWindow {
                             }
                         }
                     }
+                    // Help (qt/docs/onboarding.md): the introduction of the first start, the tutorial, the keyboard
+                    // shortcuts
+                    AdaptiveMenu {
+                        objectName: "moreHelpMenu"
+                        title: qsTr("Help")
+                        iconName: "xqt-help"
+                        AdaptiveMenuItem { objectName: "helpIntroItem"; text: qsTr("Introduction"); icon.source: app.iconUrl("xqt-book-open"); onTriggered: introDialog.show() }
+                        AdaptiveMenuItem { objectName: "helpTutorialItem"; text: qsTr("Tutorial"); icon.source: app.iconUrl("xqt-notebook-pen"); onTriggered: app.openTutorial() }
+                        AdaptiveMenuItem { objectName: "helpRestartTutorialItem"; offered: app.tutorialExists; text: qsTr("Start the tutorial again…"); icon.source: app.iconUrl("xopp-edit-undo"); onTriggered: restartTutorialDialog.open() }
+                        AdaptiveMenuItem { objectName: "helpShortcutsItem"; text: qsTr("Keyboard shortcuts (F1)"); icon.source: app.iconUrl("xqt-keyboard"); onTriggered: shortcutSheet.open() }
+                    }
                 }
             }
             // What does not fit into the bar: its buttons, with their names
@@ -3225,17 +3236,47 @@ ApplicationWindow {
             }
         }
     }
-    // The first start asks which way to keep documents (PDF files or Xournal++ files); then the recovery question;
-    // then (Android) where the libraries are kept
+    // The first start shows the introduction (qt/docs/onboarding.md), which ends in the question which way to keep
+    // documents (PDF files or Xournal++ files); the question alone when the introduction was shown already but no way
+    // was chosen. Then the recovery question; then (Android) where the libraries are kept.
+    function afterFirstStart() {
+        if (app.recoveryItems.length > 0) recoveryDialog.open()
+        else homeView.offerLibrariesHomeAtStart()
+    }
     DocumentModeDialog {
         id: documentModeDialog
-        onChosen: {
-            if (app.recoveryItems.length > 0) recoveryDialog.open()
-            else homeView.offerLibrariesHomeAtStart()
+        onChosen: win.afterFirstStart()
+    }
+    IntroDialog {
+        id: introDialog
+        onChosen: win.afterFirstStart()
+    }
+    // Help → Start the tutorial again: a fresh copy replaces the one written on (qt/docs/onboarding.md)
+    AdaptiveDialog {
+        id: restartTutorialDialog
+        objectName: "restartTutorialDialog"
+        kind: "question"
+        preferredWidth: 480
+        title: qsTr("Start the tutorial again?")
+        Label {
+            width: restartTutorialDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("A fresh copy of the tutorial replaces yours; what you wrote on it is gone. To keep it, save it "
+                       + "somewhere else first (⋮ → Save as…).")
         }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "restartTutorialConfirm"
+                text: qsTr("Start again")
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+            Button { text: qsTr("Cancel"); DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+        }
+        onAccepted: app.restartTutorial()
     }
     Component.onCompleted: {
-        if (app.askDocumentMode()) documentModeDialog.open()
+        if (app.askIntro()) introDialog.openFirstStart()
+        else if (app.askDocumentMode()) documentModeDialog.open()
         else if (app.recoveryItems.length > 0) recoveryDialog.open()
         else homeView.offerLibrariesHomeAtStart()
     }
@@ -3947,6 +3988,9 @@ ApplicationWindow {
         id: settingsPage
         objectName: "settingsPage"
         onQuitRequested: win.closeWindow()  // (asks about unsaved documents first)
+        onIntroRequested: introDialog.show()
+        onTutorialRequested: app.openTutorial()
+        onRestartTutorialRequested: restartTutorialDialog.open()
     }
     TabOverview {
         id: tabOverview
