@@ -18,6 +18,10 @@
  *  - where the characters of a few PDF pages are drawn (layout(): the last pages whose hits were marked), read on
  *    demand before any other work.
  *
+ *  - per page the words recognised in its handwriting (InkText.h), handed in by the handwriting search's indexer
+ *    (hwr/InkTextIndexer.h) when it has read them: setInk(). They are searched with the rules of InkText.h and
+ *    move with their pages; an edited page keeps its words until the indexer hands in new ones.
+ *
  * With setWordsInBackground (the fuzzy search is on), the vocabularies of the PDF text (Vocabulary.h) are made on the
  * same worker once the text is known, so the first fuzzy search does not make them on the UI thread.
  *
@@ -39,6 +43,7 @@
 #include <QString>
 #include <QTimer>
 
+#include "InkText.h"
 #include "TextMatch.h"
 #include "Vocabulary.h"
 
@@ -86,7 +91,9 @@ private:
 /// Where the matches of `terms` (TextMatch.h) are on a page of a document: in its PDF text (`pdf` reads it; may be
 /// null) and in the texts of its text elements, as the search of an open document places them. The caller holds the
 /// document lock (shared).
-std::vector<QRectF> termRects(const XojPage& page, PdfLayoutReader* pdf, const std::vector<textmatch::Term>& terms);
+/// `ink`: the words recognised in its handwriting (InkText.h; may be null), marked as the search marks them.
+std::vector<QRectF> termRects(const XojPage& page, PdfLayoutReader* pdf, const std::vector<textmatch::Term>& terms,
+                              const ink::PageText* ink = nullptr);
 
 /// A piece of text shown by a text element of a page: a plain text whole, a Markdown box per text of its layout.
 struct ElementText {
@@ -163,6 +170,14 @@ public:
     size_t vocabularyBytes() const;
     size_t layoutBytes() const;
 
+    /// The words recognised in a page's handwriting (null: none, or not read yet); textChanged when they changed.
+    void setInk(size_t page, std::shared_ptr<const ink::PageText> ink);
+    const ink::PageText* inkOf(size_t page) const;
+    std::shared_ptr<const ink::PageText> inkShared(size_t page) const;
+    /// Pages with recognised words, and their memory (tests, measurements).
+    size_t inkPages() const;
+    size_t inkBytes() const;
+
     /// The page the reader is at: missing text is read from there outwards.
     void setFocusPage(size_t page);
     /// No search needs it for now: the poppler instance of the worker may go (it is opened again when needed).
@@ -191,6 +206,7 @@ private:
         QString elements;   ///< the texts of its text elements, simplified, joined by '\n'
         bool dirty = true;  ///< read it from the document again
         std::shared_ptr<const words::Vocabulary> words;  ///< of `elements` (null: not made yet)
+        std::shared_ptr<const ink::PageText> ink;        ///< its handwriting's words (null: none known)
     };
     /// The vocabularies of a page's texts (made if needed)
     const words::Vocabulary* elementWords(size_t page);

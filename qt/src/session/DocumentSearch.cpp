@@ -266,8 +266,9 @@ void DocumentSearch::place(size_t page) {
         return;
     }
     std::vector<Place> found;
-    auto add = [&](std::vector<QRectF> rects) {
+    auto add = [&](std::vector<QRectF> rects, bool faint = false) {
         Place p;
+        p.faint = faint;
         if (!rects.empty()) {
             p.rect = rects.front();
             for (size_t i = 1; i < rects.size(); ++i) {
@@ -309,6 +310,11 @@ void DocumentSearch::place(size_t page) {
                                      s.origin[static_cast<size_t>(m.end - 1)] + 1));
                 }
             }
+        }
+    }
+    if (const ink::PageText* ink = index.inkOf(page)) {
+        for (const ink::Hit& h: ink::find(*ink, terms)) {
+            add(ink::rectsOf(*ink, h), h.p < ink::WEAK_P);
         }
     }
     // Reading order on the page (lines in 4 pt bands, then left to right)

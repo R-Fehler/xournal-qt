@@ -5,7 +5,8 @@
 if(XQT_BUILD_TESTS)
     add_executable(xqt-hwr-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/main.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkTextTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkTextTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkSearchTest.cpp)
     target_link_libraries(xqt-hwr-tests PRIVATE xqt-session Qt6::Test GTest::gtest)
     target_include_directories(xqt-hwr-tests PRIVATE "${TEST_CONFIG_DIR}")
     target_compile_definitions(xqt-hwr-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
