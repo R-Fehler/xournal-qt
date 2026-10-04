@@ -38,8 +38,8 @@ public:
 
     // --- placing ------------------------------------------------------------------------------------------------
     /// A new note in the middle of the visible part of the current page, selected (one undo step). The color: the
-    /// last one chosen. Returns false when there is no page.
-    bool insert();
+    /// last one chosen, or `color` (it becomes the last one). Returns false when there is no page.
+    bool insert(std::optional<Color> color = std::nullopt);
 
     // --- the selected note ------------------------------------------------------------------------------------
     bool hasSelection() const { return selected != nullptr; }

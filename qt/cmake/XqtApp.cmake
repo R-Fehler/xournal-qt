@@ -48,6 +48,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SettingsModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ColorPalettes.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ColorPalettes.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ToolboxModel.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ToolboxModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SessionRecovery.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SessionRecovery.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentFiles.h
@@ -118,6 +120,7 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTextFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppSnip.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppToolbox.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppRename.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppBookmarks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppAnnotations.cpp
@@ -313,6 +316,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PagesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SettingsModelTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ColorPalettesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ToolboxModelTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecoveryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ExternalChangesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SyncConflictsTest.cpp

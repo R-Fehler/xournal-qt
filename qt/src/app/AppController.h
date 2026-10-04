@@ -72,6 +72,7 @@ class MarkdownSession;
 class MarkdownEditor;
 class PageClipboard;
 class SettingsModel;
+class ToolboxModel;
 class SessionRecovery;
 class Library;
 class LibraryModel;
@@ -106,6 +107,9 @@ class AppController: public QObject {
     /// The keyboard shortcuts (the same ones in every window)
     Q_PROPERTY(QObject* shortcuts READ shortcutsModel CONSTANT)
     Q_PROPERTY(QObject* settings READ settingsModel CONSTANT)
+    /// The toolbox's tools (qt/docs/toolbox.md): the user's own ordered tools, each a tool with its settings; shared
+    /// by all windows, stored per device (ToolboxModel)
+    Q_PROPERTY(QObject* toolbox READ toolboxObject CONSTANT)
     /// How high the pen is above the screen, for pens that tell it (xqt::PenHover)
     Q_PROPERTY(QObject* penHover READ penHover CONSTANT)
     QObject* penHover() const;
@@ -425,6 +429,25 @@ public:
     /// What a color taken as `ref` ("marker:warnings") becomes in `paletteId` (invalid: that palette has no such
     /// role, the color stays as it is). For tool presets that follow a palette switch (qt/toolbox).
     Q_INVOKABLE QColor followPalette(const QString& ref, const QString& paletteId, bool highlight) const;
+
+    // --- the toolbox (qt/docs/toolbox.md; AppToolbox.cpp) ---
+    QObject* toolboxObject() const;
+    xqt::ToolboxModel* toolboxModel() const { return toolbox; }
+    /// The toolbox's first tools, made from the tool settings of before (the pen's color and width, the eraser's
+    /// kind, the font, the shape last used), as JSON
+    QString migratedToolbox() const;
+    /// Takes the toolbox's entry `id`: its tool with all its settings (color, width, line style, filling, eraser kind,
+    /// font, …), and it becomes the active entry. A sticky note entry puts a note in its color on the page instead.
+    Q_INVOKABLE bool applyToolEntry(const QString& id);
+    /// The tool in hand is this entry's tool (its kind, drawing type and variant)
+    Q_INVOKABLE bool entryInHand(const QVariantMap& entry) const;
+    /// The color an entry draws with now: its role's in the chosen palette, else its own
+    Q_INVOKABLE QColor toolEntryColor(const QVariantMap& entry) const;
+    /// The keys P, H, E, T with the toolbox: its entry of that type used last ("pen", "highlighter", "eraser",
+    /// "text"); without one, the plain tool
+    Q_INVOKABLE void takeToolOfType(const QString& type);
+    /// The toolbox (not the classic tool bar) is in use (setting toolbarMode)
+    bool toolboxMode() const;
     QString toolbarPosition() const;
     bool toolbarHidden() const;
     void setToolbarHidden(bool hidden);
@@ -1132,7 +1155,7 @@ public:
     // --- sticky notes (qt/docs/sticky-notes.md) ---
     /// A new sticky note in the middle of the visible part of the current page, selected so that it can be moved
     /// and resized right away (a select tool is chosen, as for an image). One undo step.
-    Q_INVOKABLE bool insertStickyNote();
+    Q_INVOKABLE bool insertStickyNote(const QColor& color = QColor());
     /// The pastel colors a note can have
     Q_PROPERTY(QVariantList stickyNoteColors READ stickyNoteColors CONSTANT)
     QVariantList stickyNoteColors() const;
@@ -1531,6 +1554,10 @@ private:
     xqt::LibraryBookmarksModel* libraryBookmarks = nullptr;
     std::unique_ptr<xqt::RecentFiles> ownRecent;
     xqt::SettingsModel* settingsView = nullptr;
+    std::unique_ptr<xqt::ToolboxModel> ownToolbox;
+    xqt::ToolboxModel* toolbox = nullptr;  ///< (the main window's, shared)
+    /// The color the last entry taken gave the tool (it follows a palette switch while the tool still has it)
+    QColor appliedEntryColor;
     xqt::LibraryModel* library = nullptr;
     xqt::RecentFiles* recent = nullptr;
     bool home = true;

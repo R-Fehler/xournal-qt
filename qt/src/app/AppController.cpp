@@ -112,6 +112,7 @@
 #include "shell/PagesModel.h"
 #include "shell/SessionRecovery.h"
 #include "shell/SettingsModel.h"
+#include "shell/ToolboxModel.h"
 #include "shell/SystemApps.h"
 #include "shell/ReferenceMode.h"
 #include "shell/Citations.h"
@@ -171,6 +172,26 @@ AppController::AppController(QObject* parent): QObject(parent) {
     });
     ownSettingsView = std::make_unique<SettingsModel>(*app);
     settingsView = ownSettingsView.get();
+    // The toolbox's tools (qt/docs/toolbox.md): stored in the settings; the first time made from the tools of before
+    ownToolbox = std::make_unique<ToolboxModel>(
+            [this] {
+                std::string stored;
+                app->getSettings()->getCustomElement("xournalQt").getString("toolbox", stored);
+                return stored.empty() ? migratedToolbox() : QString::fromStdString(stored);
+            },
+            [this](const QString& json) {
+                app->getSettings()->getCustomElement("xournalQt").setString("toolbox", json.toStdString());
+                app->getSettings()->customSettingsChanged();
+            });
+    toolbox = ownToolbox.get();
+    // A palette chosen: the entry in hand follows with its role's color there
+    connect(this, &AppController::colorPaletteChanged, this, [this] {
+        const QVariantMap e = toolbox->entry(toolbox->active());
+        // (only while the tool still has the color the entry gave it: a color changed since stays)
+        if (toolboxMode() && !e.value("role").toString().isEmpty() && entryInHand(e) && color() == appliedEntryColor) {
+            applyToolEntry(toolbox->active());
+        }
+    });
     ownShortcuts = std::make_unique<ShortcutsModel>(*app->getSettings());
     shortcuts = ownShortcuts.get();
     ownHandwriting = std::make_unique<hwr::HandwritingSearch>(*app);
@@ -252,6 +273,9 @@ AppController::AppController(QObject* parent): QObject(parent) {
     });
     journalFile = SessionRecovery::defaultJournalFile();
     connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, &AppController::applicationStateChanged);
+    if (toolboxMode()) {
+        applyToolEntry(toolbox->active());  // (the tool of the last time, with all its settings)
+    }
 }
 
 // A window of its own: the same settings, tools, library and rendering, but its own documents.
@@ -260,6 +284,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     app = mainWindow.app;
     colors = mainWindow.colors;
     settingsView = mainWindow.settingsView;
+    toolbox = mainWindow.toolbox;
     shortcuts = mainWindow.shortcuts;
     library = mainWindow.library;
     citations = std::make_unique<Citations>(*app->getSettings(), library);
@@ -4263,14 +4288,19 @@ QStringList AppController::fontFamilies() const { return QFontDatabase::families
 
 // --- sticky notes ------------------------------------------------------------------------------------------------
 
-bool AppController::insertStickyNote() {
+bool AppController::insertStickyNote(const QColor& color) {
     if (textPagesFixed() || !canvas() || session()->isReadOnly()) {
         return false;
     }
     if (!isSelectToolType(app->getToolHandler()->getToolType())) {
         selectTool("selectRect");  // so that the note can be moved and resized right away (as an image)
     }
-    return canvas()->notes().insert();
+    std::optional<Color> c;
+    if (color.isValid()) {
+        c = Color(static_cast<uint8_t>(color.red()), static_cast<uint8_t>(color.green()),
+                  static_cast<uint8_t>(color.blue()));
+    }
+    return canvas()->notes().insert(c);
 }
 QVariantList AppController::stickyNoteColors() const {
     QVariantList colors;

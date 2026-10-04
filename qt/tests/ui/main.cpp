@@ -29,6 +29,9 @@ int main(int argc, char* argv[]) {
     qputenv("XQT_DOCUMENT_MODE", "xopp");
     // No hover on the controls: the pointer rests where a test last clicked, and a button that appears under it
     // opened its tool tip 600 ms later, over whatever the test clicked next (a test slowed down by load missed it).
+    // The tools of before (the classic tool bar; qt/docs/toolbox.md): the tests of the toolbox choose it themselves
+    // (setting toolbarMode), the others keep the tool state and the bar they were written for
+    qputenv("XQT_TOOLBAR_MODE", "classic");
     qputenv("QT_QUICK_CONTROLS_HOVER_ENABLED", "0");
     QCoreApplication::setAttribute(Qt::AA_CompressHighFrequencyEvents, false);
     QGuiApplication app(argc, argv);

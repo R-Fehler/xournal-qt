@@ -18,6 +18,9 @@ int main(int argc, char* argv[]) {
     qputenv("XDG_CONFIG_HOME", (home.path() + "/config").toUtf8());
     qputenv("XDG_CACHE_HOME", (home.path() + "/cache").toUtf8());
     qputenv("XQT_RESOURCE_DIR", XQT_BUILD_RESOURCE_DIR);
+    // The tools of before (the classic tool bar; qt/docs/toolbox.md): the tests of the toolbox choose it themselves
+    // (setting toolbarMode), the others keep the tool state and the bar they were written for
+    qputenv("XQT_TOOLBAR_MODE", "classic");
     QGuiApplication app(argc, argv);
     setlocale(LC_NUMERIC, "C");
     xqt::AppContext::installQtUiThreadDispatcher();

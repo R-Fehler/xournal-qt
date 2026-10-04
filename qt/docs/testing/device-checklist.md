@@ -2822,3 +2822,9 @@ letter words only where the recogniser is sure.
 - [ ] A big area at a high zoom (a whole A3 poster at 400 %): it takes a moment at most, the UI does not freeze, the
       picture is about 4 megapixels.
 - [ ] Windows, Android: the picture reaches other apps through the system clipboard (Android: paste into a messenger).
+
+## The toolbox (qt/toolbox)
+
+- [ ] First start after the update: the toolbox's first pen has the pen's color and width of before; the eraser
+      erases as it did (standard, whiteout or whole strokes); the text box has the font of before.
+- [ ] Restart: the tool in hand is the entry taken last, with its color and width.
