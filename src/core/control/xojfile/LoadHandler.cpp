@@ -117,6 +117,12 @@ void LoadHandler::setPageBookmark(const std::string& label) {
     this->page->setBookmark(label);
 }
 
+// xournal-qt: the fill color of a stroke (qt/pen-styles)
+void LoadHandler::setStrokeFillColor(Color color) {
+    xoj_assert(this->stroke);
+    this->stroke->setFillColor(color);
+}
+
 void LoadHandler::finalizePage() {
     xoj_assert(this->page);
 

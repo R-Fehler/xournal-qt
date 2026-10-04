@@ -44,6 +44,7 @@
 #include "TextEditor.h"
 #include "render/RenderService.h"
 #include "session/DocumentSession.h"
+#include "session/PenFill.h"
 #include "session/StickyNote.h"
 
 using xoj::util::Rectangle;
@@ -196,6 +197,9 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
                 this->inputHandler = std::make_unique<StrokeHandler>(&control, getPage());
         }
         this->inputHandler->onButtonPressEvent(pos, zoom);
+        if (Stroke* stroke = this->inputHandler->getStroke()) {
+            penfill::apply(*control.getSettings(), *h, *stroke);  // (its fill color, before its view is made)
+        }
         this->overlayViews.emplace_back(this->inputHandler->createView(this));
     } else if (h->getToolType() == TOOL_ERASER) {
         if (eraserInNote(x, y)) {

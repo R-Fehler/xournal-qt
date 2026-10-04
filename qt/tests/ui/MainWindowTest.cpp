@@ -4880,13 +4880,32 @@ TEST_F(MainWindowTest, thePensMenuOffersItsLineStyles) {
     until([&] { return dash->isVisible() && dash->width() > 0; });
     click(dash);
     EXPECT_EQ(controller->lineStyle(), QStringLiteral("dash")) << "a tap on the sample chooses it";
+
+    // The filling: on, then a color of the bar, then the line's color again
+    controller->setFillEnabled(false);
+    auto* fillSwitch = childNamed(options, "fillSwitch");
+    ASSERT_NE(fillSwitch, nullptr);
+    click(fillSwitch);
+    EXPECT_TRUE(controller->fillEnabled()) << "the switch fills";
+    auto* colorRow = childNamed(options, "fillColorRow");
+    ASSERT_NE(colorRow, nullptr);
+    until([&] { return colorRow->isVisible() && colorRow->height() > 0; });
+    EXPECT_TRUE(colorRow->isVisible()) << "the colors of the filling show once it is on";
+    auto* barColor = childNamed(colorRow, "fillColor");
+    ASSERT_NE(barColor, nullptr);
+    until([&] { return barColor->width() > 0; });
+    click(barColor);
+    EXPECT_GT(controller->fillColor().alpha(), 0) << "another color";
+    click(childNamed(colorRow, "fillSameColor"));
+    EXPECT_EQ(controller->fillColor().alpha(), 0) << "the line's color again";
+    controller->setFillEnabled(false);
     QMetaObject::invokeMethod(menu, "close");
     until([&] { return !menu->property("visible").toBool(); });
 
-    // The highlighter has no line styles: no options for it
+    // The highlighter has no line styles (its filling stays)
     controller->selectTool("highlighter");
     EXPECT_FALSE(controller->hasLineStyle());
-    EXPECT_FALSE(options->property("offered").toBool());
+    EXPECT_TRUE(options->property("offered").toBool()) << "the options of its filling";
     controller->selectTool("pen");
     EXPECT_EQ(controller->lineStyle(), QStringLiteral("dash")) << "the pen kept its style";
 

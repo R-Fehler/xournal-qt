@@ -69,7 +69,7 @@ void BaseShapeOrSplineToolView::commitDrawing(cairo_t* cr) const {
             cairo_fill_preserve(mask.get());
         } else {
             // Not need when using a mask: transparency will be applied upon blitting.
-            Util::cairo_set_source_rgbi(cr, strokeColor, fillingAlpha);
+            Util::cairo_set_source_rgbi(cr, fillColor, fillingAlpha);  // xournal-qt: fillColor (qt/pen-styles)
             cairo_fill_preserve(cr);
         }
     }

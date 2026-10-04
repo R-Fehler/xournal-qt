@@ -58,6 +58,7 @@
 #include "PenHover.h"
 #include "StickyNotes.h"
 #include "session/PageMargins.h"
+#include "session/PenFill.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentTextIndex.h"
@@ -1418,6 +1419,58 @@ void AppController::setLineStyle(const QString& name) {
 bool AppController::hasLineStyle() const {
     return app->getToolHandler()->hasCapability(TOOL_CAP_LINE_STYLE, SelectedTool::active);
 }
+
+bool AppController::fillEnabled() const { return app->getToolHandler()->getFill() != -1; }
+
+void AppController::setFillEnabled(bool on) {
+    ToolHandler* th = app->getToolHandler();
+    if (!th->hasCapability(TOOL_CAP_FILL, SelectedTool::toolbar)) {
+        return;
+    }
+    th->setFillEnabled(on);
+    th->saveSettings();
+    Q_EMIT toolChanged();
+}
+
+int AppController::fillAlpha() const {
+    const ToolHandler* th = app->getToolHandler();
+    return th->getToolType() == TOOL_HIGHLIGHTER ? th->getHighlighterFill() : th->getPenFill();
+}
+
+void AppController::setFillAlpha(int alpha) {
+    ToolHandler* th = app->getToolHandler();
+    alpha = std::clamp(alpha, 1, 255);
+    if (th->getToolType() == TOOL_HIGHLIGHTER) {
+        th->setHighlighterFill(alpha);
+    } else if (th->getToolType() == TOOL_PEN) {
+        th->setPenFill(alpha);
+    } else {
+        return;
+    }
+    th->saveSettings();
+    Q_EMIT toolChanged();
+}
+
+QColor AppController::fillColor() const {
+    const auto c = penfill::color(*app->getSettings(), app->getToolHandler()->getToolType());
+    return c ? toQColor(*c) : QColor(Qt::transparent);
+}
+
+void AppController::setFillColor(const QColor& c) {
+    const ToolType type = app->getToolHandler()->getToolType();
+    if (!penfill::hasOwnColor(type)) {
+        return;
+    }
+    penfill::setColor(*app->getSettings(), type,
+                      c.isValid() && c.alpha() > 0 ? std::optional<Color>(toColor(c)) : std::nullopt);
+    Q_EMIT toolChanged();
+}
+
+bool AppController::hasFill() const {
+    return app->getToolHandler()->hasCapability(TOOL_CAP_FILL, SelectedTool::active);
+}
+
+bool AppController::hasFillColor() const { return penfill::hasOwnColor(app->getToolHandler()->getToolType()); }
 
 QColor AppController::color() const { return toQColor(app->getToolHandler()->getColor()); }
 int AppController::size() const {

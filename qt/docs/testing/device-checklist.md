@@ -2517,3 +2517,15 @@ Line styles:
 - [ ] On a phone (the menu is a bottom sheet): the samples are in the sheet and can be tapped.
 - [ ] Save, close, open again: the dashes are kept. The .xopp opens in Xournal++ with the same dashes.
 - [ ] Export a PDF and print: the dashes look as on the screen.
+
+Filling:
+- [ ] In the same menu (pen or highlighter in hand): "Fill" on. A rectangle, an ellipse and a closed freehand
+      stroke are filled while they are drawn and afterwards, with the line's color at the opacity shown (50 % at
+      first, upstream's).
+- [ ] The pen: another color for the filling (a color of the bar, or "+" for any color); the line keeps its own.
+      The highlighter fills with its own color only.
+- [ ] The opacity slider changes the next shapes; "Fill" off: shapes are empty again.
+- [ ] Erase part of a filled shape: the pieces stay filled with the same color.
+- [ ] Copy and paste a filled shape (also into another tab): the fill color comes along.
+- [ ] Save, close, open again; export a PDF; print: the fillings look the same. In Xournal++ the file opens; a
+      filling of another color shows there in the line's color (upstream has no fill color).

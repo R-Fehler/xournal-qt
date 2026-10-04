@@ -148,6 +148,9 @@ void SaveHandler::visitStroke(XmlPointNode* stroke, const Stroke* s) {
 void SaveHandler::visitStrokeExtended(XmlPointNode* stroke, const Stroke* s) {
     if (s->getFill() != -1) {
         stroke->setAttrib(xoj::xml_attrs::FILL_STR, s->getFill());
+        if (const auto c = s->getFillColor()) {  // xournal-qt: qt/pen-styles
+            stroke->setAttrib(xoj::xml_attrs::FILL_COLOR_STR, getColorStr(*c));
+        }
     }
 
     StrokeCapStyle capStyle = s->getStrokeCapStyle();

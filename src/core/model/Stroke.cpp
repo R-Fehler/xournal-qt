@@ -81,6 +81,9 @@ constexpr void updateSnappedBounds(Rectangle<Float>& snap, Point const& p) {
 }
 
 
+/// xournal-qt: in serialized strokes (the clipboard), a fill color follows (Stroke::serialize)
+static constexpr int FILL_COLOR_FLAG = 0x100;
+
 Stroke::Stroke(): Element(ELEMENT_STROKE) {}
 
 Stroke::~Stroke() = default;
@@ -93,6 +96,7 @@ void Stroke::applyStyleFrom(const Stroke* other) {
     setToolType(other->getToolType());
     setWidth(other->getWidth());
     setFill(other->getFill());
+    setFillColor(other->getFillColor());  // xournal-qt
     setStrokeCapStyle(other->getStrokeCapStyle());
     setLineStyle(other->getLineStyle());
 
@@ -174,13 +178,18 @@ void Stroke::serialize(ObjectOutputStream& out) const {
 
     out.writeInt(this->toolType);
 
-    out.writeInt(fill);
+    // xournal-qt: a fill color follows the line style, flagged in the fill (upstream fails on such a stroke)
+    const bool withFillColor = fill >= 0 && fillColor;
+    out.writeInt(withFillColor ? (fill | FILL_COLOR_FLAG) : fill);
 
     out.writeInt(this->capStyle);
 
     out.writeData(this->points.data(), this->points.size(), sizeof(Point));
 
     this->lineStyle.serialize(out);
+    if (withFillColor) {
+        out.writeUInt(uint32_t(*fillColor));
+    }
 
     out.endObject();
 }
@@ -196,11 +205,19 @@ void Stroke::readSerialized(ObjectInputStream& in) {
     this->toolType = static_cast<StrokeTool::Value>(in.readInt());
 
     this->fill = in.readInt();
+    const bool withFillColor = this->fill >= 0 && (this->fill & FILL_COLOR_FLAG);  // xournal-qt
+    if (withFillColor) {
+        this->fill &= ~FILL_COLOR_FLAG;
+    }
 
     this->capStyle = static_cast<StrokeCapStyle::Value>(in.readInt());
 
     in.readData(this->points);
     this->lineStyle.readSerialized(in);
+    this->fillColor.reset();
+    if (withFillColor) {
+        this->fillColor = Color(in.readUInt());
+    }
 
     in.endObject();
 }

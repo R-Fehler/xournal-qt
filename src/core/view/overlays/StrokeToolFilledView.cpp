@@ -30,7 +30,7 @@ void StrokeToolFilledView::drawFilling(cairo_t* cr, const std::vector<Point>& pt
      *   Upon adding a segment, the filling can actually shrink, making it easier to redraw the filling every time.
      */
     StrokeViewHelper::pathToCairo(cr, this->filling.contour);
-    Util::cairo_set_source_rgbi(cr, strokeColor, this->filling.alpha);
+    Util::cairo_set_source_rgbi(cr, fillColor, this->filling.alpha);  // xournal-qt: fillColor (qt/pen-styles)
     cairo_fill(cr);
 }
 

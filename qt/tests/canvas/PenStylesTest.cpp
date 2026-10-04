@@ -33,8 +33,12 @@
 #include "render/RenderService.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
+#include "session/PenFill.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/GzUtil.h"
+#include "util/serializing/BinObjectEncoding.h"
+#include "util/serializing/ObjectInputStream.h"
+#include "util/serializing/ObjectOutputStream.h"
 
 #include "CanvasInput.h"
 #include "CanvasPage.h"
@@ -126,6 +130,18 @@ protected:
         return row;
     }
 
+    /// The canvas' color at a point of the page (points)
+    QColor canvasAt(QPointF p) {
+        processEvents(100);
+        auto* page = view->getPage(0);
+        const auto info = page->bufferInfo();
+        EXPECT_TRUE(info.valid);
+        const double s = info.zoom * info.dpiScale;
+        const QImage tile =
+                page->composeTile(QRect(static_cast<int>(p.x() * s), static_cast<int>(p.y() * s), 1, 1));
+        return QColor(tile.pixel(0, 0));
+    }
+
     QTemporaryDir tmp;
     std::unique_ptr<AppContext> app;
     std::unique_ptr<DocumentSession> session;
@@ -150,6 +166,34 @@ std::string unzipped(const fs::path& file) {
     }
     gzclose(f);
     return xml;
+}
+
+/// A PDF page's color at a point (points), as poppler draws it
+QColor pdfAt(const fs::path& pdf, QPointF p, double scale = 2) {
+    XojPdfDocument doc;
+    EXPECT_TRUE(doc.load(pdf, "", nullptr)) << pdf;
+    XojPdfPageSPtr page = doc.getPage(0);
+    cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_RGB24, static_cast<int>(page->getWidth() * scale),
+                                                    static_cast<int>(page->getHeight() * scale));
+    cairo_t* cr = cairo_create(s);
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    cairo_paint(cr);
+    cairo_scale(cr, scale, scale);
+    page->render(cr);
+    cairo_destroy(cr);
+    cairo_surface_flush(s);
+    const unsigned char* px = cairo_image_surface_get_data(s) +
+                              static_cast<int>(p.y() * scale) * cairo_image_surface_get_stride(s) +
+                              4 * static_cast<int>(p.x() * scale);
+    QColor c(px[2], px[1], px[0]);
+    cairo_surface_destroy(s);
+    return c;
+}
+/// Reddish (a red filling at half opacity on white: about 255, 128, 128)
+bool reddish(const QColor& c) { return c.red() > 200 && c.green() < 200 && c.blue() < 200 && c.red() - c.green() > 50; }
+/// Grayish (the black line's color at half opacity)
+bool grayish(const QColor& c) {
+    return c.red() < 220 && c.red() > 40 && std::abs(c.red() - c.green()) < 20 && std::abs(c.red() - c.blue()) < 20;
 }
 
 /// How often a row of pixels changes between ink and paper
@@ -262,4 +306,128 @@ TEST_F(PenStylesTest, lineStylesAreKeptInXoppAndShownTheSameInAPdfExport) {
     EXPECT_LE(changes(solid), 2);
     EXPECT_GE(changes(pdfRow(pdf, 250, 120, 380)), 40) << "the export lost the dashes";
     EXPECT_GE(changes(pdfRow(pdf, 450, 120, 380)), 40) << "the export lost the dots";
+}
+
+TEST_F(PenStylesTest, shapesAndStrokesAreFilledWithTheLinesColorOrAnother) {
+    tools()->setColor(Colors::black, false);
+    tools()->setFillEnabled(true);
+    tools()->setPenFill(128);  // (upstream's default opacity of the filling)
+    ASSERT_EQ(tools()->getFill(), 128);
+
+    // The line's color (upstream's filling)
+    tools()->setDrawingType(DRAWING_TYPE_RECTANGLE);
+    drawLine(QPointF(100, 100), QPointF(250, 200));
+    ASSERT_EQ(strokes().size(), 1u);
+    EXPECT_EQ(strokes()[0]->getFill(), 128);
+    EXPECT_FALSE(strokes()[0]->getFillColor());
+    EXPECT_TRUE(grayish(canvasAt(QPointF(175, 150)))) << "filled with the line's color";
+
+    // Another color: also while it is drawn (the overlay of the shape), and when it is done
+    penfill::setColor(*app->getSettings(), TOOL_PEN, Colors::red);
+    tools()->setDrawingType(DRAWING_TYPE_ELLIPSE);
+    const QPointF from(300, 100), to(450, 200);
+    tablet(QEvent::TabletPress, viewPos(from), 0.6, Qt::LeftButton, Qt::LeftButton);
+    for (int i = 1; i <= 20; ++i) {
+        tablet(QEvent::TabletMove, viewPos(from + (to - from) * (i / 20.0)), 0.6, Qt::NoButton, Qt::LeftButton);
+    }
+    EXPECT_TRUE(reddish(canvasAt(QPointF(375, 150)))) << "the shape being drawn is filled with the other color";
+    tablet(QEvent::TabletRelease, viewPos(to), 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    ASSERT_EQ(strokes().size(), 2u);
+    ASSERT_TRUE(strokes()[1]->getFillColor());
+    EXPECT_EQ(*strokes()[1]->getFillColor(), Colors::red);
+    EXPECT_EQ(strokes()[1]->getColor(), Colors::black) << "the line keeps its color";
+    EXPECT_TRUE(reddish(canvasAt(QPointF(375, 150))));
+
+    // A freehand stroke (a triangle drawn by hand): filled as well, while drawn and when done
+    tools()->setDrawingType(DRAWING_TYPE_DEFAULT);
+    const std::vector<QPointF> corners{{100, 300}, {300, 300}, {200, 450}, {100, 300}};
+    tablet(QEvent::TabletPress, viewPos(corners[0]), 0.6, Qt::LeftButton, Qt::LeftButton);
+    for (size_t k = 1; k < corners.size(); ++k) {
+        for (int i = 1; i <= 20; ++i) {
+            tablet(QEvent::TabletMove, viewPos(corners[k - 1] + (corners[k] - corners[k - 1]) * (i / 20.0)), 0.6,
+                   Qt::NoButton, Qt::LeftButton);
+        }
+    }
+    EXPECT_TRUE(reddish(canvasAt(QPointF(200, 350)))) << "the stroke being drawn is filled";
+    tablet(QEvent::TabletRelease, viewPos(corners.back()), 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    ASSERT_EQ(strokes().size(), 3u);
+    EXPECT_EQ(strokes()[2]->getFill(), 128);
+    EXPECT_TRUE(reddish(canvasAt(QPointF(200, 350))));
+
+    // Without the filling: nothing inside
+    tools()->setFillEnabled(false);
+    tools()->setDrawingType(DRAWING_TYPE_RECTANGLE);
+    drawLine(QPointF(300, 300), QPointF(450, 400));
+    ASSERT_EQ(strokes().size(), 4u);
+    EXPECT_EQ(strokes()[3]->getFill(), -1);
+    EXPECT_FALSE(strokes()[3]->getFillColor());
+    EXPECT_EQ(canvasAt(QPointF(375, 350)), QColor(Qt::white));
+
+    // The highlighter fills with its own color (upstream draws it through a mask in the line's color)
+    tools()->selectTool(TOOL_HIGHLIGHTER);
+    tools()->setFillEnabled(true);
+    drawLine(QPointF(100, 600), QPointF(250, 700));
+    ASSERT_EQ(strokes().size(), 5u);
+    EXPECT_NE(strokes()[4]->getFill(), -1);
+    EXPECT_FALSE(strokes()[4]->getFillColor());
+    tools()->setFillEnabled(false);
+    tools()->selectTool(TOOL_PEN);
+    tools()->setDrawingType(DRAWING_TYPE_DEFAULT);
+    penfill::setColor(*app->getSettings(), TOOL_PEN, std::nullopt);
+}
+
+TEST_F(PenStylesTest, theFillingIsSavedCopiedAndExported) {
+    tools()->setColor(Colors::black, false);
+    tools()->setFillEnabled(true);
+    tools()->setPenFill(128);
+    tools()->setDrawingType(DRAWING_TYPE_RECTANGLE);
+    drawLine(QPointF(100, 100), QPointF(250, 200));  // the line's color
+    penfill::setColor(*app->getSettings(), TOOL_PEN, Colors::red);
+    drawLine(QPointF(300, 100), QPointF(450, 200));  // red
+    tools()->setDrawingType(DRAWING_TYPE_DEFAULT);
+    tools()->setFillEnabled(false);
+    ASSERT_EQ(strokes().size(), 2u);
+
+    // .xopp: upstream's fill="128"; the other color in an attribute of ours (upstream fills with the line's color)
+    const fs::path xopp = fs::path(tmp.filePath("fill.xopp").toStdString());
+    ASSERT_TRUE(session->saveAs(xopp).ok);
+    const std::string xml = unzipped(xopp);
+    EXPECT_NE(xml.find("fill=\"128\""), std::string::npos);
+    EXPECT_NE(xml.find("xqt-fill-color=\"#ff0000ff\""), std::string::npos);
+    auto loaded = DocumentSession::loadFile(xopp);
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    std::vector<const Stroke*> back;
+    for (const Element* e: loaded.document->getPage(0)->getSelectedLayer()->getElementsView()) {
+        back.push_back(dynamic_cast<const Stroke*>(e));
+    }
+    ASSERT_EQ(back.size(), 2u);
+    EXPECT_EQ(back[0]->getFill(), 128);
+    EXPECT_FALSE(back[0]->getFillColor());
+    EXPECT_EQ(back[1]->getFill(), 128);
+    ASSERT_TRUE(back[1]->getFillColor());
+    EXPECT_EQ(*back[1]->getFillColor(), Colors::red);
+
+    // The clipboard (serialized strokes): the color comes along; a stroke without one is written as upstream writes it
+    for (const Stroke* s: strokes()) {
+        ObjectOutputStream out(new BinObjectEncoding());
+        s->serialize(out);
+        ObjectInputStream in;
+        GString* data = out.stealData();
+        ASSERT_TRUE(in.read(data->str, data->len));
+        g_string_free(data, true);
+        Stroke copy;
+        copy.readSerialized(in);
+        EXPECT_EQ(copy.getFill(), 128);
+        EXPECT_EQ(copy.getFillColor(), s->getFillColor());
+        EXPECT_EQ(copy.getPointCount(), s->getPointCount());
+    }
+
+    // The PDF export draws the fillings
+    const fs::path pdf = fs::path(tmp.filePath("fill.pdf").toStdString());
+    ExportHelper::exportPdf(session->getDocument(), pdf, nullptr, nullptr, EXPORT_BACKGROUND_ALL, false);
+    EXPECT_TRUE(grayish(pdfAt(pdf, QPointF(175, 150)))) << pdfAt(pdf, QPointF(175, 150)).name().toStdString();
+    EXPECT_TRUE(reddish(pdfAt(pdf, QPointF(375, 150)))) << pdfAt(pdf, QPointF(375, 150)).name().toStdString();
+    penfill::setColor(*app->getSettings(), TOOL_PEN, std::nullopt);
 }

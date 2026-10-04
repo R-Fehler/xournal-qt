@@ -421,6 +421,12 @@ void XmlParser::parseStrokeTag(const XmlParserHelper::AttributeMap& attributeMap
     // forward data to builder
     this->builder.addStroke(tool, color, width, fill, capStyle, lineStyle, std::move(this->tempFilename),
                             this->tempTimestamp);
+    // xournal-qt: the fill color (qt/pen-styles)
+    if (const auto code = XmlParserHelper::getAttrib<std::string_view>(xoj::xml_attrs::FILL_COLOR_STR, attributeMap)) {
+        if (const auto c = XmlParserHelper::parseColorCode(*code)) {
+            this->builder.setStrokeFillColor(*c);
+        }
+    }
 
     // Reset timestamp, filename was already moved from
     this->tempTimestamp = 0;

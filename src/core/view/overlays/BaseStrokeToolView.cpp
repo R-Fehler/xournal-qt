@@ -16,6 +16,7 @@ BaseStrokeToolView::BaseStrokeToolView(Repaintable* parent, const Stroke& stroke
         ToolView(parent),
         cairoOp(stroke.getToolType() == StrokeTool::HIGHLIGHTER ? CAIRO_OPERATOR_MULTIPLY : CAIRO_OPERATOR_OVER),
         strokeColor(strokeColorWithAlpha(stroke)),
+        fillColor(stroke.getFillColor().value_or(strokeColor)),  // xournal-qt
         lineStyle(stroke.getLineStyle()),
         strokeWidth(stroke.getWidth()) {}
 
