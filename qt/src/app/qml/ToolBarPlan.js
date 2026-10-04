@@ -14,8 +14,11 @@
 // (a column of two, at a side), "grid" (the tools of the compact chrome: six columns, nothing overflows) and
 // "merged" (a text document: everything in the overflow, ⋮ in the format bar).
 
+/// Entries of ⋮ shown as buttons where there is room (the toolbox's command bar, qt/docs/toolbox.md): the first to
+/// give way, back into ⋮ (not into "more tools")
+var PROMOTED = ["favourite", "bookmark", "print", "share"]
 /// The steps of the ladder after 1, in order (names of buttons, or a form of the colors or widths)
-var LADDER = [
+var LADDER = PROMOTED.concat([
     "widths:single",
     "colors:recent",
     // (Open externally after Search: for a file shown here, a text file or an image, it is how the file is edited)
@@ -23,10 +26,10 @@ var LADDER = [
     "addPage", "image", "emoji", "pdfText", "geometry", "shape",
     "colors:single",
     "sticky", "write", "text", "touchDrawing", "select", "hand"
-]
+])
 /// The groups in their order, and the row of each in "twoRows"
-var GROUPS = ["edit", "tools", "colors", "widths", "insert", "view", "file"]
-var ROW_OF = { edit: 0, tools: 0, view: 0, colors: 1, widths: 1, insert: 1, file: 1 }
+var GROUPS = ["edit", "tools", "colors", "widths", "insert", "view", "doc", "file"]
+var ROW_OF = { edit: 0, tools: 0, view: 0, colors: 1, widths: 1, insert: 1, doc: 1, file: 1 }
 /// The groups of the buttons (the colors and widths are strips of their own)
 var GROUP_OF = {
     undo: "edit", redo: "edit",
@@ -34,7 +37,8 @@ var GROUP_OF = {
     sticky: "tools", shape: "tools", geometry: "tools", pdfText: "tools", emoji: "tools",
     image: "insert", addPage: "insert",
     search: "view", fullScreen: "view", present: "view", settings: "view",
-    new: "file", open: "file", save: "file", editAsNotes: "file", openExternally: "file"
+    new: "file", open: "file", save: "file", editAsNotes: "file", openExternally: "file",
+    share: "doc", print: "doc", bookmark: "doc", favourite: "doc"
 }
 
 var ICON = 48       // a button
@@ -123,7 +127,7 @@ function fitZone(items, state, fits, maxRecent, input) {
         } else {
             if (items.indexOf(step) < 0 || state.cut[step]) continue
             state.cut[step] = true
-            state.more = true
+            if (PROMOTED.indexOf(step) < 0) state.more = true  // (a promoted one goes back into ⋮)
         }
         ++steps
     }

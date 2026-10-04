@@ -657,3 +657,24 @@ TEST_F(ToolboxTest, onAPhoneTheDockHoldsTheFirstToolsAndTheSheetHoldsThemAll) {
     EXPECT_TRUE(box->property("vertical").toBool());
     EXPECT_NEAR(rectOf(box).right(), 915, 1);
 }
+
+TEST_F(ToolboxTest, theCommandBarShowsEntriesOfTheMoreMenuWhereThereIsRoom) {
+    auto* moreMenu = find<QObject>("moreMenu");
+    ASSERT_NE(moreMenu, nullptr);
+    auto check = [&](int w, int h) {
+        resize(w, h);
+        for (const auto& [button, item]: {std::pair{"shareButton", "shareItem"}, std::pair{"printButton", "printItem"}}) {
+            const bool inBar = shown(find(button));
+            QObject* entry = entryOf(moreMenu, item);
+            ASSERT_NE(entry, nullptr);
+            EXPECT_NE(inBar, entry->property("offered").toBool())
+                    << button << " at " << w << ": in the bar or in ⋮, never both, never neither";
+        }
+    };
+    check(1920, 1080);
+    EXPECT_TRUE(shown(find("shareButton"))) << "room for them at 1920";
+    EXPECT_TRUE(shown(find("printButton")));
+    EXPECT_FALSE(shown(find("moreToolsButton"))) << "nothing in \"more tools\"";
+    check(1024, 700);
+    check(800, 600);
+}

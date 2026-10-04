@@ -1102,13 +1102,17 @@ ApplicationWindow {
             text: textTool, write: writeButton, sticky: stickyTool, shape: shapeTool, geometry: geometryTool,
             pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, addPage: addPageTool, search: searchTool,
             fullScreen: fullScreenTool, present: presentTool, settings: settingsTool, new: newTool, open: openTool,
-            save: saveTool, editAsNotes: editAsNotesTool, openExternally: openExternallyTool
+            save: saveTool, editAsNotes: editAsNotesTool, openExternally: openExternallyTool,
+            share: shareTool, print: printTool, bookmark: bookmarkTool, favourite: favouriteTool
         })
         readonly property var order: ["undo", "redo",
                                       "pen", "eraser", "hand", "touchDrawing", "select", "text", "write", "sticky",
                                       "shape", "geometry", "pdfText", "emoji", "image", "addPage", "search",
                                       "fullScreen", "present", "settings", "new", "open", "save", "editAsNotes",
-                                      "openExternally"]
+                                      "openExternally", "share", "print", "bookmark", "favourite"]
+        /// The buttons in the bar now (an entry of ⋮ shown as a button is not in ⋮ too)
+        property var barNames: []
+        function inBar(n) { return barNames.indexOf(n) >= 0 }
         /// What the plan depends on: a change lays the bar out again (once, after the bindings settle)
         readonly property var planKey: [planLayout, win.phoneChrome, width, height, win.textDoc, app.toolbarColors.length,
                                         colorStrip.others.length, order.map(function(n) { return slots[n].offered !== false }),
@@ -1194,6 +1198,8 @@ ApplicationWindow {
                     item.parent = barContent
                     item.x = at.x
                     item.y = at.y
+                } else if (p.overflow.indexOf(n) >= 0 && item.promoted === true) {
+                    item.parent = toolBank  // (an entry of ⋮ without room: in ⋮ again)
                 } else if (p.overflow.indexOf(n) >= 0) {
                     shown.push(n)
                 } else {
@@ -1210,6 +1216,7 @@ ApplicationWindow {
                 item.y = Math.floor(i / columns) * 52
             })
             overflowNames = shown
+            barNames = Object.keys(p.placed)
             // The strips (the phone chrome: its dock's cycling buttons)
             const dock = win.phoneChrome
             colorStrip.parent = dock ? phoneDock.colorSlot : p.placed.colors ? barContent : toolBank
@@ -1235,7 +1242,7 @@ ApplicationWindow {
                              : p.layout === "grid" ? barContent : toolArea
             toolEnd.x = dock || p.layout === "merged" ? 0 : p.end.x
             toolEnd.y = dock ? 0 : p.layout === "merged" ? -2 : p.layout === "rail" ? toolArea.height - toolEnd.height : p.end.y
-            moreToolsButton.offered = p.overflow.length > 0 && p.layout !== "grid" && !dock
+            moreToolsButton.offered = shown.length > 0 && p.layout !== "grid" && !dock
         }
         /// A button of "more tools" was used: it closes, unless the button opened a menu of its own
         function slotUsed(item) {
@@ -1297,12 +1304,12 @@ ApplicationWindow {
                     id: moreMenu
                     objectName: "moreMenu"
                     AdaptiveMenuItem { objectName: "saveAsItem"; offered: !win.textDoc; text: qsTr("Save as…"); icon.source: app.iconUrl("xopp-document-save"); onTriggered: openSaveDialog(null) }
-                    AdaptiveMenuItem { objectName: "shareItem"; text: qsTr("Share…"); icon.source: app.iconUrl("xqt-share"); onTriggered: shareDialog.openFor("") }
-                    AdaptiveMenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); icon.source: app.iconUrl("xopp-document-print"); onTriggered: printDialog.open() }
+                    AdaptiveMenuItem { objectName: "shareItem"; offered: !toolArea.inBar("share"); text: qsTr("Share…"); icon.source: app.iconUrl("xqt-share"); onTriggered: shareDialog.openFor("") }
+                    AdaptiveMenuItem { objectName: "printItem"; offered: !toolArea.inBar("print"); text: qsTr("Print… (Ctrl+P)"); icon.source: app.iconUrl("xopp-document-print"); onTriggered: printDialog.open() }
                     AdaptiveMenuItem {
                         objectName: "bookmarkPageItem"
                         readonly property bool marked: (app.bookmarks, app.isBookmarked(app.pageNumber - 1))
-                        offered: app.canBookmark
+                        offered: app.canBookmark && !toolArea.inBar("bookmark")
                         text: marked ? qsTr("Remove the bookmark of this page") : qsTr("Bookmark this page")
                         icon.source: app.iconUrl(marked ? "xqt-bookmark-filled" : "xqt-bookmark")
                         icon.color: "transparent"
@@ -1311,7 +1318,7 @@ ApplicationWindow {
                     // A favourite: a star kept beside the file, never in it (qt/docs/bookmarks.md)
                     AdaptiveMenuItem {
                         objectName: "favouriteDocumentItem"
-                        offered: app.canFavourite
+                        offered: app.canFavourite && !toolArea.inBar("favourite")
                         text: app.favourite ? qsTr("Remove from favourites") : qsTr("Add to favourites")
                         icon.source: app.iconUrl(app.favourite ? "xqt-star-filled" : "xqt-star")
                         icon.color: "transparent"
@@ -1988,6 +1995,55 @@ ApplicationWindow {
             label: qsTr("Open externally")
             tip: qsTr("Open externally (in the app the system has for this file)")
             onClicked: win.openExternally()
+        }
+        // The toolbox's command bar (qt/docs/toolbox.md): entries of ⋮ as buttons where there is room (one place for
+        // each action: ⋮ leaves out what the bar shows); without room they are in ⋮
+        IconButton {
+            id: shareTool
+            objectName: "shareButton"
+            parent: toolBank
+            property bool offered: win.toolboxMode && !win.phoneLayout
+            property bool promoted: true
+            iconName: "xqt-share"
+            label: qsTr("Share")
+            tip: qsTr("Share…")
+            onClicked: shareDialog.openFor("")
+        }
+        IconButton {
+            id: printTool
+            objectName: "printButton"
+            parent: toolBank
+            property bool offered: win.toolboxMode && !win.phoneLayout
+            property bool promoted: true
+            iconName: "xopp-document-print"
+            label: qsTr("Print")
+            tip: qsTr("Print… (Ctrl+P)")
+            onClicked: printDialog.open()
+        }
+        IconButton {
+            id: bookmarkTool
+            objectName: "bookmarkButton"
+            parent: toolBank
+            readonly property bool marked: (app.bookmarks, app.isBookmarked(app.pageNumber - 1))
+            property bool offered: win.toolboxMode && !win.phoneLayout && app.canBookmark
+            property bool promoted: true
+            iconName: marked ? "xqt-bookmark-filled" : "xqt-bookmark"
+            checked: marked
+            label: marked ? qsTr("Bookmarked") : qsTr("Bookmark")
+            tip: marked ? qsTr("Remove the bookmark of this page") : qsTr("Bookmark this page")
+            onClicked: app.toggleBookmark(app.pageNumber - 1)
+        }
+        IconButton {
+            id: favouriteTool
+            objectName: "favouriteButton"
+            parent: toolBank
+            property bool offered: win.toolboxMode && !win.phoneLayout && app.canFavourite
+            property bool promoted: true
+            iconName: app.favourite ? "xqt-star-filled" : "xqt-star"
+            checked: app.favourite
+            label: qsTr("Favourite")
+            tip: app.favourite ? qsTr("Remove from favourites") : qsTr("Add to favourites")
+            onClicked: app.favourite = !app.favourite
         }
     }
 

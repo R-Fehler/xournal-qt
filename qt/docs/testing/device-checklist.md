@@ -2843,6 +2843,8 @@ letter words only where the recogniser is sure.
       screen. F5: it stays (write on the slides); the corner field hides it and shows it again.
 - [ ] Phone (Fold 7 folded): the dock has undo, redo, the first tools, "My tools", the page number; the tool in hand is
       always in the dock; "My tools" lists all, "Add a tool" works; sideways the dock is a rail at the right.
+- [ ] The command bar at 1920 has share, print, bookmark, favourite as buttons and ⋮ does not list them; at 1024 they
+      are back in ⋮.
 - [ ] Settings → Pen → Tools: "Classic tool bar" brings back the old bar, pen pill and tool square; "My toolbox" brings
       the toolbox back; "Back to the first tools…" resets it.
 - [ ] First start after the update: the toolbox's first pen has the pen's color and width of before; the eraser
