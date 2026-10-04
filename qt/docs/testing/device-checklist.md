@@ -2838,3 +2838,8 @@ offered).
 - [ ] Unplug the headset while recording: the recording ends with a message and the file plays up to that moment.
 - [ ] A `.xopp` with recordings made here opens in Xournal++ without a message; its play tool plays the strokes'
       recordings when Xournal++'s audio folder is set to the app's audio folder (see Settings → Audio).
+- [ ] A PDF with notes that has recordings, in Acrobat, Okular, Evince, Preview and pdf.js: the attachments panel
+      lists `audio-p001-….ogg` with its description; saved out of the PDF it plays in VLC and the system player.
+- [ ] Move pages in the app, Ctrl+S: the attachment's page numbers follow (check in Okular's attachments panel).
+- [ ] Export for Xournal++: open the exported `.xopp` in Xournal++ (its audio folder not set): the play tool plays the
+      strokes' recordings from `name.audio/`.

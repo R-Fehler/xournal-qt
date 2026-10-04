@@ -96,3 +96,40 @@ highlighter and strokes after the recording not, undo/redo keeping the stamp; a 
 opened; memos and removing as one undo step each; the `.xopp` round trip (the raw XML: `ts`/`fn` as upstream writes
 them and `xqt-audio` on the page and its duplicate); upstream's `old.xopp` with its recording; the play tool's hit
 (nearest, too far, no recording, hidden layer); the names.
+
+## Storage
+
+`qt/src/audio/AudioFiles.*`; `HybridPdf` (PDFs with notes and archives), `DocumentSave` (Save as).
+
+- **`.xopp`, as upstream**: the strokes name their recordings bare (`fn="2026-10-04_14-03-22.ogg"`), the files are
+  in the app's audio folder (`<app data>/audio`, e.g. `~/.local/share/xournal-qt/audio`; user data, never the cache).
+  A recording is found, in this order: the name itself when it is an absolute path that exists; next to the
+  document and in its `name.audio` folder; the app's audio folder; the recordings a PDF with notes brought (below);
+  Xournal++'s audio folder when set in the settings (read only, `setExtraFolders`); folders added by the app.
+- **PDFs with notes**: every recording the document refers to is an attachment named with its pages, so it is found
+  without the app (the author: "with the page number in the filetitle so it's easy to recover/use even with archived
+  PDFs"): `audio-p012-2026-10-04_14-03-22.ogg`, `audio-p012-p015-…` when it is on several pages (the first and last
+  page with its memo or its ink, 1-based, three digits at least). Flat names (no folders, which many PDF apps do not
+  show), MIME type `audio/ogg`, a description such as "Audio recording 2026-10-04_14-03-22, pages 12 to 15 (Ogg
+  Vorbis; …)". No annotation is drawn for other PDF apps (decided). The marker lists them in `/Audio` (attachment
+  name, name in the document) apart from `/Files`; the clean copy leaves them out.
+  - The data is read from the recording's file while the PDF is written (a qpdf stream provider), not kept in memory.
+  - **Incremental save** (Ctrl+S): a recording the file has stays as it is; when its pages changed (pages moved,
+    inserted, deleted) its file specification is **renamed** (the same stream: the recording is not appended again);
+    a new recording is appended. A recording removed from the document, or a new one in an archive PDF, makes the
+    save a full write.
+  - **Opening** takes the recordings out into the PDF's cache entry (`audio/`, next to the clean copy, once per version
+    of the file); they are found for that PDF from there. "Save as" `.xopp` copies the recordings found only there
+    into the app's audio folder, where the `.xopp`'s bare names find them.
+  - Archive PDFs (PDF/A-3): associated files with `/AFRelationship /Supplement` in the catalog's `/AF`.
+  - A recording whose file is nowhere is left out (its strokes keep their names); a log line says so.
+- **Export for Xournal++**: the recordings are copied into `name.audio/` next to the exported `name.xopp`, and its
+  strokes name them by their **absolute** paths (Xournal++ plays an absolute `fn` as it is), so Xournal++ plays them
+  without setting its audio folder. Our app finds them there too (also after the two were moved together: by name in
+  `name.audio/`). Voice memos stay bare names (Xournal++ does not read them).
+
+Tests: `AudioStorageTest` (label `session`): the search order and attachment names; a PDF with notes carries the
+recording (bytes unchanged, `audio/ogg`, the marker), `qpdf --check`, the clean copy without it, found again from the
+PDF with the app's file gone; Ctrl+S after moving pages renames the attachment keeping its stream, and removing the
+recording writes the file in full without it; an archive lists it in `/AF` as `/Supplement`; Export for Xournal++
+copies it and writes absolute names; Save as `.xopp` puts it into the app's audio folder.

@@ -71,7 +71,9 @@ add_library(xqt-audio STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/audio/Player.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/audio/Player.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/audio/DocumentAudio.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/DocumentAudio.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/DocumentAudio.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/AudioFiles.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/AudioFiles.cpp)
 target_include_directories(xqt-audio PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src")
 target_link_libraries(xqt-audio PUBLIC Qt6::Core xoj-core PRIVATE xqt-vorbis)
 set_target_properties(xqt-audio PROPERTIES AUTOMOC ON)

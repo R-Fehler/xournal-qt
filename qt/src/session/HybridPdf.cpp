@@ -27,11 +27,14 @@
 #include <QtGlobal>
 #include <glib.h>
 #include <qpdf/Buffer.hh>
+#include <qpdf/Pipeline.hh>
+#include <QFile>
 #include <qpdf/QPDF.hh>
 #include <qpdf/QPDFEFStreamObjectHelper.hh>
 #include <qpdf/QPDFEmbeddedFileDocumentHelper.hh>
 #include <qpdf/QPDFFileSpecObjectHelper.hh>
 #include <qpdf/QPDFMatrix.hh>
+#include <qpdf/QPDFNameTreeObjectHelper.hh>
 #include <qpdf/QPDFObjectHandle.hh>
 #include <qpdf/QPDFPageDocumentHelper.hh>
 #include <qpdf/QPDFPageObjectHelper.hh>
@@ -59,6 +62,8 @@
 #include "view/background/BackgroundView.h"
 
 #include "ArchivePdf.h"
+#include "audio/AudioFiles.h"
+#include "audio/DocumentAudio.h"
 #include "DocumentImages.h"
 #include "DocumentLink.h"
 #include "IncrementalPdf.h"
@@ -77,6 +82,7 @@ namespace {
 constexpr const char* MARKER = "/XournalQt";  ///< in the catalog, and the private key of our annotations
 constexpr const char* CLEAN_NAME = "base.pdf";
 constexpr const char* CHECK_NAME = "changed.txt";
+constexpr const char* AUDIO_NAME = "audio";  ///< the recordings it carries (qt/docs/audio.md)
 constexpr const char* PICTURES_NAME = "pictures";  ///< the pictures a text document carries (qt/docs/md-images.md)
 constexpr const char* PAGES_NAME = "pages.txt";  ///< the file's page objects the clean copy's pages are
 constexpr double MARGIN = 2.0;  ///< around a layer's elements (pt)
@@ -474,6 +480,48 @@ void putInkText(QPDFObjectHandle page, QPDFObjectHandle stream, QPDFObjectHandle
     page.replaceKey("/Resources", res);
 }
 
+/// The recordings a marker lists (/Audio: attachment name, then the recording's name in the document, for each).
+std::vector<std::pair<std::string, std::string>> audioListOf(QPDFObjectHandle marker) {
+    std::vector<std::pair<std::string, std::string>> out;
+    QPDFObjectHandle list = marker.isDictionary() ? marker.getKey("/Audio") : QPDFObjectHandle::newNull();
+    for (int i = 0; list.isArray() && i + 1 < list.getArrayNItems(); i += 2) {
+        QPDFObjectHandle a = list.getArrayItem(i), b = list.getArrayItem(i + 1);
+        if (a.isString() && b.isString()) {
+            out.emplace_back(a.getUTF8Value(), b.getUTF8Value());
+        }
+    }
+    return out;
+}
+
+/// Size and MD5 of a recording's file (its embedded stream's /Params), read in pieces.
+bool measureFile(const fs::path& file, long long& size, std::string& md5) {
+    QFile f(QString::fromStdU16String(file.u16string()));
+    if (!f.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    QCryptographicHash hash(QCryptographicHash::Md5);
+    if (!hash.addData(&f)) {
+        return false;
+    }
+    size = f.size();
+    md5 = hash.result().toStdString();
+    return true;
+}
+
+/// Gives a file to qpdf in pieces, when the stream is written.
+std::function<void(Pipeline*)> fileProvider(const fs::path& file) {
+    return [file](Pipeline* p) {
+        QFile f(QString::fromStdU16String(file.u16string()));
+        if (f.open(QIODevice::ReadOnly)) {
+            QByteArray chunk;
+            while (!(chunk = f.read(1 << 16)).isEmpty()) {
+                p->write(reinterpret_cast<const unsigned char*>(chunk.constData()), static_cast<size_t>(chunk.size()));
+            }
+        }
+        p->finish();
+    };
+}
+
 /// Remove our annotations from every page (except `keep`, which lose our mark), our marker and our embedded files.
 /// Returns the /NM of our annotations whose hash differs from the marker's, or that are missing.
 std::vector<std::string> strip(QPDF& pdf, const std::set<std::string>& keep = {}) {
@@ -498,6 +546,9 @@ std::vector<std::string> strip(QPDF& pdf, const std::set<std::string>& keep = {}
                     files.insert(more.getArrayItem(i).getUTF8Value());
                 }
             }
+        }
+        for (const auto& [name, source]: audioListOf(marker)) {  // (the recordings: qt/docs/audio.md)
+            files.insert(name);
         }
     }
     std::set<std::string> flattened;  // an archive PDF: the layers merged into the page content
@@ -645,8 +696,22 @@ public:
         return page < layers.size() && layer < layers[page].size() ? layers[page][layer] : 0;
     }
     uint64_t backgroundHash(size_t page) const { return page < backgrounds.size() ? backgrounds[page] : 0; }
+    /// The recordings' names written instead of theirs (Export for Xournal++: absolute paths; qt/docs/audio.md).
+    const std::map<std::string, std::string>* audioNames = nullptr;
 
 protected:
+    void writeAudio(XmlNode* node, const AudioContent& content) override {
+        if (audioNames) {
+            if (auto it = audioNames->find(audio::nameOf(content)); it != audioNames->end()) {
+                AudioContent renamed = content;
+                audio::stamp(renamed, it->second, content.getTimestamp());
+                SaveHandler::writeAudio(node, renamed);
+                return;
+            }
+        }
+        SaveHandler::writeAudio(node, content);
+    }
+
     void visitLayer(XmlNode* page, const Layer* l) override {
         SaveHandler::visitLayer(page, l);
         if (current < layers.size()) {
@@ -845,11 +910,15 @@ void addInkWords(Prepared& prep, const std::vector<std::shared_ptr<const ink::Pa
 /// Everything that needs the document: under its shared lock (and briefly its lock).
 Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work, const BasePageOf& baseOf,
                  size_t pdfPageCount, bool attach = false, const fs::path& linkFolder = {},
-                 const LinkMap* linkMap = nullptr, const Reuse* reuse = nullptr) {
+                 const LinkMap* linkMap = nullptr, const Reuse* reuse = nullptr,
+                 const std::map<std::string, std::string>* audioNames = nullptr) {
     Prepared out;
     // The .xopp first (not written yet): its hashes say what each drawing shows
     const fs::path xopp = work / DATA_NAME;
     HybridSaveHandler h(pdfName, attach);
+    h.audioNames = audioNames;
+    std::vector<audio::Recording> recordings;  // (qt/docs/audio.md: their files are found after the lock)
+    fs::path docFile;
     {
         std::shared_lock lock(doc);
         h.prepareSave(&doc, xopp);
@@ -857,6 +926,8 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
     {
         std::shared_lock lock(doc);
         out.attachments = TextDocument::attachments(doc, pdfName);  // (qt/docs/md-pdf.md)
+        recordings = audio::recordingsOf(doc);
+        docFile = doc.getFilepath();
         out.bg = doc.getPdfFilepath();
         const size_t bgPages = pdfPageCount != npos ? pdfPageCount : doc.getPdfPageCount();
         cairo_surface_t* surface = cairo_pdf_surface_create_for_stream(appendTo, &out.drawn, 1, 1);
@@ -1016,6 +1087,23 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
             out.extras.emplace_back(n, bytesOf(it->path()));
         }
     }
+    // The recordings, for other apps too (qt/docs/audio.md): "audio-p012-…ogg" with their pages. One whose file is
+    // nowhere is left out (its strokes keep their names).
+    for (const auto& rec: recordings) {
+        TextDocument::Attachment a;
+        a.file = audio::find(rec.name, docFile);
+        if (a.file.empty()) {
+            g_warning("Recording %s not found: not in the PDF", rec.name.c_str());
+            continue;
+        }
+        a.source = rec.name;
+        a.name = audio::attachmentName(rec.name, rec.pages);
+        a.description = audio::attachmentDescription(rec.name, rec.pages);
+        a.mime = audio::MIME;
+        a.relationship = "/Supplement";
+        a.fixed = true;
+        out.attachments.push_back(std::move(a));
+    }
     return out;
 }
 
@@ -1049,6 +1137,33 @@ void addEmbedded(QPDF& pdf, const std::string& name, const std::string& data, co
         spec.getObjectHandle().replaceKey("/AFRelationship", QPDFObjectHandle::newName(relationship));
     }
     QPDFEmbeddedFileDocumentHelper(pdf).replaceEmbeddedFile(name, spec);
+}
+
+/// A recording as an embedded file (its data read from its file when the PDF is written). False if it cannot be read.
+bool addEmbeddedFile(QPDF& pdf, const TextDocument::Attachment& a, bool archive) {
+    long long size = 0;
+    std::string md5;
+    if (!measureFile(a.file, size, md5)) {
+        return false;
+    }
+    auto stream = QPDFEFStreamObjectHelper::createEFStream(pdf, fileProvider(a.file));
+    stream.setSubtype(a.mime);
+    stream.setModDate(pdfDateNow());
+    QPDFObjectHandle params = stream.getObjectHandle().getDict().getKey("/Params");
+    if (!params.isDictionary()) {
+        params = QPDFObjectHandle::newDictionary();
+    }
+    params.replaceKey("/Size", QPDFObjectHandle::newInteger(size));
+    params.replaceKey("/CheckSum", QPDFObjectHandle::newString(md5));
+    params.replaceKey("/ModDate", QPDFObjectHandle::newString(pdfDateNow()));
+    stream.getObjectHandle().getDict().replaceKey("/Params", params);
+    auto spec = QPDFFileSpecObjectHelper::createFileSpec(pdf, a.name, stream);
+    spec.setDescription(a.description);
+    if (archive && !a.relationship.empty()) {
+        spec.getObjectHandle().replaceKey("/AFRelationship", QPDFObjectHandle::newName(a.relationship));
+    }
+    QPDFEmbeddedFileDocumentHelper(pdf).replaceEmbeddedFile(a.name, spec);
+    return true;
 }
 
 /// A base page we drew: what it shows (an incremental save keeps it while that stays the same).
@@ -1513,8 +1628,16 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
             addEmbedded(out, name, data, "A file of the Xournal++ document of this PDF", archive ? "/Supplement" : nullptr);
             files.appendItem(QPDFObjectHandle::newUnicodeString(name));
         }
+        QPDFObjectHandle audioList = QPDFObjectHandle::newArray();
         for (const auto& a: prep.attachments) {  // (for other apps: a text document's "name.md"; listed with the
-            addEmbedded(out, a.name, a.data, a.description,  // images, so the clean copy never carries them)
+            if (!a.source.empty()) {             // images, so the clean copy never carries them)
+                if (addEmbeddedFile(out, a, archive)) {  // (a recording: listed in /Audio with its name in the document)
+                    audioList.appendItem(QPDFObjectHandle::newUnicodeString(a.name));
+                    audioList.appendItem(QPDFObjectHandle::newUnicodeString(a.source));
+                }
+                continue;
+            }
+            addEmbedded(out, a.name, a.data, a.description,
                         archive && !a.relationship.empty() ? a.relationship.c_str() : nullptr, a.mime);
             files.appendItem(QPDFObjectHandle::newUnicodeString(a.name));
         }
@@ -1558,6 +1681,9 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
         }
         marker.replaceKey("/Data", QPDFObjectHandle::newUnicodeString(DATA_NAME));
         marker.replaceKey("/Files", files);
+        if (audioList.getArrayNItems() > 0) {
+            marker.replaceKey("/Audio", audioList);
+        }
         marker.replaceKey("/Annots", hashes);
         QPDFObjectHandle drawnList = QPDFObjectHandle::newArray();  // (the base pages we drew: kept while the same)
         for (size_t i = 0; i < prep.pages.size(); ++i) {
@@ -2592,7 +2718,11 @@ private:
             }
             efdh.replaceEmbeddedFile(a.name, QPDFFileSpecObjectHelper(u.add(spec)));
         };
+        embedAudio(efdh);
         for (const auto& a: prep.attachments) {  // (the same files for other apps, their data new)
+            if (!a.source.empty()) {
+                continue;  // (a recording: embedAudio)
+            }
             files.appendItem(QPDFObjectHandle::newUnicodeString(a.name));
             if (a.fixed) {
                 // A picture: the one the file has stays as it is (its data does not change under its name); a new one
@@ -2618,6 +2748,77 @@ private:
         }
         if (!before.empty()) {
             throw std::runtime_error("the document has other background images");
+        }
+    }
+
+    /// The recordings (qt/docs/audio.md): one the file has stays as it is, renamed when its pages changed (the same
+    /// file specification and stream, under its new name); a new one is added. A recording the document no longer
+    /// has, or a new one in an archive PDF: the whole file is written anew.
+    void embedAudio(QPDFEmbeddedFileDocumentHelper& efdh) {
+        std::map<std::string, std::string> had;  // source -> attachment name
+        for (const auto& [name, source]: audioListOf(e.marker)) {
+            had[source] = name;
+        }
+        for (const auto& a: prep.attachments) {
+            if (a.source.empty()) {
+                continue;
+            }
+            auto it = had.find(a.source);
+            if (it == had.end()) {
+                if (archive) {
+                    throw std::runtime_error("a new recording in an archive PDF");  // (its /AF: written in full)
+                }
+                long long size = 0;
+                std::string md5;
+                if (!measureFile(a.file, size, md5)) {
+                    continue;  // (unreadable: not carried, as in a full write)
+                }
+                QPDFObjectHandle dict = QPDFObjectHandle::newDictionary();
+                dict.replaceKey("/Type", QPDFObjectHandle::newName("/EmbeddedFile"));
+                dict.replaceKey("/Subtype", QPDFObjectHandle::newName("/" + a.mime));
+                QPDFObjectHandle params = QPDFObjectHandle::newDictionary();
+                params.replaceKey("/Size", QPDFObjectHandle::newInteger(size));
+                params.replaceKey("/CheckSum", QPDFObjectHandle::newString(md5));
+                params.replaceKey("/ModDate", QPDFObjectHandle::newString(now));
+                dict.replaceKey("/Params", params);
+                QPDFObjectHandle stream = u.addStream(dict, bytesOf(a.file));
+                QPDFObjectHandle ef = QPDFObjectHandle::newDictionary();
+                ef.replaceKey("/F", stream);
+                ef.replaceKey("/UF", stream);
+                QPDFObjectHandle spec = QPDFObjectHandle::newDictionary();
+                spec.replaceKey("/Type", QPDFObjectHandle::newName("/Filespec"));
+                spec.replaceKey("/F", QPDFObjectHandle::newUnicodeString(a.name));
+                spec.replaceKey("/UF", QPDFObjectHandle::newUnicodeString(a.name));
+                spec.replaceKey("/EF", ef);
+                spec.replaceKey("/Desc", QPDFObjectHandle::newUnicodeString(a.description));
+                efdh.replaceEmbeddedFile(a.name, QPDFFileSpecObjectHelper(u.add(spec)));
+            } else if (it->second != a.name) {
+                auto spec = efdh.getEmbeddedFile(it->second);
+                if (!spec) {
+                    throw std::runtime_error("a recording is missing from the file");
+                }
+                QPDFObjectHandle s = spec->getObjectHandle();
+                if (!s.isIndirect()) {
+                    throw std::runtime_error("a recording's file specification is not an object of its own");
+                }
+                u.touch(s);
+                s.replaceKey("/F", QPDFObjectHandle::newUnicodeString(a.name));
+                s.replaceKey("/UF", QPDFObjectHandle::newUnicodeString(a.name));
+                s.replaceKey("/Desc", QPDFObjectHandle::newUnicodeString(a.description));
+                // (not removeEmbeddedFile: it turns the file specification into null)
+                QPDFObjectHandle names = e.root.getKey("/Names");
+                QPDFNameTreeObjectHelper tree(names.getKey("/EmbeddedFiles"), q);
+                tree.remove(it->second);
+                efdh.replaceEmbeddedFile(a.name, QPDFFileSpecObjectHelper(s));
+            }
+            if (it != had.end()) {
+                had.erase(it);
+            }
+            audioList.appendItem(QPDFObjectHandle::newUnicodeString(a.name));
+            audioList.appendItem(QPDFObjectHandle::newUnicodeString(a.source));
+        }
+        if (!had.empty()) {
+            throw std::runtime_error("a recording was removed");  // (it goes with the next full write)
         }
     }
 
@@ -2675,6 +2876,11 @@ private:
             marker.replaceKey("/InkFont", inkFont);
         }
         marker.replaceKey("/Files", files);
+        if (audioList.getArrayNItems() > 0) {
+            marker.replaceKey("/Audio", audioList);
+        } else if (marker.hasKey("/Audio")) {
+            marker.removeKey("/Audio");
+        }
         marker.replaceKey("/Annots", hashes);
         if (archive) {
             marker.replaceKey("/Flattened", flattened);
@@ -2738,6 +2944,7 @@ private:
     QPDFObjectHandle flattened = QPDFObjectHandle::newArray();       ///< and /Flattened
     QPDFObjectHandle record = QPDFObjectHandle::newDictionary();     ///< and /Layers
     QPDFObjectHandle files = QPDFObjectHandle::newArray();           ///< and /Files
+    QPDFObjectHandle audioList = QPDFObjectHandle::newArray();       ///< and /Audio (embedAudio)
     size_t annotations = 0;
 };
 
@@ -3022,7 +3229,38 @@ Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf, size
     Result r;
     try {
         WorkDir work;
-        const Prepared prep = prepare(doc, pdf.filename().string(), work.path, {}, pdfPageCount, attached);
+        // The recordings, as Xournal++ finds them wherever the copy goes: copied into "name.audio" next to it and
+        // named there by their absolute paths (qt/docs/audio.md, "Export for Xournal++")
+        std::map<std::string, std::string> audioNames;
+        {
+            std::vector<audio::Recording> recordings;
+            fs::path docFile;
+            {
+                std::shared_lock lock(doc);
+                recordings = audio::recordingsOf(doc);
+                docFile = doc.getFilepath();
+            }
+            const fs::path folder = fs::absolute(audio::exportFolderOf(xopp));
+            for (const auto& rec: recordings) {
+                const fs::path file = audio::find(rec.name, docFile);
+                if (file.empty()) {
+                    continue;
+                }
+                std::error_code ec;
+                fs::create_directories(folder, ec);
+                const fs::path target = folder / file.filename();
+                if (!fs::equivalent(file, target, ec)) {
+                    fs::copy_file(file, target, fs::copy_options::overwrite_existing, ec);
+                    if (ec) {
+                        continue;
+                    }
+                }
+                const std::u8string abs = target.u8string();
+                audioNames[rec.name] = std::string(abs.begin(), abs.end());
+            }
+        }
+        const Prepared prep = prepare(doc, pdf.filename().string(), work.path, {}, pdfPageCount, attached, {}, nullptr,
+                                      nullptr, &audioNames);
         if (!prep.error.empty()) {
             r.error = prep.error;
             return r;
@@ -3236,6 +3474,31 @@ void extractPictures(QPDF& q, QPDFObjectHandle marker, const fs::path& dir) {
 }
 }  // namespace
 
+namespace {
+/// The recordings a PDF carries (the marker's /Audio) written into `dir`/audio under their names in the document
+/// (qt/docs/audio.md). The folder is made also when there are none.
+void extractAudio(QPDF& q, QPDFObjectHandle marker, const fs::path& dir) {
+    const fs::path folder = dir / AUDIO_NAME;
+    std::error_code ec;
+    const fs::path tmp = partOf(folder);
+    fs::remove_all(tmp, ec);
+    fs::create_directories(tmp, ec);
+    QPDFEmbeddedFileDocumentHelper efdh(q);
+    for (const auto& [name, source]: audioListOf(marker)) {
+        const std::u8string bare = fs::path(std::u8string(source.begin(), source.end())).filename().u8string();
+        auto spec = efdh.getEmbeddedFile(name);
+        if (bare.empty() || !spec) {
+            continue;
+        }
+        auto buffer = spec->getEmbeddedFileStream().getStreamData(qpdf_dl_all);
+        writeFile(tmp / fs::path(bare),
+                  std::string(reinterpret_cast<const char*>(buffer->getBuffer()), buffer->getSize()));
+    }
+    fs::remove_all(folder, ec);
+    fs::rename(tmp, folder, ec);
+}
+}  // namespace
+
 Opened open(const fs::path& pdf) {
     Opened o;
     try {
@@ -3280,6 +3543,7 @@ Opened open(const fs::path& pdf) {
                 }
             }
             extractPictures(q, marker, dir);  // (before strip(): it removes them)
+            extractAudio(q, marker, dir);
             std::vector<QPDFObjectHandle> pages;  // (the clean copy's page k is this page of the file)
             for (auto& p: QPDFPageDocumentHelper(q).getAllPages()) {
                 pages.push_back(p.getObjectHandle());
@@ -3310,8 +3574,16 @@ Opened open(const fs::path& pdf) {
                 q.processFile(pdf.string().c_str());
                 extractPictures(q, q.getRoot().getKey(MARKER), dir);
             }
+            if (!fs::exists(dir / AUDIO_NAME, ec)) {  // (an entry made before recordings were carried)
+                QPDF q;
+                q.setSuppressWarnings(true);
+                q.processFile(pdf.string().c_str());
+                extractAudio(q, q.getRoot().getKey(MARKER), dir);
+            }
         }
         o.pictures = dir / PICTURES_NAME;
+        o.audio = dir / AUDIO_NAME;
+        audio::setExtractedFolder(pdf, o.audio);
         {
             std::istringstream in(bytesOf(check));
             for (std::string line; std::getline(in, line);) {

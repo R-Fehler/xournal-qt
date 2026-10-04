@@ -58,6 +58,8 @@
 #include "DocumentSearch.h"
 #include "DocumentTextIndex.h"
 #include "DocumentSession.h"
+#include "audio/AudioFiles.h"
+#include "audio/DocumentAudio.h"
 #include "HybridPdf.h"
 #include "MergedPdf.h"
 #include "PdfPageKeeper.h"
@@ -407,14 +409,27 @@ void DocumentSession::beginSave() {
             t.target = getFilePath();
             t.hybrid = isHybrid();
             break;
-        case SaveKind::SaveAs:
+        case SaveKind::SaveAs: {
             t.target = t.request.target;
+            // The recordings a PDF with notes brought (in the cache): into the app's audio folder, where the .xopp's
+            // bare names find them, as upstream (qt/docs/audio.md)
+            std::vector<std::string> names;
+            fs::path before;
+            {
+                std::shared_lock lock(*doc);
+                for (const auto& r: audio::recordingsOf(*doc)) {
+                    names.push_back(r.name);
+                }
+                before = doc->getFilepath();
+            }
+            audio::adoptExtracted(names, before);
             // Like Control::saveImpl(saveAs=true): the document takes the new path before saving (the location of an
             // attached background PDF is derived from it).
             doc->lock();
             doc->setFilepath(t.target);
             doc->unlock();
             break;
+        }
         case SaveKind::Hybrid:
             t.target = t.request.target;
             if (!hasExtension(t.target, ".pdf")) {
