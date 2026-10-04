@@ -2558,3 +2558,13 @@ letter words only where the recogniser is sure.
 - [ ] Write more on a page, wait, Ctrl+S: the save is still incremental (the save message), and the new words are
       found in Okular after reloading. Open the PDF in xournal-qt again: a search finds each handwritten word once
       (not twice: the text layer is not read back as PDF text).
+- [ ] The model and the runtime (the author's machine, once): run `qt/scripts/hwr-model.sh` (it copies the model
+      from `~/.cache/huggingface` where the research put it, else downloads it) and note the revision and the
+      sha256 lines it prints; pin them in `qt/src/shell/ModelDownload.cpp` (`builtIn()`: revision, sha256 and size
+      of each file). Install ONNX Runtime (`pip install --user onnxruntime` and
+      `export XQT_ONNXRUNTIME=$(python3 -c 'import onnxruntime,os;print(os.path.dirname(onnxruntime.__file__))')/capi/libonnxruntime.so.1.*`,
+      or a distribution package with `libonnxruntime.so.1`).
+- [ ] The real-model tests: `XQT_HWR_MODEL=~/.local/share/xournal-qt/models/trocr-small-hw-int8
+      XQT_ONNXRUNTIME=<the .so> XQT_BENCH_HWR=1 build-qt/xqt-hwr-tests --gtest_filter='Trocr*'`: the benchmark line
+      is read ("This is a dumb test …"), at least two of "this", "dumb", "test" among the readings; the time per
+      line printed (research: about 0.2 s per 8 words on 2 threads). The tiny-model test passes too.
