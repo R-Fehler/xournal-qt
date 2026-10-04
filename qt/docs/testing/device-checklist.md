@@ -2822,3 +2822,9 @@ letter words only where the recogniser is sure.
 - [ ] A big area at a high zoom (a whole A3 poster at 400 %): it takes a moment at most, the UI does not freeze, the
       picture is about 4 megapixels.
 - [ ] Windows, Android: the picture reaches other apps through the system clipboard (Android: paste into a messenger).
+
+## Stickers (qt/stickers, qt/docs/stickers.md)
+
+- [ ] A sticker file (`<library>/Stickers/….xopp`) opens in Xournal++ 1.2 / 1.3 without a message: one page of the
+      content's size on plain paper, the ink in "Layer 1", Markdown boxes as their source text, notes as coloured
+      rectangles with their ink, the picture of the PDF (when saved with it) in "Sticker picture" at the bottom.
