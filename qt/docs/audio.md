@@ -31,3 +31,38 @@ Tests: `OggVorbisTest` (label `audio`): a sine through the file (exact length, S
 samples in odd chunks, seeking to the sample (a tone burst found 20 ms after seeking 20 ms before it, forwards and
 back), a file copied while being written and one cut in the middle of a page, files that are no recording, upstream's
 `test.ogg`, a non-ASCII path.
+
+## Devices
+
+`qt/src/audio/AudioDevice.h`: the microphone (`AudioInput`, gives mono float samples) and the speaker (`AudioOutput`,
+pulls mono float samples at the file's rate) behind small interfaces. Three backends:
+
+- **Qt Multimedia** (`QtAudioDevice.cpp`): `QAudioSource` asked for mono float at the microphone's own rate (else
+  mono 16-bit, else its preferred format mixed down); `QAudioSink` at the file's rate in mono, else the device's
+  preferred format with linear resampling and the sample copied to every channel. Built when `XQT_AUDIO` is on (the
+  default) and `Qt6::Multimedia` is found; no FFmpeg plugin is needed, as Qt only moves samples.
+- **Fakes** (`FakeAudio.h`): a tone for the microphone, a counter for the speaker, driven by a 10 ms timer or moved on
+  by hand in tests. `XQT_FAKE_AUDIO=1` makes the app use them (UI tests; trying the UI in a build without Qt
+  Multimedia).
+- **None**: a build without Qt Multimedia does not offer recording (the record button is hidden), but recordings in
+  documents are kept, saved and exported as before.
+
+Both run on the UI thread: mono 48 kHz is little data, and encoding 10 ms costs well under a millisecond.
+
+### Recording and playing
+
+- `Recorder` writes what the microphone gives into a `VorbisWriter`. **Its time is its count of samples**:
+  `positionMs()` is the length of the file so far, and that is the timestamp a stroke made now gets (upstream's `ts`,
+  milliseconds from the start of its recording). Paused time is not in the file and not in the timestamps. It
+  reports a level (the peak of the last 50 ms) and **warns when the first 5 s are silent** (below about -50 dBFS: a
+  muted or wrong microphone), until sound comes. A device that fails (unplugged) ends the recording; the file keeps
+  what came before.
+- `Player` decodes while the speaker asks. Its position is where it started plus what the device has played (not what
+  is buffered); a seek restarts the device, so nothing from before the seek is heard after it. Pause, resume, seek
+  while paused, a signal at the end.
+
+Tests: `RecorderTest`, `PlayerTest` (fakes moved by hand: the file's length is the samples given, pause, level,
+the silence warning and its end, a microphone that cannot be opened or is unplugged, no backend; the position of the
+player against what the fake speaker gets, pause/resume/seek forwards, back and beyond the end, a missing file, an
+unplugged speaker; one test each with the fakes' timers). `RecorderTest.theRealMicrophone` records a second from the
+real microphone with `XQT_AUDIO_DEVICE=1` in a build with Qt Multimedia (skipped otherwise).

@@ -2824,3 +2824,15 @@ letter words only where the recogniser is sure.
 - [ ] A big area at a high zoom (a whole A3 poster at 400 %): it takes a moment at most, the UI does not freeze, the
       picture is about 4 megapixels.
 - [ ] Windows, Android: the picture reaches other apps through the system clipboard (Android: paste into a messenger).
+
+## Audio recordings (qt/audio)
+
+Builds with Qt Multimedia only (`cmake` prints "Audio recordings: Qt Multimedia …"; without it recording is not
+offered).
+
+- [ ] `XQT_AUDIO_DEVICE=1 build-qt/xqt-audio-tests --gtest_filter=*RealMicrophone*` passes on Linux (PipeWire and
+      PulseAudio), Windows and macOS (it asks for the microphone there).
+- [ ] A microphone that only takes stereo or 44.1 kHz (a USB headset): the recording is mono and plays at the right
+      speed. A speaker that does not take the file's rate (some Bluetooth devices): the recording plays at the right
+      pitch and speed.
+- [ ] Unplug the headset while recording: the recording ends with a message and the file plays up to that moment.

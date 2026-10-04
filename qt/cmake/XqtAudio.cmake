@@ -61,15 +61,46 @@ endforeach()
 # xqt-audio: the files (OggVorbis), the recorder and player behind interfaces, the fake devices of the tests.
 add_library(xqt-audio STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/audio/OggVorbis.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/OggVorbis.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/OggVorbis.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/AudioDevice.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/AudioDevice.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/FakeAudio.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/FakeAudio.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/Recorder.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/Recorder.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/Player.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/Player.cpp)
 target_include_directories(xqt-audio PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src")
 target_link_libraries(xqt-audio PUBLIC Qt6::Core PRIVATE xqt-vorbis)
 set_target_properties(xqt-audio PROPERTIES AUTOMOC ON)
 
+# The microphone and the speaker through Qt Multimedia (QAudioSource / QAudioSink; no FFmpeg plugin needed: the files
+# are Ogg Vorbis by the codec above). Without it the app builds and runs, and does not offer recording;
+# XQT_FAKE_AUDIO=1 then gives fake devices (qt/src/audio/FakeAudio.h) to try the UI.
+option(XQT_AUDIO "Audio recordings: record and play through Qt Multimedia when it is found" ON)
+set(XQT_HAVE_QT_MULTIMEDIA OFF)
+if(XQT_AUDIO)
+    find_package(Qt6 ${Qt6_VERSION} QUIET COMPONENTS Multimedia)
+    if(TARGET Qt6::Multimedia)
+        set(XQT_HAVE_QT_MULTIMEDIA ON)
+    endif()
+endif()
+if(XQT_HAVE_QT_MULTIMEDIA)
+    message(STATUS "Audio recordings: Qt Multimedia ${Qt6Multimedia_VERSION}")
+    target_sources(xqt-audio PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../src/audio/QtAudioDevice.cpp)
+    target_link_libraries(xqt-audio PUBLIC Qt6::Multimedia)
+    target_compile_definitions(xqt-audio PRIVATE XQT_HAVE_QT_MULTIMEDIA)
+else()
+    message(STATUS "Audio recordings: no Qt Multimedia (Qt6::Multimedia not found or XQT_AUDIO off): recording is not "
+        "offered; XQT_FAKE_AUDIO=1 uses fake devices")
+endif()
+
 if(XQT_BUILD_TESTS)
     add_executable(xqt-audio-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/audio/main.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/audio/OggVorbisTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/audio/OggVorbisTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/audio/RecorderTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/audio/PlayerTest.cpp)
     target_link_libraries(xqt-audio-tests PRIVATE xqt-audio Qt6::Test GTest::gtest)
     target_include_directories(xqt-audio-tests PRIVATE "${TEST_CONFIG_DIR}")
     gtest_discover_tests(xqt-audio-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS audio
