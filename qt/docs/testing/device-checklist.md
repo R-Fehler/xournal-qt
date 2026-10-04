@@ -2523,3 +2523,11 @@ Finder:
 - [ ] Two columns (decision aid for `qt/docs/md-columns.md`): open a long `.md` as pages on the tablet in landscape,
       turn on "Two pages side by side": does reading two pages side by side give what a two-column mode was wanted
       for? If not, note what is missing (one page in two columns, printing handouts, ...).
+
+## Handwriting search (qt/hwr-search)
+
+Handwritten words become searchable (never converted to text). The steps below need the model: run
+`qt/scripts/hwr-model.sh` once (or let Settings download it, once that is built), see
+[qt/docs/handwriting-search.md](../handwriting-search.md). Matching rules (unit-tested, `xqt-hwr-tests`): readings of a
+word that the recogniser found likely take part; a word of 3+ letters is found with a typo even with Fuzzy off; 1-2
+letter words only where the recogniser is sure.

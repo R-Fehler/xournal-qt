@@ -54,6 +54,9 @@ enum Bounds : unsigned {
     /// FuzzyTypos (typosOf()).
     Fuzzy = 4,
     FuzzyTypos = 8 | 16,
+    /// With Fuzzy: only the word containing the term or a typo, not its letters in order (WordMatch.h, rule 2). Used
+    /// for recognised handwriting (InkText.h) by the plain search, never for text.
+    TypoOnly = 32,
 };
 /// The typo tolerance of a fuzzy term (WordMatch.h: 0 none, 1, 2), and its bits.
 inline int typosOf(unsigned bounds) { return static_cast<int>((bounds & FuzzyTypos) >> 3); }

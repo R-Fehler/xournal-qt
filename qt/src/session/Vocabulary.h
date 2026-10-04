@@ -35,6 +35,15 @@
 namespace xqt::words {
 
 using Id = std::uint32_t;
+/// No word (a reading without letters or digits).
+constexpr Id NO_WORD = 0xFFFFFFFFu;
+
+/// The number of a word (case folded, as TextMatch::words() gives it), added to the dictionary if it is new. The words
+/// recognised in handwriting are kept by their numbers (InkText.h), so a term is matched once per word of the
+/// dictionary (Matches), not once per occurrence.
+Id idOf(QStringView word);
+/// The word with this number ("" if there is none).
+QString textOf(Id id);
 
 /// Words in the dictionary, and the memory it takes (tests, measurements).
 size_t dictionarySize();
@@ -58,20 +67,23 @@ private:
     std::vector<Word> list;
 };
 
-/// How the words of the dictionary match a fuzzy term.
+/// How the words of the dictionary match a term, word by word: a term with textmatch::Fuzzy by WordMatch's rules
+/// (without the letters in order with textmatch::TypoOnly); the others (the words of recognised handwriting, InkText.h)
+/// by their bounds: the whole word (Word), its start (WordStart), its end (WordEnd), else anywhere in it - all Exact.
 class Matches {
 public:
-    /// For a term with textmatch::Fuzzy (kept for the last few terms, and extended when the dictionary grew).
+    /// For a term (kept for the last few terms, and extended when the dictionary grew).
     static std::shared_ptr<const Matches> of(const textmatch::Term& term);
     wordmatch::Quality quality(Id id) const;
     /// How a word (as TextMatch::words() gives it) matches.
-    wordmatch::Quality match(QStringView word) const { return rule.match(word); }
+    wordmatch::Quality match(QStringView word) const;
 
     explicit Matches(const textmatch::Term& term);  // (use of())
 
 private:
     friend struct MatchCache;
     wordmatch::Rule rule;
+    unsigned bounds = 0;
     std::vector<wordmatch::Quality> known;  ///< by number, the words the dictionary had then
 };
 
@@ -86,6 +98,9 @@ public:
     size_t size() const { return list.size(); }
     /// Some term is fuzzy: a vocabulary of the texts is needed.
     bool fuzzy() const { return anyFuzzy; }
+    /// All terms, and those whose hits count (recognised handwriting is matched with them, InkText.h).
+    const std::vector<textmatch::Term>& all() const { return list; }
+    const std::vector<textmatch::Term>& counted() const { return countedTerms; }
 
     struct Found {
         int count = 0;         ///< hits of the counted terms (where hits of different terms overlap: once)

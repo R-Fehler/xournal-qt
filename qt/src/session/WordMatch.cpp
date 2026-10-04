@@ -70,9 +70,9 @@ int editDistance(QStringView a, QStringView b, int max) {
     return std::min((*last)[static_cast<size_t>(m)], max + 1);
 }
 
-Rule::Rule(QStringView term, int typos):
+Rule::Rule(QStringView term, int typos, bool inOrder):
         text(term.toString()),
-        gaps(gapsAllowed(static_cast<int>(term.size()))),
+        gaps(inOrder ? gapsAllowed(static_cast<int>(term.size())) : -1),
         edits(typosAllowed(static_cast<int>(term.size()), typos)) {}
 
 Quality Rule::match(QStringView word) const {
@@ -83,7 +83,7 @@ Quality Rule::match(QStringView word) const {
     if (word.size() >= n && word.contains(text)) {
         return Exact;
     }
-    if (const int g = gapsOf(text, word); g >= 0 && g <= gaps) {
+    if (const int g = gaps >= 0 ? gapsOf(text, word) : -1; g >= 0 && g <= gaps) {
         return Fuzzy;  // its letters in this order, from the word's first one on
     }
     if (edits > 0 && editDistance(text, word, edits) <= edits) {

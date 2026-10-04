@@ -86,6 +86,21 @@ size_t dictionaryBytes() {
     return d.bytes();
 }
 
+Id idOf(QStringView word) {
+    if (word.isEmpty()) {
+        return NO_WORD;
+    }
+    Dictionary& d = Dictionary::instance();
+    std::lock_guard lock(d.mtx);
+    return d.add(word);
+}
+
+QString textOf(Id id) {
+    Dictionary& d = Dictionary::instance();
+    std::lock_guard lock(d.mtx);
+    return id < d.count() ? d.at(id).toString() : QString();
+}
+
 // --- Vocabulary ------------------------------------------------------------------------------------------------
 
 Vocabulary::Vocabulary(std::initializer_list<QStringView> texts) {
@@ -113,7 +128,24 @@ Vocabulary::Vocabulary(std::initializer_list<QStringView> texts) {
 
 // --- Matches ---------------------------------------------------------------------------------------------------
 
-Matches::Matches(const textmatch::Term& term): rule(term.text, textmatch::typosOf(term.bounds)) {}
+Matches::Matches(const textmatch::Term& term):
+        rule(term.text, textmatch::typosOf(term.bounds), (term.bounds & textmatch::TypoOnly) == 0),
+        bounds(term.bounds) {}
+
+wordmatch::Quality Matches::match(QStringView word) const {
+    if (bounds & textmatch::Fuzzy) {
+        return rule.match(word);
+    }
+    const QString& t = rule.term();
+    bool found = false;
+    switch (bounds & textmatch::Word) {
+        case textmatch::Word: found = word == t; break;
+        case textmatch::WordStart: found = word.startsWith(t); break;
+        case textmatch::WordEnd: found = word.endsWith(t); break;
+        default: found = !t.isEmpty() && word.contains(t); break;
+    }
+    return found ? wordmatch::Exact : wordmatch::None;
+}
 
 wordmatch::Quality Matches::quality(Id id) const {
     if (id < known.size()) {
@@ -122,7 +154,7 @@ wordmatch::Quality Matches::quality(Id id) const {
     // A word added since: matched now
     Dictionary& d = Dictionary::instance();
     std::lock_guard lock(d.mtx);
-    return id < d.count() ? rule.match(d.at(id)) : wordmatch::None;
+    return id < d.count() ? match(d.at(id)) : wordmatch::None;
 }
 
 struct MatchCache {
@@ -146,7 +178,7 @@ struct MatchCache {
             m->known = before->known;
         }
         for (size_t id = from; id < d.count(); ++id) {
-            m->known.push_back(m->rule.match(d.at(static_cast<Id>(id))));
+            m->known.push_back(m->match(d.at(static_cast<Id>(id))));
         }
         return m;
     }
