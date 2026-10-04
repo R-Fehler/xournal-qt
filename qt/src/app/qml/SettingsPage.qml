@@ -329,6 +329,45 @@ Popup {
                                    + "of a half-centimetre grid when they come close to it (as in Xournal++). Also in "
                                    + "the shapes menu of the tool bar. Hold Alt to do the opposite for a moment.")
                     }
+                    SectionTitle { text: qsTr("Colors") }
+                    ComboRow {
+                        objectName: "colorPaletteRow"
+                        text: qsTr("Color palette")
+                        options: app.colorPalettes.map(function(p) { return { text: p.name, value: p.id } })
+                        dependsOn: app.colorPalette
+                        getter: function() { return app.colorPalette }
+                        setter: function(id) { app.colorPalette = id }
+                    }
+                    Flow {  // the chosen palette's ink colors, with their roles' names
+                        objectName: "colorPalettePreview"
+                        Layout.fillWidth: true
+                        spacing: 4
+                        Repeater {
+                            model: {
+                                const all = app.colorPalettes
+                                for (let i = 0; i < all.length; ++i) if (all[i].id === app.colorPalette) return all[i].roles
+                                return []
+                            }
+                            delegate: Rectangle {
+                                required property var modelData
+                                width: 22; height: 22; radius: 11
+                                color: modelData.ink
+                                border.width: 1
+                                border.color: "#9e9e9e"
+                                ToolTip.visible: dotHover.hovered
+                                ToolTip.text: modelData.name
+                                ToolTip.delay: 400
+                                HoverHandler { id: dotHover }
+                            }
+                        }
+                    }
+                    Hint {
+                        text: qsTr("The color chooser of the tool bar has a tab for each palette. Each color of a "
+                                   + "palette has a meaning (warnings, key terms, headings, …) that stays the same in "
+                                   + "every palette: a color taken from a palette follows when another palette is "
+                                   + "chosen. With the highlighter the palettes give their highlight colors, half "
+                                   + "see-through on light paper and stronger on dark paper.")
+                    }
                     Item { Layout.preferredHeight: 16 }
                 }
             }

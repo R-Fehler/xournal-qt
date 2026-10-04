@@ -15,6 +15,7 @@
 #include <vector>
 
 #include <QColor>
+#include <QMap>
 #include <QJSValue>
 #include <QMetaObject>
 #include <QFileSystemWatcher>
@@ -163,6 +164,13 @@ class AppController: public QObject {
     /// Color of PDF text highlights, one of three presets
     Q_PROPERTY(QColor pdfHighlightColor READ pdfHighlightColor WRITE setPdfHighlightColor NOTIFY pdfTextModeChanged)
     Q_PROPERTY(QVariantList pdfHighlightColors READ pdfHighlightColors CONSTANT)
+    /// The color palettes of the color chooser (ColorPalettes.h, qt/resources/palettes/palettes.json):
+    /// [{ id, name, source, background, dark, roles: [{ key, name, ink, highlight }] }]
+    Q_PROPERTY(QVariantList colorPalettes READ colorPalettes CONSTANT)
+    /// The chosen palette's id (setting "colorPalette"; default: the first, "classic")
+    Q_PROPERTY(QString colorPalette READ colorPalette WRITE setColorPalette NOTIFY colorPaletteChanged)
+    /// The role of the color in hand when it was taken from a palette: "marker:warnings" (else "")
+    Q_PROPERTY(QString colorRole READ colorRole NOTIFY toolChanged)
     /// The text mode edits the typed text of a page (textFlowPage, 0-based); how far it goes below the page (points)
     Q_PROPERTY(bool textFlowActive READ textFlowActive NOTIFY textFlowChanged)
     Q_PROPERTY(int textFlowPage READ textFlowPage NOTIFY textFlowChanged)
@@ -350,6 +358,28 @@ public:
     QColor pdfHighlightColor() const;
     void setPdfHighlightColor(const QColor& color);
     QVariantList pdfHighlightColors() const;
+    QVariantList colorPalettes() const;
+    QString colorPalette() const;
+    void setColorPalette(const QString& id);
+    /// The background color of the current page (white without a document)
+    Q_INVOKABLE QColor paperColor() const;
+    /// The highlighter's opacity on the current page's paper: 0.5 on light paper, 0.8 on dark
+    /// (ColorPalettes::highlighterOpacity)
+    Q_INVOKABLE double highlighterOpacity() const;
+    // --- colors taken from a palette remember their role (qt/docs/color-palettes.md) ---
+    /// The tool in hand takes the color of `role` in palette `paletteId` (its ink; the highlight color for the
+    /// highlighter) and remembers the role; the palette becomes the chosen one, and the other tools' colors taken from
+    /// a palette follow it.
+    Q_INVOKABLE void setPaletteColor(const QString& paletteId, const QString& role);
+    QString colorRole() const;
+    /// The role of a tool's color ("pen", "highlighter", "text"): "marker:warnings", or "" when it was not taken
+    /// from a palette (or has been changed since)
+    Q_INVOKABLE QString colorRoleOf(const QString& tool) const;
+    /// The color of `role` in `paletteId` (invalid: the palette leaves the role out). For tool presets (qt/toolbox).
+    Q_INVOKABLE QColor paletteColor(const QString& paletteId, const QString& role, bool highlight) const;
+    /// What a color taken as `ref` ("marker:warnings") becomes in `paletteId` (invalid: that palette has no such
+    /// role, the color stays as it is). For tool presets that follow a palette switch (qt/toolbox).
+    Q_INVOKABLE QColor followPalette(const QString& ref, const QString& paletteId, bool highlight) const;
     QString toolbarPosition() const;
     bool toolbarHidden() const;
     void setToolbarHidden(bool hidden);
@@ -1221,6 +1251,7 @@ Q_SIGNALS:
     void linkTargetMissing(const QString& name);
     void copiedPagesChanged();
     void toolbarColorsChanged();
+    void colorPaletteChanged();
     void insertPagesRequested(int position);
     void pageBackgroundRequested(const QList<int>& pages);
     void noteSpaceRequested(const QList<int>& pages, bool allPages);
@@ -1389,6 +1420,11 @@ private:
     QString pdfMode = "highlight";
     void applyPdfTextMode();
     void storeToolbarColors(const QVariantList& colors);
+    /// The roles of the tools' colors (setting "colorRoles": "pen=marker:warnings;highlighter=classic:keyTerms")
+    QMap<QString, QString> colorRoles() const;
+    void storeColorRoles(const QMap<QString, QString>& roles);
+    /// The colors taken from a palette take their role's color in `paletteId` (where it has the role)
+    void followColorPalette(const QString& paletteId);
     std::vector<QMetaObject::Connection> currentConnections;
     /// The view of the current tab (another tab: select more ends in the one before)
     QPointer<xqt::CanvasView> currentCanvas;

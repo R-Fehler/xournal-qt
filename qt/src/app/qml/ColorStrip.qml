@@ -1,7 +1,9 @@
 // The colors of the tool bar (qt/docs/adaptive-layout.md, "The tool bar"), in the form the room allows (ToolBarPlan.js):
-// - "full": the palette (the tool bar's colors) and "+";
-// - "recent": the current color, the colors used last (then the palette's) and a palette button;
-// - "single": one cycling button: a tap takes the next of the first five palette colors, a long press the palette.
+// - "full": the palette (the tool bar's colors) and "+" (the color chooser);
+// - "recent": the current color, the colors used last (then the palette's) and a palette button (the color chooser);
+// - "single": one cycling button: a tap takes the next of the first five palette colors, a long press the chooser.
+// The color chooser (ColorChooser.qml) has the tool bar's colors and "Add a color…" in its first tab, then a tab for
+// each color palette.
 // A color: a tap uses it; a long press (or a right click) offers removing it, adding one, the default colors.
 import QtQuick
 import QtQuick.Controls
@@ -115,13 +117,12 @@ Item {
             return -1
         }
         onClicked: {
-            if (strip.mode === "full") colorDialog.open()
-            else if (strip.mode === "recent") strip.openPalette()
+            if (strip.mode !== "single") strip.openPalette()  // (the palettes, and "Add a color…")
             else if (strip.cycleColors.length > 0) app.setColor(strip.cycleColors[(cycleIndex + 1) % strip.cycleColors.length])
         }
         onPressAndHold: if (strip.mode !== "full") strip.openPalette()
         ToolTip.visible: hovered
-        ToolTip.text: strip.mode === "full" ? qsTr("Add a color (press and hold a color to remove it)")
+        ToolTip.text: strip.mode === "full" ? qsTr("More colors: palettes, add a color (press and hold a color to remove it)")
                       : strip.mode === "recent" ? qsTr("All colors")
                       : qsTr("Color (tap: the next one; hold: all colors)")
         ToolTip.delay: 600
@@ -168,79 +169,53 @@ Item {
     function openPalette() {
         palettePopup.open()
     }
-    // All colors: the palette, the recent ones, "Add a color"
-    Popup {
+    // All colors (ColorChooser.qml): the first tab has the tool bar's colors, the recent ones and "Add a color"; the
+    // others the color palettes
+    ColorChooser {
         id: palettePopup
         objectName: "colorPalette"
-        focus: true  // (Esc closes it)
-        background: Rectangle {
-            radius: palettePopup.asSheet ? 16 : 12
-            color: "#ffffff"
-            border.width: palettePopup.asSheet ? 0 : 1
-            border.color: "#d5d8dc"
+        anchorItem: lastCell
+        side: strip.side
+        Label { text: qsTr("Tool bar colors"); font.weight: Font.DemiBold; color: "#5f6368" }
+        Grid {
+            columns: palettePopup.columns
+            columnSpacing: palettePopup.asSheet ? 8 : 0
+            Repeater {
+                model: palettePopup.opened ? strip.palette : []
+                delegate: Swatch {
+                    required property color modelData
+                    required property int index
+                    objectName: "paletteSwatch"
+                    swatchColor: modelData
+                    paletteIndex: index
+                    onClicked: palettePopup.close()
+                }
+            }
         }
-        /// In the phone classes a bottom sheet (qt/docs/adaptive-layout.md, "The phone chrome")
-        readonly property bool asSheet: typeof win !== "undefined" && win !== null && win.phoneLayout
-        modal: asSheet
-        dim: asSheet
-        width: asSheet && parent ? win.sheetWidth : implicitWidth
-        bottomPadding: asSheet ? 10 + 8 + win.sheetBottomPadding : 10
-        parent: asSheet ? Overlay.overlay : lastCell
-        // (margins: kept inside the window)
-        x: asSheet ? win.sheetX
-           : strip.side === "left" ? parent.width + 4 : strip.side === "right" ? -width - 4 : 0
-        y: asSheet ? win.sheetBottom - height
-           : strip.side === "top" ? parent.height + 4 : strip.side === "bottom" ? -height - 4 : 0
-        margins: asSheet ? 0 : 8
-        padding: 10
-        leftPadding: asSheet ? 16 : 10
-        rightPadding: asSheet ? 16 : 10
-        /// Swatches per row: six, as many as fit across a sheet
-        readonly property int columns: asSheet ? Math.max(6, Math.floor((width - 32) / 48)) : 6
-        Column {
-            spacing: 6
-            Shortcut { sequence: "Back"; enabled: palettePopup.opened; onActivated: palettePopup.close() }  // (Android's back key)
-            Label { text: qsTr("Colors"); font.weight: Font.DemiBold; color: "#5f6368" }
-            Grid {
-                columns: palettePopup.columns
-                columnSpacing: palettePopup.asSheet ? 8 : 0
-                Repeater {
-                    model: palettePopup.opened ? strip.palette : []
-                    delegate: Swatch {
-                        required property color modelData
-                        required property int index
-                        objectName: "paletteSwatch"
-                        swatchColor: modelData
-                        paletteIndex: index
-                        onClicked: palettePopup.close()
-                    }
+        Label {
+            visible: recentGrid.count > 0
+            text: qsTr("Used lately")
+            color: "#5f6368"
+            font.pixelSize: 13
+        }
+        Grid {
+            columns: palettePopup.columns
+            columnSpacing: palettePopup.asSheet ? 8 : 0
+            Repeater {
+                id: recentGrid
+                model: palettePopup.opened ? win.toolGroups.recentColors.filter(function(c) { return strip.paletteIndexOf(c) < 0 }) : []
+                delegate: Swatch {
+                    required property color modelData
+                    swatchColor: modelData
+                    onClicked: palettePopup.close()
                 }
             }
-            Label {
-                visible: recentGrid.count > 0
-                text: qsTr("Used lately")
-                color: "#5f6368"
-                font.pixelSize: 13
-            }
-            Grid {
-                columns: palettePopup.columns
-                columnSpacing: palettePopup.asSheet ? 8 : 0
-                Repeater {
-                    id: recentGrid
-                    model: palettePopup.opened ? win.toolGroups.recentColors.filter(function(c) { return strip.paletteIndexOf(c) < 0 }) : []
-                    delegate: Swatch {
-                        required property color modelData
-                        swatchColor: modelData
-                        onClicked: palettePopup.close()
-                    }
-                }
-            }
-            Button {
-                objectName: "paletteAddColor"
-                flat: true
-                text: qsTr("Add a color…")
-                onClicked: { palettePopup.close(); colorDialog.open() }
-            }
+        }
+        Button {
+            objectName: "paletteAddColor"
+            flat: true
+            text: qsTr("Add a color…")
+            onClicked: { palettePopup.close(); colorDialog.open() }
         }
     }
 }
