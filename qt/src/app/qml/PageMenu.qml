@@ -27,7 +27,8 @@ Popup {
     property int page: 0
     /// The document was shown beside itself at the page (the page grid closes then)
     signal referenced()
-    readonly property var pages: app.pages.isSelected(page) ? app.pages.selectedPages() : [page]
+    // (the selection's count: read again when the selection changes, also for the same page)
+    readonly property var pages: (app.pages.selectionCount, app.pages.isSelected(page) ? app.pages.selectedPages() : [page])
     readonly property string what: pages.length > 1 ? qsTr("%1 pages").arg(pages.length) : qsTr("page")
     readonly property int lastPage: pages[pages.length - 1]
 

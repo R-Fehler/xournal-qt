@@ -1,7 +1,8 @@
 // Grid of all pages of the current document over the canvas: fling through the whole document, tap a page to go
 // there. Zoom (pinch, Ctrl+wheel, −/+) changes the number of columns: bigger previews, fewer per row.
-// Search hits are marked on the previews. Pages can be selected (Ctrl/Shift+click, or "Select" for touch), copied,
-// pasted, deleted and dragged to another place (press and hold), undone like everything else (see PageKeys).
+// Search hits are marked on the previews. Pages can be selected (Ctrl/Shift+click, or "Select" for touch; a finger
+// held on a page turns "Select" on with that page selected), copied, pasted, deleted, rotated and dragged to another
+// place (press and hold, then move), undone like everything else (see PageKeys).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -229,6 +230,12 @@ Rectangle {
                     else pageGrid.choose(cell.pageIndex)
                 }
                 onHeld: grid.forceActiveFocus()
+                // A finger held on a page: "Select" with the page selected (moving on drags the selection)
+                onHeldToSelect: {
+                    grid.currentIndex = cell.index
+                    pageGrid.selectionMode = true
+                    if (!app.pages.isSelected(cell.pageIndex)) app.pages.toggleSelected(cell.pageIndex)
+                }
                 onMenuRequested: function(x, y) { pageMenu.openFor(cell.pageIndex, cell, x, y) }
             }
         }
@@ -347,7 +354,7 @@ Rectangle {
                 checked: pageGrid.selectionMode
                 onToggled: pageGrid.selectionMode = checked
                 ToolTip.visible: hovered
-                ToolTip.text: qsTr("Tap pages to select them (Ctrl/Shift+click also works)")
+                ToolTip.text: qsTr("Tap pages to select them (Ctrl/Shift+click, or hold a page with a finger)")
             }
             ToolSeparator { visible: !pageGrid.phoneTools }
             ToolButton {

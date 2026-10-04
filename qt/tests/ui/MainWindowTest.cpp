@@ -979,6 +979,184 @@ TEST_F(MainWindowTest, pageGridDragAndDropMovesSelectedPages) {
     EXPECT_EQ(session->pageOrder(), original);
 }
 
+namespace {
+/// The page previews of a view hold for this long (ms) before a held finger selects (the app: 400)
+/// (the delegates are the view's items, not its QObject children)
+void shortenHolds(QQuickItem* item, int ms = 150) {
+    if (item->objectName() == QLatin1String("pageArea")) {
+        item->setProperty("pressAndHoldInterval", ms);
+    }
+    for (QQuickItem* child: item->childItems()) {
+        shortenHolds(child, ms);
+    }
+}
+}  // namespace
+
+// The author: "long pressing on pages in grid overview or side panel should enable the selection mode and select the
+// page which is long pressed". A finger held on a page in the grid turns "Select" on with that page; taps then select;
+// a held finger that moves drags the selected pages. The mouse is as before.
+TEST_F(MainWindowTest, holdingAPageInTheGridSelectsIt) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    auto* session = controller->tabManager().currentSession();
+    const auto original = session->pageOrder();
+    auto* gridPanel = find<QQuickItem>("pageGrid");
+    ASSERT_NE(gridPanel, nullptr);
+    key(Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
+    auto* grid = find<QQuickItem>("pageGridView");
+    ASSERT_NE(grid, nullptr);
+    wait(100);
+    shortenHolds(grid);
+    auto* pagesModel = qobject_cast<xqt::PagesModel*>(controller->pagesModel());
+
+    // The mouse: held still and let go is a click (it opens the page), no selection
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, centerOf(itemAt(grid, 3)));
+    wait(300);
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, centerOf(itemAt(grid, 3)));
+    wait(50);
+    EXPECT_FALSE(gridPanel->isVisible()) << "a held mouse click opens the page";
+    EXPECT_EQ(controller->pageNumber(), 4);
+    EXPECT_EQ(pagesModel->selectionCount(), 0);
+
+    key(Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
+    ASSERT_TRUE(gridPanel->isVisible());
+    wait(100);
+    shortenHolds(grid);
+    static QPointingDevice* finger = QTest::createTouchDevice();
+    const auto hold = [&](int index) {
+        const QPoint at = centerOf(itemAt(grid, index));
+        QTest::touchEvent(window, finger).press(1, at);
+        wait(300);
+        return at;
+    };
+    QPoint at = hold(1);
+    EXPECT_TRUE(gridPanel->property("selectionMode").toBool()) << "selecting while the finger is still down";
+    EXPECT_EQ(pagesModel->selectedPages(), QList<int>({1}));
+    QTest::touchEvent(window, finger).release(1, at);
+    wait(60);
+    EXPECT_TRUE(gridPanel->isVisible()) << "letting go does not open the page";
+    EXPECT_TRUE(gridPanel->property("selectionMode").toBool());
+    EXPECT_EQ(pagesModel->selectedPages(), QList<int>({1}));
+    EXPECT_TRUE(find<QQuickItem>("pageActionBar")->isVisible());
+    EXPECT_EQ(controller->pageNumber(), 4) << "still on the page it was on";
+
+    // A tap now selects another page
+    at = centerOf(itemAt(grid, 4));
+    QTest::touchEvent(window, finger).press(1, at);
+    QTest::touchEvent(window, finger).release(1, at);
+    wait(60);
+    EXPECT_EQ(pagesModel->selectedPages(), QList<int>({1, 4}));
+
+    // Holding a page that is selected keeps it so
+    at = hold(4);
+    QTest::touchEvent(window, finger).release(1, at);
+    wait(60);
+    EXPECT_EQ(pagesModel->selectedPages(), QList<int>({1, 4}));
+    EXPECT_FALSE(controller->canUndoPages()) << "holding still moves no page";
+
+    // Held, then moved: page 7 joins the selection and the three go behind page 9 (index 8)
+    at = hold(6);
+    EXPECT_EQ(pagesModel->selectedPages(), QList<int>({1, 4, 6}));
+    QQuickItem* targetCell = itemAt(grid, 8);
+    const QPoint to = targetCell->mapToScene(QPointF(targetCell->width() * 0.8, targetCell->height() / 2)).toPoint();
+    for (int i = 1; i <= 10; ++i) {
+        QTest::touchEvent(window, finger).move(1, at + (to - at) * i / 10);
+        wait(10);
+    }
+    QTest::touchEvent(window, finger).release(1, to);
+    wait(60);
+    const auto order = session->pageOrder();
+    ASSERT_EQ(order.size(), original.size());
+    EXPECT_EQ(order[6], original[1]);
+    EXPECT_EQ(order[7], original[4]);
+    EXPECT_EQ(order[8], original[6]);
+    EXPECT_EQ(order[5], original[8]);
+    EXPECT_TRUE(gridPanel->isVisible());
+    controller->undoPages();
+    EXPECT_EQ(session->pageOrder(), original);
+}
+
+// The same in the sidebar, which had no selection mode: a held finger starts it (a bar says how many pages are
+// selected, with their menu and a way out); taps select until it ends.
+TEST_F(MainWindowTest, holdingAPageInTheSidebarSelectsIt) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    auto* sidebar = find<QQuickItem>("sidebar");
+    auto* list = find<QQuickItem>("sidebarList");
+    ASSERT_NE(sidebar, nullptr);
+    ASSERT_NE(list, nullptr);
+    ASSERT_TRUE(list->isVisible());
+    wait(100);
+    shortenHolds(list);
+    auto* pagesModel = qobject_cast<xqt::PagesModel*>(controller->pagesModel());
+    auto* bar = find<QQuickItem>("sidebarSelectionBar");
+    ASSERT_NE(bar, nullptr);
+    EXPECT_FALSE(bar->isVisible());
+
+    // The mouse held still: a click (goes to the page)
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, centerOf(itemAt(list, 2)));
+    wait(300);
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, centerOf(itemAt(list, 2)));
+    wait(50);
+    EXPECT_EQ(controller->pageNumber(), 3);
+    EXPECT_FALSE(sidebar->property("selectionMode").toBool());
+
+    static QPointingDevice* finger = QTest::createTouchDevice();
+    QPoint at = centerOf(itemAt(list, 1));
+    QTest::touchEvent(window, finger).press(1, at);
+    wait(300);
+    EXPECT_TRUE(sidebar->property("selectionMode").toBool());
+    QTest::touchEvent(window, finger).release(1, at);
+    wait(60);
+    EXPECT_EQ(pagesModel->selectedPages(), QList<int>({1}));
+    EXPECT_EQ(controller->pageNumber(), 3) << "holding does not go to the page";
+    EXPECT_TRUE(bar->isVisible());
+
+    at = centerOf(itemAt(list, 0));
+    QTest::touchEvent(window, finger).press(1, at);
+    QTest::touchEvent(window, finger).release(1, at);
+    wait(60);
+    EXPECT_EQ(pagesModel->selectedPages(), QList<int>({0, 1})) << "a tap selects in the selection mode";
+    EXPECT_EQ(controller->pageNumber(), 3);
+
+    // Its menu acts on the selection
+    auto* more = find<QQuickItem>("sidebarSelectionMenu");
+    ASSERT_NE(more, nullptr);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(more));
+    wait(100);
+    auto* menu = sidebar->findChild<QObject*>("pageMenu");
+    ASSERT_NE(menu, nullptr);
+    EXPECT_TRUE(menu->property("visible").toBool());
+    EXPECT_EQ(menu->property("what").toString(), "2 pages");
+    QMetaObject::invokeMethod(menu, "close");
+    wait(100);
+
+    // Done: the selection goes, a tap goes to a page again
+    auto* done = find<QQuickItem>("sidebarSelectionDone");
+    ASSERT_NE(done, nullptr);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(done));
+    wait(60);
+    EXPECT_EQ(pagesModel->selectionCount(), 0);
+    EXPECT_FALSE(sidebar->property("selectionMode").toBool());
+    EXPECT_FALSE(bar->isVisible());
+    at = centerOf(itemAt(list, 0));
+    QTest::touchEvent(window, finger).press(1, at);
+    QTest::touchEvent(window, finger).release(1, at);
+    wait(60);
+    EXPECT_EQ(controller->pageNumber(), 1);
+
+    // Unselecting the last page ends the mode too
+    at = centerOf(itemAt(list, 2));
+    QTest::touchEvent(window, finger).press(1, at);
+    wait(300);
+    QTest::touchEvent(window, finger).release(1, at);
+    wait(60);
+    ASSERT_TRUE(sidebar->property("selectionMode").toBool());
+    QTest::touchEvent(window, finger).press(1, at);
+    QTest::touchEvent(window, finger).release(1, at);
+    wait(60);
+    EXPECT_EQ(pagesModel->selectionCount(), 0);
+    EXPECT_FALSE(sidebar->property("selectionMode").toBool());
+}
+
 // XQT_SHOTS=<folder>: writes the pictures for the README (off-screen, so no display is needed).
 //   XQT_SHOTS=/tmp/shots ./xqt-ui-tests --gtest_filter='*shot*:ShotOfTheCanvas.*'
 namespace {

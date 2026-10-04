@@ -2585,3 +2585,20 @@ See qt/docs/curtain.md. On the 2-in-1 with pen and fingers, and with a mouse.
       reveal the next line; the spotlight's hole is made wider from just outside its edge; writing just inside the
       hole's edge still writes. Elsewhere on the black a finger still scrolls.
 - [ ] B, move the curtain, B (away), B: it is back where it was; the same for the spotlight; another tab has its own.
+
+## Long press on pages (qt/page-ops)
+
+On the 2-in-1 with a finger, the pen and a mouse; on Android (phone and tablet).
+- [ ] Page grid (Ctrl+Alt+G, four-finger tap): a finger held still on a page for about half a second selects it and
+      turns "Select" on (the action bar shows "1 page selected") while the finger is still down; letting go does not
+      open the page. Taps then select and unselect pages.
+- [ ] Held, then moved: the selected pages (the held one included) follow the finger and go where it is let go; one
+      undo puts them back.
+- [ ] Sidebar: the same hold selects the page and shows the bar "1 page selected" with ⋮ (the page menu of the
+      selection) and ✕; taps then select instead of going to the page; ✕, Esc or unselecting the last page ends it.
+      In the drawer of the phone classes the drawer stays open while selecting.
+- [ ] A resting finger that does not mean to select (scrolling the list slowly, a slow tap): the list still scrolls
+      when the finger moves before the hold time; a slow tap selects (which ✕ undoes), it never moves pages.
+- [ ] The mouse is as before: a long click opens the page, Ctrl/Shift+click selects, right click the menu, press and
+      hold then move drags.
+- [ ] No haptic tick yet (the app has none anywhere): check whether the hold feels clear enough without one.
