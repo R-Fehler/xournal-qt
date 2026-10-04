@@ -2520,3 +2520,6 @@ Finder:
 - [ ] A Markdown text box with a table in a `.xopp`: narrow it with the ⟷ knob: the columns share the new width as
       above, words break only when the box is narrower than the table at its smallest.
 
+- [ ] Two columns (decision aid for `qt/docs/md-columns.md`): open a long `.md` as pages on the tablet in landscape,
+      turn on "Two pages side by side": does reading two pages side by side give what a two-column mode was wanted
+      for? If not, note what is missing (one page in two columns, printing handouts, ...).

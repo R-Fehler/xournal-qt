@@ -715,6 +715,13 @@
   smoke-tested without Homebrew. Intel needs the libraries from elsewhere; signing needs an Apple account
   (`qt/docs/macos.md`).
 
+- **Markdown table columns, `qt/md-tables` (2026-10-04).** Columns sized as a browser's automatic table layout (VS
+  Code's preview, GitHub): each column its widest word, the rest by how much more its longest line needs; a table
+  that fits is as wide as its text; one whose words do not fit is drawn smaller (down to 60 %), words break only
+  past that, never wider than the box or over the next cell. A research note on a two-column mode
+  ([md-columns.md](md-columns.md)): feasible (about 8 to 9 days), not built; paired pages give two columns of
+  reading today.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
