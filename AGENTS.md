@@ -21,6 +21,9 @@ The machine is a slow 2-in-1, so every build and test run costs real time.
 - Don't rebuild or retest after edits to docs or QML text alone.
 
 `qt/scripts/linux-deps.sh` installs what the build needs (Debian, Ubuntu, KDE neon). Qt 6.5 or newer (`find_package(Qt6 6.5)`).
+In a Claude Code cloud container (Ubuntu 24.04, Qt 6.4 only, GitHub downloads blocked), `qt/scripts/cloud-env.sh`
+sets up Qt 6.9 and the libraries from conda-forge in `/opt/xqt-env` (about 3.7 GB, 2 s when already there); then
+`source /opt/xqt-env/cloud-env.env` and configure with `$XQT_CMAKE_ARGS`.
 
 - `build-qt` is for the tests. `build-release` is the build the author tries on the device. Rebuild it after
   integrating into `master-qt` (`cmake --build build-release -j8`), and do not leave it broken.
