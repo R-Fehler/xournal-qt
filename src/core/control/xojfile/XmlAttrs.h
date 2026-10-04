@@ -50,6 +50,7 @@ constexpr auto NATURAL_SIZE_STR = u8"natural_size";
 constexpr auto TOOL_STR = u8"tool";
 constexpr auto PRESSURES_STR = u8"pressures";
 constexpr auto FILL_STR = u8"fill";
+constexpr auto FILL_COLOR_STR = u8"xqt-fill-color";  // xournal-qt: the fill color of a stroke (qt/pen-styles)
 constexpr auto CAPSTYLE_STR = u8"capStyle";
 
 // text

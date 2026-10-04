@@ -14,6 +14,7 @@
 #include <array>    // for array
 #include <cstddef>  // for size_t
 #include <memory>   // for unique_ptr
+#include <optional>  // for optional (xournal-qt: fill color)
 #include <vector>   // for vector
 
 #include "AudioContent.h"  // for AudioContent
@@ -120,6 +121,11 @@ public:
      *   1: The shape is nearly fully transparent filled
      */
     void setFill(int fill);
+
+    /// xournal-qt: the color of the filling (qt/pen-styles); none: the stroke's color (upstream). Saved as
+    /// `xqt-fill-color`; upstream ignores it and fills with the stroke's color.
+    std::optional<Color> getFillColor() const { return fillColor; }
+    void setFillColor(std::optional<Color> c) { fillColor = c; }
 
     void addPoint(const Point& p);
     size_t getPointCount() const;
@@ -235,6 +241,7 @@ private:
      *   1: The shape is nearly fully transparent filled
      */
     int fill = -1;
+    std::optional<Color> fillColor;  ///< xournal-qt: see getFillColor()
 
     StrokeCapStyle capStyle = StrokeCapStyle::ROUND;
 };

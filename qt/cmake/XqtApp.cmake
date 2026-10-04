@@ -206,6 +206,7 @@ set(XQT_QML_FILES
     src/app/qml/ColorStrip.qml
     src/app/qml/ColorChooser.qml
     src/app/qml/WidthStrip.qml
+    src/app/qml/PenStyleOptions.qml
     src/app/qml/MarkdownFormatBar.qml
     src/app/qml/MarkdownTableEditor.qml
     src/app/qml/LookUpMenu.qml

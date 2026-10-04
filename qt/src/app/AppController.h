@@ -154,6 +154,20 @@ class AppController: public QObject {
     /// Upstream's drawing type of the tool: default (freehand), strokeRecognizer, line, rectangle, ellipse, arrow,
     /// doubleArrow, drawCoordinateSystem
     Q_PROPERTY(QString drawingType READ drawingType WRITE setDrawingType NOTIFY toolChanged)
+    /// The pen's line style, by upstream's names (StrokeStyle): plain, dash, dashdot, dot ("custom": dashes of a file
+    /// or of upstream's settings). Upstream keeps it per tool, in its settings, and in .xopp (`style`).
+    Q_PROPERTY(QString lineStyle READ lineStyle WRITE setLineStyle NOTIFY toolChanged)
+    /// The tool in hand draws with a line style (upstream: the pen only, TOOL_CAP_LINE_STYLE)
+    Q_PROPERTY(bool hasLineStyle READ hasLineStyle NOTIFY toolChanged)
+    /// The tool in hand fills what it draws (upstream's tool fill: pen and highlighter, shapes and freehand strokes)
+    Q_PROPERTY(bool fillEnabled READ fillEnabled WRITE setFillEnabled NOTIFY toolChanged)
+    /// The opacity of the filling, 0-255 (upstream's fill alpha of the tool)
+    Q_PROPERTY(int fillAlpha READ fillAlpha WRITE setFillAlpha NOTIFY toolChanged)
+    /// The color of the filling; transparent: the stroke's color (only the pen has another, PenFill.h)
+    Q_PROPERTY(QColor fillColor READ fillColor WRITE setFillColor NOTIFY toolChanged)
+    /// The tool in hand can fill (TOOL_CAP_FILL), and with a color of its own
+    Q_PROPERTY(bool hasFill READ hasFill NOTIFY toolChanged)
+    Q_PROPERTY(bool hasFillColor READ hasFillColor NOTIFY toolChanged)
     /// 0 = very fine ... 4 = very thick (upstream ToolSize), 5 = the tool's own width (customWidth)
     Q_PROPERTY(int size READ size NOTIFY toolChanged)
     /// The adjustable width of the tool (points; 0: the tool has no sizes). Setting it selects it (size 5).
@@ -343,6 +357,17 @@ public:
     Q_INVOKABLE QStringList fontFamilies() const;
     QString drawingType() const;
     void setDrawingType(const QString& type);
+    QString lineStyle() const;
+    void setLineStyle(const QString& name);
+    bool hasLineStyle() const;
+    bool fillEnabled() const;
+    void setFillEnabled(bool on);
+    int fillAlpha() const;
+    void setFillAlpha(int alpha);
+    QColor fillColor() const;
+    void setFillColor(const QColor& c);
+    bool hasFill() const;
+    bool hasFillColor() const;
     int size() const;
     QVariantList palette() const;
     QVariantList toolbarColors() const;

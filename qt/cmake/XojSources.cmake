@@ -216,6 +216,7 @@ set(XOJ_TOOLS_SOURCES
     ${XOJ_SRC}/core/view/overlays/StrokeToolView.cpp
     ${XOJ_SRC}/core/view/overlays/StrokeToolFilledView.cpp
     ${XOJ_SRC}/core/view/overlays/StrokeToolFilledHighlighterView.cpp
+    ${XOJ_SRC}/core/view/overlays/LaserPointerView.cpp
     ${XOJ_SRC}/core/gui/inputdevices/InputUtils.cpp
     ${XOJ_SRC}/core/gui/inputdevices/PositionInputData.cpp
     ${XOJ_SRC}/core/gui/LegacyRedrawable.cpp

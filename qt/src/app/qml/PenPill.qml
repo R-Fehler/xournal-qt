@@ -1,5 +1,6 @@
-// Without a tool bar (full screen, or the bar put away) and with pen or highlighter in hand: a small pill at a side
-// of the screen with the colors one draws with, the width and a pen / highlighter switch. Drag it to another side.
+// Without a tool bar (full screen, or the bar put away) and with pen, highlighter or laser pointer in hand: a small pill
+// at a side of the screen with the colors one draws with, the width and a pen / highlighter switch (held: the laser
+// pointer too). Drag it to another side.
 // The width knob: a tap goes to the next of the five widths of the tool bar (the fifth is the one set there).
 // "+": the color chooser (ColorChooser.qml): these colors and "Add a color…", then the color palettes.
 import QtQuick
@@ -12,7 +13,8 @@ Rectangle {
     id: pill
     objectName: "penPill"
     z: 59
-    visible: win.noToolbar && !app.homeVisible && !win.hudHidden && (app.tool === "pen" || app.tool === "highlighter")
+    visible: win.noToolbar && !app.homeVisible && !win.hudHidden
+             && (app.tool === "pen" || app.tool === "highlighter" || win.toolGroups.isLaser(app.tool))
     radius: 18
     color: "#f7ffffff"
     border.width: 1

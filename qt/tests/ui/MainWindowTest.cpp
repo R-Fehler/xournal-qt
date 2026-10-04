@@ -4926,7 +4926,8 @@ TEST_F(MainWindowTest, cyclingToolButtons) {
     ASSERT_TRUE(shapes->property("visible").toBool()) << "a long press: the list";
     EXPECT_EQ(shapes->property("title").toString(), QStringLiteral("Shapes"));
     ASSERT_NE(entryOf(shapes, "variant_arrow"), nullptr);
-    EXPECT_EQ(shapes->property("count").toInt(), 8) << "the seven shapes (and the geometry's entry, not offered)";
+    EXPECT_EQ(shapes->property("count").toInt(), 9)
+            << "the seven shapes (and the geometry's entry, not offered; the pen's options)";
     QMetaObject::invokeMethod(entryOf(shapes, "variant_arrow"), "triggered");
     until([&] { return !shapes->property("visible").toBool(); });
     EXPECT_EQ(controller->drawingType(), QStringLiteral("arrow"));
@@ -4959,6 +4960,126 @@ TEST_F(MainWindowTest, cyclingToolButtons) {
     auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
     settings->set("toolVariants", "");
     controller->selectTool("pen");
+}
+
+// The pen's options (qt/pen-styles): the menu of the pen and shape buttons offers upstream's line styles while the pen
+// is in hand (the highlighter has none, as upstream); the pen keeps the one chosen, also over a restart.
+TEST_F(MainWindowTest, thePensMenuOffersItsLineStyles) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    window->setWidth(1920);
+    wait(100);
+    controller->selectTool("pen");
+    controller->setDrawingType("default");
+    controller->setLineStyle("plain");
+    auto* pen = find<QQuickItem>("penButton");
+    auto* menu = find<QObject>("penButtonVariants");
+    ASSERT_NE(pen, nullptr);
+    ASSERT_NE(menu, nullptr);
+    QMetaObject::invokeMethod(pen, "pressAndHold");
+    until([&] { return menu->property("visible").toBool(); });
+    ASSERT_TRUE(menu->property("visible").toBool());
+    auto* options = qobject_cast<QQuickItem*>(entryOf(menu, "penStyleOptions"));
+    ASSERT_NE(options, nullptr);
+    EXPECT_TRUE(options->isVisible());
+    EXPECT_GT(options->height(), 0);
+    const auto childNamed = [](QQuickItem* root, const QString& name) {
+        std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* it) -> QQuickItem* {
+            if (it->objectName() == name) return it;
+            for (QQuickItem* c: it->childItems()) {
+                if (QQuickItem* f = walk(c)) return f;
+            }
+            return nullptr;
+        };
+        return walk(root);
+    };
+    for (const char* name: {"lineStyle_plain", "lineStyle_dash", "lineStyle_dashdot", "lineStyle_dot"}) {
+        EXPECT_NE(childNamed(options, name), nullptr) << name;
+    }
+    auto* dash = childNamed(options, "lineStyle_dash");
+    ASSERT_NE(dash, nullptr);
+    until([&] { return dash->isVisible() && dash->width() > 0; });
+    click(dash);
+    EXPECT_EQ(controller->lineStyle(), QStringLiteral("dash")) << "a tap on the sample chooses it";
+
+    // The filling: on, then a color of the bar, then the line's color again
+    controller->setFillEnabled(false);
+    auto* fillSwitch = childNamed(options, "fillSwitch");
+    ASSERT_NE(fillSwitch, nullptr);
+    click(fillSwitch);
+    EXPECT_TRUE(controller->fillEnabled()) << "the switch fills";
+    auto* colorRow = childNamed(options, "fillColorRow");
+    ASSERT_NE(colorRow, nullptr);
+    until([&] { return colorRow->isVisible() && colorRow->height() > 0; });
+    EXPECT_TRUE(colorRow->isVisible()) << "the colors of the filling show once it is on";
+    auto* barColor = childNamed(colorRow, "fillColor");
+    ASSERT_NE(barColor, nullptr);
+    until([&] { return barColor->width() > 0; });
+    click(barColor);
+    EXPECT_GT(controller->fillColor().alpha(), 0) << "another color";
+    click(childNamed(colorRow, "fillSameColor"));
+    EXPECT_EQ(controller->fillColor().alpha(), 0) << "the line's color again";
+    controller->setFillEnabled(false);
+    QMetaObject::invokeMethod(menu, "close");
+    until([&] { return !menu->property("visible").toBool(); });
+
+    // The highlighter has no line styles (its filling stays)
+    controller->selectTool("highlighter");
+    EXPECT_FALSE(controller->hasLineStyle());
+    EXPECT_TRUE(options->property("offered").toBool()) << "the options of its filling";
+    controller->selectTool("pen");
+    EXPECT_EQ(controller->lineStyle(), QStringLiteral("dash")) << "the pen kept its style";
+
+    // Kept over a restart (upstream's tool settings)
+    restart();
+    EXPECT_EQ(controller->lineStyle(), QStringLiteral("dash"));
+    controller->setLineStyle("plain");
+}
+
+// The laser pointer (qt/pen-styles): upstream's laser pen and highlighter in the pen button's list, and at once from
+// the tools of full screen and presenting (the tool square); the pen pill stays for it (its color, its width).
+TEST_F(MainWindowTest, theLaserPointerIsAtHandWhilePresenting) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    window->setWidth(1920);
+    wait(100);
+    controller->selectTool("pen");
+    controller->setDrawingType("default");
+    auto* menu = find<QObject>("penButtonVariants");
+    ASSERT_NE(menu, nullptr);
+    ASSERT_NE(entryOf(menu, "variant_laserPointerPen"), nullptr) << "in the pen button's list";
+    ASSERT_NE(entryOf(menu, "variant_laserPointerHighlighter"), nullptr);
+    QMetaObject::invokeMethod(entryOf(menu, "variant_laserPointerHighlighter"), "triggered");
+    EXPECT_EQ(controller->tool(), QStringLiteral("laserPointerHighlighter"));
+    EXPECT_TRUE(find<QQuickItem>("penButton")->property("checked").toBool()) << "the pen button shows it";
+    click(find<QQuickItem>("penButton"));
+    EXPECT_EQ(controller->tool(), QStringLiteral("pen")) << "a tap: back to the pen";
+
+    QMetaObject::invokeMethod(window, "startPresenting", Q_ARG(QVariant, false));  // (F5)
+    ASSERT_TRUE(controller->presenting());
+    auto* square = find<QQuickItem>("quickToolSquare");
+    ASSERT_NE(square, nullptr);
+    until([&] { return square->isVisible(); });
+    ASSERT_TRUE(square->isVisible()) << "presenting: the tool square";
+    QObject* tools = find("quickTools");
+    click(square);
+    ASSERT_TRUE(waitOpened(tools, true));
+    QQuickItem* laser = findItem("laserPointerButton");
+    ASSERT_NE(laser, nullptr);
+    click(laser);
+    EXPECT_EQ(controller->tool(), QStringLiteral("laserPointerPen")) << "one tap from the tool square";
+    ASSERT_TRUE(waitOpened(tools, false));
+    auto* pill = find<QQuickItem>("penPill");
+    ASSERT_NE(pill, nullptr);
+    until([&] { return pill->isVisible(); });
+    EXPECT_TRUE(pill->isVisible()) << "the pen pill for its color and width";
+    click(square);
+    ASSERT_TRUE(waitOpened(tools, true));
+    laser = findItem("laserPointerButton");
+    EXPECT_EQ(laser->property("text").toString(), QStringLiteral("Back to the pen"));
+    click(laser);
+    EXPECT_EQ(controller->tool(), QStringLiteral("pen"));
+    ASSERT_TRUE(waitOpened(tools, false));
+    window->setProperty("fullScreenMode", false);  // (stops presenting)
+    until([&] { return !controller->presenting(); });
 }
 
 // On a touch screen a finger held on a plain button shows its name above the finger, and letting go does not press it

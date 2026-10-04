@@ -132,6 +132,9 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
         [&s](const QVariant& v) { s.setPressureMultiplier(std::clamp(v.toDouble(), 0.5, 4.0)); });
     add("pressureGuessing", [&s] { return QVariant(s.isPressureGuessingEnabled()); },
         [&s](const QVariant& v) { s.setPressureGuessingEnabled(v.toBool()); });
+    // The laser pointer's ink starts to fade this long after the pen is lifted (ms; upstream's setting, 500 ms)
+    add("laserPointerFadeOutTime", [&s] { return QVariant(static_cast<int>(s.getLaserPointerFadeOutTime())); },
+        [&s](const QVariant& v) { s.setLaserPointerFadeOutTime(static_cast<unsigned int>(std::clamp(v.toInt(), 0, 60000))); });
     // Tool of the pen's eraser end / side button (upstream button "eraser") and of the first barrel button.
     auto buttonTool = [this](Button button) {
         return std::pair{[this, button] {

@@ -747,6 +747,14 @@
   shows itself: a gray square of its real size at the zoom, dashed for whole strokes, round for whiteout; a cursor up
   to 256 device pixels, drawn as geometry above that ([hover-cursors.md](hover-cursors.md)).
 
+- **Line styles, fillings and the laser pointer, `qt/pen-styles` (2026-10-04).** The pen's options (the menu of the
+  pen and shape buttons, also from the pen pill: `PenStyleOptions`) choose upstream's line styles (solid, dashed,
+  dash-dot, dotted) and its filling (on / off, opacity) for shapes and freehand strokes; the pen also fills with
+  another color (a small seam: `Stroke::getFillColor`, saved as `xqt-fill-color`, upstream fills with the line's
+  color). Upstream's laser pen and highlighter: `LaserPointerView` compiled unmodified, its handler ported to a
+  QTimer; the ink fades after upstream's `laserPointerFadeOutTime` (Settings → Pen), never in the document, the
+  undo stack or the pictures of the page. In the pen button's list, and one tap from the tool square while presenting.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

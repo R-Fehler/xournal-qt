@@ -45,6 +45,7 @@ protected:
      */
     const cairo_operator_t cairoOp;
     const Color strokeColor;
+    const Color fillColor;  ///< xournal-qt: the stroke's fill color, else strokeColor (qt/pen-styles)
     const LineStyle lineStyle;
     double strokeWidth;
 };

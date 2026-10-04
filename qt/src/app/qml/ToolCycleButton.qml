@@ -81,5 +81,9 @@ IconButton {
             icon.source: app.iconUrl("xqt-close")
             onTriggered: app.toggleGeometryTool("")
         }
+        // The pen's options: its line style and filling (the pen draws the shapes too)
+        PenStyleOptions {
+            offered: (button.group === "pen" || button.group === "shape") && (app.hasLineStyle || app.hasFill)
+        }
     }
 }

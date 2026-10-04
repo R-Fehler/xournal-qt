@@ -37,6 +37,8 @@
 #include "control/ToolHandler.h"
 #include "TextEditor.h"
 #include "model/Font.h"
+#include "model/LineStyle.h"
+#include "model/StrokeStyle.h"
 #include "control/tools/EditSelection.h"
 #include "control/settings/Settings.h"
 #include "gui/toolbarMenubar/model/ColorPalette.h"
@@ -56,6 +58,7 @@
 #include "PenHover.h"
 #include "StickyNotes.h"
 #include "session/PageMargins.h"
+#include "session/PenFill.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentTextIndex.h"
@@ -1396,6 +1399,82 @@ void AppController::setDrawingType(const QString& name) {
     Q_EMIT toolChanged();
 }
 
+QString AppController::lineStyle() const {
+    const LineStyle& style = app->getToolHandler()->getLineStyle();
+    if (!style.hasDashes()) {
+        return QStringLiteral("plain");
+    }
+    const std::string name = StrokeStyle::formatStyle(style);
+    return name.rfind("cust", 0) == 0 ? QStringLiteral("custom") : QString::fromStdString(name);
+}
+
+void AppController::setLineStyle(const QString& name) {
+    ToolHandler* th = app->getToolHandler();
+    if (!th->hasCapability(TOOL_CAP_LINE_STYLE, SelectedTool::toolbar)) {
+        return;  // (upstream: only the pen has line styles)
+    }
+    // Upstream's names (StrokeStyle::parseStyle: dash, dashdot, dot; anything else is a plain line)
+    th->setLineStyle(StrokeStyle::parseStyle(name.toStdString()));
+    th->saveSettings();
+    Q_EMIT toolChanged();
+}
+
+bool AppController::hasLineStyle() const {
+    return app->getToolHandler()->hasCapability(TOOL_CAP_LINE_STYLE, SelectedTool::active);
+}
+
+bool AppController::fillEnabled() const { return app->getToolHandler()->getFill() != -1; }
+
+void AppController::setFillEnabled(bool on) {
+    ToolHandler* th = app->getToolHandler();
+    if (!th->hasCapability(TOOL_CAP_FILL, SelectedTool::toolbar)) {
+        return;
+    }
+    th->setFillEnabled(on);
+    th->saveSettings();
+    Q_EMIT toolChanged();
+}
+
+int AppController::fillAlpha() const {
+    const ToolHandler* th = app->getToolHandler();
+    return th->getToolType() == TOOL_HIGHLIGHTER ? th->getHighlighterFill() : th->getPenFill();
+}
+
+void AppController::setFillAlpha(int alpha) {
+    ToolHandler* th = app->getToolHandler();
+    alpha = std::clamp(alpha, 1, 255);
+    if (th->getToolType() == TOOL_HIGHLIGHTER) {
+        th->setHighlighterFill(alpha);
+    } else if (th->getToolType() == TOOL_PEN) {
+        th->setPenFill(alpha);
+    } else {
+        return;
+    }
+    th->saveSettings();
+    Q_EMIT toolChanged();
+}
+
+QColor AppController::fillColor() const {
+    const auto c = penfill::color(*app->getSettings(), app->getToolHandler()->getToolType());
+    return c ? toQColor(*c) : QColor(Qt::transparent);
+}
+
+void AppController::setFillColor(const QColor& c) {
+    const ToolType type = app->getToolHandler()->getToolType();
+    if (!penfill::hasOwnColor(type)) {
+        return;
+    }
+    penfill::setColor(*app->getSettings(), type,
+                      c.isValid() && c.alpha() > 0 ? std::optional<Color>(toColor(c)) : std::nullopt);
+    Q_EMIT toolChanged();
+}
+
+bool AppController::hasFill() const {
+    return app->getToolHandler()->hasCapability(TOOL_CAP_FILL, SelectedTool::active);
+}
+
+bool AppController::hasFillColor() const { return penfill::hasOwnColor(app->getToolHandler()->getToolType()); }
+
 QColor AppController::color() const { return toQColor(app->getToolHandler()->getColor()); }
 int AppController::size() const {
     ToolHandler* th = app->getToolHandler();
@@ -1432,7 +1511,8 @@ double AppController::sizeWidth(int s) const {
         return th->getCustomThickness(type);
     }
     const bool sized = std::any_of(CUSTOM_WIDTH_TOOLS.begin(), CUSTOM_WIDTH_TOOLS.end(),
-                                   [type](const auto& t) { return t.first == type; });
+                                   [type](const auto& t) { return t.first == type; }) ||
+                       type == TOOL_LASER_POINTER_PEN || type == TOOL_LASER_POINTER_HIGHLIGHTER;  // (no own width)
     return sized && s >= 0 && s < 5 ? th->getToolThickness(type)[s] : 0;
 }
 

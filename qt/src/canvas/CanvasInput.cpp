@@ -606,8 +606,10 @@ bool CanvasInput::actionStart(const Event& event) {
     // A read-only document (a Markdown file shown): every tool is the hand. A document shown for reading only (the
     // reference beside another one): every tool but the select tools, which select to copy.
     const bool readingTool = isSelectToolType(toolType) || xoj::tool::isPdfSelectionTool(toolType);
+    // The laser pointer changes nothing: it points on documents shown for reading too
+    const bool laser = toolType == TOOL_LASER_POINTER_PEN || toolType == TOOL_LASER_POINTER_HIGHLIGHTER;
     this->readOnlyPress = (view.getSession().isReadOnly() || (view.isReadingOnly() && !readingTool)) &&
-                          toolType != TOOL_HAND;
+                          toolType != TOOL_HAND && !laser;
     if (toolType == TOOL_HAND || this->readOnlyPress) {
         return true;  // the hand tool does not change the selection (scrolling keeps it)
     }

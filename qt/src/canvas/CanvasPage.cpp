@@ -18,6 +18,7 @@
 #include "model/Layer.h"
 #include "view/overlays/SelectorView.h"
 #include "control/tools/InputHandler.h"
+#include "control/tools/LaserPointerHandler.h"
 #include "control/tools/ArrowHandler.h"
 #include "control/tools/CoordinateSystemHandler.h"
 #include "control/tools/EllipseHandler.h"
@@ -44,6 +45,7 @@
 #include "TextEditor.h"
 #include "render/RenderService.h"
 #include "session/DocumentSession.h"
+#include "session/PenFill.h"
 #include "session/StickyNote.h"
 
 using xoj::util::Rectangle;
@@ -196,7 +198,20 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
                 this->inputHandler = std::make_unique<StrokeHandler>(&control, getPage());
         }
         this->inputHandler->onButtonPressEvent(pos, zoom);
+        if (Stroke* stroke = this->inputHandler->getStroke()) {
+            penfill::apply(*control.getSettings(), *h, *stroke);  // (its fill color, before its view is made)
+        }
         this->overlayViews.emplace_back(this->inputHandler->createView(this));
+    } else if (toolType == TOOL_LASER_POINTER_PEN || toolType == TOOL_LASER_POINTER_HIGHLIGHTER) {
+        // Port of XojPageView: one handler for the ink of the page until it faded out (never in the document)
+        if (!this->laserPointer) {
+            this->laserPointer = std::make_unique<LaserPointerHandler>(this, &control, getPage());
+            this->laserPointer->onButtonPressEvent(pos, zoom);
+            this->overlayViews.emplace_back(this->laserPointer->createView(this));
+            drawOnce(*this->overlayViews.back());
+        } else {
+            this->laserPointer->onButtonPressEvent(pos, zoom);
+        }
     } else if (h->getToolType() == TOOL_ERASER) {
         if (eraserInNote(x, y)) {
             this->eraser->erase(x, y);
@@ -359,6 +374,31 @@ xoj::util::Point<int> CanvasPage::getPixelPosition() const {
     return {0, 0};
 }
 
+void CanvasPage::drawOnce(const xoj::view::OverlayView& v) {
+    // Upstream's LaserPointerView makes its picture (a mask of the visible part of the page) when it is first drawn,
+    // and a stroke finished before that is not in it. GTK draws the view at once; here the next frame may come after
+    // a quick stroke (a dot), so it is drawn once now, on a pixel, with the device scale of the page's buffer.
+    double dpiScale = 1.0;
+    raster->withPlacedBuffer([&](xoj::view::Mask& buffer, const PageRaster::Placement&) {
+        if (buffer.isInitialized()) {
+            cairo_surface_get_device_scale(cairo_get_target(buffer.get()), &dpiScale, &dpiScale);
+        }
+    });
+    cairo_surface_t* surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 1, 1);
+    cairo_surface_set_device_scale(surface, dpiScale, dpiScale);
+    cairo_t* cr = cairo_create(surface);
+    cairo_scale(cr, getZoom(), getZoom());
+    v.draw(cr);
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+}
+
+void CanvasPage::deleteLaserPointerHandler() {
+    // Port of XojPageView::deleteLaserPointerHandler: its view went with the last step of the fade
+    eraseViewsOf(this->overlayViews, this->laserPointer.get());
+    this->laserPointer.reset();
+}
+
 ZoomControl* CanvasPage::getZoomControl() const { return view.getZoomControl(); }
 
 bool CanvasPage::onMotionNotifyEvent(const PositionInputData& pos) {
@@ -373,6 +413,8 @@ bool CanvasPage::onMotionNotifyEvent(const PositionInputData& pos) {
 
     if (this->inputHandler && this->inputHandler->onMotionNotifyEvent(pos, zoom)) {
         // input handler used this event
+    } else if (this->laserPointer && this->laserPointer->onMotionNotifyEvent(pos, zoom)) {
+        // the laser pointer's stroke
     } else if (this->selector) {
         this->selector->currentPos(x, y);
     } else if (h->getToolType() == TOOL_SELECT_PDF_TEXT_LINEAR || h->getToolType() == TOOL_SELECT_PDF_TEXT_RECT) {
@@ -402,6 +444,9 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
     if (this->inputHandler) {
         this->inputHandler->onButtonReleaseEvent(pos, getZoom());
         this->inputHandler.reset();
+    } else if (const ToolType t = control.getToolHandler()->getToolType();
+               this->laserPointer && (t == TOOL_LASER_POINTER_PEN || t == TOOL_LASER_POINTER_HIGHLIGHTER)) {
+        this->laserPointer->onButtonReleaseEvent(pos, getZoom());
     }
     if (this->inEraser) {
         this->inEraser = false;
@@ -517,6 +562,8 @@ void CanvasPage::onSequenceCancelEvent(DeviceId deviceId) {
     if (this->inputHandler) {
         this->inputHandler->onSequenceCancelEvent();
         this->inputHandler.reset();
+    } else if (this->laserPointer) {
+        this->laserPointer->onSequenceCancelEvent();
     }
     if (this->inEraser) {
         // xournal-qt: keep what was erased so far (the erase is undoable), like a release.

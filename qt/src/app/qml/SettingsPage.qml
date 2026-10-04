@@ -335,6 +335,18 @@ Popup {
                                    + "pen will write, or the crosshair. With the eraser it is the eraser itself, gray, "
                                    + "as big as it erases at the zoom (dashed when it erases whole strokes).")
                     }
+                    SectionTitle { text: qsTr("Laser pointer") }
+                    SliderRow {
+                        objectName: "laserFadeSlider"
+                        key: "laserPointerFadeOutTime"; text: qsTr("The ink fades after")
+                        from: 0; to: 10000; stepSize: 100
+                        factor: 0.001; decimals: 1; suffix: " s"
+                    }
+                    Hint {
+                        text: qsTr("The laser pointer and the laser highlighter (in the list of the pen button, and "
+                                   + "in the tools of full screen and presenting) draw ink that is never kept: it "
+                                   + "fades this long after the pen is lifted.")
+                    }
                     SectionTitle { text: qsTr("Grid") }
                     SwitchRow { objectName: "snapGridSwitch"; key: "snapGrid"; text: qsTr("Snap to the grid") }
                     Hint {

@@ -59,6 +59,8 @@ public:
     virtual void finalizeLayer() = 0;
     virtual void addStroke(StrokeTool tool, Color color, double width, int fill, StrokeCapStyle capStyle,
                            const LineStyle& lineStyle, fs::path filename, size_t timestamp) = 0;
+    /// xournal-qt: the stroke's fill color (qt/pen-styles); after addStroke
+    virtual void setStrokeFillColor(Color /*color*/) {}
     virtual void setStrokePoints(std::vector<Point> pointVector, bool hasPressure) = 0;
     virtual void finalizeStroke() = 0;
     virtual void addText(std::string font, double size, xoj::util::Matrix matrix, Color color,
