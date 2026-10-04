@@ -1,5 +1,8 @@
 #include "HybridPdf.h"
 
+#include "InkText.h"
+#include "InkTextLayer.h"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -244,7 +247,8 @@ void unflatten(QPDFObjectHandle page, std::set<std::string>& found) {
         return;
     }
     auto markOf = [](QPDFObjectHandle c) {
-        return c.isStream() ? c.getDict().getKey(MARKER) : QPDFObjectHandle::newNull();
+        QPDFObjectHandle mark = c.isStream() ? c.getDict().getKey(MARKER) : QPDFObjectHandle::newNull();
+        return mark.isDictionary() && mark.hasKey("/InkText") ? QPDFObjectHandle::newNull() : mark;  // (not the text)
     };
     // Content another app appended after ours was drawn with the page's own content in "q ... Q": it keeps that (a
     // plain "q" and "Q" instead of ours), so it stays where it was
@@ -360,6 +364,116 @@ void setSpace(QPDFObjectHandle page, const NoteSpace& s) {
     page.replaceKey(BOXES, saved);
 }
 
+// --- the text layer of the handwriting (InkTextLayer.h) ---------------------------------------------------------------
+
+bool isInkText(QPDFObjectHandle c) {
+    QPDFObjectHandle mark = c.isStream() ? c.getDict().getKey(MARKER) : QPDFObjectHandle::newNull();
+    return mark.isDictionary() && mark.hasKey("/InkText");
+}
+
+/// Remove the text layer from a page (its stream and its font in the page's resources). Whether it had one.
+bool removeInkText(QPDFObjectHandle page) {
+    QPDFObjectHandle contents = page.getKey("/Contents");
+    if (!contents.isArray()) {
+        return false;
+    }
+    QPDFObjectHandle kept = QPDFObjectHandle::newArray();
+    bool removed = false;
+    for (int i = 0; i < contents.getArrayNItems(); ++i) {
+        QPDFObjectHandle c = contents.getArrayItem(i);
+        if (isInkText(c)) {
+            removed = true;
+        } else {
+            kept.appendItem(c);
+        }
+    }
+    if (!removed) {
+        return false;
+    }
+    page.replaceKey("/Contents", kept);
+    QPDFObjectHandle res = page.getKey("/Resources");
+    if (res.isDictionary() && res.getKey("/Font").isDictionary() && res.getKey("/Font").hasKey(InkTextLayer::FONT_RESOURCE)) {
+        res = res.shallowCopy();
+        QPDFObjectHandle fonts = res.getKey("/Font").shallowCopy();
+        fonts.removeKey(InkTextLayer::FONT_RESOURCE);
+        res.replaceKey("/Font", fonts);
+        page.replaceKey("/Resources", res);
+    }
+    return true;
+}
+
+/// The font of the text layer, made with `add` (an indirect object of a direct one) and `addStream` (a stream).
+template <typename Add, typename AddStream>
+QPDFObjectHandle makeInkFont(Add add, AddStream addStream) {
+    auto name = QPDFObjectHandle::newName("/XqtGlyphless");
+    QPDFObjectHandle file = addStream(QPDFObjectHandle::newDictionary(), InkTextLayer::glyphlessFont());
+    QPDFObjectHandle descriptor = QPDFObjectHandle::newDictionary();
+    descriptor.replaceKey("/Type", QPDFObjectHandle::newName("/FontDescriptor"));
+    descriptor.replaceKey("/FontName", name);
+    descriptor.replaceKey("/Flags", QPDFObjectHandle::newInteger(4));  // symbolic
+    descriptor.replaceKey("/FontBBox", QPDFObjectHandle::newArray(QPDFObjectHandle::Rectangle(
+                                               0, InkTextLayer::DESCENT, InkTextLayer::ADVANCE, InkTextLayer::ASCENT)));
+    descriptor.replaceKey("/ItalicAngle", QPDFObjectHandle::newInteger(0));
+    descriptor.replaceKey("/Ascent", QPDFObjectHandle::newInteger(InkTextLayer::ASCENT));
+    descriptor.replaceKey("/Descent", QPDFObjectHandle::newInteger(InkTextLayer::DESCENT));
+    descriptor.replaceKey("/CapHeight", QPDFObjectHandle::newInteger(InkTextLayer::ASCENT));
+    descriptor.replaceKey("/StemV", QPDFObjectHandle::newInteger(80));
+    descriptor.replaceKey("/FontFile2", file);
+    QPDFObjectHandle info = QPDFObjectHandle::newDictionary();
+    info.replaceKey("/Registry", QPDFObjectHandle::newString("Adobe"));
+    info.replaceKey("/Ordering", QPDFObjectHandle::newString("Identity"));
+    info.replaceKey("/Supplement", QPDFObjectHandle::newInteger(0));
+    QPDFObjectHandle cid = QPDFObjectHandle::newDictionary();
+    cid.replaceKey("/Type", QPDFObjectHandle::newName("/Font"));
+    cid.replaceKey("/Subtype", QPDFObjectHandle::newName("/CIDFontType2"));
+    cid.replaceKey("/BaseFont", name);
+    cid.replaceKey("/CIDSystemInfo", info);
+    cid.replaceKey("/FontDescriptor", add(descriptor));
+    cid.replaceKey("/DW", QPDFObjectHandle::newInteger(InkTextLayer::ADVANCE));
+    cid.replaceKey("/CIDToGIDMap", addStream(QPDFObjectHandle::newDictionary(), InkTextLayer::cidToGidMap()));
+    QPDFObjectHandle font = QPDFObjectHandle::newDictionary();
+    font.replaceKey("/Type", QPDFObjectHandle::newName("/Font"));
+    font.replaceKey("/Subtype", QPDFObjectHandle::newName("/Type0"));
+    font.replaceKey("/BaseFont", name);
+    font.replaceKey("/Encoding", QPDFObjectHandle::newName("/Identity-H"));
+    font.replaceKey("/DescendantFonts", QPDFObjectHandle::newArray(std::vector<QPDFObjectHandle>{add(cid)}));
+    font.replaceKey("/ToUnicode", addStream(QPDFObjectHandle::newDictionary(), InkTextLayer::toUnicode()));
+    return add(font);
+}
+
+/// The sig of a page's text layer: its words and the page's size (where it goes on the base page is not in it: a page
+/// that moves or gets another space for notes is written again anyway).
+std::string inkSigOf(const std::vector<InkTextLayer::Word>& words, double w, double h) {
+    if (words.empty()) {
+        return {};
+    }
+    return InkTextLayer::sigOf(InkTextLayer::contentOf(words, h, "") + std::to_string(std::lround(w * 10)) + 'x' +
+                               std::to_string(std::lround(h * 10)));
+}
+
+/// The text layer's stream first in the page's content (the graphics state is the page's own there), its font in the
+/// page's resources (copied: they may be shared).
+void putInkText(QPDFObjectHandle page, QPDFObjectHandle stream, QPDFObjectHandle font) {
+    QPDFObjectHandle old = page.getKey("/Contents");
+    QPDFObjectHandle contents = QPDFObjectHandle::newArray();
+    contents.appendItem(stream);
+    if (old.isArray()) {
+        for (int i = 0; i < old.getArrayNItems(); ++i) {
+            contents.appendItem(old.getArrayItem(i));
+        }
+    } else if (old.isStream() || old.isDictionary()) {
+        contents.appendItem(old);
+    }
+    page.replaceKey("/Contents", contents);
+    QPDFObjectHandle res = page.getKey("/Resources");
+    res = res.isDictionary() ? res.shallowCopy() : QPDFObjectHandle::newDictionary();
+    QPDFObjectHandle fonts = res.getKey("/Font");
+    fonts = fonts.isDictionary() ? fonts.shallowCopy() : QPDFObjectHandle::newDictionary();
+    fonts.replaceKey(InkTextLayer::FONT_RESOURCE, font);
+    res.replaceKey("/Font", fonts);
+    page.replaceKey("/Resources", res);
+}
+
 /// Remove our annotations from every page (except `keep`, which lose our mark), our marker and our embedded files.
 /// Returns the /NM of our annotations whose hash differs from the marker's, or that are missing.
 std::vector<std::string> strip(QPDF& pdf, const std::set<std::string>& keep = {}) {
@@ -403,6 +517,7 @@ std::vector<std::string> strip(QPDF& pdf, const std::set<std::string>& keep = {}
     std::set<std::string> seen;
     for (auto& page: QPDFPageDocumentHelper(pdf).getAllPages()) {
         QPDFObjectHandle p = page.getObjectHandle();
+        removeInkText(p);  // (the app searches the handwriting itself)
         unflatten(p, seen);
         restoreBoxes(p);  // (space for notes: the clean copy has the page's own size)
         QPDFObjectHandle annots = p.getKey("/Annots");
@@ -713,8 +828,19 @@ struct Prepared {
     std::string xopp;
     std::vector<std::pair<std::string, std::string>> extras;  ///< files next to the .xopp (attached images)
     std::vector<TextDocument::Attachment> attachments;        ///< files for other apps (a text document's "name.md")
+    std::vector<std::vector<InkTextLayer::Word>> inkWords;    ///< per page: its text layer (InkTextLayer.h)
     std::string error;
 };
+
+/// The words of the text layer of each page (`pages`: the recognised handwriting per page; may be null).
+void addInkWords(Prepared& prep, const std::vector<std::shared_ptr<const ink::PageText>>* pages) {
+    prep.inkWords.assign(prep.pages.size(), {});
+    for (size_t i = 0; pages && i < pages->size() && i < prep.pages.size(); ++i) {
+        if (const auto& page = (*pages)[i]) {
+            prep.inkWords[i] = InkTextLayer::wordsOf(*page);
+        }
+    }
+}
 
 /// Everything that needs the document: under its shared lock (and briefly its lock).
 Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work, const BasePageOf& baseOf,
@@ -1392,8 +1518,40 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
                         archive && !a.relationship.empty() ? a.relationship.c_str() : nullptr, a.mime);
             files.appendItem(QPDFObjectHandle::newUnicodeString(a.name));
         }
+        // The handwriting as invisible text, for other PDF viewers (InkTextLayer.h)
+        QPDFObjectHandle inkSigs = QPDFObjectHandle::newArray();
+        QPDFObjectHandle inkFont = QPDFObjectHandle::newNull();
+        for (size_t i = 0; i < order.size() && i < prep.pages.size(); ++i) {
+            const double w = prep.pages[i].width, h = prep.pages[i].height;
+            const std::vector<InkTextLayer::Word>* words = i < prep.inkWords.size() ? &prep.inkWords[i] : nullptr;
+            const std::string sig = words ? inkSigOf(*words, w, h) : std::string();
+            inkSigs.appendItem(QPDFObjectHandle::newString(sig));
+            if (sig.empty()) {
+                continue;
+            }
+            if (!inkFont.isIndirect()) {
+                inkFont = makeInkFont([&](QPDFObjectHandle o) { return out.makeIndirectObject(o); },
+                                      [&](QPDFObjectHandle dict, const std::string& data) {
+                                          QPDFObjectHandle stream = QPDFObjectHandle::newStream(&out, data);
+                                          for (const auto& k: dict.getKeys()) {
+                                              stream.getDict().replaceKey(k, dict.getKey(k));
+                                          }
+                                          return stream;
+                                      });
+            }
+            const std::string cm = placementOf(order[i], AnnotSpec{}, w, h).cm.unparse();
+            QPDFObjectHandle stream = QPDFObjectHandle::newStream(&out, InkTextLayer::contentOf(*words, h, cm));
+            QPDFObjectHandle mark = QPDFObjectHandle::newDictionary();
+            mark.replaceKey("/InkText", QPDFObjectHandle::newString(sig));
+            stream.getDict().replaceKey(MARKER, mark);
+            putInkText(order[i], stream, inkFont);
+        }
         QPDFObjectHandle marker = QPDFObjectHandle::newDictionary();
         marker.replaceKey("/Version", QPDFObjectHandle::newInteger(archive ? ARCHIVE_FORMAT_VERSION : FORMAT_VERSION));
+        marker.replaceKey("/InkText", inkSigs);
+        if (inkFont.isIndirect()) {
+            marker.replaceKey("/InkFont", inkFont);
+        }
         if (archive) {
             marker.replaceKey("/Archive", QPDFObjectHandle::newBool(true));
             marker.replaceKey("/Flattened", flattened);
@@ -1495,8 +1653,8 @@ InkStreams inkStreamsOf(const std::vector<QPDFObjectHandle>& contents) {
     for (int i = 0; i < static_cast<int>(contents.size()); ++i) {
         QPDFObjectHandle c = contents[static_cast<size_t>(i)];
         QPDFObjectHandle mark = c.isStream() ? c.getDict().getKey(MARKER) : QPDFObjectHandle::newNull();
-        if (!mark.isDictionary()) {
-            continue;
+        if (!mark.isDictionary() || mark.hasKey("/InkText")) {
+            continue;  // (the text layer of the handwriting is not the drawing)
         }
         if (mark.hasKey("/Layers")) {
             ink.after = i;
@@ -1773,6 +1931,7 @@ public:
                 updatePage(i);
             }
         }
+        placeInkText();
         step("annotations");
         PdfBookmarks::write(q, bookmarksOf(prep, order), &u);
         embedData();
@@ -2464,9 +2623,57 @@ private:
 
     /// The marker (the hashes, what was drawn, the record, the size of the last full write) and the document
     /// information.
+    // --- the text layer of the handwriting (InkTextLayer.h) -------------------------------------------------------
+
+    /// The pages whose text layer changed (by the marker's sigs per page), new pages, and pages whose space for notes
+    /// changed get theirs anew; the others are not read.
+    void placeInkText() {
+        QPDFObjectHandle recorded = e.marker.getKey("/InkText");
+        inkFont = e.marker.getKey("/InkFont");
+        inkSigs = QPDFObjectHandle::newArray();
+        for (size_t i = 0; i < order.size() && i < prep.pages.size(); ++i) {
+            const double w = prep.pages[i].width, h = prep.pages[i].height;
+            const std::vector<InkTextLayer::Word>* words = i < prep.inkWords.size() ? &prep.inkWords[i] : nullptr;
+            const std::string sig = words ? inkSigOf(*words, w, h) : std::string();
+            inkSigs.appendItem(QPDFObjectHandle::newString(sig));
+            const auto n = static_cast<int>(i);
+            const std::string was = recorded.isArray() && n < recorded.getArrayNItems() &&
+                                                    recorded.getArrayItem(n).isString()
+                                            ? recorded.getArrayItem(n).getStringValue()
+                                            : std::string();
+            QPDFObjectHandle page = order[i];
+            const bool fresh = u.isNew(page);
+            if (!fresh && sig == was && !spaceChanged.count(i)) {
+                continue;  // (as it was: not read)
+            }
+            if (sig.empty() && !fresh && was.empty()) {
+                continue;
+            }
+            u.touch(page);
+            removeInkText(page);  // (the one before; a copy of a page may carry its original's)
+            if (sig.empty()) {
+                continue;
+            }
+            if (!inkFont.isIndirect()) {
+                inkFont = makeInkFont([&](QPDFObjectHandle o) { return u.add(o); },
+                                      [&](QPDFObjectHandle dict, const std::string& data) { return u.addStream(dict, data); });
+            }
+            QPDFObjectHandle dict = QPDFObjectHandle::newDictionary();
+            QPDFObjectHandle mark = QPDFObjectHandle::newDictionary();
+            mark.replaceKey("/InkText", QPDFObjectHandle::newString(sig));
+            dict.replaceKey(MARKER, mark);
+            const std::string cm = placementOf(page, AnnotSpec{}, w, h).cm.unparse();
+            putInkText(page, u.addStream(dict, InkTextLayer::contentOf(*words, h, cm)), inkFont);
+        }
+    }
+
     void mark(const std::string& xoppExport) {
         QPDFObjectHandle marker = e.marker;
         u.touch(marker.isIndirect() ? marker : e.root);
+        marker.replaceKey("/InkText", inkSigs.isArray() ? inkSigs : QPDFObjectHandle::newArray());
+        if (inkFont.isIndirect()) {
+            marker.replaceKey("/InkFont", inkFont);
+        }
         marker.replaceKey("/Files", files);
         marker.replaceKey("/Annots", hashes);
         if (archive) {
@@ -2502,6 +2709,8 @@ private:
         }
     }
 
+    QPDFObjectHandle inkSigs = QPDFObjectHandle::newNull();  ///< the marker's /InkText (placeInkText)
+    QPDFObjectHandle inkFont = QPDFObjectHandle::newNull();
     Existing& e;
     QPDF& q;
     IncrementalPdf::Update& u;
@@ -2736,8 +2945,9 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, si
                 auto existing = openExisting(target, *options.revision, mode == Mode::Archive, whyFull);
                 step("open the file");
                 if (existing) {
-                    const Prepared prep = prepare(doc, target.filename().string(), work.path, baseOf, pdfPageCount,
-                                                  false, target.parent_path(), nullptr, &existing->reuse);
+                    Prepared prep = prepare(doc, target.filename().string(), work.path, baseOf, pdfPageCount, false,
+                                            target.parent_path(), nullptr, &existing->reuse);
+                    addInkWords(prep, options.inkText);
                     step("draw what changed and write the .xopp");
                     if (!prep.error.empty()) {
                         r.error = prep.error;
@@ -2768,8 +2978,9 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, si
         } else if (exists) {
             whyFull = "no revision to build on";
         }
-        const Prepared prep =
+        Prepared prep =
                 prepare(doc, target.filename().string(), work.path, baseOf, pdfPageCount, false, target.parent_path());
+        addInkWords(prep, options.inkText);
         step("draw and write the .xopp");
         if (!prep.error.empty()) {
             r.error = prep.error;
@@ -2789,12 +3000,13 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, si
 }
 
 Result writeArchive(Document& doc, const fs::path& target, const BasePageOf& baseOf, size_t pdfPageCount,
-                    const LinkMap& links) {
+                    const LinkMap& links, const std::vector<std::shared_ptr<const ink::PageText>>* inkText) {
     Result r;
     try {
         WorkDir work;
-        const Prepared prep = prepare(doc, target.filename().string(), work.path, baseOf, pdfPageCount, false,
-                                      target.parent_path(), links.archived || !links.from.empty() ? &links : nullptr);
+        Prepared prep = prepare(doc, target.filename().string(), work.path, baseOf, pdfPageCount, false,
+                                target.parent_path(), links.archived || !links.from.empty() ? &links : nullptr);
+        addInkWords(prep, inkText);
         if (!prep.error.empty()) {
             r.error = prep.error;
             return r;

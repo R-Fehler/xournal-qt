@@ -2549,3 +2549,12 @@ letter words only where the recogniser is sure.
       breaks.
 - [ ] Switch "Search handwriting" off: hits in handwriting disappear from open documents at once; the library's
       cache stays (switching it on again needs no reading).
+- [ ] Text layer for other PDF apps: a PDF with notes whose handwriting was read (Settings on, the model there):
+      save it, open it in Okular, Evince, Firefox (pdf.js) and MuPDF: Ctrl+F for a handwritten word finds it where
+      the ink is; selecting across the ink selects words, copying gives the recognised text; nothing extra is drawn
+      (the text is invisible), printing shows only the ink. Words the recogniser was unsure of are not there.
+- [ ] Archive PDF (Export as archive PDF) of the same document: the same in the four viewers; veraPDF
+      (`verapdf --flavour 3b file.pdf`) still says PDF/A-3b compliant.
+- [ ] Write more on a page, wait, Ctrl+S: the save is still incremental (the save message), and the new words are
+      found in Okular after reloading. Open the PDF in xournal-qt again: a search finds each handwritten word once
+      (not twice: the text layer is not read back as PDF text).

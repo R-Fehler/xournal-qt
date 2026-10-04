@@ -31,7 +31,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkLayoutTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/RecognizerTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkIndexerTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkLibraryTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkLibraryTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkTextLayerTest.cpp)
     target_link_libraries(xqt-hwr-tests PRIVATE xqt-hwr xqt-shell Qt6::Test GTest::gtest)
     target_include_directories(xqt-hwr-tests PRIVATE "${TEST_CONFIG_DIR}")
     target_compile_definitions(xqt-hwr-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")

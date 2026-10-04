@@ -48,6 +48,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/Vocabulary.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/InkText.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/InkText.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/InkTextLayer.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/InkTextLayer.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/FuzzyMatch.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/FuzzyMatch.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/FuzzyQuery.h
