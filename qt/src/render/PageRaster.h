@@ -106,6 +106,18 @@ public:
     /// Whether this thread is drawing a page for the screen right now: what only the screen shows (a sticky note that
     /// peeks, the corner of a covering one) asks this. Thumbnails, previews and exports are not for the screen.
     static bool drawingForScreen();
+    /// While it lives, this thread draws for the screen (drawingForScreen): a picture of what the screen shows (a snip,
+    /// RegionRender.h) is drawn so.
+    class ScreenScope {
+    public:
+        ScreenScope();
+        ~ScreenScope();
+        ScreenScope(const ScreenScope&) = delete;
+        ScreenScope& operator=(const ScreenScope&) = delete;
+
+    private:
+        bool before;
+    };
 
     // --- UI thread ---------------------------------------------------------------------------------------------
     /// Re-render the whole page (zoom or page changed). Upstream: XojPageView::rerenderPage(sizeChanged).

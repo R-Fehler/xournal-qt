@@ -86,7 +86,8 @@ set_target_properties(xoj-tools PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
 # Render service (Qt-free): page rasters rendered by worker threads, port of upstream RenderJob.
 add_library(xoj-render STATIC
     "${CMAKE_CURRENT_LIST_DIR}/../src/render/PageRaster.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/../src/render/RenderService.cpp")
+    "${CMAKE_CURRENT_LIST_DIR}/../src/render/RenderService.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/../src/render/RegionRender.cpp")
 target_include_directories(xoj-render PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src")
 target_link_libraries(xoj-render PUBLIC xoj-core)
 set_target_properties(xoj-render PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)

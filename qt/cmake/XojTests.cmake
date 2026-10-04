@@ -45,6 +45,7 @@ set(XOJ_UNIT_TEST_SOURCES
 set(XQT_UNIT_TEST_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/../tests/unit/UndoRedoTest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../tests/unit/PageRasterTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../tests/unit/RegionRenderTest.cpp
 )
 add_executable(xoj-unit-tests "${CMAKE_CURRENT_LIST_DIR}/../tests/unit/main.cpp"
     ${XOJ_UNIT_TEST_SOURCES} ${XQT_UNIT_TEST_SOURCES})

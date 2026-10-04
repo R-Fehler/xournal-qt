@@ -12,8 +12,11 @@
 #include "session/MergedPdf.h"
 #include "session/PdfPageKeeper.h"
 #include "util/Util.h"
+#include "render/RegionRender.h"
 
 namespace xqt {
+
+static_assert(PageClipboard::IMAGE_DPI == region::MIN_DPI, "pictures of pages: one resolution");
 
 namespace {
 std::string stampOf(const fs::path& p) {
