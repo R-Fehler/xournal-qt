@@ -623,6 +623,38 @@ Popup {
                             { text: qsTr("Here, in place of this one"), value: "here" }
                         ]
                     }
+                    // The library's To-dos (qt/docs/todos.md): which check boxes of Markdown are to-dos
+                    SectionTitle { text: qsTr("To-dos") }
+                    ComboRow {
+                        objectName: "todoSourceRow"
+                        key: "todoSource"
+                        text: qsTr("Collect to-dos from")
+                        options: [
+                            { text: qsTr("Lines marked as to-dos"), value: "marked" },
+                            { text: qsTr("Every check box"), value: "all" }
+                        ]
+                    }
+                    GridLayout {
+                        Layout.fillWidth: true
+                        visible: (sheet.s.revision, sheet.s.get("todoSource")) !== "all"
+                        columns: sheet.narrow ? 1 : 2
+                        rowSpacing: 0
+                        Label { text: qsTr("Marker"); Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                        TextField {
+                            objectName: "todoMarkerField"
+                            Layout.fillWidth: sheet.narrow
+                            Layout.preferredWidth: sheet.narrow ? -1 : 260
+                            text: (sheet.s.revision, sheet.s.get("todoMarker"))
+                            placeholderText: "todo:"
+                            onEditingFinished: sheet.s.set("todoMarker", text)
+                        }
+                    }
+                    Hint {
+                        text: qsTr("A check box line (- [ ] …) of a Markdown text, a sticky note or a Markdown file is a "
+                                   + "to-do when it has the marker anywhere in it (upper or lower case); the list does not "
+                                   + "show the marker. Check-box stamps for handwritten to-dos always count. A due date: "
+                                   + "📅 2026-10-12 or due:2026-10-12.")
+                    }
                     // Looking up selected text, the papers of references, arXiv (qt/docs/citations.md)
                     SectionTitle { text: qsTr("Web and citations") }
                     SwitchRow {

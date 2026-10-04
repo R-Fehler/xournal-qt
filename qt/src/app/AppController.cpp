@@ -81,6 +81,7 @@
 #include "shell/LibraryArchive.h"
 #include "shell/LibraryMigration.h"
 #include "shell/LibraryBookmarks.h"
+#include "shell/LibraryTodos.h"
 #include "shell/LibraryModel.h"
 #include "shell/Stickers.h"
 #include "shell/DocumentChapters.h"
@@ -150,6 +151,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::selectMoreChanged);  // (available)
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followSnipTool);
+    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followTodoStampTool);
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
     loadCustomWidths();
@@ -181,6 +183,10 @@ AppController::AppController(QObject* parent): QObject(parent) {
     library = ownLibrary.get();
     ownLibraryBookmarks = std::make_unique<LibraryBookmarksModel>(library);
     libraryBookmarks = ownLibraryBookmarks.get();
+    ownLibraryTodos = std::make_unique<LibraryTodosModel>(library);
+    libraryTodos = ownLibraryTodos.get();
+    applyTodoRules();
+    connect(app.get(), &AppContext::settingsChanged, this, &AppController::applyTodoRules);
     connect(library, &LibraryModel::favouriteToggled, this, &AppController::favouriteChanged);
     citations = std::make_unique<Citations>(*app->getSettings(), library);
     // Open documents take the PDF text the library index read before (their search has all counts at once)
@@ -267,6 +273,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     recent = mainWindow.recent;
     pageClipboard = mainWindow.pageClipboard;  // copied pages can be pasted in any window
     libraryBookmarks = mainWindow.libraryBookmarks;
+    libraryTodos = mainWindow.libraryTodos;
     handwriting = mainWindow.handwriting;
     handwritingView = mainWindow.handwritingView;
     connect(library, &LibraryModel::favouriteToggled, this, &AppController::favouriteChanged);

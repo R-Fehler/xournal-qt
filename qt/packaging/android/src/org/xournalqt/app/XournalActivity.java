@@ -18,6 +18,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Parcelable;
+import android.provider.CalendarContract;
 import android.provider.Settings;
 import android.view.InputDevice;
 
@@ -159,6 +160,29 @@ public class XournalActivity extends QtActivity {
             }
         });
         return true;
+    }
+
+    /// The calendar app's "new event" screen with a to-do filled in (qt/docs/todos.md): an all-day event that starts at
+    /// `beginUtcMs` (midnight UTC of its day). False when no app takes it (the native side writes an .ics then).
+    public static boolean insertCalendarEvent(String title, String description, long beginUtcMs) {
+        XournalActivity a = current.get();
+        if (a == null) {
+            return false;
+        }
+        Intent intent = new Intent(Intent.ACTION_INSERT)
+            .setData(CalendarContract.Events.CONTENT_URI)
+            .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, beginUtcMs)
+            .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, beginUtcMs + 24L * 3600 * 1000)
+            .putExtra(CalendarContract.EXTRA_EVENT_ALL_DAY, true)
+            .putExtra(CalendarContract.Events.TITLE, title)
+            .putExtra(CalendarContract.Events.DESCRIPTION, description)
+            .putExtra(CalendarContract.Events.AVAILABILITY, CalendarContract.Events.AVAILABILITY_FREE);
+        try {
+            a.startActivity(intent);
+            return true;
+        } catch (ActivityNotFoundException e) {
+            return false;
+        }
     }
 
     /// A pen digitizer is attached (a built-in S Pen layer or a Bluetooth stylus). Touch screens of phones without a

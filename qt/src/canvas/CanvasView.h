@@ -479,6 +479,9 @@ public:
     /// coordinates), for the hint that the text is longer than the note; empty otherwise. Changes with
     /// markdownCursorChanged (and when the view scrolls or zooms).
     QRectF noteTextHintBox() const;
+    /// A check-box stamp for a handwritten to-do (TodoStamp.h): its check box at this point of page `pNr` (page
+    /// coordinates). Undoable. False if there is no such page.
+    bool addTodoStamp(size_t pNr, QPointF onPage);
     /// A tap on the check box of a task in a Markdown text (page coordinates): it is switched, one undo step.
     bool toggleMarkdownCheckBox(CanvasPage& page, double x, double y);
     /// New texts of the text tool: Markdown text boxes of this size, or ordinary texts. `inPanel`: Markdown text

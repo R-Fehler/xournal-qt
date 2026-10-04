@@ -83,6 +83,12 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LayersModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryBookmarks.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryBookmarks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Todos.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Todos.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryTodos.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryTodos.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/TodoCalendar.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/TodoCalendar.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentChapters.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentChapters.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentLinks.h
@@ -121,6 +127,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppSnip.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppStickers.cpp
+
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTodos.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppRename.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppBookmarks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppAnnotations.cpp
@@ -176,6 +184,7 @@ set(XQT_QML_FILES
     src/app/qml/FolderChooser.qml
     src/app/qml/DocumentCard.qml
     src/app/qml/BookmarksView.qml
+    src/app/qml/TodosView.qml
     src/app/qml/BookmarkDialog.qml
     src/app/qml/NewDocumentDialog.qml
     src/app/qml/DocumentModeCards.qml
@@ -308,6 +317,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/DocumentLinksTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/SnipTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/StickerToolTest.cpp
+
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/TodosTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AnnotationsPanelTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/CitationsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.h
@@ -340,6 +351,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ExternalChangesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SyncConflictsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/FavouritesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TodosTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFilesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryArchiveTest.cpp

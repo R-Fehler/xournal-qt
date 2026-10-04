@@ -545,7 +545,9 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
 - `qt/todos`: a library-wide To-dos list from Markdown task lines, **grouped and filtered** (by document and
   folder, open/done, due date, text), sortable; Obsidian-style due dates; a check-box stamp for handwritten to-dos;
   "Add to calendar" as a one-way `.ics` / Android intent. A setting collects only lines marked as to-dos (default:
-  the marker `todo:`, configurable, or all check boxes); stamped boxes always count. No scripting for now.
+  the marker `todo:`, configurable, or all check boxes); stamped boxes always count. No scripting for now. *Built
+  (qt/docs/todos.md): the index, the To-dos tab, the stamp with the handwriting's picture, Add to calendar and the
+  exports. Left: the device checks (Android's calendar intent and `.ics` hand-off above all).*
 - Rotating PDF pages in a `.xopp`: a turned copy in the hidden `.name.pages.pdf` (Xournal++ reads it too).
 - Highlighter opacity on strokes: stays upstream's (compatibility).
 - [?] `qt/toolbox`: user-defined tools as the tool bar (Drawboard-like), the default mode: each entry is a tool
@@ -574,9 +576,9 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   German.
 - [?] Rotating the canvas (like Krita): the rotate gesture, reset by a double tap or the fit buttons. A feasibility
   check first.
-- [?] To-dos: how they could work (Markdown task lists, ink checkboxes, a list across the library?), whether the
+- [x] To-dos: how they could work (Markdown task lists, ink checkboxes, a list across the library?), whether the
   app may hand them to the system (calendars, reminders), and whether a script interpreter could ship (upstream
-  has Lua plugins).
+  has Lua plugins). *Decided and built as `qt/todos` (qt/docs/todos.md); no scripting. Left: the device checks.*
 
 ### Ideas round 2 of 2026-10-04 (the author chose from [qt/docs/ideas-2026-10.md](qt/docs/ideas-2026-10.md))
 The other ideas (A3–A9, A15, B1–B8) stay in that file to decide later.

@@ -57,6 +57,7 @@
 #include "session/Vocabulary.h"
 
 class Document;
+class Text;
 class QThreadPool;
 
 namespace xqt {
@@ -267,6 +268,28 @@ public:
     std::vector<Bookmark> bookmarks() const;
     /// Changes when the bookmarks of a document changed, or a document with bookmarks came or went.
     quint64 bookmarkChanges() const { return markChanges.load(); }
+    /// A to-do of an indexed document (qt/docs/todos.md): a task line of a Markdown box, a sticky note's text, a page
+    /// of a text document, or a Markdown file. All task lines are indexed; which of them the To-dos view lists (the
+    /// ones with the marker, or all) is its setting.
+    struct Todo {
+        fs::path file;        ///< the document's main file
+        int page = -1;        ///< 0-based; -1: a Markdown file (no pages in the index)
+        int box = -1;         ///< its box on the page (md::boxesOf order); -1: a Markdown file
+        int line = 0;         ///< its line in the box's text (a Markdown file: in the file), 0-based
+        int occurrence = 0;   ///< to-dos before it in the document with the same text (to find it again)
+        QString text;         ///< what follows the check box on its line (as written: marker, due date)
+        bool done = false;
+        QString due;          ///< "YYYY-MM-DD" ("": none)
+        bool stamp = false;   ///< a check-box stamp (always a to-do, whatever the marker setting)
+        double x = 0, y = 0;  ///< where its box is on the page (its top left, page coordinates); a stamp: its check box
+        double size = 0;      ///< its box's font size (points); a stamp: the side of its check box
+        double pageWidth = 0; ///< the width of its page (points)
+        bool operator==(const Todo& o) const = default;
+    };
+    /// The to-dos of all indexed documents (by file, then in the order of the document): read from the index.
+    std::vector<Todo> todos() const;
+    /// Changes when the to-dos of a document changed, or a document with to-dos came or went.
+    quint64 todoChanges() const { return todoChangeCount.load(); }
     /// The handwriting recognised in the library's documents (its pack per folder).
     InkTextStore& inkText() { return *inks; }
     const InkTextStore& inkText() const { return *inks; }
@@ -357,6 +380,10 @@ private:
         /// The links of its Markdown boxes were read (notes indexed before links were: read again once, without
         /// their PDF text)
         bool linksRead = true;
+        /// Its to-dos (task lines of its Markdown, qt/docs/todos.md), without their file. Stored in "notes".
+        std::vector<Todo> todos;
+        /// They were read (entries of documents indexed before to-dos were: read again once, without their PDF text)
+        bool todosRead = true;
         /// Its PDF's title (PdfTitle.h): the /Title if it looks like one, and the largest text of the first page it
         /// shows. Kept with its PDF's stamp in "notes".
         QString title;
@@ -421,6 +448,11 @@ private:
     void removeEmptyMirrors(fs::path dir) const;
     void convert(const fs::path& dir);
     QCborMap notesOf(const Entry& e) const;
+    /// The task lines of a Markdown text into `e`'s to-dos: of a box (`text`) on page `page`, or of a Markdown file
+    /// (page and box -1, no text)
+    static void addTodos(Entry& e, const std::string& source, int page, int box, const Text* text, double pageWidth);
+    /// Their occurrences (to-dos before them with the same text), once all are in
+    static void numberTodos(Entry& e);
     std::shared_ptr<Entry> entryOf(const fs::path& folder, const QString& name, const QCborMap& notes,
                                    const QCborValue& text) const;
 
@@ -443,6 +475,7 @@ private:
     std::atomic<quint64> generation{0};
     std::atomic<quint64> kindChanges{0};
     std::atomic<quint64> markChanges{0};
+    std::atomic<quint64> todoChangeCount{0};
     std::atomic<bool> running{false};
     std::atomic<bool> discarded{false};
     std::atomic<int> doneCount{0}, totalCount{0};

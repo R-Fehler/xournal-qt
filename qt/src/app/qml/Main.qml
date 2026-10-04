@@ -1542,6 +1542,13 @@ ApplicationWindow {
                     icon.source: app.iconUrl("xqt-snip")
                     onTriggered: app.startSnip("lasso")
                 }
+                // A check box for a to-do written by hand beside it (qt/docs/todos.md): the next tap places it
+                AdaptiveMenuItem {
+                    objectName: "todoStampItem"
+                    text: qsTr("Check box for a handwritten to-do")
+                    icon.source: app.iconUrl("xqt-list-todo")
+                    onTriggered: app.startTodoStamp()
+                }
             }
         }
         // Stickers (qt/docs/stickers.md): saved content of the library, pasted with a tap (self-contained:
@@ -4201,6 +4208,7 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("spotlight"); enabled: toolKeys && !win.textDoc; onActivated: app.toggleCurtain("spotlight") }
     Shortcut { sequence: "Escape"; enabled: docKeys && app.curtainHandles; onActivated: app.curtainHandles = false }
     Shortcut { sequence: "Escape"; enabled: app.snip !== "" && !app.curtainHandles; onActivated: app.cancelSnip() }
+    Shortcut { sequence: "Escape"; enabled: app.todoStamp && app.snip === ""; onActivated: app.cancelTodoStamp() }
     Shortcut { sequences: win.keysOf("redo"); enabled: docKeys; onActivated: app.redo() }
     // (the reference, while it has the keys and is written in)
     Shortcut { sequences: win.keysOf("save"); enabled: docKeys; onActivated: if (!app.saveReferenceInHand()) saveOrAsk(null) }

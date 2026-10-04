@@ -45,13 +45,15 @@ Rectangle {
     /// The row's width (16 px margin at the left, 8 at the right)
     readonly property real headerRoom: width - 24
     readonly property real searchMinimum: 150 + 6 + 48
-    /// The switch as icons: the library's name, its ▾, Recent, Favourites, Bookmarks
-    readonly property real switchNeed: libraryTab.implicitWidth + libraryMenuButton.implicitWidth + 3 * 40 + 4 * 2 + 8
+    /// The switch as icons: the library's name, its ▾, Recent, Favourites, Bookmarks, To-dos
+    readonly property real switchNeed: libraryTab.implicitWidth + libraryMenuButton.implicitWidth + 4 * 40 + 5 * 2 + 8
     /// What the words beside the icons of Recent, Favourites and Bookmarks add
-    readonly property real switchWords: recentWord.advanceWidth + favouritesWord.advanceWidth + bookmarksWord.advanceWidth + 3 * 12
+    readonly property real switchWords: recentWord.advanceWidth + favouritesWord.advanceWidth + bookmarksWord.advanceWidth
+                                        + todosWord.advanceWidth + 4 * 12
     TextMetrics { id: recentWord; text: qsTr("Recent") }
     TextMetrics { id: favouritesWord; text: qsTr("Favourites") }
     TextMetrics { id: bookmarksWord; text: qsTr("Bookmarks") }
+    TextMetrics { id: todosWord; text: qsTr("To-dos") }
     /// What the expanded row needs: the switch, a search wide enough for its placeholder (300; below that the grouped
     /// row with a wider search is better), New, Last page, Import, New folder, Flat, Show, Sort, − and + with their
     /// separators, Settings, and the spacing between them
@@ -69,7 +71,8 @@ Rectangle {
     /// The actions on a selection in a bar at the bottom (Open, Copy, Move, Trash, ⋮): on a phone, and where the
     /// selection bar's row does not fit
     readonly property bool selectionAtBottom: phoneLayout || selectionFull.implicitWidth + selectionLabel.implicitWidth + 96 > width
-    /// 0: library, 1: recent documents, 2: the library's bookmarks (qt/docs/bookmarks.md)
+    /// 0: library, 1: recent documents, 2: the library's bookmarks (qt/docs/bookmarks.md), 3: its to-dos
+    /// (qt/docs/todos.md)
     property int page: app.library.available ? 0 : 1
     /// Changes when a star is set or taken away (the Recent cards ask for theirs)
     property int favouriteRevision: 0
@@ -122,7 +125,9 @@ Rectangle {
         return qsTr("%1 GB").arg((bytes / (1024 * 1024 * 1024)).toFixed(1))
     }
     function pagesText(n) { return n < 0 ? "" : (n === 1 ? qsTr("1 page") : qsTr("%1 pages").arg(n)) }
-    function focusGrid() { (page === 0 ? libraryGrid : page === 2 ? bookmarksView : recentGrid).forceActiveFocus() }
+    function focusGrid() {
+        (page === 0 ? libraryGrid : page === 2 ? bookmarksView : page === 3 ? todosView : recentGrid).forceActiveFocus()
+    }
     function focusSearch() {
         page = 0
         searchField.forceActiveFocus()
@@ -560,7 +565,7 @@ Rectangle {
                 id: showButton
                 objectName: "showButton"
                 label: qsTr("Show")
-                visible: home.expanded && (home.page === 0 || home.page === 2) && app.library.available
+                visible: home.expanded && (home.page === 0 || home.page >= 2) && app.library.available
                 iconName: "xqt-filter"
                 tip: app.library.showFiltered ? qsTr("Show: some kinds of files are hidden or added") : qsTr("Show: which kinds of files")
                 checked: app.library.showFiltered
@@ -591,7 +596,7 @@ Rectangle {
                 text: "−"
                 font.pixelSize: 22
                 implicitWidth: 40
-                enabled: home.page !== 2 && (home.page === 0 ? libraryGrid : recentGrid).columns < 12
+                enabled: home.page < 2 && (home.page === 0 ? libraryGrid : recentGrid).columns < 12
                 onClicked: home.zoom(-1)
                 ToolTip.visible: hovered
                 ToolTip.text: qsTr("Smaller cells (Ctrl+wheel, pinch)")
@@ -603,7 +608,7 @@ Rectangle {
                 text: "+"
                 font.pixelSize: 22
                 implicitWidth: 40
-                enabled: home.page !== 2 && (home.page === 0 ? libraryGrid : recentGrid).columns > home.fewestColumns(home.extendedView && home.page === 0)
+                enabled: home.page < 2 && (home.page === 0 ? libraryGrid : recentGrid).columns > home.fewestColumns(home.extendedView && home.page === 0)
                 onClicked: home.zoom(1)
                 ToolTip.visible: hovered
                 ToolTip.text: qsTr("Bigger cells (Ctrl+wheel, pinch)")
@@ -655,14 +660,14 @@ Rectangle {
                         onTriggered: app.settings.set("resumeAtLastPage", checked)
                     }
                     MenuSeparator {
-                        property bool offered: home.page !== 2
+                        property bool offered: home.page < 2
                         visible: offered
                         height: offered ? implicitHeight : 0
                     }
                     // The size of the cards: − and + (Ctrl+wheel and pinch too); the menu stays open
                     RowLayout {
                         objectName: "viewCardSizeRow"
-                        property bool offered: home.page !== 2
+                        property bool offered: home.page < 2
                         visible: offered
                         height: offered ? implicitHeight : 0
                         width: parent ? parent.width : implicitWidth
@@ -1147,6 +1152,13 @@ Rectangle {
                 shown: home.visible && home.page === 2
                 bottomSpace: home.fabSpace
             }
+
+            // --- the library's to-dos ---
+            TodosView {
+                id: todosView
+                shown: home.visible && home.page === 3
+                bottomSpace: home.fabSpace
+            }
         }
 
         // --- the actions on a selection at the bottom (a phone, or no room in the selection bar) ---
@@ -1274,7 +1286,7 @@ Rectangle {
         readonly property bool named: pageIndex === 0
         readonly property bool iconOnly: !named && !home.roomy
         Layout.fillWidth: named && home.portraitPhone
-        Layout.maximumWidth: named && home.shortLayout ? 180 : Number.POSITIVE_INFINITY
+        Layout.maximumWidth: named && home.shortLayout ? 136 : Number.POSITIVE_INFINITY  // (held sideways: room for the breadcrumbs)
         Layout.fillHeight: true
         implicitHeight: home.touch ? 44 : 40
         implicitWidth: iconOnly ? (home.touch ? 44 : 40) : tabRow.implicitWidth + (named ? 20 : 28)
@@ -1573,6 +1585,14 @@ Rectangle {
                 pageIndex: 2
                 label: qsTr("Bookmarks")
                 iconName: "xqt-bookmark"
+                enabled: app.library.available
+            }
+            PageTab {
+                id: todosTab
+                objectName: "todosPageButton"
+                pageIndex: 3
+                label: qsTr("To-dos")
+                iconName: "xqt-list-todo"
                 enabled: app.library.available
             }
         }

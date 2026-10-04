@@ -53,6 +53,7 @@ class HandwritingSettings;
 class CanvasView;
 class LibraryArchive;
 class LibraryBookmarksModel;
+class LibraryTodosModel;
 class LibraryMove;
 namespace LibraryMigration {
 struct Plan;
@@ -747,6 +748,33 @@ public:
     Q_INVOKABLE bool openBookmark(const QString& path, int page);
     QObject* libraryBookmarksModel() const;
 
+    // --- to-dos (AppTodos.cpp, qt/docs/todos.md) ---
+    /// The library's To-dos view (LibraryTodosModel)
+    Q_PROPERTY(QObject* libraryTodos READ libraryTodosModel CONSTANT)
+    QObject* libraryTodosModel() const;
+    /// Tick or untick a to-do of the To-dos view (its text as written and its occurrence, LibraryIndex::Todo): in its
+    /// document where it is open (one undo step there; saved when it had no other changes), else in its file in the
+    /// background (a Markdown file through its text; a .xopp or a PDF with notes loaded, changed and saved as the app
+    /// saves them). A file that cannot be changed (read-only, an archive PDF, ...) is not: a message says why. False if
+    /// it was not done (or is not started).
+    Q_INVOKABLE bool setTodoDone(const QString& path, const QString& rawText, int occurrence, bool done);
+    /// Open a to-do's document at its page, with its line in view (`page`: where the index has it, -1: not known).
+    Q_INVOKABLE bool openTodo(const QString& path, const QString& rawText, int occurrence, int page);
+    /// "Add to calendar" of a to-do with a due date (a row of the To-dos view, LibraryTodosModel::get): on Android the
+    /// calendar app's new event, filled in; else (or when none takes it) an .ics of it in the app's cache, opened with
+    /// the system's app for it. One way (TodoCalendar.h).
+    Q_INVOKABLE bool addTodoToCalendar(const QVariantMap& row);
+    /// Export the open to-dos the To-dos view lists to `target`: an .ics (those with a due date, all-day events) or a
+    /// Markdown list (.md, any other name: .md is added)
+    Q_INVOKABLE bool exportTodos(const QUrl& target);
+    /// The check-box stamp for a handwritten to-do is armed (TodoStamp.h): the next tap on a page places it
+    Q_PROPERTY(bool todoStamp READ todoStampArmed NOTIFY todoStampChanged)
+    bool todoStampArmed() const;
+    /// Arm it (the hand tool meanwhile, so the tap writes nothing); after the stamp, the tool used before comes back
+    /// (also on any tool chosen, or cancelTodoStamp)
+    Q_INVOKABLE void startTodoStamp();
+    Q_INVOKABLE void cancelTodoStamp();
+
     /// The title page of the current document (its preview in the library and the overview; 0-based, -1: the
     /// document has no file yet, so there is nowhere to keep it).
     Q_PROPERTY(int titlePage READ titlePage NOTIFY titlePageChanged)
@@ -1347,6 +1375,8 @@ Q_SIGNALS:
     void stickerPasted(const QString& path, const QString& error);
     /// A sticker file is being written or read
     void stickerBusyChanged();
+
+    void todoStampChanged();
     /// A snip from a document with a file was pasted: the window offers to add a link to its page (addSnipLink)
     void snipLinkOffered(const QString& title);
     void fontChanged();
@@ -1487,6 +1517,11 @@ private:
     /// Follow the snip tool: armed, the tool changing to another one ends it
     void followSnipTool();
     QString snipPreviousTool;           ///< the tool before the snip ("": none)
+    QString stampPreviousTool;          ///< the tool before the check-box stamp ("": none)
+    /// The stamp ends (`restore`: the tool before it back)
+    void endTodoStamp(bool restore);
+    /// Another tool chosen while the stamp is armed: it ends, that tool stays
+    void followTodoStampTool();
     ToolType snipTool = TOOL_NONE;      ///< the select tool the snip uses
     QPointer<xqt::CanvasView> snipLinkView;  ///< the view a snip with a link was pasted into
     // --- stickers (AppStickers.cpp) ---
@@ -1559,6 +1594,16 @@ private:
     std::unique_ptr<xqt::LibraryModel> ownLibrary;
     std::unique_ptr<xqt::LibraryBookmarksModel> ownLibraryBookmarks;
     xqt::LibraryBookmarksModel* libraryBookmarks = nullptr;
+    std::unique_ptr<xqt::LibraryTodosModel> ownLibraryTodos;
+    xqt::LibraryTodosModel* libraryTodos = nullptr;
+    /// Documents that are not open, loaded to tick a to-do in them and saved (gone once saved)
+    std::vector<std::unique_ptr<xqt::DocumentSession>> todoSaves;
+    /// Tabs of all windows of this process whose document is `file` (its .xopp or PDF, or a text file edited)
+    std::vector<std::pair<AppController*, xqt::DocumentSession*>> tabsShowing(const fs::path& file) const;
+    /// Set a to-do in an open document: one undo step (false: it is not there)
+    bool setTodoIn(xqt::DocumentSession& s, const QString& rawText, int occurrence, bool done);
+    /// The to-dos setting into the view (it changes with the settings)
+    void applyTodoRules();
     std::unique_ptr<xqt::RecentFiles> ownRecent;
     xqt::SettingsModel* settingsView = nullptr;
     xqt::LibraryModel* library = nullptr;

@@ -27,6 +27,7 @@
 #include "CanvasMemory.h"
 #include "HoverPointer.h"
 #include "ScreenCalibration.h"
+#include "Todos.h"
 
 namespace xqt {
 
@@ -243,6 +244,19 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                 s.customSettingsChanged();
             });
     }
+    // To-dos (qt/docs/todos.md): "Collect to-dos from" the lines with the marker ("marked", the default) or every
+    // check box ("all"); the marker (default "todo:")
+    add("todoSource",
+        [&s] { return QVariant(todos::Rules::of(s).all ? QStringLiteral("all") : QStringLiteral("marked")); },
+        [&s](const QVariant& v) {
+            s.getCustomElement("xournalQt").setString("todoSource", v.toString() == QLatin1String("all") ? "all" : "marked");
+            s.customSettingsChanged();
+        });
+    add("todoMarker", [&s] { return QVariant(todos::Rules::of(s).marker); },
+        [&s](const QVariant& v) {
+            s.getCustomElement("xournalQt").setString("todoMarker", v.toString().trimmed().toStdString());
+            s.customSettingsChanged();
+        });
     // Hybrid PDFs (qt/docs/hybrid-pdf.md): notes of an annotated PDF go into the PDF itself (off: "name.notes.pdf");
     // whether that was explained; a .xopp for Xournal++ written next to a hybrid PDF on every save
     for (const char* key: {"hybridIntoPdf", "hybridIntoPdfExplained", "hybridExportXopp"}) {

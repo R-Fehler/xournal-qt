@@ -2899,3 +2899,56 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
       library, Copy to library… (another library's `Stickers/`), Delete (to the trash).
 - [ ] The library: the `Stickers` folder's card has a sticker mark; its stickers are cards with previews, the library
       search finds their text, a sticker opens as a document.
+
+## To-dos: the index and the setting (qt/todos)
+
+- [ ] A library with a few `.xopp` with Markdown boxes "- [ ] todo: …", a sticky note with one, a `.md` with some and a
+      PDF text document with some: after indexing (the breadcrumb row's count) the To-dos tab lists exactly the lines
+      with "todo:" (also "TODO:", "Todo:" in the middle of the line), without the marker.
+- [ ] Settings → To-dos → "Every check box": shopping-list items without the marker are listed too; back to "Lines
+      marked as to-dos": gone again at once (nothing is read again: no indexing count).
+- [ ] Settings → To-dos → Marker "#task": only lines with "#task" are listed.
+- [ ] `📅 2026-10-12` and `due:2026-10-12` show as a date chip; typing 📅 with the emoji picker works the same.
+- [ ] A library indexed by an older build: opening it reads its documents once more (a short indexing count), then
+      not again at the next start.
+
+## To-dos: the view (qt/todos)
+
+- [ ] Library home → To-dos (the switch, after Bookmarks): groups by document with the count at the right; the
+      folder beside the name. "By folder" and "Not grouped" (then each row says its document).
+- [ ] Sort: due date (overdue in red, today in amber, this week in blue), document, last changed (a document saved
+      just now comes first).
+- [ ] Filters: Open / Done / Open and done; Overdue, Due today, Due this week, No due date; the text field (Escape
+      clears it); "Only in <folder>" after going into a folder in the Library tab.
+- [ ] Tap a row: the document opens at the page with the to-do's line in view (also a `.md`: the right page).
+- [ ] Tick a to-do of a closed `.md`: the file changes only in that character (diff it); of a closed `.xopp`: no tab
+      opens, the file is saved, the row disappears from "Open" after a moment.
+- [ ] Tick a to-do of a closed PDF with notes / PDF text document: saved into the PDF (another PDF app shows the box
+      ticked), no tab.
+- [ ] Tick a to-do of an open document: ticked there, Ctrl+Z in the document takes it back; a document with other
+      unsaved changes stays unsaved (the row shows the tick until it is saved).
+- [ ] A read-only `.md` (chmod 444, not as root) or an archive PDF: a message says why, nothing changes.
+- [ ] Phone (portrait): the filters scroll sideways in one row, the rows are easy to hit, the check box does not open
+      the document; press and hold a row: the sheet with Open, Mark as done, Add to calendar.
+
+## To-dos: the check-box stamp (qt/todos)
+
+- [ ] Image button, press and hold → "Check box for a handwritten to-do": a note says to tap; the tap puts a small
+      check box exactly under the pen tip / finger; the pen is back: write the to-do beside it.
+- [ ] Escape before tapping, or another tool: no stamp, that tool stays.
+- [ ] Tap the stamp's check box: it ticks (one undo step); the To-dos tab lists it (also with the marker setting)
+      with a picture of the handwriting beside it, sharp at the screen's resolution.
+- [ ] With handwriting search on and the page read: the row shows the recognised words; the text filter finds them.
+- [ ] Xournal++ opens the file: the stamp is a small "- [ ]" text.
+
+## To-dos: calendar (qt/todos)
+
+- [ ] Linux (KDE: Merkuro/KOrganizer; GNOME: Calendar; Thunderbird): a row with a due date → Add to calendar: the
+      calendar app imports an all-day event on that day, titled with the to-do, "To-do in <doc>, page N" and the link
+      in its notes; it does not block the day as busy.
+- [ ] Windows (Outlook / Calendar) and macOS (Calendar): the same with the `.ics`.
+- [ ] Android: the calendar app's "New event" screen opens, all day, on the right day (not the day before in a time
+      zone west of UTC), with the title and the notes; Back without saving adds nothing. Without a calendar app: the
+      `.ics` is offered instead (or the message with its path).
+- [ ] ⋮ → Export open to-dos (.ics): Google Calendar's import (web) takes all dated ones; (.md): readable list by
+      document with links that open the pages in the app.

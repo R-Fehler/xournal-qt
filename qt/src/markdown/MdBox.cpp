@@ -144,6 +144,16 @@ std::optional<size_t> checkBoxAt(const Text& text, double x, double y) {
     return std::nullopt;
 }
 
+std::optional<Rect> checkBoxRect(const Text& text, size_t mark) {
+    const auto& shift = text.getTransformation().shift;
+    for (const Layout::CheckBox& box: cachedLayout(text.getText(), styleOf(text)).checkBoxes) {
+        if (box.mark == mark) {
+            return Rect{box.x + shift.x, box.y + shift.y, box.size, box.size};
+        }
+    }
+    return std::nullopt;
+}
+
 namespace {
 struct Writing {
     std::mutex mtx;
