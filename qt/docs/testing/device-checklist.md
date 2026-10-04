@@ -2709,3 +2709,39 @@ touched).
 - [ ] Tool bar at a side (⋮ → View → Tool bar position → Left): undo and redo at the top of the rail.
 - [ ] Phone (Fold folded): undo and redo in the dock. Write Markdown on a page with the soft keyboard open: the dock
       goes, undo and redo are at the right end of the format bar above the keyboard, one tap each.
+
+## Long press on pages (qt/page-ops)
+
+On the 2-in-1 with a finger, the pen and a mouse; on Android (phone and tablet).
+- [ ] Page grid (Ctrl+Alt+G, four-finger tap): a finger held still on a page for about half a second selects it and
+      turns "Select" on (the action bar shows "1 page selected") while the finger is still down; letting go does not
+      open the page. Taps then select and unselect pages.
+- [ ] Held, then moved: the selected pages (the held one included) follow the finger and go where it is let go; one
+      undo puts them back.
+- [ ] Sidebar: the same hold selects the page and shows the bar "1 page selected" with ⋮ (the page menu of the
+      selection) and ✕; taps then select instead of going to the page; ✕, Esc or unselecting the last page ends it.
+      In the drawer of the phone classes the drawer stays open while selecting.
+- [ ] A resting finger that does not mean to select (scrolling the list slowly, a slow tap): the list still scrolls
+      when the finger moves before the hold time; a slow tap selects (which ✕ undoes), it never moves pages.
+- [ ] The mouse is as before: a long click opens the page, Ctrl/Shift+click selects, right click the menu, press and
+      hold then move drags.
+- [ ] No haptic tick yet (the app has none anywhere): check whether the hold feels clear enough without one.
+
+## Rotating pages (qt/page-ops)
+
+See qt/docs/page-rotation.md. With pen, finger and mouse; a `.xopp` and a PDF with notes.
+- [ ] Page menu (sidebar ⋮, right click, grid): the two rotate icons beside "Insert pages…" turn the page a quarter
+      left / right; on a selected page they turn the selection. The grid's action bar has them too. ⋮ → Page → Rotate:
+      this page, all pages. Ctrl+Z (or the undo button) turns them back in one step.
+- [ ] The canvas, the sidebar thumbnail, the grid preview and the library/tab preview show the turned page at once,
+      with the right shape (landscape / portrait).
+- [ ] Ink, a plain text, an image and a TeX formula turn with the page and stay editable (select, move, erase);
+      Markdown boxes and sticky notes stay upright at the turned place; the page's Markdown text stays at the margins.
+- [ ] A ruled / graph page: the lines follow the new shape. A photo opened to write on: the picture turns.
+- [ ] Save, close, open again: the same. The `.xopp` opens in upstream Xournal++ with the turned ink and texts.
+- [ ] A `.xopp` with a PDF (Xournal++ files mode): on a PDF page the icons are grey and the menu says "PDF pages can
+      only be rotated in PDF files with notes"; "All pages" turns only the pages without PDF and says how many stayed.
+- [ ] A PDF with notes (and a PDF annotated in PDF files mode, before its first save): a PDF page turns with its text
+      (search hits and text selection at the turned place, links still work). Saved: Okular, Evince, Firefox/pdf.js,
+      Chrome, Acrobat, Xodo, Drawboard show the page turned with the ink on the right place; xournal-qt opens it again
+      turned. Turning a page several times quickly on a long scanned PDF: how long it waits (each turn merges a copy).

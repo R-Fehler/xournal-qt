@@ -17,18 +17,44 @@
 #include <string>
 #include <vector>
 
+#include <memory>
+
 #include "model/NoteSpace.h"
 #include "model/PageRef.h"
 #include "undo/UndoAction.h"
 
 class Document;
+class GroupUndoAction;
+class Text;
 class XojPage;
 
 namespace xqt {
 
 class DocumentSession;
+class MarkdownSession;
 
 namespace pagesize {
+
+/// The page's own Markdown text box, if it has text (the document is locked)
+const Text* pageTextOf(const PageRef& page);
+
+/// The page's own Markdown text on pages whose size changes (here, and when they are turned: PageRotate.h): taken up
+/// at its places on the pages as they are (the constructor, before the sizes change; from the page each text starts
+/// on), flowed anew on their new sizes and margins by finish(), pages added or removed included. The document must
+/// not be locked.
+class TextReflow {
+public:
+    TextReflow(DocumentSession& session, const std::vector<PageRef>& pages);
+    ~TextReflow();
+    TextReflow(const TextReflow&) = delete;
+    TextReflow& operator=(const TextReflow&) = delete;
+    /// After the sizes changed: the texts flowed anew, an undo step for each (empty when a text stayed as it was)
+    std::vector<UndoActionPtr> finish();
+
+private:
+    std::vector<std::unique_ptr<MarkdownSession>> texts;
+    std::vector<std::unique_ptr<GroupUndoAction>> groups;
+};
 
 /// A page can take another size: not one with a PDF background (it has the PDF page's size).
 bool canResize(const XojPage& page);

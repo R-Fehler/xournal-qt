@@ -116,7 +116,7 @@ Kind kindOf(const fs::path& file) {
     }
 }
 
-Result extract(const fs::path& file, const std::vector<size_t>& pages, std::string& out) {
+Result extract(const fs::path& file, const std::vector<size_t>& pages, std::string& out, int quarterTurns) {
     Result r;
     try {
         QPDF src;
@@ -131,6 +131,11 @@ Result extract(const fs::path& file, const std::vector<size_t>& pages, std::stri
                 return r;
             }
             helper.addPage(all[p], false);
+        }
+        if (const int q = ((quarterTurns % 4) + 4) % 4; q != 0) {
+            for (QPDFPageObjectHelper& page: helper.getAllPages()) {
+                page.rotatePage(90 * q, true);  // (relative: added to the /Rotate it has, an inherited one too)
+            }
         }
         QPDFWriter w(dst);
         w.setOutputMemory();

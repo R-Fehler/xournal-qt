@@ -1,5 +1,7 @@
-// Page sidebar: thumbnails of the current document. Tap a page to go there; Ctrl/Shift+click to select pages;
-// press and hold to drag the selected pages to another place; right click or ⋮ for the page menu; Ctrl+C/X/V,
+// Page sidebar: thumbnails of the current document. Tap a page to go there; Ctrl/Shift+click to select pages; a
+// finger held on a page starts the selection mode with that page selected (taps then select, until the selection is
+// empty or the bar's ✕); press and hold, then move, to drag the selected pages to another place; right click or ⋮
+// for the page menu; Ctrl+C/X/V,
 // Delete and Ctrl+Z (the one undo of the document) with the keyboard. While searching, pages with hits are framed and the list can
 // be limited to them. The last button shows the document's annotations (AnnotationList).
 import QtQuick
@@ -20,6 +22,13 @@ Rectangle {
     signal pagePicked()
     /// Room at the bottom for the system's navigation bar (its lists end above it; the sidebar's color goes on below)
     property real bottomInset: 0
+    /// Touch: taps select pages instead of going there (a finger held on a page turns it on; it ends when the selection
+    /// is empty)
+    property bool selectionMode: false
+    Connections {
+        target: app.pages
+        function onSelectionChanged() { if (app.pages.selectionCount === 0) sidebar.selectionMode = false }
+    }
     // The annotations are read only while they are shown
     Binding { target: app.annotations; property: "active"; value: sidebar.visible && sidebar.mode === "annotations" }
     onModeChanged: if (mode === "contents" && !hasContents) mode = "pages"
@@ -108,9 +117,53 @@ Rectangle {
         anchors.right: parent.right
     }
 
+    // The selection mode: how many pages are selected, their menu, and the way out
+    Pane {
+        id: selectionBar
+        objectName: "sidebarSelectionBar"
+        visible: sidebar.selectionMode && sidebar.mode === "pages"
+        anchors.top: switchRow.bottom
+        anchors.topMargin: 4
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: 6
+        anchors.rightMargin: 6
+        padding: 0
+        leftPadding: 10
+        background: Rectangle { radius: height / 2; color: "#ffffff" }
+        RowLayout {
+            width: parent.width
+            spacing: 0
+            Label {
+                Layout.fillWidth: true
+                elide: Text.ElideRight
+                text: app.pages.selectionCount === 1 ? qsTr("1 page selected")
+                                                     : qsTr("%1 pages selected").arg(app.pages.selectionCount)
+                color: "#3c4043"
+            }
+            IconButton {
+                objectName: "sidebarSelectionMenu"
+                iconName: "xqt-more"
+                tip: qsTr("What to do with the selected pages")
+                implicitWidth: 40; implicitHeight: 40
+                icon.width: 20; icon.height: 20
+                enabled: app.pages.selectionCount > 0
+                onClicked: pageMenu.openFor(app.pages.selectedPages()[0], this, 0, height)
+            }
+            IconButton {
+                objectName: "sidebarSelectionDone"
+                iconName: "xqt-close"
+                tip: qsTr("Clear the selection")
+                implicitWidth: 40; implicitHeight: 40
+                icon.width: 20; icon.height: 20
+                onClicked: { app.pages.clearSelection(); sidebar.selectionMode = false }
+            }
+        }
+    }
+
     SearchFilterChip {
         id: filterChip
-        anchors.top: switchRow.visible ? switchRow.bottom : parent.top
+        anchors.top: selectionBar.visible ? selectionBar.bottom : (switchRow.visible ? switchRow.bottom : parent.top)
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.margins: 8
@@ -124,7 +177,8 @@ Rectangle {
         id: list
         objectName: "sidebarList"
         visible: sidebar.mode === "pages"
-        anchors.top: filterChip.visible ? filterChip.bottom : (switchRow.visible ? switchRow.bottom : parent.top)
+        anchors.top: filterChip.visible ? filterChip.bottom
+                   : selectionBar.visible ? selectionBar.bottom : (switchRow.visible ? switchRow.bottom : parent.top)
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
@@ -146,7 +200,7 @@ Rectangle {
         Keys.onShortcutOverride: function(event) { event.accepted = pageKeys.isPageKey(event) }
         Keys.onPressed: function(event) {
             if (pageKeys.handle(event)) event.accepted = true
-            else if (event.key === Qt.Key_Escape) { app.pages.clearSelection(); event.accepted = true }
+            else if (event.key === Qt.Key_Escape) { app.pages.clearSelection(); sidebar.selectionMode = false; event.accepted = true }
         }
 
         delegate: Item {
@@ -218,6 +272,8 @@ Rectangle {
                         list.forceActiveFocus()
                         if (modifiers & (Qt.ControlModifier | Qt.ShiftModifier)) {
                             app.pages.select(entry.pageIndex, modifiers)
+                        } else if (sidebar.selectionMode) {
+                            app.pages.toggleSelected(entry.pageIndex)
                         } else {
                             app.pages.clearSelection()
                             app.pages.setAnchor(entry.pageIndex)
@@ -226,6 +282,11 @@ Rectangle {
                         }
                     }
                     onHeld: list.forceActiveFocus()
+                    // A finger held on a page: the selection mode with the page selected (moving on drags it)
+                    onHeldToSelect: {
+                        sidebar.selectionMode = true
+                        if (!app.pages.isSelected(entry.pageIndex)) app.pages.toggleSelected(entry.pageIndex)
+                    }
                     onMenuRequested: function(x, y) { pageMenu.openFor(entry.pageIndex, frame, x, y) }
                 }
                 ToolButton {

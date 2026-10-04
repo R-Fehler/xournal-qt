@@ -1081,6 +1081,26 @@ ApplicationWindow {
                         // Writing space beside the slides of all pages (qt/docs/note-space.md)
                         AdaptiveMenuItem { objectName: "noteSpaceItem"; text: qsTr("Space for notes…"); icon.source: app.iconUrl("xqt-note-space"); onTriggered: noteSpaceDialog.openFor([app.pageNumber - 1], true) }
                         AdaptiveMenuItem { objectName: "chapterItem"; text: qsTr("Start a chapter here…"); icon.source: app.iconUrl("xqt-toc"); onTriggered: chapterDialog.openFor(app.pageNumber - 1) }
+                        // A quarter turn of this page or of all pages (qt/docs/page-rotation.md); PDF pages of a .xopp
+                        // stay, and the menu says why
+                        AdaptiveMenu {
+                            id: rotateMenu
+                            objectName: "rotatePagesMenu"
+                            title: qsTr("Rotate")
+                            iconName: "xqt-rotate-right"
+                            readonly property var thisPage: (app.pageNumber, app.pageCount, app.currentTab, app.modified, app.rotationOf([app.pageNumber - 1]))
+                            readonly property var everyPage: (app.pageNumber, app.pageCount, app.currentTab, app.modified, app.rotationOf(app.allPages()))
+                            AdaptiveMenuItem { objectName: "rotatePageLeftItem"; text: qsTr("This page left"); icon.source: app.iconUrl("xqt-rotate-left"); enabled: rotateMenu.thisPage.possible === true; onTriggered: app.rotatePages([app.pageNumber - 1], false) }
+                            AdaptiveMenuItem { objectName: "rotatePageRightItem"; text: qsTr("This page right"); icon.source: app.iconUrl("xqt-rotate-right"); enabled: rotateMenu.thisPage.possible === true; onTriggered: app.rotatePages([app.pageNumber - 1], true) }
+                            AdaptiveMenuItem { objectName: "rotateAllLeftItem"; text: qsTr("All pages left"); icon.source: app.iconUrl("xqt-rotate-left"); enabled: rotateMenu.everyPage.possible === true; onTriggered: app.rotatePages(app.allPages(), false) }
+                            AdaptiveMenuItem { objectName: "rotateAllRightItem"; text: qsTr("All pages right"); icon.source: app.iconUrl("xqt-rotate-right"); enabled: rotateMenu.everyPage.possible === true; onTriggered: app.rotatePages(app.allPages(), true) }
+                            AdaptiveMenuItem {
+                                objectName: "rotateReasonItem"
+                                offered: (rotateMenu.everyPage.reason || "") !== ""
+                                enabled: false
+                                text: rotateMenu.everyPage.reason || ""
+                            }
+                        }
                     }
                     // How the document is shown (all pages, full screen and presenting are buttons of the view pill and
                     // the tool bar; hiding the tool bar is the tab on its edge)

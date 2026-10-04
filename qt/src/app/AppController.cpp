@@ -90,6 +90,7 @@
 #include "MdImageDecoder.h"
 #include "MarkdownSession.h"
 #include "PageResize.h"
+#include "PageRotate.h"
 #include "MdBox.h"
 #include "MdPassages.h"
 #include "session/FuzzyQuery.h"
@@ -4718,6 +4719,70 @@ int AppController::applyPageSize(const QList<int>& pages, double width, double h
         Q_EMIT pageActionDone(n == 1 ? tr("Page size changed") : tr("Size of %1 pages changed").arg(n), true);
     }
     return static_cast<int>(n);
+}
+
+// --- turning pages (qt/src/canvas/PageRotate.h) --------------------------------------------------------------------
+
+namespace {
+/// PDF pages turn in the PDF itself in a PDF with notes (and in a document that will be saved as one: PDF files mode);
+/// in a .xopp they stay (the author's decision on keeping a turned PDF page in a .xopp is open: qt/docs/page-rotation.md)
+pagerotate::PdfPages pdfRotation(const QString& saveFormat) {
+    return saveFormat == QLatin1String("pdf") ? pagerotate::PdfPages::InPdf : pagerotate::PdfPages::Kept;
+}
+}  // namespace
+
+QVariantMap AppController::rotationOf(const QList<int>& pages) const {
+    DocumentSession* s = session();
+    if (!s || pages.isEmpty()) {
+        return {{"possible", false}, {"pages", 0}, {"leftOut", 0}, {"reason", QString()}};
+    }
+    if (textPagesFixed()) {
+        return {{"possible", false},
+                {"pages", 0},
+                {"leftOut", 0},
+                {"reason", tr("The pages of a text file follow its text: they cannot be rotated")}};
+    }
+    const pagerotate::Preview p = pagerotate::preview(*s, pageList(pages), pdfRotation(saveFormat()));
+    QString reason;
+    const int leftOut = static_cast<int>(p.pdfPages + p.missingPdf);
+    if (p.pdfPages > 0) {
+        reason = p.pages == 0 ? tr("PDF pages can only be rotated in PDF files with notes")
+                              : tr("%n PDF page(s) stay as they are: PDF pages can only be rotated in PDF files with "
+                                   "notes",
+                                   "", static_cast<int>(p.pdfPages));
+    } else if (p.missingPdf > 0) {
+        reason = tr("The PDF of this page is missing");
+    }
+    return {{"possible", p.pages > 0}, {"pages", static_cast<int>(p.pages)}, {"leftOut", leftOut}, {"reason", reason}};
+}
+
+int AppController::rotatePages(const QList<int>& pages, bool right) {
+    DocumentSession* s = session();
+    if (!s || textPagesFixed()) {
+        return 0;
+    }
+    const QVariantMap before = rotationOf(pages);
+    const pagerotate::Result r = pagerotate::apply(*s, pageList(pages), right ? pagerotate::Turn::Right
+                                                                              : pagerotate::Turn::Left,
+                                                   pdfRotation(saveFormat()));
+    if (!r.error.empty()) {
+        Q_EMIT message(tr("Pages not rotated"), tr("The PDF pages could not be rotated: %1").arg(
+                                                        QString::fromStdString(r.error)),
+                       true);
+        return 0;
+    }
+    if (r.pages == 0) {
+        if (const QString why = before.value("reason").toString(); !why.isEmpty()) {
+            Q_EMIT message(tr("Pages not rotated"), why, false);
+        }
+        return 0;
+    }
+    QString text = r.pages == 1 ? tr("Page rotated") : tr("%1 pages rotated").arg(r.pages);
+    if (before.value("leftOut").toInt() > 0) {
+        text += QStringLiteral(" · ") + before.value("reason").toString();
+    }
+    Q_EMIT pageActionDone(text, true);
+    return static_cast<int>(r.pages);
 }
 
 bool AppController::pagesHavePdfBackground(const QList<int>& pages) const {

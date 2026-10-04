@@ -49,8 +49,9 @@ struct Result {
     size_t pages = 0;  ///< the pages the written PDF has
 };
 
-/// These pages (0-based, in this order) of a PDF file as a new PDF in memory (`out`).
-Result extract(const fs::path& pdf, const std::vector<size_t>& pages, std::string& out);
+/// These pages (0-based, in this order) of a PDF file as a new PDF in memory (`out`). `quarterTurns`: each page turned
+/// by this many quarter turns clockwise (its /Rotate; positive: to the right), the same for all (PageRotate.h).
+Result extract(const fs::path& pdf, const std::vector<size_t>& pages, std::string& out, int quarterTurns = 0);
 /// Write `target`: the pages of `base` (none if it is empty) followed by the pages of `addition` (a PDF in memory),
 /// marked as a merged PDF of this kind. `base` may be `target`.
 Result append(const fs::path& base, const std::string& addition, const fs::path& target, Kind kind);

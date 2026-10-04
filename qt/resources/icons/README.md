@@ -31,3 +31,6 @@ rounded hole: the spotlight) are drawn in the same style.
 
 `xqt-help` is Lucide's `circle-help`: Help (the introduction, the tutorial, the keyboard shortcuts; qt/docs/onboarding.md);
 `xqt-keyboard` is Lucide's `keyboard`: Help → Keyboard shortcuts.
+
+`xqt-rotate-left` and `xqt-rotate-right` are Lucide's `rotate-ccw-square` and `rotate-cw-square`: turning pages
+(qt/docs/page-rotation.md).
