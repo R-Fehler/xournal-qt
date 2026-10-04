@@ -714,6 +714,13 @@
   6.11, `macdeployqt` + the libraries Homebrew names through `@rpath`, an unsigned `.dmg` (Apple Silicon, macOS 15+),
   smoke-tested without Homebrew. Intel needs the libraries from elsewhere; signing needs an Apple account
   (`qt/docs/macos.md`).
+- **Getting started, `qt/onboarding` (2026-10-04, awaiting on-device test).** See [onboarding.md](onboarding.md).
+  - The first start shows a short introduction (four pages, swiped or Next, Skip): notes and PDFs you write on,
+    Markdown documents and a Markdown text inside a PDF with notes, libraries and search; its last page is the
+    existing choice PDF files / Xournal++ files. Shown once (`introSeen`); again from ⋮ → Help and Settings → Help.
+  - A tutorial (`qt/resources/help/tutorial.md`, compiled in): fifteen short sections that each ask the user to try
+    something, with marked placeholders for the author's ink and screenshots. Help → Tutorial opens a copy to write on,
+    a PDF text document in the app's data folder (not in a library); "Start the tutorial again" makes a fresh one.
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
