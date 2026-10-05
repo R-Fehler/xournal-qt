@@ -24,8 +24,9 @@ A dataset is a folder:
 ```
 
 `kind` is `scan` (photographed or scanned paper), `ink` (rendered from pen strokes, as the app does) or `synthetic`
-(rendered from fonts). `licence` is carried into the model's manifest; a dataset whose licence forbids commercial use
-must say so (`"noncommercial": true`) and the training refuses to mix it into a model unless asked.
+(rendered from fonts). `licence` is carried into the model's manifest for transparency (`"noncommercial": true` where
+a dataset says so). It does not restrict anything: the app is free and non-commercial, and the author chose
+(2026-10-05) to pick datasets and base models by quality alone.
 
 `lines.jsonl`, one object per line:
 
