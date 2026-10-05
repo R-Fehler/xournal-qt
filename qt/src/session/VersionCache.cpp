@@ -76,10 +76,37 @@ fs::path VersionCache::get(const fs::path& pdf, int id, std::string& error) {
     return file;
 }
 
+auto VersionCache::pin(const fs::path& file) -> Pin {
+    if (!contains(file)) {
+        return {};
+    }
+    const fs::path key = file.lexically_normal();
+    {
+        std::lock_guard lock(m);
+        ++pins[key];
+    }
+    return Pin(nullptr, [this, key](void*) {
+        std::lock_guard lock(m);
+        if (auto it = pins.find(key); it != pins.end() && --it->second <= 0) {
+            pins.erase(it);
+            trim();  // (unused again: over the limit, it goes)
+        }
+    });
+}
+
+bool VersionCache::pinned(const fs::path& file) const {
+    std::lock_guard lock(m);
+    return pins.count(file.lexically_normal()) > 0;
+}
+
 void VersionCache::trim() {
     uint64_t total = 0;
     size_t n = 0;
     for (auto it = entries.begin(); it != entries.end();) {
+        if (pins.count(it->file.lexically_normal())) {
+            ++it;  // (shown: never removed, not counted)
+            continue;
+        }
         total += it->bytes;
         ++n;
         if (n > 1 && (n > limitCount || total > limitBytes)) {

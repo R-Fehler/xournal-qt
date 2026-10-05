@@ -3491,3 +3491,5 @@ Seen through the replay (⋮ → View → Replay the writing).
 - [ ] A long document (300+ pages with handwriting): "Compare with now" shows the bar at once ("Comparing…") and the
       count within a second or two; scrolling stays smooth meanwhile.
 - [ ] Recent does not list "name (version N).pdf" files after showing or comparing versions.
+- [ ] Keep one version open beside the document, then show or compare six other versions one after another: the
+      first one still scrolls and renders all its pages (its file is not removed while it is shown).

@@ -729,7 +729,9 @@ is what is built.
   never compacted in place while it keeps versions), with a check box "With its version history" for the file itself.
 - The library's cards (and Recent) show a small clock on documents that keep versions; the tooltip says how many.
 - **The version cache** (`VersionCache`, the owner of the versions cut out of files to be shown or opened): the last
-  five used, at most 500 MB, removed when the app quits; other processes' after a day.
+  five used, at most 500 MB, removed when the app quits; other processes' after a day. A version a tab shows (beside
+  the document, compared, opened) is pinned by its tab: the limit never removes it and counts only the versions
+  nobody shows; closed, it is an unused one again.
 
 ### Measured (2026-10-05, the container; `XQT_BENCH_HISTORY=1 xqt-session-tests --gtest_filter='*benchTenDays*'`)
 
