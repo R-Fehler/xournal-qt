@@ -466,6 +466,52 @@ TEST_F(ToolboxTest, theLineStylesShowTheirDashesInTheEditorAndOnTheRail) {
     EXPECT_GE(inkRuns(under(entry(dotted), "toolSample")), 3) << "a dotted pen on the rail";
 }
 
+TEST_F(ToolboxTest, theEditorStaysBesideTheToolWhileSomethingIsChosenInIt) {
+    // (the author, 2026-10-05: "when I select something on the toolbelt popup the popup moves to the upper left")
+    const QString pen = nth("pen");
+    controller->applyToolEntry(pen);
+    click(entry(pen));
+    until([&] { return editorOpen(); });
+    ASSERT_TRUE(editorOpen());
+    auto* panel = qobject_cast<QQuickItem*>(editor()->property("contentItem").value<QObject*>());
+    ASSERT_NE(panel, nullptr);
+    wait(250);  // (its opening transition)
+    const QRectF before = rectOf(panel);
+    const QRectF rail = rectOf(find("toolbox"));
+    ASSERT_LT(before.right(), rail.left());
+    ASSERT_GT(before.left(), rail.left() - 400) << "beside the rail";
+    auto stays = [&](const char* what) {
+        wait(150);
+        const QRectF now = rectOf(panel);
+        EXPECT_NEAR(now.left(), before.left(), 1) << what;
+        EXPECT_NEAR(now.top(), before.top(), 1) << what;
+    };
+    click(find("editorRole_warnings"));
+    until([&] { return tools()->entry(pen).value("role") == "warnings"; });
+    stays("a color");
+    click(find("editorSize_3"));
+    until([&] { return tools()->entry(pen).value("width").toDouble() > 2; });
+    stays("a width");
+    click(find("editorLineStyle_dot"));
+    until([&] { return tools()->entry(pen).value("lineStyle") == "dot"; });
+    stays("a line style");
+    // (a tool that is not the first: the rail's other tools are rebuilt around it too)
+    QTest::keyClick(window, Qt::Key_Escape);
+    until([&] { return !editorOpen(); });
+    const QString marker = nth("highlighter", 1);
+    controller->applyToolEntry(marker);
+    click(entry(marker));
+    until([&] { return editorOpen(); });
+    wait(250);
+    const QRectF second = rectOf(panel);
+    EXPECT_NEAR(second.center().y(), rectOf(entry(marker)).center().y(), second.height() / 2 + 1);
+    click(find("editorRole_keyTerms"));
+    until([&] { return tools()->entry(marker).value("role") == "keyTerms"; });
+    wait(150);
+    EXPECT_NEAR(rectOf(panel).top(), second.top(), 1) << "the second highlighter's editor stays too";
+    EXPECT_TRUE(editorOpen());
+}
+
 TEST_F(ToolboxTest, plusAddsAToolPrefilledFromTheLastOfItsKind) {
     const int count = tools()->tools().size();
     click(find("toolboxAddButton"));

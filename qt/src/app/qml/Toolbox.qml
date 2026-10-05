@@ -78,7 +78,7 @@ Rectangle {
     readonly property var planKey: [length, cell, sections.map(function(s) { return s.length }).join(","),
                                     fixedButtons.length, moreShown]
     onPlanKeyChanged: Qt.callLater(relayout)
-    Component.onCompleted: relayout()
+    Component.onCompleted: { relayout(); syncItems() }
     function relayout() {
         const input = {
             length: length - startInset - endInset - 22, cell: cell, divider: 9, head: 2, tail: moreShown ? 2 : 1,
@@ -103,7 +103,7 @@ Rectangle {
         sections: sections.map(function(s) { return s.length }), fixed: fixedButtons.length, slack: 0
     }).need + 22 + startInset + endInset
     /// The items of the middle part: entries, dividers, stacks
-    readonly property var items: {
+    readonly property var itemsNow: {
         const out = []
         const act = store.active
         if (compact) {
@@ -132,6 +132,36 @@ Rectangle {
             }
         }
         return out
+    }
+
+    /// What the rail shows: `itemsNow`, taken only when what is where changes (an entry, a stack and the one it shows, a
+    /// divider), not when a tool's color or width does. A new list makes the Repeater build every button anew, and a
+    /// popup beside one (its editor, a stack's list) lost its place: it went to the window's corner (2026-10-05). The
+    /// buttons read their entries from the store (`entryOf`).
+    property var items: []
+    property string itemsSignature: ""
+    onItemsNowChanged: syncItems()
+    function syncItems() {
+        const sig = itemsNow.map(function(it) {
+            return it.kind + ":" + it.key + ":" + (it.entry ? it.entry.id : "")
+                   + (it.section ? ":" + it.section.map(function(e) { return e.id }).join(",") : "")
+        }).join("|")
+        if (sig === itemsSignature) return
+        itemsSignature = sig
+        items = itemsNow
+    }
+    /// An entry as the store has it now (the items keep the ids)
+    function entryOf(e) { return (store.revision, e && e.id ? store.entry(e.id) : ({})) }
+    /// The button that shows an entry now: its own, or the stack that holds it (null: none)
+    function buttonFor(id) {
+        const kids = middleGrid.children
+        for (let i = 0; i < kids.length; ++i) {
+            const it = kids[i].entryItem
+            if (!it || !kids[i].item) continue
+            if (it.kind === "entry" && it.entry.id === id) return kids[i].item
+            if (it.kind === "stack" && it.section.some(function(e) { return e.id === id })) return kids[i].item
+        }
+        return null
     }
 
     // --- what an entry does ----------------------------------------------------------------------------------------
@@ -504,7 +534,7 @@ Rectangle {
     Component {
         id: entryComponent
         ToolEntryButton {
-            readonly property var e: parent ? parent.entryItem.entry : ({})
+            readonly property var e: parent ? box.entryOf(parent.entryItem.entry) : ({})
             objectName: "toolEntry_" + (e ? e.id : "")
             cell: box.cell
             entry: e
@@ -524,8 +554,8 @@ Rectangle {
     Component {
         id: stackComponent
         ToolEntryButton {
-            readonly property var e: parent ? parent.entryItem.entry : ({})
-            readonly property var section: parent ? parent.entryItem.section : []
+            readonly property var e: parent ? box.entryOf(parent.entryItem.entry) : ({})
+            readonly property var section: parent ? parent.entryItem.section.map(box.entryOf) : []
             objectName: "toolStack_" + (e ? e.id : "")
             reorderable: false
             cell: box.cell

@@ -3467,3 +3467,6 @@ Seen through the replay (⋮ → View → Replay the writing).
 - [ ] The toolbox: tap the pen in hand; in its editor the four line buttons show a solid, a dashed, a dash-dot and a
       dotted line. Choose "Dashed": the pen on the rail shows a dashed ink sample; "Dotted": dots. The same in the
       classic tool bar's pen menu (hold the pen button).
+- [ ] The toolbox: tap the pen in hand; in its editor choose a color, a width (slider and dots), a line style, the
+      filling: the editor stays beside the pen each time (not in the window's top left corner). The same for a
+      highlighter further down, with the rail docked left, top and bottom, and floating in full screen.

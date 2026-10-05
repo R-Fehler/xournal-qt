@@ -1022,7 +1022,7 @@ ApplicationWindow {
     /// An entry's name for people ("Pen · Body", "Arrow", "Eraser (whiteout)")
     function toolEntryName(entry) { return toolboxPane.entryName(entry) }
     // A tool's editor: a tap on the tool in hand, Edit in its menu, "+" (qt/docs/toolbox.md, "Editing a tool")
-    ToolEntryEditor { id: toolEditor }
+    ToolEntryEditor { id: toolEditor; ownerOf: function(id) { return toolboxPane.buttonFor(id) } }
     // A tool's menu (a long press, a right click): edit, move, replace, duplicate, add one here, a divider, remove
     AdaptiveMenu {
         id: toolEntryMenu

@@ -24,6 +24,8 @@ Popup {
     property int addAt: -1
     /// The button it opened from (it opens beside it, towards the page)
     property Item owner: null
+    /// The button that shows an entry now (Toolbox.buttonFor): the owner again when the rail made its buttons anew
+    property var ownerOf: null
     /// The toolbox's edge (where the page is from the owner)
     property string edge: "right"
     readonly property bool adding: entryId === ""
@@ -111,19 +113,37 @@ Popup {
     topPadding: 10
     width: asSheet ? win.sheetWidth : 340
     height: Math.min(implicitHeight, (parent ? parent.height : 600) - 16)
-    readonly property rect ownerRect: {
-        if (!owner || !parent || !visible) return Qt.rect(0, 0, 0, 0)
+    // Beside its button, towards the page. Placed (not bound to the button): a button can go away while the editor is
+    // open (the rail made anew, the tool replaced), and a binding then put the editor in the window's top left corner
+    // (2026-10-05). Without a button it stays where it is, and takes the entry's button again once there is one.
+    property real placedX: 8
+    property real placedY: 8
+    function place() {
+        if (!owner || !parent) return
         const p = owner.mapToItem(parent, 0, 0)
-        return Qt.rect(p.x, p.y, owner.width, owner.height)
+        const r = Qt.rect(p.x, p.y, owner.width, owner.height)
+        placedX = Math.max(8, Math.min(parent.width - width - 8,
+                                       edge === "right" ? r.x - width - 12 : edge === "left" ? r.x + r.width + 12
+                                                        : r.x + r.width / 2 - width / 2))
+        placedY = Math.max(8, Math.min(parent.height - height - 8,
+                                       edge === "bottom" ? r.y - height - 12 : edge === "top" ? r.y + r.height + 12
+                                                         : r.y + r.height / 2 - height / 2))
     }
-    x: asSheet ? win.sheetX
-       : Math.max(8, Math.min((parent ? parent.width : 800) - width - 8,
-                              edge === "right" ? ownerRect.x - width - 12 : edge === "left" ? ownerRect.x + ownerRect.width + 12
-                                               : ownerRect.x + ownerRect.width / 2 - width / 2))
-    y: asSheet ? win.sheetBottom - height
-       : Math.max(8, Math.min((parent ? parent.height : 600) - height - 8,
-                              edge === "bottom" ? ownerRect.y - height - 12 : edge === "top" ? ownerRect.y + ownerRect.height + 12
-                                                : ownerRect.y + ownerRect.height / 2 - height / 2))
+    function findOwner() {
+        if (owner || !visible || entryId === "" || typeof ownerOf !== "function") return
+        owner = ownerOf(entryId)
+    }
+    onOwnerChanged: owner ? place() : Qt.callLater(findOwner)
+    onAboutToShow: place()
+    onWidthChanged: place()
+    onHeightChanged: place()
+    Connections {
+        target: editor.parent
+        function onWidthChanged() { editor.place() }
+        function onHeightChanged() { editor.place() }
+    }
+    x: asSheet ? win.sheetX : placedX
+    y: asSheet ? win.sheetBottom - height : placedY
     bottomPadding: asSheet ? 12 + win.sheetBottomPadding : 12
     background: Rectangle {
         radius: editor.asSheet ? 16 : 12

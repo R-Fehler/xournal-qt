@@ -98,6 +98,17 @@ pages while reading (`ViewController::setSnappingVertically`): a row taller than
 top at the view's top at the latest), a fling at its end goes on to the next row's top, a row that fits rests in the
 middle. Outside reading, up and down scrolls freely as before.
 
+## Popups beside the rail
+
+The editor opens beside its tool and stays there while something is chosen in it. Two things keep it there (the
+author, 2026-10-05: "when I select something on the toolbelt popup the popup moves to the upper left position of the
+window"): the rail's buttons are made anew only when what is where changes (an entry, a stack and the entry it shows,
+a divider), not when a tool's color, width or line style does (`Toolbox.items`, `syncItems`; the buttons read their
+entry from the store); and the editor is placed when it opens (and when it or the window changes size), not bound to
+its button: a button that goes away (a tool replaced) leaves it where it is, and it takes the entry's button again
+(`Toolbox.buttonFor`, the stack that holds it when its section is folded). A stack's list and the folded fixed tools
+close when a tool is taken in them; their buttons stay while they are open.
+
 ## Line styles
 
 The samples of a line style (the editor's four buttons, its preview, the ink of a tool on the rail, the classic pen's
