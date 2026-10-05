@@ -61,12 +61,16 @@ cairo_surface_t* surfaceFor(int w, int h) {
 
 double padOf(const LinePiece& piece) { return std::max(2.0, 0.25 * piece.box.height()); }
 
+/// The widest picture: a whole line of an A3 page in landscape (a CTC model and the dataset export take whole lines;
+/// TrOCR's pieces of 8 words are far narrower)
+constexpr int MAX_PX = 128 * LINE_PX;
+
 /// The piece's ink as coverage (A8, 255: ink) in the kept surface; its size in w, h
 cairo_surface_t* draw(const LineInput& line, const LinePiece& piece, int& w, int& h) {
     const double pad = padOf(piece);
     const double scale = LINE_PX / std::max(1.0, piece.box.height() + 2 * pad);
     h = LINE_PX;
-    w = std::clamp(static_cast<int>(std::ceil((piece.box.width() + 2 * pad) * scale)), 1, 16 * LINE_PX);
+    w = std::clamp(static_cast<int>(std::ceil((piece.box.width() + 2 * pad) * scale)), 1, MAX_PX);
     cairo_surface_t* surface = surfaceFor(w, h);
     cairo_t* cr = cairo_create(surface);
     cairo_set_operator(cr, CAIRO_OPERATOR_CLEAR);

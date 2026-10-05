@@ -222,3 +222,23 @@ TEST(CtcTest, aTinyModelIsReadThroughOnnxRuntime) {
     ASSERT_EQ(read->words.size(), 3u);
     EXPECT_EQ(read->words[2].text, QStringLiteral("a"));
 }
+
+// A long line (more than 16 times as wide as high: a whole line of a page, as a CTC model and the dataset export take
+// it) is drawn whole, not cut off at the right
+TEST(CtcTest, aLongLineIsDrawnWhole) {
+    const LineInput line = lineOf(12);  // (696 x 10 pt: about 5900 px at 128 px high)
+    const auto pieces = piecesOf(line, 100);
+    ASSERT_EQ(pieces.size(), 1u);
+    int w = 0, h = 0;
+    const std::vector<unsigned char> grey = greyOf(line, pieces[0], w, h);
+    EXPECT_NEAR(w, widthAt(pieces[0], LINE_PX), 1.0);
+    // Ink in the last word (its middle column)
+    const double scale = LINE_PX / (10.0 + 2 * 2.5);
+    const int x = static_cast<int>((2.5 + 60.0 * 11 + 12) * scale);
+    ASSERT_LT(x, w);
+    int ink = 0;
+    for (int y = 0; y < h; ++y) {
+        ink += grey[static_cast<size_t>(y * w + x)] < 128 ? 1 : 0;
+    }
+    EXPECT_GT(ink, 0);
+}
