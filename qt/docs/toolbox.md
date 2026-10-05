@@ -70,9 +70,42 @@ with 16 px to spare (no flicker at an edge).
 
 In the toolbox mode the tool bar at the top is a **command bar**: open, save, image, stickers, add a page, search, full
 screen, present, settings (New is the tab strip's "+"; recording is a fixed tool of the rail), and entries of ⋮ as
-buttons where there is room (share, print, bookmark, favourite; one
-place each: ⋮ leaves out what the bar shows, and shows it again when the bar has no room for it). The classic tool
-square, the quick tools and the pen pill of full screen are classic only.
+buttons where there is room (one place each: ⋮ leaves out what the bar shows, and shows it again when the bar has no
+room for it). The classic tool square, the quick tools and the pen pill of full screen are classic only.
+
+### The command bar (qt/ui-rework)
+
+The author (2026-10-05): "The main toolbar is now very empty. Populate it with the important new tools." Since
+qt/ui-rework the entries of ⋮ shown as buttons where there is room (`ToolBarPlan.PROMOTED`, `promoted: true` in
+`Main.qml`) are, in the order they give way back into ⋮ as the bar gets narrower:
+
+| Gives way | Button | Its entry in ⋮ | Offered |
+| --- | --- | --- | --- |
+| first | **Tags** (`tagsButton`) | Document → Tags… | always |
+| | Favourite | Add to favourites | a document with a file in a library |
+| | Bookmark | Bookmark this page | where pages can be bookmarked |
+| | Print | Print… | always |
+| | **Milestone** (`milestoneButton`, the flag) | Document → Save with a message… (Ctrl+Alt+S) | only where the document keeps versions |
+| | **Replay** (`replayButton`) | View → Replay the writing | not for a text document |
+| | **Read** (`readButton`) | View → Read (full screen, read only; Ctrl+Alt+R) | not for a text document |
+| last | Share | Share… | always |
+
+They sit with their kind: Read and Replay after Present (view), Milestone after Save (file), Tags after Favourite
+(document). Measured off-screen with a new document (no favourite): everything up to 1920 and down to 860 px; the tags
+go into ⋮ at 800, the bookmark at 760, print at 720, the replay at 680; Read and Share stay longest. Below that the
+ladder of before goes on (the commands into "more tools").
+
+Weighed and left where they are (one place each):
+
+- **The page number, go to page, the zoom and the fits**: the view pill at the page's corner (also in full screen
+  and while reading); a second copy at the top would be the same buttons twice.
+- **The reference view / compare beside**: the tab's menu ("Show this document beside", "Open as reference") and the
+  page menu; `qt/version-compare` is reworking it (the reference view, the History panel), so the bar waits for it.
+- **The version history**: the History panel of the sidebar (its button); the bar has only the milestone, and only
+  where versions are kept.
+- **Snip**: a tool, so the rail's (a toolbox entry, the select button's list) and the image button's list.
+- **Templates**: the add-a-page button's hold (the templates used last, all templates, save as template).
+- **Present, full screen, search, share**: already buttons of the bar.
 
 **A text document's format bar** (with the toolbox): undo and redo at its start, then the formatting, then the commands
 that fit, then » and ⋮. One ladder for both: the inserts go into "+ Insert" first, then the commands of low priority

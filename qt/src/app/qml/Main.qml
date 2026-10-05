@@ -1217,15 +1217,17 @@ ApplicationWindow {
             text: textTool, write: writeButton, sticky: stickyTool, shape: shapeTool, geometry: geometryTool,
             pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, sticker: stickerTool, record: recordTool, addPage: addPageTool,
             search: searchTool,
-            fullScreen: fullScreenTool, present: presentTool, settings: settingsTool, new: newTool, open: openTool,
-            save: saveTool, editAsNotes: editAsNotesTool, openExternally: openExternallyTool,
-            share: shareTool, print: printTool, bookmark: bookmarkTool, favourite: favouriteTool
+            fullScreen: fullScreenTool, present: presentTool, read: readTool, replay: replayTool, settings: settingsTool,
+            new: newTool, open: openTool, save: saveTool, milestone: milestoneTool, editAsNotes: editAsNotesTool,
+            openExternally: openExternallyTool,
+            share: shareTool, print: printTool, bookmark: bookmarkTool, favourite: favouriteTool, tags: tagsTool
         })
         readonly property var order: ["undo", "redo",
                                       "pen", "eraser", "hand", "touchDrawing", "select", "text", "write", "sticky",
                                       "shape", "geometry", "pdfText", "emoji", "image", "sticker", "record", "addPage", "search",
-                                      "fullScreen", "present", "settings", "new", "open", "save", "editAsNotes",
-                                      "openExternally", "share", "print", "bookmark", "favourite"]
+                                      "fullScreen", "present", "read", "replay", "settings", "new", "open", "save",
+                                      "milestone", "editAsNotes", "openExternally", "share", "print", "bookmark",
+                                      "favourite", "tags"]
         /// The buttons in the bar now (an entry of ⋮ shown as a button is not in ⋮ too)
         property var barNames: []
         function inBar(n) { return barNames.indexOf(n) >= 0 }
@@ -1499,7 +1501,7 @@ ApplicationWindow {
                         AdaptiveMenuItem { objectName: "versionHistoryItem"; offered: !win.textDoc; text: qsTr("Version history…"); icon.source: app.iconUrl("xqt-history"); onTriggered: win.showHistory() }
                         AdaptiveMenuItem {
                             objectName: "saveWithMessageItem"
-                            offered: !win.textDoc
+                            offered: !win.textDoc && !toolArea.inBar("milestone")
                             readonly property var keys: win.keysOf("saveWithMessage")
                             text: keys.length > 0 ? qsTr("Save with a message… (%1)").arg(keys[0]) : qsTr("Save with a message…")
                             icon.source: app.iconUrl("xqt-flag")
@@ -1530,6 +1532,7 @@ ApplicationWindow {
                         // Its tags: a PDF's keywords, without typing into it (qt/docs/tags.md)
                         AdaptiveMenuItem {
                             objectName: "documentTagsMenuItem"
+                            offered: !toolArea.inBar("tags")
                             text: qsTr("Tags…")
                             icon.source: app.iconUrl("xqt-tag")
                             onTriggered: documentTagsDialog.openFor(app.currentDocumentPath())
@@ -1635,14 +1638,14 @@ ApplicationWindow {
                         // Full screen, read only: the edges turn the pages, no ink (qt/docs/toolbox.md, "Reading")
                         AdaptiveMenuItem {
                             objectName: "readItem"
-                            offered: !win.textDoc
+                            offered: !win.textDoc && !toolArea.inBar("read")
                             readonly property var keys: win.keysOf("readOnly")
                             text: keys.length > 0 ? qsTr("Read (full screen, no ink; %1)").arg(keys[0]) : qsTr("Read (full screen, no ink)")
                             icon.source: app.iconUrl("xqt-book-open")
                             onTriggered: win.startReading()
                         }
                         // The document's timeline: how it was written, with its recordings (qt/docs/timeline.md)
-                        AdaptiveMenuItem { objectName: "replayItem"; offered: !win.textDoc; text: qsTr("Replay the writing"); icon.source: app.iconUrl("xqt-history"); onTriggered: app.timeline.start() }
+                        AdaptiveMenuItem { objectName: "replayItem"; offered: !win.textDoc && !toolArea.inBar("replay"); text: qsTr("Replay the writing"); icon.source: app.iconUrl("xqt-replay"); onTriggered: app.timeline.start() }
                         MenuSeparator {}
                         // Where the tool bar is, in this size class (the automatic place: "Automatic"); the phone
                         // classes have their dock instead
@@ -2309,6 +2312,53 @@ ApplicationWindow {
             label: qsTr("Favourite")
             tip: app.favourite ? qsTr("Remove from favourites") : qsTr("Add to favourites")
             onClicked: app.favourite = !app.favourite
+        }
+        // More of ⋮ in the command bar where there is room (qt/ui-rework; qt/docs/toolbox.md, "The command bar"):
+        // reading, the replay of the writing, a milestone of the version history (where the document keeps
+        // versions), the tags. The classic bar has none of them (its ⋮ keeps them).
+        IconButton {
+            id: readTool
+            objectName: "readButton"
+            parent: toolBank
+            property bool offered: win.toolboxMode && !win.phoneLayout && !win.textDoc
+            property bool promoted: true
+            iconName: "xqt-book-open"
+            label: qsTr("Read")
+            tip: win.withKeys(qsTr("Read: full screen, read only (the edges turn the pages)"), "readOnly")
+            onClicked: win.startReading()
+        }
+        IconButton {
+            id: replayTool
+            objectName: "replayButton"
+            parent: toolBank
+            property bool offered: win.toolboxMode && !win.phoneLayout && !win.textDoc
+            property bool promoted: true
+            iconName: "xqt-replay"
+            label: qsTr("Replay")
+            tip: qsTr("Replay the writing (how this document was written)")
+            onClicked: app.timeline.start()
+        }
+        IconButton {
+            id: milestoneTool
+            objectName: "milestoneButton"
+            parent: toolBank
+            property bool offered: win.toolboxMode && !win.phoneLayout && !win.textDoc && app.versions.on
+            property bool promoted: true
+            iconName: "xqt-flag"
+            label: qsTr("Milestone")
+            tip: win.withKeys(qsTr("Save with a message (a milestone of the version history)"), "saveWithMessage")
+            onClicked: versionMessageDialog.openFor(-1)
+        }
+        IconButton {
+            id: tagsTool
+            objectName: "tagsButton"
+            parent: toolBank
+            property bool offered: win.toolboxMode && !win.phoneLayout
+            property bool promoted: true
+            iconName: "xqt-tag"
+            label: qsTr("Tags")
+            tip: qsTr("Tags of this document…")
+            onClicked: documentTagsDialog.openFor(app.currentDocumentPath())
         }
     }
 

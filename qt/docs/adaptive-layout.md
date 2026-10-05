@@ -258,7 +258,9 @@ order of compression as the room runs short:
 2. the widths become **one cycling width button** (a tap: the next width, as the pen pill's; a long press: the five);
 3. the colors become **the current color, the recent ones and a palette button** (the color chooser): at least 4 recent colors (used
    last, then the palette's), as many as fit (they are the filler: more room, more colors);
-4. low-priority buttons go into **"more tools"**, one by one: New, Open, Save, Settings, Present, Full screen, Edit as
+4. with the toolbox, the entries of ⋮ shown as buttons go back into ⋮ first, one by one: tags, favourite, bookmark,
+   print, milestone, replay, read, share ([toolbox.md](toolbox.md), "The command bar"); then
+   low-priority buttons go into **"more tools"**, one by one: New, Open, Save, Settings, Present, Full screen, Edit as
    notes, Search, Open externally (after Search: for a file shown here it is how the file is edited; at 1280 px it
    stays in the bar next to undo and redo), Add a page, Image, Emoji, Mark PDF text, Setsquare/compass, Shapes;
 5. the colors become **one cycling color button** (a tap: the next of the first five palette colors; a long press:

@@ -3488,3 +3488,10 @@ Seen through the replay (⋮ → View → Replay the writing).
       fling comes to rest on a page top. "Scroll sideways": the edges still turn the pages.
 - [ ] A tiny window (split screen, under 360 px): the reader chrome is read only with the tap fields; the corner field
       brings the tools back.
+- [ ] The command bar (the toolbox, 1920×1080): after settings and the file buttons come Read, Replay, Share, Print,
+      Bookmark, Favourite (a library document) and Tags; ⋮ → View has no Read or Replay, ⋮ → Document no Tags…. A PDF
+      with notes that keeps versions: a flag (Milestone) after Save, and ⋮ → Document has no "Save with a message…".
+      Make the window narrower: the tags go back into ⋮ first, then favourite, bookmark, print, milestone, replay; Read
+      and Share last (each is in the bar or in ⋮, never both). The classic tool bar has none of these buttons.
+- [ ] Read in the command bar: full screen read only. Replay: the timeline bar. Milestone: the message dialog. Tags:
+      the document's tags.

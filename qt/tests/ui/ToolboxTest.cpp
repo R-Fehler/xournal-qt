@@ -824,22 +824,53 @@ TEST_F(ToolboxTest, onAPhoneTheDockHoldsTheFirstToolsAndTheSheetHoldsThemAll) {
 TEST_F(ToolboxTest, theCommandBarShowsEntriesOfTheMoreMenuWhereThereIsRoom) {
     auto* moreMenu = find<QObject>("moreMenu");
     ASSERT_NE(moreMenu, nullptr);
+    // (the entries of ⋮ in its submenus: found by their names)
+    auto item = [&](const char* name) { return window->findChild<QObject*>(name); };
+    // (qt/ui-rework: reading, the replay of the writing and the tags too; a milestone where versions are kept)
+    const std::vector<std::pair<const char*, const char*>> promoted{
+            {"shareButton", "shareItem"}, {"printButton", "printItem"}, {"readButton", "readItem"},
+            {"replayButton", "replayItem"}, {"tagsButton", "documentTagsMenuItem"}};
     auto check = [&](int w, int h) {
         resize(w, h);
-        for (const auto& [button, item]: {std::pair{"shareButton", "shareItem"}, std::pair{"printButton", "printItem"}}) {
+        for (const auto& [button, name]: promoted) {
             const bool inBar = shown(find(button));
-            QObject* entry = entryOf(moreMenu, item);
-            ASSERT_NE(entry, nullptr);
+            QObject* entry = item(name);
+            ASSERT_NE(entry, nullptr) << name;
             EXPECT_NE(inBar, entry->property("offered").toBool())
                     << button << " at " << w << ": in the bar or in ⋮, never both, never neither";
         }
     };
     check(1920, 1080);
-    EXPECT_TRUE(shown(find("shareButton"))) << "room for them at 1920";
-    EXPECT_TRUE(shown(find("printButton")));
+    for (const auto& [button, name]: promoted) {
+        EXPECT_TRUE(shown(find(button))) << button << ": room for it at 1920";
+    }
     EXPECT_FALSE(shown(find("moreToolsButton"))) << "nothing in \"more tools\"";
+    EXPECT_FALSE(shown(find("milestoneButton"))) << "a new document keeps no versions";
+    EXPECT_TRUE(item("saveWithMessageItem")->property("offered").toBool());
+    // One place each: the rail's fixed tools are not in the bar
+    for (const char* fixed: {"handButton", "selectButton", "textModeButton"}) {
+        EXPECT_FALSE(inside(find(fixed), find("topTools"))) << fixed;
+    }
+    // The ladder: the tags give way first, sharing last
+    check(1366, 768);
     check(1024, 700);
     check(800, 600);
+    resize(1920, 1080);
+    const int full = qRound(find("topTools")->width());
+    for (int w = full; w >= 600; w -= 40) {
+        resize(w, 900);
+        if (!shown(find("tagsButton"))) {
+            break;
+        }
+        EXPECT_TRUE(shown(find("shareButton"))) << "at " << w << ": the tags go before sharing";
+    }
+    // Reading from the bar: full screen, read only
+    resize(1920, 1080);
+    click(find("readButton"));
+    until([&] { return win("readOnlyOn").toBool(); });
+    EXPECT_TRUE(win("fullScreenMode").toBool());
+    window->setProperty("fullScreenMode", false);
+    until([&] { return !win("readOnlyOn").toBool(); });
 }
 
 TEST_F(ToolboxTest, aTextDocumentHasUndoRedoAndItsCommandsInTheFormatBar) {
