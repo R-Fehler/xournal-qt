@@ -3101,3 +3101,18 @@ offered).
       files to the trash). The library's `Templates` folder card has a template mark.
 - [ ] A document opened for reading only: no "Add a page from a template…"; a tap in the picker says no pages can be
       added. A `.md` or text document: nothing of this is offered.
+
+## Turning the canvas (qt/canvas-rotate, qt/docs/canvas-rotation.md)
+(Ways to turn it come with Ctrl+[ / Ctrl+] and the gesture; until then the checks below need a turned canvas.)
+- [ ] Turned by 90° and by a free angle (about 30°): the pen writes exactly under its tip, also fast strokes and short
+      dots; the stroke ends where the pen lifted. The same with the mouse and with a finger that draws.
+- [ ] Pen latency: on the Surface, writing on a turned canvas feels as direct as upright (no extra lag, no stutter
+      while writing near the edges of the screen).
+- [ ] The wheel and two fingers on the touchpad scroll the way they go on the screen (down moves the pages up on the
+      screen), also at 90°, 180° and a free angle. Momentum after a touchpad flick goes the same way.
+- [ ] One finger drags the pages along under it; a flick carries on in the direction of the flick on the screen.
+- [ ] Two fingers pinch: the point between them stays under them while zooming, turned as upright.
+- [ ] The pen hovering a link, and the mouse over one, show where it leads; the pointing hand appears on it. The
+      drawn hover dot (Android, iOS) sits under the pen tip.
+- [ ] The pages are sharp when the zoom settles (90°: as sharp as upright; free angles: smoothed by the GPU, no gaps
+      between the tiles of a page).

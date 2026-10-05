@@ -146,7 +146,8 @@ private:
 
     // touch gesture state (one session from the first finger down to the last finger up)
     struct TouchPoint {
-        QPointF pos;
+        QPointF pos;     ///< view coordinates (mapped anew at every event: the canvas may have turned meanwhile)
+        QPointF screen;  ///< screen (canvas item) coordinates
     };
     std::map<int, TouchPoint> touches;
     bool touchSessionIgnored = false;

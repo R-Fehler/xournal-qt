@@ -228,6 +228,10 @@ private:
     /// Another canvas of the process shows this view (while two canvases swap their views).
     bool shownByAnother(const xqt::CanvasView* v) const;
     void updateViewGeometry();
+    /// Item (screen) coordinates to the view's and back (the canvas turned: qt/docs/canvas-rotation.md; the same while
+    /// it is upright)
+    QPointF toView(QPointF itemPos) const;
+    QRectF toItem(const QRectF& viewRect) const;
     /// The mouse moved without a button: the formula error under it, once it rests (hoverTimer).
     void mouseHovers(QPointF scenePos);
     void setMathError(const QString& error, const QRectF& rect);
