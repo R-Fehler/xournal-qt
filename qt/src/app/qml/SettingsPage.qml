@@ -376,6 +376,16 @@ Popup {
                                    + "in the tools of full screen and presenting) draw ink that is never kept: it "
                                    + "fades this long after the pen is lifted.")
                     }
+                    SectionTitle { text: qsTr("Presenting") }
+                    SwitchRow { objectName: "presenterViewSwitch"; key: "presenterView"; text: qsTr("Presenter view on a second screen") }
+                    SwitchRow { objectName: "presenterSwapSwitch"; key: "presenterSwapScreens"; text: qsTr("Swap the screens") }
+                    Hint {
+                        text: qsTr("With a second screen (a projector), presenting (F5) shows only the slide there, "
+                                   + "and on this screen the page with its space for notes, the next page, the clock "
+                                   + "and the time since the start. Write on the page here: the audience sees it at "
+                                   + "once. The audience's screen is the one that is not the main screen; swap them "
+                                   + "when it is the other way round.")
+                    }
                     SectionTitle { text: qsTr("Grid") }
                     SwitchRow { objectName: "snapGridSwitch"; key: "snapGrid"; text: qsTr("Snap to the grid") }
                     Hint {

@@ -32,6 +32,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/TabManager.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ReferenceMode.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ReferenceMode.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PresenterConsole.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PresenterConsole.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.h
@@ -219,6 +221,8 @@ set(XQT_QML_FILES
     src/app/qml/ShortcutSheet.qml
     src/app/qml/LayerList.qml
     src/app/qml/PagePicture.qml
+    src/app/qml/AudienceWindow.qml
+    src/app/qml/PresenterPanel.qml
     src/app/qml/Hairline.qml
     src/app/qml/RaceWatch.qml
     src/app/qml/FuzzyToggle.qml
@@ -320,6 +324,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/MainWindowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ReferenceWindowTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/PresenterViewTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/DocumentLinksTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/SnipTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/StickerToolTest.cpp
@@ -343,6 +348,10 @@ if(XQT_BUILD_TESTS)
     add_test(NAME FractionalScale.ui@150 COMMAND xqt-ui-tests --gtest_filter=FractionalScale.*)
     set_tests_properties(FractionalScale.ui@150 PROPERTIES LABELS ui ENVIRONMENT
         "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_LIST_DIR}/../tests/ui/offscreen-hidpi.json;QT_SCALE_FACTOR=1.5")
+    # The presenter view with two screens (qt/docs/presenter-view.md): a laptop and a projector, off-screen
+    add_test(NAME PresenterView.ui@2screens COMMAND xqt-ui-tests --gtest_filter=PresenterView.*)
+    set_tests_properties(PresenterView.ui@2screens PROPERTIES LABELS ui ENVIRONMENT
+        "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_LIST_DIR}/../tests/ui/offscreen-two-screens.json")
 
     add_executable(xqt-shell-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/main.cpp

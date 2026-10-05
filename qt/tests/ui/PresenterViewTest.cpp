@@ -1,0 +1,437 @@
+/*
+ * xournal-qt: the presenter view on a second screen (qt/docs/presenter-view.md) in the real window, off-screen.
+ *
+ * Qt's off-screen platform takes its screens from a file: PresenterView.ui@2screens runs these tests with two
+ * (qt/tests/ui/offscreen-two-screens.json: a laptop 1920 x 1080, the primary one, and a projector 1280 x 720 at its
+ * right). In the ordinary run (one screen) the tests that need two skip, and the one-screen test checks that
+ * presenting is as before.
+ *
+ * @license GNU GPLv2 or later
+ */
+#include <functional>
+#include <memory>
+
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QGuiApplication>
+#include <QQmlApplicationEngine>
+#include <QQmlContext>
+#include <QQuickItem>
+#include <QQuickWindow>
+#include <QScreen>
+#include <QTest>
+#include <gtest/gtest.h>
+
+#include "model/Document.h"
+#include "model/Layer.h"
+#include "model/XojPage.h"
+#include "canvas/CanvasPage.h"
+#include "canvas/CanvasView.h"
+#include "canvas/CurtainLayer.h"
+#include "session/DocumentSession.h"
+#include "session/PageNoteSpace.h"
+#include "shell/HitPages.h"
+#include "shell/MdSnippets.h"
+#include "shell/PageSketches.h"
+#include "shell/PresenterConsole.h"
+#include "shell/Previews.h"
+#include "shell/SettingsModel.h"
+#include "shell/TabManager.h"
+#include "shell/Thumbnails.h"
+
+#include "AppController.h"
+#include "config-test.h"
+
+namespace {
+QString fixturePath(const char8_t* rel) {
+    const auto p = GET_TESTFILE(rel);
+    return QString::fromUtf8(reinterpret_cast<const char*>(p.c_str()));
+}
+
+class PresenterView: public ::testing::Test {
+protected:
+    void SetUp() override {
+        twoScreens = QGuiApplication::screens().size() >= 2;
+        controller = std::make_unique<AppController>();
+        engine = std::make_unique<QQmlApplicationEngine>();
+        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
+        engine->addImageProvider("sketch", new xqt::SketchProvider);
+        engine->addImageProvider("preview", new xqt::PreviewProvider);
+        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
+        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
+        engine->rootContext()->setContextProperty("app", controller.get());
+        engine->loadFromModule("XournalQt", "Main");
+        ASSERT_FALSE(engine->rootObjects().isEmpty());
+        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
+        ASSERT_NE(window, nullptr);
+        window->requestActivate();
+        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
+        QTest::mouseMove(window, QPoint(-20, -20));  // (the pointer rests outside: nothing hovered, no tool tips)
+        ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+        wait(100);
+        controller->jumpToPage(0);  // (not where an earlier test of this run left it)
+        wait(50);
+        console = qobject_cast<xqt::PresenterConsole*>(controller->presenterObject());
+        ASSERT_NE(console, nullptr);
+        audienceWindow = window->findChild<QQuickWindow*>("audienceWindow");
+        ASSERT_NE(audienceWindow, nullptr);
+    }
+    void TearDown() override {
+        controller->setPresenting(false);
+        settings()->set("presenterView", true);  // (the settings are shared by the tests of this run)
+        settings()->set("presenterSwapScreens", false);
+        settings()->set("toolbarMode", "classic");
+        controller->shutdown();
+        engine.reset();
+        controller.reset();
+    }
+
+    static void wait(int ms) {
+        QElapsedTimer t;
+        t.start();
+        while (t.elapsed() < ms) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+        }
+    }
+    /// (returns as soon as it is true: the time is for a machine slowed down by other work)
+    static void until(const std::function<bool()>& done, int ms = 5000) {
+        QElapsedTimer t;
+        t.start();
+        while (!done() && t.elapsed() < ms) {
+            wait(20);
+        }
+    }
+    QQuickItem* findIn(QQuickWindow* w, const char* name) const {
+        std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* i) -> QQuickItem* {
+            if (i->objectName() == name) {
+                return i;
+            }
+            for (QQuickItem* c: i->childItems()) {
+                if (QQuickItem* f = walk(c)) {
+                    return f;
+                }
+            }
+            return nullptr;
+        };
+        QQuickItem* root = w->contentItem()->parentItem() ? w->contentItem()->parentItem() : w->contentItem();
+        return walk(root);
+    }
+    QQuickItem* find(const char* name) const { return findIn(window, name); }
+    static QRectF sceneRect(const QQuickItem* i) { return i->mapRectToScene(QRectF(0, 0, i->width(), i->height())); }
+    void key(Qt::Key k, Qt::KeyboardModifiers m = Qt::NoModifier) {
+        QTest::keyClick(window, k, m);
+        wait(20);
+    }
+    void click(QQuickItem* item) {
+        ASSERT_NE(item, nullptr);
+        ASSERT_TRUE(item->isVisible());
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
+                          item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
+        wait(50);
+    }
+    xqt::SettingsModel* settings() const { return qobject_cast<xqt::SettingsModel*>(controller->settingsModel()); }
+    xqt::DocumentSession* session() const { return controller->tabManager().currentSession(); }
+    xqt::CanvasView* presenterView() const { return controller->tabManager().currentView(); }
+    xqt::CanvasView* audience() const { return console->audienceView(); }
+    /// F5, until the presentation settled (and with two screens, the audience's window shows)
+    void present() {
+        key(Qt::Key_F5);
+        until([&] { return controller->presenting() && (!console->available() || audienceWindow->isVisible()); });
+        wait(200);
+    }
+    /// The page goes on (or back) and the views settle
+    void settle() {
+        until([&] { return !presenterView()->getViewController().isAnimating(); }, 2000);
+        wait(50);
+    }
+    size_t strokes(size_t page) const {
+        return session()->getDocument()->getPage(page)->getSelectedLayer()->getElementsView().size();
+    }
+
+    bool twoScreens = false;
+    std::unique_ptr<AppController> controller;
+    std::unique_ptr<QQmlApplicationEngine> engine;
+    QQuickWindow* window = nullptr;
+    QQuickWindow* audienceWindow = nullptr;
+    xqt::PresenterConsole* console = nullptr;
+};
+}  // namespace
+
+// With one screen (or the presenter view switched off) presenting is as before: the page fills this window, no
+// audience's window, no console
+TEST_F(PresenterView, withOneScreenPresentingIsAsBefore) {
+    if (twoScreens) {
+        settings()->set("presenterView", false);
+    }
+    EXPECT_FALSE(console->available());
+    present();
+    ASSERT_TRUE(controller->presenting());
+    EXPECT_FALSE(console->active());
+    EXPECT_EQ(console->audienceView(), nullptr);
+    EXPECT_FALSE(audienceWindow->isVisible());
+    EXPECT_FALSE(find("presenterPanel")->isVisible());
+    const QRectF canvas = sceneRect(find("canvas"));
+    EXPECT_NEAR(canvas.right(), window->width(), 1) << "the page has the whole window";
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(controller->presenting());
+}
+
+// Two screens: the slide alone full screen on the projector (without its space for notes), the console on the laptop
+// with the page and its space for notes, the next page, the page number; the keys go from page to page in both
+// windows and the audience follows; Escape ends it everywhere
+TEST_F(PresenterView, theSlideOnTheAudiencesScreenTheConsoleOnTheLaptop) {
+    if (!twoScreens) {
+        GTEST_SKIP() << "needs two screens (PresenterView.ui@2screens)";
+    }
+    QScreen* laptop = QGuiApplication::primaryScreen();
+    QScreen* projector = QGuiApplication::screens().at(1);
+    ASSERT_NE(laptop, projector);
+    // The first page gets space for notes at its right (half the slide's width)
+    const double slideWidth = session()->getDocument()->getPage(0)->getWidth();
+    const double slideHeight = session()->getDocument()->getPage(0)->getHeight();
+    ASSERT_EQ(xqt::notespace::apply(*session(), {0}, {0, 0, 0.5, 0, true}), 1u);
+    wait(100);
+    const double pageWidth = session()->getDocument()->getPage(0)->getWidth();
+    ASSERT_GT(pageWidth, slideWidth * 1.4);
+
+    EXPECT_TRUE(console->available());
+    EXPECT_EQ(console->audienceScreen(), projector);
+    EXPECT_EQ(console->consoleScreen(), laptop);
+    present();
+    ASSERT_TRUE(controller->presenting());
+    ASSERT_TRUE(console->active());
+    ASSERT_NE(audience(), nullptr);
+    EXPECT_NE(audience(), presenterView()) << "a view of its own";
+    EXPECT_EQ(&audience()->getSession(), session()) << "of the same document";
+    EXPECT_EQ(presenterView()->mirror(), audience());
+
+    // The windows on their screens
+    EXPECT_TRUE(audienceWindow->isVisible());
+    EXPECT_EQ(audienceWindow->screen(), projector);
+    until([&] { return audienceWindow->geometry() == projector->geometry(); });
+    EXPECT_EQ(audienceWindow->geometry(), projector->geometry()) << "full screen on the projector";
+    EXPECT_EQ(window->screen(), laptop);
+
+    // The console: the page with its space for notes at the left, the panel at the right
+    auto* panel = find("presenterPanel");
+    ASSERT_TRUE(panel->isVisible());
+    auto* canvas = find("canvas");
+    EXPECT_LE(sceneRect(canvas).right(), sceneRect(panel).left() + 0.5) << "the page beside the panel";
+    const QRectF consolePage = presenterView()->pageViewRect(0);
+    EXPECT_GE(consolePage.left(), -0.5);
+    EXPECT_LE(consolePage.right(), canvas->width() + 0.5) << "the whole page, with its space for notes";
+    EXPECT_NEAR(consolePage.width() / consolePage.height(), pageWidth / slideHeight, 0.01);
+    EXPECT_TRUE(find("presenterNotesHint")->isVisible());
+    EXPECT_EQ(find("presenterPageLabel")->property("text").toString(),
+              QString("Page 1 of %1").arg(controller->pageCount()));
+
+    // The audience's screen: only the slide, as large as the screen allows, its space for notes out of view
+    auto* slide = findIn(audienceWindow, "audienceCanvas");
+    ASSERT_NE(slide, nullptr);
+    EXPECT_EQ(slide->property("view").value<QObject*>(), audience());
+    EXPECT_NEAR(slide->width() / slide->height(), slideWidth / slideHeight, 0.01) << "the slide's shape";
+    EXPECT_NEAR(slide->height(), projector->geometry().height(), 1) << "an A4 page upright fills the height";
+    const QRectF audiencePage = audience()->pageViewRect(0);
+    const double z = audience()->getViewController().zoom();
+    EXPECT_NEAR(audiencePage.left(), 0, 0.5);
+    EXPECT_NEAR(audiencePage.top(), 0, 0.5);
+    EXPECT_NEAR(slideWidth * z, slide->width(), 0.5) << "the slide fills the canvas";
+    EXPECT_GT(audiencePage.right(), slide->width() + 100) << "the space for notes is beside it, out of view";
+    EXPECT_TRUE(slide->clip());
+
+    // The next page, smaller
+    EXPECT_TRUE(console->nextPicture().contains(QString("/1/"))) << console->nextPicture().toStdString();
+    EXPECT_TRUE(find("presenterNext")->isVisible());
+
+    // Keys in the console: on, and the audience follows
+    key(Qt::Key_Space);
+    settle();
+    EXPECT_EQ(controller->pageNumber(), 2);
+    until([&] { return audience()->currentPageNo() == 1; });
+    EXPECT_EQ(audience()->currentPageNo(), 1u);
+    EXPECT_EQ(console->page(), 1);
+    EXPECT_FALSE(find("presenterNotesHint")->isVisible()) << "no space for notes on page 2";
+    EXPECT_NEAR(audience()->pageViewRect(1).left(), 0, 0.5);
+    EXPECT_NEAR(audience()->pageViewRect(1).top(), 0, 0.5);
+    EXPECT_EQ(find("presenterPageLabel")->property("text").toString(),
+              QString("Page 2 of %1").arg(controller->pageCount()));
+
+    // Keys in the audience's window (a clicker sends them to whichever window has the focus)
+    audienceWindow->requestActivate();
+    until([&] { return audienceWindow->isActive(); });
+    ASSERT_TRUE(audienceWindow->isActive());
+    QTest::keyClick(audienceWindow, Qt::Key_Right);
+    settle();
+    EXPECT_EQ(controller->pageNumber(), 3);
+    until([&] { return audience()->currentPageNo() == 2; });
+    EXPECT_EQ(audience()->currentPageNo(), 2u);
+    QTest::keyClick(audienceWindow, Qt::Key_PageUp);
+    settle();
+    EXPECT_EQ(controller->pageNumber(), 2);
+    QTest::keyClick(audienceWindow, Qt::Key_End);
+    settle();
+    EXPECT_EQ(controller->pageNumber(), controller->pageCount());
+    until([&] { return console->page() == controller->pageCount() - 1; });
+    EXPECT_TRUE(console->nextPicture().isEmpty()) << "after the last page nothing comes";
+    EXPECT_EQ(find("presenterNextLabel")->property("text").toString(), QString("The last page"));
+    // A page number typed there: on in the console (the audience does not see it), Enter goes there
+    QTest::keyClick(audienceWindow, Qt::Key_3);
+    until([&] { return window->isActive(); });
+    EXPECT_TRUE(window->isActive()) << "the number is typed on in the console";
+    EXPECT_TRUE(find("pageJump")->isVisible());
+    key(Qt::Key_Return);
+    settle();
+    EXPECT_EQ(controller->pageNumber(), 3);
+    until([&] { return audience()->currentPageNo() == 2; });
+    EXPECT_EQ(audience()->currentPageNo(), 2u);
+
+    // Escape in the audience's window ends the presentation: its window goes, the console too
+    audienceWindow->requestActivate();
+    until([&] { return audienceWindow->isActive(); });
+    QTest::keyClick(audienceWindow, Qt::Key_Escape);
+    until([&] { return !audienceWindow->isVisible(); });
+    EXPECT_FALSE(controller->presenting());
+    EXPECT_FALSE(console->active());
+    EXPECT_EQ(presenterView()->mirror(), nullptr);
+    EXPECT_FALSE(audienceWindow->isVisible());
+    EXPECT_FALSE(panel->isVisible());
+}
+
+// The time since the start: it runs from the start of the presentation, pauses, goes on, goes back to 0
+TEST_F(PresenterView, theTimeSinceTheStart) {
+    if (!twoScreens) {
+        GTEST_SKIP() << "needs two screens (PresenterView.ui@2screens)";
+    }
+    present();
+    ASSERT_TRUE(console->active());
+    EXPECT_TRUE(console->timerRunning()) << "it starts with the presentation";
+    wait(120);
+    const qint64 a = console->elapsedMs();
+    EXPECT_GE(a, 100);
+    EXPECT_EQ(find("presenterElapsed")->property("text").toString(), QString("0:00"));
+
+    click(find("presenterTimerToggle"));
+    EXPECT_FALSE(console->timerRunning());
+    const qint64 paused = console->elapsedMs();
+    wait(120);
+    EXPECT_EQ(console->elapsedMs(), paused) << "paused";
+    click(find("presenterTimerToggle"));
+    EXPECT_TRUE(console->timerRunning());
+    wait(120);
+    EXPECT_GE(console->elapsedMs(), paused + 100) << "goes on";
+
+    click(find("presenterTimerReset"));
+    EXPECT_LT(console->elapsedMs(), 100) << "back to 0";
+    EXPECT_TRUE(console->timerRunning()) << "and runs on";
+
+    // The clock shows the time of day
+    EXPECT_FALSE(find("presenterClock")->property("text").toString().isEmpty());
+}
+
+// Written on the console's page: the stroke shows on the audience's screen while it is written, then it is in the
+// document; the laser pointer and the curtain show there too
+TEST_F(PresenterView, inkLaserAndCurtainShowOnTheAudiencesScreen) {
+    if (!twoScreens) {
+        GTEST_SKIP() << "needs two screens (PresenterView.ui@2screens)";
+    }
+    present();
+    ASSERT_TRUE(console->active());
+    auto* canvas = find("canvas");
+    xqt::CanvasView* view = presenterView();
+    const QPoint a = canvas->mapToScene(view->pageViewRect(0).center()).toPoint();
+    auto drawFrom = [&](QPoint at) {
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, at);
+        for (int i = 1; i <= 8; ++i) {
+            QTest::mouseMove(window, at + QPoint(-20 * i, 10 * i));
+        }
+        wait(30);
+    };
+
+    controller->selectTool("pen");
+    const size_t before = strokes(0);
+    drawFrom(a);
+    EXPECT_EQ(audience()->getPage(0)->mirroredViewCount(), 1u) << "the audience sees it being written";
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, a + QPoint(-160, 80));
+    wait(100);
+    EXPECT_EQ(strokes(0), before + 1);
+    EXPECT_EQ(audience()->getPage(0)->mirroredViewCount(), 0u) << "now it is in the document";
+
+    controller->selectTool("laserPointerPen");
+    drawFrom(a + QPoint(0, 40));
+    EXPECT_EQ(audience()->getPage(0)->mirroredViewCount(), 1u) << "the laser pointer";
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, a + QPoint(-160, 120));
+    wait(50);
+    EXPECT_EQ(strokes(0), before + 1) << "its ink is never kept";
+
+    controller->toggleCurtain("curtain");
+    wait(50);
+    ASSERT_TRUE(view->curtain().visible());
+    EXPECT_TRUE(audience()->curtain().visible()) << "the curtain on the audience's screen";
+    EXPECT_FALSE(audience()->curtain().handlesShown());
+    EXPECT_EQ(audience()->curtain().centre(), view->curtain().centre());
+    controller->toggleCurtain("");
+    wait(50);
+    EXPECT_FALSE(audience()->curtain().active());
+    controller->selectTool("pen");
+}
+
+// "Swap screens" in the console: the audience's window goes to the laptop's screen, the console to the projector's;
+// the controls over the page (the toolbox, floating while presenting) stay beside the panel
+TEST_F(PresenterView, swapScreensAndTheToolboxBesideThePanel) {
+    if (!twoScreens) {
+        GTEST_SKIP() << "needs two screens (PresenterView.ui@2screens)";
+    }
+    settings()->set("toolbarMode", "toolbox");
+    wait(100);
+    QScreen* laptop = QGuiApplication::primaryScreen();
+    QScreen* projector = QGuiApplication::screens().at(1);
+    present();
+    ASSERT_TRUE(console->active());
+    auto* toolbox = find("toolbox");
+    ASSERT_NE(toolbox, nullptr);
+    until([&] { return toolbox->isVisible(); });
+    EXPECT_TRUE(toolbox->isVisible()) << "presenting keeps the floating toolbox";
+    EXPECT_LE(sceneRect(toolbox).right(), sceneRect(find("presenterPanel")).left()) << "beside the panel";
+
+    click(find("presenterSwapScreens"));
+    EXPECT_TRUE(console->swapScreens());
+    until([&] { return audienceWindow->screen() == laptop && window->screen() == projector; });
+    EXPECT_EQ(audienceWindow->screen(), laptop);
+    EXPECT_EQ(window->screen(), projector);
+    until([&] { return audienceWindow->geometry() == laptop->geometry(); });
+    EXPECT_EQ(audienceWindow->geometry(), laptop->geometry());
+    EXPECT_TRUE(console->active()) << "still presenting";
+
+    click(find("presenterSwapScreens"));
+    until([&] { return audienceWindow->screen() == projector; });
+    EXPECT_EQ(audienceWindow->screen(), projector);
+}
+
+// Another tab while presenting: the audience's screen shows that document
+TEST_F(PresenterView, anotherTabPresentsOnTheAudiencesScreenToo) {
+    if (!twoScreens) {
+        GTEST_SKIP() << "needs two screens (PresenterView.ui@2screens)";
+    }
+    controller->newDocument();
+    wait(100);
+    controller->setCurrentTab(0);
+    wait(100);
+    present();
+    ASSERT_TRUE(console->active());
+    xqt::DocumentSession* first = session();
+    EXPECT_EQ(&audience()->getSession(), first);
+    controller->setCurrentTab(1);
+    wait(100);
+    ASSERT_TRUE(controller->presenting());
+    ASSERT_TRUE(console->active());
+    EXPECT_NE(session(), first);
+    EXPECT_EQ(&audience()->getSession(), session());
+    EXPECT_EQ(presenterView()->mirror(), audience());
+    // The presented tab is closed: the next one presents
+    controller->closeTab(1);
+    wait(100);
+    if (controller->presenting()) {
+        ASSERT_NE(audience(), nullptr);
+        EXPECT_EQ(&audience()->getSession(), session());
+    }
+}

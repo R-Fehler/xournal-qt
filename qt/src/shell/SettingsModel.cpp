@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <string>
+#include <string_view>
 
 #include <QColor>
 #include <QScreen>
@@ -388,6 +389,22 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             s.getCustomElement("xournalQt").setBool("adaptiveLayout", v.toBool());
             s.customSettingsChanged();
         });
+
+    // Presenting with two screens: the slide on the audience's screen, the presenter's console on the other
+    // (qt/docs/presenter-view.md; PresenterConsole reads these); swapped: the audience's screen is the primary one
+    for (const char* key: {"presenterView", "presenterSwapScreens"}) {
+        const bool fallback = std::string_view(key) == "presenterView";
+        add(key,
+            [&s, key, fallback] {
+                bool on = fallback;
+                s.getCustomElement("xournalQt").getBool(key, on);
+                return QVariant(on);
+            },
+            [&s, key](const QVariant& v) {
+                s.getCustomElement("xournalQt").setBool(key, v.toBool());
+                s.customSettingsChanged();
+            });
+    }
 
     // The toolbox or the classic tool bar (qt/docs/toolbox.md)
     add("toolbarMode", [&s] { return QVariant(toolbarMode(s)); },

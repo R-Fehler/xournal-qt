@@ -79,6 +79,7 @@ class Library;
 class LibraryModel;
 class RecentFiles;
 class ReferenceMode;
+class PresenterConsole;
 class StickersModel;
 namespace DocumentFiles {
 struct Result;
@@ -278,6 +279,8 @@ class AppController: public QObject {
     Q_PROPERTY(QString pdfTextMode READ pdfTextMode WRITE setPdfTextMode NOTIFY pdfTextModeChanged)
     /// Reference mode: another document beside the current one (xqt::ReferenceMode).
     Q_PROPERTY(QObject* reference READ referenceObject CONSTANT)
+    /// The presenter view on a second screen while presenting (xqt::PresenterConsole, qt/docs/presenter-view.md)
+    Q_PROPERTY(QObject* presenter READ presenterObject CONSTANT)
     /// Looking up selected text, papers of references, arXiv (Citations.h, qt/docs/citations.md)
     Q_PROPERTY(QObject* citations READ citationsObject CONSTANT)
     /// Documents of a crashed previous run that can be recovered: [{ title, time }]. Empty when there are none.
@@ -859,6 +862,7 @@ public:
     /// copy as its reference.
     Q_INVOKABLE bool compareConflict(const QString& document, const QString& copy);
     QObject* referenceObject() const;
+    QObject* presenterObject() const;
     QObject* citationsObject() const;
     xqt::ReferenceMode& reference() const { return *referenceMode; }
     /// Ctrl+S: while the reference has the keys and is written in, it is saved (true). When it needs a file first,
@@ -1585,6 +1589,7 @@ private:
     void handOverHandwriting(xqt::DocumentSession& s);
     std::unique_ptr<xqt::TabManager> tabs;
     std::unique_ptr<xqt::ReferenceMode> referenceMode;  ///< (after `tabs`, reset before it)
+    std::unique_ptr<xqt::PresenterConsole> presenter;   ///< (after `tabs`, reset before it)
     std::unique_ptr<xqt::Citations> citations;
     bool replacePristine = true;  ///< opening a file replaces an untouched new document (not for a reference)
     std::unique_ptr<xqt::PagesModel> pages;

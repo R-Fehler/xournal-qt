@@ -1,0 +1,6 @@
+{
+    "screens": [
+        { "name": "Laptop", "x": 0, "y": 0, "width": 1920, "height": 1080, "logicalDpi": 96, "logicalBaseDpi": 96 },
+        { "name": "Projector", "x": 1920, "y": 0, "width": 1280, "height": 720, "logicalDpi": 96, "logicalBaseDpi": 96 }
+    ]
+}

@@ -2985,3 +2985,31 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
 - [ ] First start after the update: the toolbox's first pen has the pen's color and width of before; the eraser
       erases as it did (standard, whiteout or whole strokes); the text box has the font of before.
 - [ ] Restart: the tool in hand is the entry taken last, with its color and width.
+
+## The presenter view on a second screen (qt/presenter-view)
+
+See qt/docs/presenter-view.md. The laptop (or the 2-in-1) with a projector or a second monitor, the desktop extended
+to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
+- [ ] A document whose first slide has space for notes at its right and below (Space for notes…). F5: the slide alone,
+      full screen on the projector, black around it, none of the space for notes; on the laptop the console: the page
+      with its space for notes at the left, the clock, the time running from 0:00, "Page 1 of …", the next page.
+- [ ] The app's window was on the projector when F5 was pressed: the console goes to the laptop, the slide to the
+      projector (not both on one screen).
+- [ ] Space, → ↓ Page Down, ← ↑ Page Up, Backspace, Home, End, "4" Enter in the console: both screens go there. Click
+      on the projector's screen, then the same keys: they work there too; "4" there: the number shows on the laptop only.
+      A presentation clicker (it sends Page Down / Page Up) works whichever window has the focus.
+- [ ] Write on the console's page with the pen (toolbox): the audience sees the stroke as it is drawn, smoothly, and it
+      stays. The laser pointer: its ink shows and fades on both screens. B and Shift+B: curtain and spotlight on the
+      projector too, without handles; moving the curtain on the laptop moves it there at once.
+- [ ] The time: pause (it stops, grey), go on, back to 0:00 (it runs on); the clock shows the time of day in the
+      system's format.
+- [ ] Swap screens: the slide goes to the laptop, the console to the projector; again: back. Settings → Pen →
+      Presenting → "Swap the screens" is the same switch.
+- [ ] Escape (in either window), F5 or End: the projector's window goes; the laptop shows the full-screen editor as
+      after presenting on one screen. Leaving full screen afterwards brings the window back as it was.
+- [ ] Unplug the projector while presenting: presenting goes on on the laptop as with one screen; plug it in again:
+      the audience's window comes back.
+- [ ] Settings → Pen → Presenting → "Presenter view on a second screen" off: F5 with two screens presents on the
+      window's screen only, as before. With one screen F5 is as before.
+- [ ] A 4K projector, a long PDF lecture: going on page by page stays quick; memory (the canvas' share) stays within its
+      setting.
