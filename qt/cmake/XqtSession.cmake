@@ -97,6 +97,10 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/Citation.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfTitle.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfTitle.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfKeywords.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfKeywords.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/Tags.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/Tags.cpp
 )
 target_include_directories(xqt-session PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src" "${CMAKE_CURRENT_LIST_DIR}/../src/session")
 target_link_libraries(xqt-session PUBLIC Qt6::Core xoj-render xoj-core xqt-markdown)

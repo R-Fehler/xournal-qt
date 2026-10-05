@@ -2985,3 +2985,11 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
 - [ ] First start after the update: the toolbox's first pen has the pen's color and width of before; the eraser
       erases as it did (standard, whiteout or whole strokes); the text box has the font of before.
 - [ ] Restart: the tool in hand is the entry taken last, with its color and width.
+
+## Tags: what is read (qt/tags, qt/docs/tags.md)
+- [ ] A library with a `.xopp` whose typed text says `#exam`, a Markdown box with `#course/math`, a sticky note with
+      `#idea`, a `.md` with an Obsidian front matter (`tags: [project]`) and a PDF from Zotero or arXiv with keywords:
+      after indexing, every one of them has its tags (the Tags tab, the cards); `C#`, `page#3`, `#1984`, `# Heading`
+      and `#tags` in code blocks are none.
+- [ ] A library indexed by an older build: the documents are read once more (the indexing line counts them), plain
+      PDFs only for their keywords (quickly); the next start reads nothing.
