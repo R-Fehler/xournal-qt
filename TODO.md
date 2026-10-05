@@ -643,16 +643,31 @@ The other ideas (A3–A9, A15, B1–B8) stay in that file to decide later.
 
 ### Handwriting in German and English (the author, 2026-10-05)
 Formats shared by training and app: [qt/research/hwr/train/FORMATS.md](qt/research/hwr/train/FORMATS.md).
-- [~] `qt/hwr-training` (Python, PyTorch): datasets (fhswf German, synthetic German/English, IAM only from the
+- [x] `qt/hwr-training` (Python, PyTorch): datasets (fhswf German, synthetic German/English, IAM only from the
   author's own copy, xournal-qt ink datasets), TrOCR-small (from the handwritten model) and a small CTC model, DDP with
   torchrun on GPUs with at least 11 GB, configs for a German model, one combined English+German model and fine-tuning
   on user data, evaluation (words found, CER, WER per dataset, language and writer), export to the app's model folder.
-- [~] `qt/hwr-multilang` (app): English / German / both; several models with merged readings; a CTC recogniser;
+- [x] `qt/hwr-multilang` (app): English / German / both; several models with merged readings; a CTC recogniser;
   per-document language detection and override; `xournal-qt-cli hwr-lines` exports ink lines as a dataset.
 - Licences don't restrict the choice of datasets or base models (the author, 2026-10-05: a free, non-commercial
   research app); they are recorded for transparency only.
 - [ ] `qt/hwr-userdata` (later, lower priority): a dataset of the user's own hand made in xournal-qt (prompted
   sentences to write, corrections of readings), exported for fine-tuning.
+
+### A document timeline (the author, 2026-10-05: B9 levels 1 and 2 as one design; `qt/timeline`)
+"A play bar at the bottom, like an audio player, that replays the audio and replays the document editing history in
+read-only mode." Decided: levels 1 and 2 of [ideas B9](qt/docs/ideas-2026-10.md) together, on one clock.
+- [ ] Every new element (stroke, text, image, TeX image, link) gets its creation time, an absolute time saved as the
+  element attribute `xqt-created` (a seam like `xqt-group`; upstream ignores and drops it). Eraser pieces and moved,
+  recoloured or resized elements keep their time; pasted elements and stickers are new (the time they were pasted).
+- [ ] One timeline per document: elements ordered by creation time; recordings placed on it by their start time, so
+  the audio plays where it overlaps (the strokes' upstream `ts`/`fn` place elements of Xournal++ files with a
+  recording); long pauses between sessions compressed (a session mark on the bar). Elements without any time (older
+  files, files saved by Xournal++) come first, in the order they sit in their layer.
+- [ ] Replay, read-only: a play bar at the bottom (play/pause, scrub, speed, jump to the session marks), the pages
+  drawn as of the bar's time, the stroke being written drawn on progressively (evenly along its length: points have
+  no times). Tapping a stroke jumps there. Leaving it brings the document back as it was; nothing is changed.
+- Not in this block: erasing, moving and page changes (level 3, with the version history); per-point times.
 
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
