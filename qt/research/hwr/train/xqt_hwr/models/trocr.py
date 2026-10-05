@@ -95,6 +95,8 @@ def load(base: str, texts: list[str] | None = None, tiny: dict | None = None, at
         model = VisionEncoderDecoderModel.from_pretrained(base, attn_implementation=attn)
     except (ValueError, ImportError):
         model = VisionEncoderDecoderModel.from_pretrained(base, attn_implementation="eager")
+    if getattr(model.encoder, "pooler", None) is not None:
+        model.encoder.pooler = None  # (unused by the decoder; DDP refuses parameters without gradients)
     tok = AutoTokenizer.from_pretrained(base, use_fast=True)
     if model.config.decoder_start_token_id is None:
         model.config.decoder_start_token_id = 2

@@ -50,12 +50,14 @@ def test_finetune_lora_and_last_layers(trained, data_root, tmp_path):
     assert meta(tmp_path / "c/checkpoints/best")["kind"] == "ctc"
 
 
-@pytest.mark.parametrize("cfg", ["tiny-ctc.yaml", "tiny-trocr.yaml"])
-def test_ddp_two_cpu_processes(cfg, data_root, tmp_path):
+@pytest.mark.parametrize("cfg", ["tiny-ctc.yaml", "tiny-trocr.yaml", "tiny-finetune-trocr.yaml"])
+def test_ddp_two_cpu_processes(cfg, data_root, tmp_path, trained):
     env = dict(os.environ, OMP_NUM_THREADS="1", PYTHONPATH=str(ROOT))
     cmd = [sys.executable, "-m", "torch.distributed.run", "--standalone", "--nproc_per_node=2",
            str(ROOT / "train.py"), "--config", str(TINY / cfg), "--set", f"data_root={data_root}",
-           "--set", f"out_dir={tmp_path}"]
+           "--set", f"out_dir={tmp_path}", "--set", "train.max_steps=3", "--set", "val.every_steps=3"]
+    if "finetune" in cfg:  # a saved model through from_pretrained (DDP must see no unused parameters), with LoRA
+        cmd += ["--set", f"finetune.init_from={trained / 'trocr/checkpoints/best'}", "--set", "finetune.freeze=none"]
     r = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=600)
     assert r.returncode == 0, r.stdout[-3000:] + r.stderr[-3000:]
     assert "2 process(es) on cpu" in r.stdout
