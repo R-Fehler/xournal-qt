@@ -2842,6 +2842,24 @@ scripted models (`xqt-hwr-tests`); the steps below need the real models.
 - [ ] With `XQT_HWR_MODEL_DE=<folder>` the German row says the model is that folder and offers neither download nor
       removal.
 
+## Training the handwriting models on a GPU machine (qt/hwr-training)
+
+Not app checks: the first real run of `qt/research/hwr/train` (its README has the commands). The CPU smoke tests
+(`python -m pytest -q` there, about a minute) proved the pipeline with tiny models; these need the GPU and the real data.
+- [ ] `python -m pytest -q` passes on the GPU machine's environment (requirements-gpu.txt).
+- [ ] `prepare.py all`: fhswf, synthetic-de/-en, IAM (hub) and CVL prepared; `prepare.py check` on each: the writers
+      look right (fhswf: a writer column or file-name pattern rather than the 15-block fallback, see the README), no
+      writer in both train and test.
+- [ ] The first TrOCR log says whether German characters round-trip through `microsoft/trocr-small-handwritten`'s
+      tokenizer, and which were added.
+- [ ] `de-trocr.yaml` and `de-ctc.yaml` fit in 11 GB at the configured batch sizes (else note the batch that fits);
+      2-GPU `torchrun` gives about twice the lines per second; `--resume` continues a stopped run.
+- [ ] `export.py` parity: fp32 identical readings; int8 readings mostly the same (note the share).
+- [ ] `evaluate.py compare` of the exported German models and the app's English model on fhswf, CVL and IAM test
+      lines: German words found well above the research baseline (TrOCR-small: 41 %).
+- [ ] The exported folders work in the app: copy to `~/.local/share/xournal-qt/models/<name>/`, choose the model,
+      search a page of German handwriting.
+
 ## Snip: a picture of part of a page (qt/snip)
 
 - [ ] Select button, press and hold: "Snip a rectangle (copy its picture)"; drag over ink on a PDF page: "Copied

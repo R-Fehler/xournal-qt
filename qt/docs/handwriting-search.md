@@ -133,6 +133,11 @@ The sentences are the texts (`sentences-<lang>.txt`; `make_sample.py` makes the 
   `XQT_HWR_MODEL` is set; `XQT_BENCH_HWR=1` with the model prints the time per line. English and German are tested
   with scripted models (`MultiModelTest`: merging, the language of a document, the choice).
 
+- **Training models** (German, German + English, a person's own hand): `qt/research/hwr/train` ([README](../research/hwr/train/README.md)),
+  PyTorch on GPUs, exporting the model folders of [FORMATS.md](../research/hwr/train/FORMATS.md).
+- Tests that need the runtime or the model are skipped unless `XQT_ONNXRUNTIME` (a tiny model in
+  `qt/tests/hwr/data`) or `XQT_HWR_MODEL` is set; `XQT_BENCH_HWR=1` with the model prints the time per line.
+
 ## Decisions (2026-10-04)
 
 - Off until switched on in Settings; no learning from the user's handwriting; English only (English and German since

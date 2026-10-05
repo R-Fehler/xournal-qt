@@ -1,0 +1,30 @@
+# Fine-tune a trained TrOCR model on one person's handwriting (an ink dataset exported by the app, FORMATS.md),
+# mixing in some base data so it does not forget everyone else's hands. Minutes on one GPU.
+#   python train.py --config configs/user-finetune.yaml --set finetune.init_from=runs/de-trocr/checkpoints/best
+# For a CTC model see user-finetune-ctc.yaml.
+extends: de-trocr.yaml
+name: trocr-small-de-personal
+out_dir: runs/finetune-personal
+datasets:
+  - {name: my-handwriting, weight: 0.7}                 # prepared by the app: xournal-qt-cli hwr-lines
+  - {name: fhswf-german, weight: 0.15}
+  - {name: synthetic-de, weight: 0.15}
+finetune:
+  init_from: runs/de-trocr/checkpoints/best
+  freeze: lora                    # none | encoder (decoder learns) | lora (adapters, merged at export)
+  lora: {r: 8, alpha: 16, dropout: 0.05}
+train:
+  batch_size: 16
+  grad_accum: 1
+  lr: 1.0e-4                      # LoRA; use 1e-5 with freeze: none or encoder
+  warmup_steps: 50
+  max_steps: 1500
+  steps_per_epoch: 200
+  early_stopping: 4
+val:
+  every_steps: 100
+  datasets: [my-handwriting]      # stop on the person's held-out lines
+  max_lines: 400
+augment:
+  p: 0.7
+  elastic: 0.1                    # small sets: gentle augmentation (stronger hurt in the literature)

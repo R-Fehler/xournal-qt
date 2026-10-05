@@ -1,0 +1,20 @@
+# GPU machine (Linux, NVIDIA driver for CUDA 12.8+), Python 3.10-3.12:
+#   python3 -m venv ~/xqt-hwr-venv && . ~/xqt-hwr-venv/bin/activate
+#   pip install -r requirements-gpu.txt && pip install -e .
+# The CPU test env in this repo ran with torch 2.13, transformers 5.18, onnx 1.23, onnxruntime 1.30, peft 0.21.
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch>=2.6,<2.14
+torchvision>=0.21,<0.29
+transformers>=4.46,<6
+tokenizers>=0.20
+huggingface_hub>=0.25
+safetensors
+onnx>=1.16
+onnxruntime>=1.18
+pillow>=10.1
+pyyaml
+numpy
+pyarrow>=14
+fonttools>=4.40
+peft>=0.12
+pytest>=7

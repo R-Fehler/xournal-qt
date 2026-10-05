@@ -589,6 +589,10 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   Settings with the model's download. Left: pin the model's revision and sha256s (`qt/scripts/hwr-model.sh` prints
   them) and run the real-model device checks; bundle the runtime in packages; text layer in plain "Export as PDF";
   German (built as `qt/hwr-multilang`, above).
+- [x] `qt/hwr-training`: everything to train the handwriting models on GPUs (≥ 11 GB, DDP), two models for the app
+  (German TrOCR and CTC) plus a combined German + English one, user data and fine-tuning. Built
+  (`qt/research/hwr/train`, CPU smoke tests). Left: the GPU runs, checking fhswf's writer ids and CVL's layout on the
+  real data, and the app's CtcRecognizer read with an exported CTC folder.
 - [x] Rotating the canvas (like Krita): the rotate gesture, reset by a double tap or the fit buttons. A feasibility
   check first. *Built as `qt/canvas-rotate` ([canvas-rotation.md](qt/docs/canvas-rotation.md)). Left: the device
   checks (pen latency turned, the touchpad's rotate direction, the on-screen keyboard), edge scrolling and pages in the

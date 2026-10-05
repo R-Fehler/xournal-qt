@@ -1,0 +1,27 @@
+# Fine-tune a trained CTC model on one person's handwriting: only the last LSTM layer and the head learn.
+#   python train.py --config configs/user-finetune-ctc.yaml --set finetune.init_from=runs/de-ctc/checkpoints/best
+extends: de-ctc.yaml
+name: crnn-de-personal
+out_dir: runs/finetune-personal-ctc
+datasets:
+  - {name: my-handwriting, weight: 0.7, render_from_strokes: true}   # drawn again from the strokes, varied
+  - {name: fhswf-german, weight: 0.15}
+  - {name: synthetic-de, weight: 0.15}
+finetune:
+  init_from: runs/de-ctc/checkpoints/best
+  freeze: last_layers             # none | last_layers
+  last_lstm_layers: 1
+train:
+  batch_size: 32
+  lr: 2.0e-4
+  warmup_steps: 50
+  max_steps: 2000
+  steps_per_epoch: 200
+  early_stopping: 4
+val:
+  every_steps: 100
+  datasets: [my-handwriting]
+  max_lines: 400
+augment:
+  p: 0.7
+  elastic: 0.1
