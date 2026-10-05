@@ -323,7 +323,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/GeometryToolTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CurtainCanvasTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/ReferenceCanvasTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/FractionalScaleTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/FractionalScaleTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CanvasRotationItemTest.cpp)
     target_link_libraries(xqt-quick-tests PRIVATE xqt-quick Qt6::QuickControls2 Qt6::GuiPrivate Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-quick-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     gtest_discover_tests(xqt-quick-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS quick

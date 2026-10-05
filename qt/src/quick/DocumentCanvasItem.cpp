@@ -599,8 +599,8 @@ DocumentCanvasItem::DocumentCanvasItem(QQuickItem* parent): QQuickItem(parent) {
     connect(&hoverTimer, &QTimer::timeout, this, [this] {
         // (only once the mouse rests: the hit test of the Markdown texts is not for every move)
         if (auto* v = canvasView.data(); v && !mouseGrab && claims(hoverScenePos)) {
-            if (const auto hit = v->mathErrorAt(mapFromScene(hoverScenePos))) {
-                setMathError(hit->error, hit->viewRect);
+            if (const auto hit = v->mathErrorAt(toView(mapFromScene(hoverScenePos)))) {
+                setMathError(hit->error, toItem(hit->viewRect));
                 return;
             }
         }
@@ -612,12 +612,13 @@ void DocumentCanvasItem::linkHovers(QPointF itemPos, Qt::KeyboardModifiers modif
     linkHoverAt = itemPos;
     linkHoverByMouse = mouse;
     std::optional<xqt::CanvasView::LinkHover> link;
+    const QPointF viewPos = toView(itemPos);
     if (canvasView && input && isVisible() && QRectF(0, 0, width(), height()).contains(itemPos) &&
-        !canvasView->curtain().covers(itemPos)) {  // (under the curtain nothing is shown, not even where links go)
-        link = canvasView->hoverLinkAt(itemPos);  // (the links each page keeps: cheap for every move)
+        !canvasView->curtain().covers(viewPos)) {  // (under the curtain nothing is shown, not even where links go)
+        link = canvasView->hoverLinkAt(viewPos);  // (the links each page keeps: cheap for every move)
     }
     if (!link) {
-        const bool width = mouse && canvasView && input && canvasView->boxResize().onHandle(itemPos);
+        const bool width = mouse && canvasView && input && canvasView->boxResize().onHandle(viewPos);
         endLinkHover(width);  // (the handle that sets a box's width)
         linkHoverAt = itemPos;
         return;
@@ -654,7 +655,7 @@ void DocumentCanvasItem::linkHovers(QPointF itemPos, Qt::KeyboardModifiers modif
     }
     // The mouse's cursor: a pointing hand where a click follows the link
     const bool hand = mouse && !linkCovered && input->clickFollowsLink(link->editing, modifiers);
-    const bool width = mouse && !hand && canvasView->boxResize().onHandle(itemPos);
+    const bool width = mouse && !hand && canvasView->boxResize().onHandle(viewPos);
     setPointerKind(hand ? PointerKind::Link : width ? PointerKind::WidthHandle : PointerKind::Tool);
 }
 
@@ -864,6 +865,7 @@ void DocumentCanvasItem::setView(QObject* object) {
             canvasView->setShown(false);
             canvasView->setReadingOnly(false);
             canvasView->setSnapVertically(false);
+            canvasView->setRotatable(true);
         }
     }
     endLinkHover();
@@ -878,12 +880,13 @@ void DocumentCanvasItem::setView(QObject* object) {
         canvasView->setShown(true);
         canvasView->setReadingOnly(reading);
         canvasView->setSnapVertically(verticalSnap);
+        canvasView->setRotatable(turnable);
         // (a paste with the keys asks where the mouse rests: over a sticky note it goes into the note)
         canvasView->setMousePointerSource([this]() -> std::optional<QPointF> {
             if (!mouseOverWindow || !claims(hoverScenePos)) {
                 return std::nullopt;
             }
-            return mapFromScene(hoverScenePos);
+            return toView(mapFromScene(hoverScenePos));
         });
         input = std::make_unique<xqt::CanvasInput>(*canvasView);
         connect(canvasView, &xqt::CanvasView::updateRequested, this, &QQuickItem::update);
@@ -952,6 +955,17 @@ void DocumentCanvasItem::setReadingOnly(bool on) {
     Q_EMIT readingOnlyChanged();
 }
 
+void DocumentCanvasItem::setRotatable(bool on) {
+    if (on == turnable) {
+        return;
+    }
+    turnable = on;
+    if (canvasView) {
+        canvasView->setRotatable(on);
+    }
+    Q_EMIT rotatableChanged();
+}
+
 void DocumentCanvasItem::setSnapVertically(bool on) {
     if (on == verticalSnap) {
         return;
@@ -974,26 +988,63 @@ bool DocumentCanvasItem::heldByAnother(bool DocumentCanvasItem::*grab) const {
     });
 }
 
-qreal DocumentCanvasItem::contentWidth() const {
-    return canvasView ? canvasView->documentLayout().contentSize(canvasView->getViewController().zoom()).width() : 0;
+namespace {
+/// The axis of the upright view (0: x, 1: y) a screen axis (0: across, 1: down) runs along when the canvas is turned
+/// by a multiple of 90°, and whether the same way (none: a free angle, there are no scroll bars then)
+std::optional<std::pair<int, bool>> viewAxis(const xqt::ViewController& vc, int screenAxis) {
+    if (!vc.rightAngled()) {
+        return std::nullopt;
+    }
+    const QPointF along = vc.screenDeltaToView(screenAxis == 0 ? QPointF(1, 0) : QPointF(0, 1));
+    return std::abs(along.x()) > 0.5 ? std::pair{0, along.x() > 0} : std::pair{1, along.y() > 0};
 }
+double component(QPointF p, int axis) { return axis == 0 ? p.x() : p.y(); }
+double component(QSizeF s, int axis) { return axis == 0 ? s.width() : s.height(); }
+}  // namespace
 
-qreal DocumentCanvasItem::contentHeight() const {
-    return canvasView ? canvasView->documentLayout().contentSize(canvasView->getViewController().zoom()).height() : 0;
-}
+// The scroll bars are the screen's: turned by 90° or 270° the one at the right scrolls the view sideways (and the way
+// the pages move on the screen); at a free angle there are none (no content size).
+qreal DocumentCanvasItem::contentWidth() const { return screenContent(0).first; }
 
-qreal DocumentCanvasItem::contentX() const {
-    return canvasView ? canvasView->getViewController().scrollPosition().x() : 0;
-}
+qreal DocumentCanvasItem::contentHeight() const { return screenContent(1).first; }
 
-qreal DocumentCanvasItem::contentY() const {
-    return canvasView ? canvasView->getViewController().scrollPosition().y() : 0;
+qreal DocumentCanvasItem::contentX() const { return screenContent(0).second; }
+
+qreal DocumentCanvasItem::contentY() const { return screenContent(1).second; }
+
+std::pair<qreal, qreal> DocumentCanvasItem::screenContent(int screenAxis) const {
+    if (!canvasView) {
+        return {0, 0};
+    }
+    const xqt::ViewController& vc = canvasView->getViewController();
+    const auto axis = viewAxis(vc, screenAxis);
+    if (!axis) {
+        return {0, 0};
+    }
+    const auto [a, sameWay] = *axis;
+    const double content = component(canvasView->documentLayout().contentSize(vc.zoom()), a);
+    const double pos = component(vc.scrollPosition(), a);
+    return {content, sameWay ? pos : std::max(0.0, content - pos - component(vc.viewSize(), a))};
 }
 
 void DocumentCanvasItem::scrollTo(qreal x, qreal y) {
-    if (canvasView) {
-        canvasView->getViewController().setScrollPosition(QPointF(x, y));
+    if (!canvasView) {
+        return;
     }
+    xqt::ViewController& vc = canvasView->getViewController();
+    QPointF target = vc.scrollPosition();
+    for (int screenAxis: {0, 1}) {
+        const auto axis = viewAxis(vc, screenAxis);
+        if (!axis) {
+            return;
+        }
+        const auto [a, sameWay] = *axis;
+        const double value = screenAxis == 0 ? x : y;
+        const double content = component(canvasView->documentLayout().contentSize(vc.zoom()), a);
+        const double pos = sameWay ? value : content - value - component(vc.viewSize(), a);
+        (a == 0 ? target.rx() : target.ry()) = pos;
+    }
+    vc.setScrollPosition(target);
 }
 
 void DocumentCanvasItem::updateViewGeometry() {
@@ -1007,6 +1058,14 @@ void DocumentCanvasItem::updateViewGeometry() {
                                                                  window()->effectiveDevicePixelRatio()));
     }
     canvasView->getViewController().setViewSize(size());
+}
+
+QPointF DocumentCanvasItem::toView(QPointF itemPos) const {
+    return canvasView ? canvasView->getViewController().screenToView(itemPos) : itemPos;
+}
+
+QRectF DocumentCanvasItem::toItem(const QRectF& viewRect) const {
+    return canvasView ? canvasView->getViewController().viewToScreen(viewRect) : viewRect;
 }
 
 void DocumentCanvasItem::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
@@ -1176,7 +1235,7 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             } else if (e->type() == QEvent::TabletRelease && t->button() == Qt::LeftButton) {
                 penGrab = false;
             }
-            input->tabletEvent(t, mapFromScene(t->position()));
+            input->tabletEvent(t, toView(mapFromScene(t->position())));
             pointerMoved(mapFromScene(t->position()), PointerSource::Pen,
                          t->pointerType() == QPointingDevice::PointerType::Eraser);
             showCursorForPen();
@@ -1207,7 +1266,7 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
                 return false;
             }
             xqt::inputlog::decision(e, true, "touch");
-            input->touchEvent(t, [this](QPointF scenePos) { return mapFromScene(scenePos); });
+            input->touchEvent(t, [this](QPointF scenePos) { return toView(mapFromScene(scenePos)); });
             if (e->type() == QEvent::TouchEnd || e->type() == QEvent::TouchCancel) {
                 touchSessionOwned = false;
             }
@@ -1271,7 +1330,7 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
                 mouseGrab = false;
                 mouseElsewhere = false;
             }
-            input->mouseEvent(m, mapFromScene(m->scenePosition()));
+            input->mouseEvent(m, toView(mapFromScene(m->scenePosition())));
             m->accept();
             return true;
         }
@@ -1295,7 +1354,7 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             if (!claims(w->scenePosition())) {
                 return false;
             }
-            input->wheelEvent(w, mapFromScene(w->scenePosition()));
+            input->wheelEvent(w, toView(mapFromScene(w->scenePosition())));
             w->accept();
             return true;
         }
@@ -1304,7 +1363,7 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             if (!claims(g->scenePosition())) {
                 return false;
             }
-            input->nativeGestureEvent(g, mapFromScene(g->scenePosition()));
+            input->nativeGestureEvent(g, toView(mapFromScene(g->scenePosition())));
             g->accept();
             return true;
         }
@@ -1398,7 +1457,7 @@ QRectF DocumentCanvasItem::emojiCompletionRect() const {
                    : QRectF();
 }
 
-QRectF DocumentCanvasItem::noteTextHint() const { return canvasView ? canvasView->noteTextHintBox() : QRectF(); }
+QRectF DocumentCanvasItem::noteTextHint() const { return canvasView ? toItem(canvasView->noteTextHintBox()) : QRectF(); }
 
 void DocumentCanvasItem::chooseEmojiCompletion(int index) {
     if (canvasView) {
@@ -1435,7 +1494,7 @@ QVariant DocumentCanvasItem::inputMethodQuery(Qt::InputMethodQuery query) const 
         const double zoom = canvasView->getViewController().zoom();
         const QRectF r = editor->cursorRectOnPage();
         const QPointF origin = canvasView->pageViewRect(*idx).topLeft();
-        return QRectF(origin + r.topLeft() * zoom, r.size() * zoom);
+        return toItem(QRectF(origin + r.topLeft() * zoom, r.size() * zoom));  // (on the screen: the canvas may be turned)
     }
     return editor->inputMethodQuery(query);
 }
@@ -1527,7 +1586,8 @@ void DocumentCanvasItem::updateGeometryNode(QSGNode* rootNode, double zoom, doub
     // Nothing changed for a moment (neither the tool, nor the zoom, nor the scroll position): a new size or zoom is
     // drawn anew. Until then the pictures are scaled on the GPU.
     const std::array<double, 10> key{toolHeight, rotation, middle.x(), middle.y(), zoom,
-                                     dpr,        pageAt.x(), pageAt.y(), width(), height()};
+                                     dpr,        pageAt.x(), pageAt.y(), canvasView->getViewController().viewSize().width(),
+                                     canvasView->getViewController().viewSize().height()};
     if (key != lastGeometryKey) {
         lastGeometryKey = key;
         geometrySettled = false;
@@ -1558,7 +1618,8 @@ void DocumentCanvasItem::updateGeometryNode(QSGNode* rootNode, double zoom, doub
     // over that. It is in the tool's own coordinates, so it stays right while the tool moves on (only a part that comes
     // into view is not sharp until it rests again).
     if (baseScale < wanted) {
-        const QRectF inView = QRectF(0, 0, width(), height()).intersected(QRectF(pageAt, r.size()));
+        const QRectF inView = QRectF(QPointF(0, 0), canvasView->getViewController().viewSize())
+                                      .intersected(QRectF(pageAt, r.size()));
         if (settled && !inView.isEmpty()) {
             const double most = MAX_PICTURE / wanted;  // points a side
             auto limited = [&](QRectF part) {
@@ -1600,6 +1661,9 @@ void DocumentCanvasItem::updateGeometryNode(QSGNode* rootNode, double zoom, doub
     const QPointF displayAt = pageAt + displayMiddle * zoom;
     QMatrix4x4 d;
     d.translate(static_cast<float>(snap(displayAt.x(), dpr)), static_cast<float>(snap(displayAt.y(), dpr)));
+    if (const double turned = canvasView->getViewController().rotation(); turned != 0) {
+        d.rotate(static_cast<float>(-turned), 0, 0, 1);  // (the canvas turned: the number upright on the screen)
+    }
     d.scale(static_cast<float>(zoom));
     g->displayAt->setMatrix(d);
 
@@ -1634,14 +1698,17 @@ void DocumentCanvasItem::updateCurtainNode(QSGNode* rootNode, double zoom, doubl
     m.translate(static_cast<float>(middle.x()), static_cast<float>(middle.y()));
     m.rotate(static_cast<float>(curtain.rotation() * 180 / M_PI), 0, 0, 1);
     c->body->setMatrix(m);
-    c->clip->setRect(QRectF(0, 0, width(), height()));
+    // (the view: the canvas item clips what of it is off the screen, also while the canvas is turned)
+    const QSizeF view = canvasView->getViewController().viewSize();
+    c->clip->setRect(QRectF(QPointF(0, 0), view));
     const QSizeF size = curtain.size();
     const bool spotlight = curtain.shape() == xqt::CurtainLayer::Shape::Spotlight;
     if (spotlight) {
         // Black as far as the farthest corner of the canvas (whichever way it is turned)
         const QPointF centre = m.map(QPointF(0, 0));
         double farthest = 0;
-        for (const QPointF corner: {QPointF(0, 0), QPointF(width(), 0), QPointF(0, height()), QPointF(width(), height())}) {
+        for (const QPointF corner: {QPointF(0, 0), QPointF(view.width(), 0), QPointF(0, view.height()),
+                                    QPointF(view.width(), view.height())}) {
             farthest = std::max(farthest, std::hypot(corner.x() - centre.x(), corner.y() - centre.y()));
         }
         const double reach = farthest / std::max(zoom, 1e-6) + std::max(size.width(), size.height()) + 10;
@@ -1757,9 +1824,31 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
         return root;
     }
 
-    const double zoom = canvasView->getViewController().zoom();
+    const xqt::ViewController& vc = canvasView->getViewController();
+    const double zoom = vc.zoom();
     const double dpr = window() ? window()->effectiveDevicePixelRatio() : 1.0;
     const auto [first, last] = canvasView->visiblePages();
+    // The canvas turned (qt/docs/canvas-rotation.md): everything below is drawn in the upright view, which this turns
+    // onto the screen. The pages' pictures stay upright; the GPU turns their tiles.
+    {
+        QMatrix4x4 turn;  // (the identity while upright)
+        if (vc.rotated()) {
+            QPointF at = vc.viewToScreen(QPointF(0, 0));  // where the view's origin is on the screen
+            if (vc.rightAngled()) {
+                // A quarter turn maps whole device pixels onto whole device pixels, once the view's origin lies on
+                // one: the tiles are shown pixel for pixel, as upright (qt/docs/hidpi.md). (Input is mapped without
+                // this, less than a device pixel away.)
+                at = snapPoint(at, dpr);
+            }
+            const auto c = static_cast<float>(vc.rotationCos()), s = static_cast<float>(vc.rotationSin());
+            turn = QMatrix4x4(c, -s, 0, static_cast<float>(at.x()), s, c, 0, static_cast<float>(at.y()), 0, 0, 1, 0,
+                              0, 0, 0, 1);
+        }
+        if (root->matrix() != turn) {
+            root->setMatrix(turn);
+        }
+    }
+    const QRectF viewRect(QPointF(0, 0), vc.viewSize());
 
     // Composing and uploading tiles is what a scroll pays for: while the view moves, only a few per frame (the rest
     // of a page shows its preview and follows in the next frames), when it stands still more.
@@ -1769,7 +1858,13 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
     lastZoom = zoom;
     int tileBudget = moving ? TILES_WHILE_MOVING : TILES_WHEN_STILL;
     const int budgetOfTheFrame = tileBudget;
-    const QRectF viewport = QRectF(0, 0, width(), height()).adjusted(-TILE, -TILE, TILE, TILE);
+    const QRectF viewport = viewRect.adjusted(-TILE, -TILE, TILE, TILE);
+    // Turned, the view is the bounding box of the screen: a tile is composed only when it meets the screen itself (the
+    // separating axes of two rectangles: the view's, then the screen's)
+    const QRectF screenport = QRectF(QPointF(0, 0), vc.screenSize()).adjusted(-TILE, -TILE, TILE, TILE);
+    const auto meetsScreen = [&](const QRectF& inView) {
+        return inView.intersects(viewport) && (!vc.rotated() || vc.viewToScreen(inView).intersects(screenport));
+    };
     bool more = false;  // tiles left for the next frame
 
     std::unordered_map<const xqt::CanvasPage*, PageNode*> keep;
@@ -1863,7 +1958,7 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             const QRectF inItem(r.x() + (origin.x() + px.x() / info.dpiScale) * scale,
                                 r.y() + (origin.y() + px.y() / info.dpiScale) * scale,
                                 px.width() / info.dpiScale * scale, px.height() / info.dpiScale * scale);
-            if (!inItem.intersects(viewport)) {
+            if (!meetsScreen(inItem)) {
                 continue;  // (composed when it comes into view)
             }
             if (tileBudget <= 0) {
@@ -1888,7 +1983,7 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
         // preview under the tiles
         bool uncovered = false;
         if (!info.whole) {
-            const QRectF inView = r.intersected(QRectF(0, 0, width(), height()));
+            const QRectF inView = r.intersected(viewRect);
             const QRectF drawn(r.x() + info.area.x() * zoom, r.y() + info.area.y() * zoom, info.area.width() * zoom,
                                info.area.height() * zoom);
             uncovered = !inView.isEmpty() && !drawn.adjusted(-1, -1, 1, 1).contains(inView);

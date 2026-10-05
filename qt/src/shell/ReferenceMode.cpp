@@ -239,7 +239,9 @@ void ReferenceMode::setNoteCovers(bool covers) {
         shownView->notes().setCover(covers);
     }
 }
-QRectF ReferenceMode::noteBox() const { return shownView ? shownView->notes().selectedViewBox() : QRectF(); }
+QRectF ReferenceMode::noteBox() const {
+    return shownView ? shownView->getViewController().viewToScreen(shownView->notes().selectedViewBox()) : QRectF();
+}
 bool ReferenceMode::writeNoteText() {
     return shownView && editing() && !shownSession->isReadOnly() && shownView->writeNoteText();
 }
@@ -461,16 +463,21 @@ void ReferenceMode::clearSelection() {
 
 bool ReferenceMode::pdfTextIsSelected() const { return shownView && shownView->hasPdfTextSelection(); }
 
-QRectF ReferenceMode::pdfSelectionEnds() const { return shownView ? shownView->pdfSelectionEnds() : QRectF(); }
+// (on the screen: the canvas item's coordinates, the canvas may be turned)
+QRectF ReferenceMode::pdfSelectionEnds() const {
+    return shownView ? shownView->getViewController().viewToScreenEnds(shownView->pdfSelectionEnds()) : QRectF();
+}
 
-QRectF ReferenceMode::pdfSelectionBox() const { return shownView ? shownView->pdfSelectionBox() : QRectF(); }
+QRectF ReferenceMode::pdfSelectionBox() const {
+    return shownView ? shownView->getViewController().viewToScreen(shownView->pdfSelectionBox()) : QRectF();
+}
 
 bool ReferenceMode::selectPdfTextAt(qreal x, qreal y) {
     if (!shownView) {
         return false;
     }
     // The same word again: its whole line (as on the notes)
-    const QPointF where(x, y);
+    const QPointF where = shownView->getViewController().screenToView(QPointF(x, y));
     const bool again = shownView->hasPdfTextSelection() &&
                        shownView->pdfSelectionEnds().adjusted(-8, -8, 8, 8).contains(where);
     const bool selected = shownView->selectPdfTextAt(where, again);
@@ -479,7 +486,8 @@ bool ReferenceMode::selectPdfTextAt(qreal x, qreal y) {
 }
 
 bool ReferenceMode::dragPdfSelection(qreal x, qreal y, bool startEnd) {
-    const bool moved = shownView && shownView->dragPdfSelection(QPointF(x, y), startEnd);
+    const bool moved = shownView &&
+                       shownView->dragPdfSelection(shownView->getViewController().screenToView(QPointF(x, y)), startEnd);
     if (moved) {
         Q_EMIT pdfTextSelectionChanged();
     }
@@ -542,7 +550,8 @@ bool ReferenceMode::pasteElements() {
 }
 
 bool ReferenceMode::pasteAt(qreal x, qreal y) {
-    return shownView && editing() && !shownSession->isReadOnly() && shownView->pasteElements(QPointF(x, y));
+    return shownView && editing() && !shownSession->isReadOnly() &&
+           shownView->pasteElements(shownView->getViewController().screenToView(QPointF(x, y)));
 }
 
 bool ReferenceMode::canPaste() const {

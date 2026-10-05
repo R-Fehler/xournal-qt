@@ -39,9 +39,20 @@ void ViewController::setViewSize(QSizeF size) {
     if (size.isEmpty()) {
         return;
     }
+    if (rotated() && initialized) {
+        // Turned: the document point in the middle of the screen stays there
+        const Anchor middle = anchorAt(viewCentre);
+        screen = size;
+        applyAngle(angle);
+        kept = Fit::None;
+        placeAnchor(middle, viewCentre);
+        Q_EMIT changed();
+        return;
+    }
     const Anchor keep = anchorAt(QPointF(view.width() / 2, 0));
     const size_t group = initialized && layout->horizontal() ? currentGroup() : 0;
-    view = size;
+    screen = size;
+    applyAngle(angle);  // (the view: the screen's size, or the bounding box of the turned screen)
     if (!initialized) {
         initialized = true;
         if (kept == Fit::Page) {  // presenting
@@ -315,28 +326,50 @@ void ViewController::scrollToPage(size_t page) {
     Q_EMIT changed();
 }
 
-void ViewController::pinchBegin(QPointF centroid, double distance) {
+void ViewController::pinchBegin(QPointF centroid, double distance, std::optional<double> fingerDegrees) {
     stopMomentum();
-    pinchAnchor = anchorAt(centroid);
+    pinchAnchor = anchorAt(screenToView(centroid));
     pinchStartDistance = std::max(distance, 1.0);
     pinchStartZoom = z;
+    twistActive = false;
+    if (fingerDegrees) {
+        twistBegin(*fingerDegrees);
+    }
 }
 
-void ViewController::pinchUpdate(QPointF centroid, double distance) {
+void ViewController::pinchUpdate(QPointF centroid, double distance, std::optional<double> fingerDegrees) {
     const double ratio = std::max(distance, 1.0) / pinchStartDistance;
     const double zoom = std::clamp(pinchStartZoom * ratio, minZoom(), maxZoom());
     const bool zoomed = zoom != z;
     z = zoom;
-    placeAnchor(pinchAnchor, centroid);  // also pans with the centroid
+    bool turned = false;
+    if (fingerDegrees && twistActive) {
+        twistTotal += std::remainder(*fingerDegrees - twistLastFinger, 360.0);
+        twistLastFinger = *fingerDegrees;
+        if (const auto target = twistTarget(); target && *target != angle) {
+            applyAngle(*target);
+            turned = true;
+        }
+    }
+    // The document point that was under the fingers stays under them, on the screen (also while it turns)
+    placeAnchor(pinchAnchor, screenToView(centroid));  // also pans with the centroid
     if (zoomed) {
         kept = Fit::None;
         settleTimer.start();
         Q_EMIT zoomChanged();
     }
+    if (turned) {
+        kept = Fit::None;
+        jumped = true;
+        Q_EMIT rotationChanged();
+    }
     Q_EMIT changed();
 }
 
-void ViewController::pinchEnd() { zoomGestureEnded(); }
+void ViewController::pinchEnd() {
+    twistActive = false;
+    zoomGestureEnded();
+}
 
 void ViewController::zoomGestureEnded() {
     // (a Ctrl+wheel has no end: its zoom is stable once it did not change for a while)
@@ -407,6 +440,144 @@ void ViewController::layoutChanged() {
     }
     clamp();
     Q_EMIT changed();
+}
+
+// --- the canvas turned ----------------------------------------------------------------------------------------------
+
+namespace {
+/// Degrees in [0, 360)
+double normalised(double degrees) {
+    double a = std::fmod(degrees, 360.0);
+    if (a < 0) {
+        a += 360.0;
+    }
+    return a >= 360.0 ? 0.0 : a;
+}
+}  // namespace
+
+void ViewController::applyAngle(double degrees) {
+    angle = normalised(degrees);
+    if (std::fmod(angle, 90.0) == 0) {
+        // Exact at right angles: the screen's pixels are the view's pixels
+        static constexpr double C[4] = {1, 0, -1, 0};
+        static constexpr double S[4] = {0, 1, 0, -1};
+        const int q = static_cast<int>(angle / 90.0) % 4;
+        cosA = C[q];
+        sinA = S[q];
+    } else {
+        const double r = angle * M_PI / 180.0;
+        cosA = std::cos(r);
+        sinA = std::sin(r);
+    }
+    if (angle == 0) {
+        view = screen;
+    } else {
+        const double w = screen.width(), h = screen.height();
+        view = QSizeF(std::abs(w * cosA) + std::abs(h * sinA), std::abs(w * sinA) + std::abs(h * cosA));
+    }
+    screenCentre = QPointF(screen.width() / 2, screen.height() / 2);
+    viewCentre = QPointF(view.width() / 2, view.height() / 2);
+}
+
+double ViewController::snapAngle(double degrees) {
+    const double a = normalised(degrees);
+    const double right = std::round(a / 90.0) * 90.0;
+    return std::abs(a - right) <= SNAP_DEGREES ? normalised(right) : a;
+}
+
+void ViewController::setRotation(double degrees, std::optional<QPointF> screenAnchor) {
+    const double target = normalised(degrees);
+    if (target == angle) {
+        return;
+    }
+    if (screen.isEmpty() || !initialized) {
+        applyAngle(target);
+        Q_EMIT rotationChanged();
+        return;
+    }
+    stopMomentum();
+    const QPointF at = screenAnchor.value_or(screenCentre);
+    const Anchor a = anchorAt(screenToView(at));
+    applyAngle(target);
+    kept = Fit::None;
+    placeAnchor(a, screenToView(at));
+    jumped = true;
+    Q_EMIT rotationChanged();
+    Q_EMIT changed();
+}
+
+void ViewController::rotateBy(double degrees, std::optional<QPointF> screenAnchor) {
+    const double step = std::abs(degrees);
+    if (step == 0) {
+        return;
+    }
+    if (std::fmod(angle, step) == 0) {
+        setRotation(angle + degrees, screenAnchor);
+        return;
+    }
+    // From a free angle: to the next multiple of the step that way
+    setRotation(degrees > 0 ? std::ceil(angle / step) * step : std::floor(angle / step) * step, screenAnchor);
+}
+
+QRectF ViewController::viewToScreen(const QRectF& r) const {
+    if (angle == 0 || r.isNull()) {
+        return r;
+    }
+    const QPointF a = viewToScreen(r.topLeft()), b = viewToScreen(r.topRight()), c = viewToScreen(r.bottomRight()),
+                  d = viewToScreen(r.bottomLeft());
+    const double left = std::min({a.x(), b.x(), c.x(), d.x()}), right = std::max({a.x(), b.x(), c.x(), d.x()});
+    const double top = std::min({a.y(), b.y(), c.y(), d.y()}), bottom = std::max({a.y(), b.y(), c.y(), d.y()});
+    return QRectF(QPointF(left, top), QPointF(right, bottom));
+}
+
+std::array<QPointF, 4> ViewController::screenInView() const {
+    const double w = screen.width(), h = screen.height();
+    return {screenToView(QPointF(0, 0)), screenToView(QPointF(w, 0)), screenToView(QPointF(w, h)),
+            screenToView(QPointF(0, h))};
+}
+
+void ViewController::twistBegin(double fingerDegrees) {
+    twistActive = true;
+    twistEngaged = false;
+    twistStartAngle = angle;
+    twistStartFinger = fingerDegrees;
+    twistLastFinger = fingerDegrees;
+    twistTotal = 0;
+    twistOffset = 0;
+}
+
+std::optional<double> ViewController::twistTarget() {
+    if (!twistEngaged) {
+        if (std::abs(twistTotal) < ROTATE_START_DEGREES) {
+            return std::nullopt;
+        }
+        // From here on it turns with the fingers, behind them by the start (so that nothing jumps)
+        twistEngaged = true;
+        twistOffset = std::copysign(ROTATE_START_DEGREES, twistTotal);
+    }
+    return snapAngle(twistStartAngle + twistTotal - twistOffset);
+}
+
+void ViewController::twistTo(double fingerDegrees, QPointF screenAnchor) {
+    if (!twistActive) {
+        twistBegin(fingerDegrees);
+        return;
+    }
+    twistTotal += std::remainder(fingerDegrees - twistLastFinger, 360.0);
+    twistLastFinger = fingerDegrees;
+    if (const auto target = twistTarget()) {
+        setRotation(*target, screenAnchor);
+    }
+}
+
+void ViewController::twistBy(double deltaDegrees, QPointF screenAnchor) {
+    if (!twistActive) {
+        twistBegin(0);
+    }
+    twistTotal += deltaDegrees;
+    if (const auto target = twistTarget()) {
+        setRotation(*target, screenAnchor);
+    }
 }
 
 // --- scrolling sideways ---------------------------------------------------------------------------------------------

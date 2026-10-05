@@ -10101,3 +10101,68 @@ TEST_F(HomeScreenMarkdownTest, bookmarkingAPageOfAMarkdownFile) {
     EXPECT_EQ(card->property("modelData").toMap().value("label").toString(), "Page 2");
     EXPECT_EQ(card->property("modelData").toMap().value("page").toInt(), 1);
 }
+
+// The canvas turned in steps of 90° (qt/docs/canvas-rotation.md): Ctrl+] and Ctrl+[, the chip in the layout pill that
+// says how far and turns it back, the fits and two taps on the page turn it upright; presenting shows it upright
+TEST_F(MainWindowTest, theCanvasTurnsInQuarterStepsAndComesBackUpright) {
+    xqt::CanvasView* view = controller->tabManager().currentView();
+    ASSERT_NE(view, nullptr);
+    auto& vc = view->getViewController();
+    auto* chip = find<QQuickItem>("rotationChip");
+    ASSERT_NE(chip, nullptr);
+    EXPECT_FALSE(chip->isVisible());
+    ASSERT_TRUE(controller->canRotateCanvas());
+    auto* canvas = find<QQuickItem>("canvas");
+    canvas->forceActiveFocus();
+    QTest::keyClick(window, Qt::Key_BracketRight, Qt::ControlModifier);
+    wait(30);
+    EXPECT_EQ(vc.rotation(), 90);
+    EXPECT_EQ(controller->canvasRotation(), 90);
+    nextFrame();
+    EXPECT_TRUE(chip->isVisible());
+    EXPECT_EQ(chip->property("text").toString(), QString::fromUtf8("↺ 90°"));
+    QTest::keyClick(window, Qt::Key_BracketLeft, Qt::ControlModifier);
+    QTest::keyClick(window, Qt::Key_BracketLeft, Qt::ControlModifier);
+    wait(30);
+    EXPECT_EQ(vc.rotation(), 270);
+    EXPECT_EQ(chip->property("text").toString(), QString::fromUtf8("↺ -90°"));
+    click(chip);
+    EXPECT_EQ(vc.rotation(), 0) << "the chip turns it upright";
+    nextFrame();
+    EXPECT_FALSE(chip->isVisible());
+
+    // The fits turn it upright as well
+    controller->rotateCanvas(90);
+    controller->fitWidth();
+    EXPECT_EQ(vc.rotation(), 0);
+    controller->rotateCanvas(-90);
+    controller->fitPage();
+    EXPECT_EQ(vc.rotation(), 0);
+    // ... and two taps on the page (the middle button too), before they zoom
+    controller->rotateCanvas(90);
+    const double zoom = vc.zoom();
+    view->doubleTapAt(QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
+    EXPECT_EQ(vc.rotation(), 0);
+    EXPECT_EQ(vc.zoom(), zoom) << "turning it upright is all two taps do then";
+
+    // Presenting shows the pages upright, and the keys do not turn it meanwhile
+    controller->rotateCanvas(90);
+    controller->setPresenting(true);
+    wait(50);
+    EXPECT_EQ(vc.rotation(), 0);
+    EXPECT_FALSE(controller->canRotateCanvas());
+    controller->rotateCanvas(90);
+    EXPECT_EQ(vc.rotation(), 0);
+    controller->setPresenting(false);
+    wait(50);
+    EXPECT_TRUE(controller->canRotateCanvas());
+
+    // Where the canvas item says no (the reference beside the notes): upright, and it stays so
+    controller->rotateCanvas(90);
+    view->setRotatable(false);
+    EXPECT_EQ(vc.rotation(), 0);
+    EXPECT_FALSE(controller->canRotateCanvas());
+    controller->rotateCanvas(90);
+    EXPECT_EQ(vc.rotation(), 0);
+    view->setRotatable(true);
+}

@@ -86,9 +86,15 @@ public:
     DocumentSession& getSession() const { return session; }
     RenderService& getRenderService() const { return renderService; }
     ViewController& getViewController() { return viewController; }
+    const ViewController& getViewController() const { return viewController; }
     const DocumentLayout& documentLayout() const { return layout; }
     /// Scrolling sideways comes to rest on whole pages (setting "snapPages" of ours, default on)
     static bool snapSetting(Settings& settings);
+    /// Two fingers (and the touchpad's rotate gesture) turn the canvas (setting "rotateGesture" of ours, default on;
+    /// qt/docs/canvas-rotation.md)
+    static bool rotateGestureSetting(Settings& settings);
+    /// A gesture may turn the canvas now: allowed here and the setting on
+    bool rotationGestureAllowed() const;
     /// Snapping up and down too, while the view is read (qt/docs/toolbox.md, "Reading"): with the setting snapPages
     /// a drag or a fling comes to rest on a row of pages
     void setSnapVertically(bool on);
@@ -143,6 +149,20 @@ public:
     /// taps follow links, they do not switch the check boxes of Markdown tasks; no undo from gestures. Nothing
     /// lands in the document.
     void setReadingOnly(bool on);
+
+    // --- the canvas turned (qt/docs/canvas-rotation.md) --------------------------------------------------------
+    /// The canvas may be turned (the gesture, Ctrl+[ / Ctrl+]): not while presenting, not in a text file or a text
+    /// document of notes (their text runs across the screen), not where the canvas item says no (the reference beside
+    /// the notes: setRotatable)
+    bool rotationAllowed() const;
+    /// Shown where it may be turned (the canvas item: the reference beside the notes may not). Not: upright again.
+    void setRotatable(bool on);
+    bool isRotatable() const { return rotatable; }
+    /// Turn the canvas by `degrees` (a step: from a free angle to the next multiple), about the middle. False: not
+    /// allowed here.
+    bool rotateCanvasBy(double degrees);
+    /// Upright again (the double tap, the fits, the chip): about a point of the screen, or the middle
+    void resetRotation(std::optional<QPointF> screenAnchor = std::nullopt);
     bool isReadingOnly() const { return readingOnly; }
 
     // --- memory (CanvasMemory) --------------------------------------------------------------------------------
@@ -567,7 +587,8 @@ Q_SIGNALS:
     /// The undo or redo steps of the Markdown being written changed (MarkdownEditor::canUndo / canRedo): the undo
     /// and redo buttons follow them.
     void markdownUndoChanged();
-    /// A long press with a finger, or a right click: the UI shows what can be done here (paste, ...).
+    /// A long press with a finger, or a right click: the UI shows what can be done here (paste, ...). Screen
+    /// coordinates (the canvas item's: the canvas may be turned, qt/docs/canvas-rotation.md), as for the signals below.
     void contextRequested(QPointF viewPos);
     /// The emoji suggestions for a shortcode being typed were shown, changed or closed (emojiCompletion()).
     void emojiCompletionChanged();
@@ -581,7 +602,7 @@ Q_SIGNALS:
     void navigationChanged();
     /// currentPageNo() changed (the primary view: the session's current page).
     void currentPageChanged(qulonglong page);
-    /// PDF text was selected (Select mode): the UI offers marking / copying it; rect in view coordinates.
+    /// PDF text was selected (Select mode): the UI offers marking / copying it; rect in screen coordinates.
     void pdfTextSelected(QRectF viewRect);
     void pdfTextSelectionCleared();
     /// The setsquare / compass changed on its own (e.g. put aside because its page went).
@@ -647,6 +668,7 @@ private:
     std::vector<std::unique_ptr<CanvasPage>> pages;
     bool shown = false;
     bool readingOnly = false;
+    bool rotatable = true;
     bool snapVertically = false;
     std::pair<size_t, size_t> window{1, 0};
     /// The last plan trimmed this view (it was not the current one): it has no window of its own

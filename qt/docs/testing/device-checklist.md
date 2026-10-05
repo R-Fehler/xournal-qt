@@ -3226,3 +3226,50 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
       unsaved ink: a message says to save first, nothing is written.
 - [ ] A `.xopp`'s Tags… lists the typed `#tags` and explains that only those exist (Close only); a `.md`'s mentions
       the front matter.
+
+## Turning the canvas (qt/canvas-rotate, qt/docs/canvas-rotation.md)
+- [ ] Ctrl+] turns the canvas a quarter clockwise, Ctrl+[ counter-clockwise; the turn keeps the middle of the screen
+      where it is. The layout pill shows "↺ 90°" (or "↺ -90°"); a tap on it turns the canvas upright.
+- [ ] Turned: two taps on the page (or a middle click) turn it upright, the place tapped staying under the finger, and
+      zoom nothing; two taps again zoom as before. Fit the width / height / whole page (menu, Ctrl+0, double tap on
+      the zoom) turn it upright and fit; "Real size" keeps the angle.
+- [ ] F5 (presenting) shows the pages upright; Ctrl+[ / Ctrl+] do nothing while presenting, nor in a `.md` file or a
+      text document of notes. The reference beside the notes never turns (also after "swap").
+- [ ] Turned by 90° and by a free angle (about 30°): the pen writes exactly under its tip, also fast strokes and short
+      dots; the stroke ends where the pen lifted. The same with the mouse and with a finger that draws.
+- [ ] Pen latency: on the Surface, writing on a turned canvas feels as direct as upright (no extra lag, no stutter
+      while writing near the edges of the screen).
+- [ ] The wheel and two fingers on the touchpad scroll the way they go on the screen (down moves the pages up on the
+      screen), also at 90°, 180° and a free angle. Momentum after a touchpad flick goes the same way.
+- [ ] One finger drags the pages along under it; a flick carries on in the direction of the flick on the screen.
+- [ ] Two fingers pinch: the point between them stays under them while zooming, turned as upright.
+- [ ] The pen hovering a link, and the mouse over one, show where it leads; the pointing hand appears on it. The
+      drawn hover dot (Android, iOS) sits under the pen tip.
+- [ ] The pages are sharp when the zoom settles (90°: as sharp as upright; free angles: smoothed by the GPU, no gaps
+      between the tiles of a page).
+- [ ] Turned by 90° and about 30°: a long press (or right click) on PDF text selects the word and its pill and knobs
+      sit at the turned text; dragging a knob widens the selection where the finger is. The context pill (paste…)
+      opens where the finger was; "Paste" there lands under that spot.
+- [ ] A tapped link's popup, a sticky note's pill, the "text goes on below the note" hint and a formula error's tool
+      tip sit beside the turned thing on the screen.
+- [ ] Writing text on a turned canvas (a text box, a Markdown box): the on-screen keyboard (Android) does not cover
+      the cursor; the emoji suggestions (":smi") open at the cursor; an input method's candidate window (Linux, IME)
+      opens at the cursor.
+- [ ] Scroll bars: at 90° and 270° the bar at the right scrolls along the turned pages (dragging it down moves the
+      pages up on the screen), at 180° both bars run the other way round; at a free angle there are none.
+- [ ] Two fingers twisted on the touch screen: nothing turns for a small twist while pinching or scrolling; past
+      about 12° the canvas turns with the fingers (a little behind them), the point between them staying under them,
+      zooming at the same time when they spread. Near 0°, 90°, 180°, 270° it snaps (within 6°). A quick twist never
+      undoes (two-finger tap).
+- [ ] The touchpad's rotate gesture (macOS; KDE/GNOME on Wayland with a touchpad that reports it): turning two fingers
+      turns the canvas the same way round as the fingers (check the direction!), about the pointer, with the same
+      start and snapping.
+- [ ] Settings → Touch → "Turn the canvas with two fingers" off: twisting only pans and zooms; Ctrl+[ / Ctrl+] and
+      the chip still work. On again: twisting turns it.
+- [ ] At a free angle, scrolling and zooming a big PDF stay as smooth as upright (only the tiles on the turned screen
+      are composed: `XQT_PERF=1` shows no more tiles per second than upright). At 90° at 125 % or 150 % the text of
+      a PDF is as crisp as upright.
+- [ ] The setsquare and the compass on a turned canvas: they move and turn with two fingers as upright; the number of
+      their angle display stays upright on the screen.
+- [ ] The curtain and the snip on a turned canvas: the curtain's handles work where they are shown; a snip's
+      rectangle is a rectangle of the page (turned on the screen) and the picture is what it encloses.

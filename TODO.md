@@ -542,7 +542,8 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   across layers (a sticker with Markdown boxes is two groups), no sticky notes in a group.*
 - `qt/audio`: yes (Qt audio + bundled Ogg Vorbis; `.xopp` recordings in the app's audio folder as upstream; PDF
   attachments with page numbers; voice memos per page; Android foreground service; 2 s lead-in).
-- Canvas rotation (`qt/canvas-rotate`): yes, after `qt/toolbox` (90° steps first, then free with snapping).
+- Canvas rotation (`qt/canvas-rotate`): yes, after `qt/toolbox` (90° steps first, then free with snapping). *Built
+  ([canvas-rotation.md](qt/docs/canvas-rotation.md)); left: the device checks.*
 - `qt/todos`: a library-wide To-dos list from Markdown task lines, **grouped and filtered** (by document and
   folder, open/done, due date, text), sortable; Obsidian-style due dates; a check-box stamp for handwritten to-dos;
   "Add to calendar" as a one-way `.ics` / Android intent. A setting collects only lines marked as to-dos (default:
@@ -578,8 +579,10 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   Settings with the model's download. Left: pin the model's revision and sha256s (`qt/scripts/hwr-model.sh` prints
   them) and run the real-model device checks; bundle the runtime in packages; text layer in plain "Export as PDF";
   German.
-- [?] Rotating the canvas (like Krita): the rotate gesture, reset by a double tap or the fit buttons. A feasibility
-  check first.
+- [x] Rotating the canvas (like Krita): the rotate gesture, reset by a double tap or the fit buttons. A feasibility
+  check first. *Built as `qt/canvas-rotate` ([canvas-rotation.md](qt/docs/canvas-rotation.md)). Left: the device
+  checks (pen latency turned, the touchpad's rotate direction, the on-screen keyboard), edge scrolling and pages in the
+  corners at free angles.*
 - [x] To-dos: how they could work (Markdown task lists, ink checkboxes, a list across the library?), whether the
   app may hand them to the system (calendars, reminders), and whether a script interpreter could ship (upstream
   has Lua plugins). *Decided and built as `qt/todos` (qt/docs/todos.md); no scripting. Left: the device checks.*

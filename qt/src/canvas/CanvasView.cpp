@@ -352,6 +352,16 @@ bool CanvasView::snapSetting(Settings& settings) {
     return snap;
 }
 
+bool CanvasView::rotateGestureSetting(Settings& settings) {
+    bool on = true;
+    settings.getCustomElement("xournalQt").getBool("rotateGesture", on);
+    return on;
+}
+
+bool CanvasView::rotationGestureAllowed() const {
+    return rotateGestureSetting(*session.getSettings()) && rotationAllowed();
+}
+
 void CanvasView::applyScrolling() {
     viewController.setSnapping(presenting || snapSetting(*session.getSettings()), presenting ? 1 : 0);
     viewController.setSnappingVertically(snapVertically && !presenting);
@@ -368,6 +378,7 @@ void CanvasView::setPresenting(bool on) {
     }
     const size_t page = currentPageNo();
     if (on) {
+        viewController.setRotation(0);  // (presenting shows the pages upright)
         zoomBeforePresenting = viewController.zoom();
         fitBeforePresenting = viewController.keptFit();
     }
@@ -1207,6 +1218,11 @@ std::optional<QRectF> CanvasView::textColumnAt(size_t index, QPointF pagePoint) 
 }
 
 void CanvasView::doubleTapAt(QPointF viewPos) {
+    if (viewController.rotated()) {
+        // Turned: two taps turn it upright again, the point tapped staying where it is (qt/docs/canvas-rotation.md)
+        resetRotation(viewController.viewToScreen(viewPos));
+        return;
+    }
     const auto idx = layout.pageAt(viewController.viewToContent(viewPos), viewController.zoom());
     if (!idx) {
         return;
@@ -1317,11 +1333,11 @@ bool CanvasView::tapAt(QPointF viewPos) {
     }
     // A web address in a text on the page comes first: it lies on top of the PDF
     if (auto text = textLinkAt(viewPos)) {
-        Q_EMIT linkTapped(text->uri, text->page, text->viewRect);
+        Q_EMIT linkTapped(text->uri, text->page, viewController.viewToScreen(text->viewRect));
         return true;
     }
     if (auto link = linkAt(viewPos)) {
-        Q_EMIT linkTapped(link->uri, link->page, link->viewRect);
+        Q_EMIT linkTapped(link->uri, link->page, viewController.viewToScreen(link->viewRect));
         return true;
     }
     // A text file edited: a tap puts the cursor there
@@ -1547,7 +1563,7 @@ std::optional<CanvasView::LinkHover> CanvasView::hoverLinkAt(QPointF viewPos) {
 
 bool CanvasView::followLinkAt(QPointF viewPos) {
     if (const auto hover = hoverLinkAt(viewPos)) {
-        Q_EMIT linkTapped(hover->target.uri, hover->target.page, hover->target.viewRect);
+        Q_EMIT linkTapped(hover->target.uri, hover->target.page, viewController.viewToScreen(hover->target.viewRect));
         return true;
     }
     return false;
@@ -1814,7 +1830,7 @@ bool CanvasView::finishPdfSelection(CanvasPage& page, XojPdfPageSelectionStyle s
     for (const auto& r: pdfSelection->getSelectedTextRects()) {
         box |= QRectF(QPointF(std::min(r.x1, r.x2), std::min(r.y1, r.y2)), QPointF(std::max(r.x1, r.x2), std::max(r.y1, r.y2)));
     }
-    Q_EMIT pdfTextSelected(QRectF(pageRect.topLeft() + box.topLeft() * zoom, box.size() * zoom));
+    Q_EMIT pdfTextSelected(viewController.viewToScreen(QRectF(pageRect.topLeft() + box.topLeft() * zoom, box.size() * zoom)));
     return true;
 }
 
@@ -2532,6 +2548,34 @@ void CanvasView::setReadingOnly(bool on) {
     if (on) {
         endTextEditing();  // (a text being typed when the document became the reference: kept, as when it is left)
     }
+}
+
+bool CanvasView::rotationAllowed() const {
+    if (!rotatable || presenting || session.textFile() || session.isEditableText()) {
+        return false;
+    }
+    Document& doc = *session.getDocument();
+    std::shared_lock lock(doc);
+    return !TextDocument::isTextDocument(doc);
+}
+
+void CanvasView::setRotatable(bool on) {
+    rotatable = on;
+    if (!on) {
+        resetRotation();
+    }
+}
+
+bool CanvasView::rotateCanvasBy(double degrees) {
+    if (!rotationAllowed()) {
+        return false;
+    }
+    viewController.rotateBy(degrees);
+    return true;
+}
+
+void CanvasView::resetRotation(std::optional<QPointF> screenAnchor) {
+    viewController.setRotation(0, screenAnchor);
 }
 
 void CanvasView::setShown(bool value) {

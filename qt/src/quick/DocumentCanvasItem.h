@@ -51,7 +51,8 @@ class DocumentCanvasItem: public QQuickItem {
     Q_OBJECT
     /// The xqt::CanvasView to show (set from C++ through the application controller).
     Q_PROPERTY(QObject* view READ view WRITE setView NOTIFY viewChanged)
-    /// Size of the scrollable content and the scroll position (for scroll bars), in logical pixels.
+    /// Size of the scrollable content and the scroll position (for scroll bars), in logical pixels, along the screen's
+    /// axes (the canvas turned by 90°: the view's sideways; at a free angle: none, 0).
     Q_PROPERTY(qreal contentWidth READ contentWidth NOTIFY viewportChanged)
     Q_PROPERTY(qreal contentHeight READ contentHeight NOTIFY viewportChanged)
     Q_PROPERTY(qreal contentX READ contentX NOTIFY viewportChanged)
@@ -61,6 +62,9 @@ class DocumentCanvasItem: public QQuickItem {
     /// Reading (qt/docs/toolbox.md): a drag or a fling up and down comes to rest on a row of pages, when the setting
     /// snapPages is on (CanvasView::setSnapVertically)
     Q_PROPERTY(bool snapVertically READ snapVertically WRITE setSnapVertically NOTIFY snapVerticallyChanged)
+    /// The canvas may be turned here (qt/docs/canvas-rotation.md; the reference beside the notes may not:
+    /// CanvasView::setRotatable)
+    Q_PROPERTY(bool rotatable READ rotatable WRITE setRotatable NOTIFY rotatableChanged)
     /// The mouse rests on a formula of a Markdown text that cannot be drawn: why (empty: none), and where it is (item
     /// coordinates). The window shows it as a tool tip.
     Q_PROPERTY(QString mathError READ mathError NOTIFY mathErrorChanged)
@@ -96,6 +100,8 @@ public:
     bool snapVertically() const { return verticalSnap; }
     void setSnapVertically(bool on);
     void setReadingOnly(bool on);
+    bool rotatable() const { return turnable; }
+    void setRotatable(bool on);
 
     QString mathError() const { return mathErrorText; }
     QVariantMap hoveredLink() const { return linkShown; }
@@ -196,6 +202,7 @@ Q_SIGNALS:
     void viewportChanged();
     void readingOnlyChanged();
     void snapVerticallyChanged();
+    void rotatableChanged();
     void mathErrorChanged();
     void hoveredLinkChanged();
     void hoveredLinkPointerChanged();
@@ -228,6 +235,12 @@ private:
     /// Another canvas of the process shows this view (while two canvases swap their views).
     bool shownByAnother(const xqt::CanvasView* v) const;
     void updateViewGeometry();
+    /// The content's size and the scroll position along a screen axis (0: across, 1: down), for the scroll bars
+    std::pair<qreal, qreal> screenContent(int screenAxis) const;
+    /// Item (screen) coordinates to the view's and back (the canvas turned: qt/docs/canvas-rotation.md; the same while
+    /// it is upright)
+    QPointF toView(QPointF itemPos) const;
+    QRectF toItem(const QRectF& viewRect) const;
     /// The mouse moved without a button: the formula error under it, once it rests (hoverTimer).
     void mouseHovers(QPointF scenePos);
     void setMathError(const QString& error, const QRectF& rect);
@@ -268,6 +281,7 @@ private:
     bool viewReplaced = false;
     bool reading = false;
     bool verticalSnap = false;
+    bool turnable = true;
     bool mouseElsewhere = false;  ///< a mouse drag that began outside the canvas (e.g. on a scroll bar)
     QTimer hoverTimer;            ///< the mouse rests (mouseHovers)
     QPointF hoverScenePos;

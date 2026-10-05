@@ -373,6 +373,17 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
         });
     add("zoomGestures", [&s] { return QVariant(s.isZoomGesturesEnabled()); },
         [&s](const QVariant& v) { s.setZoomGesturesEnabled(v.toBool()); });
+    // Two fingers twisted (and the touchpad's rotate gesture) turn the canvas (qt/docs/canvas-rotation.md)
+    add("rotateGesture",
+        [&s] {
+            bool on = true;
+            s.getCustomElement("xournalQt").getBool("rotateGesture", on);  // (CanvasView::rotateGestureSetting)
+            return QVariant(on);
+        },
+        [&s](const QVariant& v) {
+            s.getCustomElement("xournalQt").setBool("rotateGesture", v.toBool());
+            s.customSettingsChanged();
+        });
     // One finger draws with the tool, two scroll and zoom (upstream's setting; also the tool bar's toggle)
     add("touchDrawing", [&s] { return QVariant(s.getTouchDrawingEnabled()); },
         [&s](const QVariant& v) { s.setTouchDrawingEnabled(v.toBool()); });

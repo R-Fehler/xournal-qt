@@ -568,6 +568,16 @@ Popup {
                         text: qsTr("One finger scrolls (unless it draws), two fingers pan and zoom. Tap with two "
                                    + "fingers to undo, with three fingers to redo.")
                     }
+                    SwitchRow {
+                        objectName: "rotateGestureRow"
+                        key: "rotateGesture"
+                        text: qsTr("Turn the canvas with two fingers")
+                    }
+                    Hint {
+                        text: qsTr("Twist two fingers (or turn them on the touchpad) to turn the canvas, not the pages. "
+                                   + "It snaps to quarter turns. Two taps on the page, a fit or the chip beside the "
+                                   + "page number turn it upright again; Ctrl+] and Ctrl+[ turn it by a quarter.")
+                    }
                     Item { Layout.preferredHeight: 16 }
                 }
             }

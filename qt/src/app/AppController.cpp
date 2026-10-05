@@ -915,6 +915,8 @@ void AppController::currentTabChanged() {
                                              &AppController::zoomChanged));
         currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoom100Changed, this,
                                              &AppController::zoomChanged));
+        currentConnections.push_back(connect(&v->getViewController(), &ViewController::rotationChanged, this,
+                                             &AppController::canvasRotationChanged));
         // The play tool on ink with a recording (qt/docs/audio.md)
         currentConnections.push_back(connect(v, &CanvasView::playRequested, this, [this](const QString& name, qint64 ts) {
             if (audioControl) {
@@ -937,6 +939,7 @@ void AppController::currentTabChanged() {
     Q_EMIT savingChanged();
     Q_EMIT undoRedoChanged();
     Q_EMIT zoomChanged();
+    Q_EMIT canvasRotationChanged();
     Q_EMIT pageChanged();
     Q_EMIT searchChanged();
     Q_EMIT pageUndoChanged();
@@ -1019,7 +1022,9 @@ bool AppController::pasteAt(qreal x, qreal y) {
     if (textPagesFixed()) {
         return false;  // (a text file: its pages are its text)
     }
-    return canvas() && !session()->isReadOnly() && canvas()->pasteElements(QPointF(x, y));
+    // (x, y: the canvas item's; the canvas may be turned)
+    return canvas() && !session()->isReadOnly() &&
+           canvas()->pasteElements(canvas()->getViewController().screenToView(QPointF(x, y)));
 }
 bool AppController::canPaste() const {
     const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
@@ -1328,6 +1333,7 @@ void AppController::setPresenting(bool on) {
     presentingOn = on;
     updatePresentedView();
     Q_EMIT presentingChanged();
+    Q_EMIT canvasRotationChanged();  // (none while presenting)
 }
 
 void AppController::updatePresentedView() {
@@ -4413,7 +4419,9 @@ void AppController::setNoteCovers(bool covers) {
         canvas()->notes().setCover(covers);
     }
 }
-QRectF AppController::noteBox() const { return canvas() ? canvas()->notes().selectedViewBox() : QRectF(); }
+QRectF AppController::noteBox() const {
+    return canvas() ? canvas()->getViewController().viewToScreen(canvas()->notes().selectedViewBox()) : QRectF();
+}
 void AppController::deleteStickyNote() {
     if (canvas()) {
         canvas()->notes().deleteSelected();
@@ -4587,11 +4595,31 @@ void AppController::fitWidth() {
     if (referenceMode->focused()) {
         referenceMode->fitWidth();  // (the page in view there)
     } else if (canvas() && session()) {
+        canvas()->resetRotation();
         canvas()->getViewController().fitWidth(session()->getCurrentPageNo());
     }
 }
 
+double AppController::canvasRotation() const { return canvas() ? canvas()->getViewController().rotation() : 0.0; }
+
+bool AppController::canRotateCanvas() const { return canvas() && canvas()->rotationAllowed(); }
+
+void AppController::rotateCanvas(double degrees) {
+    if (canvas()) {
+        canvas()->rotateCanvasBy(degrees);
+    }
+}
+
+void AppController::resetCanvasRotation() {
+    if (canvas()) {
+        canvas()->resetRotation();
+    }
+}
+
 void AppController::fitHeight() {
+    if (canvas()) {
+        canvas()->resetRotation();
+    }
     if (canvas() && session() && canvas()->documentLayout().horizontal()) {
         canvas()->getViewController().fitHeight();  // sideways: all rows, and kept
     } else if (canvas() && session()) {
@@ -4601,6 +4629,7 @@ void AppController::fitHeight() {
 
 void AppController::fitPage() {
     if (canvas() && session()) {
+        canvas()->resetRotation();
         canvas()->getViewController().fitPage(session()->getCurrentPageNo(), true);
     }
 }
@@ -5257,7 +5286,7 @@ bool AppController::selectPdfTextAt(qreal x, qreal y) {
         return false;
     }
     // The same word again: its whole line (like a phone widens the selection)
-    const QPointF where(x, y);
+    const QPointF where = canvas()->getViewController().screenToView(QPointF(x, y));
     const bool again = canvas()->hasPdfTextSelection() && canvas()->pdfSelectionEnds().adjusted(-8, -8, 8, 8).contains(where);
     const bool selected = canvas()->selectPdfTextAt(where, again);
     Q_EMIT pdfTextSelectionChanged();
@@ -5265,16 +5294,22 @@ bool AppController::selectPdfTextAt(qreal x, qreal y) {
 }
 
 bool AppController::dragPdfSelection(qreal x, qreal y, bool startEnd) {
-    const bool changed = canvas() && canvas()->dragPdfSelection(QPointF(x, y), startEnd);
+    const bool changed =
+            canvas() && canvas()->dragPdfSelection(canvas()->getViewController().screenToView(QPointF(x, y)), startEnd);
     if (changed) {
         Q_EMIT pdfTextSelectionChanged();
     }
     return changed;
 }
 
-QRectF AppController::pdfSelectionEnds() const { return canvas() ? canvas()->pdfSelectionEnds() : QRectF(); }
+// (on the screen: the canvas item's coordinates, the canvas may be turned)
+QRectF AppController::pdfSelectionEnds() const {
+    return canvas() ? canvas()->getViewController().viewToScreenEnds(canvas()->pdfSelectionEnds()) : QRectF();
+}
 
-QRectF AppController::pdfSelectionBox() const { return canvas() ? canvas()->pdfSelectionBox() : QRectF(); }
+QRectF AppController::pdfSelectionBox() const {
+    return canvas() ? canvas()->getViewController().viewToScreen(canvas()->pdfSelectionBox()) : QRectF();
+}
 
 void AppController::showPdfSelection() {
     if (canvas()) {

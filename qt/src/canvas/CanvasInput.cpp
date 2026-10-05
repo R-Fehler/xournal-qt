@@ -82,7 +82,7 @@ CanvasInput::CanvasInput(CanvasView& view, QObject* parent): QObject(parent), vi
     connect(&longPressTimer, &QTimer::timeout, this, [this] {
         cancelFingerStroke();  // (held still while drawing with the finger: the dot it began is taken back)
         longPressFired = true;
-        Q_EMIT this->view.contextRequested(touchSessionStartPos);
+        Q_EMIT this->view.contextRequested(this->view.getViewController().viewToScreen(touchSessionStartPos));
     });
     // The pen held still with the pen or highlighter: the same
     penHoldTimer.setSingleShot(true);
@@ -188,7 +188,7 @@ void CanvasInput::penHeld() {
     sequenceStartPage = nullptr;
     inputRunning = false;
     penHoldFired = true;
-    Q_EMIT view.contextRequested(penHoldPos);
+    Q_EMIT view.contextRequested(view.getViewController().viewToScreen(penHoldPos));
 }
 
 // --- tablet --------------------------------------------------------------------------------------------------------
@@ -363,7 +363,7 @@ bool CanvasInput::mouseEvent(QMouseEvent* e, QPointF viewPos) {
                     lastGeometryPos = onGeometryPage(viewPos);
                     return true;
                 }
-                Q_EMIT view.contextRequested(viewPos);
+                Q_EMIT view.contextRequested(view.getViewController().viewToScreen(viewPos));
                 return true;
             }
             modifier2 = e->button() == Qt::MiddleButton;
@@ -1368,10 +1368,17 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
     }
 
     std::vector<int> released;
+    if (vc.rotated()) {
+        // (the fingers that did not move this time: where they are in the view now, if the canvas turned)
+        for (auto& [id, tp]: touches) {
+            tp.pos = vc.screenToView(tp.screen);
+        }
+    }
     for (const auto& pt: e->points()) {
         const QPointF pos = sceneToView(pt.scenePosition());
+        const QPointF screen = vc.viewToScreen(pos);
         if (pt.state() == QEventPoint::State::Pressed) {
-            touches[pt.id()] = TouchPoint{pos};
+            touches[pt.id()] = TouchPoint{pos, screen};
             continue;
         }
         if (pt.state() == QEventPoint::State::Released) {
@@ -1379,6 +1386,7 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         }
         if (auto it = touches.find(pt.id()); it != touches.end()) {
             it->second.pos = pos;
+            it->second.screen = screen;
         }
     }
     touchSessionMaxPoints = std::max(touchSessionMaxPoints, static_cast<int>(touches.size()));
@@ -1470,17 +1478,21 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         panning = false;
     } else if (!touchSessionIgnored) {
         std::vector<QPointF> pts;
+        std::vector<QPointF> screenPts;  // (the pinch is anchored on the screen: the canvas may turn under it)
         std::vector<int> ids;
-        QPointF centroid;
+        QPointF centroid, screenCentroid;
         for (const auto& [id, tp]: touches) {
             if (std::find(released.begin(), released.end(), id) == released.end()) {
                 pts.push_back(tp.pos);
+                screenPts.push_back(tp.screen);
                 ids.push_back(id);
                 centroid += tp.pos;
+                screenCentroid += tp.screen;
             }
         }
         if (!pts.empty()) {
             centroid /= static_cast<double>(pts.size());
+            screenCentroid /= static_cast<double>(pts.size());
         }
         // Two fingers on the setsquare or the compass: this touch belongs to the tool until the last finger is up.
         // It follows the first two fingers (a third one changes nothing).
@@ -1542,15 +1554,24 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
             panning = false;
         } else if (pts.size() >= 2) {
             const double dist = std::hypot(pts[0].x() - pts[1].x(), pts[0].y() - pts[1].y());
+            // The angle of the line between the first two fingers on the screen: twisted, they turn the canvas
+            // (qt/docs/canvas-rotation.md)
+            const double fingers = std::atan2(screenPts[1].y() - screenPts[0].y(), screenPts[1].x() - screenPts[0].x()) *
+                                   180.0 / M_PI;
             if (!pinching) {
-                vc.pinchBegin(centroid, dist);
+                pinchTwists = view.rotationGestureAllowed();
+                vc.pinchBegin(screenCentroid, dist, pinchTwists ? std::optional(fingers) : std::nullopt);
                 pinchStartDistance = dist;
                 pinching = true;
             } else {
                 touchSessionTravel += std::hypot(centroid.x() - lastCentroid.x(), centroid.y() - lastCentroid.y());
                 // Upstream's "zoom gestures" setting: without it, two fingers only pan.
                 const bool zoom = view.getSession().getSettings()->isZoomGesturesEnabled();
-                vc.pinchUpdate(centroid, zoom ? dist : pinchStartDistance);
+                vc.pinchUpdate(screenCentroid, zoom ? dist : pinchStartDistance,
+                               pinchTwists ? std::optional(fingers) : std::nullopt);
+                if (vc.twisting()) {
+                    touchSessionTravel = std::max(touchSessionTravel, TAP_SLOP_PX + 1);  // (a twist is not a tap: no undo)
+                }
             }
             lastCentroid = centroid;
             panning = false;
@@ -1693,17 +1714,18 @@ bool CanvasInput::wheelEvent(QWheelEvent* e, QPointF viewPos) {
         vc.zoomBy(std::pow(1.0015, e->angleDelta().y()), viewPos);
         return true;
     }
-    // (scrolling sideways, what cannot scroll up or down scrolls left or right)
-    const QPointF delta = vc.scrollDelta(!e->pixelDelta().isNull() ? QPointF(e->pixelDelta())
-                                                                    : QPointF(e->angleDelta()) / 120.0 * 48.0);
+    // (scrolling sideways, what cannot scroll up or down scrolls left or right; the canvas turned: the pages move
+    // the way the fingers or the wheel go on the screen)
+    const QPointF delta = vc.scrollDelta(vc.screenDeltaToView(
+            !e->pixelDelta().isNull() ? QPointF(e->pixelDelta()) : QPointF(e->angleDelta()) / 120.0 * 48.0));
     const double now = monotonicMs();
 
     switch (e->phase()) {
         case Qt::NoScrollPhase:
             if (vc.snapping() && vc.groupFitsView()) {
                 // Snapping to pages: a notch of the wheel (120) is a page
-                const QPointF notches = vc.scrollDelta(!e->angleDelta().isNull() ? QPointF(e->angleDelta())
-                                                                                 : QPointF(e->pixelDelta()) * 2.5);
+                const QPointF notches = vc.scrollDelta(vc.screenDeltaToView(
+                        !e->angleDelta().isNull() ? QPointF(e->angleDelta()) : QPointF(e->pixelDelta()) * 2.5));
                 wheelPages += notches.x();
                 while (std::abs(wheelPages) >= 120.0) {
                     const int step = wheelPages > 0 ? -1 : 1;  // (up / left: back)
@@ -1771,10 +1793,20 @@ bool CanvasInput::wheelEvent(QWheelEvent* e, QPointF viewPos) {
 }
 
 bool CanvasInput::nativeGestureEvent(QNativeGestureEvent* e, QPointF viewPos) {
+    ViewController& vc = view.getViewController();
     if (e->gestureType() == Qt::ZoomNativeGesture) {
-        view.getViewController().zoomBy(1.0 + e->value(), viewPos);
+        vc.zoomBy(1.0 + e->value(), viewPos);
+    } else if (e->gestureType() == Qt::RotateNativeGesture) {
+        // The touchpad's turn (degrees, clockwise): the canvas turns about the pointer once it adds up to the start
+        // of a turn, snapping to quarters (qt/docs/canvas-rotation.md)
+        if (view.rotationGestureAllowed()) {
+            vc.twistBy(e->value(), vc.viewToScreen(viewPos));
+        }
+    } else if (e->gestureType() == Qt::BeginNativeGesture) {
+        vc.twistEnd();  // (a new gesture: its turn adds up from nothing)
     } else if (e->gestureType() == Qt::EndNativeGesture) {
-        view.getViewController().zoomGestureEnded();  // (the fingers left the touchpad)
+        vc.twistEnd();
+        vc.zoomGestureEnded();  // (the fingers left the touchpad)
     }
     return true;
 }

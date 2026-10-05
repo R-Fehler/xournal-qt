@@ -146,7 +146,8 @@ private:
 
     // touch gesture state (one session from the first finger down to the last finger up)
     struct TouchPoint {
-        QPointF pos;
+        QPointF pos;     ///< view coordinates (mapped anew at every event: the canvas may have turned meanwhile)
+        QPointF screen;  ///< screen (canvas item) coordinates
     };
     std::map<int, TouchPoint> touches;
     bool touchSessionIgnored = false;
@@ -226,6 +227,7 @@ private:
     /// The release is where the press was (however long it took): a tap on the selection when select more is on
     bool barelyMoved(const Event& release) const;
     bool pinching = false;
+    bool pinchTwists = false;  ///< the pinch may turn the canvas (CanvasView::rotationGestureAllowed, at its start)
     double pinchStartDistance = 1;
     bool panning = false;
     QPointF lastCentroid;
