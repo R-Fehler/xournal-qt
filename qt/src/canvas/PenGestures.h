@@ -8,9 +8,11 @@
  *   upstream's shape recognizer mode does on release: two undo steps, the first one brings the freehand stroke back.
  *   The shape is there at once, while the pen still rests; lifting the pen ends it (what the pen does meanwhile is
  *   not drawn).
+ * - Scratch out to erase (opt-in): a quick zigzag of the pen over ink deletes the strokes it covers, in one undo step,
+ *   and is not kept itself (ScratchOut.h). A zigzag over nothing, or drawn slowly, stays a stroke.
  *
- * The settings, in the "xournalQt" part of settings.xml: "holdToStraighten" (on by default) and
- * "holdToStraightenTime" (ms, 500 by default).
+ * The settings, in the "xournalQt" part of settings.xml: "holdToStraighten" (on by default),
+ * "holdToStraightenTime" (ms, 500 by default) and "scratchOut" (off by default).
  *
  * @license GNU GPLv2 or later
  */
@@ -34,6 +36,8 @@ void setHoldToStraighten(Settings& settings, bool on);
 /// How long the pen rests before the stroke is straightened (ms)
 int holdTime(Settings& settings);
 void setHoldTime(Settings& settings, int ms);
+bool scratchOut(Settings& settings);
+void setScratchOut(Settings& settings, bool on);
 }  // namespace pengestures
 
 /// Upstream's StrokeHandler (freehand, and its shape recognizer mode) with the gestures of the pen.
@@ -48,8 +52,15 @@ public:
     /// The stroke was straightened: the pen does nothing more until it is lifted.
     bool straightened() const { return done; }
 
+    void onButtonPressEvent(const PositionInputData& pos, double zoom) override;
+    void onButtonReleaseEvent(const PositionInputData& pos, double zoom) override;
+
 private:
+    /// The stroke is a quick zigzag over strokes: they are deleted (one undo step), the zigzag goes. False: it stays.
+    bool scratchOut(const PositionInputData& release, double zoom);
+
     bool done = false;
+    guint32 pressTime = 0;
 };
 
 }  // namespace xqt

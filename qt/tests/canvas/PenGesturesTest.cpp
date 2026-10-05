@@ -1,11 +1,13 @@
 /*
  * xournal-qt: the pen's gestures (qt/docs/pen-gestures.md), replayed as Qt tablet events through the canvas:
  * hold to straighten (a stroke held still before the pen is lifted becomes the shape upstream's ShapeRecognizer sees
- * in it).
+ * in it) and scratch out to erase (a quick zigzag over ink deletes it; never a stroke of the handwriting fixture).
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <memory>
 #include <vector>
 
@@ -34,6 +36,8 @@
 #include "CanvasView.h"
 #include "PenGestures.h"
 #include "PenHover.h"
+#include "ScratchOut.h"
+#include "config-test.h"
 
 using namespace xqt;
 
@@ -103,6 +107,14 @@ protected:
             tablet(QEvent::TabletMove, at + QPointF(shake, -shake), 0.5, Qt::NoButton, Qt::LeftButton);
             processEvents(20);
         }
+    }
+    /// A whole stroke, `stepMs` between the pen's reports (5: a pen at 200 Hz)
+    void drawPath(const std::vector<QPointF>& path, ulong stepMs = 5) {
+        tablet(QEvent::TabletPress, path.front(), 0.5, Qt::LeftButton, Qt::LeftButton, stepMs);
+        for (size_t i = 1; i < path.size(); ++i) {
+            tablet(QEvent::TabletMove, path[i], 0.5, Qt::NoButton, Qt::LeftButton, stepMs);
+        }
+        tablet(QEvent::TabletRelease, path.back(), 0.0, Qt::LeftButton, Qt::NoButton, stepMs);
     }
     void lift(QPointF at) { tablet(QEvent::TabletRelease, at, 0.0, Qt::LeftButton, Qt::NoButton); }
 
@@ -277,4 +289,139 @@ TEST_F(PenGesturesTest, aPenHeldStillWhereItWentDownIsALongPressNotAShape) {
     processEvents();
     EXPECT_TRUE(strokes().empty());
     EXPECT_EQ(context.count(), 1);
+}
+
+// --- scratch out to erase -------------------------------------------------------------------------------------------
+
+namespace {
+/// A quick zigzag over [x0, x0 + w] at y0, `sweeps` sweeps, going down by `drift` per sweep
+std::vector<QPointF> zigzag(double x0, double y0, double w, int sweeps, double drift) {
+    std::vector<QPointF> path;
+    for (int k = 0; k < sweeps; ++k) {
+        const double a = k % 2 ? x0 + w : x0, b = k % 2 ? x0 : x0 + w;
+        for (int i = 0; i < 12; ++i) {
+            const double t = i / 12.0;
+            path.emplace_back(a + (b - a) * t, y0 + drift * (k + t) + 1.5 * std::sin(t * M_PI));
+        }
+    }
+    path.emplace_back(sweeps % 2 ? x0 + w : x0, y0 + drift * sweeps);
+    return path;
+}
+std::vector<Point> points(const std::vector<QPointF>& path) {
+    std::vector<Point> out;
+    for (const QPointF& p: path) {
+        out.emplace_back(p.x(), p.y());
+    }
+    return out;
+}
+}  // namespace
+
+TEST_F(PenGesturesTest, scratchOutIsOffByDefault) {
+    EXPECT_FALSE(pengestures::scratchOut(settings()));
+    drawPath(wobblyLine({100, 200}, {200, 205}));
+    drawPath(zigzag(90, 195, 120, 5, 2));
+    processEvents();
+    EXPECT_EQ(strokes().size(), 2u);  // (the zigzag is a stroke like any other)
+}
+
+TEST_F(PenGesturesTest, aQuickZigzagOverInkErasesItInOneUndoStep) {
+    pengestures::setScratchOut(settings(), true);
+    drawPath(wobblyLine({100, 200}, {200, 205}));  // a "word"
+    drawPath(wobblyLine({110, 190}, {120, 215}));  // a letter of it, upright
+    drawPath(wobblyLine({100, 300}, {200, 305}));  // the next line: stays
+    ASSERT_EQ(strokes().size(), 3u);
+
+    drawPath(zigzag(90, 194, 120, 5, 3));
+    processEvents();
+    auto now = strokes();
+    ASSERT_EQ(now.size(), 1u);  // the zigzag is not kept, the word is gone
+    EXPECT_NEAR(now.front()->getBoundingBox().y, 300, 5);
+
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(strokes().size(), 3u);
+    session->getUndoRedoHandler()->redo();
+    EXPECT_EQ(strokes().size(), 1u);
+}
+
+TEST_F(PenGesturesTest, aZigzagOverNothingOrDrawnSlowlyStaysAStroke) {
+    pengestures::setScratchOut(settings(), true);
+    drawPath(zigzag(100, 400, 120, 5, 3));  // nothing under it
+    processEvents();
+    EXPECT_EQ(strokes().size(), 1u);
+
+    drawPath(wobblyLine({100, 200}, {200, 205}));
+    drawPath(zigzag(90, 194, 120, 5, 3), 400);  // (0.4 s between reports: 25 s for 600 pt, slower than writing)
+    processEvents();
+    EXPECT_EQ(strokes().size(), 3u);
+}
+
+TEST_F(PenGesturesTest, aZigzagCrossingTheEndOfALongStrokeLeavesIt) {
+    pengestures::setScratchOut(settings(), true);
+    drawPath(wobblyLine({100, 200}, {400, 205}));  // a long line: the zigzag covers its start only
+    drawPath(zigzag(90, 194, 60, 5, 3));
+    processEvents();
+    EXPECT_EQ(strokes().size(), 2u);
+}
+
+TEST_F(PenGesturesTest, theHighlighterDoesNotScratchOut) {
+    pengestures::setScratchOut(settings(), true);
+    drawPath(wobblyLine({100, 200}, {200, 205}));
+    tools()->selectTool(TOOL_HIGHLIGHTER);
+    drawPath(zigzag(90, 194, 120, 5, 3));
+    processEvents();
+    EXPECT_EQ(strokes().size(), 2u);
+}
+
+TEST_F(PenGesturesTest, zigzagsAreRecognisedAndHandwritingIsNot) {
+    EXPECT_TRUE(scratchout::analyse(points(zigzag(100, 100, 80, 5, 3))).zigzag);
+    EXPECT_TRUE(scratchout::analyse(points(zigzag(100, 100, 30, 4, 2))).zigzag);
+    EXPECT_TRUE(scratchout::analyse(points(zigzag(100, 100, 60, 4, 8))).zigzag);  // (going down a block of lines)
+    EXPECT_FALSE(scratchout::analyse(points(zigzag(100, 100, 60, 3, 3))).zigzag);  // (two turns: a "z")
+
+    // Cursive "mmm" and "www": up and down while moving on along the line
+    std::vector<QPointF> m, w, loops;
+    for (int arch = 0; arch < 6; ++arch) {
+        for (int i = 0; i <= 12; ++i) {
+            const double a = M_PI * i / 12;
+            m.emplace_back(100 + arch * 5 + 2.5 * (1 - std::cos(a)), 100 - 10 * std::sin(a));
+        }
+    }
+    for (int v = 0; v < 6; ++v) {
+        for (int i = 0; i <= 6; ++i) {
+            w.emplace_back(100 + v * 5 + 2.5 * i / 6.0, 90 + 10 * i / 6.0);
+        }
+        for (int i = 0; i <= 6; ++i) {
+            w.emplace_back(102.5 + v * 5 + 2.5 * i / 6.0, 100 - 10 * i / 6.0);
+        }
+    }
+    // Tight loops ("eeee", "llll"): they turn back, on curves
+    for (int i = 0; i < 190; ++i) {
+        const double t = i * 0.1;
+        loops.emplace_back(100 + 0.5 * t - 5 * std::sin(t), 100 - 5 * std::cos(t));
+    }
+    EXPECT_FALSE(scratchout::analyse(points(m)).zigzag);
+    EXPECT_FALSE(scratchout::analyse(points(w)).zigzag);
+    EXPECT_FALSE(scratchout::analyse(points(loops)).zigzag);
+}
+
+TEST_F(PenGesturesTest, noStrokeOfTheHandwritingFixtureIsAScratchOut) {
+    auto loaded = DocumentSession::loadFile(GET_TESTFILE(u8"benchmark/handwritten-text.xopp"));
+    ASSERT_TRUE(loaded.document);
+    size_t seen = 0;
+    int mostReversals = 0;
+    for (size_t p = 0; p < loaded.document->getPageCount(); ++p) {
+        for (const Layer* layer: loaded.document->getPage(p)->getLayersView()) {
+            for (const Element* e: layer->getElementsView()) {
+                if (const auto* s = dynamic_cast<const Stroke*>(e)) {
+                    const auto shape = scratchout::analyse(s->getPointVector());
+                    EXPECT_FALSE(shape.zigzag) << "page " << p << ", a stroke at " << s->getBoundingBox().x << ", "
+                                               << s->getBoundingBox().y;
+                    mostReversals = std::max(mostReversals, shape.reversals);
+                    ++seen;
+                }
+            }
+        }
+    }
+    EXPECT_GT(seen, 10000u);
+    std::cout << "handwriting fixture: " << seen << " strokes, at most " << mostReversals << " turns" << std::endl;
 }

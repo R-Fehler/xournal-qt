@@ -142,6 +142,8 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
         [&s](const QVariant& v) { pengestures::setHoldToStraighten(s, v.toBool()); });
     add("holdToStraightenTime", [&s] { return QVariant(pengestures::holdTime(s)); },
         [&s](const QVariant& v) { pengestures::setHoldTime(s, v.toInt()); });
+    add("scratchOut", [&s] { return QVariant(pengestures::scratchOut(s)); },
+        [&s](const QVariant& v) { pengestures::setScratchOut(s, v.toBool()); });
     // Tool of the pen's eraser end / side button (upstream button "eraser") and of the first barrel button.
     auto buttonTool = [this](Button button) {
         return std::pair{[this, button] {

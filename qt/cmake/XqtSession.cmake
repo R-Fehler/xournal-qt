@@ -129,6 +129,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasInput.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/PenGestures.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/PenGestures.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ScratchOut.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ScratchOut.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasInput.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/PenHover.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/PenHover.cpp

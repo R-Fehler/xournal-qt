@@ -12,8 +12,15 @@
 #include "model/Layer.h"
 #include "model/Stroke.h"
 #include "model/XojPage.h"
+#include "gui/inputdevices/PositionInputData.h"
+#include "util/DispatchPool.h"
+#include "util/Range.h"
+#include "view/overlays/StrokeToolView.h"
+#include "undo/DeleteUndoAction.h"
 #include "undo/InsertUndoAction.h"
 #include "undo/UndoRedoHandler.h"
+
+#include "ScratchOut.h"
 
 namespace xqt {
 
@@ -37,6 +44,16 @@ int holdTime(Settings& s) {
 
 void setHoldTime(Settings& s, int ms) {
     s.getCustomElement("xournalQt").setInt("holdToStraightenTime", std::clamp(ms, MIN_HOLD_MS, MAX_HOLD_MS));
+    s.customSettingsChanged();
+}
+bool scratchOut(Settings& s) {
+    bool on = false;
+    s.getCustomElement("xournalQt").getBool("scratchOut", on);
+    return on;
+}
+
+void setScratchOut(Settings& s, bool on) {
+    s.getCustomElement("xournalQt").setBool("scratchOut", on);
     s.customSettingsChanged();
 }
 }  // namespace pengestures
@@ -86,6 +103,59 @@ bool GestureStrokeHandler::straighten(double restRadius) {
         }
     }
     strokeRecognizerDetected(std::move(shape), layer);  // (the view goes; the stroke is the undo step's now)
+    return true;
+}
+
+void GestureStrokeHandler::onButtonPressEvent(const PositionInputData& pos, double zoom) {
+    StrokeHandler::onButtonPressEvent(pos, zoom);
+    pressTime = pos.timestamp;
+}
+
+void GestureStrokeHandler::onButtonReleaseEvent(const PositionInputData& pos, double zoom) {
+    if (stroke && !done && stroke->getToolType() == StrokeTool::PEN &&
+        pengestures::scratchOut(*control->getSettings()) && scratchOut(pos, zoom)) {
+        return;
+    }
+    StrokeHandler::onButtonReleaseEvent(pos, zoom);
+}
+
+bool GestureStrokeHandler::scratchOut(const PositionInputData& release, double zoom) {
+    const std::vector<Point>& zigzag = stroke->getPointVector();
+    const scratchout::Shape shape = scratchout::analyse(zigzag);
+    const double durationMs = static_cast<double>(static_cast<gint32>(release.timestamp - pressTime));
+    if (!shape.zigzag || !scratchout::quick(shape.length, durationMs, zoom)) {
+        return false;
+    }
+    Layer* layer = page->getSelectedLayer();
+    Document* doc = control->getDocument();
+    std::vector<std::pair<Element::Index, const Element*>> victims;
+    doc->lock_shared();
+    for (const Element* e: scratchout::covered(*layer, zigzag, shape, stroke->getWidth())) {
+        victims.emplace_back(layer->indexOf(e), e);
+    }
+    doc->unlock_shared();
+    if (victims.empty()) {
+        return false;  // (over nothing: a stroke like any other)
+    }
+
+    // The strokes go (the last first, so that each keeps its place for the undo), in one undo step
+    std::sort(victims.begin(), victims.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+    auto undo = std::make_unique<DeleteUndoAction>(page, true);
+    Range range(stroke->getBoundingBox());
+    doc->lock();
+    for (const auto& [index, e]: victims) {
+        range = range.unite(Range(e->getBoundingBox()));
+        auto [owned, pos] = layer->removeElement(e);
+        undo->addElement(layer, std::move(owned), pos);
+    }
+    doc->unlock();
+    // The zigzag is not kept: its view goes without being drawn into the page
+    getViewPool()->dispatchAndClear(xoj::view::StrokeToolView::CANCELLATION_REQUEST, range);
+    stroke.reset();
+    for (const auto& victim: victims) {
+        page->fireElementChanged(victim.second);
+    }
+    control->getUndoRedoHandler()->addUndoAction(std::move(undo));
     return true;
 }
 

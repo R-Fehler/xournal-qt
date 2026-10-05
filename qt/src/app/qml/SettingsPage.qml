@@ -382,6 +382,15 @@ Popup {
                                    + "highlighter and keep the pen still on the screen for a moment: the stroke becomes "
                                    + "that shape, straight and neat. Undo brings the stroke back as you drew it.")
                     }
+                    SwitchRow {
+                        objectName: "scratchOutSwitch"
+                        key: "scratchOut"; text: qsTr("Scratch out to erase")
+                    }
+                    Hint {
+                        text: qsTr("Scribble quickly back and forth over handwriting (at least four strokes across, "
+                                   + "like crossing out on paper): what the zigzag covers is erased, and the zigzag "
+                                   + "goes too. Undo brings it back. A zigzag over nothing stays a stroke.")
+                    }
                     SectionTitle { text: qsTr("Laser pointer") }
                     SliderRow {
                         objectName: "laserFadeSlider"

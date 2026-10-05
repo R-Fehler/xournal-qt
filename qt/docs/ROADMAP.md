@@ -835,6 +835,13 @@
   (`ToolboxModel`, JSON in the settings); the classic bar stays for one release (Settings → Pen → Tools)
   ([toolbox.md](toolbox.md)).
 
+- **Pen gestures, `qt/pen-gestures` (2026-10-05).** Hold to straighten: a freehand stroke of the pen or highlighter
+  whose pen rests 0.5 s before the lift becomes upstream's `ShapeRecognizer` shape (line, triangle, rectangle,
+  circle, ellipse) while the pen still rests; undo brings the freehand stroke back; on by default, its time a
+  setting. Scratch out to erase (opt-in): a quick zigzag of the pen over strokes deletes those it covers in one undo
+  step and is not kept; over nothing it stays a stroke; the shape test passes no stroke of the handwriting fixture.
+  Both in `GestureStrokeHandler` (upstream's `StrokeHandler`, unmodified) ([pen-gestures.md](pen-gestures.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
