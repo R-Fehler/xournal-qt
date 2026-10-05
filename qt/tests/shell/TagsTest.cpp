@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <chrono>
 #include <fstream>
+#include <iterator>
 #include <memory>
 
 #include <QCborMap>
@@ -25,6 +26,7 @@
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
 #include "session/FuzzyQuery.h"
+#include "session/HybridPdf.h"
 #include "session/PdfKeywords.h"
 #include "session/StickyNote.h"
 #include "session/Tags.h"
@@ -324,4 +326,103 @@ TEST(Tags, theLibrarySearchFindsTags) {
     model.setNamesOnly(true);
     model.setSearchQuery("tag:course/physics");
     EXPECT_EQ(names(), (std::vector<std::string>{"paper.pdf"}));
+}
+
+// Tags written into a PDF's keywords: an incremental update (the file as it was stays its start), the document
+// information and, where there is one, the XMP's dc:subject; keywords that are still wanted keep their spelling
+TEST(Tags, writtenIntoAPdfsKeywords) {
+    EXPECT_EQ(pdfkeywords::keywordsFor("Machine learning, optics; C++", list({"optics", "Machine-learning", "exam"})),
+              "Machine learning, optics, exam");
+    EXPECT_EQ(pdfkeywords::keywordsFor("", list({"a", "A", "b"})), "a, b");
+    QTemporaryDir tmp;
+    const fs::path dir(tmp.path().toStdString());
+    makeTaggedPdf(dir / "paper.pdf", "Machine learning, physics", {"physics"});
+    std::string before;
+    {
+        std::ifstream in(dir / "paper.pdf", std::ios::binary);
+        before.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    std::string error;
+    ASSERT_TRUE(pdfkeywords::write(dir / "paper.pdf", list({"Machine-learning", "exam", "course/math"}), error)) << error;
+    const auto k = pdfkeywords::read(dir / "paper.pdf");
+    EXPECT_EQ(k.info, "Machine learning, exam, course/math");
+    EXPECT_EQ(k.subject, list({"Machine-learning", "exam", "course/math"}));
+    std::string after;
+    {
+        std::ifstream in(dir / "paper.pdf", std::ios::binary);
+        after.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    EXPECT_EQ(after.substr(0, before.size()), before) << "appended, the file as it was stays";
+    {
+        QPDF q;
+        q.processFile((dir / "paper.pdf").string().c_str());
+        EXPECT_EQ(q.getAllPages().size(), 1u);
+    }
+    // None: the keywords go, also from the XMP
+    ASSERT_TRUE(pdfkeywords::write(dir / "paper.pdf", {}, error)) << error;
+    EXPECT_EQ(pdfkeywords::tagsOf(dir / "paper.pdf"), QStringList());
+    // A PDF without document information gets one
+    makeTaggedPdf(dir / "bare.pdf", "");
+    ASSERT_TRUE(pdfkeywords::write(dir / "bare.pdf", list({"one"}), error)) << error;
+    EXPECT_EQ(pdfkeywords::tagsOf(dir / "bare.pdf"), list({"one"}));
+    writeFile(dir / "broken.pdf", "%PDF-1.4 nothing");
+    EXPECT_FALSE(pdfkeywords::write(dir / "broken.pdf", list({"x"}), error));
+    EXPECT_FALSE(error.empty());
+}
+
+// A PDF with notes keeps its notes and its keywords through the app's saves (in full and incremental); an archive PDF
+// stays PDF/A (its XMP follows the document information)
+TEST(Tags, pdfsWithNotesAndArchivesKeepTheirKeywords) {
+    QTemporaryDir tmp;
+    const fs::path dir(tmp.path().toStdString());
+    auto makeDoc = [] {
+        auto doc = std::make_unique<Document>(nullptr);
+        auto page = std::make_shared<XojPage>(595.0, 842.0);
+        page->getLayers().push_back(new Layer());
+        page->getLayers().front()->addElement(textAt("Notes #typed", false));
+        doc->addPage(page);
+        return doc;
+    };
+    const fs::path notes = dir / "lecture.pdf";
+    {
+        auto doc = makeDoc();
+        ASSERT_TRUE(HybridPdf::write(*doc, notes).ok);
+    }
+    std::string error;
+    ASSERT_TRUE(pdfkeywords::write(notes, list({"exam"}), error)) << error;
+    {
+        auto loaded = DocumentSession::loadFile(notes);
+        ASSERT_TRUE(loaded.document) << loaded.error;
+        EXPECT_TRUE(loaded.hybrid);
+        EXPECT_TRUE(loaded.hybridChanged.empty()) << "our annotations are as we wrote them";
+        // Saved again incrementally, then in full
+        auto opened = HybridPdf::open(notes);
+        ASSERT_TRUE(opened.document) << opened.error;
+        const HybridPdf::Revision rev = HybridPdf::revisionOf(opened.base, notes);
+        HybridPdf::WriteOptions incremental;
+        incremental.revision = &rev;
+        ASSERT_TRUE(HybridPdf::write(*opened.document, notes, {}, npos, {}, incremental).ok);
+        EXPECT_EQ(pdfkeywords::tagsOf(notes), list({"exam"})) << "after an incremental save";
+        HybridPdf::WriteOptions full;
+        full.compact = true;
+        auto again = HybridPdf::open(notes);
+        ASSERT_TRUE(again.document) << again.error;
+        ASSERT_TRUE(HybridPdf::write(*again.document, notes, {}, npos, {}, full).ok);
+        EXPECT_EQ(pdfkeywords::tagsOf(notes), list({"exam"})) << "after a full save";
+    }
+    // An archive PDF
+    const fs::path archive = dir / "lecture.archive.pdf";
+    {
+        auto doc = makeDoc();
+        ASSERT_TRUE(HybridPdf::writeArchive(*doc, archive).ok);
+    }
+    ASSERT_TRUE(pdfkeywords::write(archive, list({"kept", "exam"}), error)) << error;
+    EXPECT_EQ(pdfkeywords::read(archive).info, "kept, exam");
+    QPDF q;
+    q.processFile(archive.string().c_str());
+    auto buffer = q.getRoot().getKey("/Metadata").getStreamData(qpdf_dl_all);
+    const std::string xmp(reinterpret_cast<const char*>(buffer->getBuffer()), buffer->getSize());
+    EXPECT_NE(xmp.find("<pdf:Keywords>kept, exam</pdf:Keywords>"), std::string::npos);
+    EXPECT_NE(xmp.find("<pdfaid:part>3</pdfaid:part>"), std::string::npos) << "still PDF/A";
+    EXPECT_TRUE(HybridPdf::isArchive(archive));
 }

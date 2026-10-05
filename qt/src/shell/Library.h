@@ -302,6 +302,8 @@ public:
     std::vector<Tagged> tagged() const;
     /// The tags of one document ({} when it has none or is not indexed yet).
     QStringList tagsOf(const fs::path& file) const;
+    /// Only those typed in it (not its PDF's keywords).
+    QStringList textTagsOf(const fs::path& file) const;
     /// Whether an indexed document has a tag that `query` matches (tags::matches: `course` also finds `course/math`).
     bool hasTag(const fs::path& file, QStringView query) const;
     /// Changes when the tags of a document changed, or a document with tags came or went.

@@ -7,6 +7,8 @@
 #include <qpdf/QPDF.hh>
 #include <qpdf/QPDFObjectHandle.hh>
 
+#include "ArchivePdf.h"
+#include "IncrementalPdf.h"
 #include "Tags.h"
 
 namespace xqt::pdfkeywords {
@@ -95,5 +97,132 @@ Keywords read(const fs::path& pdf) {
 }
 
 QStringList tagsOf(const fs::path& pdf) { return read(pdf).tags(); }
+
+QString keywordsFor(const QString& old, const QStringList& wanted) {
+    QStringList out, covered;
+    const bool listed = old.contains(u',') || old.contains(u';');
+    static const QRegularExpression lists(QStringLiteral("[,;]"));
+    static const QRegularExpression spaces(QStringLiteral("\\s+"));
+    for (const QString& piece: old.split(listed ? lists : spaces, Qt::SkipEmptyParts)) {
+        const QString tag = tags::fromKeyword(piece);
+        if (!tag.isEmpty() && tags::contains(wanted, tag) && !tags::contains(covered, tag)) {
+            out << piece.trimmed();
+            covered << tag;
+        }
+    }
+    for (const QString& t: wanted) {
+        if (!t.isEmpty() && !tags::contains(covered, t)) {
+            out << t;
+            covered << t;
+        }
+    }
+    return out.join(QStringLiteral(", "));
+}
+
+namespace {
+std::string xmlEscaped(const QString& s) {
+    QString e = s.toHtmlEscaped();  // (& < > ")
+    e.replace(u'\'', QLatin1String("&apos;"));
+    return e.toStdString();
+}
+
+/// An XMP packet with its dc:subject and pdf:Keywords set to these (only those that are there are changed; a
+/// subject is added beside a pdf:Keywords). Empty when nothing is to change.
+/// A text as a regex_replace format ("$" written "$$")
+std::string literal(const std::string& s) {
+    std::string out;
+    for (const char c: s) {
+        out += c;
+        if (c == '$') {
+            out += '$';
+        }
+    }
+    return out;
+}
+
+std::string withKeywords(const std::string& xmp, const QStringList& tags, const QString& keywords) {
+    std::string out = xmp;
+    static const std::regex subject(R"(<dc:subject\b[^>]*>[\s\S]*?</dc:subject\s*>|<dc:subject\b[^>]*/>)");
+    static const std::regex keywordsElement(R"(<pdf:Keywords\b[^>]*>[\s\S]*?</pdf:Keywords\s*>|<pdf:Keywords\b[^>]*/>)");
+    static const std::regex keywordsAttribute(R"(\bpdf:Keywords\s*=\s*("[^"]*"|'[^']*'))");
+    std::string bag = "<dc:subject><rdf:Bag>";
+    for (const QString& t: tags) {
+        bag += "<rdf:li>" + xmlEscaped(t) + "</rdf:li>";
+    }
+    bag += "</rdf:Bag></dc:subject>";
+    const bool hadSubject = std::regex_search(out, subject);
+    const bool hadKeywords = std::regex_search(out, keywordsElement) || std::regex_search(out, keywordsAttribute);
+    if (!hadSubject && !hadKeywords) {
+        return {};  // (metadata without keywords: the document information is enough)
+    }
+    if (hadSubject) {
+        out = std::regex_replace(out, subject, tags.isEmpty() ? std::string() : literal(bag));
+    }
+    const std::string k = xmlEscaped(keywords);
+    out = std::regex_replace(out, keywordsElement, keywords.isEmpty() ? std::string() : literal("<pdf:Keywords>" + k + "</pdf:Keywords>"));
+    out = std::regex_replace(out, keywordsAttribute, literal("pdf:Keywords=\"" + k + "\""));
+    return out == xmp ? std::string() : out;
+}
+}  // namespace
+
+bool write(const fs::path& pdf, const QStringList& tags, std::string& error) {
+    try {
+        IncrementalPdf::Tail tail;
+        if (!IncrementalPdf::readTail(pdf, tail, error)) {
+            return false;
+        }
+        QPDF q;
+        q.setSuppressWarnings(true);
+        q.processFile(pdf.string().c_str());
+        if (q.isEncrypted()) {
+            error = "the PDF is encrypted";
+            return false;
+        }
+        IncrementalPdf::Update u(q);
+        OH trailer = q.getTrailer();
+        OH info = trailer.getKey("/Info");
+        QString old;
+        if (info.isDictionary() && info.getKey("/Keywords").isString()) {
+            old = QString::fromStdString(info.getKey("/Keywords").getUTF8Value());
+        }
+        const QString keywords = keywordsFor(old, tags);
+        if (!info.isDictionary()) {
+            info = u.add(OH::newDictionary());
+            trailer.replaceKey("/Info", info);
+        } else if (!info.isIndirect()) {
+            info = u.add(info.shallowCopy());  // (the update's trailer refers to it)
+            trailer.replaceKey("/Info", info);
+        } else {
+            u.touch(info);
+        }
+        if (keywords.isEmpty()) {
+            info.removeKey("/Keywords");
+        } else {
+            info.replaceKey("/Keywords", OH::newUnicodeString(keywords.toStdString()));
+        }
+        OH meta = q.getRoot().getKey("/Metadata");
+        if (meta.isStream()) {
+            auto buffer = meta.getStreamData(qpdf_dl_all);
+            const std::string xmp(reinterpret_cast<const char*>(buffer->getBuffer()), buffer->getSize());
+            if (xmp.find("pdfaid:part") != std::string::npos) {
+                ArchivePdf::update(q, u);  // (PDF/A: the metadata follows the document information)
+            } else if (const std::string changed = withKeywords(xmp, tags::fromKeywords(keywords), keywords);
+                       !changed.empty()) {
+                u.touch(meta);
+                u.touchData(meta);
+                meta.replaceStreamData(changed, OH::newNull(), OH::newNull());
+            }
+        }
+        const std::string bytes = u.serialize(tail);
+        const IncrementalPdf::Result r = IncrementalPdf::append(pdf, tail, bytes);
+        if (!r.ok) {
+            error = r.error;
+        }
+        return r.ok;
+    } catch (const std::exception& e) {
+        error = e.what();
+        return false;
+    }
+}
 
 }  // namespace xqt::pdfkeywords

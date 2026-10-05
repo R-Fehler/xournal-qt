@@ -1581,6 +1581,12 @@ QStringList LibraryIndex::tagsOf(const fs::path& file) const {
     return e ? e->tags() : QStringList();
 }
 
+QStringList LibraryIndex::textTagsOf(const fs::path& file) const {
+    std::lock_guard lock(mtx);
+    const EntryPtr e = find(file);
+    return e ? e->textTags : QStringList();
+}
+
 bool LibraryIndex::hasTag(const fs::path& file, QStringView query) const {
     return tags::anyMatches(tagsOf(file), query);
 }

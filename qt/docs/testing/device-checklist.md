@@ -3013,3 +3013,14 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
       shows the folder as before.
 - [ ] Cards show their tags on the preview, above "last read": 1 on a narrow card, up to 3 on a wide one, then "+N";
       the mouse over them lists all in a tip.
+
+## Tags: "Tags…" writes a PDF's keywords (qt/tags)
+- [ ] A card's menu of a plain PDF → Tags…: "None yet", the library's tags as suggestions; type `exam`, Enter, tap a
+      suggestion, Save: the card shows both after a moment, the Tags tab counts them; Zotero (or `pdfinfo`) shows the
+      keywords; the PDF opens as before in other apps.
+- [ ] The same for a PDF with notes and an archive PDF (veraPDF still says PDF/A-3b); open, draw, save (incremental),
+      then "Save as" over it / let it compact: the keywords stay.
+- [ ] A PDF open in a tab without changes: ⋮ → Document → Tags…, Save: the tab stays where it was (read again). With
+      unsaved ink: a message says to save first, nothing is written.
+- [ ] A `.xopp`'s Tags… lists the typed `#tags` and explains that only those exist (Close only); a `.md`'s mentions
+      the front matter.

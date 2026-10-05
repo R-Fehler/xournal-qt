@@ -191,6 +191,7 @@ set(XQT_QML_FILES
     src/app/qml/BookmarksView.qml
     src/app/qml/TodosView.qml
     src/app/qml/TagsView.qml
+    src/app/qml/TagsDialog.qml
     src/app/qml/BookmarkDialog.qml
     src/app/qml/NewDocumentDialog.qml
     src/app/qml/DocumentModeCards.qml

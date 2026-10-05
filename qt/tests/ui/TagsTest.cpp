@@ -23,6 +23,8 @@
 
 #include "model/Document.h"
 #include "model/Layer.h"
+#include "model/Point.h"
+#include "model/Stroke.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
@@ -37,6 +39,9 @@
 #include "shell/RecentFiles.h"
 #include "shell/TabManager.h"
 #include "shell/Thumbnails.h"
+
+#include "undo/InsertUndoAction.h"
+#include "undo/UndoRedoHandler.h"
 
 #include "AppController.h"
 
@@ -260,4 +265,90 @@ TEST_F(TagsUiTest, cardsShowTheirTags) {
     });
     EXPECT_TRUE(plusShown);
     EXPECT_FALSE(findAll("cardTag").empty());
+}
+
+// "Tags…" of a card: a PDF gets tags as keywords (Save writes the file, the index and the card follow); a Xournal++ file
+// shows its typed tags and says how to add one
+TEST_F(TagsUiTest, theTagsDialogWritesAPdfsKeywords) {
+    const QString paper = QString::fromStdString((root / "plain.pdf").string());
+    QVariantMap info = controller->documentTags(QString::fromStdString((root / "lecture.xopp").string()));
+    EXPECT_FALSE(info.value("editable").toBool()) << "a .xopp: typed tags only";
+    EXPECT_FALSE(info.value("why").toString().isEmpty());
+    EXPECT_EQ(info.value("typed").toStringList(), (QStringList{"course/math", "exam"}));
+    info = controller->documentTags(paper);
+    EXPECT_TRUE(info.value("editable").toBool());
+    EXPECT_TRUE(info.value("file").toStringList().isEmpty());
+    EXPECT_TRUE(info.value("suggestions").toStringList().contains("exam"));
+
+    // The card's menu → Tags…: a tag typed, one of the suggestions, Save
+    library->setFlat(true);
+    QObject* dialog = nullptr;
+    for (QObject* o: window->findChildren<QObject*>("tagsDialog")) {
+        if (o->parent() && QString(o->parent()->metaObject()->className()).contains("HomeView")) {
+            dialog = o;
+        }
+    }
+    if (!dialog) {
+        dialog = window->findChild<QObject*>("tagsDialog");
+    }
+    ASSERT_NE(dialog, nullptr);
+    QMetaObject::invokeMethod(dialog, "openFor", Q_ARG(QVariant, paper));
+    until([&] { return dialog->property("opened").toBool(); });
+    wait(300);  // (its transition: the field where it stays)
+    QQuickItem* field = findItem("tagsDialogField");
+    ASSERT_NE(field, nullptr);
+    click(field);
+    for (char c: std::string("#reading")) {
+        QTest::keyClick(window, c);
+    }
+    QTest::keyClick(window, Qt::Key_Return);
+    until([&] { return !findAll("tagsDialogChip").empty(); });
+    EXPECT_EQ(findAll("tagsDialogChip").size(), 1u);
+    QQuickItem* exam = nullptr;
+    for (QQuickItem* s: findAll("tagsDialogSuggestion")) {
+        if (s->property("tag").toString() == "exam") {
+            exam = s;
+        }
+    }
+    ASSERT_NE(exam, nullptr);
+    click(exam);
+    EXPECT_EQ(findAll("tagsDialogChip").size(), 2u);
+    QMetaObject::invokeMethod(dialog, "accept");
+    until([&] { return xqt::pdfkeywords::tagsOf(root / "plain.pdf").size() == 2; });
+    EXPECT_EQ(xqt::pdfkeywords::tagsOf(root / "plain.pdf"), (QStringList{"reading", "exam"}));
+    until([&] { return library->searchIndex()->tagsOf(root / "plain.pdf").size() == 2; });
+    EXPECT_EQ(library->searchIndex()->tagsOf(root / "plain.pdf"), (QStringList{"reading", "exam"}));
+}
+
+// A PDF open in a tab: without changes it gets the tags and the tab reads it again; with unsaved changes it is refused
+TEST_F(TagsUiTest, aPdfOpenInATab) {
+    const QString paper = QString::fromStdString((root / "plain.pdf").string());
+    ASSERT_TRUE(controller->openPath(paper));
+    until([&] { return controller->tabCount() == 1; });
+    ASSERT_TRUE(controller->setDocumentTags(paper, {"open"}));
+    until([&] { return xqt::pdfkeywords::tagsOf(root / "plain.pdf") == QStringList{"open"}; });
+    EXPECT_EQ(xqt::pdfkeywords::tagsOf(root / "plain.pdf"), QStringList{"open"});
+    wait(100);
+    EXPECT_EQ(controller->tabCount(), 1) << "read again in its place";
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    ASSERT_NE(s, nullptr);
+    {
+        Document& doc = *s->getDocument();
+        auto page = doc.getPage(0);
+        auto stroke = std::make_unique<Stroke>();
+        stroke->setWidth(2);
+        stroke->addPoint(Point(100, 100, 1.0));
+        stroke->addPoint(Point(200, 180, 1.0));
+        const Stroke* raw = stroke.get();
+        Layer* layer = page->getSelectedLayer();
+        doc.lock();
+        layer->addElement(std::move(stroke));
+        doc.unlock();
+        s->getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, layer, raw));
+    }
+    ASSERT_TRUE(s->isModified());
+    EXPECT_FALSE(controller->setDocumentTags(paper, {"other"})) << "unsaved changes: saved first";
+    wait(100);
+    EXPECT_EQ(xqt::pdfkeywords::tagsOf(root / "plain.pdf"), QStringList{"open"});
+    s->getUndoRedoHandler()->undo();
 }

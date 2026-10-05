@@ -64,6 +64,7 @@
 #include "IncrementalPdf.h"
 #include "MdBox.h"
 #include "MergedPdf.h"
+#include "PdfKeywords.h"
 #include "PageBookmarks.h"
 #include "PdfBookmarks.h"
 #include "StickyNote.h"
@@ -1581,6 +1582,16 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
     }
     info.replaceKey("/Producer", QPDFObjectHandle::newString(std::string(PROJECT_STRING) + " + QPDF " + QPDF_VERSION));
     info.replaceKey("/ModDate", QPDFObjectHandle::newString(pdfDateNow()));
+    if (hybrid) {
+        // The file written over keeps its keywords: its tags (qt/docs/tags.md; given to the file, not to the document,
+        // so a background without them would drop them)
+        if (std::error_code ec; fs::exists(target, ec) && !fs::equivalent(target, prep.bg, ec)) {
+            const QString keywords = pdfkeywords::read(target).info;
+            if (!keywords.isEmpty()) {
+                info.replaceKey("/Keywords", QPDFObjectHandle::newUnicodeString(keywords.toStdString()));
+            }
+        }
+    }
     step("annotations, data, marker");
     ArchiveWrite how;
     if (!archive) {

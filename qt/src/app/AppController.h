@@ -777,6 +777,15 @@ public:
     /// The library's Tags view (LibraryTagsModel)
     Q_PROPERTY(QObject* libraryTags READ libraryTagsModel CONSTANT)
     QObject* libraryTagsModel() const;
+    /// The main file of the current tab's document (its .xopp, PDF, Markdown or text file; "": none)
+    Q_INVOKABLE QString currentDocumentPath() const;
+    /// "Tags…" of a document (its main file): { name, pdf, typed (the #tags typed in it, from the index), file (a PDF's
+    /// keywords as tags), suggestions (the library's tags, most used first), editable (a PDF that can be written), why
+    /// (why not, for the dialog) }
+    Q_INVOKABLE QVariantMap documentTags(const QString& path) const;
+    /// Give a PDF these tags as its keywords (an incremental update, in the background; tabs showing it read it again).
+    /// Refused with a message when a tab has unsaved changes of it. documentTagsWritten when done.
+    Q_INVOKABLE bool setDocumentTags(const QString& path, const QStringList& tags);
 
     /// The library's To-dos view (LibraryTodosModel)
     Q_PROPERTY(QObject* libraryTodos READ libraryTodosModel CONSTANT)
@@ -1373,6 +1382,8 @@ Q_SIGNALS:
     void notesChanged();
     /// Messages from the core (XojMsgBox) and file errors, shown by QML.
     void message(const QString& title, const QString& text, bool error);
+    /// A document's tags were written (setDocumentTags)
+    void documentTagsWritten(const QString& path);
     /// This folder can be a library only with "All files access": the window explains why it is asked for, then
     /// calls requestStorageAccess.
     void storageAccessNeeded(const QString& folder);
@@ -1623,6 +1634,8 @@ private:
     std::unique_ptr<xqt::LibraryModel> ownLibrary;
     std::unique_ptr<xqt::LibraryBookmarksModel> ownLibraryBookmarks;
     xqt::LibraryBookmarksModel* libraryBookmarks = nullptr;
+    /// Tabs of all windows showing this file, also a plain PDF (its document's background)
+    std::vector<std::pair<AppController*, xqt::DocumentSession*>> tabsWithFile(const fs::path& file) const;
     std::unique_ptr<xqt::LibraryTagsModel> ownLibraryTags;
     xqt::LibraryTagsModel* libraryTags = nullptr;
     std::unique_ptr<xqt::LibraryTodosModel> ownLibraryTodos;

@@ -3,6 +3,7 @@
  * metadata's dc:subject, as Zotero, Acrobat and LaTeX's hyperref write them.
  *
  * Reads with qpdf (the trailer, the document information and the catalog's /Metadata; no page is read), on any thread.
+ * Writes them as an incremental update, the way the app saves PDFs with notes (qt/docs/tags.md, "Tags in files").
  *
  * @license GNU GPLv2 or later
  */
@@ -23,6 +24,16 @@ struct Keywords {
     /// As tags (Tags.h): of both, each once
     QStringList tags() const;
 };
+
+/// The /Keywords that stand for `tags` when the PDF had `old`: the keywords of `old` whose tag is still wanted stay
+/// as they were written ("Machine learning" for the tag Machine-learning), the new tags follow; ", " between them.
+QString keywordsFor(const QString& old, const QStringList& tags);
+
+/// Give `pdf` these tags as its keywords, without touching anything else: an incremental update (IncrementalPdf.h)
+/// with its document information's /Keywords (removed when there are none) and, where it has XMP metadata, its
+/// dc:subject and pdf:Keywords (an archive PDF's metadata is written anew from the document information, so it stays
+/// PDF/A: ArchivePdf::update). Atomic. False with `error` (an encrypted PDF is not changed).
+bool write(const fs::path& pdf, const QStringList& tags, std::string& error);
 
 /// The keywords of `pdf`.
 Keywords read(const fs::path& pdf);

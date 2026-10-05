@@ -2128,6 +2128,8 @@ Rectangle {
         }
     }
 
+    TagsDialog { id: homeTagsDialog }
+
     AdaptiveMenu {
         id: itemMenu
         objectName: "homeItemMenu"
@@ -2160,6 +2162,14 @@ Rectangle {
                 target: itemMenu
                 function onAboutToShow() { favouriteItemRef.starred = app.isFavouriteFile(home.menuPath) }
             }
+        }
+        // Its tags: a PDF's keywords, written into the file; the #tags typed in it (qt/docs/tags.md)
+        AdaptiveMenuItem {
+            objectName: "documentTagsItem"
+            text: qsTr("Tags…")
+            icon.source: app.iconUrl("xqt-tag")
+            offered: !home.menuMany && !home.menuFolder && ["notes", "pdf", "md"].indexOf(home.menuKind) >= 0
+            onTriggered: homeTagsDialog.openFor(home.menuPath)
         }
         AdaptiveMenuItem {
             objectName: "openAsLibraryItem"
