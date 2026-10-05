@@ -3709,3 +3709,24 @@ On the Surface Pro 8 (Windows, Direct3D) and the Linux laptop (OpenGL), and on t
       but no model: a sweep says so, with the same button.
 - [ ] Phone (Fold 7): "My tools" → Other tools: "Mark PDF text" and "Copy handwriting as text"; Select and snip: the
       selections and the two snips.
+
+## Sharing a folder or the library as a zip (qt/share-zip, qt/docs/library.md)
+
+- [ ] A folder card's menu → Share folder…: the dialog shows the number of files and the recordings' size after a
+      moment; Share: the progress, then "Zip ready" with the size; Show in file manager selects `<folder>.zip`; Save a
+      copy… into Downloads works. Cancel during a big library: nothing is left in the cache's `share/` folder.
+- [ ] Open the zip in Windows Explorer, macOS Finder, Android Files and iOS Files: one folder with the documents and
+      subfolders, the times of the files as they were (not the time of unzipping); `.xournal_library` folders are in
+      it (hidden on Linux/macOS).
+- [ ] With a password: Explorer and Finder refuse it (as the dialog says); 7-Zip (Windows) and Keka (macOS) open it
+      with the password; Android: the option is not offered.
+- [ ] Recipient with xournal-qt: open the zip with the app (double click, "Open with", or drop it on the library):
+      "Open in library" offers Inbox; Unpack shows the new folder; the search finds handwriting and (with PDF text)
+      PDF words at once, the cards have their pictures at once, and the handwriting job does not start for them
+      (XQT_PERF / the Settings → Handwriting count stays).
+- [ ] The same zip unpacked by Explorer (or Android Files) into a library folder: on opening, the library takes the
+      readings over (no handwriting is read again; the first look hashes the files once).
+- [ ] For Xournal++: Xournal++ opens every `.xopp` of the unzipped folder with its PDF, also a document whose PDF was
+      outside the folder (in `_attached/`); recordings play after setting Xournal++'s audio folder to `name.audio`.
+- [ ] Plain PDFs: Acrobat, Preview and a phone viewer show the ink; a protected PDF still asks for its password.
+- [ ] A library copied by hand to another disk (times not kept): opening it reads nothing again.

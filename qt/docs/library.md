@@ -309,6 +309,19 @@ sync clients upload whole files anyway, and neither the app nor a sync client ev
 are written in the background a few seconds after the last change (at the latest 30 s after the first one), and
 when the library is closed.
 
+**Entries that survive a copy.** Each `notes.pack` entry also keeps a content hash (BLAKE2b-256) of its own file
+(`sha`: the `.xopp`, the Markdown file, the lone PDF or image) and of the PDF it uses (`pdfSha`). They are computed in
+the background after the documents are indexed (`LibraryIndex::fillHashes`; entries of before get them once, at the
+first update after this build, which reads every indexed file once more; a document saved in the app gets its hash at
+the next update). When a document has an entry whose file has the same name and size but **another time** (a library
+copied by hand, unzipped by any app, synced by an app that does not keep times), the file's hash is computed and
+compared: the same content takes the entry over with the new stamps (`LibraryIndex::adopt`), and its handwriting
+(`InkTextStore::restamp`) and its stored preview (`PreviewCache::adopt`) follow; nothing is read again and nothing is
+recognised again. Never on name and size alone: another content (the same size) is read as usual. A preview asked for
+before the index got to its folder is drawn again (and found to look the same: only the small stamps pack is
+written). Measured hash speed on the development machine: about 700 MB/s (BLAKE2b; SHA-256 was 140 MB/s in Qt's
+implementation, which is why it is not used).
+
 **Reading positions are not cache.** The title page and the page each document was left at (and when it was last
 read) are kept in the config folder, `~/.config/xournal-qt/libraries/<key of the library>/pages.json`, by the
 document's path in the library: renaming and moving in the app take them along, and removing the cache folders
@@ -359,6 +372,80 @@ Measured on a 300-page text PDF: 3–13 ms per page (13 ms with ~700 marks of a 
 the search changed.
 
 Code: `qt/src/shell/Library.*` (library, search index), `Previews.*`, `LibraryModel.*`, `RecentFiles.*`.
+
+## Sharing a folder or the library
+
+**Share folder…** (a folder card's menu, and "Share this folder…" in the library menu while a folder is open) and
+**Share library…** (the library menu, ▾ next to the library's name) put the folder with its subfolders, or the whole
+library, into one zip (`qt/src/shell/LibraryShare.*`, the dialog `ShareZipDialog.qml`). The zip has one top folder
+named like the folder (or the library), so any unzip makes one folder; the user's files are never changed.
+
+| Format | What is in it |
+| --- | --- |
+| For xournal-qt (the default) | the documents as they are (a `.xopp` with its PDF, PDFs with notes, Markdown with its `name.assets/`, images, text and other files, sync conflict copies), with the library's readings of exactly these documents |
+| For Xournal++ | notes as `.xopp` with their PDF; a PDF with notes becomes `name.xopp` + `name.xopp.bg.pdf` (as "For Xournal++" exports it), its recordings in `name.audio/`; a README |
+| Plain PDFs | every notes document (a `.xopp`, a PDF with notes) as a PDF with the ink drawn into its pages (upstream's PDF export); the rest as it is; a README |
+
+The dialog's choices (and their defaults):
+- **Handwriting readings and previews** (on; xournal-qt format): the zip's folders get `.xournal_library/` packs
+  written fresh for the shared documents only: `notes.pack` (their notes, text elements, Markdown passages, bookmarks,
+  to-dos, tags, links, with the content hashes), `ink-text.pack` (the handwriting read), `previews.pack` (their card
+  pictures, when the title page is the first page). Each entry is taken from the library's cache only when it is up to
+  date with the file as it is now (`LibraryIndex::snapshot`, `PreviewCache::storedEntry`), and it is stamped for the
+  file as it is in the zip: its size and its time in whole seconds, which is the time the receiving app gives the
+  unpacked file. Entries of other documents, stale entries, autosaves, clean copies and other caches never go along.
+  A protected PDF has no readings (the library does not read it).
+  - **PDF text too** (off: "faster search, bigger file"): `pdf-text.pack` as well. Without it, the recipient's library
+    reads the PDF text of documents that show PDF pages (their handwriting and previews are kept).
+- **Version history** (off): PDFs with notes that keep versions go as a copy written anew in one piece, without them
+  (as Share sends one: `HybridPdf::compact`), as do PDFs with notes saved incrementally (older revisions may hold
+  deleted ink). On: they go as they are.
+- **Recordings** (on; their number and size are counted when the dialog opens, `LibraryShare::survey`): a `.xopp`'s
+  recordings go into `name.audio/` next to it (where the app finds them by name, [audio.md](audio.md)); a PDF with
+  notes carries them. Off: they stay behind, also the recordings a PDF with notes carries (left out of its copy) and
+  files already in a `name.audio/` folder next to their notes.
+- **A password** (off; only where the libzip in use can write AES, `Zip::aesAvailable()`: not in the Android build,
+  whose vcpkg libzip has no crypto backend): every entry encrypted with WinZip AES-256. The dialog says that Windows
+  Explorer and macOS Finder cannot open such zips; 7-Zip and Keka can.
+
+**Protected PDFs** go as they are, encrypted with their password (the summary lists them). **Files outside the
+folder** that documents need (a `.xopp`'s PDF or background picture by path, a Markdown file's picture) go into
+`_attached/` in the zip, and the copies' paths are rewritten (a `.xopp`'s `filename` attributes, relative; a Markdown
+link through `LinkRewrite::rewriteMarkdown`); a `.xopp` that names a file inside the folder by an absolute path gets
+a relative one. **Links to documents outside the folder** (Markdown links; the links of notes as the library index
+knows them) are listed in the summary; links between shared documents stay as they are (relative).
+
+Every entry carries its time twice: as the DOS time every unzipper reads and as the extended timestamp field (0x5455,
+UTC seconds) that Info-ZIP, 7-Zip, macOS and this app read. The top folder's `.xournal_library/share-manifest.pack`
+lists every file with its size, content hash and time, the app's version and the choices (the receiving app reads it
+and does not keep it). Files that are compressed already (PDFs, `.xopp`, pictures, recordings, the packs) are stored,
+the rest deflated.
+
+It runs on a worker at low priority with a progress dialog ("Writing the zip…", Cancel) and ends with a summary: the
+zip's name and size, how many documents went with their readings, the attached files, the links outside, the
+protected PDFs, what was left out, and **Show in file manager** (the desktop; where the platform's share sheet works
+later, there) and **Save a copy…** (a folder dialog). The zip is written into the app cache (`share/<name>.zip`, the
+folder Share's copies use) through a temporary file that libzip renames at the end, so a cancelled or failed zip
+leaves nothing; zips there older than a day are removed when the next one is written (the folder's owner is
+LibraryShare). Tests: `LibraryShareTest` (shell), `InkLibraryTest.aSharedZipUnpackedWithOtherTimesIsNotReadAgain`
+(hwr), `HomeScreenTest.shareLibraryAsZipAndOpenItInTheLibrary` (ui).
+
+### Receiving a shared zip
+
+A `.zip` opened with the app (the file manager's "Open with", the open dialog's "Shared folders (*.zip)", dropped on
+the library) asks **Open in library** (`OpenZipDialog.qml`, `qt/src/shell/LibraryUnzip.*`): it says what the zip holds
+(and whether it carries the library's readings), and unpacks it into a new folder (the zip's top folder, else named
+after the zip; " (2)" when the name is taken) inside the folder chosen, **Inbox** by default. A zip with a password asks
+for it (a wrong one says so); an AES zip where libzip cannot read AES says to unpack it with another app.
+- Everything goes into a hidden folder next to the target first and is renamed into place at the end: the library
+  never sees half a folder; cancelled or failed, nothing stays.
+- No path leaves the target: names with `..`, absolute paths, drive letters and Windows streams are left out (listed),
+  as are symbolic links and duplicates. At most 200,000 entries and 64 GB, and the zip must fit the free space; each
+  entry is checked against its stated size while it is written.
+- The files get the times the zip gives (UTC), so the readings it carries match them; the packs go where the library
+  keeps its cache (in the folders, or in the app cache under the new folders' paths, before they exist). The library
+  then shows the new folder and reads nothing again. Unpacked by another app (Explorer gives local DOS times,
+  two-second steps), the library adopts the entries by size and content hash (above, "Entries that survive a copy").
 
 ## Search in an open document
 The search of an open document (Ctrl+F, and the tab overview's search over all open documents) works on a text index
@@ -583,7 +670,8 @@ xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open 
   trashed from here. A folder that is gone drops out. The "Show" filter does not apply to the Recent grid.
 - **On a card**:
   - tap: open (a folder: enter it; another file (not a document or text): its app, below)
-  - a folder's menu: "Open as library (new window)" opens that folder as a library of its own, in another window
+  - a folder's menu: "Share folder…" (a zip, see "Sharing a folder or the library"); "Open as library (new window)"
+    opens that folder as a library of its own, in another window
     (another process, as "Open a folder as library…"). Its documents' caches are already in its folders
     (`.xournal_library/`), so nothing is indexed again. (Not so when the library keeps its cache in the app cache:
     the subfolder is a library with a key and settings of its own, starts with the cache in its folders and indexes

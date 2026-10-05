@@ -305,16 +305,39 @@ QString fileStamp(const fs::path& file) {
 }
 
 QString documentStamp(const DocumentItem& item) {
+    return documentStamp(item, [](const fs::path& f) { return fileStamp(f); });
+}
+
+QString documentStamp(const DocumentItem& item, const std::function<QString(const fs::path&)>& stampOf) {
     QString stamp;
     const fs::path none;
     for (const fs::path& f: {item.xopp, item.pdf, item.xopp.empty() ? none : DocumentFiles::attachmentOf(item.xopp),
                              item.xopp.empty() ? none : DocumentFiles::pagesOf(item.xopp), item.md, item.image,
                              item.other}) {
         if (!f.empty()) {
-            stamp += fileStamp(f) + ';';
+            stamp += stampOf(f) + ';';
         }
     }
     return stamp;
+}
+
+QString contentHash(const fs::path& file) {
+    QFile f(QString::fromStdU16String(file.u16string()));
+    if (file.empty() || !f.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    QCryptographicHash hash(QCryptographicHash::Blake2b_256);
+    if (!hash.addData(&f)) {
+        return {};
+    }
+    return QString::fromLatin1(hash.result().toHex());
+}
+
+fs::path ownFileOf(const DocumentItem& item) {
+    if (!item.xopp.empty()) {
+        return item.xopp;
+    }
+    return item.pdf.empty() ? item.main() : fs::path();
 }
 
 // --- LibraryIndex ---------------------------------------------------------------------------------------------
@@ -505,6 +528,12 @@ QCborMap LibraryIndex::notesOf(const Entry& e) const {
     if (!e.sample.isEmpty()) {
         notes.insert(QStringLiteral("sample"), e.sample);
     }
+    if (!e.sha.isEmpty()) {
+        notes.insert(QStringLiteral("sha"), e.sha);
+    }
+    if (!e.pdfSha.isEmpty()) {
+        notes.insert(QStringLiteral("pdfSha"), e.pdfSha);
+    }
     if (e.showsPdfPages() && e.titleRead) {
         notes.insert(QStringLiteral("title"), e.title);
         notes.insert(QStringLiteral("heading"), e.heading);
@@ -595,6 +624,8 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
     }
     e->pdfStamp = notes.value(QStringLiteral("pdfStamp")).toString();
     e->sample = notes.value(QStringLiteral("sample")).toString();
+    e->sha = notes.value(QStringLiteral("sha")).toString();
+    e->pdfSha = notes.value(QStringLiteral("pdfSha")).toString();
     const QCborArray pdfPages = notes.value(QStringLiteral("pdfPages")).toArray();
     const QCborArray texts = notes.value(QStringLiteral("text")).toArray();
     const QCborArray aspects = notes.value(QStringLiteral("aspects")).toArray();
@@ -1429,6 +1460,16 @@ void LibraryIndex::run(std::vector<DocumentItem> items, quint64 gen) {
             current = find(file);
         }
         const bool taken = !current && (current = movedHere(item, orphans, orphansCollected)) != nullptr;
+        if (current && !taken && !current->upToDate(item)) {
+            // Its files with another time but the same size and content (copied, unzipped, synced): taken over
+            if (EntryPtr adopted = adopt(item, current)) {
+                std::lock_guard lock(mtx);
+                if (find(file) == current) {
+                    put(adopted);
+                    current = adopted;
+                }
+            }
+        }
         if (current && current->upToDate(item)) {
             if (taken) {
                 std::lock_guard lock(mtx);
@@ -1464,6 +1505,10 @@ void LibraryIndex::run(std::vector<DocumentItem> items, quint64 gen) {
         doneCount = ++done;
         notify();
     }
+    fillHashes(items, gen);
+    if (generation != gen) {
+        return;  // a newer update takes over
+    }
     // Documents that are gone
     {
         std::lock_guard lock(mtx);
@@ -1488,6 +1533,127 @@ void LibraryIndex::run(std::vector<DocumentItem> items, quint64 gen) {
         running = false;
     }
     notify();
+}
+
+namespace {
+/// The size in a stamp ("size:time"; -1: none).
+qint64 sizeOfStamp(const QString& stamp) {
+    const qsizetype colon = stamp.indexOf(QLatin1Char(':'));
+    bool ok = false;
+    const qint64 size = colon > 0 ? stamp.left(colon).toLongLong(&ok) : -1;
+    return ok ? size : -1;
+}
+/// The content hash of a file whose stamp is `stamp`, if it still is after it was read ("" if not).
+QString hashOfStamped(const fs::path& file, const QString& stamp) {
+    const QString hash = contentHash(file);
+    return !hash.isEmpty() && fileStamp(file) == stamp ? hash : QString();
+}
+}  // namespace
+
+LibraryIndex::EntryPtr LibraryIndex::adopt(const DocumentItem& item, const EntryPtr& e) {
+    if (!e || e->file != item.main()) {
+        return nullptr;
+    }
+    const QString own = ownStamp(item), pdfNow = fileStamp(e->pdf);
+    const bool ownDiffers = e->xoppStamp != own, pdfDiffers = e->pdfStamp != pdfNow;
+    if (!ownDiffers && !pdfDiffers) {
+        return nullptr;  // (something else is missing: read as usual)
+    }
+    // Never on name and size alone: the content must be the one the entry was read from
+    auto same = [](const fs::path& file, const QString& was, const QString& now, const QString& hash) {
+        return !hash.isEmpty() && !was.isEmpty() && !now.isEmpty() && sizeOfStamp(was) == sizeOfStamp(now) &&
+               sizeOfStamp(now) >= 0 && hashOfStamped(file, now) == hash;
+    };
+    if (ownDiffers && !same(ownFileOf(item), e->xoppStamp, own, e->sha)) {
+        return nullptr;
+    }
+    if (pdfDiffers && !same(e->pdf, e->pdfStamp, pdfNow, e->pdfSha)) {
+        return nullptr;
+    }
+    auto adopted = std::make_shared<Entry>(*e);
+    adopted->xoppStamp = own;
+    adopted->pdfStamp = pdfNow;
+    ++adoptions;
+    // Its handwriting was read from the same content, and its preview shows it
+    const QString inkWas = e->xoppStamp.isEmpty() ? e->pdfStamp : e->xoppStamp;
+    const QString inkNow = own.isEmpty() ? pdfNow : own;
+    if (inkWas != inkNow) {
+        inks->restamp(e->file, inkWas, inkNow);
+    }
+    std::vector<std::pair<QString, QString>> changes;
+    if (ownDiffers) {
+        changes.emplace_back(e->xoppStamp, own);
+    }
+    if (pdfDiffers) {
+        changes.emplace_back(e->pdfStamp, pdfNow);
+    }
+    PreviewCache::adopt(item, changes);
+    return adopted;
+}
+
+void LibraryIndex::fillHashes(const std::vector<DocumentItem>& items, quint64 gen) {
+    for (const DocumentItem& item: items) {
+        if (generation != gen || discarded) {
+            return;
+        }
+        EntryPtr e;
+        {
+            std::lock_guard lock(mtx);
+            e = find(item.main());
+        }
+        if (!e || !e->upToDate(item)) {
+            continue;
+        }
+        const fs::path own = ownFileOf(item);
+        const bool needOwn = e->sha.isEmpty() && !e->xoppStamp.isEmpty() && !own.empty();
+        const bool needPdf = e->pdfSha.isEmpty() && !e->pdfStamp.isEmpty() && !e->pdf.empty();
+        if (!needOwn && !needPdf) {
+            continue;
+        }
+        auto hashed = std::make_shared<Entry>(*e);
+        if (needOwn) {
+            hashed->sha = hashOfStamped(own, e->xoppStamp);
+            ++hashCount;
+        }
+        if (needPdf) {
+            hashed->pdfSha = hashOfStamped(e->pdf, e->pdfStamp);
+            ++hashCount;
+        }
+        if (hashed->sha == e->sha && hashed->pdfSha == e->pdfSha) {
+            continue;  // (changed while it was read: the next update)
+        }
+        std::lock_guard lock(mtx);
+        if (find(item.main()) == e) {
+            put(hashed);
+        }
+    }
+}
+
+std::optional<LibraryIndex::Snapshot> LibraryIndex::snapshot(const DocumentItem& item) {
+    if (!item.valid() || !where.contains(item.main())) {
+        return std::nullopt;
+    }
+    load(item.main().parent_path());
+    EntryPtr e;
+    {
+        std::lock_guard lock(mtx);
+        e = find(item.main());
+    }
+    if (!e || e->locked || !e->upToDate(item)) {
+        return std::nullopt;
+    }
+    Snapshot s;
+    s.notes = notesOf(*e);
+    if (!e->pdfText.empty()) {
+        s.pdfText = pdfTextOf(e->pdfStamp, e->pdfText);
+    }
+    s.ownStamp = e->xoppStamp;
+    s.pdfStamp = e->pdfStamp;
+    s.sha = e->sha;
+    s.pdfSha = e->pdfSha;
+    s.pdf = e->pdf;
+    s.ink = inkOf(*e);
+    return s;
 }
 
 void LibraryIndex::applyMoves(const std::vector<std::pair<fs::path, fs::path>>& moves) {

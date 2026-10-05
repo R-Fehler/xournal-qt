@@ -789,21 +789,23 @@ especially interested in importing annotations that come from the GoodNotes PDF 
 ### Sharing a folder or the library as a zip (the author, 2026-10-05 evening; `qt/share-zip`)
 The author asked for sharing folders or whole libraries by zipping them, with the library's data so the recipient's
 search is fast at once. Built with the recommendations (the author: "add the zip share to the build blocks"):
-- [ ] Share → "Share folder…" / "Share library…": a zip, three formats: xournal-qt (as is), for Xournal++ (`.xopp` +
-  PDF), plain PDFs (ink flattened). Progress, Cancel, a summary.
-- [ ] xournal-qt format: the handwriting readings and previews written fresh for exactly the shared files (no stale
+- [x] Share → "Share folder…" / "Share library…": a zip, three formats: xournal-qt (as is), for Xournal++ (`.xopp` +
+  PDF), plain PDFs (ink flattened). Progress, Cancel, a summary. (Left: the platform share sheet on Android; there
+  "Save a copy…".)
+- [x] xournal-qt format: the handwriting readings and previews written fresh for exactly the shared files (no stale
   entries of other documents); the PDF text optional ("faster search, bigger file"). No other hidden data, autosaves
-  or caches.
-- [ ] Version history left out by default (a checkbox includes it); recordings included (their size shown);
+  or caches. (Left: files in `_attached/` get no entries of their own; the recipient reads them.)
+- [x] Version history left out by default (a checkbox includes it); recordings included (their size shown);
   protected PDFs stay protected; an optional zip password (AES), with the note that Explorer and Finder need 7-Zip
-  or Keka for it.
-- [ ] Files outside the folder that documents need (a `.xopp`'s PDF, Markdown images) included in a subfolder with
-  paths rewritten, listed in the summary; links to documents outside the folder listed.
-- [ ] Cache entries survive any unzip: a manifest (size + content hash per file) lets the library adopt an entry whose
+  or Keka for it. (Left: no password option on Android, whose libzip has no crypto backend.)
+- [x] Files outside the folder that documents need (a `.xopp`'s PDF, Markdown images) included in a subfolder with
+  paths rewritten, listed in the summary; links to documents outside the folder listed. (Left: links of notes not
+  indexed yet are not checked.)
+- [x] Cache entries survive any unzip: a manifest (size + content hash per file) lets the library adopt an entry whose
   file has the same size and content but another time (also helps a library copied by hand); the zip also carries
-  UTC times (extended timestamp field).
-- [ ] Receiving: "Open in library…" unpacks a shared zip into a library folder (Inbox by default), name clashes as
-  " (2)"; also when a zip is opened with the app.
+  UTC times (extended timestamp field). (The hashes are kept in the cache entries themselves; left: the device checks.)
+- [x] Receiving: "Open in library…" unpacks a shared zip into a library folder (Inbox by default), name clashes as
+  " (2)"; also when a zip is opened with the app. (Left: the device checks.)
 
 ### Replay, from the author's test of 0.6.0 (2026-10-05; `qt/replay-polish`)
 "The replay scrollbar is hard to use on Android, or generally not easy to see and understand for the first time

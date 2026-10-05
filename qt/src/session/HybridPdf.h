@@ -186,6 +186,12 @@ void forgetHistory(QPDF& q);
 /// Write the file anew in one piece, without its earlier revisions and its version history (the same content; qpdf),
 /// atomically. For a file shared as it is. `to`: a copy written there instead (the file keeps its history).
 bool compact(const fs::path& pdf, std::string& error, const fs::path& to = {});
+/// The same for sharing a folder or the library as a zip (qt/docs/library.md, "Sharing a folder or the library"):
+/// `withoutRecordings` also leaves out the recordings the PDF carries (the marker's /Audio; its strokes keep their
+/// names, as for a recording that is nowhere).
+bool compact(const fs::path& pdf, std::string& error, const fs::path& to, bool withoutRecordings);
+/// The bytes of the recordings a PDF with notes carries (its marker's /Audio; 0: none, not ours, or protected).
+uint64_t recordingBytes(const fs::path& pdf);
 
 /// Version history (PdfHistory.h): version `id` of `pdf` as a file of its own at `out` (the file cut after that
 /// version; an older version whose .xopp is a delta gets its whole .xopp back), a PDF with notes that opens as the

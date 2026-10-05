@@ -1044,7 +1044,11 @@ Rectangle {
                     onExited: libraryGrid.dropIndex = -1
                     onDropped: function(drop) {
                         libraryGrid.dropIndex = -1
-                        if (drop.hasUrls) {
+                        if (drop.hasUrls && drop.urls.length === 1 && String(drop.urls[0]).toLowerCase().endsWith(".zip")
+                                && !app.library.contains(drop.urls[0])) {
+                            app.openUrls(drop.urls)  // (a zip: "Open in library…")
+                            drop.accept(Qt.CopyAction)
+                        } else if (drop.hasUrls) {
                             const urls = drop.urls, folder = targetFolder
                             home.confirmImport(app.library.temporary, function() { app.library.importUrls(urls, folder) })
                             drop.accept(Qt.CopyAction)
@@ -1586,6 +1590,19 @@ Rectangle {
                                 enabled: app.library.available
                                 offered: app.canShowInFileManager
                                 onTriggered: app.showInFileManager(app.library.rootPath)
+                            }
+                            AdaptiveMenuItem {
+                                objectName: "shareLibraryItem"
+                                text: qsTr("Share library…")
+                                enabled: app.library.available && !app.libraryShare.running
+                                onTriggered: shareZip.openFor("")
+                            }
+                            AdaptiveMenuItem {
+                                objectName: "shareThisFolderItem"
+                                text: qsTr("Share this folder…")
+                                offered: app.library.folder !== "" && !app.library.flat
+                                enabled: app.library.available && !app.libraryShare.running
+                                onTriggered: shareZip.openFor(app.library.folder)
                             }
                             AdaptiveMenuItem {
                                 objectName: "exportLibraryArchiveItem"
@@ -2254,6 +2271,13 @@ Rectangle {
             onTriggered: app.copyDocumentLink(home.menuPath)
         }
         AdaptiveMenuItem {
+            objectName: "shareFolderItem"
+            text: qsTr("Share folder…")
+            offered: !home.menuMany && home.menuFolder && home.menuModel === app.library
+            enabled: !app.libraryShare.running
+            onTriggered: shareZip.openFor(app.library.relativeFolder(home.menuPath))
+        }
+        AdaptiveMenuItem {
             objectName: "shareCardItem"
             text: qsTr("Share…")
             offered: !home.menuMany && !home.menuFolder && ["pdf", "notes", "md", "text"].indexOf(home.menuKind) >= 0
@@ -2622,6 +2646,9 @@ Rectangle {
             }
         }
     }
+
+    // Share folder… / Share library…: a zip (ShareZipDialog.qml)
+    ShareZipDialog { id: shareZip; objectName: "shareZip" }
 
     // Export library as archive: what it does, the whole library or this folder, then a folder outside the library
     AdaptiveDialog {

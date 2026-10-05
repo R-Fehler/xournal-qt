@@ -412,6 +412,10 @@ check failed.
   and **Show in file manager**. A document whose PDF is missing, or that cannot be read, is listed as failed and the
   rest goes on.
 
+Sharing a folder or the whole library as a zip, for other people rather than for keeping (the documents as they are
+with the library's readings, for Xournal++, or as plain PDFs), is "Share folder…" / "Share library…":
+[library.md](library.md), "Sharing a folder or the library".
+
 ### Validation
 
 - The tests: `qpdf --check` passes; poppler draws each page like our PDF export (mean difference < 0.5/255, < 0.2 %
@@ -740,6 +744,8 @@ is what is built.
   of new PDFs with notes" (off). The choice per document is the session's (`keepsVersions`) until a save writes it.
 - **Share** sends a PDF with notes that keeps versions without them (a copy written anew in the app cache; the file is
   never compacted in place while it keeps versions), with a check box "With its version history" for the file itself.
+  Sharing a folder or the library as a zip does the same per file ("Version history", off by default; [library.md](library.md),
+  "Sharing a folder or the library").
 - The library's cards (and Recent) show a small clock on documents that keep versions; the tooltip says how many.
 - **The version cache** (`VersionCache`, the owner of the versions cut out of files to be shown or opened): the last
   five used, at most 500 MB, removed when the app quits; other processes' after a day. A version a tab shows (beside
@@ -862,7 +868,8 @@ The author (2026-10-05): "support pdf encryption and opening of encrypted PDFs u
   document is shared with its own password. **Export as plain PDF** of a protected document is protected with the
   same password (drawn through the cairo backend, which reads the PDF with poppler; qpdf's backend reads the file
   itself). The archive export of a protected document has no password (PDF/A forbids encryption; its dialog says so).
-  "For Xournal++" is refused (Xournal++ cannot open encrypted PDFs).
+  "For Xournal++" is refused (Xournal++ cannot open encrypted PDFs). A folder or the library shared as a zip takes
+  protected PDFs as they are, encrypted, in every format ([library.md](library.md), "Sharing a folder or the library").
 
 ### Nothing unencrypted on disk
 

@@ -1058,6 +1058,17 @@
   ([handwriting-search.md](handwriting-search.md)). Short rails fold the fixed tools from their end, one more at a
   time, instead of all at once ([toolbox.md](toolbox.md)).
 
+- **Sharing a folder or the library as a zip, `qt/share-zip` (2026-10-05).** "Share folder…" / "Share library…": one
+  zip in three formats (xournal-qt as is, for Xournal++, plain PDFs), with the library's readings (handwriting,
+  previews, notes; the PDF text on request) written fresh for exactly the shared documents, version history left out
+  and recordings in unless chosen otherwise, protected PDFs as they are, files from outside in `_attached/` with the
+  copies' paths rewritten, links outside listed, UTC times (0x5455), a manifest, an optional AES-256 password (not on
+  Android: its libzip has no crypto). "Open in library…" unpacks a zip into Inbox (zip slip, links and size checks; a
+  password asked for). Cache entries keep content hashes, so a library copied or unzipped with other times is not read
+  or recognised again ([library.md](library.md), "Sharing a folder or the library", "Entries that survive a copy").
+  Left: the device checks (Explorer, Finder, Android and iOS Files, 7-Zip and Keka with a password); the platform
+  share sheet for the zip on Android.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

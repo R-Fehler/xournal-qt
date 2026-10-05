@@ -37,6 +37,8 @@
 #include <QQmlContext>
 #include <QQuickItem>
 #include <QQuickTextDocument>
+#include <set>
+
 #include <QQuickWindow>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -95,6 +97,7 @@
 #include "shell/MdSnippets.h"
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
+#include "shell/ZipFile.h"
 #include "shell/PagesModel.h"
 #include "shell/RecentFiles.h"
 #include "shell/Previews.h"
@@ -2315,6 +2318,67 @@ TEST_F(HomeScreenTest, exportLibraryAsArchive) {
     EXPECT_TRUE(xqt::HybridPdf::isArchive(target / "notes.pdf"));
     QMetaObject::invokeMethod(summary, "close");
     ASSERT_TRUE(waitOpened(summary, false));
+}
+
+TEST_F(HomeScreenTest, shareLibraryAsZipAndOpenItInTheLibrary) {
+    // (qt/docs/library.md, "Sharing a folder or the library")
+    ASSERT_NE(find("shareLibraryItem"), nullptr);
+    QObject* share = find("shareZip");
+    ASSERT_NE(share, nullptr);
+    QMetaObject::invokeMethod(share, "openFor", Q_ARG(QVariant, QString()));
+    QObject* dialog = find("shareZipDialog");
+    ASSERT_TRUE(waitOpened(dialog, true));
+    EXPECT_TRUE(findItem("shareZipFormatApp")->property("checked").toBool());
+    EXPECT_TRUE(findItem("shareZipReadings")->property("checked").toBool()) << "readings and previews: on";
+    EXPECT_FALSE(findItem("shareZipPdfText")->property("checked").toBool()) << "PDF text: off";
+    EXPECT_FALSE(findItem("shareZipHistory")->property("checked").toBool()) << "version history: off";
+    EXPECT_TRUE(findItem("shareZipRecordings")->property("checked").toBool()) << "recordings: on";
+    EXPECT_FALSE(findItem("shareZipPassword")->property("checked").toBool()) << "no password";
+    EXPECT_EQ(findItem("shareZipPassword")->property("visible").toBool(), xqt::Zip::aesAvailable());
+    EXPECT_TRUE(QTest::qWaitFor(
+            [&] { return findItem("shareZipRecordings")->property("text").toString().contains("none"); }, 10000))
+            << "the survey counted the recordings: none here";
+    click(findItem("shareZipFormatPdf"));
+    EXPECT_FALSE(findItem("shareZipReadings")->property("visible").toBool()) << "only for xournal-qt";
+    click(findItem("shareZipFormatApp"));
+    QObject* summary = find("shareZipSummary");
+    ASSERT_NE(summary, nullptr);
+    QMetaObject::invokeMethod(dialog, "accept");
+    ASSERT_TRUE(waitOpened(summary, true, 60000));
+    const QVariantMap result = summary->property("outcome").toMap();
+    const fs::path zip(result["zip"].toString().toStdString());
+    ASSERT_TRUE(fs::exists(zip)) << zip;
+    EXPECT_FALSE(result["cancelled"].toBool());
+    const std::string top = root.filename().string();
+    std::set<std::string> names;
+    const xqt::Zip::Reader reader(zip);
+    for (const auto& e: reader.entries()) {
+        names.insert(e.name);
+    }
+    for (const std::string f: {"/Physics/sheet.pdf", "/lecture.pdf", "/notes.xopp"}) {
+        EXPECT_TRUE(names.count(top + f)) << f;
+    }
+    EXPECT_TRUE(findItem("shareZipSummaryText")->property("text").toString().startsWith(
+            QString::fromStdString(zip.filename().string())));
+    EXPECT_NE(findItem("shareZipSaveCopy"), nullptr);
+    QMetaObject::invokeMethod(summary, "close");
+    ASSERT_TRUE(waitOpened(summary, false));
+
+    // Opened with the app: "Open in library…", into the Inbox by default
+    controller->openPath(QString::fromStdString(zip.string()));
+    QObject* open = find("openZipDialog");
+    ASSERT_NE(open, nullptr);
+    ASSERT_TRUE(waitOpened(open, true));
+    EXPECT_TRUE(findItem("openZipText")->property("text").toString().contains("with the library's readings"));
+    EXPECT_EQ(findItem("openZipFolder")->property("currentValue").toString(), "Inbox");
+    EXPECT_FALSE(findItem("openZipPassword")->property("visible").toBool());
+    QMetaObject::invokeMethod(open, "accept");
+    const QString folder = QString::fromStdString("Inbox/" + top);
+    EXPECT_TRUE(QTest::qWaitFor(
+            [&] { return controller->libraryModel()->property("folder").toString() == folder; }, 20000));
+    EXPECT_TRUE(fs::exists(root / "Inbox" / top / "Physics" / "sheet.pdf"));
+    EXPECT_TRUE(fs::exists(root / "Inbox" / top / "notes.xopp"));
+    EXPECT_GT(gridCount(), 0);
 }
 
 TEST_F(HomeScreenTest, libraryMenuMarksThisLibraryWithoutToggles) {

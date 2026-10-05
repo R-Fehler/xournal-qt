@@ -83,6 +83,8 @@
 #include "shell/Previews.h"
 #include "shell/Library.h"
 #include "shell/LibraryArchive.h"
+#include "shell/LibraryShare.h"
+#include "shell/LibraryUnzip.h"
 #include "shell/LibraryMigration.h"
 #include "shell/LibraryBookmarks.h"
 #include "shell/LibraryTodos.h"
@@ -3369,6 +3371,11 @@ DocumentSession::LoadResult loadShownFile(const fs::path& file) {
 bool AppController::openFile(const QUrl& url) { return openPath(xqt::localPathOf(url)); }
 
 bool AppController::openPath(const QString& path) {
+    if (QFileInfo(path).suffix().compare(QLatin1String("zip"), Qt::CaseInsensitive) == 0 && QFileInfo(path).isFile()) {
+        // A zip: "Open in library…" asks where it goes (also at the start: once the window is there)
+        QTimer::singleShot(0, this, [this, path] { Q_EMIT zipOpened(path); });
+        return true;
+    }
     const fs::path file(path.toStdString());
     if (int existing = tabs->indexOfFile(file); existing >= 0) {
         tabs->setCurrentIndex(existing);  // already open: show it

@@ -36,6 +36,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -154,6 +155,15 @@ private:
 QString documentStamp(const DocumentItem& item);
 /// Size and modification time of one file ("" if it does not exist).
 QString fileStamp(const fs::path& file);
+/// documentStamp with the stamps of the files from `stampOf` (sharing as a zip: the files as they are in the zip).
+QString documentStamp(const DocumentItem& item, const std::function<QString(const fs::path&)>& stampOf);
+/// A hash of a file's content (BLAKE2b-256, hex; "" if it cannot be read): a cache entry whose file has another time
+/// but the same size and this hash is the same file (copied, unzipped, synced: qt/docs/library.md, "Entries that
+/// survive a copy").
+QString contentHash(const fs::path& file);
+/// The file whose stamp is a cache entry's own ("xopp" stamp): the .xopp, a Markdown file, a lone image or text file,
+/// a lone PDF (none for a PDF with its .xopp: the PDF has its own stamp).
+fs::path ownFileOf(const DocumentItem& item);
 
 class LibraryIndex final: public QObject {
     Q_OBJECT
@@ -312,6 +322,22 @@ public:
     bool hasTag(const fs::path& file, QStringView query) const;
     /// Changes when the tags of a document changed, or a document with tags came or went.
     quint64 tagChanges() const { return tagChangeCount.load(); }
+    /// What the cache holds of a document as its files are now (sharing it as a zip with its readings,
+    /// LibraryShare.h): its "notes" and "pdf-text" entries as stored, its stamps and content hashes, its handwriting.
+    /// Nothing when it has no entry, the entry is not up to date, or it is protected. Its folder's packs are read if
+    /// they are not yet. Any thread.
+    struct Snapshot {
+        QCborMap notes;
+        QCborMap pdfText;  ///< empty: none
+        QString ownStamp, pdfStamp, sha, pdfSha;
+        fs::path pdf;      ///< the PDF it uses ("": none)
+        std::shared_ptr<const InkDoc> ink;  ///< its handwriting, read from its file as it is now (null: none)
+    };
+    std::optional<Snapshot> snapshot(const DocumentItem& item);
+    /// Entries taken over because their files have the same size and content hash but another time (copied,
+    /// unzipped), and content hashes computed so far (tests).
+    int entriesAdopted() const { return adoptions.load(); }
+    int hashesComputed() const { return hashCount.load(); }
     /// The handwriting recognised in the library's documents (its pack per folder).
     InkTextStore& inkText() { return *inks; }
     const InkTextStore& inkText() const { return *inks; }
@@ -392,6 +418,10 @@ private:
         QString pdfStamp;
         QString sample;                  ///< a hash of the start and end of its main file ("": not known, entries
                                          ///< of older versions): tells two files with the same size and time apart
+        /// Content hashes (contentHash) of its own file (the one of `xoppStamp`) and of its PDF ("": not computed
+        /// yet; filled in the background after the documents are indexed): an entry whose files have another time
+        /// but the same size and content is taken over instead of reading them again (adopt).
+        QString sha, pdfSha;
         std::map<int, QString> pdfText;  ///< simplified text of the PDF pages it shows
         std::vector<int> pdfPage;        ///< per page: the PDF page it shows (-1: none)
         QStringList elementText;         ///< per page: the text of its text elements (simplified)
@@ -483,6 +513,12 @@ private:
     /// its path (moved or renamed by another program, or by the app before the index was told): one with the same
     /// name, else one with the same sample (without a sample: only by name). Orphans by kind and stamp.
     EntryPtr movedHere(const DocumentItem& item, std::multimap<QString, EntryPtr>& orphans, bool& collected);
+    /// The entry with the stamps of the files as they are now, if they differ from its stamps only in time (same
+    /// size, same content hash): its handwriting and preview follow. Null when it cannot be taken over (the lock is
+    /// not held).
+    EntryPtr adopt(const DocumentItem& item, const EntryPtr& e);
+    /// Compute the content hashes the entries of these documents lack (in the background, after an update).
+    void fillHashes(const std::vector<DocumentItem>& items, quint64 generation);
     /// Returns whether everything could be written.
     bool writeChanged();
     /// Remove `dir` and its parents while they are empty folders in the library's folder in the app cache.
@@ -524,7 +560,7 @@ private:
     std::atomic<bool> discarded{false};
     std::atomic<int> doneCount{0}, totalCount{0};
     std::atomic<int> docsRead{0}, pdfRead{0}, packWrites{0}, conversions{0}, handedOver{0}, titleReads{0},
-            kindReads{0}, keywordReads{0};
+            kindReads{0}, keywordReads{0}, adoptions{0}, hashCount{0};
     std::function<void(const fs::path&)> checkHook;
 };
 

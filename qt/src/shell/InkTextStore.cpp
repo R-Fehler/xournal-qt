@@ -283,6 +283,23 @@ void InkTextStore::moved(const fs::path& from, const fs::path& to) {
     scheduler->changed();
 }
 
+void InkTextStore::restamp(const fs::path& file, const QString& from, const QString& to) {
+    load(file.parent_path());
+    {
+        std::lock_guard lock(mtx);
+        Folder& f = folders[file.parent_path()];
+        auto it = f.docs.find(file.filename().string());
+        if (it == f.docs.end() || !it->second || it->second->stamp != from) {
+            return;
+        }
+        auto doc = std::make_shared<InkDoc>(*it->second);
+        doc->stamp = to;
+        it->second = std::move(doc);
+        f.changed = true;
+    }
+    scheduler->changed();
+}
+
 void InkTextStore::flush() {
     scheduler->cancel();
     writeChanged();

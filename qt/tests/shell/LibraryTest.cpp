@@ -1015,8 +1015,10 @@ TEST_F(LibraryTest, renamedAndMovedDocumentsKeepTheirIndex) {
     ASSERT_TRUE(model.moveTo(rowOf(root / "Archive"), "Semester"));  // a folder with both documents
     EXPECT_EQ(foundIn("unicorn"), root / "Semester" / "Archive" / "Week 1.xopp");
     EXPECT_EQ(index->pdfPagesRead(), pdfPagesAtStart) << "no PDF text is read again";
-    EXPECT_EQ(index->documentsRead(), 4) << "only the .xopp written again by the rename and the move (new PDF path); "
-                                            "the folder move reads nothing";
+    EXPECT_EQ(index->documentsRead(), 3) << "only the .xopp written again by the rename (new PDF path); the move "
+                                            "writes the same bytes again (the PDF's path relative to it stays), so its "
+                                            "entry is taken over by its content hash; the folder move reads nothing";
+    EXPECT_EQ(index->entriesAdopted(), 1);
     EXPECT_EQ(index->search("xournal").size(), 2u);
 
     index->flush();
