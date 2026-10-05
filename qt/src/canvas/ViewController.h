@@ -100,13 +100,17 @@ public:
 
     // --- scrolling sideways (the layout's horizontal mode) and presenting -------------------------------------
     /// A fit that is kept when the view changes size: sideways the rows fill the height, presenting the page
-    /// fills the screen. Zooming by hand ends it.
-    enum class Fit { None, Height, Page };
+    /// fills the screen, the audience's view of the presenter view a part of a page (Rect). Zooming by hand ends it.
+    enum class Fit { None, Height, Page, Rect };
     Fit keptFit() const { return kept; }
     /// Zoom so that all rows fill the height of the view (sideways: "fit to the window height"), and keep it.
     void fitHeight();
     /// Presenting: zoom so that the page fills the screen (as much as its shape allows), show it, and keep that.
     void fitPresentedPage(size_t page);
+    /// The audience's screen of the presenter view (qt/docs/presenter-view.md): zoom so that a part of a page (the
+    /// slide without its space for notes) fills the view as far as its shape allows, centre it, and keep that (also
+    /// when the view changes size or the pages move).
+    void fitPageRect(size_t page, QRectF rectPt);
     /// What a new view or layout starts with: sideways the height, else the width of the page.
     void fitDefault(std::optional<size_t> page = std::nullopt);
     /// Scrolling sideways, come to rest on whole pages (their group: a column, a pair) after a drag, a fling or a
@@ -176,6 +180,11 @@ private:
     void placeGroup(size_t group);
 
     Fit kept = Fit::None;
+    /// Fit::Rect: the page and its part (points)
+    size_t keptPage = 0;
+    QRectF keptRect;
+    /// Fit::Rect: zoom and scroll to it (no signals)
+    void placeKeptRect();
     bool snap = false;
     bool snapVertical = false;
     int snapMaxStep = 0;

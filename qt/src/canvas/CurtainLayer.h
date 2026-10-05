@@ -71,6 +71,10 @@ public:
     double rotation() const { return turn; }
     /// Put it there (tests; the page stays)
     void place(QPointF centre, QSizeF size, double rotation);
+    /// The audience's screen of the presenter view (CanvasView::setMirror): the same shape at the same place of the
+    /// same page as `other` (another view's of the same document), without handles; away when it is away or its page
+    /// is not in this view. Nothing changes (and nothing is drawn again) when it is there already.
+    void follow(const CurtainLayer& other);
 
     /// Its handles are shown: a drag on it moves it, its corners and edges size it, the knob turns it
     bool handlesShown() const { return visible() && withHandles; }

@@ -48,12 +48,21 @@ void ViewController::setViewSize(QSizeF size) {
             fitPresentedPage(std::exchange(pendingPage, std::nullopt).value_or(0));
             return;
         }
+        if (kept == Fit::Rect) {  // the audience's screen
+            pendingPage.reset();
+            fitPageRect(keptPage, keptRect);
+            return;
+        }
         fitDefault(pendingPage.value_or(0));
         if (pendingPage) {  // requested before the view had a size (e.g. a restored tab)
             const size_t page = *pendingPage;
             pendingPage.reset();
             scrollToPage(page);
         }
+        return;
+    }
+    if (kept == Fit::Rect) {
+        fitPageRect(keptPage, keptRect);
         return;
     }
     if (kept != Fit::None && layout->horizontal() && layout->pageCount() > 0) {
@@ -377,6 +386,16 @@ void ViewController::stepMomentum() {
 
 void ViewController::layoutChanged() {
     jumped = true;
+    if (kept == Fit::Rect && !view.isEmpty() && keptPage < layout->pageCount()) {
+        const double before = z;
+        placeKeptRect();  // (the pages moved: the same part of the same page)
+        if (z != before) {
+            settleTimer.start();
+            Q_EMIT zoomChanged();
+        }
+        Q_EMIT changed();
+        return;
+    }
     if (kept == Fit::Height && layout->horizontal() && !view.isEmpty()) {
         // (a page of another height: the rows fill the height again)
         const double fit = std::clamp(layout->fitHeightZoom(view.height()), minZoom(), maxZoom());
@@ -450,6 +469,36 @@ void ViewController::fitPresentedPage(size_t page) {
     placeGroup(layout->groupOf(page));
     pageJump = page;
     Q_EMIT changed();
+}
+
+void ViewController::fitPageRect(size_t page, QRectF rectPt) {
+    jumped = true;
+    kept = Fit::Rect;
+    keptPage = page;
+    keptRect = rectPt;
+    if (!initialized || view.isEmpty() || page >= layout->pageCount() || rectPt.isEmpty()) {
+        return;  // (fitted once the view has a size)
+    }
+    stopMomentum();
+    const double before = z;
+    placeKeptRect();
+    pageJump = page;
+    if (z != before) {
+        settleTimer.start();
+        Q_EMIT zoomChanged();
+    }
+    Q_EMIT changed();
+}
+
+void ViewController::placeKeptRect() {
+    if (keptRect.isEmpty() || keptPage >= layout->pageCount()) {
+        return;
+    }
+    z = std::clamp(std::min(view.width() / keptRect.width(), view.height() / keptRect.height()), minZoom(), maxZoom());
+    const QRectF p = layout->pageRect(keptPage, z);
+    const QPointF centre = p.topLeft() + keptRect.center() * z;
+    scrollPos = centre - QPointF(view.width() / 2, view.height() / 2);
+    clamp();
 }
 
 void ViewController::fitDefault(std::optional<size_t> page) {

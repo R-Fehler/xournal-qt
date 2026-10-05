@@ -97,6 +97,9 @@ CanvasPage::CanvasPage(CanvasView& view, PageRef page):
 }
 
 CanvasPage::~CanvasPage() {
+    // (a stroke being written, the laser pointer's ink: their views on the audience's page go with them)
+    eraseViewsOfHandler(inputHandler.get());
+    eraseViewsOfHandler(laserPointer.get());
     unregisterFromHandler();
     raster->detach();
     view.getRenderService().cancel(raster.get());
@@ -189,7 +192,7 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
         if (this->inputHandler) {
             // Upstream workaround for https://github.com/xournalpp/xournalpp/issues/4377
             g_warning("InputHandler already exists upon CanvasPage::onButtonPressEvent. Deleting it (and its views)");
-            eraseViewsOf(this->overlayViews, this->inputHandler.get());
+            eraseViewsOfHandler(this->inputHandler.get());
             this->inputHandler.reset();
         }
         switch (h->getDrawingType()) {
@@ -219,6 +222,7 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
             penfill::apply(*control.getSettings(), *h, *stroke);  // (its fill color, before its view is made)
         }
         this->overlayViews.emplace_back(this->inputHandler->createView(this));
+        mirrorViewOf(this->inputHandler.get(), false);  // (the audience sees it being written)
     } else if (toolType == TOOL_LASER_POINTER_PEN || toolType == TOOL_LASER_POINTER_HIGHLIGHTER) {
         // Port of XojPageView: one handler for the ink of the page until it faded out (never in the document)
         if (!this->laserPointer) {
@@ -226,6 +230,7 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
             this->laserPointer->onButtonPressEvent(pos, zoom);
             this->overlayViews.emplace_back(this->laserPointer->createView(this));
             drawOnce(*this->overlayViews.back());
+            mirrorViewOf(this->laserPointer.get(), true);  // (the audience sees where it points)
         } else {
             this->laserPointer->onButtonPressEvent(pos, zoom);
         }
@@ -382,6 +387,68 @@ void CanvasPage::removeOverlayViewsOf(const OverlayBase* o) {
     flagDirtyRegion(Range(0, 0, getWidth(), getHeight()));
 }
 
+// --- the audience's screen of the presenter view (CanvasView::setMirror) ---------------------------------------------
+
+CanvasPage* CanvasPage::mirrorPage() const {
+    CanvasView* m = view.mirror();
+    return m ? m->canvasPageOf(page.get()) : nullptr;
+}
+
+template <typename Handler>
+void CanvasPage::mirrorViewOf(const Handler* handler, bool once) {
+    // Upstream's handlers tell all their views (a DispatchPool): a second view of the stroke on the audience's page
+    // follows it as the first one does, and goes when the handler finishes it (or with eraseViewsOfHandler)
+    if (CanvasPage* m = mirrorPage(); m && handler) {
+        m->addMirroredView(handler, handler->createView(m), once);
+    }
+}
+
+void CanvasPage::addMirroredView(const OverlayBase* handler, std::unique_ptr<xoj::view::OverlayView> v, bool once) {
+    if (!v) {
+        return;
+    }
+    if (std::find(mirrored.begin(), mirrored.end(), handler) == mirrored.end()) {
+        mirrored.push_back(handler);
+    }
+    overlayViews.emplace_back(std::move(v));
+    if (once) {
+        drawOnce(*overlayViews.back());
+    }
+    flagDirtyRegion(Range(0, 0, getWidth(), getHeight()));
+}
+
+bool CanvasPage::isMirroredView(const xoj::view::OverlayView* v) const {
+    return std::any_of(mirrored.begin(), mirrored.end(), [v](const OverlayBase* h) { return v->isViewOf(h); });
+}
+
+void CanvasPage::dropMirroredViews() {
+    if (mirrored.empty()) {
+        return;
+    }
+    for (const OverlayBase* h: std::exchange(mirrored, {})) {
+        eraseViewsOf(overlayViews, h);
+    }
+    flagDirtyRegion(Range(0, 0, getWidth(), getHeight()));
+}
+
+size_t CanvasPage::mirroredViewCount() const {
+    return static_cast<size_t>(std::count_if(overlayViews.begin(), overlayViews.end(),
+                                             [this](const auto& v) { return isMirroredView(v.get()); }));
+}
+
+void CanvasPage::eraseViewsOfHandler(const OverlayBase* handler) {
+    if (!handler) {
+        return;
+    }
+    eraseViewsOf(overlayViews, handler);
+    if (CanvasPage* m = mirrorPage()) {
+        if (const auto it = std::find(m->mirrored.begin(), m->mirrored.end(), handler); it != m->mirrored.end()) {
+            m->mirrored.erase(it);
+            m->removeOverlayViewsOf(handler);
+        }
+    }
+}
+
 xoj::util::Point<int> CanvasPage::getPixelPosition() const {
     // Content pixels (upstream: the page's position in the layout, independent of scrolling).
     if (auto idx = view.indexOf(this)) {
@@ -412,7 +479,7 @@ void CanvasPage::drawOnce(const xoj::view::OverlayView& v) {
 
 void CanvasPage::deleteLaserPointerHandler() {
     // Port of XojPageView::deleteLaserPointerHandler: its view went with the last step of the fade
-    eraseViewsOf(this->overlayViews, this->laserPointer.get());
+    eraseViewsOfHandler(this->laserPointer.get());
     this->laserPointer.reset();
 }
 
@@ -460,6 +527,7 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
     const auto scope = view.actingScope(view.indexOf(this));
     if (this->inputHandler) {
         this->inputHandler->onButtonReleaseEvent(pos, getZoom());
+        eraseViewsOfHandler(this->inputHandler.get());  // (what it did not finish itself; and on the audience's)
         this->inputHandler.reset();
     } else if (const ToolType t = control.getToolHandler()->getToolType();
                this->laserPointer && (t == TOOL_LASER_POINTER_PEN || t == TOOL_LASER_POINTER_HIGHLIGHTER)) {
@@ -597,6 +665,7 @@ void CanvasPage::onSequenceCancelEvent(DeviceId deviceId) {
     currentSequenceDeviceId.reset();
     if (this->inputHandler) {
         this->inputHandler->onSequenceCancelEvent();
+        eraseViewsOfHandler(this->inputHandler.get());
         this->inputHandler.reset();
     } else if (this->laserPointer) {
         this->laserPointer->onSequenceCancelEvent();
@@ -909,7 +978,8 @@ void CanvasPage::flagDirtyRegion(const Range& rg) const {
 }
 
 void CanvasPage::drawAndDeleteToolView(xoj::view::ToolView* v, const Range& rg) {
-    if (v->isViewOf(this->inputHandler.get())) {
+    // (a stroke finished on the presenter's page: drawn onto the audience's page as well, until it is rendered)
+    if (v->isViewOf(this->inputHandler.get()) || isMirroredView(v)) {
         // Draw the inputHandler's view onto the page buffer (upstream: no re-render, no flicker).
         const bool drawn = raster->withBuffer([&](xoj::view::Mask& buffer) {
             if (auto* cr = buffer.get(); cr) {
