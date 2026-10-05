@@ -364,6 +364,24 @@ Popup {
                                    + "pen will write, or the crosshair. With the eraser it is the eraser itself, gray, "
                                    + "as big as it erases at the zoom (dashed when it erases whole strokes).")
                     }
+                    // The pen's gestures (qt/docs/pen-gestures.md)
+                    SectionTitle { text: qsTr("Gestures") }
+                    SwitchRow {
+                        objectName: "holdToStraightenSwitch"
+                        key: "holdToStraighten"; text: qsTr("Hold to straighten")
+                    }
+                    SliderRow {
+                        objectName: "holdToStraightenTimeSlider"
+                        visible: (sheet.s.revision, sheet.s.get("holdToStraighten"))
+                        key: "holdToStraightenTime"; text: qsTr("Hold for")
+                        from: 250; to: 2000; stepSize: 50
+                        factor: 0.001; decimals: 2; suffix: " s"
+                    }
+                    Hint {
+                        text: qsTr("Finish a line, a circle, an ellipse, a rectangle or a triangle with the pen or the "
+                                   + "highlighter and keep the pen still on the screen for a moment: the stroke becomes "
+                                   + "that shape, straight and neat. Undo brings the stroke back as you drew it.")
+                    }
                     SectionTitle { text: qsTr("Laser pointer") }
                     SliderRow {
                         objectName: "laserFadeSlider"

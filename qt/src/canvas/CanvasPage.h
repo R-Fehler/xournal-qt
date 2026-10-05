@@ -78,6 +78,9 @@ public:
     bool onMotionNotifyEvent(const PositionInputData& pos);
     bool onButtonReleaseEvent(const PositionInputData& pos);
     void onSequenceCancelEvent(DeviceId deviceId);
+    /// The pen rests at the end of a freehand stroke: it becomes the shape recognised in it (PenGestures.h, "Hold to
+    /// straighten"). False: no stroke being drawn here, or no shape in it.
+    bool straightenStroke();
 
     // --- display ----------------------------------------------------------------------------------------------
     struct BufferInfo {

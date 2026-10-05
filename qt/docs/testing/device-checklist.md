@@ -2985,3 +2985,19 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
 - [ ] First start after the update: the toolbox's first pen has the pen's color and width of before; the eraser
       erases as it did (standard, whiteout or whole strokes); the text box has the font of before.
 - [ ] Restart: the tool in hand is the entry taken last, with its color and width.
+
+## Hold to straighten (qt/pen-gestures, qt/docs/pen-gestures.md)
+- [ ] Surface pen, pen tool: draw a rough line and keep the pen still on the screen (about half a second): the line
+      becomes straight while the pen still rests (snapped to horizontal or vertical when close to it); lift: it stays.
+      The same for a rough rectangle, triangle, circle and ellipse.
+- [ ] A hand that shakes a little while resting still straightens; a slow careful stroke (a signature, slow
+      handwriting) is not straightened while it moves, and a short pause in the middle of a word changes nothing
+      unless it lasts the whole time.
+- [ ] Ctrl+Z after a straightened line: the stroke as drawn comes back; Ctrl+Z again: it is gone. Redo twice: the line.
+- [ ] A scribble (no shape) held still: nothing happens, writing on after the pause continues the same stroke.
+- [ ] After the shape appeared, moving the pen before lifting draws nothing (also when it moves onto the next page).
+- [ ] The highlighter: a rough underline held still becomes a straight underline, still see-through.
+- [ ] A press held still without moving still opens the long-press menu (not a shape).
+- [ ] Settings → Pen → Gestures: "Hold to straighten" off: no straightening; on with "Hold for" at 1.0 s: half a
+      second is not enough, a second is.
+- [ ] On a sticky note and on a PDF page: the shape lands where the stroke was, in the note.

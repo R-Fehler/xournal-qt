@@ -26,6 +26,7 @@
 
 #include "CanvasMemory.h"
 #include "HoverPointer.h"
+#include "PenGestures.h"
 #include "ScreenCalibration.h"
 #include "Todos.h"
 
@@ -136,6 +137,11 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
     // The laser pointer's ink starts to fade this long after the pen is lifted (ms; upstream's setting, 500 ms)
     add("laserPointerFadeOutTime", [&s] { return QVariant(static_cast<int>(s.getLaserPointerFadeOutTime())); },
         [&s](const QVariant& v) { s.setLaserPointerFadeOutTime(static_cast<unsigned int>(std::clamp(v.toInt(), 0, 60000))); });
+    // The pen's gestures (qt/docs/pen-gestures.md): hold to straighten, and how long the pen rests for it (ms)
+    add("holdToStraighten", [&s] { return QVariant(pengestures::holdToStraighten(s)); },
+        [&s](const QVariant& v) { pengestures::setHoldToStraighten(s, v.toBool()); });
+    add("holdToStraightenTime", [&s] { return QVariant(pengestures::holdTime(s)); },
+        [&s](const QVariant& v) { pengestures::setHoldTime(s, v.toInt()); });
     // Tool of the pen's eraser end / side button (upstream button "eraser") and of the first barrel button.
     auto buttonTool = [this](Button button) {
         return std::pair{[this, button] {

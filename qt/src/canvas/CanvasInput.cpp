@@ -34,6 +34,7 @@
 #include "StickyNotes.h"
 #include "MarkdownBoxResize.h"
 #include "MarkdownEditor.h"
+#include "PenGestures.h"
 #include "Snip.h"
 #include "session/DocumentSession.h"
 
@@ -87,6 +88,9 @@ CanvasInput::CanvasInput(CanvasView& view, QObject* parent): QObject(parent), vi
     penHoldTimer.setSingleShot(true);
     penHoldTimer.setInterval(LONG_PRESS_MS);
     connect(&penHoldTimer, &QTimer::timeout, this, [this] { penHeld(); });
+    // The pen resting at the end of a stroke: hold to straighten
+    straightenTimer.setSingleShot(true);
+    connect(&straightenTimer, &QTimer::timeout, this, [this] { penRested(); });
     wheelSnapTimer.setSingleShot(true);
     wheelSnapTimer.setInterval(180);
     connect(&wheelSnapTimer, &QTimer::timeout, this, [this] { this->view.getViewController().endScroll({}); });
@@ -103,6 +107,69 @@ void CanvasInput::startPenHold(const Event& event) {
     }
     penHoldPos = event.viewPos;
     penHoldTimer.start();
+}
+
+void CanvasInput::armStraighten(const Event& event) {
+    stopStraighten();
+    if (event.deviceClass != DeviceClass::Pen || !inputRunning || !sequenceStartPage || view.textMode() ||
+        view.isReadingOnly()) {
+        return;
+    }
+    ToolHandler* h = view.getSession().getToolHandler();
+    const ToolType tool = h->getToolType();
+    const DrawingType drawing = h->getDrawingType();
+    Settings& settings = *view.getSession().getSettings();
+    if ((tool != TOOL_PEN && tool != TOOL_HIGHLIGHTER) ||
+        (drawing != DRAWING_TYPE_DEFAULT && drawing != DRAWING_TYPE_SHAPE_RECOGNIZER) ||
+        !pengestures::holdToStraighten(settings)) {
+        return;
+    }
+    straightenArmed = true;
+    straightenHoldMs = pengestures::holdTime(settings);
+    straightenPos = event.viewPos;
+}
+
+void CanvasInput::trackStraighten(const Event& event) {
+    if (!straightenArmed ||
+        std::hypot(event.viewPos.x() - straightenPos.x(), event.viewPos.y() - straightenPos.y()) <=
+                pengestures::HOLD_SLOP_PX) {
+        return;  // (resting: the time runs on)
+    }
+    straightenPos = event.viewPos;
+    straightenMovedMs = monotonicMs();
+    straightenMoved = true;
+    if (!straightenTimer.isActive()) {
+        straightenTimer.start(straightenHoldMs);  // (moving on restarts nothing: penRested looks at the time)
+    }
+}
+
+void CanvasInput::stopStraighten() {
+    straightenTimer.stop();
+    straightenArmed = false;
+    straightenMoved = false;
+    straightened = false;
+}
+
+void CanvasInput::penRested() {
+    if (!straightenArmed || !straightenMoved || !deviceClassPressed || runningDeviceClass != DeviceClass::Pen ||
+        !inputRunning) {
+        return;
+    }
+    const double still = monotonicMs() - straightenMovedMs;
+    if (still < straightenHoldMs) {
+        straightenTimer.start(std::max(1, static_cast<int>(std::ceil(straightenHoldMs - still))));
+        return;  // it moved meanwhile: wait for the rest of the time from then
+    }
+    CanvasPage* page = sequenceStartPage;
+    if (!page && lastEvent) {
+        page = view.pageAt(lastEvent->viewPos);
+    }
+    if (page && page->straightenStroke()) {
+        straightenArmed = false;
+        straightened = true;  // (the pen does nothing more until it is lifted)
+        Q_EMIT view.updateRequested();
+    }
+    // (no shape: it may rest again later, after moving on)
 }
 
 bool CanvasInput::penHoldTool() const {
@@ -150,6 +217,7 @@ bool CanvasInput::tabletEvent(QTabletEvent* e, QPointF viewPos) {
     // change, possibly while the tip is down. Finish the running action of the previous tool first.
     if (inputRunning && runningDeviceClass && *runningDeviceClass != ev.deviceClass && lastEvent) {
         penHoldTimer.stop();
+        stopStraighten();
         actionEnd(*lastEvent);
         deviceClassPressed = false;
         runningDeviceClass.reset();
@@ -167,11 +235,13 @@ bool CanvasInput::tabletEvent(QTabletEvent* e, QPointF viewPos) {
                 runningDeviceClass = ev.deviceClass;
                 actionStart(ev);
                 startPenHold(ev);
+                armStraighten(ev);
             } else if (e->button() == Qt::MiddleButton || e->button() == Qt::RightButton) {
                 // Port of StylusInputHandler: a barrel button press changes the tool; during a stroke, the stroke
                 // ends and a new one starts with the button's tool.
                 (e->button() == Qt::MiddleButton ? modifier2 : modifier3) = true;
                 penHoldTimer.stop();
+                stopStraighten();
                 if (inputRunning) {
                     actionEnd(ev);
                     actionStart(ev);
@@ -184,17 +254,24 @@ bool CanvasInput::tabletEvent(QTabletEvent* e, QPointF viewPos) {
             if (penHoldFired) {
                 break;  // held still: the window offers what can be done here; nothing more until the pen is lifted
             }
+            if (straightened) {
+                break;  // the stroke became a shape: nothing more until the pen is lifted (no new stroke on another page)
+            }
             if (penHoldTimer.isActive() && std::hypot(viewPos.x() - penHoldPos.x(), viewPos.y() - penHoldPos.y()) >
                                                    PEN_HOLD_SLOP_PX) {
                 penHoldTimer.stop();  // it moved: writing (also when it rests later)
             }
             if (deviceClassPressed) {
                 actionMotion(ev);
+                trackStraighten(ev);
             }
             break;
         case QEvent::TabletRelease:
             if (e->button() == Qt::LeftButton) {
                 penHoldTimer.stop();
+                // (straightened: the release goes where the stroke ended, its page ends the input sequence)
+                const Event release = straightened && lastEvent ? *lastEvent : ev;
+                stopStraighten();
                 if (penHoldFired) {
                     // The stroke was taken back when the long press was noticed: only the tool goes back (a barrel
                     // button may have lent another one)
@@ -203,13 +280,14 @@ bool CanvasInput::tabletEvent(QTabletEvent* e, QPointF viewPos) {
                         h->fireToolChanged();
                     }
                 } else if (deviceClassPressed) {
-                    actionEnd(ev);
+                    actionEnd(release);
                 }
                 deviceClassPressed = false;
                 runningDeviceClass.reset();
             } else if (e->button() == Qt::MiddleButton || e->button() == Qt::RightButton) {
                 (e->button() == Qt::MiddleButton ? modifier2 : modifier3) = false;
                 penHoldTimer.stop();
+                stopStraighten();
                 if (inputRunning) {
                     actionEnd(ev);
                     actionStart(ev);
@@ -240,6 +318,7 @@ void CanvasInput::proximityEvent(bool entered) {
         modifier2 = modifier3 = false;
         penHoldTimer.stop();
         penHoldFired = false;
+        stopStraighten();
         if (inputRunning && lastEvent) {
             actionEnd(*lastEvent);
         }
