@@ -40,6 +40,11 @@ enum class TextKind { Pdf, Markdown };
 TextKind newTextDocuments(Settings& settings);
 void setNewTextDocuments(Settings& settings, TextKind kind);
 
+/// Version history (qt/docs/hybrid-pdf.md, "Version history"): a document that becomes a PDF with notes keeps its
+/// versions from its first save ("keepVersionsOfNewPdfs", off unless set).
+bool keepVersionsOfNewPdfs(Settings& settings);
+void setKeepVersionsOfNewPdfs(Settings& settings, bool on);
+
 QString nameOf(Mode mode);  ///< "xopp", "pdf", "" (Unset)
 Mode fromName(const QString& name);  ///< Unset for anything else
 

@@ -1385,6 +1385,25 @@ bool DocumentSession::filesChangedOnDisk() {
 
 bool DocumentSession::isHybrid() const { return hasExtension(getFilePath(), ".pdf"); }
 
+bool DocumentSession::keepsVersions() const {
+    if (versionsChoice) {
+        return *versionsChoice;
+    }
+    std::error_code ec;
+    if (isHybrid() && fs::exists(getFilePath(), ec) && HybridPdf::isHybrid(getFilePath())) {
+        return HybridPdf::markerOf(getFilePath()).history;
+    }
+    return DocumentMode::keepVersionsOfNewPdfs(*app.getSettings());
+}
+
+void DocumentSession::setKeepsVersions(bool on) {
+    if (on == keepsVersions() && !versionsChoice) {
+        return;
+    }
+    versionsChoice = on;
+    Q_EMIT versionsChanged();
+}
+
 bool DocumentSession::hasEarlierRevisions() const {
     std::error_code ec;
     return isHybrid() && fs::exists(getFilePath(), ec) && HybridPdf::hasEarlierRevisions(getFilePath());
