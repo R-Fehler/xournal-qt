@@ -2924,3 +2924,8 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
 - [ ] Erase across a grouped stroke with the stroke eraser's partial mode: the pieces still belong to the group.
 - [ ] Duplicate a page with a group, drag the group from the first page onto the copy: there they are two groups (a
       tap selects only the dragged one).
+- [ ] Copy a group (Ctrl+C), paste (Ctrl+V): the copy is a group of its own (a tap selects the copy only, not the
+      original as well). Cut and paste: still a group.
+- [ ] Copy a group here and paste it into Xournal++ (running at the same time): pasted, ungrouped, nothing missing.
+      Copy in Xournal++ and paste here: pasted, ungrouped.
+- [ ] Several sticky notes with a grouped figure (Select more), copied and pasted: the figure is still a group.

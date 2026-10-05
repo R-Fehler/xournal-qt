@@ -676,6 +676,12 @@ bool MixedSelection::pasteGroup(size_t pNr, sticky::Group content, std::optional
     if (!group->elements.empty()) {
         auto undo = std::make_unique<AddUndoAction>(onPage, false);
         std::unique_lock lock(*doc);
+        // xournal-qt: copied groups get new numbers: they never join one of the page's (qt/docs/groups.md)
+        std::vector<Element*> pasted;
+        for (const auto& e: group->elements) {
+            pasted.push_back(e.get());
+        }
+        groups::renumber(pasted, *doc);
         for (size_t i = 0; i < group->elements.size(); ++i) {
             Layer* into = group->markdown[i] ? mdLayer : own;
             Element* e = group->elements[i].get();

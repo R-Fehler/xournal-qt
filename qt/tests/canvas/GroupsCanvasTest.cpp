@@ -311,3 +311,58 @@ TEST_F(GroupsCanvasTest, aGroupMovedToAnotherPageDoesNotJoinAGroupThere) {
     EXPECT_EQ(selected().size(), 2u);
 }
 
+// --- the clipboard -----------------------------------------------------------------------------------------------
+
+// Copied: upstream's data as it is (Xournal++ pastes it) and the groups beside it; pasted: a group of its own (a new
+// number), never joined to the one it was copied from
+TEST_F(GroupsCanvasTest, aCopiedGroupIsPastedAsANewGroup) {
+    addStroke(100, 100, 200, 100, 4);
+    addStroke(100, 140, 200, 140, 4);
+    addStroke(400, 100, 500, 100);
+    view->selectAllOnPage();
+    ASSERT_TRUE(view->copySelection());
+    const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+    ASSERT_TRUE(mime->hasFormat("application/xournal"));
+    ASSERT_TRUE(mime->hasFormat(groups::CLIPBOARD_MIME));
+    EXPECT_EQ(mime->data(groups::CLIPBOARD_MIME).toStdString(), "4 4 0");
+    view->clearSelection();
+    ASSERT_TRUE(view->pasteElements());
+    view->clearSelection();
+    const auto groups = groupsOnPage();
+    ASSERT_EQ(groups.size(), 6u);
+    EXPECT_EQ(groups[3], groups[4]);
+    EXPECT_NE(groups[3], 0u);
+    EXPECT_NE(groups[3], 4u) << "a group of its own";
+    EXPECT_EQ(groups[5], 0u);
+    // Upstream's data without ours (copied in Xournal++): pasted without groups
+    auto* plain = new QMimeData;
+    plain->setData("application/xournal", mime->data("application/xournal"));
+    QGuiApplication::clipboard()->setMimeData(plain);
+    ASSERT_TRUE(view->pasteElements());
+    view->clearSelection();
+    const auto after = groupsOnPage();
+    ASSERT_EQ(after.size(), 9u);
+    EXPECT_EQ(after[6], 0u);
+    EXPECT_EQ(after[7], 0u);
+}
+
+// A selection of notes with elements keeps its groups on the clipboard (the fork's format), pasted with new numbers
+TEST_F(GroupsCanvasTest, groupsInACopiedSelectionOfNotesAndElements) {
+    Stroke* a = addStroke(100, 100, 200, 100, 4);
+    Stroke* b = addStroke(100, 140, 200, 140, 4);
+    std::vector<const Element*> elements{a, b};
+    const std::string bytes = sticky::serializeGroup(xoj::util::Rectangle<double>(100, 100, 100, 40), {}, elements);
+    auto read = sticky::deserializeGroup(bytes.data(), bytes.size());
+    ASSERT_TRUE(read);
+    ASSERT_EQ(read->elements.size(), 2u);
+    EXPECT_EQ(read->elements[0]->getGroup(), 4u);
+    EXPECT_EQ(read->elements[1]->getGroup(), 4u);
+    // Pasted (as a sticker is): one new group
+    ASSERT_TRUE(view->pasteSticker(bytes));
+    view->clearSelection();
+    const auto groups = groupsOnPage();
+    ASSERT_EQ(groups.size(), 4u);
+    EXPECT_EQ(groups[2], groups[3]);
+    EXPECT_NE(groups[2], 4u);
+}
+

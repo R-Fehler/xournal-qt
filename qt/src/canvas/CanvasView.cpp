@@ -479,6 +479,14 @@ bool CanvasView::copySelection() {
     auto* mime = new QMimeData;
     mime->setData(XOURNAL_MIME, QByteArray(data->str, static_cast<qsizetype>(data->len)));
     g_string_free(data, TRUE);
+    // xournal-qt: the groups beside it (qt/docs/groups.md), only when there are any
+    std::vector<const Element*> copied;
+    for (const Element* e: selection->getElementsView()) {
+        copied.push_back(e);
+    }
+    if (groups::stateOf(copied).canUngroup) {
+        mime->setData(groups::CLIPBOARD_MIME, QByteArray::fromStdString(groups::clipboardNumbers(copied)));
+    }
     QString text;
     for (const Element* e: selection->getElementsView()) {
         if (e->getType() == ELEMENT_TEXT) {
@@ -779,6 +787,13 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
         sel->readSerialized(in);
         const int count = in.readInt();
         auto undo = std::make_unique<AddUndoAction>(page, false);
+        // xournal-qt: their groups (qt/docs/groups.md), with new numbers on this page
+        std::vector<groups::Id> pastedGroups;
+        if (mime->hasFormat(groups::CLIPBOARD_MIME)) {
+            pastedGroups = groups::fromClipboard(mime->data(groups::CLIPBOARD_MIME).toStdString(),
+                                                 static_cast<size_t>(std::max(0, count)));
+        }
+        std::vector<Element*> pasted;
         for (int i = 0; i < count; i++) {
             const std::string name = in.getNextObjectName();
             ElementPtr element;
@@ -796,8 +811,14 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
                 throw InputStreamException("Unknown object " + name, __FILE__, __LINE__);
             }
             element->readSerialized(in);
+            element->setGroup(pastedGroups.empty() ? 0 : pastedGroups[static_cast<size_t>(i)]);
+            pasted.push_back(element.get());
             undo->addElement(layer, element.get(), layer->indexOf(element.get()));
             sel->addElement(std::move(element), std::numeric_limits<Element::Index>::max());
+        }
+        {
+            std::shared_lock lock(*doc);
+            groups::renumber(pasted, *doc);
         }
         session.getUndoRedoHandler()->addUndoAction(std::move(undo));
 

@@ -271,7 +271,7 @@ thread_local std::optional<Rectangle<double>> changingNote;
 /// copies its whole buffer for each stroke it reads (ObjectInputStream::readData), so one stream for a note with
 /// hundreds of strokes took quadratic time (15 ms to read a note with 300 strokes, now 1-3 ms). The name changed
 /// with the format: a note copied by an older version is not pasted (not misread).
-constexpr const char* CLIPBOARD_OBJECT = "StickyNote2";
+constexpr const char* CLIPBOARD_OBJECT = "StickyNote3";  // (3: with the elements' groups, qt/docs/groups.md)
 }  // namespace
 
 NoteLayerChange::NoteLayerChange(const Layer& layer): before(changingNote) {
@@ -617,10 +617,12 @@ void writeElement(ObjectOutputStream& out, const Element& e) {
     GString* bytes = one.stealData();
     out.writeImage(std::string_view(bytes->str, bytes->len));
     g_string_free(bytes, TRUE);
+    out.writeUInt(e.getGroup());  // (not in upstream's serialization: qt/docs/groups.md)
 }
 /// An element written by writeElement (nullptr: not one)
 ElementPtr readElement(ObjectInputStream& in) {
     const std::string bytes = in.readImage();
+    const uint32_t group = in.readUInt();
     ObjectInputStream one;
     if (!one.read(bytes.data(), bytes.size())) {
         return nullptr;
@@ -641,6 +643,7 @@ ElementPtr readElement(ObjectInputStream& in) {
         return nullptr;
     }
     element->readSerialized(one);
+    element->setGroup(group);
     return element;
 }
 }  // namespace
@@ -755,7 +758,7 @@ xoj::util::Point<double> groupPastePlace(const Rectangle<double>& bounds,
 // --- several notes and elements together ------------------------------------------------------------------------
 
 namespace {
-constexpr const char* GROUP_CLIPBOARD_OBJECT = "StickyGroup1";
+constexpr const char* GROUP_CLIPBOARD_OBJECT = "StickyGroup2";  // (2: with the elements' groups)
 }
 
 std::string serializeGroup(const Rectangle<double>& bounds, const std::vector<const Layer*>& notes,
