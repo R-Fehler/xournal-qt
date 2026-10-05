@@ -9,7 +9,9 @@
  * One document at a time: it is loaded on a worker at low priority, its pages go to the recognition worker
  * (InkRecognitionService) with the lowest priority (after every open document), two at a time, each a copy of its
  * strokes; lines read before (its entry in the library's cache, also of an older version of the file) are not read
- * again. The result goes into the folder's "ink-text" pack (InkTextStore). Documents whose handwriting is in the pack
+ * again. With several models, the document's language decides which read its lines (hwr/LanguagePlan.h: the user's
+ * choice and the decision kept in its entry, else found from its first lines and kept). The result goes into the
+ * folder's "ink-text" pack (InkTextStore). Documents whose handwriting is in the pack
  * for the file as it is now are skipped (LibraryIndex::inkCandidates).
  *
  * UI thread.

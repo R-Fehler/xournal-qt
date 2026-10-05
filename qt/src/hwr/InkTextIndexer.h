@@ -10,7 +10,9 @@
  *  - the page in view first, then the others from there outwards; the document in front before the others
  *    (setFocused);
  *  - two pages at a time at most are with the worker (each a copy of its strokes);
- *  - pages left incomplete because the recogniser was not ready are read again when it is (recognizerChanged).
+ *  - pages left incomplete because the recogniser was not ready are read again when it is (recognizerChanged);
+ *  - with several models, the document's LanguagePlan says which read its lines (its language, found from its first
+ *    lines, or the user's choice); a new choice looks at every page again.
  * What it read (the lines of each page and their results) is what the library keeps for the document when it is saved
  * (pages()).
  *
@@ -29,6 +31,7 @@
 #include <QTimer>
 
 #include "InkRecognitionService.h"
+#include "LanguagePlan.h"
 
 class XojPage;
 
@@ -43,7 +46,9 @@ class InkTextIndexer final: public QObject {
 public:
     static constexpr int DELAY_MS = 2000;
 
-    InkTextIndexer(DocumentSession& session, InkRecognitionService& service, QObject* parent = nullptr);
+    /// `plan`: which models read the document's lines (LanguagePlan.h; null: a new one, Automatic).
+    InkTextIndexer(DocumentSession& session, InkRecognitionService& service, QObject* parent = nullptr,
+                   std::shared_ptr<LanguagePlan> plan = nullptr);
     ~InkTextIndexer() override;
 
     /// How long after opening and after the last edit pages are read (tests; default DELAY_MS).
@@ -52,6 +57,11 @@ public:
     void setFocused(bool focused);
     /// Start now, without the delay (tests, a search started).
     void start();
+    /// The document's plan of which models read its lines (its decision is kept with the results).
+    const std::shared_ptr<LanguagePlan>& plan() const { return languages; }
+    /// The user chose the document's handwriting language: its pages are looked at again (lines the chosen model did
+    /// not read yet are read by it).
+    void setLanguageChoice(LanguagePlan::Choice choice);
 
     /// What was read per page (in the document's order): its lines, and whether all of them were read. Pages not read
     /// yet (or changed since) have no entry (`known` false).
@@ -90,6 +100,7 @@ private:
 
     DocumentSession& session;
     InkRecognitionService& service;
+    std::shared_ptr<LanguagePlan> languages;
     std::map<const XojPage*, Indexed> indexed;
     std::set<const XojPage*> dirty;
     std::map<quint64, Outstanding> outstanding;

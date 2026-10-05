@@ -70,19 +70,30 @@ QCborMap InkTextStore::encode(const InkDoc& doc) {
             QCborArray word{tenths(w.box.x()), tenths(w.box.y()), tenths(w.box.width()), tenths(w.box.height()),
                             bytes255(w.conf)};
             for (size_t i = 0; i < w.candidates.size(); ++i) {
-                // (the best reading as recognised, the others as their letters: what the search matches)
+                // (the best reading as recognised, the others as their letters: what the search matches; the share
+                // with the models that read it above its 8 bits)
                 word.append(i == 0 ? w.text : words::textOf(w.candidates[i].word));
-                word.append(bytes255(w.candidates[i].p));
+                word.append(bytes255(w.candidates[i].p) | (static_cast<qint64>(w.candidates[i].models) << 8));
             }
             line.append(word);
         }
+        if (result->models != 0) {
+            line.append(static_cast<qint64>(result->models));  // (the models that read the line: not a word)
+        }
         results.append(line);
     }
-    return QCborMap{{QStringLiteral("stamp"), doc.stamp},
-                    {QStringLiteral("rec"), doc.recognizer},
-                    {QStringLiteral("complete"), doc.complete},
-                    {QStringLiteral("pages"), pages},
-                    {QStringLiteral("lines"), results}};
+    QCborMap out{{QStringLiteral("stamp"), doc.stamp},
+                 {QStringLiteral("rec"), doc.recognizer},
+                 {QStringLiteral("complete"), doc.complete},
+                 {QStringLiteral("pages"), pages},
+                 {QStringLiteral("lines"), results}};
+    if (!doc.language.isEmpty()) {
+        out.insert(QStringLiteral("lang"), doc.language);
+    }
+    if (!doc.languageChoice.isEmpty() && doc.languageChoice != QLatin1String("auto")) {
+        out.insert(QStringLiteral("langChoice"), doc.languageChoice);
+    }
+    return out;
 }
 
 std::shared_ptr<InkDoc> InkTextStore::decode(const QCborMap& map) {
@@ -93,6 +104,8 @@ std::shared_ptr<InkDoc> InkTextStore::decode(const QCborMap& map) {
     doc->stamp = map.value(QStringLiteral("stamp")).toString();
     doc->recognizer = map.value(QStringLiteral("rec")).toString();
     doc->complete = map.value(QStringLiteral("complete")).toBool();
+    doc->language = map.value(QStringLiteral("lang")).toString();
+    doc->languageChoice = map.value(QStringLiteral("langChoice")).toString();
     std::unordered_map<quint64, std::shared_ptr<const ink::LineResult>> lines;
     for (const QCborValue& lv: map.value(QStringLiteral("lines")).toArray()) {
         const QCborArray line = lv.toArray();
@@ -101,6 +114,10 @@ std::shared_ptr<InkDoc> InkTextStore::decode(const QCborMap& map) {
         }
         auto result = std::make_shared<ink::LineResult>();
         for (qsizetype k = 1; k < line.size(); ++k) {
+            if (line.at(k).isInteger()) {
+                result->models = static_cast<uint32_t>(line.at(k).toInteger());
+                continue;
+            }
             const QCborArray word = line.at(k).toArray();
             if (word.size() < 7) {
                 continue;
@@ -113,7 +130,10 @@ std::shared_ptr<InkDoc> InkTextStore::decode(const QCborMap& map) {
                 if (i == 5) {
                     w.text = text;
                 }
-                w.candidates.push_back(ink::candidate(text, from255(word.at(i + 1))));
+                const qint64 v = word.at(i + 1).toInteger();
+                ink::Candidate c = ink::candidate(text, static_cast<float>(v & 0xff) / 255.0f);
+                c.models = static_cast<uint8_t>((v >> 8) & 0xff);
+                w.candidates.push_back(c);
             }
             result->words.push_back(std::move(w));
         }
@@ -202,7 +222,30 @@ void InkTextStore::put(const fs::path& file, InkDoc doc) {
             return;
         }
         Folder& f = folders[file.parent_path()];
-        f.docs[file.filename().string()] = std::make_shared<const InkDoc>(std::move(doc));
+        auto& entry = f.docs[file.filename().string()];
+        doc.languageChoice = entry ? entry->languageChoice : QString();  // (the user's: only setLanguageChoice)
+        entry = std::make_shared<const InkDoc>(std::move(doc));
+        f.changed = true;
+    }
+    scheduler->changed();
+}
+
+void InkTextStore::setLanguageChoice(const fs::path& file, const QString& choice) {
+    load(file.parent_path());
+    {
+        std::lock_guard lock(mtx);
+        if (discarded) {
+            return;
+        }
+        Folder& f = folders[file.parent_path()];
+        auto& entry = f.docs[file.filename().string()];
+        auto doc = entry ? std::make_shared<InkDoc>(*entry) : std::make_shared<InkDoc>();
+        const QString value = choice == QLatin1String("auto") ? QString() : choice;
+        if (entry && doc->languageChoice == value) {
+            return;
+        }
+        doc->languageChoice = value;
+        entry = std::move(doc);
         f.changed = true;
     }
     scheduler->changed();

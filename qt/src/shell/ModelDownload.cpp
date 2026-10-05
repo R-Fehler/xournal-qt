@@ -12,27 +12,46 @@
 namespace xqt {
 
 namespace {
-/// The model this build downloads: Xenova's ONNX export of TrOCR-small handwritten (MIT), int8. The revision and the
-/// sha256 of each file are pinned by the author (qt/scripts/hwr-model.sh prints them); until then nothing is
-/// downloaded, and the model comes from the script (qt/docs/handwriting-search.md).
-ModelDownload::Model builtIn() {
-    ModelDownload::Model m;
-    m.name = QStringLiteral("trocr-small-hw-int8");
-    m.source = QStringLiteral("https://huggingface.co/Xenova/trocr-small-handwritten");
-    m.revision = QString();  // TODO(author): the commit hwr-model.sh printed
-    m.encoder = QStringLiteral("onnx/encoder_model_quantized.onnx");
-    m.decoder = QStringLiteral("onnx/decoder_model_merged_quantized.onnx");
-    m.tokenizer = QStringLiteral("tokenizer.json");
+/// The models this build downloads.
+/// English: Xenova's ONNX export of TrOCR-small handwritten (MIT), int8. The revision and the sha256 of each file are
+/// pinned by the author (qt/scripts/hwr-model.sh prints them); until then nothing is downloaded, and the model comes
+/// from the script (qt/docs/handwriting-search.md).
+/// German: the project's own CTC model (qt/research/hwr/train, FORMATS.md "kind": "ctc"), pinned when it is published;
+/// until then a folder holding one can be chosen in Settings.
+std::vector<ModelDownload::Model> builtIn() {
+    ModelDownload::Model en;
+    en.name = QStringLiteral("trocr-small-hw-int8");
+    en.language = QStringLiteral("en");
+    en.kind = QStringLiteral("trocr");
+    en.source = QStringLiteral("https://huggingface.co/Xenova/trocr-small-handwritten");
+    en.revision = QString();  // TODO(author): the commit hwr-model.sh printed
+    en.encoder = QStringLiteral("onnx/encoder_model_quantized.onnx");
+    en.decoder = QStringLiteral("onnx/decoder_model_merged_quantized.onnx");
+    en.tokenizer = QStringLiteral("tokenizer.json");
     // (sizes: about 23 and 41 MB, measured in the research; the exact ones and the sha256 are pinned with the revision)
-    m.files = {{m.encoder, QString(), 23 * 1024 * 1024},
-               {m.decoder, QString(), 41 * 1024 * 1024},
-               {m.tokenizer, QString(), 1024 * 1024},
-               {QStringLiteral("generation_config.json"), QString(), 1024},
-               {QStringLiteral("preprocessor_config.json"), QString(), 1024}};
-    return m;
+    en.files = {{en.encoder, QString(), 23 * 1024 * 1024},
+                {en.decoder, QString(), 41 * 1024 * 1024},
+                {en.tokenizer, QString(), 1024 * 1024},
+                {QStringLiteral("generation_config.json"), QString(), 1024},
+                {QStringLiteral("preprocessor_config.json"), QString(), 1024}};
+    en.unpinned = QObject::tr("This version of the app does not name the model's files yet: install it with "
+                              "qt/scripts/hwr-model.sh (see the handwriting search's documentation).");
+    ModelDownload::Model de;
+    de.name = QStringLiteral("crnn-de");
+    de.language = QStringLiteral("de");
+    de.kind = QStringLiteral("ctc");
+    de.source = QStringLiteral("https://huggingface.co/xournal-qt/crnn-de");  // TODO(author): where it is published
+    de.revision = QString();
+    // (about 10 MB: a small CRNN in int8; the files, sizes and sha256 are pinned when it is published)
+    de.files = {{QStringLiteral("model.json"), QString(), 4 * 1024},
+                {QStringLiteral("model_int8.onnx"), QString(), 10 * 1024 * 1024},
+                {QStringLiteral("alphabet.txt"), QString(), 1024}};
+    de.unpinned = QObject::tr("The German model is not published yet. Choose a folder that holds one (with its "
+                              "model.json) instead.");
+    return {en, de};
 }
 
-const ModelDownload::Model* testModel = nullptr;
+const std::vector<ModelDownload::Model>* testModels = nullptr;
 
 QString sha256Of(const QByteArray& data) {
     return QString::fromLatin1(QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex());
@@ -66,21 +85,31 @@ bool ModelDownload::Model::pinned() const {
            std::all_of(files.begin(), files.end(), [](const File& f) { return f.sha256.size() == 64; });
 }
 
-const ModelDownload::Model& ModelDownload::model() {
-    static const Model m = builtIn();
-    return testModel ? *testModel : m;
+const std::vector<ModelDownload::Model>& ModelDownload::catalogue() {
+    static const std::vector<Model> all = builtIn();
+    return testModels ? *testModels : all;
 }
 
-void ModelDownload::setModel(const Model* m) { testModel = m; }
+void ModelDownload::setCatalogue(const std::vector<Model>* models) { testModels = models; }
+
+const ModelDownload::Model* ModelDownload::modelFor(const QString& language) {
+    for (const Model& m: catalogue()) {
+        if (m.language == language) {
+            return &m;
+        }
+    }
+    return nullptr;
+}
 
 QByteArray ModelDownload::manifestOf(const Model& m) {
-    QString s = QStringLiteral("{\n  \"name\": \"%1\",\n  \"source\": \"%2\",\n  \"revision\": \"%3\",\n"
+    QString s = QStringLiteral("{\n  \"kind\": \"trocr\",\n  \"languages\": [\"%9\"],\n  \"name\": \"%1\",\n  \"source\": \"%2\",\n  \"revision\": \"%3\",\n"
                                "  \"license\": \"MIT\",\n  \"encoder\": \"%4\",\n  \"decoder\": \"%5\",\n"
                                "  \"tokenizer\": \"%6\",\n  \"decoder_start_token_id\": %7,\n  \"eos_token_id\": %8,\n"
                                "  \"image_size\": 384,\n  \"files\": {\n")
                         .arg(m.name, m.source, m.revision, m.encoder, m.decoder, m.tokenizer)
                         .arg(m.start)
-                        .arg(m.end);
+                        .arg(m.end)
+                        .arg(m.language.isEmpty() ? QStringLiteral("en") : m.language);
     for (size_t i = 0; i < m.files.size(); ++i) {
         s += QStringLiteral("    \"%1\": {\"sha256\": \"%2\", \"size\": %3}%4\n")
                      .arg(m.files[i].path, m.files[i].sha256.toLower())
@@ -91,8 +120,8 @@ QByteArray ModelDownload::manifestOf(const Model& m) {
     return s.toUtf8();
 }
 
-ModelDownload::ModelDownload(QString folder, QObject* parent):
-        QObject(parent), target(std::move(folder)), staging(target + QStringLiteral(".part")) {}
+ModelDownload::ModelDownload(Model model, QString folder, QObject* parent):
+        QObject(parent), fetching(std::move(model)), target(std::move(folder)), staging(target + QStringLiteral(".part")) {}
 
 ModelDownload::~ModelDownload() { ++generation; }
 
@@ -128,9 +157,9 @@ void ModelDownload::start() {
     }
     ++generation;
     why.clear();
-    if (!model().pinned()) {
-        fail(tr("This version of the app does not name the model's files yet: install it with "
-                "qt/scripts/hwr-model.sh (see the handwriting search's documentation)."));
+    if (!fetching.pinned()) {
+        fail(fetching.unpinned.isEmpty() ? tr("This version of the app does not name the model's files yet.")
+                                         : fetching.unpinned);
         return;
     }
     if (!QDir().mkpath(staging)) {
@@ -166,7 +195,7 @@ void ModelDownload::fail(const QString& reason) {
 }
 
 void ModelDownload::next() {
-    const Model& m = model();
+    const Model& m = fetching;
     while (index < m.files.size()) {
         const File& f = m.files[index];
         const QString local = QDir(staging).filePath(f.path);
@@ -226,12 +255,16 @@ void ModelDownload::next() {
 }
 
 void ModelDownload::finish() {
-    const Model& m = model();
-    QSaveFile manifest(QDir(staging).filePath(QStringLiteral("model.json")));
-    const QByteArray bytes = manifestOf(m);
-    if (!manifest.open(QIODevice::WriteOnly) || manifest.write(bytes) != bytes.size() || !manifest.commit()) {
-        fail(tr("Could not write the model's manifest"));
-        return;
+    const Model& m = fetching;
+    const bool ownManifest = std::any_of(m.files.begin(), m.files.end(),
+                                         [](const File& f) { return f.path == QLatin1String("model.json"); });
+    if (!ownManifest) {
+        QSaveFile manifest(QDir(staging).filePath(QStringLiteral("model.json")));
+        const QByteArray bytes = manifestOf(m);
+        if (!manifest.open(QIODevice::WriteOnly) || manifest.write(bytes) != bytes.size() || !manifest.commit()) {
+            fail(tr("Could not write the model's manifest"));
+            return;
+        }
     }
     // In the model's place (a model there before goes)
     if (QFileInfo::exists(target) && !QDir(target).removeRecursively()) {

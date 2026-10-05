@@ -15,6 +15,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -47,12 +48,23 @@ struct Capabilities {
     /// The recogniser and its model ("trocr-small-hw-int8/<hash of the model files>/seg1"): results of another one are
     /// read again
     QString id;
+    /// Several models (MultiRecognizer): their ids and languages, by their bit in ink::Candidate::models
+    QStringList models;
+    std::vector<QStringList> modelLanguages;
+    /// The languages of the models with these bits (all languages for 0)
+    QStringList languagesOf(uint32_t bits) const;
 };
+
+class LanguagePlan;
 
 struct Context {
     QString language = QStringLiteral("en");
     /// Asked between the steps of a line: stop (the document closed, the app quits); the line has no result then.
     std::function<bool()> cancelled;
+    /// The document's plan of which models read its lines (LanguagePlan.h; null: all of them).
+    std::shared_ptr<LanguagePlan> plan;
+    /// What was read in the line before (not enough(): another model is to read it too); the result has it as well.
+    const ink::LineResult* before = nullptr;
 };
 
 class Recognizer {
@@ -63,6 +75,13 @@ public:
     virtual bool ready(QString* why = nullptr) const = 0;
     /// The words of a line (boxes relative to its origin); nullopt if it failed or was cancelled. The worker's thread.
     virtual std::optional<ink::LineResult> recognizeLine(const LineInput& line, const Context& context) = 0;
+    /// A line read before is all this context wants (else it is read again with `before`: by the models that did not
+    /// read it). One model: always.
+    virtual bool enough(const ink::LineResult& known, const Context& context) const {
+        (void)known;
+        (void)context;
+        return true;
+    }
     /// Give back the memory of the model (nothing was read for a while); it is loaded again when needed. The worker's
     /// thread.
     virtual void unload() {}

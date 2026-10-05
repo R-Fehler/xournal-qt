@@ -5,11 +5,16 @@
 
 namespace xqt::hwr {
 
-FakeRecognizer::FakeRecognizer(QString id): recId(std::move(id)) {}
+FakeRecognizer::FakeRecognizer(QString id, QStringList languages): recId(std::move(id)), langs(std::move(languages)) {}
 
 void FakeRecognizer::setScript(Script s) {
     std::lock_guard lock(mtx);
     script = std::move(s);
+}
+
+void FakeRecognizer::setConfidence(Confidence c) {
+    std::lock_guard lock(mtx);
+    confidence = std::move(c);
 }
 
 void FakeRecognizer::setLine(quint64 hash, std::vector<Readings> words) {
@@ -25,7 +30,7 @@ void FakeRecognizer::setReady(bool ready, QString why) {
 
 Capabilities FakeRecognizer::capabilities() const {
     Capabilities c;
-    c.languages = {QStringLiteral("en")};
+    c.languages = langs;
     c.topK = 5;
     c.id = recId;
     return c;
@@ -52,10 +57,12 @@ std::optional<ink::LineResult> FakeRecognizer::recognizeLine(const LineInput& li
         return std::nullopt;
     }
     Script s;
+    Confidence sure;
     std::vector<Readings> scripted;
     {
         std::lock_guard lock(mtx);
         s = script;
+        sure = confidence;
         if (auto it = lines.find(line.hash); it != lines.end()) {
             scripted = it->second;
         }
@@ -75,7 +82,7 @@ std::optional<ink::LineResult> FakeRecognizer::recognizeLine(const LineInput& li
         }
         ink::Word w;
         w.box = line.words[i].box;
-        w.conf = 0.9f;
+        w.conf = sure ? sure(line, i) : 0.9f;
         w.text = readings.front().first;
         for (const auto& [text, p]: readings) {
             w.candidates.push_back(ink::candidate(text, p));

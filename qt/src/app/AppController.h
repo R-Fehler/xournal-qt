@@ -126,6 +126,10 @@ class AppController: public QObject {
     Q_PROPERTY(QObject* library READ libraryModel CONSTANT)
     /// The handwriting search: its switch, model, download and progress (HandwritingSettings)
     Q_PROPERTY(QObject* handwriting READ handwritingSettings CONSTANT)
+    /// The handwriting language of the current document (⋮ → Document → Handwriting language; hwr/LanguagePlan.h):
+    /// "auto", "en", "de" or "both"; kept in the library's handwriting cache, not in the file
+    Q_PROPERTY(QString handwritingLanguage READ handwritingLanguage WRITE setHandwritingLanguage
+                       NOTIFY handwritingLanguageChanged)
     Q_PROPERTY(QObject* recent READ recentModel CONSTANT)
     /// The home screen (library, recent documents) is shown instead of the current document; always when no
     /// document is open.
@@ -344,6 +348,8 @@ public:
     QObject* settingsModel() const;
     QObject* libraryModel() const;
     QObject* handwritingSettings() const;
+    QString handwritingLanguage() const;
+    void setHandwritingLanguage(const QString& language);
     QObject* recentModel() const;
     bool homeVisible() const;
     void setHomeVisible(bool visible);
@@ -1461,6 +1467,7 @@ Q_SIGNALS:
     /// This window should be closed (its last document was moved away).
     void closeWindowRequested();
     void documentChanged();
+    void handwritingLanguageChanged();
     void homeVisibleChanged();
     void titleChanged();
     void modifiedChanged();

@@ -8,6 +8,9 @@
  *   --dump                 print a structural summary of the document (pages, layers, elements)
  *   --bench-render=ZOOM    render every page at ZOOM and print timings
  *   --pdf-dir=DIR          export every FILE as DIR/<name>.pdf (many documents in one go)
+ * and a command:
+ *   hwr-lines DOC --out DIR [--text FILE] [--lang de] [--writer ID] [--licence ID]
+ *                          the handwriting of DOC as a line dataset (qt/src/hwr/LineDataset.h; this command links Qt)
  *
  * @license GNU GPLv2 or later
  */
@@ -47,6 +50,11 @@
 
 #ifdef _WIN32
 #include "../src/app/WindowsFonts.h"
+#endif
+#ifdef XQT_CLI_HWR
+#include <QCoreApplication>
+
+#include "hwr/LineDataset.h"
 #endif
 
 namespace {
@@ -207,6 +215,66 @@ int benchRender(const fs::path& infile, double zoom) {
 }
 }  // namespace
 
+#ifdef XQT_CLI_HWR
+namespace {
+/// xournal-qt-cli hwr-lines DOC --out DIR [--text FILE] [--lang de] [--writer ID] [--licence ID]
+int hwrLines(int argc, char* argv[]) {
+    QCoreApplication app(argc, argv);
+    xqt::hwr::LineExport job;
+    const QStringList args = QCoreApplication::arguments().mid(2);
+    auto usage = [] {
+        std::cerr << "usage: xournal-qt-cli hwr-lines <doc.xopp|pdf> --out <dir> [--text <transcripts.txt>] "
+                     "[--lang en|de] [--writer <id>] [--licence <id>]\n"
+                     "  The handwriting of the document as a line dataset (qt/research/hwr/train/FORMATS.md):\n"
+                     "  dataset.json, lines.jsonl, images/ and strokes/ in <dir>. --text: one line of text per\n"
+                     "  line of ink, in reading order. --licence: of the writer's own lines (default \"private\",\n"
+                     "  marked noncommercial; any other licence is not marked).\n";
+        return 1;
+    };
+    for (qsizetype i = 0; i < args.size(); ++i) {
+        const QString& a = args[i];
+        auto value = [&]() -> QString { return i + 1 < args.size() ? args[++i] : QString(); };
+        if (a == QLatin1String("--out")) {
+            job.out = value();
+        } else if (a == QLatin1String("--text")) {
+            job.texts = value();
+        } else if (a == QLatin1String("--lang")) {
+            job.language = value();
+        } else if (a == QLatin1String("--writer")) {
+            job.writer = value();
+        } else if (a == QLatin1String("--licence") || a == QLatin1String("--license")) {
+            job.licence = value();
+            job.noncommercial = job.licence == QLatin1String("private");
+        } else if (a == QLatin1String("--help") || a == QLatin1String("-h")) {
+            return usage();
+        } else if (!a.startsWith(QLatin1String("--")) && job.document.isEmpty()) {
+            job.document = a;
+        } else {
+            std::cerr << "unknown argument: " << a.toStdString() << "\n";
+            return usage();
+        }
+    }
+    if (job.document.isEmpty() || job.out.isEmpty() || job.language.isEmpty()) {
+        return usage();
+    }
+    const xqt::hwr::LineExportResult r = xqt::hwr::exportLines(job);
+    for (const QString& w: r.warnings) {
+        std::cerr << "warning: " << w.toStdString() << "\n";
+    }
+    if (!r.ok) {
+        std::cerr << r.error.toStdString() << "\n";
+        return -3;
+    }
+    std::cout << r.lines << " lines written to " << job.out.toStdString();
+    if (!job.texts.isEmpty()) {
+        std::cout << " (" << std::min(r.lines, r.transcripts) << " with their text)";
+    }
+    std::cout << "\n";
+    return 0;
+}
+}  // namespace
+#endif
+
 int main(int argc, char* argv[]) {
     // Same as upstream initCAndCoutLocales(): numbers in C locale for cairo/PDF output.
     setlocale(LC_ALL, "");
@@ -221,6 +289,11 @@ int main(int argc, char* argv[]) {
     xqt::windows::useFontconfig();
 #endif
     std::cout.imbue(std::locale());
+#ifdef XQT_CLI_HWR
+    if (argc >= 2 && std::string(argv[1]) == "hwr-lines") {
+        return hwrLines(argc, argv);
+    }
+#endif
 
     gchar** optFilename = nullptr;
     gchar* pdfDir = nullptr;

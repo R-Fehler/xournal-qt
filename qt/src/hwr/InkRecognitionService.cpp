@@ -261,9 +261,13 @@ int InkRecognitionService::process(Queued& q) {
     };
     for (const InkLine& line: layout.lines) {
         LineRef ref{line.hash, line.origin(), known(line.hash)};
-        if (!ref.result) {
-            std::shared_ptr<Recognizer> r = recognizer();
-            if (r && r->ready()) {
+        std::shared_ptr<Recognizer> r = recognizer();
+        Context context;
+        context.cancelled = cancelled;
+        context.plan = q.job.plan;
+        const bool ready = r && r->ready();
+        if (!ref.result || (ready && !r->enough(*ref.result, context))) {
+            if (ready) {
                 // Not before the pages in view are drawn, nor while the user writes
                 for (;;) {
                     RenderService::waitForVisiblePages(std::chrono::milliseconds(500));
@@ -281,8 +285,7 @@ int InkRecognitionService::process(Queued& q) {
                 if (cancelled()) {
                     return result.recognised;
                 }
-                Context context;
-                context.cancelled = cancelled;
+                context.before = ref.result.get();
                 if (auto read = r->recognizeLine(LineInput::of(q.job.strokes, layout, line), context)) {
                     ref.result = std::make_shared<const ink::LineResult>(std::move(*read));
                     remember(line.hash, ref.result);

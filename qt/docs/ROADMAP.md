@@ -926,6 +926,17 @@
   scroll bars are mapped to the screen, tiles are culled against the turned screen, quarter turns stay pixel exact
   ([canvas-rotation.md](canvas-rotation.md)).
 
+- **Handwriting in English and German, `qt/hwr-multilang` (2026-10-05).** Several handwriting models at once
+  ([handwriting-search.md](handwriting-search.md), "Languages and models"): Settings → Search chooses the languages
+  (English, German, both by default) and shows per language its model (download with consent from a pinned catalogue,
+  the German one "not published yet"; a folder of one's own; remove). A CTC recogniser for the training block's
+  models (ONNX Runtime, CTC prefix beam search, per-character confidence) beside TrOCR. Both models read a line and
+  their readings go into one list per ink word (noisy-OR for a reading both gave, each reading keeps its model); the
+  results are named by the set of models. Per document, its first 6 lines decide the language and the other model then
+  reads only unsure lines (revisited when the confidence drops); ⋮ → Document → Handwriting language overrides it;
+  both kept in the library's cache. `xournal-qt-cli hwr-lines` writes a document's lines as a training/evaluation
+  dataset (FORMATS.md §1), with "Handwriting sample" pages to write in `qt/research/hwr/sample/`.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

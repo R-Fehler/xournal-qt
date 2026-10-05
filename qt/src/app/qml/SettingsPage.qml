@@ -8,6 +8,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import QtQuick.Dialogs
 
 Popup {
     id: sheet
@@ -1271,9 +1272,8 @@ Popup {
                     Hint {
                         text: qsTr("Handwritten words become searchable: in open documents, in the library, and (as "
                                    + "invisible text) in PDFs with notes and archive PDFs that other PDF apps open. "
-                                   + "The handwriting is never turned into text. English only for now. The recogniser "
-                                   + "runs on this computer at low priority; the library's other documents are read "
-                                   + "only on mains power.")
+                                   + "The handwriting is never turned into text. The recogniser runs on this computer "
+                                   + "at low priority; the library's other documents are read only on mains power.")
                     }
                     Label {
                         objectName: "handwritingStatus"
@@ -1283,81 +1283,150 @@ Popup {
                         text: app.handwriting.status
                         color: app.handwriting.ready ? "#1e7e34" : "#6b6f75"
                     }
-                    ColumnLayout {
-                        // The model is downloaded only when the user asks, its address and size shown first
-                        objectName: "handwritingDownload"
-                        visible: app.handwriting.enabled && app.handwriting.ownModel && !app.handwriting.modelInstalled
-                        Layout.fillWidth: true
-                        spacing: 6
-                        Label {
-                            Layout.fillWidth: true
-                            wrapMode: Text.WordWrap
-                            text: qsTr("The recogniser needs its model (%1), downloaded once from:")
-                                  .arg(app.handwriting.downloadSize)
-                        }
-                        TextEdit {
-                            objectName: "handwritingModelSource"
-                            Layout.fillWidth: true
-                            readOnly: true
-                            selectByMouse: true
-                            wrapMode: TextEdit.WrapAnywhere
-                            text: app.handwriting.downloadSource
-                            font.pixelSize: 13
-                            color: "#3c4043"
-                        }
-                        RowLayout {
-                            Button {
-                                objectName: "handwritingDownloadButton"
-                                text: qsTr("Download the model")
-                                enabled: app.handwriting.downloadAvailable && !app.handwriting.downloading
-                                onClicked: app.handwriting.download()
-                            }
-                            Button {
-                                objectName: "handwritingCancelDownload"
-                                visible: app.handwriting.downloading
-                                text: qsTr("Cancel")
-                                onClicked: app.handwriting.cancelDownload()
-                            }
-                        }
-                        ProgressBar {
-                            objectName: "handwritingDownloadProgress"
-                            visible: app.handwriting.downloading
-                            Layout.fillWidth: true
-                            value: app.handwriting.downloadProgress
-                        }
-                        Label {
-                            visible: app.handwriting.downloadError !== ""
-                            Layout.fillWidth: true
-                            wrapMode: Text.WordWrap
-                            text: app.handwriting.downloadError
-                            color: "#c5221f"
-                        }
-                        Hint {
-                            visible: !app.handwriting.downloadAvailable
-                            text: qsTr("This version of the app cannot download it yet: install it with "
-                                       + "qt/scripts/hwr-model.sh (see the documentation of the handwriting search).")
-                        }
-                    }
+                    // The languages read: a model each (one for both would serve both)
                     RowLayout {
-                        visible: app.handwriting.ownModel && app.handwriting.modelInstalled
+                        visible: app.handwriting.enabled
                         Layout.fillWidth: true
                         Label {
                             Layout.fillWidth: true
-                            wrapMode: Text.WrapAnywhere
-                            text: qsTr("The model is in %1").arg(app.handwriting.modelFolder)
-                            font.pixelSize: 12
-                            color: "#6b6f75"
+                            wrapMode: Text.WordWrap
+                            text: qsTr("Handwriting languages")
                         }
-                        Button {
-                            objectName: "handwritingRemoveModel"
-                            text: qsTr("Remove the model")
-                            onClicked: app.handwriting.removeModel()
+                        ComboBox {
+                            objectName: "handwritingLanguagesCombo"
+                            Layout.fillWidth: sheet.narrow
+                            Layout.preferredWidth: sheet.narrow ? -1 : 260
+                            model: [
+                                { text: qsTr("English"), value: "en" },
+                                { text: qsTr("German"), value: "de" },
+                                { text: qsTr("English and German"), value: "en+de" }
+                            ]
+                            textRole: "text"
+                            valueRole: "value"
+                            currentIndex: (count, indexOfValue(app.handwriting.languages))
+                            onActivated: app.handwriting.languages = currentValue
                         }
                     }
                     Hint {
-                        visible: app.handwriting.enabled && !app.handwriting.ownModel
-                        text: qsTr("The model is the one in %1 (XQT_HWR_MODEL or the setting \"handwritingModel\"): "
-                                   + "it is never downloaded over or removed here.").arg(app.handwriting.modelFolder)
+                        visible: app.handwriting.enabled
+                        text: qsTr("With both, a document's language is found from its first lines: the other "
+                                   + "model then reads only the lines the first one is unsure of. ⋮ → Document → "
+                                   + "Handwriting language sets it for one document.")
+                    }
+                    // Per language its model: downloaded only when the user asks, its address and size shown first
+                    Repeater {
+                        model: app.handwriting.enabled ? app.handwriting.models : []
+                        delegate: ColumnLayout {
+                            id: hwModel
+                            required property var modelData
+                            readonly property string lang: modelData.language
+                            objectName: "handwritingModel_" + lang
+                            visible: modelData.needed || modelData.installed
+                            Layout.fillWidth: true
+                            spacing: 6
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Label {
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WordWrap
+                                    text: qsTr("%1: %2").arg(hwModel.modelData.label).arg(hwModel.modelData.state)
+                                    font.bold: true
+                                }
+                                Button {
+                                    objectName: "handwritingChooseFolder_" + hwModel.lang
+                                    flat: true
+                                    text: hwModel.modelData.own ? qsTr("Choose a folder…") : qsTr("Use the app's own")
+                                    onClicked: {
+                                        if (hwModel.modelData.own) {
+                                            modelFolderDialog.language = hwModel.lang
+                                            modelFolderDialog.open()
+                                        } else {
+                                            app.handwriting.chooseFolder(hwModel.lang, "")
+                                        }
+                                    }
+                                }
+                            }
+                            ColumnLayout {
+                                objectName: "handwritingDownload_" + hwModel.lang
+                                visible: hwModel.modelData.own && !hwModel.modelData.installed
+                                Layout.fillWidth: true
+                                spacing: 6
+                                Label {
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WordWrap
+                                    text: qsTr("The model (%1) is downloaded once from:").arg(hwModel.modelData.size)
+                                }
+                                TextEdit {
+                                    objectName: "handwritingModelSource_" + hwModel.lang
+                                    Layout.fillWidth: true
+                                    readOnly: true
+                                    selectByMouse: true
+                                    wrapMode: TextEdit.WrapAnywhere
+                                    text: hwModel.modelData.source
+                                    font.pixelSize: 13
+                                    color: "#3c4043"
+                                }
+                                RowLayout {
+                                    Button {
+                                        objectName: "handwritingDownloadButton_" + hwModel.lang
+                                        text: qsTr("Download")
+                                        enabled: hwModel.modelData.downloadAvailable && !hwModel.modelData.downloading
+                                        onClicked: app.handwriting.download(hwModel.lang)
+                                    }
+                                    Button {
+                                        objectName: "handwritingCancelDownload_" + hwModel.lang
+                                        visible: hwModel.modelData.downloading
+                                        text: qsTr("Cancel")
+                                        onClicked: app.handwriting.cancelDownload(hwModel.lang)
+                                    }
+                                }
+                                ProgressBar {
+                                    visible: hwModel.modelData.downloading
+                                    Layout.fillWidth: true
+                                    value: hwModel.modelData.progress
+                                }
+                                Label {
+                                    visible: hwModel.modelData.error !== ""
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WordWrap
+                                    text: hwModel.modelData.error
+                                    color: "#c5221f"
+                                }
+                                Hint {
+                                    visible: !hwModel.modelData.downloadAvailable
+                                    text: hwModel.modelData.unpinned
+                                }
+                            }
+                            RowLayout {
+                                visible: hwModel.modelData.own && hwModel.modelData.installed
+                                Layout.fillWidth: true
+                                Label {
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WrapAnywhere
+                                    text: qsTr("In %1").arg(hwModel.modelData.folder)
+                                    font.pixelSize: 12
+                                    color: "#6b6f75"
+                                }
+                                Button {
+                                    objectName: "handwritingRemoveModel_" + hwModel.lang
+                                    text: qsTr("Remove")
+                                    onClicked: app.handwriting.removeModel(hwModel.lang)
+                                }
+                            }
+                            Hint {
+                                visible: !hwModel.modelData.own
+                                text: qsTr("The model is the one in %1 (chosen here, or XQT_HWR_MODEL / "
+                                           + "XQT_HWR_MODEL_DE): it is never downloaded over or removed here.")
+                                      .arg(hwModel.modelData.folder)
+                            }
+                        }
+                    }
+                    FolderDialog {
+                        id: modelFolderDialog
+                        objectName: "handwritingModelFolderDialog"
+                        property string language: "en"
+                        title: qsTr("A folder with a handwriting model (model.json)")
+                        onAccepted: app.handwriting.chooseFolder(language, selectedFolder)
                     }
                     Item { Layout.preferredHeight: 16 }
                 }

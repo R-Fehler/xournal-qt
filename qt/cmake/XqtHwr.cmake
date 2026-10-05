@@ -9,6 +9,14 @@ add_library(xqt-hwr STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/Recognizer.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/FakeRecognizer.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/FakeRecognizer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/ModelInfo.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/ModelInfo.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/LanguagePlan.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/LineDataset.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/LineDataset.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/LanguagePlan.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/MultiRecognizer.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/MultiRecognizer.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/LineImage.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/LineImage.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/WordAlignment.h
@@ -20,12 +28,20 @@ add_library(xqt-hwr STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/HandwritingSearch.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/HandwritingSearch.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/BeamSearch.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/BeamSearch.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/BeamSearch.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/CtcDecode.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/CtcDecode.cpp)
 target_include_directories(xqt-hwr PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src" "${CMAKE_CURRENT_LIST_DIR}/../src/hwr")
 target_link_libraries(xqt-hwr PUBLIC xqt-session)
 set_target_properties(xqt-hwr PROPERTIES AUTOMOC ON)
 
-# The TrOCR recogniser in ONNX Runtime. Only the C API's headers are vendored (qt/3rdparty/onnxruntime): the runtime is
+# The CLI's "hwr-lines": a document's handwriting as a line dataset (LineDataset.h; Qt only for this command)
+if(TARGET xournal-qt-cli)
+    target_link_libraries(xournal-qt-cli PRIVATE xqt-hwr)
+    target_compile_definitions(xournal-qt-cli PRIVATE XQT_CLI_HWR)
+endif()
+
+# The recognisers in ONNX Runtime (TrOCR, CTC). Only the C API's headers are vendored (qt/3rdparty/onnxruntime): the runtime is
 # opened when the handwriting search is switched on (dlopen), so the app builds and runs without it.
 option(XQT_HWR_ONNX "Handwriting search: the TrOCR recogniser in ONNX Runtime (loaded at run time)" ON)
 if(XQT_HWR_ONNX)
@@ -33,7 +49,9 @@ if(XQT_HWR_ONNX)
         ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/OrtRuntime.h
         ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/OrtRuntime.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/TrocrRecognizer.h
-        ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/TrocrRecognizer.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/TrocrRecognizer.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/CtcRecognizer.h
+        ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/CtcRecognizer.cpp)
     target_include_directories(xqt-hwr PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/onnxruntime/include")
     target_compile_definitions(xqt-hwr PUBLIC XQT_HWR_ONNX)
     target_link_libraries(xqt-hwr PRIVATE ${CMAKE_DL_LIBS})
@@ -49,9 +67,12 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkIndexerTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkLibraryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkTextLayerTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/ModelDownloadTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/ModelDownloadTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/MultiModelTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/LineDatasetTest.cpp)
     if(XQT_HWR_ONNX)
-        target_sources(xqt-hwr-tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/TrocrTest.cpp)
+        target_sources(xqt-hwr-tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/TrocrTest.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/CtcTest.cpp)
     endif()
     target_link_libraries(xqt-hwr-tests PRIVATE xqt-hwr xqt-shell Qt6::Test GTest::gtest)
     target_include_directories(xqt-hwr-tests PRIVATE "${TEST_CONFIG_DIR}")

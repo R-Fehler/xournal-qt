@@ -59,12 +59,18 @@ cairo_surface_t* surfaceFor(int w, int h) {
     return kept.surface;
 }
 
+double padOf(const LinePiece& piece) { return std::max(2.0, 0.25 * piece.box.height()); }
+
+/// The widest picture: a whole line of an A3 page in landscape (a CTC model and the dataset export take whole lines;
+/// TrOCR's pieces of 8 words are far narrower)
+constexpr int MAX_PX = 128 * LINE_PX;
+
 /// The piece's ink as coverage (A8, 255: ink) in the kept surface; its size in w, h
 cairo_surface_t* draw(const LineInput& line, const LinePiece& piece, int& w, int& h) {
-    const double pad = std::max(2.0, 0.25 * piece.box.height());
+    const double pad = padOf(piece);
     const double scale = LINE_PX / std::max(1.0, piece.box.height() + 2 * pad);
     h = LINE_PX;
-    w = std::clamp(static_cast<int>(std::ceil((piece.box.width() + 2 * pad) * scale)), 1, 16 * LINE_PX);
+    w = std::clamp(static_cast<int>(std::ceil((piece.box.width() + 2 * pad) * scale)), 1, MAX_PX);
     cairo_surface_t* surface = surfaceFor(w, h);
     cairo_t* cr = cairo_create(surface);
     cairo_set_operator(cr, CAIRO_OPERATOR_CLEAR);
@@ -175,6 +181,34 @@ std::vector<float> pixelsOf(const LineInput& line, const LinePiece& piece, int s
     for (size_t i = 0; i < plane; ++i) {
         const float v = (square[i] / 255.0f - 0.5f) / 0.5f;
         out[i] = out[plane + i] = out[2 * plane + i] = v;
+    }
+    return out;
+}
+
+double widthAt(const LinePiece& piece, int height) {
+    const double pad = padOf(piece);
+    return (piece.box.width() + 2 * pad) * height / std::max(1.0, piece.box.height() + 2 * pad);
+}
+
+std::vector<float> inkOf(const LineInput& line, const LinePiece& piece, int height, int maxWidth, int& width) {
+    int w = 0, h = 0;
+    const std::vector<unsigned char> grey = greyOf(line, piece, w, h);
+    height = std::max(1, height);
+    width = std::clamp(static_cast<int>(std::lround(static_cast<double>(w) * height / std::max(1, h))), 1,
+                       std::max(1, maxWidth));
+    const auto W = static_cast<size_t>(w), H = static_cast<size_t>(h);
+    const auto OW = static_cast<size_t>(width), OH = static_cast<size_t>(height);
+    std::vector<float> source(grey.size());
+    for (size_t i = 0; i < grey.size(); ++i) {
+        source[i] = 1.0f - static_cast<float>(grey[i]) / 255.0f;  // (ink 1, paper 0)
+    }
+    std::vector<float> rows(OW * H);  ///< each row resampled to the width
+    for (size_t y = 0; y < H; ++y) {
+        resample(source.data() + y * W, W, 1, rows.data() + y * OW, OW, 1);
+    }
+    std::vector<float> out(OW * OH);
+    for (size_t x = 0; x < OW; ++x) {
+        resample(rows.data() + x, H, OW, out.data() + x, OH, OW);
     }
     return out;
 }

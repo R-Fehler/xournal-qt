@@ -8,6 +8,7 @@
 #include <QJsonObject>
 
 #include "LineImage.h"
+#include "ModelInfo.h"
 #include "WordAlignment.h"
 
 namespace xqt::hwr {
@@ -22,6 +23,7 @@ Manifest Manifest::read(const QString& dir) {
     const QByteArray bytes = f.readAll();
     const QJsonObject o = QJsonDocument::fromJson(bytes).object();
     m.name = o.value(QStringLiteral("name")).toString();
+    m.languages = ModelInfo::read(dir).languages;
     m.encoder = o.value(QStringLiteral("encoder")).toString();
     m.decoder = o.value(QStringLiteral("decoder")).toString();
     m.tokenizer = o.value(QStringLiteral("tokenizer")).toString();
@@ -49,7 +51,7 @@ TrocrRecognizer::~TrocrRecognizer() = default;
 Capabilities TrocrRecognizer::capabilities() const {
     Capabilities c;
     c.strokes = false;
-    c.languages = {QStringLiteral("en")};
+    c.languages = manifest.languages.isEmpty() ? QStringList{QStringLiteral("en")} : manifest.languages;
     c.topK = 5;
     c.id = manifest.valid() ? manifest.id : QStringLiteral("trocr/none");
     return c;

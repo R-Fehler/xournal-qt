@@ -1,0 +1,20 @@
+The Kalman gain weighs the measurement against the prediction.
+The quick brown fox jumps over the lazy dog.
+Please hand in the homework by Thursday.
+The controller is stable if all eigenvalues are negative.
+The transfer function has two poles and one zero.
+Meet me at 7:45 in room B 2.03.
+The derivative of sin(x) is cos(x).
+We measure the voltage with an oscilloscope.
+The matrix A is symmetric and positive definite.
+Sum the squared errors over all data points.
+An observer estimates the state of the system.
+How much does a kilogram of cheese cost?
+The result is roughly 3.14 metres.
+Exam on 14 March, bring a calculator.
+Jack quietly moved up front and seized the big ball of wax.
+Write each sentence on one line.
+This is a dumb test, written many times.
+The library keeps every reading of every word.
+Spring arrives and the trees blossom.
+See you next week, best wishes.

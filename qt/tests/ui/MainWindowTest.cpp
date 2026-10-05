@@ -7445,18 +7445,60 @@ TEST_F(MainWindowTest, settingsSearchTabSwitchesTheHandwritingSearch) {
     auto* status = findItem("handwritingStatus");
     until([&] { return status->isVisible(); });
     EXPECT_FALSE(status->property("text").toString().isEmpty());
-    if (!hw->property("modelInstalled").toBool()) {
-        auto* offer = findItem("handwritingDownload");
-        until([&] { return offer->isVisible(); });
-        EXPECT_TRUE(offer->isVisible());
-        EXPECT_TRUE(findItem("handwritingModelSource")->property("text").toString().startsWith("https://huggingface.co/"));
-        EXPECT_FALSE(hw->property("downloading").toBool()) << "nothing before the button";
+    // The languages (English and German by default), and per language its model
+    auto* languages = findItem("handwritingLanguagesCombo");
+    ASSERT_NE(languages, nullptr);
+    until([&] { return languages->isVisible(); });
+    const QString before = hw->property("languages").toString();
+    hw->setProperty("languages", "en+de");
+    EXPECT_EQ(languages->property("currentValue").toString(), QStringLiteral("en+de"));
+    for (const QVariant& v: hw->property("models").toList()) {
+        const QVariantMap m = v.toMap();
+        const QString lang = m.value("language").toString();
+        auto* row = findItem(QString(QStringLiteral("handwritingModel_") + lang).toUtf8().constData());
+        ASSERT_NE(row, nullptr) << lang.toStdString();
+        until([&] { return row->isVisible(); });
+        if (m.value("own").toBool() && !m.value("installed").toBool()) {
+            auto* offer = findItem(QString(QStringLiteral("handwritingDownload_") + lang).toUtf8().constData());
+            until([&] { return offer->isVisible(); });
+            EXPECT_TRUE(offer->isVisible());
+            EXPECT_TRUE(findItem(QString(QStringLiteral("handwritingModelSource_") + lang).toUtf8().constData())->property("text").toString().startsWith("https://huggingface.co/"));
+            EXPECT_FALSE(m.value("downloading").toBool()) << "nothing before the button";
+        }
+        if (lang == QLatin1String("de") && !m.value("downloadAvailable").toBool()) {
+            EXPECT_FALSE(findItem("handwritingDownloadButton_de")->property("enabled").toBool()) << "not published yet";
+        }
     }
+    hw->setProperty("languages", before);
     click(toggle);
     until([&] { return !hw->property("enabled").toBool(); });
     EXPECT_FALSE(hw->property("enabled").toBool());
     key(Qt::Key_Escape);
     ASSERT_TRUE(waitOpened(sheet, false));
+}
+
+// ⋮ → Document → Handwriting language: offered while the handwriting search is on; the choice is the document's (kept
+// in the library's cache, not in the file)
+TEST_F(MainWindowTest, theHandwritingLanguageIsChosenPerDocument) {
+    QObject* hw = controller->property("handwriting").value<QObject*>();
+    ASSERT_NE(hw, nullptr);
+    hw->setProperty("enabled", false);
+    auto* menu = find<QObject>("handwritingLanguageMenu");
+    ASSERT_NE(menu, nullptr);
+    EXPECT_FALSE(menu->property("offered").toBool()) << "only while the handwriting search is on";
+    hw->setProperty("enabled", true);
+    until([&] { return menu->property("offered").toBool(); });
+    EXPECT_TRUE(menu->property("offered").toBool());
+    EXPECT_EQ(controller->property("handwritingLanguage").toString(), QStringLiteral("auto"));
+    EXPECT_TRUE(find<QObject>("handwritingLanguageAuto")->property("checked").toBool());
+    QMetaObject::invokeMethod(find<QObject>("handwritingLanguageDe"), "triggered");
+    EXPECT_EQ(controller->property("handwritingLanguage").toString(), QStringLiteral("de"));
+    until([&] { return find<QObject>("handwritingLanguageDe")->property("checked").toBool(); });
+    EXPECT_TRUE(find<QObject>("handwritingLanguageDe")->property("checked").toBool());
+    EXPECT_FALSE(find<QObject>("handwritingLanguageAuto")->property("checked").toBool());
+    QMetaObject::invokeMethod(find<QObject>("handwritingLanguageAuto"), "triggered");
+    EXPECT_EQ(controller->property("handwritingLanguage").toString(), QStringLiteral("auto"));
+    hw->setProperty("enabled", false);
 }
 
 // A hybrid PDF whose ink another app moved: the window says so and offers to keep ours or import theirs.

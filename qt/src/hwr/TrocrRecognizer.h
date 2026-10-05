@@ -3,8 +3,9 @@
  * int8, in ONNX Runtime (qt/docs/research/handwriting-recognition.md: 97 % of the English words found among its
  * readings on IAM, about 0.2 s per line on two threads of a laptop).
  *
- * The model is a folder (HandwritingSearch::modelDir) with the ONNX export's files and a manifest "model.json":
- *   { "name": "trocr-small-hw-int8", "source": ..., "revision": ...,
+ * The model is a folder (HandwritingSearch::modelDir) with the ONNX export's files and a manifest "model.json"
+ * (qt/research/hwr/train/FORMATS.md, "kind": "trocr"; ModelInfo.h):
+ *   { "kind": "trocr", "name": "trocr-small-hw-int8", "languages": ["en"], "source": ..., "revision": ...,
  *     "encoder": "onnx/encoder_model_quantized.onnx", "decoder": "onnx/decoder_model_merged_quantized.onnx",
  *     "tokenizer": "tokenizer.json", "decoder_start_token_id": 2, "eos_token_id": 2, "image_size": 384,
  *     "files": { "<path>": { "sha256": "...", "size": n }, ... } }
@@ -37,6 +38,7 @@ namespace xqt::hwr {
 
 struct Manifest {
     QString name;
+    QStringList languages;  ///< (ModelInfo.h; English if the manifest names none)
     QString encoder, decoder, tokenizer;
     int64_t start = 2, end = 2;
     int imageSize = 384;

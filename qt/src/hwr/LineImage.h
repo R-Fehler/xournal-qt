@@ -6,7 +6,8 @@
  * picture to 384 x 384, so a long line is cut at word gaps into pieces of at most MAX_WORDS words (pieces of about
  * equal numbers of words), each read on its own. The picture is drawn with cairo into an A8 surface (one per thread,
  * kept) and scaled to the model's size (averaged when shrinking, linear when growing), then turned into the model's
- * input: three equal channels, (v / 255 - 0.5) / 0.5.
+ * input: three equal channels, (v / 255 - 0.5) / 0.5. A CTC model (CtcRecognizer.h) gets the same picture scaled to
+ * its input height instead, ink as 1 (inkOf).
  *
  * @license GNU GPLv2 or later
  */
@@ -37,5 +38,11 @@ std::vector<LinePiece> piecesOf(const LineInput& line, int maxWords = MAX_WORDS)
 std::vector<unsigned char> greyOf(const LineInput& line, const LinePiece& piece, int& width, int& height);
 /// The model's input for a piece: 3 x size x size floats (channel by channel).
 std::vector<float> pixelsOf(const LineInput& line, const LinePiece& piece, int size = MODEL_PX);
+/// A CTC model's input for a piece (qt/research/hwr/train/FORMATS.md, "kind": "ctc"): the picture greyOf() draws,
+/// scaled to `height` pixels keeping its aspect ratio (at most `maxWidth` wide: a longer one is squeezed), ink 1 on
+/// paper 0, row by row; its width in `width`.
+std::vector<float> inkOf(const LineInput& line, const LinePiece& piece, int height, int maxWidth, int& width);
+/// How wide the piece's picture is when drawn `height` pixels high (before any squeezing).
+double widthAt(const LinePiece& piece, int height);
 
 }  // namespace xqt::hwr

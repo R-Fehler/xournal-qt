@@ -7,7 +7,8 @@
  * of that document from there outwards, then the other open documents, then the library). The worker
  *  1. lays the strokes out in lines and words (InkLayout.h);
  *  2. takes the lines it knows by their hash from its cache (a line moved, a page seen before, or the library's
- *     pack: remember()); reads the others with the recogniser, one line at a time;
+ *     pack: remember()); reads the others with the recogniser, one line at a time, and those it knows but the
+ *     recogniser finds not enough for the job's plan (Recognizer::enough: another model is to read it, LanguagePlan.h);
  *  3. hands the page's words (InkText.h: PageText) and its lines back to the client on the client's thread.
  * Before each line it waits while pages in view are being rendered (RenderService::waitForVisiblePages) and while the
  * user writes (noteActivity(): nothing is read until ACTIVITY_PAUSE_MS after the last change of a page). Without a
@@ -89,6 +90,8 @@ public:
     struct Job {
         double priority = 0;  ///< smaller first
         std::vector<InkStroke> strokes;
+        /// The document's plan of which models read its lines (LanguagePlan.h; null: all)
+        std::shared_ptr<LanguagePlan> plan;
     };
     using Done = std::function<void(PageResult)>;
     /// Read a page; `done` is called on `owner`'s thread (not if `owner` is gone or cancelled the job). Returns its id.

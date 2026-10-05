@@ -1,0 +1,25 @@
+{
+  "kind": "ctc",
+  "name": "tiny-ctc",
+  "languages": [
+    "de"
+  ],
+  "version": "test",
+  "model": "model.onnx",
+  "alphabet": "alphabet.txt",
+  "blank": 0,
+  "input_height": 16,
+  "max_width": 2048,
+  "licence": "GPL-2.0-or-later",
+  "trained_on": [],
+  "files": {
+    "model.onnx": {
+      "sha256": "c8eae7fb3e45190e979e4e5eef43ef6170eaf2f8f3bcbb3505d6c33fff5a88b7",
+      "size": 464
+    },
+    "alphabet.txt": {
+      "sha256": "72680d70ed36c04c2d82c9a99d42c9505a5ee435eccb29efbdee75f35f337d05",
+      "size": 6
+    }
+  }
+}

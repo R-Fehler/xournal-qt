@@ -2,7 +2,7 @@
  * xournal-qt: a recogniser with scripted readings, for the tests of the handwriting search.
  *
  * Every word box of a line gets the readings the script gives for it (by the line's hash and the word's place in it,
- * or by its box); without a script, word i of a line reads "w<i>". It counts its calls (lines read), can be slow
+ * or by its box); without a script, word i of a line reads "w<i>". Its confidence is 0.9, or what setConfidence says. It counts its calls (lines read), can be slow
  * (setDelay) to test pausing and cancelling, and can be not ready.
  *
  * @license GNU GPLv2 or later
@@ -24,12 +24,15 @@ public:
     /// Readings of word `word` of `line` (empty: no word there).
     using Script = std::function<Readings(const LineInput& line, size_t word)>;
 
-    explicit FakeRecognizer(QString id = QStringLiteral("fake/1"));
+    explicit FakeRecognizer(QString id = QStringLiteral("fake/1"), QStringList languages = {QStringLiteral("en")});
 
     void setScript(Script script);
     /// The words of the line with this hash read so (one entry per word box; more or fewer are cut or left empty).
     void setLine(quint64 hash, std::vector<Readings> words);
     void setReady(bool ready, QString why = {});
+    /// How sure it is of the words of a line (default 0.9 for every word).
+    using Confidence = std::function<float(const LineInput& line, size_t word)>;
+    void setConfidence(Confidence confidence);
     /// Each line takes this long (checked for cancelling every 5 ms).
     void setDelay(int ms) { delayMs = ms; }
     /// Lines read so far (not counting cancelled ones).
@@ -44,8 +47,10 @@ public:
 
 private:
     QString recId;
+    QStringList langs;
     mutable std::mutex mtx;
     Script script;
+    Confidence confidence;
     std::map<quint64, std::vector<Readings>> lines;
     bool isReady = true;
     QString notReady;

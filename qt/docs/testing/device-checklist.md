@@ -2795,11 +2795,52 @@ letter words only where the recogniser is sure.
 - [ ] Settings → Search with the search on and no model in the app's data folder: the address
       (huggingface.co/Xenova/trocr-small-handwritten/tree/<revision>) and "64 MB" are shown before anything is
       downloaded; Download shows progress; Cancel stops it; Download again goes on after the files already done;
-      "Remove the model" frees the folder and the status says the model is missing. With `XQT_HWR_MODEL` set, the
-      Settings say the model is that folder and offer neither download nor removal.
+      "Remove" (the English row since qt/hwr-multilang) frees the folder and the status says the model is missing.
+      With `XQT_HWR_MODEL` set, the Settings say the model is that folder and offer neither download nor removal.
 - [ ] Without ONNX Runtime installed: Settings says it is not installed; the app works as before; nothing is read.
 - [ ] The library shows "Reading handwriting: N documents left" while it reads (wide window), "Handwriting: N left"
       on a phone-wide window.
+
+## Handwriting in English and German (qt/hwr-multilang)
+
+Two models (English and German) read the same handwriting; their readings are searched together, nothing is
+transcribed ([qt/docs/handwriting-search.md](../handwriting-search.md), "Languages and models"). Unit-tested with
+scripted models (`xqt-hwr-tests`); the steps below need the real models.
+- [ ] Settings → Search, search on: "Handwriting languages" shows "English and German" (the default). Below it a row
+      per language: English (state, address and size before anything is downloaded, Download, Remove when it is
+      there) and German ("not published yet": Download is disabled, "Choose a folder…" is offered). The status line
+      says that German has no model yet while only English is there.
+- [ ] German from a folder: "Choose a folder…" on the German row, pick a folder with a German model (model.json of
+      `kind` "ctc" or "trocr", `languages` ["de"]): the row says "In use", the status "Ready" once the documents are
+      read; the library's documents are read again (another set of models). "Use the app's own" goes back.
+- [ ] "English" only, then "German" only: the other model's row says its language is not read; nothing is
+      downloaded or removed by switching. A model that reads both languages (`languages` ["de", "en"]) in
+      `~/.local/share/xournal-qt/models/<name>/` serves both rows ("Read by <name>").
+- [ ] A CTC model of the training block (`qt/research/hwr/train`, `kind` "ctc") chosen as the German model: German
+      handwriting (umlauts, ß) is found by Ctrl+F; `XQT_HWR_MODEL_DE=<folder> XQT_ONNXRUNTIME=<the .so>
+      build-qt/xqt-hwr-tests --gtest_filter='Ctc*'` passes. A line wider than the model's `max_width` (a long
+      line on a landscape page) is still found word by word.
+- [ ] Both models in use, a page with English and German lines: Ctrl+F finds German words ("Straße", "Verstärkung")
+      and English ones; a word both models read ("Kalman", "Test") is marked once, not twice; the library's search
+      finds the document by either. Close and open it again: nothing is read again (the pack keeps both models'
+      readings).
+- [ ] Language per document (both models in use): open an English `.xopp` with a page or more of handwriting;
+      with `XQT_PERF=1` or `top`, the reading takes about as long per line as with English alone after the first
+      six lines (the German model only reads lines the English one is unsure of). A German document: the same the
+      other way round. A document with English and German paragraphs: German words in the German paragraphs are
+      found.
+- [ ] ⋮ → Document → "Handwriting language" (only with the search on): Automatic is checked; choose German: the
+      English model stops reading this document, the German one reads what it had not read; close and reopen it:
+      German is still checked (kept in `.xournal_library/ink-text.pack`, the `.xopp` is unchanged: `git diff` or a
+      checksum of the file). Back to Automatic.
+- [ ] Line dataset: open `qt/research/hwr/sample/handwriting-sample-de.xopp`, write the ten sentences of page 1 under
+      their prompts (each on one line) with the pen, save as `~/hwr-data/sample-de.xopp`; then
+      `xournal-qt-cli hwr-lines ~/hwr-data/sample-de.xopp --text qt/research/hwr/sample/sentences-de.txt --lang de
+      --out ~/hwr-data/sample-de`: it says 10 lines (and warns that there are 20 sentences while page 2 is empty);
+      the pictures in `images/` show each sentence whole, umlauts and all; `lines.jsonl` pairs each picture with its
+      sentence. The training block's reader (`qt/research/hwr/train`) loads the folder.
+- [ ] With `XQT_HWR_MODEL_DE=<folder>` the German row says the model is that folder and offers neither download nor
+      removal.
 
 ## Snip: a picture of part of a page (qt/snip)
 
