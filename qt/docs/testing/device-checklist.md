@@ -3404,3 +3404,11 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
 - [ ] The library (and Recent): the card of a PDF with notes that keeps versions has a small clock under its "PDF ✎"
       badge; its tooltip says how many ("Keeps its versions (7)"). A PDF with notes without versions has none. The
       library lists as fast as before (the number comes from the marker the index reads anyway).
+- [ ] Acrobat (desktop): open a PDF with notes that keeps versions, add a comment, File → Save (not Save As): back in
+      xournal-qt the History panel lists the versions and a row "Changed in another app" with Acrobat's date; the next
+      Ctrl+S on the same day is a new version (Acrobat's revision is never cut away), the comment stays.
+- [ ] Acrobat "Save As…" (or "Reduce file size"), and macOS Preview saving the file: the latest state opens in
+      xournal-qt; the History panel says how many versions were removed by another app (they are gone: those apps
+      write the file anew). Preview on iPad/iPhone the same.
+- [ ] An older version cut out of the file (`head -c <end> file.pdf > old.pdf`, the end from "Show beside the
+      document"'s file in the cache) opens in Okular, Firefox and Acrobat with the ink of that day.

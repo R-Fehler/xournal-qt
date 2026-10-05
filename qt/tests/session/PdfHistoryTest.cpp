@@ -532,3 +532,46 @@ TEST_F(PdfHistoryTest, everyThirtiethVersionIsWhole) {
     EXPECT_FALSE(PdfHistory::xmlOf(out, listed, 29, error).empty()) << error;
     EXPECT_FALSE(PdfHistory::xmlOf(out, listed, 31, error).empty()) << error;
 }
+
+// XQT_BENCH_HISTORY=1: a written lecture (20 pages, 300 strokes each), ten days with 20 more strokes a day: what each
+// day's version adds to the file, with and without the deltas (qt/docs/hybrid-pdf.md, "Version history")
+TEST_F(PdfHistoryTest, benchTenDaysOfALecture) {
+    if (!std::getenv("XQT_BENCH_HISTORY")) {
+        GTEST_SKIP() << "XQT_BENCH_HISTORY=1 runs it";
+    }
+    makeTextPdf(path("lecture.pdf"), std::vector<std::string>(20, "slide"));
+    auto loaded = DocumentSession::loadFile(path("lecture.pdf"));
+    ASSERT_TRUE(loaded.document);
+    auto s = std::make_unique<DocumentSession>(*app, std::move(loaded.document));
+    for (size_t p = 0; p < 20; ++p) {
+        for (int k = 0; k < 300; ++k) {
+            drawOn(*s, p, 40 + (k % 100) * 7.5);
+        }
+    }
+    s->setKeepsVersions(true);
+    HybridPdf::compactAbove = 0.25;
+    ASSERT_TRUE(s->saveAsHybrid(path("notes.pdf")).ok);
+    uint64_t last = fs::file_size(path("notes.pdf"));
+    std::printf("first version: %llu bytes\n", static_cast<unsigned long long>(last));
+    for (int d = 2; d <= 11; ++d) {
+        clockNow = at(d % 28 + 1, 10);
+        for (int k = 0; k < 20; ++k) {
+            drawOn(*s, static_cast<size_t>(1 + d % 19), 100 + k * 30);
+        }
+        const auto r = save(*s);
+        const uint64_t now = fs::file_size(path("notes.pdf"));
+        std::printf("day %2d: version %d, the file grew by %llu bytes (appended %llu)\n", d, r.version,
+                    static_cast<unsigned long long>(now - last), static_cast<unsigned long long>(r.appended));
+        last = now;
+    }
+    const auto listed = PdfHistory::list(path("notes.pdf"));
+    for (const auto& v: listed.versions) {
+        std::printf("version %d: %s\n", v.id, v.kind.c_str());
+    }
+    QPDF q;
+    q.processFile(path("notes.pdf").string().c_str());
+    auto spec = QPDFEmbeddedFileDocumentHelper(q).getEmbeddedFile(HybridPdf::DATA_NAME);
+    std::printf("the .xopp: %zu bytes gzipped; %zu versions, %llu bytes in all\n",
+                static_cast<size_t>(spec->getEmbeddedFileStream().getStreamData()->getSize()), listed.versions.size(),
+                static_cast<unsigned long long>(last));
+}

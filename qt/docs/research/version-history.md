@@ -1,6 +1,6 @@
 # Version history inside the PDF: research and plan (2026-10-05; confirmed with changes, see "Confirmed by the author")
 
-Status: **a proposal for the author to confirm** (nothing built). The author, 2026-10-05: "a fully version controlled
+Status: **built** in `qt/pdf-history` as the section "Confirmed by the author" says (see [hybrid-pdf.md](../hybrid-pdf.md), "Version history"); compare and play and pruning are not. Before: a proposal for the author to confirm. The author, 2026-10-05: "a fully version controlled
 PDF document leveraging the append saving … enable/disable that on documents … a version sidebar … the save date as
 the commit message … commit-like messages on save … for milestones … the progression of an ink-based lecture".
 Background: [ideas-2026-10.md](../ideas-2026-10.md) B6 (versions inside the PDF) and B9 (the timeline),

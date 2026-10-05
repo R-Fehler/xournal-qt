@@ -649,3 +649,102 @@ every document is a single PDF, with no sidecars.
   has the PDF open without `FILE_SHARE_DELETE` makes the rename fail on Windows; the save then reports an error and
   the file stays as it was. Incremental saves rename over the file too. A retry, or `ReplaceFileW`, may be needed
   there.
+
+## Version history (`qt/pdf-history`)
+
+The author (2026-10-05): "a fully version controlled PDF document leveraging the append saving … a version sidebar,
+the save date as the commit message and optional milestone messages", off by default but easy to find. The research
+and the plan: [research/version-history.md](research/version-history.md); its section "Confirmed by the author"
+is what is built.
+
+### The model
+
+- **A version is a revision of the file that our save wrote while history is on** (Ctrl+S, Save on close, "Save with
+  a message…"; autosaves never touch the PDF). The file cut after that revision's `%%EOF` is the file as it was saved
+  then (`PdfRevisions`: our own walk of the cross-reference chain, classic tables and streams, other apps' updates, a
+  damaged tail; a prefix opens in qpdf through a bounded input source).
+- **One version per local calendar day.** The first save of a day appends a new version; a further save that day
+  appends and then writes the day's two revisions again as one over the prefix before them
+  (`IncrementalPdf::Update::serializeOver`, `append(…, keep)`): what only the earlier save used goes, the file grows
+  by the day's last state only. A version written in full (the first save of a new file) and a version followed by
+  another app's revision are never cut away: the next save is a new version.
+- **A milestone is a version with a message** ("Save with a message…", Ctrl+Alt+S, at most 200 characters). It is never
+  replaced; the saves after it start a new version. A milestone saved on a day whose version is unnamed takes that
+  version's place. A message can be given or changed later (only the marker is appended; that update counts as part
+  of the current version, see `/Start` below).
+- **Version 0 is the file as it was when history began:** a plain PDF "as received" (the first save with history on
+  appends the whole document on top of it, its bytes stay; streams the file has already are referred to, not copied:
+  `Update::copyAll` with `indexReuse`), or a PDF with notes as it was (its `.xopp`'s checksum recorded).
+- **No compaction while on.** The 25 % rule and the many-pages rule are off. Where a save cannot build on the file
+  (another app saved it, it was edited elsewhere, anything unexpected) the whole document is appended as one update
+  instead of writing the file anew, so no version is lost. Save as over another file, Export, and Share without the
+  versions write fresh files.
+- **Restore** never rewrites history: the version's pages replace the document's pages in one undo step; the next save
+  is a new version with the message "Restored the version of …" (never in place of the day's version).
+- **No pruning** in this build: all versions are kept; the panel shows the size they take.
+
+### In the file
+
+- The marker gets `/History << /On true /Count n /Latest (date) /Start offset >>` and `/Versions`, a compressed stream
+  with one JSON line per version: `id`, `date` (UTC), `day` (local), `msg`, `start` and `end` in the file, `sha` (SHA-256
+  of the uncompressed `.xopp`), `kind` (`received`, `full`, `delta`), `base` (a delta's version), `pages`. Each
+  revision's list covers the versions before it and its own; the latest is the truth. `/Count` is what the library
+  reads (no list, no chain). `/Start` says where the revision with this marker begins: it tells our revisions from
+  other apps'.
+- `PdfHistory::list` checks the list against the file: a listed end that is no revision end is a version another app
+  removed (it wrote the file anew; said once in the panel), a revision after the first version that no version covers
+  is another app's ("Changed in another app", with its `/ModDate`).
+- **Older versions as deltas.** At the first save of a new version, the version before it (still the file's last
+  revision, ours, an ordinary day's version) is written again: its pages and drawings stay the same objects, so any
+  PDF viewer still shows that version as it was; its `document.xopp` leaves the attachment tree and the marker gets
+  `/XoppDelta << /Data stream /Base id >>`, a byte delta (`ByteDelta`: copy ranges and inserts, 16-byte blocks by a
+  rolling hash) of its uncompressed `.xopp` against the version before it. It stays whole when it is a milestone,
+  every 30th version, the first version, after another app's revision, or when the delta would be more than half of
+  its `.xopp`. The delta is checked to give the version back before it is written, and every rebuilt version against
+  its SHA-256 (`PdfHistory::xmlOf`). The latest version always has a whole `document.xopp` (Acrobat's attachments,
+  `pdfdetach`); the `.xopp` of any version: `xournal-qt-cli export-xopp <file.pdf> [--version N] [-o out.xopp]`.
+  The writer gives the same bytes for the same document (a test), so the deltas stay small; a change on the first
+  page changes the `.xopp`'s preview and with it its delta.
+- Attached background images whose size and checksum the file has are not written again (with or without history).
+
+### In the app
+
+- The page sidebar's **History** button (a clock, after Annotations): while versions are not kept, what they are and
+  the switch "Keep versions of this document" (a `.xopp` document: "needs a PDF with notes", with Save as PDF with
+  notes…; an archive PDF and a text file keep none). On: the list newest first ("Unsaved changes", versions with their
+  date as "Today 14:30", milestones with a flag and their message, other apps' revisions), the Milestones filter, the
+  size line, "Save with a message…". A row's menu: Show beside the document (read-only, as the reference), Restore this
+  version…, Open as a copy (a new document, not saved), Add / Change the message…
+- ⋮ → Document → "Version history…" and "Save with a message… (Ctrl+Alt+S)". Settings → Documents → "Keep versions
+  of new PDFs with notes" (off). The choice per document is the session's (`keepsVersions`) until a save writes it.
+- **Share** sends a PDF with notes that keeps versions without them (a copy written anew in the app cache; the file is
+  never compacted in place while it keeps versions), with a check box "With its version history" for the file itself.
+- The library's cards (and Recent) show a small clock on documents that keep versions; the tooltip says how many.
+- **The version cache** (`VersionCache`, the owner of the versions cut out of files to be shown or opened): the last
+  five used, at most 500 MB, removed when the app quits; other processes' after a day.
+
+### Measured (2026-10-05, the container; `XQT_BENCH_HISTORY=1 xqt-session-tests --gtest_filter='*benchTenDays*'`)
+
+A generated lecture of 20 pages with 300 strokes each (12 points per stroke; real handwriting has more points per
+stroke), one day's version after another with 20 strokes added each day: the first version 414 KB; each later day
+grows the file by 5–7 KB with the deltas, where a whole `.xopp` per version would add 25–32 KB (the embedded `.xopp`
+is 62 KB gzipped at the end). Eleven versions: 532 KB in all.
+
+### Other apps
+
+- Acrobat's "Save" appends its own update: the versions stay, its revision is listed as "Changed in another app" and
+  never cut away. Acrobat "Save As", "Reduce file size", macOS Preview and most mobile apps write the file anew: the
+  latest state stays, the versions are gone (the panel says how many were removed). To be checked on the device
+  ([testing/device-checklist.md](testing/device-checklist.md)).
+- An old version cut out of the file shows correctly in any PDF viewer (its page drawings are complete); its `.xopp`
+  needs xournal-qt or `xournal-qt-cli export-xopp` when it is a delta.
+
+### Not built (follow-ups)
+
+- **Compare and play** (the plan's step 8): the scrubber across versions with ▶ belongs on the replay play bar of
+  the parallel block `qt/timeline`, which the version scrubber should reuse. Compare beside the document works today
+  through "Show beside the document" (the reference view), without changed-page marks.
+- Pruning (thinning unnamed versions) and "Remove unnamed versions": only if real files need it.
+- Signed revisions are not looked for (our appender never cuts a revision that is not ours and the last).
+- A cheaper version 0 for long PDFs: the first save appends our page tree with references to the original's streams;
+  page dictionaries and resources are copied (small next to the content, but not nothing).
