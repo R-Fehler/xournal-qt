@@ -39,6 +39,8 @@ rounded hole: the spotlight) are drawn in the same style.
 (qt/docs/page-rotation.md).
 
 `xqt-snip` is Lucide's `scissors`: the snip tool (copy the picture of a part of a page, qt/docs/snip.md).
+`xqt-snip-rect` and `xqt-snip-lasso` (a dashed rectangle or lasso with small scissors: the snip's two shapes, the
+toolbox's snip entry and the select list) are drawn in the same style.
 
 `xqt-sticker` is Lucide's `sticker` (a sheet with a peeled corner and a smile): the sticker tool (qt/docs/stickers.md).
 

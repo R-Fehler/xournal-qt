@@ -3470,3 +3470,8 @@ Seen through the replay (⋮ → View → Replay the writing).
 - [ ] The toolbox: tap the pen in hand; in its editor choose a color, a width (slider and dots), a line style, the
       filling: the editor stays beside the pen each time (not in the window's top left corner). The same for a
       highlighter further down, with the rail docked left, top and bottom, and floating in full screen.
+- [ ] The toolbox's "+" → Snip: the editor offers Rectangle and Lasso (no color, no width); Add: the snip is armed at
+      once; drag a lasso over a page: "Copied picture", the pen in hand before comes back. The new entry shows the
+      lasso icon with two dots. Tap it, then tap it again while armed: the rectangle (icon and dot change), drag a
+      rectangle: copied. Shift+L / Shift+S lift the entry when its shape matches. Long press → Edit… changes the shape.
+      Folded into a stack on a short rail it still snips.

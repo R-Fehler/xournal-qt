@@ -17,7 +17,8 @@ per device. Reading and presenting are two modes over one "tools hidden" view (b
 **My tools.** Each entry is a tool with its settings: a pen (color or palette role, width, line style, filling), a
 highlighter, a shape (line, rectangle, ellipse, arrow, double arrow, coordinate system, recognized shapes; drawn with
 the pen or the highlighter), an eraser (standard, whiteout, whole strokes; its size), a text box (its font and color),
-a sticky note (its pastel), the laser pointer (pen or highlighter). Dividers group them into sections.
+a sticky note (its pastel), the laser pointer (pen or highlighter), a **snip** (a rectangle or a lasso whose picture goes to the clipboard; a
+cycling tool: a tap while it is armed takes the other shape, qt/ui-rework). Dividers group them into sections.
 
 The first start: three pens (body, key terms, warnings) | two highlighters (key terms, definitions) | the eraser | a
 line, a text box, a sticky note | the laser pointer. The pens and highlighters take their colors from the **palette
@@ -134,7 +135,8 @@ written after a pause of 400 ms (a dragged slider writes once), and when the app
  {"id":"e5","type":"eraser","variant":"whiteout","width":8.5},
  {"id":"e7","type":"text","font":{"family":"Sans","size":12},"color":"#2b2b2b","role":"body"},
  {"id":"e8","type":"sticky","color":"#fff59d"},
- {"id":"e9","type":"laser","base":"pen","color":"#ff0000","width":2.4}]}
+ {"id":"e9","type":"laser","base":"pen","color":"#ff0000","width":2.4},
+ {"id":"e10","type":"snip","variant":"lasso"}]}
 ```
 
 `role` is a palette role: the entry draws with that role's color in the chosen palette (ink; the highlight color for

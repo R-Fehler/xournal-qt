@@ -127,6 +127,9 @@ bool AppController::entryInHand(const QVariantMap& e) const {
     if (type == "text") {
         return t == "text";
     }
+    if (type == "snip") {
+        return snipShape() == e.value("variant").toString();  // (armed with its shape)
+    }
     return false;
 }
 
@@ -141,6 +144,12 @@ bool AppController::applyToolEntry(const QString& id) {
     }
     if (type == "sticky") {
         return insertStickyNote(QColor(e.value("color").toString()));
+    }
+    // A snip (qt/docs/snip.md): one picture of a rectangle or a lasso, then the tool in hand before comes back; it is
+    // never the entry in hand for long, so the active entry stays the one it gives back to
+    if (type == "snip") {
+        startSnip(e.value("variant").toString());
+        return true;
     }
     if (snip::isArmed()) {
         endSnip(false);  // (another tool taken: the snip ends)

@@ -303,17 +303,37 @@ Tools that do almost the same share one button (`ToolCycleButton.qml`, the logic
 
 | Group | Variants (a tap goes through them) | Only in its list |
 | --- | --- | --- |
-| `pen` | pen ↔ highlighter (freehand) | |
+| `pen` | pen ↔ highlighter (freehand) | the laser pointer and the laser highlighter |
 | `eraser` | standard ↔ whiteout ↔ whole strokes (`eraserMode`) | |
-| `select` | rectangle ↔ lasso | rectangle and lasso on all layers |
+| `select` | rectangle ↔ lasso | rectangle and lasso on all layers; the two snips (never remembered as its variant) |
 | `shape` | line, rectangle, ellipse, arrow, double arrow, coordinate system, recognize shapes (the pen, or the highlighter in hand, draws them) | |
-| `geometry` | setsquare ↔ compass | "Take it off the page" (also the × of the geometry pill) |
+| `geometry` | setsquare ↔ compass | the curtain and the spotlight (put out or taken away, beside the tool in hand); "Take it off the page" (also the × of the geometry pill) |
+| `snip` (qt/ui-rework) | snip a rectangle ↔ snip with the lasso (one picture to the clipboard, then the tool before; [snip.md](snip.md)) | |
+
+**The groups reviewed** (qt/ui-rework, the author: "think of the cycling groups we currently have and whether we can
+have the snipping screenshots as a cycling tool in the toolbelt"):
+
+- **The snips** are a group of their own: in the toolbox an entry of the kind "Snip" ("+" or "Add a tool here…"; not
+  among the first tools), whose icon is its shape (`xqt-snip-rect`, `xqt-snip-lasso`) with two dots for the two. A tap
+  snips with its shape; a tap while it is armed takes the other shape, which the entry keeps; its editor (Edit… in its
+  menu) chooses the shape too. A snip is never the toolbox's active entry: the tool before stays the one that comes
+  back. Among the fixed tools the snips keep their one place, the select button's list (with Shift+S, Shift+L); the
+  image button's list keeps them as well, as an insert (a picture to paste). The classic bar is unchanged.
+- **Curtain ↔ spotlight** stay in the setsquare's list (and ⋮ → View), not a group with a button: they are not tools
+  but sheets over the page whatever tool is in hand, and are put out and taken away; a cycle (curtain → spotlight →
+  none) on a button would hide which one is out. Their keys are B and Shift+B.
+- **The laser pointer** stays in the pen's list in the classic bar; in the toolbox it is an entry of its own (drawn
+  with the pen or the highlighter), as before.
+- **Pen ↔ highlighter, the eraser's kinds, select, the shapes, setsquare ↔ compass** stay as they are; with the
+  toolbox, the pens, highlighters, erasers and shapes are entries (each with its settings), and select and setsquare
+  are fixed tools that cycle as in the classic bar.
 
 - A tap on the button while its tool is in use: the next variant. A tap while another tool is in use: its tool with
   the variant used last (remembered per group in the setting `toolVariants`; the eraser's is `eraserMode`).
 - The icon is the variant in use (or the one last used); small dots under it say how many there are and which one.
 - A long press (or a right click) lists all variants with icon and name, with the group's name on top: to pick one.
-- The keys (P, H, E, S, L) take a variant directly; the button follows and remembers it.
+- The keys (P, H, E, S, L; Shift+S and Shift+L for the snips) take a variant directly; the button follows and
+  remembers it.
 - The pen pill of the compact chrome uses the same `pen` button (smaller); the tool square's popup holds the tool
   bar's buttons themselves.
 - The shapes menu and the eraser menu are gone. What they held besides variants: the sticky note (a button of its

@@ -180,6 +180,7 @@ Rectangle {
             const v = win.toolGroups.variant("shape", e.variant)
             return role !== "" ? v.name + " · " + role : v.name
         }
+        if (e.type === "snip") return win.toolGroups.variant("snip", e.variant === "lasso" ? "snipLasso" : "snipRect").name
         const kind = kinds[e.type] || e.type
         return role !== "" ? kind + " · " + role : kind
     }
@@ -192,13 +193,21 @@ Rectangle {
         return key
     }
     /// The entry is the tool in hand (the active entry, and the tool is still its tool)
+    /// (a snip is never the active entry: it is in hand while it is armed with its shape)
     function inHand(e) {
-        return (app.tool, app.drawingType, app.settings.revision, store.revision,
-                e && store.active === e.id && app.entryInHand(e))
+        return (app.tool, app.drawingType, app.snip, app.settings.revision, store.revision,
+                !!e && (e.type === "snip" || store.active === e.id) && app.entryInHand(e))
     }
     function tap(e, button) {
-        if (inHand(e)) editRequested(e, button)
+        if (e && e.type === "snip") cycleSnip(e)
+        else if (inHand(e)) editRequested(e, button)
         else app.applyToolEntry(e.id)
+    }
+    /// A snip (a cycling tool, ToolGroups' "snip"): a tap snips with its shape; a tap while it is armed takes the
+    /// other shape, which the entry keeps (its editor: Edit… in its menu)
+    function cycleSnip(e) {
+        if (inHand(e)) store.update(e.id, { variant: e.variant === "lasso" ? "rect" : "lasso" })
+        app.applyToolEntry(e.id)
     }
     /// The width one wheel step further (a fifth more or less), within 0.1–150 pt
     function stepWidth(e, steps) {
@@ -481,7 +490,7 @@ Rectangle {
             icon.width: 22; icon.height: 22
             iconName: "xqt-plus"
             label: qsTr("Add a tool")
-            tip: qsTr("Add a tool (a pen, highlighter, shape, eraser, text box, sticky note, laser pointer)")
+            tip: qsTr("Add a tool (a pen, highlighter, shape, eraser, text box, sticky note, laser pointer, snip)")
             onClicked: box.addRequested(addButton)
         }
         IconButton {

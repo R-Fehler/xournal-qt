@@ -5,6 +5,8 @@
 //   pen       pen ↔ highlighter (freehand); the laser pointer and laser highlighter in the list only
 //   select    rectangle ↔ lasso (the multi-layer ones and the snips only in the list: a snip copies the picture of a
 //             rectangle or lasso and gives the tool back, qt/docs/snip.md)
+//   snip      rectangle ↔ lasso snip (one picture to the clipboard, then the tool before; the toolbox's snip entry
+//             cycles the same way, qt/docs/toolbox.md)
 //   shape     line, rectangle, ellipse, arrow, double arrow, coordinate system, recognized shapes (the pen draws them)
 //   geometry  setsquare ↔ compass (on the page; the geometry pill takes it away); curtain and spotlight only in the list (they are
 //             not tools of their own: they lie over the page whatever tool is in hand, qt/docs/curtain.md)
@@ -33,8 +35,16 @@ QtObject {
                 { key: "selectRegion", icon: "xopp-select-lasso", name: qsTr("Lasso") },
                 { key: "selectMultiLayerRect", icon: "xopp-select-rect", name: qsTr("Rectangle on all layers"), listOnly: true },
                 { key: "selectMultiLayerRegion", icon: "xopp-select-lasso", name: qsTr("Lasso on all layers"), listOnly: true },
-                { key: "snipRect", icon: "xqt-snip", name: qsTr("Snip a rectangle (copy its picture)"), listOnly: true, snip: "rect" },
-                { key: "snipLasso", icon: "xqt-snip", name: qsTr("Snip with the lasso (copy its picture)"), listOnly: true, snip: "lasso" }
+                { key: "snipRect", icon: "xqt-snip-rect", name: qsTr("Snip a rectangle (copy its picture)"), listOnly: true, snip: "rect" },
+                { key: "snipLasso", icon: "xqt-snip-lasso", name: qsTr("Snip with the lasso (copy its picture)"), listOnly: true, snip: "lasso" }
+            ]
+        },
+        // The snips as a group of their own (the toolbox's snip entry): the icon shows which
+        "snip": {
+            name: qsTr("Snip (copy a picture)"),
+            variants: [
+                { key: "snipRect", icon: "xqt-snip-rect", name: qsTr("Snip a rectangle (copy its picture)"), snip: "rect" },
+                { key: "snipLasso", icon: "xqt-snip-lasso", name: qsTr("Snip with the lasso (copy its picture)"), snip: "lasso" }
             ]
         },
         "shape": {
@@ -97,7 +107,8 @@ QtObject {
         if (group === "shape")
             return (tool === "pen" || tool === "highlighter") && type !== "default" && type !== "dontChange"
                    && type !== "spline" ? type : ""
-        if (group === "select" && app.snip !== "") return app.snip === "lasso" ? "snipLasso" : "snipRect"
+        if ((group === "select" || group === "snip") && app.snip !== "") return app.snip === "lasso" ? "snipLasso" : "snipRect"
+        if (group === "snip") return ""
         if (group === "select")
             return ["selectRect", "selectRegion", "selectMultiLayerRect", "selectMultiLayerRegion"].indexOf(tool) >= 0 ? tool : ""
         if (group === "geometry") return app.geometryTool
@@ -151,7 +162,8 @@ QtObject {
             return
         }
         if (snipOf(group, key) !== "") {
-            app.startSnip(snipOf(group, key))  // (never remembered: the button stays the selection's)
+            app.startSnip(snipOf(group, key))
+            if (group === "snip") remember(group, key)  // (the select button stays the selection's)
             return
         }
         if (group === "pen") {
@@ -202,6 +214,8 @@ QtObject {
                 const a = groups.activeKey(g)
                 if (a !== "" && groups.snipOf(g, a) === "") groups.remember(g, a)
             })
+            const snip = groups.activeKey("snip")  // (Shift+S, Shift+L)
+            if (snip !== "") groups.remember("snip", snip)
             if (["pen", "highlighter", "text"].indexOf(app.tool) >= 0) groups.noteColor(app.color)
         }
     }

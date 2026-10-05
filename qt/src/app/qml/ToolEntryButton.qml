@@ -68,6 +68,7 @@ AbstractButton {
         case "text": return "xqt-text-box"
         case "sticky": return "xqt-sticky-note"
         case "laser": return "xopp-laser-pointer"
+        case "snip": return e.variant === "lasso" ? "xqt-snip-lasso" : "xqt-snip-rect"
         }
         return "xopp-tool-pencil"
     }
@@ -135,7 +136,7 @@ AbstractButton {
         Canvas {
             id: sample
             objectName: "toolSample"
-            visible: button.type !== "sticky" && button.type !== "text"
+            visible: button.type !== "sticky" && button.type !== "text" && button.type !== "snip"
             anchors.horizontalCenter: parent.horizontalCenter
             y: Math.round(parent.height / 2 + 6)
             width: 28
@@ -195,6 +196,23 @@ AbstractButton {
             font.family: button.entry && button.entry.font ? button.entry.font.family : ""
             font.pixelSize: 12
             font.weight: Font.DemiBold
+        }
+        // A snip (a cycling tool): two dots, the one of its shape in color (ToolCycleButton's dots)
+        Row {
+            objectName: "snipDots"
+            visible: button.type === "snip"
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: Math.round(parent.height / 2 + 9)
+            spacing: 3
+            Repeater {
+                model: ["rect", "lasso"]
+                delegate: Rectangle {
+                    required property string modelData
+                    width: 4; height: 4; radius: 2
+                    color: (button.entry.variant || "rect") === modelData
+                           ? (button.inHand ? Material.accentColor : "#505050") : "#b4b8bd"
+                }
+            }
         }
         // A stack: dots for the entries it holds
         Row {

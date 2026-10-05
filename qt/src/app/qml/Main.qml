@@ -1119,7 +1119,7 @@ ApplicationWindow {
             if (purpose === "replace") {
                 const fresh = store.prefill(type)
                 if (store.replace(entryId, fresh)) {
-                    if (type !== "sticky") app.applyToolEntry(entryId)
+                    if (type !== "sticky" && type !== "snip") app.applyToolEntry(entryId)
                     const id = entryId
                     win.afterMenus(function() { toolEditor.openFor(store.entry(id), b, toolboxPane.edge) })
                 }
@@ -1135,7 +1135,8 @@ ApplicationWindow {
                     { type: "eraser", icon: "xopp-tool-eraser", name: qsTr("Eraser") },
                     { type: "text", icon: "xqt-text-box", name: qsTr("Text box") },
                     { type: "sticky", icon: "xqt-sticky-note", name: qsTr("Sticky note") },
-                    { type: "laser", icon: "xopp-laser-pointer", name: qsTr("Laser pointer") }]
+                    { type: "laser", icon: "xopp-laser-pointer", name: qsTr("Laser pointer") },
+                    { type: "snip", icon: "xqt-snip", name: qsTr("Snip (a picture of a rectangle or lasso to copy)") }]
             delegate: AdaptiveMenuItem {
                 required property var modelData
                 objectName: "toolType_" + modelData.type

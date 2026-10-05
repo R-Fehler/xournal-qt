@@ -2,7 +2,7 @@
  * xournal-qt: the toolbox's tools (qt/docs/toolbox.md): the user's own ordered tools ("my tools"), each a tool with
  * its settings, like pens taken from a sorted toolbox on a table (Drawboard). A pen in the body color, a red pen, a
  * yellow highlighter, a dashed arrow, a whiteout eraser, a text box in a font, a sticky note in a color, the laser
- * pointer: each is one entry. Dividers group them into sections (which fold into stacks when the rail is short).
+ * pointer, a snip (a picture of a rectangle or a lasso to the clipboard): each is one entry. Dividers group them into sections (which fold into stacks when the rail is short).
  *
  * The model is plain data: an ordered list of entries (QVariantMap for QML), the active entry, the order in which
  * entries were used (the keys P / H / E / T take the most recent one of their type). Applying an entry to the tool in
@@ -19,7 +19,8 @@
  *     {"id":"e5","type":"eraser","variant":"whiteout","width":8.5},
  *     {"id":"e7","type":"text","font":{"family":"Sans","size":12},"color":"#2b2b2b","role":"body"},
  *     {"id":"e8","type":"sticky","color":"#fff59d"},
- *     {"id":"e9","type":"laser","base":"pen","color":"#ff0000","width":2.4}]}
+ *     {"id":"e9","type":"laser","base":"pen","color":"#ff0000","width":2.4},
+ *     {"id":"e10","type":"snip","variant":"lasso"}]}
  * `role` is a role of the color palettes (ColorPalettes.h): the entry takes that role's color in the palette chosen
  * now (ink; the highlight color for a highlighter), so it follows a palette switch; `color` is used when the role is
  * empty or the palette leaves it out. Widths are points (0.1 to 150).

@@ -546,6 +546,55 @@ TEST_F(ToolboxTest, plusAddsAToolPrefilledFromTheLastOfItsKind) {
     EXPECT_EQ(tools()->tools().size(), count + 1);
 }
 
+TEST_F(ToolboxTest, aSnipIsACyclingToolOfItsOwnThatCanBeAdded) {
+    // (the author, 2026-10-05: "can we have the snipping screenshots as a cycling tool in the toolbelt")
+    const QString pen = nth("pen");
+    controller->applyToolEntry(pen);
+    const int count = tools()->tools().size();
+    click(find("toolboxAddButton"));
+    trigger(find<QObject>("toolTypeMenu"), "toolType_snip");
+    until([&] { return editorOpen(); });
+    ASSERT_TRUE(editorOpen());
+    EXPECT_TRUE(shown(find("toolEditorSnipShapes")));
+    EXPECT_FALSE(shown(find("toolEditorColors"))) << "a snip has no color";
+    EXPECT_FALSE(shown(find("toolEditorWidth")));
+    click(find("editorSnip_lasso"));
+    click(find("toolEditorAdd"));
+    until([&] { return tools()->tools().size() == count + 1; });
+    const QString snip = tools()->tools().last().toMap().value("id").toString();
+    EXPECT_EQ(tools()->entry(snip).value("variant"), "lasso");
+    EXPECT_EQ(controller->snipShape(), "lasso") << "taken at once: the next lasso is copied";
+    EXPECT_EQ(tools()->active(), pen) << "the pen comes back after the picture";
+    until([&] { return !editorOpen(); });  // (its closing transition)
+    until([&] { return shown(entry(snip)); });
+    auto* button = entry(snip);
+    ASSERT_TRUE(shown(button));
+    EXPECT_TRUE(button->property("inHand").toBool());
+    EXPECT_EQ(controller->tool(), "selectRegion");
+
+    // A tap while it is armed: the other shape (the entry keeps it), as a cycling button
+    click(button);
+    until([&] { return controller->snipShape() == "rect"; });
+    EXPECT_EQ(controller->snipShape(), "rect");
+    EXPECT_EQ(tools()->entry(snip).value("variant"), "rect");
+    EXPECT_FALSE(editorOpen()) << "a tap cycles, it does not open the editor";
+    button = entry(snip);
+    EXPECT_TRUE(button->property("inHand").toBool());
+
+    // Escape: no snip, the pen again; the entry is put down
+    QTest::keyClick(window, Qt::Key_Escape);
+    until([&] { return controller->snipShape().isEmpty(); });
+    EXPECT_EQ(controller->tool(), "pen");
+    until([&] { return !entry(snip)->property("inHand").toBool(); });
+    EXPECT_FALSE(entry(snip)->property("inHand").toBool());
+    EXPECT_TRUE(entry(pen)->property("inHand").toBool());
+    // A tap again: the shape it has now
+    click(entry(snip));
+    until([&] { return controller->snipShape() == "rect"; });
+    EXPECT_EQ(controller->snipShape(), "rect");
+    controller->cancelSnip();
+}
+
 TEST_F(ToolboxTest, theMenuOfAToolMovesReplacesDuplicatesAndRemovesIt) {
     auto* menu = find<QObject>("toolEntryMenu");
     ASSERT_NE(menu, nullptr);

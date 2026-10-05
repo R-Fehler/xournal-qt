@@ -85,7 +85,7 @@ Popup {
                                  : type === "eraser" ? [1, 2.83, 8.5, 19.84, 30]
                                  : type === "laser" ? [0.7, 1.41, 2.4, 4, 7] : [0.42, 0.85, 1.41, 2.26, 5.67]
     readonly property bool hasWidth: ["pen", "highlighter", "shape", "eraser", "laser"].indexOf(type) >= 0
-    readonly property bool hasColor: type !== "eraser"
+    readonly property bool hasColor: type !== "eraser" && type !== "snip"
     readonly property bool hasLineStyle: type === "pen" || (type === "shape" && entry.base !== "highlighter")
     readonly property bool hasFill: type === "pen" || type === "highlighter" || type === "shape"
     /// 0.1 to 150 pt on a log scale (slider 0 … 1)
@@ -186,7 +186,7 @@ Popup {
             Canvas {
                 id: preview
                 objectName: "toolEditorPreview"
-                visible: editor.type !== "text" && editor.type !== "sticky"
+                visible: editor.type !== "text" && editor.type !== "sticky" && editor.type !== "snip"
                 Layout.fillWidth: true
                 Layout.preferredHeight: 44
                 readonly property var key: [editor.shownColor, editor.entry.width, editor.entry.lineStyle, editor.type,
@@ -300,6 +300,30 @@ Popup {
                         font.pixelSize: 12
                         display: AbstractButton.TextUnderIcon
                         onClicked: editor.set({ variant: modelData.key })
+                    }
+                }
+            }
+
+            // --- a snip's shape (a tap on it while it is armed takes the other one too) ---
+            RowLayout {
+                objectName: "toolEditorSnipShapes"
+                visible: editor.type === "snip"
+                Layout.fillWidth: true
+                Repeater {
+                    model: win.toolGroups.variants("snip")
+                    delegate: Button {
+                        required property var modelData
+                        readonly property string shape: modelData.snip
+                        objectName: "editorSnip_" + shape
+                        Layout.fillWidth: true
+                        flat: true
+                        checkable: true
+                        checked: (editor.entry.variant || "rect") === shape
+                        icon.source: app.iconUrl(modelData.icon)
+                        text: shape === "lasso" ? qsTr("Lasso") : qsTr("Rectangle")
+                        font.pixelSize: 12
+                        display: AbstractButton.TextUnderIcon
+                        onClicked: editor.set({ variant: shape })
                     }
                 }
             }
