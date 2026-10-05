@@ -738,7 +738,10 @@ Formats shared by training and app: [qt/research/hwr/train/FORMATS.md](qt/resear
   `AdaptiveLayoutTest.toolBarPlaceIsChosenPerSizeClass` and `SafeAreasKeyboardTest.theFormatBarDocksAboveTheKeyboardAndTheCursorStaysInView`
   failed once each and passed alone (also `ColorChooserTest.theHighlighterTakesHighlightColors`, 3 of 3 alone);
   `CitationsTest.selectedTextIsSearchedInTheDocumentTheTabsAndTheLibrary` failed
-  about 1 in 4. Wait for the state instead of time.
+  about 1 in 4. Wait for the state instead of time. Again on 2026-10-05 (`ctest -L 'hwr|shell|ui' -j3`, after
+  `qt/hwr-multilang`): `theFold7FoldedAndUnfolded`, `AdaptiveLayoutTest.classesSidebarAndControlsAtFiveSizes`,
+  `AdaptiveLayoutTest.colorsAndWidthsTakeTheRoomThereIs` and
+  `ToolboxAudioTest.recordingIsAFixedToolOfTheRailAndItsPillStaysInSight` failed together and passed 4 of 4 alone.
 - [ ] `Tabs.closingATabDoesNotWaitForQueuedWork` checks a fixed time limit for closing a tab: it failed once in the
   full suite at a load of about 15 and passed 6 of 6 alone. Make its limit relative (for example to one render's
   time), or measure the waiting rather than wall time.
