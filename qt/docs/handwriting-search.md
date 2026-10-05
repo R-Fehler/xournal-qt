@@ -60,6 +60,8 @@ What to expect:
 - **ONNX Runtime** is not linked: only its C API's headers are vendored (`qt/3rdparty/onnxruntime`), and
   `libonnxruntime.so.1` is opened when the search is switched on (`XQT_ONNXRUNTIME`, else next to the program, else
   the system's). Without it, Settings says so and nothing else changes. Packages will bundle it later.
+- **Training models** (German, German + English, a person's own hand): `qt/research/hwr/train` ([README](../research/hwr/train/README.md)),
+  PyTorch on GPUs, exporting the model folders of [FORMATS.md](../research/hwr/train/FORMATS.md).
 - Tests that need the runtime or the model are skipped unless `XQT_ONNXRUNTIME` (a tiny model in
   `qt/tests/hwr/data`) or `XQT_HWR_MODEL` is set; `XQT_BENCH_HWR=1` with the model prints the time per line.
 

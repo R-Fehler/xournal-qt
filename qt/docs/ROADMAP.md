@@ -793,6 +793,14 @@
   with notes and archive PDFs (still PDF/A-3b) for other viewers. Off until switched on; the model (64 MB) is
   downloaded from Settings with consent once its sha256s are pinned (until then `qt/scripts/hwr-model.sh`).
 
+- **Handwriting model training, `qt/hwr-training` (2026-10-05).** A PyTorch project in `qt/research/hwr/train`
+  ([README](../research/hwr/train/README.md)) that takes a GPU machine (≥ 11 GB, 1..N GPUs with DDP) to model folders
+  the app loads: datasets in the shared line format (fhswf, IAM, CVL, synthetic lines in Google handwriting fonts,
+  the app's ink exports), TrOCR-small and a 5.7 M-parameter CTC model, German and combined German + English configs,
+  personal fine-tuning (LoRA, frozen layers), evaluation by words found as the app's search finds them, export to
+  int8 ONNX (the merged decoder of the Xenova format) with a parity check. Proven end to end on the CPU with tiny
+  models; the real training runs are the author's.
+
 - **Snip, `qt/snip` (2026-10-04).** A rectangle or lasso (the select tools' list, the image button's list, Shift+S /
   Shift+L) copies the picture of what is there to the clipboard (PNG, at least 200 dpi and the screen's resolution,
   at most about 4 MP, transparent outside a lasso), then the tool before comes back. Drawn off the UI thread by a

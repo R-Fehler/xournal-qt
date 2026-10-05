@@ -1,5 +1,8 @@
 # Handwriting recognition trials (throwaway)
 
+**The training project for the app's models is in [`train/`](train/README.md)** (datasets, PyTorch training on
+GPUs, evaluation by words found, export to the app's model folders).
+
 Throwaway scripts behind the measured numbers in
 [`qt/docs/research/handwriting-recognition.md`](../../docs/research/handwriting-recognition.md). They are not
 app code; nothing in `qt/` or `src/` uses them. Nothing but these scripts is committed.

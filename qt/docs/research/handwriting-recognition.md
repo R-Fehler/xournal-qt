@@ -335,6 +335,8 @@ math feature is a separate "convert selection to LaTeX" command using Pix2Text M
    PP-OCRv6-small; fhswf, synthetic German, permissive modern lines), with a clean licence chain, and ships it as
    a second ONNX model chosen by the document's language. Or fix the kraken ONNX export and ship PP-OCRv6 medium
    (Apache-2.0, 64 MB).
+   *(2026-10-05: the training project is built, `qt/research/hwr/train`: TrOCR-small and a CTC model, German and
+   combined German + English, personal fine-tuning; the GPU runs are the author's.)*
 6. **Corrections and lexicon;** then optionally the training-text check, and the adapter experiment if data shows
    a need.
 7. Later: ink-to-text conversion, and math to LaTeX (Pix2Text MFR).
