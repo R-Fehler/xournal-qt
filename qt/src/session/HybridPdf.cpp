@@ -93,6 +93,8 @@ constexpr const char* CHECK_NAME = "changed.txt";
 constexpr const char* AUDIO_NAME = "audio";  ///< the recordings it carries (qt/docs/audio.md)
 constexpr const char* PICTURES_NAME = "pictures";  ///< the pictures a text document carries (qt/docs/md-images.md)
 constexpr const char* PAGES_NAME = "pages.txt";  ///< the file's page objects the clean copy's pages are
+/// A protected PDF's pictures and recordings are taken out (by this process): "unpacked-<pid>" (removeProtectedLeftovers)
+constexpr const char* UNPACKED_PREFIX = "unpacked-";
 constexpr double MARGIN = 2.0;  ///< around a layer's elements (pt)
 /// A base page with space for notes (qt/docs/note-space.md): its boxes as the PDF had them (/MediaBox, /CropBox)
 constexpr const char* BOXES = "/XournalQtBoxes";
@@ -3196,10 +3198,77 @@ static std::string titleOf(const fs::path& pdf) {
 
 // --- public ---------------------------------------------------------------------------------------------------------
 
+void markUnpacked(const fs::path& folder) {
+    std::error_code ec;
+    if (fs::is_directory(folder, ec)) {
+        writeFile(folder / (std::string(UNPACKED_PREFIX) + std::to_string(Util::getPid())), "");
+    }
+}
+
 void dropExtracted(const fs::path& base) {
     std::error_code ec;
     fs::remove_all(base.parent_path() / PICTURES_NAME, ec);
     fs::remove_all(base.parent_path() / AUDIO_NAME, ec);
+    fs::remove(base.parent_path() / (std::string(UNPACKED_PREFIX) + std::to_string(Util::getPid())), ec);
+}
+
+int removeUnpackedLeftovers(const std::vector<fs::path>& roots, const std::function<bool(int64_t)>& alive,
+                            const std::function<void(const fs::path&)>& remove) {
+    int removed = 0;
+    const std::string prefix = UNPACKED_PREFIX;
+    for (const fs::path& root: roots) {
+        std::error_code ec;
+        for (auto it = fs::directory_iterator(root, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+            std::error_code dec;
+            if (!it->is_directory(dec)) {
+                continue;
+            }
+            bool stale = false;
+            for (auto f = fs::directory_iterator(it->path(), dec); !dec && f != fs::directory_iterator();
+                 f.increment(dec)) {
+                const std::string n = f->path().filename().string();
+                if (n.rfind(prefix, 0) == 0) {
+                    try {
+                        const int64_t pid = std::stoll(n.substr(prefix.size()));
+                        if (alive(pid)) {
+                            stale = false;  // (a process that still runs has it open)
+                            break;
+                        }
+                        stale = true;
+                    } catch (const std::exception&) {
+                        stale = true;
+                    }
+                }
+            }
+            if (stale) {
+                remove(it->path());
+                ++removed;
+            }
+        }
+    }
+    return removed;
+}
+
+int removeProtectedLeftovers(const std::function<bool(int64_t)>& alive) {
+    // The clean copies' entries: their pictures and recordings (the encrypted clean copy stays); the documents' work
+    // folders of Markdown pictures: whole
+    int removed = removeUnpackedLeftovers({cacheFolder()}, alive, [](const fs::path& dir) {
+        std::error_code ec;
+        fs::remove_all(dir / PICTURES_NAME, ec);
+        fs::remove_all(dir / AUDIO_NAME, ec);
+        for (auto it = fs::directory_iterator(dir, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+            if (it->path().filename().string().rfind(UNPACKED_PREFIX, 0) == 0) {
+                std::error_code rec;
+                fs::remove(it->path(), rec);
+            }
+        }
+    });
+    removed += removeUnpackedLeftovers({Util::getCacheSubfolder("md-assets")}, alive,
+                                       [](const fs::path& dir) {
+                                           std::error_code ec;
+                                           fs::remove_all(dir, ec);
+                                       });
+    return removed;
 }
 
 int forgetCopies(const fs::path& pdf) {
@@ -4291,6 +4360,9 @@ Opened open(const fs::path& pdf) {
             // the player read files; DocumentSession removes them when it is closed)
             extractPictures(q, marker, dir);  // (before strip(): it removes them)
             extractAudio(q, marker, dir);
+            if (secret) {
+                markUnpacked(dir);  // (removed when it is closed, or at a start after a crash)
+            }
             if (!fs::exists(check, ec)) {
                 std::vector<QPDFObjectHandle> pages;  // (the clean copy's page k is this page of the file)
                 for (auto& p: QPDFPageDocumentHelper(q).getAllPages()) {

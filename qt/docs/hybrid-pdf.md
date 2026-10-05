@@ -870,9 +870,12 @@ For a protected document (its file, or the PDF its `.xopp` annotates):
 | Share, PDF copy, export | encrypted (above) |
 | printing | an unencrypted PDF for the printer in a temporary folder, removed ten minutes later |
 
-Known gaps: pictures of Markdown boxes and voice memos the PDF carries are taken out into the app cache while it is
-open (the renderer and the player read files) and removed when it is closed; an attached page-background image passes
-through a temporary file of the save's work folder (removed at once). Tested by `PdfEncryptionTest
+Pictures of Markdown boxes and voice memos the PDF carries are taken out into the app cache while it is open (the
+renderer and the player read files): their folders are marked with the process (`unpacked-<pid>`), removed when the
+document is closed, and at the next start of the app for every process that no longer runs (a crash;
+`HybridPdf::removeProtectedLeftovers`, called before anything is opened). Known gaps: a Markdown work folder made only
+after opening (a picture inserted then) is not marked (removed when the document is closed, not after a crash); an
+attached page-background image passes through a temporary file of the save's work folder (removed at once). Tested by `PdfEncryptionTest
 .nothingOfAProtectedDocumentStaysUnencryptedInTheCache`: after opening, editing, autosaving, saving, a copy and
 opening again, no file in the cache holds a marker text of the document readable (as bytes, gunzipped, or in a PDF
 that opens without a password).

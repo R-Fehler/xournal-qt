@@ -163,6 +163,9 @@ auto DocumentSession::loadFile(const fs::path& path, bool attachPdf, const std::
                 // The pictures its Markdown carries: into its work folder, found there from now on (while the result
                 // lives, and then by the session's own root; qt/docs/md-images.md)
                 DocumentImages::unpack(path, opened.pictures);
+                if (result.encrypted) {
+                    HybridPdf::markUnpacked(DocumentImages::workFolder(path));  // (removed at a start after a crash)
+                }
                 result.pictures = std::make_shared<md::images::RootHandle>(DocumentImages::embeddedRoot(path));
                 prepareLoaded(*result.document);
                 return result;

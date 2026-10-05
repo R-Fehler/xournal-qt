@@ -504,3 +504,24 @@ TEST_F(PdfPasswordTest, protectingRemovesEverythingTheCachesKeptOfIt) {
     EXPECT_TRUE(index->search(QString::fromStdString(marker)).empty());
 }
 
+// A start removes what a crashed process had taken out of protected PDFs (pictures, recordings): the app's
+// constructor cleans up before anything is opened
+TEST_F(PdfPasswordTest, aStartRemovesWhatACrashLeftUnpacked) {
+    const fs::path cache = fs::path(qEnvironmentVariable("XDG_CACHE_HOME").toStdString()) / "xournal-qt";
+    const fs::path entry = cache / "hybrid-pdf" / "0123456789abcdef-1-2";
+    const fs::path work = cache / "md-assets" / "fedcba9876543210";
+    for (const fs::path& d: {entry / "pictures", entry / "audio", work}) {
+        fs::create_directories(d);
+    }
+    std::ofstream(entry / "pictures" / "photo.png") << "picture";
+    std::ofstream(entry / "audio" / "memo.ogg") << "sound";
+    std::ofstream(entry / "unpacked-4999997");
+    std::ofstream(work / "photo.png") << "picture";
+    std::ofstream(work / "unpacked-4999997");
+    TearDown();  // (the app quits: a crash would leave the same)
+    SetUp();     // (and starts again)
+    EXPECT_FALSE(fs::exists(entry / "pictures"));
+    EXPECT_FALSE(fs::exists(entry / "audio"));
+    EXPECT_FALSE(fs::exists(work));
+    fs::remove_all(entry);
+}

@@ -48,6 +48,7 @@
 #include "session/PdfHistory.h"
 #include "session/PdfRevisions.h"
 #include "util/Util.h"
+#include "util/PathUtil.h"
 
 #include "config.h"
 
@@ -592,6 +593,56 @@ TEST_F(PdfEncryptionTest, nothingOfAProtectedDocumentStaysUnencryptedInTheCache)
     }
     EXPECT_EQ(leaks(cache, MARKER).size(), 1U);
     fs::remove(plain);
+}
+
+// What a protected PDF takes out into the cache while it is open (its pictures and recordings) is marked with the
+// process, removed when it is closed, and what a crashed process left behind goes at the next start
+TEST_F(PdfEncryptionTest, picturesAndRecordingsTakenOutDoNotOutliveTheProcess) {
+    const fs::path pdf = protectedPdf("lecture.pdf");
+    protectedNotes(pdf).reset();
+    const std::string mark = "unpacked-" + std::to_string(Util::getPid());
+    fs::path entry;
+    {
+        auto loaded = DocumentSession::loadFile(pdf, false, PASSWORD);
+        ASSERT_TRUE(loaded.document) << loaded.error;
+        DocumentSession s(*app, std::move(loaded.document));
+        entry = s.getDocument()->getPdfFilepath().parent_path();
+        EXPECT_TRUE(fs::exists(entry / mark)) << "marked with this process";
+        EXPECT_TRUE(fs::exists(entry / "pictures"));
+    }
+    EXPECT_FALSE(fs::exists(entry / "pictures")) << "removed when it is closed";
+    EXPECT_FALSE(fs::exists(entry / mark));
+    EXPECT_TRUE(fs::exists(entry / "base.pdf")) << "the encrypted clean copy stays";
+
+    // Left behind by a process that crashed (and one by a process that still runs)
+    const fs::path cache = HybridPdf::cacheFolder();
+    const fs::path work = Util::getCacheSubfolder("md-assets");
+    auto leftover = [](const fs::path& dir, int64_t pid) {
+        fs::create_directories(dir / "pictures");
+        fs::create_directories(dir / "audio");
+        std::ofstream(dir / "pictures" / "photo.png") << "picture";
+        std::ofstream(dir / "audio" / "memo.ogg") << "sound";
+        std::ofstream(dir / ("unpacked-" + std::to_string(pid)));
+        std::ofstream(dir / "base.pdf") << "%PDF";
+    };
+    leftover(cache / "aaaa-crashed", 4999999);
+    leftover(cache / "bbbb-running", 4999998);
+    leftover(work / "cccc-crashed", 4999999);
+    leftover(cache / "dddd-plain", 0);
+    fs::remove(cache / "dddd-plain" / "unpacked-0");  // (not a protected PDF's: not marked)
+    const int removed =
+            HybridPdf::removeProtectedLeftovers([](int64_t pid) { return pid == 4999998 || pid == Util::getPid(); });
+    EXPECT_EQ(removed, 2);
+    EXPECT_FALSE(fs::exists(cache / "aaaa-crashed" / "pictures"));
+    EXPECT_FALSE(fs::exists(cache / "aaaa-crashed" / "audio"));
+    EXPECT_FALSE(fs::exists(cache / "aaaa-crashed" / "unpacked-4999999"));
+    EXPECT_TRUE(fs::exists(cache / "aaaa-crashed" / "base.pdf")) << "(an encrypted clean copy: kept)";
+    EXPECT_FALSE(fs::exists(work / "cccc-crashed")) << "a work folder of Markdown pictures: whole";
+    EXPECT_TRUE(fs::exists(cache / "bbbb-running" / "pictures" / "photo.png")) << "its process still has it open";
+    EXPECT_TRUE(fs::exists(cache / "dddd-plain" / "pictures" / "photo.png"));
+    for (const char* d: {"aaaa-crashed", "bbbb-running", "dddd-plain"}) {
+        fs::remove_all(cache / d);
+    }
 }
 
 // Measurements (skipped unless XQT_BENCH_ENCRYPTED is set: a PDF to use, or "1" for a generated one of 1,321 pages):
