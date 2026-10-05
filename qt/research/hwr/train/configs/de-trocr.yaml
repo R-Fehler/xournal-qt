@@ -1,0 +1,51 @@
+# The German TrOCR model: TrOCR-small (IAM-trained by Microsoft) fine-tuned on German handwriting.
+#   torchrun --nproc_per_node=<GPUs> train.py --config configs/de-trocr.yaml
+name: trocr-small-de
+kind: trocr
+languages: [de]
+version: 2026.10.1
+data_root: ~/hwr-data
+out_dir: runs/de-trocr
+seed: 1234
+
+datasets:                         # weights are shares of the samples (renormalised when an optional one is missing)
+  - {name: fhswf-german, weight: 0.45}
+  - {name: synthetic-de, weight: 0.35}
+  - {name: cvl-lines, weight: 0.20, langs: [de], optional: true}
+
+model:
+  base: microsoft/trocr-small-handwritten   # or microsoft/trocr-small-stage1 (before IAM)
+  add_missing_chars: true         # characters the tokenizer cannot write become tokens
+  gradient_checkpointing: false   # true: about 3x less activation memory, ~25 % slower (batch 64 fits)
+  attn_implementation: sdpa
+
+train:
+  batch_size: 24                  # per GPU; ~8-9 GB in bf16/fp16 with sdpa (estimated); 16 if it does not fit
+  grad_accum: 2                   # 48 lines per step per GPU
+  lr: 4.0e-5
+  weight_decay: 0.01
+  warmup_steps: 1000
+  max_steps: 40000
+  steps_per_epoch: 2000           # how often the sampler draws anew
+  num_workers: 8                  # per GPU; rendering and augmentation are CPU work
+  precision: auto                 # bf16 where supported, else fp16 with a gradient scaler
+  clip_grad: 1.0
+  early_stopping: 8               # evaluations without better words found
+  log_every: 50
+  max_target_tokens: 64
+
+val:
+  every_steps: 2000
+  max_lines: 800                  # spread over the GPUs
+  topk: 4                         # the app's beams
+
+augment:
+  p: 0.9
+  slant: 0.5
+  elastic: 0.3
+  morph: 0.3
+  contrast: 0.5
+  blur: 0.2
+  noise: 0.2
+  rotate: 0.2
+  scale: 0.3

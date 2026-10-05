@@ -1,0 +1,26 @@
+# CPU smoke test: a miniature CRNN on a few synthetic lines.
+name: tiny-ctc
+kind: ctc
+languages: [de, en]
+version: 0.0.1
+out_dir: runs/tiny-ctc
+datasets:
+  - {name: synthetic-de, weight: 1}
+  - {name: synthetic-en, weight: 1}
+model:
+  input_height: 64
+  max_width: 512
+  arch: {channels: [8, 8, 16, 16, 16, 16], proj: 32, lstm_hidden: 16, lstm_layers: 2, dropout: 0.1}
+train:
+  batch_size: 4
+  grad_accum: 1
+  lr: 1.0e-3
+  warmup_steps: 1
+  max_steps: 3
+  steps_per_epoch: 3
+  num_workers: 0
+  log_every: 1
+val:
+  every_steps: 3
+  max_lines: 6
+  topk: 3

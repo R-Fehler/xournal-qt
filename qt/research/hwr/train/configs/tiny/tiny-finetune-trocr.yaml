@@ -1,0 +1,13 @@
+extends: tiny-trocr.yaml
+name: tiny-trocr-personal
+datasets:
+  - {name: ink-user, weight: 0.7}
+  - {name: synthetic-de, weight: 0.3}
+finetune:
+  freeze: lora
+  lora: {r: 2, alpha: 4}
+val:
+  datasets: [ink-user]
+  every_steps: 2
+train:
+  max_steps: 2

@@ -1,0 +1,26 @@
+# CPU smoke test: a randomly initialised miniature TrOCR (no download) on a few synthetic lines.
+name: tiny-trocr
+kind: trocr
+languages: [de, en]
+version: 0.0.1
+out_dir: runs/tiny-trocr
+datasets:
+  - {name: synthetic-de, weight: 1}
+  - {name: synthetic-en, weight: 1}
+model:
+  base: tiny
+  tiny: {image_size: 64, vocab_size: 300}
+train:
+  batch_size: 4
+  grad_accum: 2
+  lr: 1.0e-3
+  warmup_steps: 1
+  max_steps: 3
+  steps_per_epoch: 3
+  num_workers: 0
+  log_every: 1
+  max_target_tokens: 32
+val:
+  every_steps: 3
+  max_lines: 6
+  topk: 2

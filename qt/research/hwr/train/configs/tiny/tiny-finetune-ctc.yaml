@@ -1,0 +1,13 @@
+extends: tiny-ctc.yaml
+name: tiny-ctc-personal
+datasets:
+  - {name: ink-user, weight: 0.7, render_from_strokes: true}
+  - {name: synthetic-de, weight: 0.3}
+finetune:
+  freeze: last_layers
+  last_lstm_layers: 1
+val:
+  datasets: [ink-user]
+  every_steps: 2
+train:
+  max_steps: 2

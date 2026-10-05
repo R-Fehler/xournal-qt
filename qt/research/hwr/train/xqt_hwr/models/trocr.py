@@ -84,13 +84,17 @@ def _set_ids(model, tok):
         model.generation_config.pad_token_id = tok.pad_token_id
 
 
-def load(base: str, texts: list[str] | None = None, tiny: dict | None = None) -> TrocrBundle:
-    """A base model from the hub or a folder (save_pretrained: the model and its tokenizer), or `tiny`."""
+def load(base: str, texts: list[str] | None = None, tiny: dict | None = None, attn: str = "eager") -> TrocrBundle:
+    """A base model from the hub or a folder (save_pretrained: the model and its tokenizer), or `tiny`. `attn`: the
+    encoder's attention ("sdpa" trains faster; the export and CachedDecoder do not depend on it)."""
     if base == "tiny":
         return build_tiny(texts or ["hello world"], **(tiny or {}))
     from transformers import AutoTokenizer, VisionEncoderDecoderModel
 
-    model = VisionEncoderDecoderModel.from_pretrained(base, attn_implementation="eager")
+    try:
+        model = VisionEncoderDecoderModel.from_pretrained(base, attn_implementation=attn)
+    except (ValueError, ImportError):
+        model = VisionEncoderDecoderModel.from_pretrained(base, attn_implementation="eager")
     tok = AutoTokenizer.from_pretrained(base, use_fast=True)
     if model.config.decoder_start_token_id is None:
         model.config.decoder_start_token_id = 2

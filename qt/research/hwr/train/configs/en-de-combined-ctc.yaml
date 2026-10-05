@@ -1,0 +1,13 @@
+# One CTC model for German and English, on the merged datasets.
+extends: de-ctc.yaml
+name: crnn-de-en
+languages: [de, en]
+out_dir: runs/en-de-ctc
+datasets:
+  - {name: fhswf-german, weight: 0.25}
+  - {name: synthetic-de, weight: 0.15}
+  - {name: synthetic-en, weight: 0.15}
+  - {name: iam-lines, weight: 0.25, optional: true}
+  - {name: cvl-lines, weight: 0.20, optional: true}
+train:
+  max_steps: 100000

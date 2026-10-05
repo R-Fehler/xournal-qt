@@ -1,0 +1,13 @@
+# One TrOCR model for German and English, on the merged datasets.
+extends: de-trocr.yaml
+name: trocr-small-de-en
+languages: [de, en]
+out_dir: runs/en-de-trocr
+datasets:
+  - {name: fhswf-german, weight: 0.25}
+  - {name: synthetic-de, weight: 0.15}
+  - {name: synthetic-en, weight: 0.15}
+  - {name: iam-lines, weight: 0.25, optional: true}     # non-commercial research terms (see the README)
+  - {name: cvl-lines, weight: 0.20, optional: true}     # German and English
+train:
+  max_steps: 60000

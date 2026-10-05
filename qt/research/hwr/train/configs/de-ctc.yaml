@@ -1,0 +1,50 @@
+# The German CTC model: a CNN + BiLSTM (5.7 M parameters) trained from scratch, 64 px lines.
+#   torchrun --nproc_per_node=<GPUs> train.py --config configs/de-ctc.yaml
+name: crnn-de
+kind: ctc
+languages: [de]
+version: 2026.10.1
+data_root: ~/hwr-data
+out_dir: runs/de-ctc
+seed: 1234
+
+datasets:
+  - {name: fhswf-german, weight: 0.45}
+  - {name: synthetic-de, weight: 0.35}
+  - {name: cvl-lines, weight: 0.20, langs: [de], optional: true}
+
+model:
+  input_height: 64
+  max_width: 2048
+  alphabet_min_count: 2           # characters seen fewer times are left out (plus a fixed German/English base set)
+  arch: {channels: [32, 64, 128, 128, 256, 256], proj: 256, lstm_hidden: 256, lstm_layers: 3, dropout: 0.2}
+
+train:
+  batch_size: 48                  # per GPU; ~3-5 GB in bf16/fp16 (estimated, lines up to 2048 px)
+  grad_accum: 1
+  lr: 1.0e-3
+  weight_decay: 0.01
+  warmup_steps: 1000
+  max_steps: 80000                # from scratch: it needs more steps than the fine-tuned TrOCR
+  steps_per_epoch: 2000
+  num_workers: 8
+  precision: auto
+  clip_grad: 5.0
+  early_stopping: 10
+  log_every: 50
+
+val:
+  every_steps: 2000
+  max_lines: 800
+  topk: 5
+
+augment:
+  p: 0.9
+  slant: 0.5
+  elastic: 0.3
+  morph: 0.3
+  contrast: 0.5
+  blur: 0.2
+  noise: 0.2
+  rotate: 0.2
+  scale: 0.3
