@@ -160,7 +160,13 @@ int main(int argc, char* argv[]) {
     parser.addVersionOption();
     parser.addPositionalArgument("folder", "Folder to open as library (default: the standard library)", "[folder]");
     parser.addPositionalArgument("file", "Documents to open (.xopp, .xoj or .pdf)", "[files...]");
+    // Quick note (qt/docs/quick-note.md): also handed to the window that runs already
+    const QCommandLineOption quickNoteOption(
+            "quick-note", "Make a quick note: a new note in the library's Inbox, named by the date and time (or a line "
+                          "in today's Markdown note there, as Settings - Documents says)");
+    parser.addOption(quickNoteOption);
     parser.process(qapp);
+    const bool quickNote = parser.isSet(quickNoteOption);
 
     QStringList files;
     QString libraryDir;
@@ -198,7 +204,7 @@ int main(int argc, char* argv[]) {
                              qEnvironmentVariableIsSet("XQT_SCREENSHOT") || offscreen;
 #endif
     if (!independent) {
-        if (instance.sendToRunningInstance(files)) {
+        if (instance.sendToRunningInstance(quickNote ? files + QStringList{xqt::SingleInstance::QUICK_NOTE} : files)) {
             return 0;
         }
         instance.listen();
@@ -246,6 +252,11 @@ int main(int argc, char* argv[]) {
         controller.startSession(files);
     }
     QObject::connect(&instance, &xqt::SingleInstance::filesRequested, &controller, &AppController::openPaths);
+    QObject::connect(&instance, &xqt::SingleInstance::quickNoteRequested, &controller, &AppController::quickNote);
+    if (quickNote) {
+        // (once the window is there: a Markdown note opens with the cursor in it)
+        QTimer::singleShot(0, &controller, [&controller] { controller.quickNote(); });
+    }
 #ifdef Q_OS_MACOS
     // Finder hands documents over as events, not as arguments: a double click, "Open With", a drop on the Dock icon.
     qapp.installEventFilter(new FileOpenFilter([&controller](const QString& f) { controller.openPaths({f}); }, &qapp));
@@ -292,7 +303,16 @@ int main(int argc, char* argv[]) {
     xqt::AudioControl::setPlatformHook([](bool on) { xqt::android::setRecording(on); });
     // "Open with" and the share sheet: files other apps hand over, at start and while the app runs (the window
     // is there to show them and what went wrong)
-    xqt::android::watchIncomingFiles([&controller](const QStringList& files) { controller.receiveFiles(files); });
+    // The launcher's shortcut "Quick note" (qt/docs/quick-note.md) comes the same way, as an entry of its own.
+    xqt::android::watchIncomingFiles([&controller](QStringList files) {
+        const bool quickNote = files.removeAll(QLatin1String(xqt::android::QUICK_NOTE)) > 0;
+        if (!files.isEmpty()) {
+            controller.receiveFiles(files);
+        }
+        if (quickNote) {
+            controller.quickNote();
+        }
+    });
 #endif
 
     // Developer aid: XQT_SCREENSHOT=file.png renders the window after a moment, saves it and quits.

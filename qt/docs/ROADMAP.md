@@ -845,6 +845,14 @@
   tool with a 2 s lead-in, the list of recordings; Android foreground service, microphone permission
   ([audio.md](audio.md)). Built without Qt Multimedia here: recording is not offered in such a build.
 
+- **Quick note, `qt/quick-note` (2026-10-05).** One action makes a note to write on: a new document in the library's
+  `Inbox/` (made on first use, a fixed English name) named by the date and time (`2026-10-04 21-30.xopp`, or `.pdf`
+  in the PDF files mode), opened in a new tab with the pen in hand; or (Settings → Documents → Quick note) a line
+  `- 21:30 ` at the end of today's `Inbox/2026-10-04.md`, opened with the cursor after it (into the open text when the
+  note is open already). From the home screen (a button beside New when the header has room, else first in "+"), ⋮ →
+  Document, Ctrl+Alt+N (in the shortcut sheet), `xournal-qt --quick-note` (handed to the running window through
+  `SingleInstance`) and an Android launcher shortcut ([quick-note.md](quick-note.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

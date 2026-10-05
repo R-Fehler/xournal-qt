@@ -2,6 +2,8 @@
 // - the files other apps hand over ("Open with": ACTION_VIEW; the share sheet: ACTION_SEND, ACTION_SEND_MULTIPLE),
 //   at start and while the app runs. They are content:// URIs; the native side copies them into the library
 //   (AndroidContent.cpp, AppController::receiveFiles).
+// - the launcher's shortcut "Quick note" (res/xml/shortcuts.xml, qt/docs/quick-note.md): its intent is passed on
+//   with the files, as the entry QUICK_NOTE.
 // - whether the device has a stylus (the default of "draw with the finger").
 // - "All files access" (MANAGE_EXTERNAL_STORAGE; the storage permission before Android 11), asked for when the user
 //   opens a folder of the shared storage as a library: whether the app has it, and the system's page to allow it.
@@ -30,6 +32,10 @@ import org.qtproject.qt.android.bindings.QtActivity;
 public class XournalActivity extends QtActivity {
     /// What a share of text alone (no file) is reported as: the native side says that only files can be received.
     public static final String SHARED_TEXT = "xournal-qt:shared-text";
+    /// The launcher's shortcut "Quick note" (res/xml/shortcuts.xml) starts the activity with this action ...
+    public static final String ACTION_QUICK_NOTE = "org.xournalqt.app.QUICK_NOTE";
+    /// ... and the native side gets this entry with the files (AndroidActivity.h, QUICK_NOTE)
+    public static final String QUICK_NOTE = "xournal-qt:quick-note";
 
     private static final ArrayList<String> pending = new ArrayList<>();
     /// The native side has asked once (takeIncomingFiles), so it is running and wants to be told of new files.
@@ -59,6 +65,9 @@ public class XournalActivity extends QtActivity {
 
     private static void receive(Intent intent) {
         ArrayList<String> uris = urisOf(intent);
+        if (intent != null && ACTION_QUICK_NOTE.equals(intent.getAction())) {
+            uris.add(QUICK_NOTE);
+        }
         if (uris.isEmpty()) {
             return;
         }

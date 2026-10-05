@@ -3023,3 +3023,23 @@ offered).
 - [ ] Windows, macOS, Android: a package without Qt Multimedia's FFmpeg plugin (`windeployqt --skip-plugin-types
       multimedia`, the macOS bundle without `PlugIns/multimedia`) still records and plays; if not, the plugin must
       ship.
+
+## Quick note (qt/quick-note, qt/docs/quick-note.md)
+- [ ] Home screen at 1920×1080: the lightning beside New makes `Inbox/<date> <hh-mm>.xopp` in the library (the folder
+      appears in the grid), opens it in a tab, and the pen writes at once. In a narrower window: "+" → Quick note
+      (first entry), the same.
+- [ ] Settings → Documents → Keep documents as "PDF files": the quick note is `Inbox/<date> <hh-mm>.pdf`; it opens in
+      another PDF viewer (empty page).
+- [ ] Ctrl+Alt+N from the home screen and from a document; the shortcut sheet (F1) lists "Quick note"; ⋮ → Document →
+      "Quick note (Ctrl+Alt+N)" in a document (classic tool bar and toolbox, phone's ⋮ too).
+- [ ] Settings → Documents → Quick note: "A line in today's Markdown note": Ctrl+Alt+N opens `Inbox/<date>.md` with
+      `- 21:30 ` and the cursor after it; typing goes there. Again a few minutes later (the note still open): a second
+      line, the same tab. Close the tab, again: the file has both lines and the new one.
+- [ ] With the app running: `xournal-qt --quick-note` in a terminal brings the window to the front with a new quick
+      note; `xournal-qt --quick-note some.pdf` opens the PDF, then the quick note. Without the app running: it
+      starts with the quick note (after the reopened tabs).
+- [ ] KDE: a custom shortcut (System Settings → Shortcuts → Add command) running `xournal-qt --quick-note` works while
+      the app is in the background.
+- [ ] Android (Fold 7): a long press on the app icon shows "Quick note"; it starts the app with a new note in the
+      library's Inbox (the pen ready), and does the same when the app is already open on another document. Drag
+      the shortcut to the home screen: a tap there does the same.

@@ -126,6 +126,7 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTextFiles.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppQuickNote.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppSnip.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppStickers.cpp
@@ -329,6 +330,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ReferenceWindowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/DocumentLinksTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/SnipTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/QuickNoteTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/StickerToolTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/TodosTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ToolboxTest.cpp
@@ -356,6 +358,7 @@ if(XQT_BUILD_TESTS)
     add_executable(xqt-shell-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TabsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/QuickNoteTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LinkRewriteTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/AnnotationsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ReferenceModeTest.cpp

@@ -61,6 +61,9 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- The launcher's shortcuts (a long press on the icon): "Quick note" (res/xml/shortcuts.xml,
+                 qt/docs/quick-note.md) -->
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
 
             <!-- "Open with": a copy goes into the library (folder "Opened") and opens (AppController::receiveFiles).
                  One task (singleTask): a file handed over while the app runs opens in it as a tab. -->

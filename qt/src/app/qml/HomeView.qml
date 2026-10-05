@@ -55,11 +55,13 @@ Rectangle {
     TextMetrics { id: bookmarksWord; text: qsTr("Bookmarks") }
     TextMetrics { id: todosWord; text: qsTr("To-dos") }
     /// What the expanded row needs: the switch, a search wide enough for its placeholder (300; below that the grouped
-    /// row with a wider search is better), New, Last page, Import, New folder, Flat, Show, Sort, − and + with their
-    /// separators, Settings, and the spacing between them
-    readonly property real expandedNeed: switchNeed + 300 + 6 + 48 + 48 + resume.implicitWidth + 5 * 48
-                                         + 2 * 40 + 2 * 13 + 48 + 15 * 6
+    /// row with a wider search is better), New, Quick note, Last page, Import, New folder, Flat, Show, Sort, − and +
+    /// with their separators, Settings, and the spacing between them
+    readonly property real expandedNeed: switchNeed + 300 + 6 + 48 + 48 + 48 + resume.implicitWidth + 5 * 48
+                                         + 2 * 40 + 2 * 13 + 48 + 16 * 6
     readonly property bool expanded: !phoneLayout && headerRoom >= expandedNeed
+    /// The keys of Quick note, for its tip
+    readonly property string quickNoteKeys: (app.shortcuts.revision, app.shortcuts.keys("quickNote").join(", "))
     /// Room for the words beside the icons of the switch (Recent, Favourites, Bookmarks), and a search at its full
     /// width. One rule: words only where the header has room for every button and them; everywhere else icons (a tip
     /// on hover, and while a finger is held on them)
@@ -471,6 +473,13 @@ Rectangle {
                     /// Import, New folder and Open a file are here when they have no button of their own
                     readonly property bool grouped: !home.expanded
                     AdaptiveMenuItem {
+                        objectName: "quickNoteItem"
+                        text: qsTr("Quick note")
+                        icon.source: app.iconUrl("xqt-zap")
+                        offered: newMenu.grouped
+                        onTriggered: app.quickNote()
+                    }
+                    AdaptiveMenuItem {
                         objectName: "newDocumentItem"
                         text: qsTr("New document…")
                         icon.source: app.iconUrl("xqt-notebook-pen")
@@ -527,6 +536,16 @@ Rectangle {
                         onTriggered: home.openFileRequested()
                     }
                 }
+            }
+            // Quick note (qt/docs/quick-note.md): a new note in the library's Inbox, named by the date and time (or
+            // a line in today's Markdown note there); a button of its own when expanded, else first in "+"
+            IconButton {
+                objectName: "quickNoteButton"
+                label: qsTr("Quick note")
+                visible: home.expanded
+                iconName: "xqt-zap"
+                tip: qsTr("Quick note in the library's Inbox (%1)").arg(home.quickNoteKeys)
+                onClicked: app.quickNote()
             }
             IconButton {
                 objectName: "importButton"

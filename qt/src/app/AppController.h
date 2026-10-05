@@ -15,6 +15,7 @@
 #include <vector>
 
 #include <QColor>
+#include <QDateTime>
 #include <QMap>
 #include <QJSValue>
 #include <QMetaObject>
@@ -600,6 +601,18 @@ public:
     /// "paperFormat", "landscape"). With a name and a library, it is saved at once in the library's current folder
     /// as "<name>.xopp"; else it is a new unsaved document.
     Q_INVOKABLE bool createDocument(const QString& name, bool inLibrary);
+    /// A new document of notes saved at once as `path` (".pdf": a PDF with notes, else a .xopp), in a new tab.
+    bool createDocumentAt(fs::path path);
+    /// Quick note (qt/docs/quick-note.md; AppQuickNote.cpp): as the setting "quickNote" says, a new note in the
+    /// library's folder "Inbox" named by the date and time ("2026-10-04 21-30.xopp", or ".pdf" in the PDF files mode),
+    /// opened at once with the pen in hand; or ("daily") a line "- 21:30 " added to "Inbox/2026-10-04.md", opened
+    /// with the cursor at its end. The folder and the file are made on first use. Without a library: a new unsaved
+    /// document. The home screen, ⋮, Ctrl+Alt+N and `xournal-qt --quick-note` call it.
+    Q_INVOKABLE bool quickNote();
+    /// The same at a given time (tests).
+    bool quickNoteAt(const QDateTime& when);
+    /// The library's folder of quick notes (a fixed English name, as "Stickers")
+    static constexpr const char* QUICK_NOTE_FOLDER = "Inbox";
     /// "New Markdown file" / "New text file": an empty "name.md" / "name.txt" (`extension`: ".md" or ".txt") in the
     /// library's current folder, opened for writing (the cursor in it).
     Q_INVOKABLE bool createTextFile(const QString& name, const QString& extension);

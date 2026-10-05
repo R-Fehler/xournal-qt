@@ -12,8 +12,12 @@
 
 namespace xqt::android {
 
+/// The entry the launcher's shortcut "Quick note" adds to the incoming files (XournalActivity.QUICK_NOTE)
+inline constexpr const char* QUICK_NOTE = "xournal-qt:quick-note";
+
 /// Files other apps hand over ("Open with", the share sheet): `receive` gets the ones waiting since the start now,
-/// and later ones as they come (on the UI thread; content:// URIs, see AppController::receiveFiles).
+/// and later ones as they come (on the UI thread; content:// URIs, see AppController::receiveFiles). The launcher's
+/// shortcut "Quick note" arrives among them as QUICK_NOTE.
 void watchIncomingFiles(std::function<void(const QStringList&)> receive);
 
 /// A stylus is attached (Android's input devices report a stylus source).

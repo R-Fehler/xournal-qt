@@ -1409,6 +1409,17 @@ ApplicationWindow {
                         objectName: "moreDocumentMenu"
                         title: qsTr("Document")
                         iconName: "xqt-file-text"
+                        // Quick note (qt/docs/quick-note.md): a new note in the library's Inbox, or a line in today's
+                        // Markdown note there (Settings → Documents). Here, not at the top of ⋮ (at most 10 entries
+                        // there): a new document, as the shortcut sheet's group "Document" has it
+                        AdaptiveMenuItem {
+                            objectName: "documentQuickNoteItem"
+                            readonly property var keys: win.keysOf("quickNote")
+                            text: keys.length > 0 ? qsTr("Quick note (%1)").arg(keys[0]) : qsTr("Quick note")
+                            icon.source: app.iconUrl("xqt-zap")
+                            onTriggered: app.quickNote()
+                        }
+                        MenuSeparator {}
                         // Its name (qt/rename): the file, and what belongs to it, as the library renames it
                         AdaptiveMenuItem { objectName: "renameDocumentItem"; text: qsTr("Rename…"); icon.source: app.iconUrl("xqt-pencil"); onTriggered: renameDocumentDialog.openFor(app.currentTab) }
                         AdaptiveMenuItem {
@@ -4866,6 +4877,8 @@ ApplicationWindow {
     // Ctrl+N adds a page (what one needs while writing), Ctrl+Shift+N a document
     Shortcut { sequences: win.keysOf("addPage"); enabled: docKeys; onActivated: app.addPageAfterCurrent() }
     Shortcut { sequences: win.keysOf("newDocument"); onActivated: app.newDocument() }
+    // Quick note (qt/docs/quick-note.md): from the home screen too
+    Shortcut { sequences: win.keysOf("quickNote"); onActivated: app.quickNote() }
     Shortcut { sequences: win.keysOf("addPage"); enabled: app.homeVisible; onActivated: app.newDocument() }
     Shortcut { sequences: win.keysOf("closeTab"); enabled: docKeys; onActivated: requestCloseTab(app.currentTab) }
     // The home screen (library)
