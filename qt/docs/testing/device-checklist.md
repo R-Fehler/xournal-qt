@@ -2833,6 +2833,12 @@ scripted models (`xqt-hwr-tests`); the steps below need the real models.
       English model stops reading this document, the German one reads what it had not read; close and reopen it:
       German is still checked (kept in `.xournal_library/ink-text.pack`, the `.xopp` is unchanged: `git diff` or a
       checksum of the file). Back to Automatic.
+- [ ] Line dataset: open `qt/research/hwr/sample/handwriting-sample-de.xopp`, write the ten sentences of page 1 under
+      their prompts (each on one line) with the pen, save as `~/hwr-data/sample-de.xopp`; then
+      `xournal-qt-cli hwr-lines ~/hwr-data/sample-de.xopp --text qt/research/hwr/sample/sentences-de.txt --lang de
+      --out ~/hwr-data/sample-de`: it says 10 lines (and warns that there are 20 sentences while page 2 is empty);
+      the pictures in `images/` show each sentence whole, umlauts and all; `lines.jsonl` pairs each picture with its
+      sentence. The training block's reader (`qt/research/hwr/train`) loads the folder.
 - [ ] With `XQT_HWR_MODEL_DE=<folder>` the German row says the model is that folder and offers neither download nor
       removal.
 

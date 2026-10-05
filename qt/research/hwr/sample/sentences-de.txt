@@ -1,0 +1,20 @@
+Die Kalman-Verstärkung gewichtet Messung und Vorhersage.
+Größe, Maß und Fuß schreibt man mit ß.
+Übermorgen fährt der Zug um 7:45 Uhr ab Köln.
+Jörg wählt zwölf Äpfel und vier Birnen.
+Die Übertragungsfunktion hat zwei Pole und eine Nullstelle.
+Bitte die Hausaufgabe bis Donnerstag abgeben.
+Der Regler ist stabil, wenn alle Eigenwerte negativ sind.
+Im Frühling blühen die Bäume im Schlossgarten.
+Wie viel kostet ein Kilogramm Käse?
+Die Ableitung von sin(x) ist cos(x).
+Prüfung am 14. März, Raum B 2.03.
+Quer durch Bayern jagen zwölf Boxkämpfer Eva.
+Wir messen die Spannung mit einem Oszilloskop.
+Die Matrix A ist symmetrisch und positiv definit.
+Grüße an alle aus dem Übungsblatt drei!
+Fehlerquadrate werden über alle Messpunkte summiert.
+Das Ergebnis ist ungefähr 3,14 Meter.
+Nach der Vorlesung treffen wir uns in der Mensa.
+Ein Beobachter schätzt den Zustand des Systems.
+Schöne Grüße und bis nächste Woche.

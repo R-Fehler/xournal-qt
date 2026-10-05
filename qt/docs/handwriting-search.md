@@ -46,6 +46,38 @@ What to expect:
 - About 0.2 s per line, 4–5 s per page of dense handwriting on a laptop; a page is read once.
 - The model takes about 250 MB of memory while it reads and is unloaded after a minute without work.
 
+## Your handwriting as a dataset
+
+To train a model on your handwriting, or to measure how well a model reads it, the command line tool writes a
+document's handwriting as a **line dataset** in the format the training reads
+([qt/research/hwr/train/FORMATS.md](../research/hwr/train/FORMATS.md), §1, `"kind": "ink"`):
+
+```sh
+xournal-qt-cli hwr-lines notes.xopp --out ~/hwr-data/notes [--text transcripts.txt] [--lang de] [--writer me]
+```
+
+- Every line of ink the search finds (the same layout of lines and words) becomes `images/<id>.png` (drawn exactly
+  as the app draws a line for its recognisers: 128 px high, black ink with round caps on white), `strokes/<id>.json`
+  (the ink itself, in points relative to the line) and a line of `lines.jsonl` (`id`, `image`, `text`, `lang`,
+  `writer`, `strokes`, and the `page` and `line` it came from). `dataset.json` names the set (`kind` `ink`).
+- The ids are `<writer>-<document>-p<page>-l<line>`. Lines are in reading order: pages in order, lines top to bottom.
+- `--text`: a text file with one line of text per line of ink, in the same order (empty lines and lines starting
+  with `#` are skipped; NFC). When the numbers differ, the texts are matched as far as they go and the tool warns:
+  look at the `page` and `line` of the entries to find a sentence written on two lines. Without `--text` the texts
+  are empty (a set to read, not to train on).
+- `--licence`: the dataset's licence. Default `private`, marked `"noncommercial": true`, so the training does not mix
+  your handwriting into a model it publishes unless asked.
+
+**A handwriting sample** to start from: `qt/research/hwr/sample/handwriting-sample-en.xopp` and
+`handwriting-sample-de.xopp` have 20 numbered sentences each (grey text, not ink) with room under each one. Open one in
+xournal-qt, write every sentence once, on one line, under its prompt, save, and run
+
+```sh
+xournal-qt-cli hwr-lines handwriting-sample-de.xopp --text qt/research/hwr/sample/sentences-de.txt --lang de --out ~/hwr-data/sample-de
+```
+
+The sentences are the texts (`sentences-<lang>.txt`; `make_sample.py` makes the pages from them again after a change).
+
 ## For developers
 
 - Code: `qt/src/hwr` (layout of ink into lines and words, the recognisers, the worker, the indexer of an open
