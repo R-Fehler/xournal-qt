@@ -271,8 +271,7 @@ set(XQT_QML_FILES
     src/app/qml/ToolboxPlan.js
     src/app/qml/Toolbox.qml
     src/app/qml/ToolEntryButton.qml
-    src/app/qml/ToolEntryEditor.qml)
-
+    src/app/qml/ToolEntryEditor.qml
     src/app/qml/TemplateSaveDialog.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
