@@ -5,6 +5,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <memory>
@@ -23,12 +24,14 @@
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "session/FuzzyQuery.h"
 #include "session/PdfKeywords.h"
 #include "session/StickyNote.h"
 #include "session/Tags.h"
 #include "shell/DocumentFiles.h"
 #include "shell/Library.h"
 #include "shell/LibraryCache.h"
+#include "shell/LibraryModel.h"
 
 using namespace xqt;
 
@@ -258,4 +261,67 @@ TEST(Tags, entriesFromBeforeAreReadAgainOnce) {
     third.waitForDone();
     EXPECT_EQ(third.documentsRead(), 0) << "once";
     EXPECT_EQ(third.keywordsRead(), 0);
+}
+
+// `tag:` in the fuzzy syntax: a term of its own (never in names), negated with !, marked as `#tag` in text
+TEST(Tags, theFuzzySyntaxHasTagTerms) {
+    const FuzzyQuery q("kalman tag:#Course/ !tag:draft");
+    ASSERT_TRUE(q.isValid());
+    ASSERT_EQ(q.terms().size(), 3u);
+    EXPECT_TRUE(q.terms()[1].isTag());
+    EXPECT_EQ(q.terms()[1].text, "course/");
+    EXPECT_TRUE(q.terms()[2].isTag());
+    EXPECT_TRUE(q.terms()[2].negated);
+    EXPECT_FALSE(q.positive(2));
+    EXPECT_FALSE(q.matchName(u"course draft").found[1]) << "tags are not in names";
+    const textmatch::Term marked = FuzzyQuery("tag:exam").terms()[0].textTerm();
+    EXPECT_EQ(textmatch::count(u"#exam and #examples, #exam/oral", marked.text, marked.bounds), 2);
+    EXPECT_FALSE(FuzzyQuery("tag:").isValid()) << "an empty tag is left out";
+}
+
+// The library's search: `tag:name` in the fuzzy and in the plain search, also when only names are searched
+TEST(Tags, theLibrarySearchFindsTags) {
+    QTemporaryDir tmp;
+    const fs::path root = fs::path(tmp.path().toStdString()) / "Library";
+    writeFile(root / "kalman.md", "# Kalman filter #course/math\n");
+    writeFile(root / "Sub" / "draft.md", "Kalman, a draft #course #draft\n");
+    writeFile(root / "other.md", "Kalman without tags, #coursework\n");
+    makeTaggedPdf(root / "paper.pdf", "course/physics");
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    model.searchIndex()->waitForDone();
+    auto names = [&] {
+        std::vector<std::string> out;
+        for (int i = 0; i < model.rowCount(); ++i) {
+            out.push_back(fs::path(model.data(model.index(i), LibraryModel::PathRole).toString().toStdString())
+                                  .filename()
+                                  .string());
+        }
+        std::sort(out.begin(), out.end());
+        return out;
+    };
+    model.setFuzzySearch(true);
+    model.setSearchQuery("tag:course");
+    EXPECT_EQ(names(), (std::vector<std::string>{"draft.md", "kalman.md", "paper.pdf"}));
+    model.setSearchQuery("tag:course/");
+    EXPECT_EQ(names(), (std::vector<std::string>{"kalman.md", "paper.pdf"}));
+    model.setSearchQuery("kalman !tag:draft");
+    EXPECT_EQ(names(), (std::vector<std::string>{"kalman.md", "other.md"}));
+    model.setSearchQuery("tag:course | tag:coursework");
+    EXPECT_EQ(names().size(), 4u);
+    model.setNamesOnly(true);
+    model.setSearchQuery("tag:draft");
+    EXPECT_EQ(names(), (std::vector<std::string>{"draft.md"}));
+    model.setNamesOnly(false);
+    // The plain search: the tag terms filter, the rest is searched
+    model.setFuzzySearch(false);
+    model.setSearchQuery("tag:course");
+    EXPECT_EQ(names(), (std::vector<std::string>{"draft.md", "kalman.md", "paper.pdf"}));
+    model.setSearchQuery("draft tag:course");
+    EXPECT_EQ(names(), (std::vector<std::string>{"draft.md"}));
+    model.setSearchQuery("kalman TAG:Course/Math");
+    EXPECT_EQ(names(), (std::vector<std::string>{"kalman.md"}));
+    model.setNamesOnly(true);
+    model.setSearchQuery("tag:course/physics");
+    EXPECT_EQ(names(), (std::vector<std::string>{"paper.pdf"}));
 }

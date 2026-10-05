@@ -2993,3 +2993,10 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
       and `#tags` in code blocks are none.
 - [ ] A library indexed by an older build: the documents are read once more (the indexing line counts them), plain
       PDFs only for their keywords (quickly); the next start reads nothing.
+
+## Tags: the search (qt/tags)
+- [ ] The library's search, Fuzzy on: `tag:course` lists the documents with `#course` and `#course/…` (also a PDF
+      whose keywords say so), `tag:course/` only the nested ones, `kalman !tag:draft` leaves the drafts out; the
+      pages button of a hit marks `#course` where it is written. Fuzzy off: `tag:exam lecture` lists the documents
+      with the tag whose text has "lecture"; `tag:exam` alone all of them.
+- [ ] The help of the Fuzzy button (long press) has the `tag:` row.

@@ -188,6 +188,20 @@ private:
             t.type = FuzzyQuery::Type::Exact;
             s.remove(0, 1);
         }
+        if (s.startsWith(QLatin1String("tag:"), Qt::CaseInsensitive)) {
+            // A tag (Tags.h): the document has it; no other marks
+            t.type = FuzzyQuery::Type::Tag;
+            QString tag = s.mid(4);
+            while (tag.startsWith(u'#')) {
+                tag.remove(0, 1);
+            }
+            t.text = tag.toCaseFolded();
+            if (t.text.isEmpty()) {
+                return -1;
+            }
+            q.list.push_back(std::move(t));
+            return add({FuzzyQuery::Node::TermOp, static_cast<int>(q.list.size()) - 1, {}});
+        }
         if (s != QStringLiteral("$") && s.endsWith(u'$')) {
             t.type = FuzzyQuery::Type::Suffix;
             s.chop(1);
@@ -222,6 +236,9 @@ textmatch::Term FuzzyQuery::Term::textTerm() const {
         case Type::Suffix: return {text, textmatch::WordEnd};
         case Type::Equal:
         case Type::Boundary: return {text, textmatch::Word};
+        case Type::Tag:
+            // (`#course` and `#course/math`, not `#coursework`)
+            return {textmatch::prepare(u'#' + text), text.endsWith(u'/') ? textmatch::Anywhere : textmatch::WordEnd};
         case Type::Fuzzy:
             if (wordmatch::perWord(text)) {
                 return {text, textmatch::Fuzzy | textmatch::typoBits(typos)};
@@ -295,6 +312,7 @@ fuzzy::Result matchOne(QStringView s, const FuzzyQuery::Term& t) {
         case FuzzyQuery::Type::Prefix: return fuzzy::prefix(s, t.text);
         case FuzzyQuery::Type::Suffix: return fuzzy::suffix(s, t.text);
         case FuzzyQuery::Type::Equal: return fuzzy::equal(s, t.text);
+        case FuzzyQuery::Type::Tag: return {};  // (never in a name)
     }
     return {};
 }

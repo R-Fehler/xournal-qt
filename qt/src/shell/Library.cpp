@@ -1640,10 +1640,12 @@ QString inkSnippet(const ink::PageText& text, const ink::Hit& hit) {
 }  // namespace
 
 std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const {
-    const QString q = simplified(query).trimmed();
+    // "tag:name" terms: only documents with these tags (qt/docs/tags.md); the rest is the text searched
+    const tags::Query tagged = tags::splitQuery(simplified(query).trimmed());
+    const QString q = tagged.rest;
     const QString folded = textmatch::prepare(q);
     std::vector<Hit> hits;
-    if (q.isEmpty()) {
+    if (q.isEmpty() && tagged.tags.isEmpty()) {
         return hits;
     }
     std::vector<EntryPtr> snapshot;
@@ -1656,6 +1658,19 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const 
         }
     }
     for (const auto& e: snapshot) {
+        if (!tagged.tags.isEmpty()) {
+            const QStringList docTags = e->tags();
+            if (!std::all_of(tagged.tags.begin(), tagged.tags.end(),
+                             [&](const QString& t) { return tags::anyMatches(docTags, t); })) {
+                continue;
+            }
+            if (q.isEmpty()) {
+                Hit h;
+                h.file = e->file;
+                hits.push_back(std::move(h));  // (all documents with the tags)
+                continue;
+            }
+        }
         Hit h;
         h.file = e->file;
         h.inName = e->name.contains(q, Qt::CaseInsensitive);
@@ -1853,6 +1868,23 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
                 units.push_back(std::move(u));
             }
         }
+        // A tag term holds for the document when it has the tag (in its text or its PDF's keywords), on all its pages
+        std::vector<char> tagged(terms.size(), 0);
+        bool anyTag = false;
+        for (size_t t = 0; t < terms.size(); ++t) {
+            if (terms[t].isTag()) {
+                anyTag = true;
+            }
+        }
+        if (anyTag) {
+            const QStringList docTags = e->tags();
+            for (size_t t = 0; t < terms.size(); ++t) {
+                if (terms[t].isTag()) {
+                    tagged[t] = tags::anyMatches(docTags, terms[t].text) ? 1 : 0;
+                    inText[t] = tagged[t];
+                }
+            }
+        }
         const bool matches = query.evaluate([&](size_t t) { return name.found[t] || inText[t]; });
         if (!matches) {
             continue;
@@ -1866,7 +1898,7 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
         for (const Unit& u: units) {
             h.count += u.count;
             exact = exact || u.exact;
-            if (query.evaluate([&](size_t t) { return name.found[t] || u.on[t]; })) {
+            if (query.evaluate([&](size_t t) { return name.found[t] || tagged[t] || (!terms[t].isTag() && u.on[t]); })) {
                 listed.push_back(&u);
             }
         }

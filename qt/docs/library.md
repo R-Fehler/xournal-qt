@@ -417,6 +417,7 @@ still one). A query takes the tolerance when it is parsed, so a changed setting 
 | `^a` | the name starts with it; in text: a word | `^intro`: "Introduction" |
 | `a$` | the name ends with it; in text: a word | `sheet$`: "Exercise sheet" |
 | `^a$` | the name is it; in text: the whole word | `^lecture\ 3$` |
+| `tag:a` | documents with the tag `#a` (typed in them, or a keyword of the PDF), also the tags inside it; `tag:a/` only those inside it ([tags.md](tags.md)); also in the plain search | `tag:course` finds `#course`, `#course/math`; `kalman !tag:draft` |
 | `\ ` `\(` `\)` | a space, a parenthesis within a term | `kalman\ filter`: the phrase |
 
 Case never matters. A term left empty by its marks (`^`, `!`) is ignored, as fzf ignores it. An expression that is

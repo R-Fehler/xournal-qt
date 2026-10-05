@@ -1,4 +1,6 @@
 #include "LibraryModel.h"
+
+#include "session/Tags.h"
 #include "SyncConflicts.h"
 #include "ContentFiles.h"
 
@@ -395,10 +397,14 @@ std::vector<LibraryModel::Row> LibraryModel::fuzzyRows(const FuzzyQuery& parsed)
             }
         }
     }
+    const auto& terms = parsed.terms();
     auto byName = [&](const DocumentItem& item) {
         Row r = itemRow(item);
         const FuzzyQuery::NameMatch m = parsed.matchName(r.name, folderOf(item.main()));
-        if (!parsed.evaluate([&](size_t t) { return m.found[t] != 0; })) {
+        // (a tag: the index knows the document's tags, also when only names are searched)
+        if (!parsed.evaluate([&](size_t t) {
+                return m.found[t] != 0 || (terms[t].isTag() && idx->hasTag(item.main(), terms[t].text));
+            })) {
             return false;
         }
         named(r, m);
@@ -528,9 +534,15 @@ void LibraryModel::rebuild() {
             std::erase_if(all, [this](const DocumentItem& i) { return !shown(i); });
             return all;
         };
-        if (const QString q = LibraryIndex::simplified(query).trimmed(); !q.isEmpty() && onlyNames) {
+        // "tag:name" in the query: only documents with these tags (no folders); the rest is what is searched
+        const tags::Query tagged = tags::splitQuery(LibraryIndex::simplified(query).trimmed());
+        auto hasTags = [&](const DocumentItem& item) {
+            return std::all_of(tagged.tags.begin(), tagged.tags.end(),
+                               [&](const QString& t) { return idx->hasTag(item.main(), t); });
+        };
+        if (const QString q = tagged.rest; !LibraryIndex::simplified(query).trimmed().isEmpty() && onlyNames) {
             // Names only: the folders (not in the flat list, which shows no folders), then the documents
-            if (!flatView) {
+            if (!flatView && tagged.tags.isEmpty()) {
                 for (const auto& f: DocumentFiles::foldersRecursive(lib->root())) {
                     if (LibraryIndex::simplified(QString::fromStdString(f.filename().string())).contains(q, Qt::CaseInsensitive)) {
                         Row r = folderRow(f);
@@ -542,7 +554,7 @@ void LibraryModel::rebuild() {
             std::vector<Row> docRows;
             for (const auto& item: allShown()) {
                 Row r = itemRow(item);
-                if (LibraryIndex::simplified(r.name).contains(q, Qt::CaseInsensitive)) {
+                if (LibraryIndex::simplified(r.name).contains(q, Qt::CaseInsensitive) && hasTags(item)) {
                     r.hit.inName = true;
                     docRows.push_back(std::move(r));
                 }
@@ -551,9 +563,9 @@ void LibraryModel::rebuild() {
                 return DocumentFiles::namesLess(a.name, b.name);
             });
             std::move(docRows.begin(), docRows.end(), std::back_inserter(newRows));
-        } else if (!q.isEmpty()) {
+        } else if (!LibraryIndex::simplified(query).trimmed().isEmpty()) {
             // Folders whose name matches, then the documents (text and names)
-            for (const auto& f: DocumentFiles::foldersRecursive(lib->root())) {
+            for (const auto& f: tagged.tags.isEmpty() ? DocumentFiles::foldersRecursive(lib->root()) : std::vector<fs::path>()) {
                 if (QString::fromStdString(f.filename().string()).contains(q, Qt::CaseInsensitive)) {
                     Row r = folderRow(f);
                     r.hit.inName = true;
@@ -562,7 +574,7 @@ void LibraryModel::rebuild() {
             }
             // (other files are not in the index: found by their names, after the documents found by theirs)
             std::vector<Row> otherRows;
-            if (filter.other) {
+            if (filter.other && tagged.tags.isEmpty()) {
                 for (const auto& item: DocumentFiles::scanRecursive(lib->root(), DocumentFiles::OtherFiles)) {
                     if (item.kind() == DocumentItem::Kind::Other &&
                         LibraryIndex::simplified(QString::fromStdString(item.name())).contains(q, Qt::CaseInsensitive)) {
