@@ -585,7 +585,9 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
 
 ### Ideas round 2 of 2026-10-04 (the author chose from [qt/docs/ideas-2026-10.md](qt/docs/ideas-2026-10.md))
 The other ideas (A3–A9, A15, B1–B8) stay in that file to decide later.
-- [ ] `qt/pen-gestures` (A1, A2): **hold to straighten** (finish a stroke and keep the pen still about 0.5 s: it
+- [x] `qt/pen-gestures` (A1, A2; built 2026-10-05, [pen-gestures.md](qt/docs/pen-gestures.md); left: the device
+  checklist, thresholds checked with real scratch-outs and handwriting on the Surface, the mouse and the finger have
+  no gestures): **hold to straighten** (finish a stroke and keep the pen still about 0.5 s: it
   becomes a line, circle, ellipse, rectangle or triangle through upstream's shape recogniser, undoable in one step
   back to the freehand stroke; a setting) and **scratch out to erase** (a quick zigzag over ink deletes what it
   crosses, opt-in, one undo step; a zigzag over nothing stays a stroke).

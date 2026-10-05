@@ -167,6 +167,20 @@ private:
     bool penHoldTool() const;
     void startPenHold(const Event& event);
     void penHeld();
+    /// Hold to straighten (PenGestures.h): a stroke of the pen that rests a while before it is lifted becomes the
+    /// shape recognised in it. Armed when the pen begins a freehand stroke with the setting on; the time counts
+    /// from the last time the pen moved further than a hand shakes (`straightenPos`, when).
+    QTimer straightenTimer;
+    bool straightenArmed = false;
+    bool straightenMoved = false;  ///< the pen moved away from where it went down (resting at the press: long press)
+    bool straightened = false;     ///< done: the pen's moves are ignored until it is lifted
+    QPointF straightenPos;
+    double straightenMovedMs = 0;
+    int straightenHoldMs = 0;
+    void armStraighten(const Event& event);
+    void trackStraighten(const Event& event);
+    void stopStraighten();
+    void penRested();
     /// The setsquare / compass is being dragged over the page
     bool draggingGeometryTool = false;
     QPointF lastGeometryPos;

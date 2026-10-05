@@ -3043,3 +3043,33 @@ offered).
 - [ ] Android (Fold 7): a long press on the app icon shows "Quick note"; it starts the app with a new note in the
       library's Inbox (the pen ready), and does the same when the app is already open on another document. Drag
       the shortcut to the home screen: a tap there does the same.
+
+## Hold to straighten (qt/pen-gestures, qt/docs/pen-gestures.md)
+- [ ] Surface pen, pen tool: draw a rough line and keep the pen still on the screen (about half a second): the line
+      becomes straight while the pen still rests (snapped to horizontal or vertical when close to it); lift: it stays.
+      The same for a rough rectangle, triangle, circle and ellipse.
+- [ ] A hand that shakes a little while resting still straightens; a slow careful stroke (a signature, slow
+      handwriting) is not straightened while it moves, and a short pause in the middle of a word changes nothing
+      unless it lasts the whole time.
+- [ ] Ctrl+Z after a straightened line: the stroke as drawn comes back; Ctrl+Z again: it is gone. Redo twice: the line.
+- [ ] A scribble (no shape) held still: nothing happens, writing on after the pause continues the same stroke.
+- [ ] After the shape appeared, moving the pen before lifting draws nothing (also when it moves onto the next page).
+- [ ] The highlighter: a rough underline held still becomes a straight underline, still see-through.
+- [ ] A press held still without moving still opens the long-press menu (not a shape).
+- [ ] Settings → Pen → Gestures: "Hold to straighten" off: no straightening; on with "Hold for" at 1.0 s: half a
+      second is not enough, a second is.
+- [ ] On a sticky note and on a PDF page: the shape lands where the stroke was, in the note.
+
+## Scratch out to erase (qt/pen-gestures, qt/docs/pen-gestures.md)
+- [ ] Settings → Pen → Gestures → "Scratch out to erase" on. With the Surface pen, write a word, then scribble quickly
+      back and forth over it (four or five times across): the word is gone and the zigzag too. Ctrl+Z: the word is
+      back (one step); Ctrl+Y: gone again.
+- [ ] Scratch over part of a line of words: only the words mostly under the zigzag go; a long underline crossed at
+      its end stays.
+- [ ] Write normal handwriting with "mmm", "www", "eee", "ill", "3", "8", "z", "S", signatures and quick cursive for a
+      page: no stroke disappears and nothing is erased. Note any false positive with what was written.
+- [ ] A zigzag drawn slowly over a word stays a stroke; a quick zigzag on empty paper stays a stroke.
+- [ ] The highlighter's zigzag over text is a highlight, not an erase. Typed text, pictures and Markdown boxes under a
+      zigzag stay.
+- [ ] Off (the default): a zigzag is always a stroke.
+- [ ] On a sticky note: a zigzag over the note's ink erases it there; the page's ink under the note stays.

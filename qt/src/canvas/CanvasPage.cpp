@@ -42,6 +42,7 @@
 #include "CanvasView.h"
 #include "MdBox.h"
 #include "MixedSelection.h"
+#include "PenGestures.h"
 #include "Snip.h"
 #include "StickyNotes.h"
 #include "TextEditor.h"
@@ -211,8 +212,8 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
             case DRAWING_TYPE_COORDINATE_SYSTEM:
                 this->inputHandler = std::make_unique<CoordinateSystemHandler>(&control, getPage());
                 break;
-            default:  // freehand (with the shape recognizer if that drawing type is set)
-                this->inputHandler = std::make_unique<StrokeHandler>(&control, getPage());
+            default:  // freehand (with the shape recognizer if that drawing type is set; the pen's gestures)
+                this->inputHandler = std::make_unique<GestureStrokeHandler>(&control, getPage());
         }
         this->inputHandler->onButtonPressEvent(pos, zoom);
         if (Stroke* stroke = this->inputHandler->getStroke()) {
@@ -593,6 +594,15 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
         this->selector.reset();
     }
     return false;
+}
+
+bool CanvasPage::straightenStroke() {
+    auto* handler = dynamic_cast<GestureStrokeHandler*>(this->inputHandler.get());
+    if (!handler) {
+        return false;
+    }
+    const auto scope = view.actingScope(view.indexOf(this));
+    return handler->straighten(pengestures::HOLD_SLOP_PX / getZoom());
 }
 
 void CanvasPage::onSequenceCancelEvent(DeviceId deviceId) {
