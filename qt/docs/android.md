@@ -135,6 +135,13 @@ adb shell am start -a android.intent.action.SEND -t application/octet-stream \
 put the URI into the clip data, which carries the grant. So test SEND with a file of the app's own folder.) While
 the phone is locked the app's event loop is paused: a file handed over then opens when it is unlocked.
 
+**Quick note from the launcher.** A long press on the app's icon offers "Quick note" (a static shortcut,
+[res/xml/shortcuts.xml](../packaging/android/res/xml/shortcuts.xml); it can be dragged to the home screen). Its intent
+(action `org.xournalqt.app.QUICK_NOTE`) takes the way of the files above: the activity adds the entry
+`xournal-qt:quick-note` to the incoming files, and the native side makes a quick note
+([quick-note.md](quick-note.md)) instead of receiving a file, at start and while the app runs. From adb:
+`adb shell am start -a org.xournalqt.app.QUICK_NOTE -n org.xournalqt.app/.XournalActivity`.
+
 **Opening and importing through Android's pickers.** "Open…" (tool bar, on a phone "All tools"; Recent), "Import files…" and "Import a
 folder…" (library) show Android's system pickers (the Storage Access Framework: `ACTION_OPEN_DOCUMENT` and, for
 folders, `ACTION_OPEN_DOCUMENT_TREE`, which Qt's `FileDialog` and `FolderDialog` use on Android). They return

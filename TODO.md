@@ -588,9 +588,12 @@ The other ideas (A3–A9, A15, B1–B8) stay in that file to decide later.
   crosses, opt-in, one undo step; a zigzag over nothing stays a stroke).
 - [ ] `qt/md-find-replace` (A10): find and replace in `.md` files, text documents and Markdown boxes (case, whole
   word, replace one / all, one undo step for "all"). After `qt/toolbox` (the Markdown bar).
-- [ ] `qt/quick-note` (A11): one tap (home screen, toolbox, tray/launcher shortcut on Android), a shortcut and
+- [x] `qt/quick-note` (A11): one tap (home screen, toolbox, tray/launcher shortcut on Android), a shortcut and
   `xournal-qt --quick-note` make a new note in the library's `Inbox/` named by date and time, in the document mode
-  chosen (or append to today's `Inbox/<date>.md`, a setting).
+  chosen (or append to today's `Inbox/<date>.md`, a setting). Built 2026-10-05 ([quick-note.md](qt/docs/quick-note.md)):
+  home button / "+", ⋮ → Document, Ctrl+Alt+N, `--quick-note` through `SingleInstance` (also the `.desktop` file's action), an
+  Android launcher shortcut. Left: the Android shortcut is untested on a device (no Android build here); no toolbox
+  button (by the spec).
 - [ ] `qt/templates` (A12): "Save page as template" (the page's content, and if wanted its background, a PDF page
   included, so using it is the same as copying that page) into a `Templates/` folder of the library (and an app-wide
   set), chosen when adding pages (the add-page button's list, Insert pages dialog, new document). After `qt/stickers`

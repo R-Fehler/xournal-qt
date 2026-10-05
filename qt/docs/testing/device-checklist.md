@@ -3002,3 +3002,6 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
       starts with the quick note (after the reopened tabs).
 - [ ] KDE: a custom shortcut (System Settings → Shortcuts → Add command) running `xournal-qt --quick-note` works while
       the app is in the background.
+- [ ] Android (Fold 7): a long press on the app icon shows "Quick note"; it starts the app with a new note in the
+      library's Inbox (the pen ready), and does the same when the app is already open on another document. Drag
+      the shortcut to the home screen: a tap there does the same.

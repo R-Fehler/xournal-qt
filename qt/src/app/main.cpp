@@ -300,7 +300,16 @@ int main(int argc, char* argv[]) {
     controller.setFingerDrawingDefault(!xqt::android::hasStylus());
     // "Open with" and the share sheet: files other apps hand over, at start and while the app runs (the window
     // is there to show them and what went wrong)
-    xqt::android::watchIncomingFiles([&controller](const QStringList& files) { controller.receiveFiles(files); });
+    // The launcher's shortcut "Quick note" (qt/docs/quick-note.md) comes the same way, as an entry of its own.
+    xqt::android::watchIncomingFiles([&controller](QStringList files) {
+        const bool quickNote = files.removeAll(QLatin1String(xqt::android::QUICK_NOTE)) > 0;
+        if (!files.isEmpty()) {
+            controller.receiveFiles(files);
+        }
+        if (quickNote) {
+            controller.quickNote();
+        }
+    });
 #endif
 
     // Developer aid: XQT_SCREENSHOT=file.png renders the window after a moment, saves it and quits.

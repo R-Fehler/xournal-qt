@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- xournal-qt: the labels of the launcher's shortcuts (res/xml/shortcuts.xml) -->
+<resources>
+    <string name="xqt_quick_note">Quick note</string>
+    <string name="xqt_quick_note_long">New quick note</string>
+</resources>

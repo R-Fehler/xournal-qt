@@ -30,11 +30,13 @@ document, not saved yet.
 | Keys | **Ctrl+Alt+N** (`quickNote` in `ShortcutsModel`, listed in the shortcut sheet, changeable in Settings) |
 | Command line | `xournal-qt --quick-note` (with files: they open first). With the app running, the request goes to it through `SingleInstance` as the entry `--quick-note` after the files (never an absolute path), and the window comes to the front. |
 | Linux desktop | the right-click menu of the app's launcher or task-manager entry: the `.desktop` file's action `QuickNote` runs `xournal-qt --quick-note` |
+| Android | a launcher shortcut (long press on the icon → Quick note; `res/xml/shortcuts.xml`). Its intent (`org.xournalqt.app.QUICK_NOTE`) reaches the native side with the incoming files as the entry `xournal-qt:quick-note`, at start and while the app runs. |
 
 ## Code
 
 - `AppController::quickNote()` / `quickNoteAt(when)` (`qt/src/app/AppQuickNote.cpp`); `createDocumentAt(path)` is the
   part of `createDocument` that saves a new document as a given file.
 - `SingleInstance::QUICK_NOTE`, `quickNoteRequested()`; `main.cpp` adds `--quick-note`.
+- Android: `XournalActivity.ACTION_QUICK_NOTE` / `QUICK_NOTE`, `xqt::android::QUICK_NOTE`.
 - Tests: `qt/tests/shell/QuickNoteTest.cpp` (names, formats, the daily file, the hand-over through `SingleInstance`),
   `qt/tests/ui/QuickNoteTest.cpp` (the home button and "+", Ctrl+Alt+N, ⋮, the daily note's cursor).
