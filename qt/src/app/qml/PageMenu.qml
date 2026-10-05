@@ -254,9 +254,22 @@ Popup {
             enabled: app.titlePage !== menu.page
             onClicked: { app.setTitlePage(menu.page); menu.close() }
         }
-        PageLine {
-            text: qsTr("Start a chapter here…")
-            onClicked: { app.requestChapter(menu.page); menu.close() }
+        // A chapter starting here; the page saved to be added again (qt/docs/templates.md)
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 0
+            PageLine {
+                text: qsTr("Start a chapter here…")
+                onClicked: { app.requestChapter(menu.page); menu.close() }
+            }
+            PageAction {
+                objectName: "pageMenuSaveTemplate"
+                visible: typeof win !== "undefined" && win !== null
+                implicitHeight: menu.asSheet ? Math.max(48, menu.target) : 38
+                iconName: "xqt-file-plus"
+                tip: qsTr("Save page as template…")
+                onClicked: { win.openTemplateSave(menu.page); menu.close() }
+            }
         }
         PageLine {
             text: qsTr("Select all pages")

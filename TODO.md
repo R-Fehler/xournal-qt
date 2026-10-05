@@ -589,10 +589,11 @@ The other ideas (A3–A9, A15, B1–B8) stay in that file to decide later.
 - [ ] `qt/quick-note` (A11): one tap (home screen, toolbox, tray/launcher shortcut on Android), a shortcut and
   `xournal-qt --quick-note` make a new note in the library's `Inbox/` named by date and time, in the document mode
   chosen (or append to today's `Inbox/<date>.md`, a setting).
-- [ ] `qt/templates` (A12): "Save page as template" (the page's content, and if wanted its background, a PDF page
+- [x] `qt/templates` (A12): "Save page as template" (the page's content, and if wanted its background, a PDF page
   included, so using it is the same as copying that page) into a `Templates/` folder of the library (and an app-wide
   set), chosen when adding pages (the add-page button's list, Insert pages dialog, new document). After `qt/stickers`
-  (same folder model and picker).
+  (same folder model and picker). Built (qt/docs/templates.md). Left: templates of several pages, previews in the
+  Insert pages / New document dialogs, the device checks.
 - [ ] `qt/tags` (A13): `#tag` in typed text, Markdown and sticky notes, XMP/Info keywords in PDFs; indexed per folder;
   a Tags chip in the library like Favourites (list of tags with counts, filter), `tag:name` in the fuzzy syntax,
   shown on cards. After `qt/todos` (both extend the index's notes pack).

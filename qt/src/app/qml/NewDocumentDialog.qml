@@ -1,5 +1,6 @@
 // New document: name, page background, paper size and orientation (the settings for new pages, so the next new
-// document starts with the same choice). In the library the document is saved at once in the current folder.
+// document starts with the same choice). In the library the document is saved at once in the current folder. Or it
+// starts from a template (qt/docs/templates.md): its first page is the template's page.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -18,6 +19,10 @@ AdaptiveDialog {
     /// That size as text ("" when it is one of the formats)
     property string otherPaper: ""
     property bool landscape: false
+    /// "From a template": the template's file ("": a blank page)
+    property bool fromTemplate: false
+    property string templatePath: ""
+    property string templateName: ""
 
     onAboutToShow: {
         nameField.text = ""
@@ -28,6 +33,7 @@ AdaptiveDialog {
         paperBox.currentIndex = paper < 0 ? s.paperFormats.length : paper
         landscape = s.get("landscape")
         libraryBox.checked = canSaveInLibrary
+        fromTemplate = false
         // The name field gets the keys at once, but not on a phone or tablet: there that opens the soft keyboard over
         // half of the dialog before anything is typed (a tap on the field opens it)
         if (Qt.platform.os !== "android" && Qt.platform.os !== "ios")
@@ -35,6 +41,15 @@ AdaptiveDialog {
     }
 
     function create() {
+        if (fromTemplate) {
+            if (templatePath === "") {
+                picker.open()
+                return
+            }
+            app.createDocumentFromTemplate(nameField.text, libraryBox.checked, templatePath)
+            dlg.close()
+            return
+        }
         s.set("pageBackground", bgIndex)
         if (paper >= 0)
             s.set("paperFormat", paper)
@@ -60,8 +75,63 @@ AdaptiveDialog {
             EnterKey.type: Qt.EnterKeyDone  // (the soft keyboard's Enter key creates the document)
         }
 
-        Label { text: qsTr("Background"); font.weight: Font.DemiBold }
+        // A blank page, or a template's page
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            ButtonGroup { id: start }
+            Button {
+                objectName: "newDocumentBlank"
+                text: qsTr("Blank")
+                checkable: true
+                checked: !dlg.fromTemplate
+                flat: true
+                ButtonGroup.group: start
+                onClicked: dlg.fromTemplate = false
+            }
+            Button {
+                objectName: "newDocumentFromTemplate"
+                text: qsTr("From a template")
+                checkable: true
+                checked: dlg.fromTemplate
+                flat: true
+                ButtonGroup.group: start
+                onClicked: {
+                    dlg.fromTemplate = true
+                    if (dlg.templatePath === "") picker.open()
+                }
+            }
+        }
+        RowLayout {
+            visible: dlg.fromTemplate
+            Layout.fillWidth: true
+            spacing: 12
+            Label {
+                objectName: "newDocumentTemplateName"
+                Layout.fillWidth: true
+                elide: Text.ElideMiddle
+                text: dlg.templatePath === "" ? qsTr("No template chosen") : dlg.templateName
+                font.weight: Font.DemiBold
+            }
+            Button {
+                text: qsTr("Choose…")
+                onClicked: picker.open()
+            }
+        }
+        StickerPicker {
+            id: picker
+            mode: "templates"
+            pickOnly: true
+            onChosen: function(path) {
+                dlg.templatePath = path
+                dlg.templateName = path.replace(/^.*[\\/]/, "").replace(/\.xopp$/i, "")
+                dlg.fromTemplate = true
+            }
+        }
+
+        Label { visible: !dlg.fromTemplate; text: qsTr("Background"); font.weight: Font.DemiBold }
         BackgroundChooser {
+            visible: !dlg.fromTemplate
             Layout.fillWidth: true
             selected: dlg.bgIndex
             landscape: dlg.landscape
@@ -70,6 +140,7 @@ AdaptiveDialog {
 
         // Paper and orientation: one row, or two in a narrow window (a phone)
         GridLayout {
+            visible: !dlg.fromTemplate
             Layout.fillWidth: true
             columns: dlg.availableWidth < 520 ? 1 : 2
             columnSpacing: 12

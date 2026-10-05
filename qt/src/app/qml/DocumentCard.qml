@@ -28,6 +28,8 @@ Item {
     property bool isLibrary: false
     /// The library's Stickers folder (qt/docs/stickers.md): the folder with a sticker mark
     property bool isStickers: false
+    /// The library's Templates folder (qt/docs/templates.md): the folder with a template mark
+    property bool isTemplates: false
     property int itemCount: 0
     property bool hasPdf: false
     property bool hasXopp: false
@@ -183,8 +185,8 @@ Item {
                 }
                 // The library's Stickers folder: a sticker mark on the folder
                 Rectangle {
-                    objectName: "stickersMark"
-                    visible: card.isFolder && card.isStickers
+                    objectName: card.isTemplates ? "templatesMark" : "stickersMark"
+                    visible: card.isFolder && (card.isStickers || card.isTemplates)
                     readonly property int size: Math.round(folderIcon.iconSize * 0.5)
                     x: folderIcon.x + folderIcon.width - size * 0.7
                     y: folderIcon.y + folderIcon.height - size * 0.8
@@ -196,7 +198,7 @@ Item {
                     border.color: "#ffd7a8"
                     Image {
                         anchors.centerIn: parent
-                        source: app.iconUrl("xqt-sticker")
+                        source: app.iconUrl(card.isTemplates ? "xqt-file-plus" : "xqt-sticker")
                         sourceSize: Qt.size(parent.size * 0.62, parent.size * 0.62)
                     }
                 }

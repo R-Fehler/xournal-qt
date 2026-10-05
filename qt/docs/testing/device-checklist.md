@@ -2899,3 +2899,31 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
       library, Copy to library… (another library's `Stickers/`), Delete (to the trash).
 - [ ] The library: the `Stickers` folder's card has a sticker mark; its stickers are cards with previews, the library
       search finds their text, a sticker opens as a document.
+
+## Page templates (qt/templates, qt/docs/templates.md)
+
+- [ ] ⋮ → Page → "Save page as template…" on a ruled page with ink: the dialog names it "<document>, page N", both
+      boxes on; Save: "Saved template “…”"; `<library>/Templates/<name>.xopp` is there and opens in Xournal++ 1.2 / 1.3
+      without a message (the paper, the ink, Markdown boxes as their text, notes as rectangles).
+- [ ] On a page of a PDF: the background box says "its PDF page"; saved, `<name>.xopp.bg.pdf` (one page) lies next to
+      the template, and Xournal++ opens the template with that PDF page behind the ink.
+- [ ] The page sidebar's page menu (and the page grid's): the template icon beside "Start a chapter here…" saves that
+      page, not the current one; the menu is no taller than before.
+- [ ] Without the background: added to a document of graph paper, the page is graph paper with the template's ink.
+      Without the content: an empty page of the template's paper and size.
+- [ ] Press and hold (right-click) the add-page button: the list shows "Background, size, several pages…", the five
+      templates used last, "From a template…", "Save this page as template…"; a tap on a template adds its page after
+      the current one, shown; Undo takes it away in one step. A tap on the button still adds a plain page.
+- [ ] A PDF-page template added to a `.xopp` of another PDF (or none): the page shows the PDF page sharply, its text is
+      found by the search and can be selected; saved, the PDF page is in `.name.pages.pdf` (or `name.pdf`) next to it,
+      and the document opens again with it. Added to a PDF with notes (PDF files mode): saved into the PDF, nothing
+      next to it; another PDF viewer shows the page.
+- [ ] Insert pages dialog → "From a template", Choose…, a template, 3 pages after page 2: three copies, one undo step.
+- [ ] New document → "From a template": the background and paper rows go away; Create: the document's first page is
+      the template's page (a PDF page too), nothing to undo; in the library it is saved at once.
+- [ ] The template picker (⋮ → Page → "Add a page from a template…"): in the middle of the window (a bottom sheet on a
+      phone), "This library" / "All libraries", folders, search, sorts, previews; the card menu renames, moves (the
+      `.xopp.bg.pdf` goes along: check in a file manager), copies to all libraries / another library, deletes (both
+      files to the trash). The library's `Templates` folder card has a template mark.
+- [ ] A document opened for reading only: no "Add a page from a template…"; a tap in the picker says no pages can be
+      added. A `.md` or text document: nothing of this is offered.

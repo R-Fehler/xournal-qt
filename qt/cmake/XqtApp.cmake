@@ -247,7 +247,8 @@ set(XQT_QML_FILES
     src/app/qml/PhoneToolSheet.qml
     src/app/qml/StickerButton.qml
     src/app/qml/StickerPicker.qml
-    src/app/qml/StickerSaveDialog.qml)
+    src/app/qml/StickerSaveDialog.qml
+    src/app/qml/TemplateSaveDialog.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})
@@ -309,6 +310,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/DocumentLinksTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/SnipTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/StickerToolTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/TemplateToolTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AnnotationsPanelTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/CitationsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.h
