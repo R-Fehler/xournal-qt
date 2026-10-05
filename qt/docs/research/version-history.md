@@ -1,4 +1,4 @@
-# Version history inside the PDF: research and plan (2026-10-05)
+# Version history inside the PDF: research and plan (2026-10-05; confirmed with changes, see "Confirmed by the author")
 
 Status: **a proposal for the author to confirm** (nothing built). The author, 2026-10-05: "a fully version controlled
 PDF document leveraging the append saving … enable/disable that on documents … a version sidebar … the save date as
@@ -206,6 +206,37 @@ data.
 
 About 3 weeks; steps 1, 3 and 6 alone (no split, no pruning, no compare) are a usable first version in about a
 week for light documents.
+
+## Confirmed by the author (2026-10-05)
+
+The plan above, changed as follows after the author's questions (decisions 1–13 otherwise as recommended):
+
+- **Off by default, but easy to find (decision 1):** a History button among the sidebar's modes (Pages, Layers,
+  Contents, Annotations, History) shows, while history is off, what it does and a "Keep versions of this document"
+  switch; ⋮ → Document → Version history… opens the same; Settings → Documents has "Keep versions of new PDFs with
+  notes" (off). Documents with history on carry a mark on their library card (and in the list view), with the number
+  of versions in its tooltip/details.
+- **A version per day, plus milestones (decision 2):** the first save of a day appends a new version; every further
+  save that day replaces it (the file is cut back to where that day's version began and appended again: the cost of
+  a normal save). "Save with a message…" (Ctrl+Alt+S) makes a milestone, never replaced or pruned; saves after it
+  start a new "today". A day is the local calendar day. Another app's revision after ours is never cut away.
+- **No split of the embedded data (decision 5):** every version keeps an ordinary embedded `document.xopp`, so the
+  latest one is always extractable with any PDF tool (Acrobat's attachments, `pdfdetach`). Decision 13 is moot.
+- **Older versions as deltas instead:** at the first save of a new day, yesterday's version (still the last revision
+  of the file, and ours) is cut off and appended again with its `.xopp` stored as a byte delta (copy ranges +
+  inserts, xdelta-like, on the uncompressed `.xopp`, then compressed) against the version before it; today's version
+  goes on with a full `document.xopp`. Keyframes: every milestone, every 30th version, and any version whose delta
+  would be more than half of the full size are stored full. Each version records the sha256 of its `.xopp`; a rebuilt
+  version is checked against it. Only that last revision of ours is ever rewritten; with another app's revision after
+  it, it stays full. Covers every element (the delta knows nothing of elements). Requires a deterministic `.xopp`
+  writer (a test). An old version cut out of the file still shows correctly in any PDF viewer (its page drawings are
+  complete); its `.xopp` needs xournal-qt or `xournal-qt-cli export-xopp <file.pdf> [--version N]`.
+- **Retention (decision 4):** with deltas, no automatic pruning in the first build: all versions are kept, the
+  panel shows the size history takes; thinning (the rebuild of step 4) only if real files need it.
+- **Background-image attachments** (`document.xopp.bg_N.png`) are no longer written again on a save when their
+  checksum is unchanged (also without history).
+- **Onboarding:** the introduction and the tutorial get a short explanation of version history (after the feature
+  is built).
 
 ## Decisions for the author
 
