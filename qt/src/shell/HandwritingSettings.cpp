@@ -1,8 +1,13 @@
 #include "HandwritingSettings.h"
 
-#include <QDir>
+#include <algorithm>
 
+#include <QDir>
+#include <QFileInfo>
+
+#include "control/settings/Settings.h"
 #include "hwr/HandwritingSearch.h"
+#include "hwr/ModelInfo.h"
 #include "session/AppContext.h"
 
 #include "LibraryInkJob.h"
@@ -34,14 +39,43 @@ void HandwritingSettings::setEnabled(bool on) {
     Q_EMIT changed();
 }
 
+QString HandwritingSettings::languages() const {
+    return hwr::HandwritingSearch::languagesIn(*app.getSettings()).join(u'+');
+}
+
+void HandwritingSettings::setLanguages(const QString& value) {
+    if (value == languages()) {
+        return;
+    }
+    hwr::HandwritingSearch::setLanguagesIn(*app.getSettings(), value.split(u'+', Qt::SkipEmptyParts));
+    search.applySettings();
+    Q_EMIT changed();
+}
+
 bool HandwritingSettings::ready() const { return search.enabled() && search.service().ready(); }
+
+namespace {
+QString labelOf(const QString& language) {
+    if (language == QLatin1String("en")) {
+        return HandwritingSettings::tr("English");
+    }
+    if (language == QLatin1String("de")) {
+        return HandwritingSettings::tr("German");
+    }
+    return language;
+}
+
+QString megabytes(qint64 bytes) {
+    return HandwritingSettings::tr("%1 MB").arg(std::max<qint64>(bytes > 0 ? 1 : 0, (bytes + 512 * 1024) / (1024 * 1024)));
+}
+}  // namespace
 
 QString HandwritingSettings::status() const {
     if (!search.enabled()) {
         return tr("Off");
     }
-    if (downloading()) {
-        return tr("Downloading the model…");
+    if (anyDownloading()) {
+        return tr("Downloading a model…");
     }
     const auto r = search.service().recognizer();
     QString why;
@@ -51,47 +85,106 @@ QString HandwritingSettings::status() const {
     if (!r->ready(&why)) {
         return why.isEmpty() ? tr("The recogniser is not ready.") : why;
     }
+    QString now;
     if (pagesWaiting() > 0) {
-        return tr("Reading handwriting: %n page(s) of open documents left", nullptr, pagesWaiting());
+        now = tr("Reading handwriting: %n page(s) of open documents left", nullptr, pagesWaiting());
+    } else if (libraryLeft() > 0) {
+        now = tr("Reading the library's handwriting: %n document(s) left", nullptr, libraryLeft());
+    } else if (onBattery()) {
+        now = tr("Ready. The library's other documents are read on mains power.");
+    } else {
+        now = tr("Ready");
     }
-    if (libraryLeft() > 0) {
-        return tr("Reading the library's handwriting: %n document(s) left", nullptr, libraryLeft());
+    // A language without a model
+    QStringList missing;
+    for (const QString& l: hwr::HandwritingSearch::choose(*app.getSettings()).missing) {
+        missing << labelOf(l);
     }
-    if (onBattery()) {
-        return tr("Ready. The library's other documents are read on mains power.");
+    if (!missing.isEmpty()) {
+        now += u' ' + tr("No model for %1 yet: its handwriting is read with the other model only.")
+                              .arg(missing.join(QStringLiteral(", ")));
     }
-    return tr("Ready");
+    return now;
 }
 
-QString HandwritingSettings::modelFolder() const { return search.modelFolderInUse(); }
-
-bool HandwritingSettings::ownModel() const {
-    return QDir::cleanPath(modelFolder()) == QDir::cleanPath(hwr::HandwritingSearch::defaultModelDir());
+ModelDownload* HandwritingSettings::downloadOf(const QString& language) const {
+    auto it = fetches.find(language);
+    return it != fetches.end() ? it->second.get() : nullptr;
 }
 
-bool HandwritingSettings::modelInstalled() const { return ModelDownload::installed(modelFolder()); }
-
-QString HandwritingSettings::downloadSource() const {
-    const auto& m = ModelDownload::model();
-    return m.revision.isEmpty() ? m.source : m.source + QStringLiteral("/tree/") + m.revision;
+bool HandwritingSettings::anyDownloading() const {
+    return std::any_of(fetches.begin(), fetches.end(), [](const auto& f) { return f.second && f.second->running(); });
 }
 
-QString HandwritingSettings::downloadSize() const {
-    return tr("%1 MB").arg(static_cast<int>((ModelDownload::model().bytes() + 512 * 1024) / (1024 * 1024)));
-}
-
-bool HandwritingSettings::downloadAvailable() const { return ModelDownload::model().pinned(); }
-
-bool HandwritingSettings::downloading() const { return fetch && fetch->running(); }
-
-double HandwritingSettings::downloadProgress() const {
-    if (!fetch || fetch->bytesTotal() <= 0) {
-        return 0;
+QVariantMap HandwritingSettings::modelOf(const QString& language) const {
+    Settings& s = *app.getSettings();
+    const QString folder = hwr::HandwritingSearch::modelDir(s, language);
+    const bool own = QDir::cleanPath(folder) == QDir::cleanPath(hwr::HandwritingSearch::defaultModelDir(language));
+    const hwr::ModelInfo info = hwr::ModelInfo::read(folder);
+    const bool installed = info.valid() && info.reads(language);
+    const bool needed = hwr::HandwritingSearch::languagesIn(s).contains(language);
+    const QStringList inUse = search.enabled() ? search.modelFoldersInUse() : QStringList();
+    const bool used = installed && std::any_of(inUse.begin(), inUse.end(), [&](const QString& f) {
+                          return QDir::cleanPath(f) == QDir::cleanPath(folder);
+                      });
+    const ModelDownload::Model* model = ModelDownload::modelFor(language);
+    const ModelDownload* fetch = downloadOf(language);
+    const bool downloading = fetch && fetch->running();
+    QString state;
+    if (downloading) {
+        state = tr("Downloading… %1 %")
+                        .arg(fetch->bytesTotal() > 0 ? 100 * fetch->bytesDone() / fetch->bytesTotal() : 0);
+    } else if (installed) {
+        const QString size = megabytes(ModelDownload::sizeOnDisk(folder));
+        state = used ? tr("In use (%1)").arg(size)
+                     : needed ? tr("Installed (%1)").arg(size) : tr("Installed (%1), its language is not read").arg(size);
+    } else if (!own && QFileInfo::exists(folder)) {
+        state = info.valid() ? tr("The model in this folder does not read %1").arg(labelOf(language)) : info.error;
+    } else {
+        // Another model that reads it (one for both languages, or one found in the models folder)
+        for (const QString& f: inUse) {
+            const hwr::ModelInfo other = hwr::ModelInfo::read(f);
+            if (other.valid() && other.reads(language)) {
+                state = tr("Read by %1").arg(other.name);
+                break;
+            }
+        }
+        if (state.isEmpty()) {
+            state = tr("Not installed");
+        }
     }
-    return std::min(1.0, static_cast<double>(fetch->bytesDone()) / static_cast<double>(fetch->bytesTotal()));
+    QVariantMap m;
+    m[QStringLiteral("language")] = language;
+    m[QStringLiteral("label")] = labelOf(language);
+    m[QStringLiteral("needed")] = needed;
+    m[QStringLiteral("name")] = model ? model->name : QString();
+    m[QStringLiteral("folder")] = folder;
+    m[QStringLiteral("own")] = own;
+    m[QStringLiteral("installed")] = installed;
+    m[QStringLiteral("inUse")] = used;
+    m[QStringLiteral("state")] = state;
+    m[QStringLiteral("source")] = !model ? QString()
+                                         : model->revision.isEmpty() ? model->source
+                                                                     : model->source + QStringLiteral("/tree/") + model->revision;
+    m[QStringLiteral("size")] = model ? megabytes(model->bytes()) : QString();
+    m[QStringLiteral("downloadAvailable")] = model && model->pinned();
+    m[QStringLiteral("unpinned")] = model && !model->pinned() ? model->unpinned : QString();
+    m[QStringLiteral("downloading")] = downloading;
+    m[QStringLiteral("progress")] = fetch && fetch->bytesTotal() > 0
+                                            ? std::min(1.0, static_cast<double>(fetch->bytesDone()) /
+                                                                    static_cast<double>(fetch->bytesTotal()))
+                                            : 0.0;
+    m[QStringLiteral("error")] = fetch ? fetch->error() : QString();
+    return m;
 }
 
-QString HandwritingSettings::downloadError() const { return fetch ? fetch->error() : QString(); }
+QVariantList HandwritingSettings::models() const {
+    QVariantList out;
+    for (const hwr::HandwritingSearch::Slot& slot: hwr::HandwritingSearch::slots()) {
+        out << modelOf(slot.language);
+    }
+    return out;
+}
 
 int HandwritingSettings::pagesWaiting() const { return search.pagesWaiting(); }
 
@@ -99,12 +192,15 @@ int HandwritingSettings::libraryLeft() const { return library ? library->documen
 
 bool HandwritingSettings::onBattery() const { return !LibraryInkJob::onMains(); }
 
-void HandwritingSettings::download() {
-    if (!ownModel() || downloading()) {
+void HandwritingSettings::download(const QString& language) {
+    const ModelDownload::Model* model = ModelDownload::modelFor(language);
+    const QVariantMap m = modelOf(language);
+    if (!model || !m.value(QStringLiteral("own")).toBool() || m.value(QStringLiteral("downloading")).toBool()) {
         return;  // (a model the user chose is never replaced)
     }
+    auto& fetch = fetches[language];
     if (!fetch) {
-        fetch = std::make_unique<ModelDownload>(hwr::HandwritingSearch::defaultModelDir());
+        fetch = std::make_unique<ModelDownload>(*model, hwr::HandwritingSearch::defaultModelDir(language));
         connect(fetch.get(), &ModelDownload::changed, this, &HandwritingSettings::changed);
         connect(fetch.get(), &ModelDownload::finished, this, [this](bool ok) {
             if (ok) {
@@ -116,21 +212,32 @@ void HandwritingSettings::download() {
     fetch->start();
 }
 
-void HandwritingSettings::cancelDownload() {
-    if (fetch) {
+void HandwritingSettings::cancelDownload(const QString& language) {
+    if (ModelDownload* fetch = downloadOf(language)) {
         fetch->cancel();
     }
 }
 
-bool HandwritingSettings::removeModel() {
-    if (!ownModel() || downloading()) {
+bool HandwritingSettings::removeModel(const QString& language) {
+    const QVariantMap m = modelOf(language);
+    if (!m.value(QStringLiteral("own")).toBool() || m.value(QStringLiteral("downloading")).toBool()) {
         return false;
     }
     search.service().setRecognizer(nullptr);  // (its files go)
-    const bool ok = ModelDownload::remove(modelFolder());
+    const bool ok = ModelDownload::remove(m.value(QStringLiteral("folder")).toString());
     search.reloadModel();
     Q_EMIT changed();
     return ok;
+}
+
+void HandwritingSettings::chooseFolder(const QString& language, const QUrl& folder) {
+    if (!hwr::HandwritingSearch::slotOf(language)) {
+        return;
+    }
+    const QString path = folder.isLocalFile() ? folder.toLocalFile() : folder.toString();
+    hwr::HandwritingSearch::setModelDirIn(*app.getSettings(), language, path);
+    search.reloadModel();
+    Q_EMIT changed();
 }
 
 }  // namespace xqt

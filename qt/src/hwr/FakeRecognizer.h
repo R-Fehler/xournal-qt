@@ -24,7 +24,7 @@ public:
     /// Readings of word `word` of `line` (empty: no word there).
     using Script = std::function<Readings(const LineInput& line, size_t word)>;
 
-    explicit FakeRecognizer(QString id = QStringLiteral("fake/1"));
+    explicit FakeRecognizer(QString id = QStringLiteral("fake/1"), QStringList languages = {QStringLiteral("en")});
 
     void setScript(Script script);
     /// The words of the line with this hash read so (one entry per word box; more or fewer are cut or left empty).
@@ -44,6 +44,7 @@ public:
 
 private:
     QString recId;
+    QStringList langs;
     mutable std::mutex mtx;
     Script script;
     std::map<quint64, std::vector<Readings>> lines;

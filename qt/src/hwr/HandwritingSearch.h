@@ -6,10 +6,15 @@
  * document gets an InkTextIndexer (the one in front first), all sharing one InkRecognitionService. Off again: the
  * indexers go and the open documents forget their recognised words (the library's results stay on disk).
  *
- * The model is a folder with the model's files and its manifest (model.json, TrocrRecognizer.h). Which folder: the
- * setting "handwritingModel" if set, else the environment variable XQT_HWR_MODEL, else the app's data folder,
- * "~/.local/share/xournal-qt/models/trocr-small-hw-int8/" (where qt/scripts/hwr-model.sh and the download in Settings
- * put it). The recogniser is made by a factory the app sets (TrocrRecognizer; the tests' FakeRecognizer).
+ * The models (qt/docs/handwriting-search.md, "Languages and models"): the setting "handwritingLanguages" says which
+ * languages are read ("en", "de" or "en+de", the default); each language has a slot (slots(): English, German) whose
+ * model is a folder with a manifest (model.json, ModelInfo.h): the folder chosen in Settings for it
+ * ("handwritingModel", "handwritingModelDe"), else its environment variable (XQT_HWR_MODEL, XQT_HWR_MODEL_DE), else
+ * the app's own in its data folder, "~/.local/share/xournal-qt/models/<slot's name>/" (where qt/scripts/hwr-model.sh
+ * and the download in Settings put it). Without a model there, any model in the app's models folder that reads the
+ * language is taken; one model that reads both languages serves both. The recogniser of each model is made by a
+ * factory the app sets (by the manifest's kind: TrocrRecognizer, CtcRecognizer; the tests' FakeRecognizer); several
+ * models run together (MultiRecognizer), and their ids make the recogniser's id that names the results.
  *
  * UI thread.
  *
@@ -28,6 +33,7 @@
 
 #include "InkRecognitionService.h"
 #include "InkTextIndexer.h"
+#include "ModelInfo.h"
 #include "filesystem.h"
 
 class Settings;
@@ -42,8 +48,16 @@ namespace xqt::hwr {
 class HandwritingSearch final: public QObject {
     Q_OBJECT
 public:
-    /// The model's folder name in the app's data folder.
-    static constexpr const char* MODEL_NAME = "trocr-small-hw-int8";
+    /// A language's model: its folder name in the app's models folder (and the name of the model downloaded for it),
+    /// and where another folder may be chosen for it.
+    struct Slot {
+        QString language;  ///< "en", "de"
+        QString name;      ///< "trocr-small-hw-int8"
+        QString setting;   ///< "handwritingModel"
+        QString env;       ///< "XQT_HWR_MODEL"
+    };
+    static const std::vector<Slot>& slots();
+    static const Slot* slotOf(const QString& language);
 
     explicit HandwritingSearch(AppContext& app, QObject* parent = nullptr);
     ~HandwritingSearch() override;
@@ -51,12 +65,26 @@ public:
     /// The setting (off by default).
     static bool enabledIn(Settings& settings);
     static void setEnabledIn(Settings& settings, bool on);
-    /// The model's folder: the setting, else XQT_HWR_MODEL, else the app's data folder (see above).
-    static QString modelDir(Settings& settings);
-    /// "~/.local/share/xournal-qt/models/<MODEL_NAME>" (where downloads go).
-    static QString defaultModelDir();
+    /// The languages read ("en", "de"; English and German by default).
+    static QStringList languagesIn(Settings& settings);
+    static void setLanguagesIn(Settings& settings, const QStringList& languages);
+    /// A language's model folder: the one chosen for it, else its environment variable, else the app's own.
+    static QString modelDir(Settings& settings, const QString& language = QStringLiteral("en"));
+    /// The folder chosen for a language's model ("": the app's own again).
+    static void setModelDirIn(Settings& settings, const QString& language, const QString& folder);
+    /// "~/.local/share/xournal-qt/models" and "<that>/<slot's name>" (where downloads go).
+    static QString modelsDir();
+    static QString defaultModelDir(const QString& language = QStringLiteral("en"));
 
-    /// Makes the recogniser for a model folder (null: none). The app sets TrocrRecognizer's.
+    /// The models the languages need: the installed ones chosen for them (in the languages' order, each once), and
+    /// the languages without one.
+    struct Choice {
+        std::vector<ModelInfo> models;
+        QStringList missing;
+    };
+    static Choice choose(Settings& settings);
+
+    /// Makes the recogniser for a model folder (null: none). The app sets one by the manifest's kind.
     using Factory = std::function<std::shared_ptr<Recognizer>(const QString& modelDir)>;
     static void setFactory(Factory factory);
 
@@ -69,10 +97,10 @@ public:
     /// Read the settings again (switched on or off, another model).
     void applySettings();
     bool enabled() const { return on; }
-    /// Make the recogniser anew (the model was downloaded or removed).
+    /// Make the recogniser anew (a model was downloaded or removed).
     void reloadModel();
-    /// The model's folder in use.
-    QString modelFolderInUse() const;
+    /// The model folders in use (one per model; those of the models found, else the first language's).
+    QStringList modelFoldersInUse() const { return modelFolders; }
     InkRecognitionService& service() { return worker; }
 
     /// The open documents of a window (`window`: any key; several windows share the search), and the one in front.
@@ -93,8 +121,10 @@ private:
 
     AppContext& app;
     InkRecognitionService worker;
+    void makeRecognizer(const QStringList& folders);
+
     bool on = false;
-    QString modelFolder;
+    QStringList modelFolders;
     std::map<const DocumentSession*, QPointer<InkTextIndexer>> indexers;
     struct Window {
         std::vector<QPointer<DocumentSession>> open;

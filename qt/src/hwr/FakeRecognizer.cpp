@@ -5,7 +5,7 @@
 
 namespace xqt::hwr {
 
-FakeRecognizer::FakeRecognizer(QString id): recId(std::move(id)) {}
+FakeRecognizer::FakeRecognizer(QString id, QStringList languages): recId(std::move(id)), langs(std::move(languages)) {}
 
 void FakeRecognizer::setScript(Script s) {
     std::lock_guard lock(mtx);
@@ -25,7 +25,7 @@ void FakeRecognizer::setReady(bool ready, QString why) {
 
 Capabilities FakeRecognizer::capabilities() const {
     Capabilities c;
-    c.languages = {QStringLiteral("en")};
+    c.languages = langs;
     c.topK = 5;
     c.id = recId;
     return c;

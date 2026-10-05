@@ -2801,6 +2801,24 @@ letter words only where the recogniser is sure.
 - [ ] The library shows "Reading handwriting: N documents left" while it reads (wide window), "Handwriting: N left"
       on a phone-wide window.
 
+## Handwriting in English and German (qt/hwr-multilang)
+
+Two models (English and German) read the same handwriting; their readings are searched together, nothing is
+transcribed ([qt/docs/handwriting-search.md](../handwriting-search.md), "Languages and models"). Unit-tested with
+scripted models (`xqt-hwr-tests`); the steps below need the real models.
+- [ ] Settings → Search, search on: "Handwriting languages" shows "English and German" (the default). Below it a row
+      per language: English (state, address and size before anything is downloaded, Download, Remove when it is
+      there) and German ("not published yet": Download is disabled, "Choose a folder…" is offered). The status line
+      says that German has no model yet while only English is there.
+- [ ] German from a folder: "Choose a folder…" on the German row, pick a folder with a German model (model.json of
+      `kind` "ctc" or "trocr", `languages` ["de"]): the row says "In use", the status "Ready" once the documents are
+      read; the library's documents are read again (another set of models). "Use the app's own" goes back.
+- [ ] "English" only, then "German" only: the other model's row says its language is not read; nothing is
+      downloaded or removed by switching. A model that reads both languages (`languages` ["de", "en"]) in
+      `~/.local/share/xournal-qt/models/<name>/` serves both rows ("Read by <name>").
+- [ ] With `XQT_HWR_MODEL_DE=<folder>` the German row says the model is that folder and offers neither download nor
+      removal.
+
 ## Snip: a picture of part of a page (qt/snip)
 
 - [ ] Select button, press and hold: "Snip a rectangle (copy its picture)"; drag over ink on a PDF page: "Copied
