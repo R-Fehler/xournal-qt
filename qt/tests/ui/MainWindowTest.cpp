@@ -1195,21 +1195,29 @@ TEST_F(MainWindowTest, holdingAPageInTheSidebarSelectsIt) {
     ASSERT_TRUE(list->isVisible());
     wait(100);
     shortenHolds(list);
+    // A page scrolled into the list first (going to a page scrolls the list; with other fonts the first page can be
+    // above what it shows, and a touch at its centre would land elsewhere: Debian 13's CI, 2026-10-05)
+    const auto shown = [&](int row) {
+        QMetaObject::invokeMethod(list, "positionViewAtIndex", Q_ARG(int, row), Q_ARG(int, 4 /* ListView.Contain */));
+        wait(50);
+        return itemAt(list, row);
+    };
     auto* pagesModel = qobject_cast<xqt::PagesModel*>(controller->pagesModel());
     auto* bar = find<QQuickItem>("sidebarSelectionBar");
     ASSERT_NE(bar, nullptr);
     EXPECT_FALSE(bar->isVisible());
 
     // The mouse held still: a click (goes to the page)
-    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, centerOf(itemAt(list, 2)));
+    const QPoint third = centerOf(shown(2));
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, third);
     wait(300);
-    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, centerOf(itemAt(list, 2)));
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, third);
     wait(50);
     EXPECT_EQ(controller->pageNumber(), 3);
     EXPECT_FALSE(sidebar->property("selectionMode").toBool());
 
     static QPointingDevice* finger = QTest::createTouchDevice();
-    QPoint at = centerOf(itemAt(list, 1));
+    QPoint at = centerOf(shown(1));
     QTest::touchEvent(window, finger).press(1, at);
     wait(300);
     EXPECT_TRUE(sidebar->property("selectionMode").toBool());
@@ -1219,7 +1227,7 @@ TEST_F(MainWindowTest, holdingAPageInTheSidebarSelectsIt) {
     EXPECT_EQ(controller->pageNumber(), 3) << "holding does not go to the page";
     EXPECT_TRUE(bar->isVisible());
 
-    at = centerOf(itemAt(list, 0));
+    at = centerOf(shown(0));
     QTest::touchEvent(window, finger).press(1, at);
     QTest::touchEvent(window, finger).release(1, at);
     wait(60);
@@ -1246,14 +1254,14 @@ TEST_F(MainWindowTest, holdingAPageInTheSidebarSelectsIt) {
     EXPECT_EQ(pagesModel->selectionCount(), 0);
     EXPECT_FALSE(sidebar->property("selectionMode").toBool());
     EXPECT_FALSE(bar->isVisible());
-    at = centerOf(itemAt(list, 0));
+    at = centerOf(shown(0));
     QTest::touchEvent(window, finger).press(1, at);
     QTest::touchEvent(window, finger).release(1, at);
     wait(60);
     EXPECT_EQ(controller->pageNumber(), 1);
 
     // Unselecting the last page ends the mode too
-    at = centerOf(itemAt(list, 2));
+    at = centerOf(shown(2));
     QTest::touchEvent(window, finger).press(1, at);
     wait(300);
     QTest::touchEvent(window, finger).release(1, at);
