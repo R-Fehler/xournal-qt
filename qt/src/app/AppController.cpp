@@ -2106,6 +2106,11 @@ bool AppController::createDocument(const QString& name, bool inLibrary) {
     DocumentSession* created = s.get();
     tabs->addTab(std::move(s));
     setHomeVisible(false);
+    return saveNewDocument(*created, name, inLibrary);
+}
+
+bool AppController::saveNewDocument(DocumentSession& doc, const QString& name, bool inLibrary) {
+    DocumentSession* created = &doc;
     if (!inLibrary || !library->available()) {
         return true;
     }

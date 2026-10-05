@@ -37,6 +37,7 @@
 
 #include "control/ToolEnums.h"
 #include "filesystem.h"
+#include "model/PageRef.h"
 
 class QQuickTextDocument;
 class QWindow;
@@ -1133,6 +1134,28 @@ public:
     /// Stickers can be pasted into the current document (a page of notes, not read-only)
     Q_PROPERTY(bool canPasteSticker READ canPasteSticker NOTIFY selectionChanged)
     bool canPasteSticker() const;
+
+    // --- page templates (AppTemplates.cpp, qt/docs/templates.md) ---
+    /// The template picker's list (StickersModel of templates): the library's Templates folder or the app-wide set
+    Q_PROPERTY(QObject* templates READ templatesModel CONSTANT)
+    QObject* templatesModel() const;
+    /// What a template of page `page` would be: { offered, name: the name suggested, background: what its background
+    /// is ("pdf", "image", "paper"), folders: of the set, hasLibrary }
+    Q_INVOKABLE QVariantMap templateDraft(int page, bool appWide = false) const;
+    /// Save page `page` as a template named `name` in `folder` (relative to the set; a new name makes it) of the
+    /// library's set or (`appWide`) the app-wide one: with its background (a PDF page: that PDF page) and with its
+    /// content as asked. Written off the UI thread (templateSaved). False: no such page, nothing to save.
+    Q_INVOKABLE bool saveTemplate(int page, const QString& name, const QString& folder, bool withBackground,
+                                  bool withContent, bool appWide);
+    /// Add a template's page `count` times before page `position` (-1: after the current page), as pasting a copy
+    /// of that page does: one undo step. Read off the UI thread (templateInserted). False: no document to add to.
+    Q_INVOKABLE bool insertTemplate(const QString& path, int position = -1, int count = 1);
+    /// Pages can be added from a template to the current document (not a text file's pages, not read-only)
+    Q_PROPERTY(bool canInsertTemplate READ canInsertTemplate NOTIFY selectionChanged)
+    bool canInsertTemplate() const;
+    /// A new document that starts with a template's page (else as createDocument); read off the UI thread, then
+    /// created (templateInserted)
+    Q_INVOKABLE bool createDocumentFromTemplate(const QString& name, bool inLibrary, const QString& path);
     /// Put the setsquare ("setsquare") or the compass ("compass") on the page, or take it away again.
     Q_INVOKABLE void toggleGeometryTool(const QString& which);
     /// For the screenshot hook (it calls methods without arguments)
@@ -1347,6 +1370,10 @@ Q_SIGNALS:
     void stickerPasted(const QString& path, const QString& error);
     /// A sticker file is being written or read
     void stickerBusyChanged();
+    /// A template was written (`path`); or (`error` not empty) it could not be
+    void templateSaved(const QString& path, const QString& error);
+    /// A template's page was added (`pages` of them), or a document made from it; or (`error`) not
+    void templateInserted(const QString& path, int pages, const QString& error);
     /// A snip from a document with a file was pasted: the window offers to add a link to its page (addSnipLink)
     void snipLinkOffered(const QString& title);
     void fontChanged();
@@ -1493,6 +1520,19 @@ private:
     mutable std::unique_ptr<xqt::StickersModel> stickers;
     /// The stickers' list follows the library
     void syncStickers() const;
+    /// A new document just made: saved in the library's current folder as `name` (createDocument)
+    bool saveNewDocument(xqt::DocumentSession& doc, const QString& name, bool inLibrary);
+    // --- page templates (AppTemplates.cpp) ---
+    mutable std::unique_ptr<xqt::StickersModel> templateList;
+    void syncTemplates() const;
+    /// Read a template off the UI thread; `then` gets its page copied (nullptr and the error if it could not be read)
+    /// and whether it was saved without its background (a copied page does not keep the background's name)
+    void readTemplate(const QString& path, std::function<void(std::shared_ptr<xqt::PageClipboard>,
+                                                              bool withoutBackground, const QString& error)> then);
+    /// The template's pages for `session`, `count` times: copies, which get the background new pages get there when
+    /// the template has none of its own
+    std::vector<PageRef> templatePagesFor(xqt::PageClipboard& copy, bool withoutBackground,
+                                          xqt::DocumentSession& session, int count, bool* addedToMergedPdf);
     /// Editing beside the page: the page's text, or the text box at a point.
     QString startMarkdown(int page, std::optional<QPointF> at);
     /// After a change of the Markdown being edited: its pages and how far it goes below one.
