@@ -57,18 +57,25 @@ public:
         bool faint = false;
     };
 
+    /// How the text is matched besides, the options of the find and replace bar (qt/docs/md-editor.md, "Find and
+    /// replace"; TextMatch.h): letters as typed, whole words, a regular expression. Not with the fuzzy syntax.
+    using Options = textmatch::Options;
+
     explicit DocumentSearch(DocumentSession& session);
     ~DocumentSearch() override;
 
     /// Search for `text` (see TextMatch; empty: clear). With `jump`, the first hit from the current page on
     /// becomes current (and is scrolled to). With `fuzzy`, the text is read with the fuzzy search's syntax
-    /// (FuzzyQuery.h; an expression that is not valid: as plain text).
-    void setQuery(const QString& text, bool jump = true, bool fuzzy = false);
+    /// (FuzzyQuery.h; an expression that is not valid: as plain text). With `options` (any()), it is matched with
+    /// them instead (never fuzzy).
+    void setQuery(const QString& text, bool jump = true, bool fuzzy = false, Options options = {});
     const QString& query() const { return text; }
     /// The query is read with the fuzzy search's syntax.
     bool fuzzy() const { return fuzzyMode; }
-    /// Why a fuzzy query is searched as plain text ("": it is not, or the search is not fuzzy).
-    QString hint() const { return fuzzyMode ? parsed.hint() : QString(); }
+    const Options& options() const { return opts; }
+    /// Why a fuzzy query is searched as plain text, or a regular expression not at all ("": it is not, or the search
+    /// is neither fuzzy nor a regular expression).
+    QString hint() const;
     void clear() { setQuery({}); }
 
     /// The document matches the search: it has hits; a fuzzy query: its expression holds with the terms found in the
@@ -139,6 +146,7 @@ private:
     DocumentTextIndex index;
     QString text;
     bool fuzzyMode = false;
+    Options opts;
     FuzzyQuery parsed;                    ///< the query, when fuzzy
     std::vector<textmatch::Term> terms;   ///< what is counted and marked (empty: nothing searched)
     words::Terms counted;                 ///< `terms`, prepared for counting
