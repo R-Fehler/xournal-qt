@@ -1,6 +1,7 @@
 #include "PdfHistory.h"
 
 #include <algorithm>
+#include <fstream>
 #include <set>
 
 #include <QCryptographicHash>
@@ -8,8 +9,11 @@
 #include <QJsonObject>
 #include <qpdf/Buffer.hh>
 #include <qpdf/QPDF.hh>
+#include <qpdf/QPDFEmbeddedFileDocumentHelper.hh>
 #include <qpdf/QPDFObjectHandle.hh>
 #include <zlib.h>
+
+#include "ByteDelta.h"
 
 namespace xqt::PdfHistory {
 
@@ -68,6 +72,22 @@ std::string gunzip(const std::string& data, bool& ok) {
     inflateEnd(&z);
     ok = rc == Z_STREAM_END;
     return out;
+}
+
+std::string gzip(const std::string& data) {
+    z_stream z{};
+    if (deflateInit2(&z, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 16 + MAX_WBITS, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+        return {};
+    }
+    std::string out(deflateBound(&z, static_cast<uLong>(data.size())) + 32, '\0');
+    z.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
+    z.avail_in = static_cast<uInt>(data.size());
+    z.next_out = reinterpret_cast<Bytef*>(out.data());
+    z.avail_out = static_cast<uInt>(out.size());
+    const int rc = deflate(&z, Z_FINISH);
+    out.resize(z.total_out);
+    deflateEnd(&z);
+    return rc == Z_STREAM_END ? out : std::string();
 }
 
 std::string toJsonLines(const std::vector<Version>& versions) {
@@ -219,6 +239,128 @@ bool replacesLast(const Listed& listed, const std::string& today) {
     // (a version written in full, at the start of the file, is not cut away: that would be writing the file anew)
     return cur.id > 0 && cur.start > 0 && cur.kind != Kind::RECEIVED && !cur.milestone() && cur.day == today &&
            last.start == cur.start && last.end == cur.end;
+}
+
+}  // namespace xqt::PdfHistory
+
+namespace xqt::PdfHistory {
+
+namespace {
+std::string dataOf(QPDFObjectHandle stream) {
+    auto buffer = stream.getStreamData();
+    return std::string(reinterpret_cast<const char*>(buffer->getBuffer()), buffer->getSize());
+}
+}  // namespace
+
+std::string xmlOf(const fs::path& pdf, const Listed& listed, int id, std::string& error) {
+    // Back to the last version stored whole, then forwards through the deltas
+    size_t k = 0;
+    while (k < listed.versions.size() && listed.versions[k].id != id) {
+        ++k;
+    }
+    if (k == listed.versions.size()) {
+        error = "There is no such version in the file.";
+        return {};
+    }
+    std::vector<size_t> chain{k};
+    while (listed.versions[chain.back()].kind == Kind::DELTA) {
+        const int base = listed.versions[chain.back()].base;
+        size_t b = chain.back();
+        while (b > 0 && listed.versions[b].id != base) {
+            --b;
+        }
+        if (listed.versions[b].id != base || b == chain.back() || chain.size() > 1000) {
+            error = "The version a delta is against is not in the file any more.";
+            return {};
+        }
+        chain.push_back(b);
+    }
+    std::string xml;
+    for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
+        const Version& v = listed.versions[*it];
+        if (v.kind == Kind::RECEIVED) {
+            error = "This version is the PDF as it was received: it has no notes.";
+            return {};
+        }
+        try {
+            QPDF q;
+            PdfRevisions::open(q, pdf, v.end);
+            QPDFObjectHandle marker = q.getRoot().getKey("/XournalQt");
+            if (!marker.isDictionary()) {
+                error = "The version has no notes.";
+                return {};
+            }
+            if (v.kind == Kind::DELTA) {
+                QPDFObjectHandle d = marker.getKey(DELTA_KEY);
+                QPDFObjectHandle data = d.isDictionary() ? d.getKey("/Data") : QPDFObjectHandle::newNull();
+                std::string next;
+                if (!data.isStream() || !ByteDelta::apply(xml, dataOf(data), next)) {
+                    error = "The delta of a version does not read.";
+                    return {};
+                }
+                xml = std::move(next);
+            } else {
+                QPDFObjectHandle name = marker.getKey("/Data");
+                auto spec = QPDFEmbeddedFileDocumentHelper(q).getEmbeddedFile(name.isString() ? name.getUTF8Value()
+                                                                                               : "document.xopp");
+                if (!spec) {
+                    error = "The version's embedded document is missing.";
+                    return {};
+                }
+                bool ok = false;
+                xml = gunzip(dataOf(spec->getEmbeddedFileStream()), ok);
+                if (!ok) {
+                    error = "The version's embedded document does not read.";
+                    return {};
+                }
+            }
+        } catch (const std::exception& e) {
+            error = e.what();
+            return {};
+        }
+        if (!v.sha.empty() && sha256(xml) != v.sha) {
+            error = "Version " + std::to_string(v.id) + " is not what was saved (its checksum differs).";
+            return {};
+        }
+    }
+    return xml;
+}
+
+std::string xoppOf(const fs::path& pdf, const Listed& listed, int id, std::string& error) {
+    const std::string xml = xmlOf(pdf, listed, id, error);
+    return xml.empty() ? std::string() : gzip(xml);
+}
+
+bool exportXopp(const fs::path& pdf, int id, const fs::path& out, std::string& error) {
+    const Listed listed = list(pdf);
+    if (!listed.error.empty()) {
+        error = listed.error;
+        return false;
+    }
+    Listed from = listed;
+    if (from.versions.empty()) {
+        if (id >= 0) {
+            error = "The file keeps no versions.";
+            return false;
+        }
+        Version latest;  // (no history: the .xopp as embedded now)
+        latest.end = listed.chain.end();
+        from.versions.push_back(latest);
+    }
+    if (id < 0) {
+        id = from.versions.back().id;
+    }
+    const std::string xopp = xoppOf(pdf, from, id, error);
+    if (xopp.empty()) {
+        return false;
+    }
+    std::ofstream o(out, std::ios::binary | std::ios::trunc);
+    o.write(xopp.data(), static_cast<std::streamsize>(xopp.size()));
+    if (!o) {
+        error = "Could not write \"" + out.string() + "\".";
+        return false;
+    }
+    return true;
 }
 
 }  // namespace xqt::PdfHistory

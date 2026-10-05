@@ -69,6 +69,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfRevisions.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfHistory.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfHistory.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/ByteDelta.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/ByteDelta.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPdf.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPdf.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ArchivePdf.h
@@ -191,6 +193,12 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TodoStamp.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasGroups.cpp
 )
+# The CLI's "export-xopp": the .xopp of any version of a PDF with notes (PdfHistory.h; Qt only for this command)
+if(TARGET xournal-qt-cli)
+    target_link_libraries(xournal-qt-cli PRIVATE xqt-session)
+    target_compile_definitions(xournal-qt-cli PRIVATE XQT_CLI_SESSION)
+endif()
+
 target_include_directories(xqt-canvas PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/canvas")
 target_link_libraries(xqt-canvas PUBLIC Qt6::Gui xqt-session xoj-tools)
 set_target_properties(xqt-canvas PROPERTIES AUTOMOC ON)
@@ -207,6 +215,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/IncrementalPdfTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/PdfRevisionsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/PdfHistoryTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/ByteDeltaTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BackgroundSaveTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TextFileTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentLinkTest.cpp

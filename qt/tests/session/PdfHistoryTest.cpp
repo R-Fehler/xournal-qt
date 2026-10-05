@@ -7,6 +7,7 @@
  * @license GNU GPLv2 or later
  */
 #include <cmath>
+#include <cstdlib>
 #include <ctime>
 #include <fstream>
 #include <iterator>
@@ -93,6 +94,14 @@ void drawOn(DocumentSession& s, size_t pageNo, double y) {
     s.getDocument()->unlock();
 }
 
+size_t countOf(const std::string& text, const std::string& what) {
+    size_t n = 0;
+    for (size_t at = text.find(what); at != std::string::npos; at = text.find(what, at + 1)) {
+        ++n;
+    }
+    return n;
+}
+
 size_t strokesOf(Document& doc) {
     size_t n = 0;
     for (size_t i = 0; i < doc.getPageCount(); ++i) {
@@ -165,6 +174,20 @@ protected:
             EXPECT_EQ(qpdfCheck(cut, check), 0) << "version " << v.id << ": " << check;
             if (v.kind == PdfHistory::Kind::RECEIVED) {
                 EXPECT_FALSE(HybridPdf::isHybrid(cut));
+                continue;
+            }
+            // Its .xopp, rebuilt (a delta) or as embedded, checked against its checksum
+            const std::string rebuilt = PdfHistory::xmlOf(pdf, listed, v.id, error);
+            ASSERT_FALSE(rebuilt.empty()) << "version " << v.id << ": " << error;
+            EXPECT_EQ(PdfHistory::sha256(rebuilt), v.sha);
+            EXPECT_EQ(countOf(rebuilt, "<stroke"), strokes[k]) << "version " << v.id;
+            if (v.kind == PdfHistory::Kind::DELTA) {
+                QPDF q;
+                q.processFile(cut.string().c_str());
+                EXPECT_FALSE(QPDFEmbeddedFileDocumentHelper(q).getEmbeddedFile(HybridPdf::DATA_NAME))
+                        << "version " << v.id << ": no stale document.xopp";
+                EXPECT_TRUE(q.getRoot().getKey("/XournalQt").getKey(PdfHistory::DELTA_KEY).isDictionary());
+                EXPECT_EQ(QPDFPageDocumentHelper(q).getAllPages().size(), 3u) << "its pages are all there";
                 continue;
             }
             QPDF q;
@@ -419,4 +442,93 @@ TEST_F(PdfHistoryTest, theListReadsBack) {
     EXPECT_EQ(back[1].id, 4);
     EXPECT_EQ(back[1].end, 0u);
     EXPECT_EQ(back[1].base, -1);
+}
+
+// Older versions are kept as byte deltas of their .xopp: at the first save of a new day the day before's version is
+// written again with a delta against the version before it; milestones, the first version (written in full), every
+// 30th version and a version whose delta would be more than half of it stay whole; the latest is always whole
+TEST_F(PdfHistoryTest, olderVersionsAreStoredAsDeltas) {
+    const fs::path out = path("notes.pdf");
+    auto s = lecture(path("lecture.pdf"));
+    s->setKeepsVersions(true);
+    ASSERT_TRUE(s->saveAsHybrid(out).ok);  // version 1 (written in full)
+    std::vector<size_t> strokes{1};
+    auto day = [&](int d, const std::string& message = {}) {
+        clockNow = at(d, 10);
+        // (not on page 1: its preview, in the .xopp, changes with it; in a test document that is most of the .xopp)
+        drawOn(*s, static_cast<size_t>(1 + d % 2), 100 + 20 * (d % 30));
+        strokes.push_back(strokes.back() + 1);
+        return save(*s, message);
+    };
+    day(2);                    // version 2
+    day(3);                    // version 3: 2 becomes a delta
+    day(4, "A milestone");     // version 4: 3 a delta
+    day(5);                    // version 5: 4 stays whole (a milestone)
+    // Version 6: many strokes at once, its delta against 5 is more than half of it
+    clockNow = at(6, 10);
+    for (int k = 0; k < 150; ++k) {
+        drawOn(*s, 1, 100 + 4 * k);
+    }
+    strokes.push_back(strokes.back() + 150);
+    save(*s);
+    day(7);                    // version 7: 6 stays whole
+    day(8);                    // version 8: 7 a delta
+    if (const char* sample = std::getenv("XQT_HISTORY_SAMPLE")) {  // a sample for other PDF apps and the CLI
+        std::error_code ec;
+        fs::copy_file(out, sample, fs::copy_options::overwrite_existing, ec);
+    }
+    auto listed = PdfHistory::list(out);
+    ASSERT_EQ(listed.versions.size(), 8u);
+    using PdfHistory::Kind::DELTA;
+    using PdfHistory::Kind::FULL;
+    const std::vector<std::string> kinds{FULL, DELTA, DELTA, FULL, DELTA, FULL, DELTA, FULL};
+    for (size_t k = 0; k < kinds.size(); ++k) {
+        EXPECT_EQ(listed.versions[k].kind, kinds[k]) << "version " << listed.versions[k].id;
+    }
+    EXPECT_EQ(listed.versions[1].base, 1);
+    EXPECT_EQ(listed.chain.revisions.size(), 8u);
+    EXPECT_TRUE(listed.others.empty());
+    std::string check;
+    EXPECT_EQ(qpdfCheck(out, check), 0) << check;
+    expectVersionsOpen(out, strokes);
+    // The latest is whole: any PDF tool finds its document.xopp, and the app opens it as it is
+    auto opened = HybridPdf::open(out);
+    ASSERT_TRUE(opened.document) << opened.error;
+    EXPECT_EQ(strokesOf(*opened.document), strokes.back());
+    // A version that is not what was saved is refused (its checksum)
+    auto tampered = listed;
+    tampered.versions[2].sha = PdfHistory::sha256("something else");
+    std::string error;
+    EXPECT_TRUE(PdfHistory::xmlOf(out, tampered, tampered.versions[2].id, error).empty());
+    EXPECT_NE(error.find("checksum"), std::string::npos) << error;
+    // export-xopp: any version as a .xopp of its own
+    ASSERT_TRUE(PdfHistory::exportXopp(out, 3, path("v3.xopp"), error)) << error;
+    bool ok = false;
+    EXPECT_EQ(countOf(PdfHistory::gunzip(fileBytes(path("v3.xopp")), ok), "<stroke"), strokes[2]);
+    EXPECT_TRUE(ok);
+    ASSERT_TRUE(PdfHistory::exportXopp(out, -1, path("latest.xopp"), error)) << error;
+    EXPECT_EQ(countOf(PdfHistory::gunzip(fileBytes(path("latest.xopp")), ok), "<stroke"), strokes.back());
+    EXPECT_FALSE(PdfHistory::exportXopp(out, 99, path("none.xopp"), error));
+}
+
+// Every 30th version is stored whole: a chain of deltas is never longer
+TEST_F(PdfHistoryTest, everyThirtiethVersionIsWhole) {
+    const fs::path out = path("notes.pdf");
+    auto s = lecture(path("lecture.pdf"));
+    s->setKeepsVersions(true);
+    ASSERT_TRUE(s->saveAsHybrid(out).ok);
+    for (int d = 2; d <= 32; ++d) {
+        clockNow = at(1, 0) + d * 24 * 3600 + 3600 * 10;
+        drawOn(*s, static_cast<size_t>(1 + d % 2), 100 + 20 * (d % 30));
+        save(*s);
+    }
+    const auto listed = PdfHistory::list(out);
+    ASSERT_EQ(listed.versions.size(), 32u);
+    for (const auto& v: listed.versions) {
+        const bool whole = v.id == 1 || v.id == 30 || v.id == 32;
+        EXPECT_EQ(v.kind, whole ? PdfHistory::Kind::FULL : PdfHistory::Kind::DELTA) << "version " << v.id;
+    }
+    std::string error;
+    EXPECT_FALSE(PdfHistory::xmlOf(out, listed, 29, error).empty()) << error;
+    EXPECT_FALSE(PdfHistory::xmlOf(out, listed, 31, error).empty()) << error;
 }

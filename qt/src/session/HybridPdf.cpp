@@ -71,6 +71,7 @@
 #include "MergedPdf.h"
 #include "PdfKeywords.h"
 #include "PageBookmarks.h"
+#include "ByteDelta.h"
 #include "PdfHistory.h"
 #include "PdfRevisions.h"
 #include "PdfBookmarks.h"
@@ -2725,8 +2726,32 @@ private:
             return true;
         };
         QPDFObjectHandle dataName = e.marker.getKey("/Data");
-        if (!replaceData(dataName.isString() ? dataName.getUTF8Value() : std::string(DATA_NAME), prep.xopp, true)) {
-            throw std::runtime_error("the embedded document is missing");
+        const std::string data = dataName.isString() ? dataName.getUTF8Value() : std::string(DATA_NAME);
+        if (!replaceData(data, prep.xopp, true)) {
+            if (!history || archive) {
+                throw std::runtime_error("the embedded document is missing");
+            }
+            // The last version's .xopp became a delta (version history): the embedded document is added again
+            QPDFObjectHandle dict = QPDFObjectHandle::newDictionary();
+            dict.replaceKey("/Type", QPDFObjectHandle::newName("/EmbeddedFile"));
+            dict.replaceKey("/Subtype", QPDFObjectHandle::newName("/" + std::string(ArchivePdf::XOPP_MIME)));
+            QPDFObjectHandle params = QPDFObjectHandle::newDictionary();
+            params.replaceKey("/Size", QPDFObjectHandle::newInteger(static_cast<long long>(prep.xopp.size())));
+            const QByteArray md5 = QCryptographicHash::hash(
+                    QByteArray::fromRawData(prep.xopp.data(), static_cast<int>(prep.xopp.size())), QCryptographicHash::Md5);
+            params.replaceKey("/CheckSum", QPDFObjectHandle::newString(md5.toStdString()));
+            dict.replaceKey("/Params", params);
+            QPDFObjectHandle stream = u.addStream(dict, prep.xopp);
+            QPDFObjectHandle ef = QPDFObjectHandle::newDictionary();
+            ef.replaceKey("/F", stream);
+            ef.replaceKey("/UF", stream);
+            QPDFObjectHandle spec = QPDFObjectHandle::newDictionary();
+            spec.replaceKey("/Type", QPDFObjectHandle::newName("/Filespec"));
+            spec.replaceKey("/F", QPDFObjectHandle::newUnicodeString(data));
+            spec.replaceKey("/UF", QPDFObjectHandle::newUnicodeString(data));
+            spec.replaceKey("/EF", ef);
+            spec.replaceKey("/Desc", QPDFObjectHandle::newUnicodeString("The Xournal++ document of this PDF (xournal-qt hybrid PDF)"));
+            efdh.replaceEmbeddedFile(data, QPDFFileSpecObjectHelper(u.add(spec)));
         }
         std::set<std::string> before;
         {
@@ -2957,6 +2982,9 @@ private:
         putHistory(marker, history, [&](const std::string& data) {
             return u.addStream(QPDFObjectHandle::newDictionary(), data);
         });
+        if (marker.hasKey(PdfHistory::DELTA_KEY)) {
+            marker.removeKey(PdfHistory::DELTA_KEY);  // (the version before stored as a delta: this one is whole)
+        }
         QPDFObjectHandle trailer = q.getTrailer();
         QPDFObjectHandle info = trailer.getKey("/Info");
         if (!info.isDictionary()) {
@@ -3315,6 +3343,81 @@ Result appendWhole(const Prepared& prep, const fs::path& target, const std::stri
     return r;
 }
 
+/// Before a new version is appended: the last one, still the file's last revision and an ordinary day's version, is
+/// written again with its .xopp as a delta against the version before it (its pages and drawings stay as they are, so
+/// any PDF viewer still shows it; its embedded document.xopp goes). Milestones, every 30th version, a version after
+/// another app's revision and one whose delta would be more than half of its .xopp stay whole. False (`versions`
+/// unchanged) when it stays whole.
+bool storeAsDelta(const fs::path& target, const PdfHistory::Listed& listed, std::vector<PdfHistory::Version>& versions) {
+    using PdfHistory::Version;
+    if (versions.size() < 2 || listed.chain.garbage || !listed.chain.ok()) {
+        return false;
+    }
+    Version& cur = versions.back();
+    const Version& prev = versions[versions.size() - 2];
+    const auto& last = listed.chain.revisions.back();
+    if (cur.kind != PdfHistory::Kind::FULL || cur.id <= 0 || cur.start == 0 || cur.milestone() ||
+        cur.id % PdfHistory::KEYFRAME_EVERY == 0 || prev.kind == PdfHistory::Kind::RECEIVED || cur.sha.empty() ||
+        last.start != cur.start || last.end != cur.end) {
+        return false;
+    }
+    Steps step;
+    std::string error;
+    const std::string base = PdfHistory::xmlOf(target, listed, prev.id, error);
+    if (base.empty()) {
+        g_warning("Version %d of %s stays whole: %s", cur.id, target.string().c_str(), error.c_str());
+        return false;
+    }
+    std::string gz;
+    {
+        QPDF q;
+        q.setSuppressWarnings(true);
+        q.processFile(target.string().c_str());
+        gz = embeddedXoppOf(q);
+    }
+    bool ok = false;
+    const std::string xml = PdfHistory::gunzip(gz, ok);
+    if (!ok || PdfHistory::sha256(xml) != cur.sha) {
+        return false;
+    }
+    const std::string delta = ByteDelta::encode(base, xml);
+    std::string check;
+    if (!ByteDelta::apply(base, delta, check) || check != xml) {
+        g_warning("The delta of version %d of %s does not give it back: it stays whole", cur.id, target.string().c_str());
+        return false;
+    }
+    if (PdfHistory::gzip(delta).size() * 2 > gz.size()) {
+        return false;  // (a keyframe: the delta would be more than half of it)
+    }
+    step("the last version's delta");
+    const bool done = rewriteFrom(target, cur.start, error, [&](QPDF& q, IncrementalPdf::Update& u) {
+        QPDFObjectHandle root = q.getRoot();
+        QPDFObjectHandle marker = root.getKey(MARKER);
+        QPDFObjectHandle name = marker.getKey("/Data");
+        touchNames(u, root);
+        QPDFObjectHandle names = root.getKey("/Names");
+        QPDFNameTreeObjectHelper tree(names.getKey("/EmbeddedFiles"), q);
+        tree.remove(name.isString() ? name.getUTF8Value() : std::string(DATA_NAME));
+        u.touch(marker.isIndirect() ? marker : root);
+        QPDFObjectHandle dict = QPDFObjectHandle::newDictionary();
+        dict.replaceKey("/Type", QPDFObjectHandle::newName("/XournalQtDelta"));
+        QPDFObjectHandle d = QPDFObjectHandle::newDictionary();
+        d.replaceKey("/Data", u.addStream(dict, delta));
+        d.replaceKey("/Base", QPDFObjectHandle::newInteger(prev.id));
+        marker.replaceKey(PdfHistory::DELTA_KEY, d);
+    });
+    if (!done) {
+        g_warning("Version %d of %s stays whole: %s", cur.id, target.string().c_str(), error.c_str());
+        return false;
+    }
+    step("written again as a delta");
+    std::error_code ec;
+    cur.kind = PdfHistory::Kind::DELTA;
+    cur.base = prev.id;
+    cur.end = fs::file_size(target, ec);
+    return true;
+}
+
 /// A save with version history on (WriteOptions::history).
 Result writeKeeping(Document& doc, const fs::path& target, const BasePageOf& baseOf, size_t pdfPageCount,
                     const std::string& exportName, const WriteOptions& options, const fs::path& work) {
@@ -3370,6 +3473,7 @@ Result writeKeeping(Document& doc, const fs::path& target, const BasePageOf& bas
         r.version = v.id;
         return r;
     }
+    const std::string stampBefore = stampOf(target);
     PdfHistory::Listed listed = PdfHistory::list(target);
     std::vector<PdfHistory::Version> versions = listed.versions;
     int last = -1;
@@ -3406,6 +3510,14 @@ Result writeKeeping(Document& doc, const fs::path& target, const BasePageOf& bas
         v.start = chain.size;
     }
     step("the history");
+    // A new version: the one before it becomes a delta (the file changes, its pages stay the same objects)
+    Revision rev = options.revision ? *options.revision : Revision();
+    if (!replace && storeAsDelta(target, listed, versions)) {
+        v.start = versions.back().end;
+        if (rev.valid() && rev.stamp == stampBefore) {
+            rev.stamp = stampOf(target);
+        }
+    }
     auto finish = [&](Result r) {
         r.version = v.id;
         r.replaced = replace;
@@ -3423,16 +3535,15 @@ Result writeKeeping(Document& doc, const fs::path& target, const BasePageOf& bas
         return r;
     };
     std::string whyFull;
-    if (options.revision && options.revision->valid()) {
+    if (rev.valid()) {
         try {
-            auto existing = openExisting(target, *options.revision, false, whyFull);
+            auto existing = openExisting(target, rev, false, whyFull);
             if (existing) {
                 Prepared prep = prepared(&existing->reuse);
                 versions.push_back(v);
                 HistoryMark mark{versions};
                 const std::string was = options.revision->stamp;
-                Result r = Appending(*existing, prep, false, *options.revision, &mark)
-                                   .run(exportName, target, options.written, whyFull);
+                Result r = Appending(*existing, prep, false, rev, &mark).run(exportName, target, options.written, whyFull);
                 if (r.ok) {
                     r = finish(r);
                     keepCleanCopy(target, was, prep, existing->tree);

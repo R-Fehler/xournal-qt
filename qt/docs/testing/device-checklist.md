@@ -3371,3 +3371,12 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
 - [ ] Phone (Fold 7 folded), toolbox: "My tools" → Insert has "Record audio"; the pill is visible above the page.
 - [ ] A build without Qt Multimedia: no record button in the classic bar, the toolbox or the sheets; Ctrl+Shift+R does
       nothing; documents with recordings still open and keep them.
+
+## Version history inside PDFs with notes (qt/pdf-history, qt/docs/hybrid-pdf.md "Version history")
+
+- [ ] `xournal-qt-cli export-xopp notes.pdf --version 2 -o v2.xopp` on a PDF with notes that kept versions over a
+      few days: the .xopp opens in Xournal++ next to the PDF with the strokes of that day (its PDF background is the PDF
+      by its name, so our annotations show under the strokes: compare the strokes, not the look). Without
+      `--version`: the latest. A version that is not in the file: a message, exit code 253 (-3).
+- [ ] `pdfdetach -list notes.pdf` (or Acrobat's attachments) after several days of saves: `document.xopp` is there
+      and is the latest version; older versions are not listed as attachments.

@@ -89,6 +89,21 @@ Listed list(const fs::path& pdf);
 /// same local day, not a milestone, not version 0, and still the last revision of the file).
 bool replacesLast(const Listed& listed, const std::string& today);
 
+/// The .xopp of version `id` as its XML: the embedded document of its revision, or rebuilt from the deltas back to the
+/// last version stored whole, and checked against the version's SHA-256. Empty, with `error`, when it cannot.
+std::string xmlOf(const fs::path& pdf, const Listed& listed, int id, std::string& error);
+/// The same as a .xopp file's bytes (gzipped).
+std::string xoppOf(const fs::path& pdf, const Listed& listed, int id, std::string& error);
+
+/// Write the .xopp of version `id` (-1: the latest) of `pdf` to `out` (xournal-qt-cli export-xopp). Its PDF background
+/// is the PDF by its name, as embedded.
+bool exportXopp(const fs::path& pdf, int id, const fs::path& out, std::string& error);
+
+/// The marker key of a version whose .xopp is a delta: << /Data stream /Base id >>.
+constexpr const char* DELTA_KEY = "/XoppDelta";
+/// Every 30th version is stored whole (a delta chain is at most this long).
+constexpr int KEYFRAME_EVERY = 30;
+
 // --- small helpers -------------------------------------------------------------------------------------------------
 
 /// The clock of version history (tests set another one; nullptr: the system clock).
@@ -99,5 +114,6 @@ std::string localDay(std::time_t t);
 std::string sha256(const std::string& data);
 /// A gzip file's content (an embedded .xopp); `ok` false when it does not read.
 std::string gunzip(const std::string& data, bool& ok);
+std::string gzip(const std::string& data);
 
 }  // namespace xqt::PdfHistory
