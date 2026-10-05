@@ -1554,15 +1554,24 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
             panning = false;
         } else if (pts.size() >= 2) {
             const double dist = std::hypot(pts[0].x() - pts[1].x(), pts[0].y() - pts[1].y());
+            // The angle of the line between the first two fingers on the screen: twisted, they turn the canvas
+            // (qt/docs/canvas-rotation.md)
+            const double fingers = std::atan2(screenPts[1].y() - screenPts[0].y(), screenPts[1].x() - screenPts[0].x()) *
+                                   180.0 / M_PI;
             if (!pinching) {
-                vc.pinchBegin(screenCentroid, dist);
+                pinchTwists = view.rotationGestureAllowed();
+                vc.pinchBegin(screenCentroid, dist, pinchTwists ? std::optional(fingers) : std::nullopt);
                 pinchStartDistance = dist;
                 pinching = true;
             } else {
                 touchSessionTravel += std::hypot(centroid.x() - lastCentroid.x(), centroid.y() - lastCentroid.y());
                 // Upstream's "zoom gestures" setting: without it, two fingers only pan.
                 const bool zoom = view.getSession().getSettings()->isZoomGesturesEnabled();
-                vc.pinchUpdate(screenCentroid, zoom ? dist : pinchStartDistance);
+                vc.pinchUpdate(screenCentroid, zoom ? dist : pinchStartDistance,
+                               pinchTwists ? std::optional(fingers) : std::nullopt);
+                if (vc.twisting()) {
+                    touchSessionTravel = std::max(touchSessionTravel, TAP_SLOP_PX + 1);  // (a twist is not a tap: no undo)
+                }
             }
             lastCentroid = centroid;
             panning = false;
@@ -1784,10 +1793,20 @@ bool CanvasInput::wheelEvent(QWheelEvent* e, QPointF viewPos) {
 }
 
 bool CanvasInput::nativeGestureEvent(QNativeGestureEvent* e, QPointF viewPos) {
+    ViewController& vc = view.getViewController();
     if (e->gestureType() == Qt::ZoomNativeGesture) {
-        view.getViewController().zoomBy(1.0 + e->value(), viewPos);
+        vc.zoomBy(1.0 + e->value(), viewPos);
+    } else if (e->gestureType() == Qt::RotateNativeGesture) {
+        // The touchpad's turn (degrees, clockwise): the canvas turns about the pointer once it adds up to the start
+        // of a turn, snapping to quarters (qt/docs/canvas-rotation.md)
+        if (view.rotationGestureAllowed()) {
+            vc.twistBy(e->value(), vc.viewToScreen(viewPos));
+        }
+    } else if (e->gestureType() == Qt::BeginNativeGesture) {
+        vc.twistEnd();  // (a new gesture: its turn adds up from nothing)
     } else if (e->gestureType() == Qt::EndNativeGesture) {
-        view.getViewController().zoomGestureEnded();  // (the fingers left the touchpad)
+        vc.twistEnd();
+        vc.zoomGestureEnded();  // (the fingers left the touchpad)
     }
     return true;
 }

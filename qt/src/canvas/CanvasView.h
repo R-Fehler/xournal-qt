@@ -89,6 +89,11 @@ public:
     const DocumentLayout& documentLayout() const { return layout; }
     /// Scrolling sideways comes to rest on whole pages (setting "snapPages" of ours, default on)
     static bool snapSetting(Settings& settings);
+    /// Two fingers (and the touchpad's rotate gesture) turn the canvas (setting "rotateGesture" of ours, default on;
+    /// qt/docs/canvas-rotation.md)
+    static bool rotateGestureSetting(Settings& settings);
+    /// A gesture may turn the canvas now: allowed here and the setting on
+    bool rotationGestureAllowed() const;
     /// Snapping up and down too, while the view is read (qt/docs/toolbox.md, "Reading"): with the setting snapPages
     /// a drag or a fling comes to rest on a row of pages
     void setSnapVertically(bool on);

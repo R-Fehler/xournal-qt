@@ -3132,3 +3132,12 @@ offered).
       opens at the cursor.
 - [ ] Scroll bars: at 90° and 270° the bar at the right scrolls along the turned pages (dragging it down moves the
       pages up on the screen), at 180° both bars run the other way round; at a free angle there are none.
+- [ ] Two fingers twisted on the touch screen: nothing turns for a small twist while pinching or scrolling; past
+      about 12° the canvas turns with the fingers (a little behind them), the point between them staying under them,
+      zooming at the same time when they spread. Near 0°, 90°, 180°, 270° it snaps (within 6°). A quick twist never
+      undoes (two-finger tap).
+- [ ] The touchpad's rotate gesture (macOS; KDE/GNOME on Wayland with a touchpad that reports it): turning two fingers
+      turns the canvas the same way round as the fingers (check the direction!), about the pointer, with the same
+      start and snapping.
+- [ ] Settings → Touch → "Turn the canvas with two fingers" off: twisting only pans and zooms; Ctrl+[ / Ctrl+] and
+      the chip still work. On again: twisting turns it.

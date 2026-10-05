@@ -227,6 +227,7 @@ private:
     /// The release is where the press was (however long it took): a tap on the selection when select more is on
     bool barelyMoved(const Event& release) const;
     bool pinching = false;
+    bool pinchTwists = false;  ///< the pinch may turn the canvas (CanvasView::rotationGestureAllowed, at its start)
     double pinchStartDistance = 1;
     bool panning = false;
     QPointF lastCentroid;

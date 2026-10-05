@@ -348,6 +348,16 @@ bool CanvasView::snapSetting(Settings& settings) {
     return snap;
 }
 
+bool CanvasView::rotateGestureSetting(Settings& settings) {
+    bool on = true;
+    settings.getCustomElement("xournalQt").getBool("rotateGesture", on);
+    return on;
+}
+
+bool CanvasView::rotationGestureAllowed() const {
+    return rotateGestureSetting(*session.getSettings()) && rotationAllowed();
+}
+
 void CanvasView::applyScrolling() {
     viewController.setSnapping(presenting || snapSetting(*session.getSettings()), presenting ? 1 : 0);
     viewController.setSnappingVertically(snapVertically && !presenting);

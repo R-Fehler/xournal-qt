@@ -18,12 +18,14 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QNativeGestureEvent>
 #include <QWheelEvent>
 #include <gtest/gtest.h>
 #include <qpa/qwindowsysteminterface.h>
 
 #include "control/ToolEnums.h"
 #include "control/ToolHandler.h"
+#include "control/settings/Settings.h"
 #include "model/Document.h"
 #include "model/Font.h"
 #include "model/Text.h"
@@ -31,6 +33,7 @@
 #include "model/Stroke.h"
 #include "model/XojPage.h"
 #include "render/RenderService.h"
+#include "undo/UndoRedoHandler.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
 
@@ -381,4 +384,91 @@ TEST_F(CanvasRotationItemTest, theTextCursorIsReportedWhereItIsOnTheScreen) {
     EXPECT_LT(std::hypot(cursor.center().x() - at.x(), cursor.center().y() - at.y()), 40)
             << "near where the text tool was pressed";
     EXPECT_GT(cursor.width(), cursor.height()) << "turned by 90°, the text cursor lies across the screen";
+}
+
+namespace {
+/// Two fingers on the canvas, `radius` from `centre`, turned from `from` to `to` degrees in steps; lifted at the end
+void twist(QQuickWindow* window, QPointF centre, double radius, double from, double to, int steps = 12) {
+    static QPointingDevice* screen = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
+    auto at = [&](double degrees, int finger) {
+        const double r = (degrees + (finger ? 180.0 : 0.0)) * M_PI / 180.0;
+        return (centre + QPointF(radius * std::cos(r), radius * std::sin(r))).toPoint();
+    };
+    QTest::touchEvent(window, screen).press(0, at(from, 0)).press(1, at(from, 1));
+    for (int i = 1; i <= steps; ++i) {
+        const double a = from + (to - from) * i / steps;
+        QTest::touchEvent(window, screen).move(0, at(a, 0)).move(1, at(a, 1));
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+    }
+    QTest::touchEvent(window, screen).release(0, at(to, 0)).release(1, at(to, 1));
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+}
+}  // namespace
+
+// Two fingers twisted turn the canvas once the twist is deliberate, snapping to quarters; the point between them stays
+// under them; a twist is no two-finger tap (no undo)
+TEST_F(CanvasRotationItemTest, twoFingersTwistedTurnTheCanvas) {
+    zoomIn();
+    penStroke(QPointF(200, 200), QPointF(300, 220));  // (something to undo)
+    const size_t strokes = session->getUndoRedoHandler()->canUndo() ? 1 : 0;
+    ASSERT_EQ(strokes, 1u);
+    const QPointF centre(400, 350);
+    const auto [page, pt] = under(centre);
+    twist(window, centre, 80, 0, 8);
+    EXPECT_EQ(vc().rotation(), 0) << "a little twist does not turn it";
+    twist(window, centre, 80, 0, 52);  // 52 - 12 = 40
+    EXPECT_NEAR(vc().rotation(), 40, 1.5);
+    const QPointF now = onScreen(page, pt);
+    EXPECT_NEAR(now.x(), centre.x(), 2) << "turned about the fingers";
+    EXPECT_NEAR(now.y(), centre.y(), 2);
+    twist(window, centre, 80, 0, 57);  // 40 + 45 = 85: snaps to 90
+    EXPECT_EQ(vc().rotation(), 90);
+    twist(window, centre, 80, 10, -50);  // back by 48
+    EXPECT_NEAR(vc().rotation(), 42, 1.5);
+    EXPECT_TRUE(session->getUndoRedoHandler()->canUndo()) << "the twists undid nothing";
+    // Quickly (as fast as a tap): still a turn, not an undo
+    twist(window, centre, 80, 0, 40, 2);
+    EXPECT_NEAR(vc().rotation(), 70, 1.5);
+    EXPECT_TRUE(session->getUndoRedoHandler()->canUndo());
+
+    // Off in the settings: two fingers only pan and zoom
+    vc().setRotation(0);
+    session->getSettings()->getCustomElement("xournalQt").setBool("rotateGesture", false);
+    twist(window, centre, 80, 0, 60);
+    EXPECT_EQ(vc().rotation(), 0);
+    session->getSettings()->getCustomElement("xournalQt").setBool("rotateGesture", true);
+    // Not where the canvas may not turn (the reference)
+    view->setRotatable(false);
+    twist(window, centre, 80, 0, 60);
+    EXPECT_EQ(vc().rotation(), 0);
+    view->setRotatable(true);
+}
+
+// The touchpad's rotate gesture (macOS, Wayland): it adds up, starts after the same twist, and snaps
+TEST_F(CanvasRotationItemTest, theTouchpadsRotateGestureTurnsTheCanvas) {
+    zoomIn();
+    static QPointingDevice* pad = QTest::createTouchDevice(QInputDevice::DeviceType::TouchPad);
+    const QPointF at(300, 300);
+    const auto [page, pt] = under(at);
+    auto send = [&](Qt::NativeGestureType type, double value) {
+        QNativeGestureEvent e(type, pad, 2, at, at, window->mapToGlobal(at), value, QPointF());
+        QCoreApplication::sendEvent(window, &e);
+    };
+    send(Qt::BeginNativeGesture, 0);
+    for (int i = 0; i < 10; ++i) {
+        send(Qt::RotateNativeGesture, 4);  // 40 in all: 28
+    }
+    send(Qt::EndNativeGesture, 0);
+    EXPECT_NEAR(vc().rotation(), 28, 1e-6);
+    const QPointF now = onScreen(page, pt);
+    EXPECT_NEAR(now.x(), at.x(), 1e-6) << "about the pointer";
+    EXPECT_NEAR(now.y(), at.y(), 1e-6);
+    send(Qt::BeginNativeGesture, 0);
+    send(Qt::RotateNativeGesture, -8);
+    EXPECT_NEAR(vc().rotation(), 28, 1e-6) << "a new gesture starts from nothing";
+    send(Qt::RotateNativeGesture, -14);  // -22 + 12 = -10
+    EXPECT_NEAR(vc().rotation(), 18, 1e-6);
+    send(Qt::RotateNativeGesture, -15);  // -37 + 12 = -25: 3, snaps to 0
+    EXPECT_EQ(vc().rotation(), 0);
+    send(Qt::EndNativeGesture, 0);
 }
