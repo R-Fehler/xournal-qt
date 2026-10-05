@@ -82,22 +82,44 @@ second row (Ctrl+H, the bar's replace button, ⋮ → Find and replace; [md-edit
 
 ## Reading and presenting
 
-Two modes over one "tools hidden" view:
+The author (2026-10-05): "The reader mode sucks. The menu is half cut off the lower part of the screen and I feel like
+we should just reuse the full screen or present mode with a read only / readmode toggle that allows skipping to next
+prev page with big touch areas on the left and right side of the screen." So reading is no mode of its own any more
+(qt/ui-rework): it is **read only**, a toggle of full screen and of presenting. The reading pill is gone.
 
-- **Reading** (⋮ → View → Read; automatically in a tiny window): the page only, and it cannot be written on
-  (`DocumentCanvas.readingOnly`): the pen and the fingers scroll, PDF text can still be selected, copied and looked
-  up; no ink by accident. The toolbox, the command bar and the tab strip are hidden. The **reading pill** at the
-  bottom: the page number (all pages), ‹ ›, up and down or sideways, whole pages or free (momentum), the width or the
-  whole page, ✕. It fades 2 s after the last scroll or touch and comes back when the view moves, the page changes or
-  the pointer comes near; a touch on the faded pill only shows it. **Esc**, the pill's ✕ or the corner field leave
-  reading.
+- **Read only** (`win.readOnly`; on where `win.readOnlyOffered`: full screen, the compact chrome, presenting): the
+  floating toolbox's ⋯ → "Read only", the compact chrome's tools (the classic tool square's popup, phones' full
+  screen), **Ctrl+Alt+R** (a shortcut of its own, changeable), and **⋮ → View → Read**, which enters full screen with
+  it on (so does Ctrl+Alt+R in a window). While it is on:
+  - the page cannot be written on (`DocumentCanvas.readingOnly`): the pen and the fingers scroll, PDF text can still be
+    selected, copied and looked up (decided: selecting text writes nothing, and reading is where one copies a quote);
+    no ink by accident;
+  - the tools are hidden (`win.toolsHidden`: the floating toolbox, the classic tool square and pen pill); the view
+    pill (the page number, the zoom and its fits, the page layout) stays, as in full screen;
+  - **big tap fields at the left and right edges**: a fifth of the page's width each (at least 48 px), its whole height,
+    invisible. A tap there goes to the previous or the next page (in full screen to its top, presenting: the slide); a
+    short arrow appears at that edge. The page finds the taps itself (`DocumentCanvas.edgeTapWidth`, `edgeTapped`;
+    `CanvasView::edgeTap`): a tap that is a link or opens a covering note does that instead, a swipe or a drag
+    scrolls, and taps in a row turn page after page (no double tap there). The fields in `Main.qml`
+    (`readingTapFields`) only show the hint and let the presses through (`inputTransparent`);
+  - a **lock** in the upper right corner (`readOnlyMark`, where the toolbox floats) says so; a tap on it writes again.
+  - It ends with Esc (full screen ends, and read only with it), the lock, Ctrl+Alt+R again, the ⋯ entry, and when full
+    screen ends or the home screen is shown (`onReadOnlyOfferedChanged`).
+- **The reader chrome** (no HUD: automatic in a tiny window, or chosen in Settings → Display → Controls at this size)
+  is reading too: read only with the tap fields; the corner field brings the chrome back, as before.
 - **Presenting** (F5): full screen, black around the pages, page by page; writing on the slides stays possible: the
-  toolbox floats. The corner field hides and shows it ("present without controls" is presenting with it hidden).
+  toolbox floats. The corner field hides and shows it ("present without controls" is presenting with it hidden). Read
+  only while presenting: the edges go to the previous and next slide, the pen does not write.
+
+Kept from the reading of before, as settings rather than a pill: **up and down or sideways** and **whole pages**
+(⋮ → the view pill's page layout menu: "Scroll sideways", "Stop on whole pages"; the latter is offered while reading
+too). The width or the whole page: the view pill's zoom menu. Dropped: the pill itself, its ‹ › (the edges do that)
+and its fading.
 
 Up and down, "whole pages" (the setting `snapPages`, as sideways) makes a drag or a fling come to rest on a row of
-pages while reading (`ViewController::setSnappingVertically`): a row taller than the view rests anywhere within it (its
-top at the view's top at the latest), a fling at its end goes on to the next row's top, a row that fits rests in the
-middle. Outside reading, up and down scrolls freely as before.
+pages while reading (`ViewController::setSnappingVertically`; not while presenting, which is page by page anyway): a
+row taller than the view rests anywhere within it (its top at the view's top at the latest), a fling at its end goes
+on to the next row's top, a row that fits rests in the middle. Outside reading, up and down scrolls freely as before.
 
 ## Popups beside the rail
 
@@ -157,9 +179,10 @@ tools. The last eraser cannot be removed.
 | `qt/src/app/qml/Toolbox.qml`, `ToolboxPlan.js` | the rail: head, tools, stacks, fixed tools, tail; the plan; carrying a tool; the grip |
 | `qt/src/app/qml/ToolEntryButton.qml` | one tool: its icon and a sample of its ink; lifted in hand; the hold, the carrying, the wheel |
 | `qt/src/app/qml/ToolEntryEditor.qml` | the editor (and the draft of a new tool) |
-| `Main.qml` | where the rail is (`toolboxDocked`, `toolboxFloating`, `toolboxInDock`, `toolboxEdge`), the menus (`toolEntryMenu`, `toolTypeMenu`, `toolboxMoreMenu`), the command bar's promoted entries, the format bar's undo / redo and commands, reading (`win.reading`, `readingPill`) |
+| `Main.qml` | where the rail is (`toolboxDocked`, `toolboxFloating`, `toolboxInDock`, `toolboxEdge`), the menus (`toolEntryMenu`, `toolTypeMenu`, `toolboxMoreMenu`), the command bar's promoted entries, the format bar's undo / redo and commands, reading (`win.readOnly`, `win.reading`, `readingTapFields`, `readOnlyMark`) |
 | `PhoneDock.qml`, `PhoneToolSheet.qml` | the dock hosts the rail; the sheet "My tools" |
 | `qt/src/canvas/ViewController.*`, `CanvasView`, `DocumentCanvasItem.snapVertically` | snapping up and down while reading |
+| `CanvasView::edgeTap`, `CanvasInput` (the taps of the mouse, the pen, a finger), `DocumentCanvasItem.edgeTapWidth` / `edgeTapped` | the tap fields of reading |
 
 ## Tests
 

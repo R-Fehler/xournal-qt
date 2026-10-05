@@ -6,6 +6,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
 #include <functional>
 #include <cmath>
 #include <type_traits>
@@ -16,6 +17,7 @@
 #include <QTemporaryDir>
 #include <QElapsedTimer>
 #include <QGuiApplication>
+#include <QScreen>
 #include <QImage>
 #include <QtMath>
 #include <QQmlApplicationEngine>
@@ -872,50 +874,211 @@ TEST_F(ToolboxTest, aTextDocumentHasUndoRedoAndItsCommandsInTheFormatBar) {
     EXPECT_FALSE(shown(find("searchButton")) && inside(find("searchButton"), commands)) << "in \"more tools\" at 720";
 }
 
-TEST_F(ToolboxTest, readingIsReadOnlyWithItsPillAndEscLeavesIt) {
-    controller->applyToolEntry(nth("pen"));
-    auto* canvas = find("canvas");
-    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "reader"));
-    until([&] { return win("reading").toBool(); });
-    ASSERT_TRUE(win("reading").toBool());
-    EXPECT_TRUE(canvas->property("readingOnly").toBool());
-    EXPECT_TRUE(canvas->property("snapVertically").toBool());
-    EXPECT_FALSE(shown(find("toolbox")));
-    EXPECT_FALSE(shown(find("topTools")));
-    auto* pill = find("readingPill");
-    ASSERT_TRUE(shown(pill));
-    EXPECT_TRUE(shown(find("readingSnapButton")));
-    // The pen writes nothing (it scrolls)
-    const size_t before = [&] {
-        auto* page = controller->tabManager().currentSession()->getDocument()->getPage(0).get();
-        return page->getSelectedLayer()->getElements().size();
-    }();
-    const QPoint a = rectOf(canvas).center().toPoint();
-    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, a);
-    for (int k = 1; k <= 6; ++k) {
-        QTest::mouseMove(window, a + QPoint(10 * k, 8 * k));
-        wait(10);
+/// Reading (qt/docs/toolbox.md, "Reading"; qt/ui-rework): read only in full screen and presenting, the edges turn the
+/// pages, no ink, the tools back when it ends
+class ReadingTest: public ToolboxTest {
+protected:
+    void SetUp() override {
+        ToolboxTest::SetUp();
+        controller->addPageAfterCurrent();
+        controller->addPageAfterCurrent();
+        controller->firstPage();
+        until([&] { return page() == 1; });
+        controller->applyToolEntry(nth("pen"));
     }
-    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, a + QPoint(60, 48));
-    wait(100);
-    auto* page = controller->tabManager().currentSession()->getDocument()->getPage(0).get();
-    EXPECT_EQ(page->getSelectedLayer()->getElements().size(), before) << "no ink by accident";
-    // It fades after 2 s
-    until([&] { return pill->opacity() < 0.01; }, 4000);
-    EXPECT_LT(pill->opacity(), 0.01);
-    // Sideways from the pill
-    QMetaObject::invokeMethod(pill, "wake");
-    until([&] { return pill->opacity() > 0.99; });
-    click(find("readingSidewaysButton"));
-    until([&] { return controller->horizontalScrolling(); });
-    EXPECT_TRUE(controller->horizontalScrolling());
-    controller->setHorizontalScrolling(false);
-    // Esc: the tools again
-    QTest::keyClick(window, Qt::Key_Escape);
-    until([&] { return !win("reading").toBool(); });
-    EXPECT_FALSE(win("reading").toBool());
-    EXPECT_FALSE(canvas->property("readingOnly").toBool());
-    EXPECT_TRUE(shown(find("toolbox")));
+    int page() const { return controller->property("pageNumber").toInt(); }
+    size_t ink() const {
+        size_t n = 0;
+        auto doc = controller->tabManager().currentSession()->getDocument();
+        for (size_t i = 0; i < doc->getPageCount(); ++i) {
+            n += doc->getPage(i)->getSelectedLayer()->getElements().size();
+        }
+        return n;
+    }
+    /// A stroke with the mouse (the pen in hand) across the middle of the page
+    void stroke() {
+        const QPoint a = rectOf(find("canvas")).center().toPoint();
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, a);
+        for (int k = 1; k <= 6; ++k) {
+            QTest::mouseMove(window, a + QPoint(10 * k, 8 * k));
+            wait(10);
+        }
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, a + QPoint(60, 48));
+        wait(100);
+    }
+    void tapField(const char* name) {
+        auto* field = find(name);
+        ASSERT_TRUE(shown(field)) << name;
+        const QRectF r = rectOf(field);
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, QPoint(qRound(r.center().x()), qRound(r.top() + r.height() * 0.4)));
+        wait(80);
+    }
+    bool readOnly() const { return window->property("readOnlyOn").toBool(); }
+    /// ⋮ → View → Read, then the checks every size shares: full screen, read only, the tools away, the edges turn the
+    /// pages, no ink, Esc gives everything back
+    /// Full screen has taken the screen's size (the window follows it a little later)
+    void fullScreenSettled() {
+        until([&] { return window->size() == window->screen()->size(); });
+        wait(300);
+    }
+    void readAndLeave() {
+        auto* canvas = find("canvas");
+        QMetaObject::invokeMethod(find<QObject>("readItem"), "triggered");
+        until([&] { return readOnly(); });
+        ASSERT_TRUE(readOnly());
+        fullScreenSettled();
+        EXPECT_TRUE(win("fullScreenMode").toBool()) << "full screen";
+        EXPECT_TRUE(win("reading").toBool());
+        EXPECT_TRUE(canvas->property("readingOnly").toBool());
+        EXPECT_FALSE(shown(find("toolbox"))) << "no tools";
+        EXPECT_FALSE(shown(find("quickToolSquare")));
+        EXPECT_FALSE(shown(find("penPill")));
+        EXPECT_EQ(find("readingPill"), nullptr) << "the reading pill is gone";
+        EXPECT_TRUE(shown(find("readOnlyMark"))) << "the lock says so";
+        // The fields: a fifth of the width at each edge, the page's whole height
+        auto* next = find("readingNextField");
+        ASSERT_TRUE(shown(next));
+        EXPECT_NEAR(rectOf(next).right(), rectOf(canvas).right(), 1);
+        EXPECT_NEAR(rectOf(next).height(), rectOf(canvas).height(), 1);
+        EXPECT_GE(rectOf(next).width(), std::max(48.0, rectOf(canvas).width() * 0.19));
+        EXPECT_LE(rectOf(next).width(), std::max(48.0, rectOf(canvas).width() * 0.26));
+        // The pen writes nothing
+        const size_t before = ink();
+        stroke();
+        EXPECT_EQ(ink(), before) << "no ink by accident";
+        // The edges turn the pages, with a hint where it was tapped
+        controller->firstPage();
+        until([&] { return page() == 1; });
+        tapField("readingNextField");
+        until([&] { return page() == 2; });
+        EXPECT_EQ(page(), 2) << "the right edge: the next page";
+        EXPECT_GT(find("readingNextHint")->opacity(), 0) << "a short hint";
+        tapField("readingNextField");
+        until([&] { return page() == 3; });
+        EXPECT_EQ(page(), 3);
+        tapField("readingPreviousField");
+        until([&] { return page() == 2; });
+        EXPECT_EQ(page(), 2) << "the left edge: the previous page";
+        EXPECT_EQ(ink(), before) << "taps write nothing either";
+        // A finger: a tap at the edge turns the page too; a swipe there scrolls and turns none
+        static QPointingDevice* finger = QTest::createTouchDevice();
+        const QRectF field = rectOf(find("readingNextField"));
+        const QPoint from(qRound(field.center().x()), qRound(field.top() + field.height() * 0.7));
+        const int at = page();
+        QTest::touchEvent(window, finger).press(1, from);
+        QTest::touchEvent(window, finger).release(1, from);
+        until([&] { return page() == at + 1; });
+        EXPECT_EQ(page(), at + 1) << "a finger's tap at the right edge";
+        wait(700);  // (the hint has faded)
+        // (towards the page before: the last page may end the scrolling)
+        const QPoint top(from.x(), qRound(field.top() + field.height() * 0.2));
+        const double y0 = canvas->property("contentY").toDouble();
+        QTest::touchEvent(window, finger).press(1, top);
+        for (int k = 1; k <= 8; ++k) {
+            wait(16);
+            QTest::touchEvent(window, finger).move(1, top + QPoint(0, 25 * k));
+        }
+        wait(16);
+        const double y1 = canvas->property("contentY").toDouble();
+        QTest::touchEvent(window, finger).release(1, top + QPoint(0, 200));
+        wait(100);
+        EXPECT_LT(y1, y0) << "the page scrolled under the swipe";
+        EXPECT_LT(find("readingNextHint")->opacity(), 0.01) << "a swipe is no tap";
+        EXPECT_EQ(ink(), before);
+        // Esc: out of full screen, the tools again
+        QTest::keyClick(window, Qt::Key_Escape);
+        until([&] { return !win("fullScreenMode").toBool(); });
+        EXPECT_FALSE(win("fullScreenMode").toBool());
+        EXPECT_FALSE(readOnly());
+        EXPECT_FALSE(canvas->property("readingOnly").toBool());
+        EXPECT_FALSE(shown(find("readingNextField")));
+        stroke();
+        EXPECT_GT(ink(), before) << "the pen writes again";
+    }
+};
+
+TEST_F(ReadingTest, onADesktopReadIsFullScreenReadOnlyAndTheEdgesTurnThePages) {
+    readAndLeave();
+    until([&] { return shown(find("toolbox")); });
+    EXPECT_TRUE(shown(find("toolbox"))) << "the toolbox docked again";
+    EXPECT_FALSE(find("toolbox")->property("floating").toBool());
+}
+
+/// The same on a phone's screen (ReadingPhone.ui@phone: an off-screen screen of 412 × 915, so full screen stays a phone)
+class ReadingPhoneTest: public ReadingTest {
+protected:
+    void SetUp() override {
+        if (QGuiApplication::primaryScreen()->size() != QSize(412, 915)) {
+            GTEST_SKIP() << "needs a phone's screen (ReadingPhone.ui@phone)";
+        }
+        ReadingTest::SetUp();
+    }
+    void TearDown() override {
+        if (controller) {
+            ReadingTest::TearDown();
+        }
+    }
+};
+
+TEST_F(ReadingPhoneTest, onAPhoneReadIsFullScreenReadOnlyAndTheEdgesTurnThePages) {
+    resize(412, 915);
+    until([&] { return find("toolbox")->property("compact").toBool(); });
+    ASSERT_EQ(win("phoneLayout").toBool(), true);
+    readAndLeave();
+    EXPECT_TRUE(win("phoneLayout").toBool()) << "still a phone in full screen";
+    until([&] { return shown(find("toolbox")); });
+    EXPECT_TRUE(find("toolbox")->property("compact").toBool()) << "the phone's dock again";
+}
+
+TEST_F(ReadingTest, readOnlyIsAToggleOfFullScreenAndPresenting) {
+    window->setProperty("fullScreenMode", true);
+    fullScreenSettled();
+    auto* box = find("toolbox");
+    until([&] { return shown(box) && box->property("floating").toBool(); });
+    // The floating toolbox's ⋯: read only
+    click(find("toolboxMoreButton"));
+    trigger(find<QObject>("toolboxMoreMenu"), "toolboxReadOnlyItem");
+    until([&] { return readOnly(); });
+    ASSERT_TRUE(readOnly());
+    EXPECT_FALSE(shown(box));
+    EXPECT_TRUE(win("fullScreenMode").toBool());
+    // The lock: write again, still full screen
+    click(find("readOnlyButton"));
+    until([&] { return !readOnly(); });
+    EXPECT_FALSE(readOnly());
+    until([&] { return shown(box); });
+    EXPECT_TRUE(shown(box));
+    EXPECT_TRUE(win("fullScreenMode").toBool());
+    // The key, while presenting: page by page
+    QMetaObject::invokeMethod(window, "startPresenting", Q_ARG(QVariant, false));
+    until([&] { return controller->presenting(); });
+    wait(300);  // (presenting has settled: the console placed, the window active)
+    QTest::keyClick(window, Qt::Key_R, Qt::ControlModifier | Qt::AltModifier);
+    until([&] { return readOnly(); });
+    ASSERT_TRUE(readOnly());
+    EXPECT_TRUE(find("canvas")->property("readingOnly").toBool());
+    EXPECT_FALSE(shown(box));
+    const size_t before = ink();
+    stroke();
+    EXPECT_EQ(ink(), before);
+    tapField("readingNextField");
+    until([&] { return page() == 2; });
+    EXPECT_EQ(page(), 2) << "the next slide";
+    QTest::keyClick(window, Qt::Key_R, Qt::ControlModifier | Qt::AltModifier);
+    until([&] { return !readOnly(); });
+    EXPECT_FALSE(readOnly());
+    until([&] { return shown(box); });
+    EXPECT_TRUE(shown(box)) << "presenting with the tools again";
+    controller->setPresenting(false);
+    window->setProperty("fullScreenMode", false);
+    until([&] { return !box->property("floating").toBool(); });
+    // Not in a window: the key there enters full screen with it
+    QTest::keyClick(window, Qt::Key_R, Qt::ControlModifier | Qt::AltModifier);
+    until([&] { return readOnly(); });
+    EXPECT_TRUE(win("fullScreenMode").toBool());
+    window->setProperty("fullScreenMode", false);
+    until([&] { return !readOnly(); });
+    EXPECT_FALSE(readOnly()) << "full screen ends: read only with it";
 }
 
 namespace {

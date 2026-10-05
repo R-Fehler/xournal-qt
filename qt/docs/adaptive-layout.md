@@ -205,7 +205,7 @@ button of its own ("One place for each action", below):
 | **Document ▸** | Rename…, Edit anyway (as plain text)…, Open as PDF document, Remove unused images…, Linked from…, Copy link to this page |
 | **Export ▸** | Export as plain PDF…, Export for the archive…, Export as Markdown |
 | **Page ▸** (not for text files) | Insert pages…, Background of this page…, Page size…, Space for notes…, Start a chapter here… |
-| **View ▸** | All open documents (not in the phone chrome: its tab count), Page layout… (where the view pill has no button for it: phone portrait, the compact pill, the phone chrome), Present without controls (Ctrl+F5), Read (only the page: the reader chrome of this size class), Tool bar position ▸ (Top, Two rows at the top, Two rows at the bottom, Left, Right, Automatic for this window size; not in the phone classes: their dock) |
+| **View ▸** | All open documents (not in the phone chrome: its tab count), Page layout… (where the view pill has no button for it: phone portrait, the compact pill, the phone chrome), Present without controls (Ctrl+F5), Read (full screen, read only: the edges turn the pages; Ctrl+Alt+R), Tool bar position ▸ (Top, Two rows at the top, Two rows at the bottom, Left, Right, Automatic for this window size; not in the phone classes: their dock) |
 
 Entries that depend on the document (a `.md`: Open as PDF document, Remove unused images; a text file: no Save as, no
 Page) are left out as before. "Markdown source beside the page" is in the menu of the writing button (its long
@@ -675,8 +675,10 @@ page: Insert pages…; Present: without controls; Write on the page: its source)
 close it. The palette (`colorPalette`) and the widths (`widthChoices`) of the cycling buttons are sheets of the same
 form in the phone classes (their `asSheet`); the menus were already (`MenuSheet`).
 
-**The reader**: automatic only in a tiny window (`chromeAuto`); elsewhere by hand (⋮ → View → Read). No HUD; the
-corner field brings the chrome back (and in a tiny window stores "full" for that class).
+**The reader**: automatic only in a tiny window (`chromeAuto`); elsewhere chosen in Settings → Display. No HUD, read
+only, and the edges turn the pages (as read only in full screen, [toolbox.md](toolbox.md), "Reading and presenting");
+the corner field brings the chrome back (and in a tiny window stores "full" for that class). ⋮ → View → Read is no
+longer the reader chrome but full screen with read only on (qt/ui-rework).
 
 **The corner field** (`presentCornerMark`) of presenting and of the reader: a 48 px target in the lower left corner of
 the page. While the tools show (presenting with controls: `highlighted`) it is clearly there: an accent-colored dot in

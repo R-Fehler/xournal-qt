@@ -13,7 +13,7 @@ Rectangle {
     id: pill
     objectName: "penPill"
     z: 59
-    visible: win.noToolbar && !app.homeVisible && !win.hudHidden && !win.toolboxShown  // (the toolbox has its tools)
+    visible: win.noToolbar && !app.homeVisible && !win.toolsHidden && !win.toolboxShown  // (the toolbox has its tools; read only: none)
              && (app.tool === "pen" || app.tool === "highlighter" || win.toolGroups.isLaser(app.tool))
     radius: 18
     color: "#f7ffffff"

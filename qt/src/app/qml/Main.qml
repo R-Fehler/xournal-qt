@@ -240,12 +240,28 @@ ApplicationWindow {
     /// Nothing over the page but the page: presenting without controls, or the reader chrome
     readonly property bool hudHidden: cleanPage || (chromeMode === "reader" && !app.homeVisible) || (replaying && !app.homeVisible)
     onHudHiddenChanged: if (hudHidden) { quickTools.close(); phoneToolSheet.close() }
-    /// Reading (qt/docs/toolbox.md, "Reading and presenting"): the reader chrome of this size class (⋮ → View → Read;
-    /// automatic in a tiny window) - the page only, and the page cannot be written on: the pen and the fingers scroll,
-    /// PDF text can still be selected, copied and looked up, no ink by accident. The reading pill shows the page and how
-    /// it scrolls. Esc, the pill's ✕ or the corner field leave it. (Presenting is the other mode over the same "tools
-    /// hidden" view: writing on the slides stays possible there.)
-    readonly property bool reading: chromeMode === "reader" && !app.homeVisible && !app.presenting
+    /// Read only (qt/docs/toolbox.md, "Reading"; qt/ui-rework): a toggle of full screen and presenting (the floating
+    /// toolbox's ⋯, the compact chrome's tools, Ctrl+Alt+R; ⋮ → View → Read enters full screen with it). Off again
+    /// when full screen ends or the home screen is shown.
+    property bool readOnly: false
+    /// Where read only can be on: full screen or the compact chrome, presenting (a document with pages)
+    readonly property bool readOnlyOffered: !app.homeVisible && !textDoc && !replaying
+                                            && (chromeMode === "compact" || app.presenting)
+    onReadOnlyOfferedChanged: if (!readOnlyOffered) readOnly = false
+    readonly property bool readOnlyOn: readOnly && readOnlyOffered
+    /// Read only, from a window too: full screen first
+    function startReading() {
+        if (!readOnlyOffered && chromeMode !== "reader") fullScreenMode = true
+        readOnly = readOnlyOffered
+    }
+    function toggleReadOnly() { readOnlyOn ? (readOnly = false) : startReading() }
+    /// Reading: read only, or the reader chrome (no HUD; automatic in a tiny window). The page cannot be written on:
+    /// the pen and the fingers scroll, PDF text can still be selected, copied and looked up, no ink by accident; big
+    /// fields at the left and right edges turn the pages (readingTapFields). The tools are hidden (toolsHidden); the
+    /// lock (readOnlyMark), Esc or, in the reader chrome, the corner field bring them back.
+    readonly property bool reading: !app.homeVisible && ((chromeMode === "reader" && !app.presenting) || readOnlyOn)
+    /// The tools are put away: nothing over the page (hudHidden), or read only (the page, its number and zoom)
+    readonly property bool toolsHidden: hudHidden || readOnlyOn
     /// The document's timeline is replayed (qt/docs/timeline.md): the page as of a moment and the play bar at the
     /// bottom, read-only; no tools (as reading), the play bar's keys
     readonly property bool replaying: app.timeline.active
@@ -403,7 +419,7 @@ ApplicationWindow {
                                           && !replaying
     /// Floating over the page, a little off its edge: the compact chrome (full screen, presenting with the tools)
     readonly property bool toolboxFloating: toolboxMode && chromeMode === "compact" && !phoneLayout && !app.homeVisible
-                                            && !textDoc && !hudHidden
+                                            && !textDoc && !toolsHidden
     /// In the phone's dock (at the bottom, or the rail at the right held sideways): its first tools, "My tools"
     readonly property bool toolboxInDock: toolboxMode && dockShown && !textDoc && !replaying
     /// The toolbox is shown (docked, or floating in full screen and on phones)
@@ -997,6 +1013,16 @@ ApplicationWindow {
             text: app.presenting ? qsTr("Hide the tools (Ctrl+F5)") : qsTr("Present without controls (Ctrl+F5)")
             icon.source: app.iconUrl("xqt-eye-off")
             onTriggered: app.presenting ? (win.presentClean = true) : win.startPresenting(true)
+        }
+        // Read only: the pen does not write, the edges turn the pages (qt/docs/toolbox.md, "Reading")
+        AdaptiveMenuItem {
+            objectName: "toolboxReadOnlyItem"
+            readonly property var keys: win.keysOf("readOnly")
+            text: keys.length > 0 ? qsTr("Read only (%1)").arg(keys[0]) : qsTr("Read only")
+            icon.source: app.iconUrl("xqt-lock")
+            checkable: true
+            checked: win.readOnlyOn
+            onTriggered: win.toggleReadOnly()
         }
         AdaptiveMenuItem {
             objectName: "toolboxSearchItem"
@@ -1606,9 +1632,15 @@ ApplicationWindow {
                         AdaptiveMenuItem { objectName: "curtainItem"; offered: !win.textDoc; checkable: true; checked: app.curtain === "curtain"; text: qsTr("Curtain (B)"); icon.source: app.iconUrl("xqt-curtain"); onTriggered: app.toggleCurtain("curtain") }
                         AdaptiveMenuItem { objectName: "spotlightItem"; offered: !win.textDoc; checkable: true; checked: app.curtain === "spotlight"; text: qsTr("Spotlight (Shift+B)"); icon.source: app.iconUrl("xqt-spotlight"); onTriggered: app.toggleCurtain("spotlight") }
                         AdaptiveMenuItem { objectName: "presentCleanItem"; text: qsTr("Present without controls (Ctrl+F5)"); icon.source: app.iconUrl("xopp-presentation-mode"); onTriggered: win.startPresenting(true) }
-                        // The reader chrome of this window size: only the page; the mark in the lower left corner
-                        // brings the controls back (qt/docs/adaptive-layout.md)
-                        AdaptiveMenuItem { objectName: "readItem"; text: qsTr("Read (only the page, no ink)"); icon.source: app.iconUrl("xqt-book-open"); onTriggered: win.chooseChrome("reader") }
+                        // Full screen, read only: the edges turn the pages, no ink (qt/docs/toolbox.md, "Reading")
+                        AdaptiveMenuItem {
+                            objectName: "readItem"
+                            offered: !win.textDoc
+                            readonly property var keys: win.keysOf("readOnly")
+                            text: keys.length > 0 ? qsTr("Read (full screen, no ink; %1)").arg(keys[0]) : qsTr("Read (full screen, no ink)")
+                            icon.source: app.iconUrl("xqt-book-open")
+                            onTriggered: win.startReading()
+                        }
                         // The document's timeline: how it was written, with its recordings (qt/docs/timeline.md)
                         AdaptiveMenuItem { objectName: "replayItem"; offered: !win.textDoc; text: qsTr("Replay the writing"); icon.source: app.iconUrl("xqt-history"); onTriggered: app.timeline.start() }
                         MenuSeparator {}
@@ -2397,7 +2429,10 @@ ApplicationWindow {
         clip: true  // zoomed-in pages must not paint over the sidebar
         view: app.view
         readingOnly: win.reading || win.replaying
-        snapVertically: win.reading
+        snapVertically: win.reading && !app.presenting
+        // Reading: the edges turn the pages (a tap the page does not take otherwise; readingTapFields)
+        edgeTapWidth: readingTapFields.visible ? readingTapFields.fieldWidth : 0
+        onEdgeTapped: function(side) { readingTapFields.turn(side) }
 
         // Picture files dropped on Markdown being written (a .md, a text document, Markdown on a page): saved with
         // the document and linked at the cursor (qt/docs/md-images.md)
@@ -2723,7 +2758,7 @@ ApplicationWindow {
                     AdaptiveMenuItem {
                         objectName: "snapPagesItem"
                         text: qsTr("Stop on whole pages")
-                        enabled: app.horizontalScrolling
+                        enabled: app.horizontalScrolling || win.reading  // (up and down: while reading)
                         checkable: true
                         checked: app.snapPages
                         onTriggered: app.snapPages = !app.snapPages
@@ -4418,155 +4453,109 @@ ApplicationWindow {
             else win.presentClean = !win.presentClean
         }
     }
-    // Reading (qt/docs/toolbox.md): the page number (all pages), ‹ ›, up and down or sideways, whole pages or free,
-    // the width or the whole page, ✕ (back to the tools). It fades 2 s after the last scroll or touch, and comes back
-    // when the view moves, the page changes or the pointer comes near.
-    Item {  // (the pointer near the bottom of the page wakes it; presses go through to the page)
-        visible: readingPill.visible
-        z: 89
+    // Reading (qt/docs/toolbox.md, "Reading"; qt/ui-rework): read only in full screen or presenting, or the reader
+    // chrome. Big fields at the left and right edges (a fifth of the page's width each, at least a finger wide, its
+    // whole height, invisible) turn the pages: the previous or the next one (its top; presenting: the slide). A short
+    // arrow at that edge says the tap was taken. The page itself finds the taps (DocumentCanvas.edgeTapWidth,
+    // edgeTapped: a tap that is no link and no note), so a swipe there scrolls as anywhere; these items only show
+    // where the fields are and the hint (inputTransparent: the canvas takes the presses under them).
+    Item {
+        id: readingTapFields
+        objectName: "readingTapFields"
+        readonly property bool inputTransparent: true
+        visible: win.reading && !win.replaying && !pageGrid.visible && !contentsOverview.visible
+        z: 4  // (over the page, under its pills)
         x: canvas.x
+        y: canvas.y
         width: canvas.width
-        y: win.canvasControlsBottom - 140
-        height: 140
-        HoverHandler { onHoveredChanged: if (hovered) readingPill.wake() }
-    }
-    Pane {
-        id: readingPill
-        objectName: "readingPill"
-        visible: win.reading && !pageGrid.visible && !contentsOverview.visible && !win.replaying
-        z: 90
-        x: Math.round(canvas.x + (canvas.width - width) / 2)
-        y: win.canvasControlsBottom - height - 24
-        padding: 2
-        leftPadding: 8
-        rightPadding: 4
-        Material.foreground: "#303030"
-        /// Shown (it fades out 2 s after the last scroll or touch)
-        property bool awake: true
-        opacity: awake ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: 250 } }
-        function wake() {
-            awake = true
-            fadeTimer.restart()
+        height: canvas.height
+        readonly property real fieldWidth: Math.round(Math.max(48, width * 0.2))
+        function turn(step) {
+            if (step < 0) {
+                app.previousPage()
+                previousFieldHint.flash()
+            } else {
+                app.nextPage()
+                nextFieldHint.flash()
+            }
         }
-        Timer {
-            id: fadeTimer
-            interval: 2000
-            onTriggered: if (!pillHover.hovered) readingPill.awake = false
-        }
-        HoverHandler { id: pillHover; onHoveredChanged: hovered ? readingPill.wake() : fadeTimer.restart() }
-        onVisibleChanged: if (visible) wake()
-        Connections {
-            target: app
-            enabled: readingPill.visible
-            function onPageChanged() { readingPill.wake() }
-        }
-        Connections {
-            target: canvas
-            enabled: readingPill.visible
-            function onViewportChanged() { readingPill.wake() }
-        }
-        background: Rectangle {
-            radius: height / 2
+        component FieldHint: Rectangle {
+            id: hint
+            readonly property bool inputTransparent: true
+            property bool next: true
+            function flash() { flashAnimation.restart() }
+            anchors.verticalCenter: parent.verticalCenter
+            x: next ? parent.width - width - 12 : 12
+            width: 48
+            height: 48
+            radius: 24
             color: "#f2fafafa"
             border.width: 1
             border.color: "#40000000"
-        }
-        RowLayout {
-            spacing: 0
-            ToolButton {
-                objectName: "readingPageButton"
-                focusPolicy: Qt.NoFocus
-                text: app.pageNumber + " / " + app.pageCount
-                font.pixelSize: 14
-                Accessible.name: qsTr("All pages")
-                ToolTip.visible: hovered
-                ToolTip.text: qsTr("All pages")
-                ToolTip.delay: 600
-                onClicked: pageGrid.open()
+            opacity: 0
+            Image {
+                anchors.centerIn: parent
+                source: app.iconUrl(parent.next ? "xqt-chevron-right" : "xqt-chevron-left")
+                sourceSize.width: 26
+                sourceSize.height: 26
             }
-            IconButton {
-                objectName: "readingPreviousButton"
-                implicitWidth: 40; implicitHeight: 40
-                icon.width: 20; icon.height: 20
-                iconName: "xqt-chevron-left"
-                tip: qsTr("Previous page")
-                enabled: app.pageNumber > 1
-                onClicked: { readingPill.wake(); app.previousPage() }
-            }
-            IconButton {
-                objectName: "readingNextButton"
-                implicitWidth: 40; implicitHeight: 40
-                icon.width: 20; icon.height: 20
-                iconName: "xqt-chevron-right"
-                tip: qsTr("Next page")
-                enabled: app.pageNumber < app.pageCount
-                onClicked: { readingPill.wake(); app.nextPage() }
-            }
-            ToolSeparator {}
-            // Up and down, or sideways
-            IconButton {
-                objectName: "readingSidewaysButton"
-                implicitWidth: 40; implicitHeight: 40
-                icon.width: 20; icon.height: 20
-                iconName: app.horizontalScrolling ? "xqt-chevron-right" : "xqt-chevron-down"
-                label: app.horizontalScrolling ? qsTr("Sideways") : qsTr("Up and down")
-                tip: app.horizontalScrolling ? qsTr("Scrolling sideways (tap: up and down)") : qsTr("Scrolling up and down (tap: sideways)")
-                onClicked: { readingPill.wake(); app.horizontalScrolling = !app.horizontalScrolling }
-            }
-            // Whole pages, or free with momentum
-            ToolButton {
-                objectName: "readingSnapButton"
-                focusPolicy: Qt.NoFocus
-                text: app.snapPages ? qsTr("Pages") : qsTr("Free")
-                font.pixelSize: 13
-                checkable: false
-                ToolTip.visible: hovered
-                ToolTip.text: app.snapPages ? qsTr("Comes to rest on whole pages (tap: scrolls freely)")
-                                            : qsTr("Scrolls freely, with momentum (tap: whole pages)")
-                ToolTip.delay: 600
-                onClicked: { readingPill.wake(); app.snapPages = !app.snapPages }
-            }
-            // The width, or the whole page
-            IconButton {
-                objectName: "readingFitButton"
-                implicitWidth: 40; implicitHeight: 40
-                icon.width: 20; icon.height: 20
-                property bool whole: false
-                iconName: whole ? "xqt-page-single" : "xqt-scaling"
-                label: whole ? qsTr("Whole page") : qsTr("Page width")
-                tip: whole ? qsTr("The whole page (tap: the width)") : qsTr("The width of the page (tap: the whole page)")
-                onClicked: {
-                    readingPill.wake()
-                    whole = !whole
-                    whole ? app.fitPage() : app.fitWidth()
-                }
-            }
-            ToolSeparator {}
-            IconButton {
-                objectName: "readingCloseButton"
-                implicitWidth: 40; implicitHeight: 40
-                icon.width: 20; icon.height: 20
-                iconName: "xqt-close"
-                label: qsTr("Stop reading")
-                tip: qsTr("Stop reading: the tools again (Esc)")
-                onClicked: win.chooseChrome("full")
+            SequentialAnimation {
+                id: flashAnimation
+                NumberAnimation { target: hint; property: "opacity"; to: 0.9; duration: 90 }
+                PauseAnimation { duration: 160 }
+                NumberAnimation { target: hint; property: "opacity"; to: 0; duration: 350 }
             }
         }
-        // Faded: a touch on it only shows it again (no button is pressed blindly)
-        MouseArea {
-            anchors.fill: parent
-            visible: !readingPill.awake
-            onPressed: readingPill.wake()
+        Item {
+            objectName: "readingPreviousField"
+            readonly property bool inputTransparent: true
+            width: readingTapFields.fieldWidth
+            height: parent.height
+            FieldHint { id: previousFieldHint; objectName: "readingPreviousHint"; next: false }
+        }
+        Item {
+            objectName: "readingNextField"
+            readonly property bool inputTransparent: true
+            x: parent.width - width
+            width: readingTapFields.fieldWidth
+            height: parent.height
+            FieldHint { id: nextFieldHint; objectName: "readingNextHint"; next: true }
         }
     }
-    // Esc leaves reading (a selection first loses its selection)
+    // Read only is on: a lock in the corner where the toolbox floats says so; a tap on it gives the tools back
+    Rectangle {
+        id: readOnlyMark
+        objectName: "readOnlyMark"
+        visible: win.readOnlyOn && !win.cleanPage && !pageGrid.visible && !contentsOverview.visible
+        z: 60
+        x: win.controlsRight - width - 8
+        y: win.controlsTop + (fullScreenTabs.visible ? fullScreenTabs.height : 0) + 8
+        width: readOnlyButton.implicitWidth + 4
+        height: width
+        radius: width / 2
+        color: "#f2fafafa"
+        border.width: 1
+        border.color: "#40000000"
+        IconButton {
+            id: readOnlyButton
+            objectName: "readOnlyButton"
+            anchors.centerIn: parent
+            iconName: "xqt-lock"
+            checked: true
+            label: qsTr("Read only")
+            tip: win.withKeys(qsTr("Read only: the pen does not write, the edges turn the pages. Tap: write again"), "readOnly")
+            onClicked: win.readOnly = false
+        }
+    }
+    // Esc leaves reading (a selection first loses its selection); in full screen Esc leaves full screen, and read only
+    // with it
     Shortcut {
         sequence: "Escape"
-        enabled: win.reading && !win.replaying && !app.hasSelection && !app.pdfTextIsSelected && !win.sidebarDrawerOpen
-                 && !app.curtainHandles && app.snip === "" && !win.fullScreenMode
-        onActivated: win.chooseChrome("full")
+        enabled: win.reading && !app.presenting && !win.replaying && !app.hasSelection && !app.pdfTextIsSelected
+                 && !win.sidebarDrawerOpen && !app.curtainHandles && app.snip === "" && !win.fullScreenMode
+        onActivated: win.readOnlyOn ? (win.readOnly = false) : win.chooseChrome("full")
     }
+    Shortcut { sequences: win.keysOf("readOnly"); enabled: !app.homeVisible && !win.textDoc && !win.replaying; onActivated: win.toggleReadOnly() }
     // Digits typed while the page is at hand: go to that page (Enter)
     PageJump {
         id: pageJump
@@ -4879,7 +4868,7 @@ ApplicationWindow {
         // Only in the compact chrome (full screen): with the bar merely put away, the arrow strip brings it back at
         // once. Not while presenting without controls, nor in the reader chrome.
         // (the classic tools only: the toolbox floats in full screen instead)
-        visible: win.chromeMode === "compact" && !app.homeVisible && !win.hudHidden && !win.toolboxShown
+        visible: win.chromeMode === "compact" && !app.homeVisible && !win.toolsHidden && !win.toolboxShown
         z: 60
         x: win.canvasControlsLeft + 16  // (over the main document, also when a reference is beside it)
         y: win.canvasControlsTop + 16
@@ -4942,6 +4931,7 @@ ApplicationWindow {
                 height: Math.max(0, Math.min(barContent.implicitHeight,
                                              quickTools.roomBottom - quickTools.roomTop - quickTools.topPadding - quickTools.bottomPadding
                                              - laserToggle.height - presentToggle.height - leaveFullScreen.height
+                                             - (readOnlyToggle.visible ? readOnlyToggle.height + quickToolsColumn.spacing : 0)
                                              - (curtainToggles.visible ? curtainToggles.height + quickToolsColumn.spacing : 0)
                                              - 3 * quickToolsColumn.spacing))
             }
@@ -4987,6 +4977,20 @@ ApplicationWindow {
                         quickTools.close()
                         app.toggleCurtain("spotlight")
                     }
+                }
+            }
+            // Read only (qt/docs/toolbox.md, "Reading"): the pen does not write, the edges turn the pages
+            Button {
+                id: readOnlyToggle
+                objectName: "readOnlyToggleButton"
+                visible: win.readOnlyOffered
+                width: parent.width
+                flat: true
+                icon.source: app.iconUrl("xqt-lock")
+                text: qsTr("Read only (no ink; the edges turn the pages)")
+                onClicked: {
+                    quickTools.close()
+                    win.toggleReadOnly()
                 }
             }
             Button {

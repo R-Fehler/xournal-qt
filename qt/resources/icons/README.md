@@ -39,6 +39,7 @@ rounded hole: the spotlight) are drawn in the same style.
 (qt/docs/page-rotation.md).
 
 `xqt-snip` is Lucide's `scissors`: the snip tool (copy the picture of a part of a page, qt/docs/snip.md).
+`xqt-lock` is Lucide's `lock`: read only (full screen and presenting without ink; qt/docs/toolbox.md, "Reading").
 `xqt-snip-rect` and `xqt-snip-lasso` (a dashed rectangle or lasso with small scissors: the snip's two shapes, the
 toolbox's snip entry and the select list) are drawn in the same style.
 

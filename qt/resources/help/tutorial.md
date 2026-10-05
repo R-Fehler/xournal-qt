@@ -182,6 +182,10 @@ Try it: open this tutorial beside itself and scroll the two sides independently.
 - **Present** (**F5**): full screen on black, one page at a time, from the current page; the arrow keys, Page Up and
   Page Down or a swipe go on. Esc goes back to full-screen editing.
 - **Present without controls** (Ctrl+F5, or press and hold the Present button): only the page.
+- **Read only** (**⋮ → View → Read**, or **Ctrl+Alt+R**; in full screen also the toolbox's ⋯): full screen where the
+  pen and the fingers do not write. Tap the left or the right edge of the page for the previous or the next page; a
+  swipe still scrolls, and text of a PDF can still be selected. The lock in the corner (or Ctrl+Alt+R) lets you write
+  again, Esc leaves full screen.
 
 > **PLACEHOLDER · SCREENSHOT:** full screen with the small tool square and the page pill.
 

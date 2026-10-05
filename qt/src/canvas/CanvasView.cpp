@@ -2566,6 +2566,20 @@ void CanvasView::setReadingOnly(bool on) {
     }
 }
 
+bool CanvasView::edgeTap(QPointF viewPos) {
+    const double width = viewController.viewSize().width();
+    if (!readingOnly || replaying || edgeTapWidth <= 0 || width <= 0) {
+        return false;
+    }
+    const double w = std::min(edgeTapWidth, width / 2);
+    const int side = viewPos.x() < w ? -1 : viewPos.x() > width - w ? 1 : 0;
+    if (side == 0) {
+        return false;
+    }
+    Q_EMIT edgeTapped(side);
+    return true;
+}
+
 // --- the replay of the timeline -------------------------------------------------------------------------------------
 
 void CanvasView::rerenderDrawnPages() {

@@ -3039,9 +3039,7 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
       are back in ⋮.
 - [ ] A `.md` document at 1366: undo and redo at the start of the format bar, search, full screen, save before »;
       narrower: the inserts fold first, then the other commands go into », then the headings, then search and save.
-- [ ] ⋮ → View → Read: no tools, the pen scrolls (no ink), PDF text can be selected and copied; the reading pill at the
-      bottom fades after 2 s and comes back when scrolling; sideways and "Pages / Free" work (up and down: a fling
-      comes to rest on a page top with "Pages"); Esc and ✕ leave reading.
+- [ ] ⋮ → View → Read: full screen read only (since qt/ui-rework; see "The adaptive UI reworked" below).
 - [ ] Settings → Pen → Tools: "Classic tool bar" brings back the old bar, pen pill and tool square; "My toolbox" brings
       the toolbox back; "Back to the first tools…" resets it.
 - [ ] First start after the update: the toolbox's first pen has the pen's color and width of before; the eraser
@@ -3475,3 +3473,18 @@ Seen through the replay (⋮ → View → Replay the writing).
       lasso icon with two dots. Tap it, then tap it again while armed: the rectangle (icon and dot change), drag a
       rectangle: copied. Shift+L / Shift+S lift the entry when its shape matches. Long press → Edit… changes the shape.
       Folded into a stack on a short rail it still snips.
+- [ ] ⋮ → View → Read (Surface, 1920×1080 and a phone): full screen, no toolbox, a lock in the upper right corner; the
+      pen and a finger scroll and write nothing; PDF text can be selected with the pen and copied. Tap the right fifth
+      of the page with the pen, a finger and the mouse: the next page's top, a short arrow at the right edge; the left
+      fifth: the previous page. Tap several times quickly: page after page (no zoom from a double tap). A swipe that
+      starts at an edge scrolls. A link at the edge is followed instead.
+- [ ] Read only, then the lock: the toolbox floats again, still full screen. Ctrl+Alt+R on and off; in a window it
+      enters full screen read only. Esc leaves full screen and read only; the docked toolbox comes back.
+- [ ] Full screen → the toolbox's ⋯ → Read only; F5 while it is on: the edges go to the previous and next slide.
+      Presenting with the tools → Ctrl+Alt+R: the toolbox goes, the edges turn the slides; again: it comes back.
+- [ ] The classic tool bar (Settings → Pen → Tools): F11 → the tool square → "Read only": the square and the pen pill
+      go, the lock and the edges work the same.
+- [ ] Page layout menu (the view pill) while reading: "Stop on whole pages" is offered up and down too; with it a
+      fling comes to rest on a page top. "Scroll sideways": the edges still turn the pages.
+- [ ] A tiny window (split screen, under 360 px): the reader chrome is read only with the tap fields; the corner field
+      brings the tools back.
