@@ -25,6 +25,7 @@ namespace xqt {
 namespace {
 constexpr const char* ENABLED_KEY = "presenterView";
 constexpr const char* SWAP_KEY = "presenterSwapScreens";
+constexpr const char* NOTES_KEY = "presenterShowNotes";
 
 bool setting(Settings& s, const char* key, bool fallback) {
     bool on = fallback;
@@ -54,7 +55,13 @@ PresenterConsole::PresenterConsole(AppContext& app, QObject* parent): QObject(pa
     connect(&app, &AppContext::settingsChanged, this, [this] {
         Q_EMIT screensChanged();  // (swap screens)
         update();
+        if (showNotes() != notesShown) {
+            notesShown = showNotes();
+            Q_EMIT optionsChanged();
+            follow();  // (at once: the audience sees the space for notes now, or not any more)
+        }
     });
+    notesShown = showNotes();
     wasAvailable = available();
 }
 
@@ -75,6 +82,16 @@ bool PresenterConsole::swapScreens() const { return setting(*app.getSettings(), 
 void PresenterConsole::setSwapScreens(bool on) {
     if (on != swapScreens()) {
         app.getSettings()->getCustomElement("xournalQt").setBool(SWAP_KEY, on);
+        app.getSettings()->customSettingsChanged();
+        Q_EMIT app.settingsChanged();
+    }
+}
+
+bool PresenterConsole::showNotes() const { return setting(*app.getSettings(), NOTES_KEY, false); }
+
+void PresenterConsole::setShowNotes(bool on) {
+    if (on != showNotes()) {
+        app.getSettings()->getCustomElement("xournalQt").setBool(NOTES_KEY, on);
         app.getSettings()->customSettingsChanged();
         Q_EMIT app.settingsChanged();
     }
@@ -204,16 +221,27 @@ void PresenterConsole::follow() {
     }
     const size_t page = std::min(presented->currentPageNo(), count - 1);
     audience->setCurrentPageNo(page);
-    QRectF slide;
-    if (const PageRef p = presented->getSession().getDocument()->getPage(page)) {
-        slide = slideOf(*p);
-    }
-    audience->getViewController().fitPageRect(page, slide);
+    const QRectF region = frameOf(page);
+    audience->getViewController().fitPageRect(page, region);
     const bool moved = static_cast<int>(page) != shownPage;
     shownPage = static_cast<int>(page);
+    if (region != shown) {
+        shown = region;
+        Q_EMIT shownChanged();
+    }
     if (moved) {
         Q_EMIT pageChanged();
     }
+}
+
+QRectF PresenterConsole::frameOf(size_t page) const {
+    if (!presented) {
+        return {};
+    }
+    if (const PageRef p = presented->getSession().getDocument()->getPage(page)) {
+        return showNotes() ? QRectF(0, 0, p->getWidth(), p->getHeight()) : slideOf(*p);
+    }
+    return {};
 }
 
 int PresenterConsole::pageCount() const { return presented ? static_cast<int>(presented->pageCount()) : 0; }

@@ -80,6 +80,7 @@ protected:
         controller->setPresenting(false);
         settings()->set("presenterView", true);  // (the settings are shared by the tests of this run)
         settings()->set("presenterSwapScreens", false);
+        settings()->set("presenterShowNotes", false);
         settings()->set("toolbarMode", "classic");
         controller->shutdown();
         engine.reset();
@@ -295,6 +296,70 @@ TEST_F(PresenterView, theSlideOnTheAudiencesScreenTheConsoleOnTheLaptop) {
     EXPECT_EQ(presenterView()->mirror(), nullptr);
     EXPECT_FALSE(audienceWindow->isVisible());
     EXPECT_FALSE(panel->isVisible());
+}
+
+// "Notes for the audience too" (the console's switch, a setting): the audience sees the whole page with its space for
+// notes, at once while presenting; off again, only the slide. A page without space for notes looks the same either way.
+TEST_F(PresenterView, theAudienceSeesTheSpaceForNotesWhenAsked) {
+    if (!twoScreens) {
+        GTEST_SKIP() << "needs two screens (PresenterView.ui@2screens)";
+    }
+    const double slideWidth = session()->getDocument()->getPage(0)->getWidth();
+    const double slideHeight = session()->getDocument()->getPage(0)->getHeight();
+    ASSERT_EQ(xqt::notespace::apply(*session(), {0}, {0, 0, 0.5, 0.25, true}), 1u);
+    wait(100);
+    const double pageWidth = session()->getDocument()->getPage(0)->getWidth();
+    const double pageHeight = session()->getDocument()->getPage(0)->getHeight();
+    ASSERT_GT(pageWidth, slideWidth * 1.4);
+    ASSERT_GT(pageHeight, slideHeight * 1.2);
+    EXPECT_FALSE(console->showNotes()) << "off by default";
+
+    present();
+    ASSERT_TRUE(console->active());
+    auto* canvas = findIn(audienceWindow, "audienceCanvas");
+    ASSERT_NE(canvas, nullptr);
+    // What the audience's canvas shows of the page (page points): its size over the zoom, from the page's corner
+    auto fitted = [&] {
+        const double z = audience()->getViewController().zoom();
+        const QRectF page = audience()->pageViewRect(0);
+        return QRectF(-page.left() / z, -page.top() / z, canvas->width() / z, canvas->height() / z);
+    };
+    auto near = [](QRectF a, QRectF b) {
+        return std::abs(a.left() - b.left()) < 1 && std::abs(a.top() - b.top()) < 1 &&
+               std::abs(a.right() - b.right()) < 1 && std::abs(a.bottom() - b.bottom()) < 1;
+    };
+    const QRectF slide(0, 0, slideWidth, slideHeight);
+    const QRectF whole(0, 0, pageWidth, pageHeight);
+    EXPECT_EQ(console->shownRect(), slide);
+    EXPECT_TRUE(near(fitted(), slide)) << "only the slide";
+    EXPECT_TRUE(find("presenterNotesHint")->isVisible());
+
+    // On, from the console: at once the whole page
+    click(find("presenterShowNotes"));
+    EXPECT_TRUE(console->showNotes());
+    EXPECT_TRUE(settings()->get("presenterShowNotes").toBool()) << "remembered";
+    until([&] { return near(fitted(), whole); }, 2000);
+    EXPECT_EQ(console->shownRect(), whole);
+    EXPECT_TRUE(near(fitted(), whole)) << "the page with its space for notes";
+    EXPECT_NEAR(canvas->width() / canvas->height(), pageWidth / pageHeight, 0.01) << "the page's shape";
+    EXPECT_TRUE(audienceWindow->isVisible());
+
+    // A page without space for notes: the same either way
+    key(Qt::Key_Space);
+    settle();
+    until([&] { return audience()->currentPageNo() == 1; });
+    const QSizeF second(session()->getDocument()->getPage(1)->getWidth(), session()->getDocument()->getPage(1)->getHeight());
+    EXPECT_EQ(console->shownRect(), QRectF(QPointF(), second));
+    key(Qt::Key_Backspace);
+    settle();
+    until([&] { return audience()->currentPageNo() == 0; });
+
+    // Off again (the setting): only the slide
+    settings()->set("presenterShowNotes", false);
+    until([&] { return near(fitted(), slide); }, 2000);
+    EXPECT_EQ(console->shownRect(), slide);
+    EXPECT_TRUE(near(fitted(), slide));
+    EXPECT_FALSE(find("presenterShowNotes")->property("checked").toBool());
 }
 
 // The time since the start: it runs from the start of the presentation, pauses, goes on, goes back to 0

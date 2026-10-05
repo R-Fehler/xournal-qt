@@ -3164,6 +3164,14 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
 - [ ] A 4K projector, a long PDF lecture: going on page by page stays quick; memory (the canvas' share) stays within its
       setting.
 
+### Notes for the audience too, the audience following the presenter's view (qt/presenter-follow)
+
+- [ ] The slide with space for notes at its right and below, presenting with the projector: "Notes for the audience
+      too" in the console: at once the projector shows the whole page (slide and space for notes, as large as it fits,
+      black around it); write in the space for notes: the audience sees it as it is written. Off: only the slide again.
+      Settings → Pen → Presenting → "The audience sees the space for notes too" is the same switch and is remembered
+      after a restart. A page without space for notes looks the same either way.
+
 ## Find and replace (qt/md-find-replace)
 
 - [ ] A `.md` (and a `.txt`): Ctrl+H opens the search bar with a second row (replace with, Aa, ab, .*, Replace, All);

@@ -422,8 +422,9 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
         });
 
     // Presenting with two screens: the slide on the audience's screen, the presenter's console on the other
-    // (qt/docs/presenter-view.md; PresenterConsole reads these); swapped: the audience's screen is the primary one
-    for (const char* key: {"presenterView", "presenterSwapScreens"}) {
+    // (qt/docs/presenter-view.md; PresenterConsole reads these); swapped: the audience's screen is the primary one;
+    // the space for notes shown to the audience too (off by default)
+    for (const char* key: {"presenterView", "presenterSwapScreens", "presenterShowNotes"}) {
         const bool fallback = std::string_view(key) == "presenterView";
         add(key,
             [&s, key, fallback] {

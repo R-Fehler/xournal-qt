@@ -1,5 +1,5 @@
-// The audience's screen of the presenter view (qt/docs/presenter-view.md): only the slide, full screen on the other
-// screen, black around it. Its page follows the presenter's; strokes being written, the laser pointer and the curtain
+// The audience's screen of the presenter view (qt/docs/presenter-view.md): only the slide (or the whole page with its
+// space for notes, when the presenter shows the notes too), full screen on the other screen, black around it. Its page follows the presenter's; strokes being written, the laser pointer and the curtain
 // show here too (PresenterConsole, CanvasView::setMirror). It takes no input on the page; the keys that go from page
 // to page work here as in the console's window (a clicker sends them to whichever window has the focus).
 import QtQuick
@@ -19,11 +19,12 @@ Window {
     transientParent: null  // (a window of its own, on its own screen: not a dialog of the console)
 
     // Only the slide: the canvas has the slide's shape, as large as the screen allows, in the middle; the view shows
-    // exactly the slide in it (ViewController::fitPageRect), so its space for notes stays out of view
+    // exactly the slide in it (ViewController::fitPageRect), so its space for notes stays out of view. With the notes
+    // shown too, the canvas has the whole page's shape and shows all of it.
     DocumentCanvas {
         id: audienceCanvas
         objectName: "audienceCanvas"
-        readonly property size slide: audience.console.slideSize
+        readonly property size slide: audience.console.shownSize
         readonly property real scale: slide.width > 0 && slide.height > 0
                                       ? Math.min(audience.width / slide.width, audience.height / slide.height) : 1
         width: slide.width * scale

@@ -28,6 +28,7 @@
 #include <QMetaObject>
 #include <QObject>
 #include <QPointer>
+#include <QRectF>
 #include <QSizeF>
 #include <QString>
 #include <QTimer>
@@ -61,8 +62,14 @@ class PresenterConsole final: public QObject {
     /// The slide of the current page (the page without its space for notes), in points: the audience's window shows
     /// the slide at this shape
     Q_PROPERTY(QSizeF slideSize READ slideSize NOTIFY pageChanged)
-    /// The current page has space for notes (shown on the console only)
+    /// The current page has space for notes (shown on the console only, unless showNotes)
     Q_PROPERTY(bool pageHasNotes READ pageHasNotes NOTIFY pageChanged)
+    /// The setting "presenterShowNotes" (off by default): the audience sees the whole page with its space for notes
+    /// (and the ink written there), not only the slide
+    Q_PROPERTY(bool showNotes READ showNotes WRITE setShowNotes NOTIFY optionsChanged)
+    /// What the audience's window shows of the current page, in points (the slide, or the whole page with showNotes):
+    /// its canvas has this shape, as large as the screen allows
+    Q_PROPERTY(QSizeF shownSize READ shownSize NOTIFY shownChanged)
     /// The picture of the next page (a thumbnail's URL; "" after the last page) and its shape (height / width)
     Q_PROPERTY(QString nextPicture READ nextPicture NOTIFY pageChanged)
     Q_PROPERTY(qreal nextAspect READ nextAspect NOTIFY pageChanged)
@@ -91,6 +98,11 @@ public:
     int pageCount() const;
     QSizeF slideSize() const;
     bool pageHasNotes() const;
+    bool showNotes() const;
+    void setShowNotes(bool on);
+    /// The part of the current page the audience's view shows (page points)
+    QRectF shownRect() const { return shown; }
+    QSizeF shownSize() const { return shown.isEmpty() ? slideSize() : shown.size(); }
     QString nextPicture() const;
     qreal nextAspect() const;
 
@@ -120,18 +132,24 @@ Q_SIGNALS:
     void screensChanged();
     void pageChanged();
     void timerChanged();
+    void optionsChanged();
+    void shownChanged();
 
 private:
     void update();
     void tearDown();
-    /// The audience's view to the presenter's page, the slide filling it
+    /// The audience's view to the presenter's page, the slide (or the whole page with showNotes) filling it
     void follow();
+    /// What the audience sees of a page when it shows all of it: the slide, or the whole page with showNotes
+    QRectF frameOf(size_t page) const;
 
     AppContext& app;
     QPointer<CanvasView> presented;
     std::unique_ptr<CanvasView> audience;
     std::vector<QMetaObject::Connection> connections;
     int shownPage = 0;
+    QRectF shown;  ///< the part of the page the audience's view shows (points)
+    bool notesShown = false;  ///< showNotes as the audience's view was last fitted
     bool wasAvailable = false;
 
     bool running = false;
