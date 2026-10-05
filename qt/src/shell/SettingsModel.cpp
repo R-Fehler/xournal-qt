@@ -451,6 +451,18 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             });
     }
 
+    // The replay's hint was shown once (qt/docs/timeline.md, "The play bar"): not again
+    add("replayHintSeen",
+        [&s] {
+            bool seen = false;
+            s.getCustomElement("xournalQt").getBool("replayHintSeen", seen);
+            return QVariant(seen);
+        },
+        [&s](const QVariant& v) {
+            s.getCustomElement("xournalQt").setBool("replayHintSeen", v.toBool());
+            s.customSettingsChanged();
+        });
+
     // The toolbox or the classic tool bar (qt/docs/toolbox.md)
     add("toolbarMode", [&s] { return QVariant(toolbarMode(s)); },
         [&s](const QVariant& v) {

@@ -7,12 +7,14 @@
  * @license GNU GPLv2 or later
  */
 #include <QCoreApplication>
+#include <QGuiApplication>
 #include <QElapsedTimer>
 #include <QProcess>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QRegularExpression>
 #include <QTemporaryDir>
 #include <QTest>
 #include <functional>
@@ -35,8 +37,10 @@
 #include "shell/PageSketches.h"
 #include "shell/Previews.h"
 #include "shell/RecentFiles.h"
+#include "shell/SettingsModel.h"
 #include "shell/TabManager.h"
 #include "shell/Thumbnails.h"
+#include "shell/ToolboxModel.h"
 #include "undo/UndoRedoHandler.h"
 
 #include "AppController.h"
@@ -56,6 +60,8 @@ protected:
         xqt::timeline::setClock([this] { return clock; });
         controller = std::make_unique<AppController>();
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
+        settings()->set("replayHintSeen", true);  // (the hint's own test shows it)
+        settings()->set("touchProfile", "auto");
         engine = std::make_unique<QQmlApplicationEngine>();
         engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
         engine->addImageProvider("sketch", new xqt::SketchProvider);
@@ -73,6 +79,9 @@ protected:
         wait(100);
     }
     void TearDown() override {
+        settings()->resetLayoutChoices();
+        settings()->set("toolbarMode", "classic");  // (the other UI tests keep the classic bar)
+        settings()->set("touchProfile", "auto");
         controller->shutdown();
         engine.reset();
         controller.reset();
@@ -96,9 +105,49 @@ protected:
         }
         return done();
     }
+    /// By its objectName: among the window's objects, else in the tree of items (a Repeater's delegates)
     template <typename T = QObject>
     T* find(const char* name) const {
-        return window->findChild<T*>(name);
+        if (T* t = window->findChild<T*>(name)) {
+            return t;
+        }
+        if constexpr (std::is_base_of_v<QQuickItem, T>) {
+            std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* i) -> QQuickItem* {
+                if (i->objectName() == QLatin1String(name)) {
+                    return i;
+                }
+                for (QQuickItem* c: i->childItems()) {
+                    if (QQuickItem* f = walk(c)) {
+                        return f;
+                    }
+                }
+                return nullptr;
+            };
+            return qobject_cast<T*>(walk(window->contentItem()));
+        }
+        return nullptr;
+    }
+    /// Shown: visible all the way up, and of some size
+    static bool shown(QQuickItem* item) { return item && item->isVisible() && item->width() > 0 && item->height() > 0; }
+    static QRectF rectOf(QQuickItem* item) { return item->mapRectToScene(QRectF(0, 0, item->width(), item->height())); }
+    xqt::SettingsModel* settings() const { return qobject_cast<xqt::SettingsModel*>(controller->settingsModel()); }
+    void resize(int w, int h) {
+        window->resize(w, h);
+        until([&] { return window->width() == w && window->height() == h; });
+        wait(300);  // (the size class, then the plans settle)
+    }
+    /// What the classic tool bar shows (qt/docs/toolbox.md): its tools, the colors and widths, undo and redo in the
+    /// bar, the classic dock of a phone. None of it is there in the toolbox mode.
+    QStringList classicToolsShown() const {
+        QStringList out;
+        for (const char* name: {"penButton", "eraserButton", "shapeButton", "colorStrip", "widthStrip",
+                                 "toolUndoButton", "toolRedoButton", "dockColorSlot", "dockWidthSlot", "dockToolButton",
+                                 "quickToolSquare", "penPill"}) {
+            if (shown(find<QQuickItem>(name))) {
+                out << name;
+            }
+        }
+        return out;
     }
     QObject* timeline() const { return controller->property("timeline").value<QObject*>(); }
     QObject* audio() const { return controller->property("audio").value<QObject*>(); }
@@ -133,6 +182,16 @@ protected:
         return gz.readAllStandardOutput();
     }
     static void click(QObject* button) { QMetaObject::invokeMethod(button, "clicked"); }
+    /// Starts the replay (⋮ → View → Replay the writing) and waits for its bar
+    void startReplay() {
+        QMetaObject::invokeMethod(timeline(), "start");
+        ASSERT_TRUE(timeline()->property("active").toBool());
+        ASSERT_TRUE(until([&] { return shown(find<QQuickItem>("timelinePane")); }));
+        wait(200);  // (the layout settles)
+    }
+    /// The bar's controls a finger uses
+    static constexpr const char* CONTROLS[] = {"timelinePlay", "timelinePreviousMark", "timelineNextMark",
+                                               "timelineSpeed", "timelineClose"};
     qint64 position() const { return timeline()->property("position").toLongLong(); }
     int shown() const { return timeline()->property("shownCount").toInt(); }
     void seek(qint64 ms) { QMetaObject::invokeMethod(timeline(), "seek", Q_ARG(qint64, ms)); }
@@ -283,4 +342,224 @@ TEST_F(TimelineUiTest, theRecordingIsHeardWhereItIs) {
     EXPECT_LT(position(), 1500);
     EXPECT_TRUE(timeline()->property("playing").toBool());
     QMetaObject::invokeMethod(timeline(), "stop");
+}
+
+// The author's test of 0.6.0: "when replay is on the classic toolbar appears again". In the toolbox mode a replay hides
+// the tools and brings back no classic tool bar, neither while it replays nor after it: in a window, in full screen and
+// in a phone's chrome (its dock)
+TEST_F(TimelineUiTest, theToolboxModeShowsNoClassicToolBarDuringOrAfterAReplay) {
+    settings()->set("toolbarMode", "toolbox");
+    settings()->resetLayoutChoices();
+    controller->toolboxModel()->reset();
+    writeTwoStrokes();
+    auto* toolbox = find<QQuickItem>("toolbox");
+    ASSERT_TRUE(until([&] { return shown(toolbox); }));
+    ASSERT_EQ(classicToolsShown().join(", ").toStdString(), "") << "the toolbox mode, before";
+
+    auto replayAndLeave = [&](const char* where) {
+        QMetaObject::invokeMethod(find<QObject>("replayItem"), "triggered");
+        ASSERT_TRUE(until([&] { return timeline()->property("active").toBool(); })) << where;
+        wait(300);  // (the tool bar's plan follows after the bindings settle)
+        EXPECT_TRUE(shown(find<QQuickItem>("timelineBar"))) << where;
+        EXPECT_EQ(classicToolsShown().join(", ").toStdString(), "") << where << ": no classic tool bar while it replays";
+        EXPECT_FALSE(shown(toolbox)) << where << ": no tools while it replays";
+        for (const char* name: {"topTools", "bottomTools", "sideTools", "toolbarToggle", "toolbarShow", "phoneDock"}) {
+            EXPECT_FALSE(shown(find<QQuickItem>(name))) << where << ": " << name << " is put away while it replays";
+        }
+        click(find<QObject>("timelineClose"));
+        ASSERT_TRUE(until([&] { return !timeline()->property("active").toBool(); })) << where;
+        EXPECT_TRUE(until([&] { return shown(toolbox); })) << where << ": the toolbox again";
+        wait(300);
+        EXPECT_EQ(classicToolsShown().join(", ").toStdString(), "") << where << ": no classic tool bar after it";
+    };
+    replayAndLeave("a window");
+
+    window->setProperty("fullScreenMode", true);
+    until([&] { return window->size() == window->screen()->size(); });
+    wait(300);
+    ASSERT_TRUE(until([&] { return shown(toolbox) && toolbox->property("floating").toBool(); }));
+    replayAndLeave("full screen");
+    window->setProperty("fullScreenMode", false);
+    until([&] { return !toolbox->property("floating").toBool(); });
+
+    resize(412, 915);
+    ASSERT_TRUE(until([&] { return window->property("phoneChrome").toBool(); }));
+    ASSERT_TRUE(until([&] { return shown(toolbox) && toolbox->property("compact").toBool(); })) << "in the dock";
+    replayAndLeave("a phone");
+    EXPECT_TRUE(toolbox->property("compact").toBool()) << "the phone's dock again";
+}
+
+// The play bar on a desktop (the author's test of 0.6.0: "not easy to see and understand for the first time user"): a
+// title, the time as "12:04 · 3 Oct, 14:20", one row with the slider between the buttons, a visible track with its
+// elapsed part filled, the session marks; 40 px buttons with the mouse, 48 px with the touch profile
+TEST_F(TimelineUiTest, thePlayBarSaysWhatItIsAndItsControlsAreSizedForTheInput) {
+    writeTwoStrokes();
+    startReplay();
+    auto* bar = find<QQuickItem>("timelineBar");
+    auto* slider = find<QQuickItem>("timelineSlider");
+    EXPECT_FALSE(bar->property("twoRows").toBool()) << "one row on a desktop";
+    EXPECT_TRUE(shown(find<QQuickItem>("timelineTitle")));
+    auto* time = find<QQuickItem>("timelineTime");
+    ASSERT_TRUE(shown(time));
+    seek(2500);
+    wait(50);
+    const QString text = time->property("text").toString();
+    EXPECT_TRUE(QRegularExpression(QStringLiteral("^0:02 · \\d{1,2} \\S+, \\d\\d:\\d\\d$")).match(text).hasMatch())
+            << text.toStdString() << ": the bar's time and the clock time of the moment";
+    EXPECT_FALSE(time->property("truncated").toBool());
+    // The track and its elapsed part
+    auto* track = find<QQuickItem>("timelineTrack");
+    auto* elapsed = find<QQuickItem>("timelineElapsed");
+    ASSERT_TRUE(shown(track));
+    ASSERT_TRUE(shown(elapsed));
+    EXPECT_NEAR(elapsed->width() / track->width(), 2500.0 / timeline()->property("duration").toDouble(), 0.03);
+    EXPECT_TRUE(shown(find<QQuickItem>("timelineMark"))) << "the session's mark";
+    // The mouse: 40 px; the slider between the buttons, in the same row
+    for (const char* name: CONTROLS) {
+        auto* c = find<QQuickItem>(name);
+        ASSERT_TRUE(shown(c)) << name;
+        EXPECT_GE(c->width(), 40) << name;
+        EXPECT_GE(c->height(), 40) << name;
+        EXPECT_NEAR(rectOf(c).center().y(), rectOf(slider).center().y(), 6) << name << ": one row";
+    }
+    EXPECT_GT(rectOf(slider).width(), 300);
+    // The touch profile: 48 px, a larger handle
+    settings()->set("touchProfile", "on");
+    ASSERT_TRUE(until([&] { return find<QQuickItem>("timelineClose")->width() >= 48; }));
+    wait(100);  // (the rows are laid out again)
+    for (const char* name: CONTROLS) {
+        auto* c = find<QQuickItem>(name);
+        EXPECT_GE(c->width(), 48) << name;
+        EXPECT_GE(c->height(), 48) << name;
+    }
+    EXPECT_GE(slider->height(), 48) << "the slider takes the finger in the row's whole height";
+    EXPECT_GE(find<QQuickItem>("timelineHandle")->width(), 24);
+    // Inside the page, above its bottom
+    auto* canvas = find<QQuickItem>("canvas");
+    EXPECT_LE(rectOf(bar).bottom(), rectOf(canvas).bottom() - 8);
+    EXPECT_GE(rectOf(bar).left(), rectOf(canvas).left());
+    EXPECT_LE(rectOf(bar).right(), rectOf(canvas).right());
+}
+
+// The first replay explains itself, once: a card above the bar (what replay is, how it is used), dismissed with
+// "Got it"; remembered in the settings; the title shows it again
+TEST_F(TimelineUiTest, theFirstReplayShowsAHintOnce) {
+    settings()->set("replayHintSeen", false);
+    writeTwoStrokes();
+    startReplay();
+    auto* hint = find<QQuickItem>("timelineHint");
+    ASSERT_NE(hint, nullptr);
+    EXPECT_TRUE(shown(hint)) << "the first replay";
+    EXPECT_TRUE(settings()->get("replayHintSeen").toBool()) << "remembered";
+    EXPECT_LE(rectOf(hint).bottom(), rectOf(find<QQuickItem>("timelinePane")).top()) << "above the bar";
+    click(find<QObject>("timelineHintClose"));
+    EXPECT_TRUE(until([&] { return !shown(hint); }));
+    click(find<QObject>("timelineClose"));
+    ASSERT_TRUE(until([&] { return !timeline()->property("active").toBool(); }));
+    startReplay();
+    wait(100);
+    EXPECT_FALSE(shown(hint)) << "once";
+    click(find<QObject>("timelineTitle"));
+    EXPECT_TRUE(until([&] { return shown(hint); })) << "the title shows it again";
+    click(find<QObject>("timelineClose"));
+    ASSERT_TRUE(until([&] { return !timeline()->property("active").toBool(); }));
+    startReplay();
+    wait(100);
+    EXPECT_FALSE(shown(hint));
+    QMetaObject::invokeMethod(timeline(), "stop");
+}
+
+namespace {
+/// On a phone's screen (TimelinePhone.ui@phone: an off-screen screen of 412 × 915, so full screen stays a phone), with
+/// the touch profile and a navigation bar at the bottom
+class TimelinePhoneTest: public TimelineUiTest {
+protected:
+    void SetUp() override {
+        if (QGuiApplication::primaryScreen()->size() != QSize(412, 915)) {
+            GTEST_SKIP() << "needs a phone's screen (TimelinePhone.ui@phone)";
+        }
+        TimelineUiTest::SetUp();
+        settings()->set("touchProfile", "on");
+        resize(412, 915);
+        ASSERT_TRUE(until([&] { return window->property("phoneChrome").toBool(); }));
+        find<QObject>("safeInsets")->setProperty("bottom", 40);
+    }
+    void TearDown() override {
+        if (controller) {
+            TimelineUiTest::TearDown();
+        }
+    }
+    /// The bar on a phone: two rows (the slider on its own), touch-sized, above the navigation bar, off the edges
+    void checkTheBar(const char* where) {
+        auto* bar = find<QQuickItem>("timelineBar");
+        auto* pane = find<QQuickItem>("timelinePane");
+        auto* slider = find<QQuickItem>("timelineSlider");
+        EXPECT_TRUE(bar->property("twoRows").toBool()) << where;
+        for (const char* name: CONTROLS) {
+            auto* c = find<QQuickItem>(name);
+            ASSERT_TRUE(shown(c)) << where << " " << name;
+            EXPECT_GE(c->width(), 48) << where << " " << name;
+            EXPECT_GE(c->height(), 48) << where << " " << name;
+            EXPECT_GE(rectOf(c).top(), rectOf(slider).bottom() - 1) << where << " " << name << ": the slider's own row";
+            EXPECT_LE(rectOf(c).right(), rectOf(pane).right()) << where << " " << name;
+            EXPECT_LE(rectOf(c).bottom(), rectOf(pane).bottom()) << where << " " << name << ": inside the bar";
+        }
+        EXPECT_GE(slider->height(), 48) << where;
+        EXPECT_GE(rectOf(slider).top(), rectOf(pane).top()) << where << ": inside the bar";
+        EXPECT_GT(slider->width(), 250) << where;
+        EXPECT_FALSE(find<QQuickItem>("timelineTime")->property("truncated").toBool())
+                << where << ": " << find<QQuickItem>("timelineTime")->property("text").toString().toStdString();
+        const double safeBottom = window->property("safeBottom").toDouble();
+        EXPECT_LE(rectOf(pane).bottom(), window->height() - safeBottom - 8) << where << ": above the navigation bar";
+        EXPECT_GE(rectOf(pane).left(), 12) << where << ": off the edge (the back gesture)";
+        EXPECT_LE(rectOf(pane).right(), window->width() - 12) << where;
+        EXPECT_FALSE(shown(find<QQuickItem>("phoneDock"))) << where << ": the dock is put away";
+        EXPECT_FALSE(shown(find<QQuickItem>("viewPill"))) << where;
+    }
+    /// A finger drags the handle: the replay's time moves, the page does not scroll
+    void dragTheHandle(const char* where) {
+        static QPointingDevice* finger = QTest::createTouchDevice();
+        auto* canvas = find<QQuickItem>("canvas");
+        auto* handle = find<QQuickItem>("timelineHandle");
+        seek(0);
+        wait(50);
+        const double x0 = canvas->property("contentX").toDouble();
+        const double y0 = canvas->property("contentY").toDouble();
+        const QPoint from = rectOf(handle).center().toPoint();
+        QTest::touchEvent(window, finger).press(1, from);
+        for (int k = 1; k <= 10; ++k) {
+            wait(16);
+            QTest::touchEvent(window, finger).move(1, from + QPoint(16 * k, -3 * k));
+        }
+        wait(16);
+        EXPECT_TRUE(shown(find<QQuickItem>("timelineBubble"))) << where << ": the time above the finger";
+        QTest::touchEvent(window, finger).release(1, from + QPoint(160, -30));
+        wait(100);
+        EXPECT_GT(position(), 0) << where << ": the replay's time moved";
+        EXPECT_NEAR(canvas->property("contentX").toDouble(), x0, 0.5) << where << ": the page did not scroll";
+        EXPECT_NEAR(canvas->property("contentY").toDouble(), y0, 0.5) << where << ": the page did not scroll";
+        EXPECT_FALSE(shown(find<QQuickItem>("timelineBubble"))) << where;
+    }
+};
+}  // namespace
+
+TEST_F(TimelinePhoneTest, onAPhoneThePlayBarIsTwoTouchSizedRowsAboveTheNavigationBar) {
+    writeTwoStrokes();
+    // (a longer replay: the handle has room to go)
+    clock = T0 + 60000;
+    drag({100, 350}, {300, 350});
+    startReplay();
+    checkTheBar("the phone's chrome");
+    dragTheHandle("the phone's chrome");
+    // Full screen on the phone
+    QMetaObject::invokeMethod(timeline(), "stop");
+    window->setProperty("fullScreenMode", true);
+    until([&] { return window->size() == window->screen()->size(); });
+    wait(300);
+    ASSERT_TRUE(window->property("phoneLayout").toBool());
+    startReplay();
+    checkTheBar("full screen");
+    dragTheHandle("full screen");
+    QMetaObject::invokeMethod(timeline(), "stop");
+    window->setProperty("fullScreenMode", false);
 }

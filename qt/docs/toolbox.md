@@ -71,6 +71,7 @@ with 16 px to spare (no flicker at an edge).
 | phone portrait | the dock at the bottom: undo, redo, the first tools that fit (the one in hand always among them), **My tools** (a sheet: every tool, "Add a tool", the other tools and commands; record audio under Insert), the page number |
 | phone held sideways | the same as a rail at the right |
 | a text document (`.md`) | no toolbox (no ink): undo and redo lead its format bar |
+| replaying the writing | no toolbox, and no command bar, its tab or phone dock either: the play bar only ([timeline.md](timeline.md)) |
 
 In the toolbox mode the tool bar at the top is a **command bar**: open, save, image, stickers, add a page, search, full
 screen, present, settings (New is the tab strip's "+"; recording is a fixed tool of the rail), and entries of ⋮ as

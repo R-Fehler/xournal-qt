@@ -808,9 +808,11 @@ search is fast at once. Built with the recommendations (the author: "add the zip
 ### Replay, from the author's test of 0.6.0 (2026-10-05; `qt/replay-polish`)
 "The replay scrollbar is hard to use on Android, or generally not easy to see and understand for the first time
 user. Also when replay is on the classic toolbar appears again."
-- [ ] Bug: in the toolbox mode, starting a replay shows the classic tool bar.
-- [ ] The play bar easy to see and to use, with a finger too: touch-sized controls and handle, clear contrast,
-  above the system bars (safe areas), what it is said at first use, the time and the session marks readable.
+- [x] Bug: in the toolbox mode, starting a replay shows the classic tool bar. (The tool bar, its tab and the phone's
+  dock are put away while it replays, in both modes. Left: checking on the device.)
+- [x] The play bar easy to see and to use, with a finger too: touch-sized controls and handle, clear contrast,
+  above the system bars (safe areas), what it is said at first use, the time and the session marks readable. (Left:
+  the back gesture over the slider on Android, by hand; gesture exclusion rects if it is a problem.)
 
 ### The rail on an unfolded phone (the author, 2026-10-05, on 0.6.0; `qt/rail-fill`)
 "On an unfolded / wide android phone the rail is just showing one item although there is plenty space on the rail.
