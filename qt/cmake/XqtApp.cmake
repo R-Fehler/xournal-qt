@@ -140,6 +140,7 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppStickers.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTodos.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTags.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppAdopt.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppEncryption.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppToolbox.cpp
 

@@ -3576,3 +3576,25 @@ Seen through the replay (⋮ → View → Replay the writing).
       and Share last (each is in the bar or in ⋮, never both). The classic tool bar has none of these buttons.
 - [ ] Read in the command bar: full screen read only. Replay: the timeline bar. Milestone: the message dialog. Tags:
       the document's tags.
+
+## Annotations of other apps made editable (qt/adopt-annotations)
+
+- [ ] GoodNotes (iPad): a PDF with pen, highlighter, a text box, a shape and an image; export it as PDF, "Editable",
+      annotations included; open it here: "This PDF has N annotations from GoodNotes" (or "another app"). Make
+      editable: the ink is in a layer "From GoodNotes" in the right places and colours, the highlighter multiplies over
+      the text, nothing is shown twice. Note what stayed page content (text boxes, images: expected) and how the
+      pressure strokes look (expected: an even width). Export the same page "Flattened": nothing is offered.
+- [ ] Drawboard PDF (Surface): pen with pressure, highlighter pen, a text highlight, a text box, a rectangle, an arrow,
+      a note; save; open here and make editable. Compare with Drawboard side by side (widths, colours, positions, the
+      arrow head, the note's text). Then Ctrl+S (PDF with notes) and open the file in Drawboard again: our annotations
+      in place of its own, nothing twice.
+- [ ] Preview (Mac) and Markup (iPhone/iPad): a sketch, a highlight with a note, a text box, a shape, a signature;
+      open here: "from Preview"; the signature is a picture at its place; the note a sticky note.
+- [ ] A PDF with turned pages (Rotate 90/270) and a cropped one marked up in Acrobat or Xodo: the converted marks lie
+      where they were.
+- [ ] "Not now", close and open the file again: not asked again; ⋮ → Document → "Adopt annotations from other
+      apps (N)…" asks and does it; Ctrl+Z brings the original annotations back (shown by the PDF again), Ctrl+Y
+      takes them again. The Annotations panel shows "N annotations from … in the PDF · Make editable" while there
+      are some.
+- [ ] A `.xopp` of such a PDF (Xournal++ files mode): make editable, save: `.name.pages.pdf` appears beside it; the
+      PDF itself is unchanged (still has its annotations in another app).

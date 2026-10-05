@@ -771,8 +771,10 @@ especially interested in importing annotations that come from the GoodNotes PDF 
   textured paper) for `.xopp` and PDFs, with a printing warning for dark pages.
 - [ ] `qt/page-files`: A6 insert pages from a PDF file, A7 extract or split selected pages into a new document or
   PDF, A8 export pages as PNG.
-- [ ] `qt/adopt-annotations`: B8, annotations made in other apps become editable ink, text and highlights (consent,
+- [x] `qt/adopt-annotations`: B8, annotations made in other apps become editable ink, text and highlights (consent,
   Annotations panel); GoodNotes exports first, Drawboard PDF second, Preview and the standard annotation types too.
+  (The standard types, consent once per file, ⋮ → Document, the panel's offer, a layer "From <app>", undo; left: real
+  GoodNotes / Drawboard / Preview exports to confirm the assumptions and any app-specific handling they need.)
 
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message

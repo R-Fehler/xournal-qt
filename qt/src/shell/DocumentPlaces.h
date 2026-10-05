@@ -53,6 +53,10 @@ void setRead(const fs::path& document, qint64 when = -1);
 /// its content: kept here, never written into the file.
 bool favourite(const fs::path& document);
 void setFavourite(const fs::path& document, bool on);
+/// How many annotations of other apps the document had when making them editable was offered (0: never offered;
+/// qt/docs/adopt-annotations.md): offered again only when it has more.
+int adoptionOffered(const fs::path& document);
+void setAdoptionOffered(const fs::path& document, int count);
 /// Files or folders renamed or moved (old, new): their entries follow.
 void moved(const std::vector<std::pair<fs::path, fs::path>>& moves);
 

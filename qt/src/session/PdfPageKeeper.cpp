@@ -359,6 +359,32 @@ fs::path PdfPageKeeper::annotatedPdf() const {
     return MergedPdf::inCache(bg) ? madeFrom : bg;
 }
 
+auto PdfPageKeeper::held() const -> Held {
+    Held h;
+    {
+        Document* doc = session.getDocument();
+        std::shared_lock lock(*doc);
+        h.pdf = doc->getPdfFilepath();
+    }
+    h.madeFrom = madeFrom;
+    h.grownFrom = grownFrom;
+    return h;
+}
+
+bool PdfPageKeeper::takeBackground(const Held& h, std::string& error) {
+    if (!switchTo(h.pdf, error)) {
+        return false;
+    }
+    madeFrom = h.madeFrom;
+    grownFrom = h.grownFrom;
+    if (MergedPdf::inCache(h.pdf)) {
+        createdInCache.insert(h.pdf);
+    }
+    knownPath.clear();  // (its kind is read from its mark when asked)
+    knownStamp.clear();
+    return true;
+}
+
 void PdfPageKeeper::discardCached() {
     for (const fs::path& f: createdInCache) {
         std::error_code ec;

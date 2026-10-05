@@ -177,6 +177,13 @@ class AppController: public QObject {
     /// Its PDF allows printing / copying its text (one opened without its owner password may not).
     Q_PROPERTY(bool printAllowed READ printAllowed NOTIFY titleChanged)
     Q_PROPERTY(bool copyAllowed READ copyAllowed NOTIFY titleChanged)
+    // --- annotations of other apps made editable (AppAdopt.cpp; qt/docs/adopt-annotations.md)
+    /// How many annotations of other apps the current document's PDF has that can be made editable (0: none, or not
+    /// looked at yet), and the app that made them (empty: not known).
+    Q_PROPERTY(int adoptableCount READ adoptableCount NOTIFY adoptableChanged)
+    Q_PROPERTY(QString adoptableApp READ adoptableApp NOTIFY adoptableChanged)
+    /// Making them editable runs (on a worker).
+    Q_PROPERTY(bool adopting READ adopting NOTIFY adoptableChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY undoRedoChanged)
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY undoRedoChanged)
     Q_PROPERTY(QString tool READ tool NOTIFY toolChanged)
@@ -1203,6 +1210,15 @@ public:
     Q_INVOKABLE void jumpToPage(int index);
     /// The same, showing this part of the page (page points): an item of the Annotations panel.
     Q_INVOKABLE void jumpToPlace(int index, const QRectF& rect);
+    // --- annotations of other apps made editable (AppAdopt.cpp; qt/docs/adopt-annotations.md) ---
+    /// Make the annotations of other apps in the current document editable (converted on a worker, then taken by the
+    /// document as one undo step); the snackbar says how many.
+    Q_INVOKABLE void adoptAnnotations();
+    /// "Not now" to the offer: it is not made again for this file until the file has more of them.
+    Q_INVOKABLE void declineAdoption();
+    int adoptableCount() const;
+    QString adoptableApp() const;
+    bool adopting() const { return adoptRunning; }
     // --- the annotations as Markdown (qt/docs/annotations-md.md) ---
     /// Where "Export as Markdown" writes without asking: "<name>.annotations.md" next to the document, with Xournal++
     /// files. Empty: ask with a save dialog (PDF files mode writes nothing next to files), or the document was never
@@ -1652,6 +1668,9 @@ Q_SIGNALS:
     void archiveExportsChanged();
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
+    void adoptableChanged();
+    /// A document was opened whose PDF has annotations of other apps that can be made editable (asked once per file)
+    void annotationsToAdopt(int count, const QString& app, const QString& file);
     /// A web picture's "Load image" was tapped: the window shows the address (and what networking means, when
     /// `access` is "ask") before loadWebImage fetches it.
     void webImageRequested(const QString& url, const QString& host, const QString& access);
@@ -1883,6 +1902,20 @@ private:
     std::vector<QMetaObject::Connection> currentConnections;
     /// The view of the current tab (another tab: select more ends in the one before)
     QPointer<xqt::CanvasView> currentCanvas;
+
+    // --- annotations of other apps (AppAdopt.cpp) ---
+    struct AdoptScan {
+        fs::path pdf;  ///< the background PDF looked at
+        int count = 0;
+        QString app;
+        bool scanning = false;
+        bool offer = false;  ///< ask about them when the scan is done
+    };
+    std::map<quint64, AdoptScan> adoptScans;  ///< by session serial (forgotten when the tab goes)
+    bool adoptRunning = false;
+    /// Look at the session's background PDF for annotations of other apps (on a worker), unless it was looked at;
+    /// `offer`: ask about them (annotationsToAdopt) if not asked before for this file.
+    void scanAdoptable(xqt::DocumentSession* s, bool offer);
 
     // --- text files (AppTextFiles.cpp) ---
     /// Open a Markdown or text file as a text document (editable when it can be). nullptr: not such a file.

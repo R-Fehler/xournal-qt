@@ -138,10 +138,45 @@ Item {
         }
     }
 
+    // Marks of other apps in the PDF (qt/docs/adopt-annotations.md): they can be made editable
+    Rectangle {
+        id: adoptBanner
+        objectName: "adoptBanner"
+        anchors.top: bar.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.margins: visible ? 6 : 0
+        visible: app.adoptableCount > 0
+        height: visible ? adoptRow.implicitHeight + 12 : 0
+        radius: 8
+        color: Material.theme === Material.Dark ? "#2d333b" : "#eef3fd"
+        RowLayout {
+            id: adoptRow
+            anchors.fill: parent
+            anchors.leftMargin: 10
+            anchors.rightMargin: 4
+            spacing: 4
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                font.pixelSize: 12
+                text: app.adoptableApp !== ""
+                      ? qsTr("%n annotation(s) from %1 in the PDF", "", app.adoptableCount).arg(app.adoptableApp)
+                      : qsTr("%n annotation(s) of another app in the PDF", "", app.adoptableCount)
+            }
+            Button {
+                objectName: "adoptBannerButton"
+                flat: true
+                enabled: !app.adopting
+                text: qsTr("Make editable")
+                onClicked: app.adoptAnnotations()
+            }
+        }
+    }
     ListView {
         id: list
         objectName: "annotationList"
-        anchors.top: bar.bottom
+        anchors.top: adoptBanner.bottom
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right

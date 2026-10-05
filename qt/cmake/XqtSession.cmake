@@ -103,6 +103,9 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentLink.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/StickyNote.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/StickyNote.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/AdoptAnnotations.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/AdoptAnnotations.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentAdopt.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/StickerFile.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/StickerFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TemplateFile.h
@@ -236,6 +239,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TextFileTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentLinkTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/StickyNoteTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/AdoptAnnotationsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/StickerFileTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TemplateFileTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/GroupsTest.cpp

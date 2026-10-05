@@ -129,6 +129,18 @@ public:
     static std::function<bool(int)> stopSaveAt;
     /// Page numbers of the background PDF stay valid while this does not change (a save dropped PDF pages).
     quint64 numbering() const { return numberingNo; }
+    /// What the keeper knows of the background PDF besides the file (annotations adopted from other apps change the
+    /// file for a copy with the same pages, AdoptAnnotations.h; undo puts this back).
+    struct Held {
+        fs::path pdf;       ///< the background PDF
+        fs::path madeFrom;  ///< (see the members)
+        fs::path grownFrom;
+    };
+    Held held() const;
+    /// The document takes `pdf` as its background PDF: the same pages under the same numbers as the one it has (a copy
+    /// without some annotations, or the one it had before). A file in the merged PDFs' cache is removed with the
+    /// keeper (as the merged PDFs it writes there). False if it does not load (`error`; nothing changed).
+    bool takeBackground(const Held& held, std::string& error);
     /// Remove the merged PDFs this keeper wrote into the cache (the document is closed without being saved; also
     /// done when the keeper goes).
     void discardCached();

@@ -12,12 +12,15 @@ document's annotations by page, top to bottom:
 | Kind | What is listed |
 | --- | --- |
 | Highlight | The highlighter's strokes over PDF text, with the text under them. Strokes drawn one after another in one color on the same or the next lines are one highlight. Highlight, underline and strike through made from selected PDF text are highlighter strokes too. |
-| Highlight in the PDF | The PDF's own markup annotations (highlight, underline, squiggly, strike out) made in other apps, with the text under them and their note. The annotations our hybrid PDF writes for its own layers (`xopp:` names) are not listed twice. |
+| Highlight in the PDF | The PDF's own markup annotations (highlight, underline, squiggly, strike out) made in other apps, with the text under them and their note. The annotations our hybrid PDF writes for its own layers (`xopp:` names) are not listed twice. Made editable ([adopt-annotations.md](adopt-annotations.md)) they are highlighter strokes, listed as highlights. |
 | Text / Markdown | Text boxes and Markdown boxes with their text. The panel shows a Markdown box formatted. |
 | Handwriting | Every piece of ink, as a small picture of it on its page: the pen's strokes (drawn by hand, with the ruler, as shapes or through the stroke recogniser: all pen strokes), on any visible layer, and highlighter strokes over no text (neither PDF text nor a text box). A stroke joins the piece written just before it when it is within 18 pt (about 6 mm); pieces that overlap are one; a dot or short mark (under 4 pt) joins the nearest piece within 36 pt, else it is listed by itself. Ink on PDF text (an underline, a circle, a strike through, a word written over the slide) is listed with that text: `on “Kalman gain”`. Not listed: the whiteout eraser's strokes (they hide ink), hidden layers. |
 | Link | A link marker: a Markdown box that is only `[title](target)` ([links.md](links.md)). |
 | Note | Sticky notes: another block builds them and plugs in with `annotations::setNoteSource` (a function called for each page read, under the document's read lock). The filter shows "Notes" only when there are any. |
 
+- While the PDF has annotations of other apps that can be made editable (ink, highlights, text boxes, shapes, notes,
+  stamps), a line at the top says how many and from which app, with **Make editable**
+  ([adopt-annotations.md](adopt-annotations.md)).
 - A tap scrolls to the item (its page, with the item in view) and remembers the place for Back, like other jumps.
 - The filter button chooses the kinds shown; the counter says "N of M" while the filter hides some.
 - **It follows the document.** Page changes are collected and read 600 ms after the writing pauses, on one worker
