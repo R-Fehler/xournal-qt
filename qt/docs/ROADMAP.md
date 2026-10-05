@@ -835,6 +835,16 @@
   (`ToolboxModel`, JSON in the settings); the classic bar stays for one release (Settings → Pen → Tools)
   ([toolbox.md](toolbox.md)).
 
+- **The presenter view on a second screen, `qt/presenter-view` (2026-10-05).** Presenting (F5) with two screens: the
+  audience's screen shows only the slide, full screen, never its space for notes; the window presented from becomes
+  the console on the other screen: the page with its space for notes and the floating toolbox, a panel with the clock,
+  the time since the start (pause, go on, back to 0), the page number, the next page smaller, swap screens and end.
+  The audience's screen is a second view of the document (one session, `CanvasMemory`'s one limit) that follows the
+  presenter's page, fitted to the slide (`ViewController::fitPageRect`), and shows strokes as they are written, the
+  laser pointer and the curtain (`CanvasView::setMirror`). The page keys work in both windows. The audience's screen
+  is the one that is not primary (a setting and a button swap them); with one screen nothing changes. Tests with two
+  off-screen screens (`PresenterView.ui@2screens`) ([presenter-view.md](presenter-view.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

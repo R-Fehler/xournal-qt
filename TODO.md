@@ -598,9 +598,10 @@ The other ideas (A3–A9, A15, B1–B8) stay in that file to decide later.
 - [ ] `qt/tags` (A13): `#tag` in typed text, Markdown and sticky notes, XMP/Info keywords in PDFs; indexed per folder;
   a Tags chip in the library like Favourites (list of tags with counts, filter), `tag:name` in the fuzzy syntax,
   shown on cards. After `qt/todos` (both extend the index's notes pack).
-- [ ] `qt/presenter-view` (A14): while presenting on a second screen, the laptop shows the current slide with its
+- [x] `qt/presenter-view` (A14): while presenting on a second screen, the laptop shows the current slide with its
   note space, the next slide, a timer and the page number; the audience screen shows only the slide. After
-  `qt/toolbox` (presenting chrome).
+  `qt/toolbox` (presenting chrome). Built 2026-10-05 ([presenter-view.md](qt/docs/presenter-view.md)); left: the
+  device checks (window placement on X11, Wayland and Windows, a clicker, unplugging the projector).
 
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
