@@ -19,12 +19,12 @@
 var PROMOTED = ["favourite", "bookmark", "print", "share"]
 /// The steps of the ladder after 1, in order (names of buttons, or a form of the colors or widths)
 var LADDER = PROMOTED.concat([
+    "record",  // (recording, qt/docs/audio.md: before the widths, which a full HD bar shows all five of)
     "widths:single",
     "colors:recent",
     // (Open externally after Search, the stickers and recording: for a file shown here, a text file or an image, it
     // is how the file is edited)
-    "new", "open", "save", "settings", "present", "fullScreen", "editAsNotes", "search", "sticker", "record",
-    "openExternally",
+    "new", "open", "save", "settings", "present", "fullScreen", "editAsNotes", "search", "sticker", "openExternally",
     "addPage", "image", "emoji", "pdfText", "geometry", "shape",
     "colors:single",
     "sticky", "write", "text", "touchDrawing", "select", "hand"
