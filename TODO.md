@@ -800,6 +800,13 @@ search is fast at once. Built with the recommendations (the author: "add the zip
 - [ ] Receiving: "Open in library…" unpacks a shared zip into a library folder (Inbox by default), name clashes as
   " (2)"; also when a zip is opened with the app.
 
+### Replay, from the author's test of 0.6.0 (2026-10-05; `qt/replay-polish`)
+"The replay scrollbar is hard to use on Android, or generally not easy to see and understand for the first time
+user. Also when replay is on the classic toolbar appears again."
+- [ ] Bug: in the toolbox mode, starting a replay shows the classic tool bar.
+- [ ] The play bar easy to see and to use, with a finger too: touch-sized controls and handle, clear contrast,
+  above the system bars (safe areas), what it is said at first use, the time and the session marks readable.
+
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
    when a save falls back to a full write, and a check in MuPDF and pdf.js).
