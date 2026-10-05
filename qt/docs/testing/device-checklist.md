@@ -2843,3 +2843,15 @@ offered).
 - [ ] Move pages in the app, Ctrl+S: the attachment's page numbers follow (check in Okular's attachments panel).
 - [ ] Export for Xournal++: open the exported `.xopp` in Xournal++ (its audio folder not set): the play tool plays the
       strokes' recordings from `name.audio/`.
+- [ ] The microphone button is in the tool bar after the image button (wide window), in "more tools" when the bar is
+      short, and in the phone's "All tools" sheet under Insert. A tap: the red pill at the top with the time running
+      and the level moving when speaking; write with the pen: the stroke is tied (the play tool plays it later).
+- [ ] Mute the microphone (or pick a wrong one) and record: after 5 s "No sound: is the microphone on?"; speak: it goes.
+- [ ] Pause in the pill: the time stops, the dot blinks; go on: the recording has no gap for the pause.
+- [ ] Another tab while recording: the pill says "for <document>", ink there is not tied; close the recording's tab:
+      the recording ends with a message.
+- [ ] Hold the button: "Play tool": tap a stroke written 10 s into the recording: playing starts about 8 s in (the 2 s
+      lead-in; Settings → Documents → Audio recordings changes it); the slider has a tick per stroke; ±5 s; pause; ×.
+- [ ] "Recordings of this document…": pages, length, ink count; play; remove (the ink stays; Ctrl+Z brings it back).
+- [ ] With a pen on the Surface and the iPad: the record button and the pills are easy to hit; writing while
+      recording feels the same as without (no lag from the encoder).

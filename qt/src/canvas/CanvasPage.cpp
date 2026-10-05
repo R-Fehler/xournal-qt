@@ -259,6 +259,8 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
         leaveNote();  // (the text editor keeps the note's layer for its text)
     } else if (h->getToolType() == TOOL_SELECT_PDF_TEXT_LINEAR || h->getToolType() == TOOL_SELECT_PDF_TEXT_RECT) {
         view.pdfTextPress(*this, x, y);
+    } else if (h->getToolType() == TOOL_PLAY_OBJECT) {
+        view.playAt(*this, x, y);  // (upstream's PlayObject: the ink's recording, qt/docs/audio.md)
     } else if (h->getToolType() == TOOL_SELECT_OBJECT) {
         const bool aggregate = add && (view.getSelection() || together);
         selectObjectAt(x, y, false, aggregate);

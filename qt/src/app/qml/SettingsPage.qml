@@ -818,6 +818,30 @@ Popup {
                         }
                     }
                     Hint { text: qsTr("%F is the date (2026-09-19), %H-%M the time.") }
+                    // Audio recordings (qt/docs/audio.md)
+                    SectionTitle { visible: app.audio.available; text: qsTr("Audio recordings") }
+                    RowLayout {
+                        visible: app.audio.available
+                        Layout.fillWidth: true
+                        Label {
+                            text: qsTr("Playing from ink starts this much earlier")
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                        }
+                        SpinBox {
+                            objectName: "audioLeadIn"
+                            from: 0
+                            to: 10
+                            value: Math.round(app.audio.leadInMs / 1000)
+                            textFromValue: function(v) { return qsTr("%1 s").arg(v) }
+                            valueFromText: function(t) { return parseInt(t) }
+                            onValueModified: app.audio.leadInMs = value * 1000
+                        }
+                    }
+                    Hint {
+                        visible: app.audio.available
+                        text: qsTr("Recordings are kept in the app's audio folder, as Xournal++ keeps them; a PDF with notes carries its own.")
+                    }
                     Item { Layout.preferredHeight: 16 }
                 }
             }

@@ -133,3 +133,33 @@ recording (bytes unchanged, `audio/ogg`, the marker), `qpdf --check`, the clean 
 PDF with the app's file gone; Ctrl+S after moving pages renames the attachment keeping its stream, and removing the
 recording writes the file in full without it; an archive lists it in `/AF` as `/Supplement`; Export for Xournal++
 copies it and writes absolute names; Save as `.xopp` puts it into the app's audio folder.
+
+## In the app
+
+`qt/src/app/AudioControl.*` (the QML object `app.audio`), `RecordButton.qml`, `RecordingPill.qml`,
+`PlaybackPill.qml`, `RecordingsDialog.qml`. The QML is self-contained so `qt/toolbox` can place the button wherever
+its toolbox wants it.
+
+- **Where the button is**: the tool bar's "insert" group, after the image button (`ToolBarPlan.js`: group `insert`,
+  in the overflow ladder just before "Add a page"), and in the phone's "All tools" sheet under Insert
+  (`PhoneToolSheet.qml`). Offered only when recording is available (a build with Qt Multimedia, or
+  `XQT_FAKE_AUDIO=1`) and not in a text file. Ctrl+Shift+R starts and stops.
+- **Recording**: a tap starts recording for the document of this tab; the recording is a voice memo of the page shown
+  then, and ink written meanwhile is tied to it. The red pill at the top of the canvas shows the time, the level,
+  pause/resume and stop, and "No sound: is the microphone on?" when the first 5 s were silent. **The recording belongs
+  to its tab**: in another tab the pill says whose it is ("for lecture.xopp"), ink there is not tied to it, and closing
+  its tab ends it. One recording per window. Starting a recording stops what plays (the speaker would be recorded).
+- **Playing**: held (or right-clicked), the button offers the **play tool** (upstream's `TOOL_PLAY_OBJECT`: a tap on
+  ink with a recording plays it from its moment) and **Recordings of this document…** (each with its pages, length and
+  amount of ink; play it, or remove it from the document: its ink stays, without the recording; undoable). Playing from
+  ink starts **2 s earlier** (Settings → Documents → Audio recordings, 0–10 s), so the words before the ink are heard.
+  The playback pill: 5 s back and forward, play/pause, a slider with a tick at every moment ink was written, the time,
+  ×. Playing stops when another tab comes in front.
+- Not built yet: upstream's fading of ink without a recording while the play tool is chosen
+  (`PageRaster::rasterMarkAudioStrokes`), a speaker chip on pages and thumbnails, "Play from here" in the selection pill,
+  a field for Xournal++'s audio folder in the settings (`audio::setExtraFolders` is there).
+
+Tests: `AudioUiTest` (label `ui`, fake devices with their timers): record from the tool bar's button, the pill, a
+stroke tied to the recording and the page's memo, stop, the play tool on the stroke, the playback pill's pause and ×;
+the list of recordings from the button's menu, removing one and undo; a recording belongs to its tab (another tab's
+ink is not tied, closing the tab ends it).

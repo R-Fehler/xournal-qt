@@ -28,7 +28,7 @@ BottomSheet {
         { name: "select", title: qsTr("Select"), cells: variantCells("select") },
         { name: "shape", title: qsTr("Shapes"), cells: variantCells("shape") },
         { name: "geometry", title: qsTr("Setsquare, compass and curtain"), cells: variantCells("geometry") },
-        { name: "insert", title: qsTr("Insert"), cells: [{ slot: "image" }, { slot: "addPage" }] },
+        { name: "insert", title: qsTr("Insert"), cells: [{ slot: "image" }, { slot: "record" }, { slot: "addPage" }] },
         { name: "document", title: qsTr("Document and view"),
           cells: [{ slot: "search" }, { slot: "present" }, { slot: "fullScreen" }, { slot: "settings" }, { slot: "new" },
                   { slot: "open" }, { slot: "save" }, { slot: "editAsNotes" }, { slot: "openExternally" }] }

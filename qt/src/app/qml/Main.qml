@@ -804,13 +804,14 @@ ApplicationWindow {
             undo: undoTool, redo: redoTool,
             pen: penTool, eraser: eraserTool, hand: handTool, touchDrawing: touchDrawingTool, select: selectTool,
             text: textTool, write: writeButton, sticky: stickyTool, shape: shapeTool, geometry: geometryTool,
-            pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, addPage: addPageTool, search: searchTool,
+            pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, record: recordTool, addPage: addPageTool,
+            search: searchTool,
             fullScreen: fullScreenTool, present: presentTool, settings: settingsTool, new: newTool, open: openTool,
             save: saveTool, editAsNotes: editAsNotesTool, openExternally: openExternallyTool
         })
         readonly property var order: ["undo", "redo",
                                       "pen", "eraser", "hand", "touchDrawing", "select", "text", "write", "sticky",
-                                      "shape", "geometry", "pdfText", "emoji", "image", "addPage", "search",
+                                      "shape", "geometry", "pdfText", "emoji", "image", "record", "addPage", "search",
                                       "fullScreen", "present", "settings", "new", "open", "save", "editAsNotes",
                                       "openExternally"]
         /// What the plan depends on: a change lays the bar out again (once, after the bindings settle)
@@ -1542,6 +1543,8 @@ ApplicationWindow {
                 }
             }
         }
+        // Recording (qt/docs/audio.md): self-contained, the tool bar only places it
+        RecordButton { id: recordTool; parent: toolBank }
         IconButton {
             id: addPageTool
             objectName: "addPageButton"
@@ -3884,6 +3887,29 @@ ApplicationWindow {
         z: 57
     }
     // The curtain: its handles, taking it away (below the setsquare's pill when that is out too)
+    // A recording runs, a recording plays (qt/docs/audio.md): at the top of the canvas, in the middle
+    RecordingPill {
+        id: recordingPill
+        anchors.top: canvas.top
+        anchors.horizontalCenter: canvas.horizontalCenter
+        anchors.topMargin: 12 + win.canvasControlsTop - canvas.y
+        z: 57
+    }
+    PlaybackPill {
+        anchors.top: recordingPill.visible ? recordingPill.bottom : canvas.top
+        anchors.horizontalCenter: canvas.horizontalCenter
+        anchors.topMargin: recordingPill.visible ? 8 : 12 + win.canvasControlsTop - canvas.y
+        z: 57
+    }
+    Connections {
+        target: app.audio
+        function onMessage(text) { snackbar.show(text, false) }
+    }
+    Shortcut {
+        sequence: "Ctrl+Shift+R"
+        enabled: app.audio.available && !app.homeVisible
+        onActivated: app.audio.toggleRecording()
+    }
     CurtainPill {
         anchors.top: geometryPill.visible ? geometryPill.bottom : canvas.top
         anchors.right: canvas.right

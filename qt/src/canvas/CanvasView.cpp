@@ -74,6 +74,7 @@
 #include "session/DocumentLink.h"
 #include "session/DocumentSession.h"
 #include "session/StickyNote.h"
+#include "audio/DocumentAudio.h"
 
 namespace xqt {
 
@@ -1650,6 +1651,19 @@ QRectF CanvasView::pdfSelectionEnds() const {
                           pageRect.y() + std::min(first.y1, first.y2) * zoom),
                   QPointF(pageRect.x() + std::max(last.x1, last.x2) * zoom,
                           pageRect.y() + std::max(last.y1, last.y2) * zoom));
+}
+
+bool CanvasView::playAt(CanvasPage& page, double x, double y) {
+    std::optional<audio::Hit> hit;
+    {
+        std::shared_lock lock(*session.getDocument());
+        hit = audio::hitAt(*page.getPage(), x, y);
+    }
+    if (!hit) {
+        return false;
+    }
+    Q_EMIT playRequested(QString::fromStdString(hit->name), static_cast<qint64>(hit->ts));
+    return true;
 }
 
 void CanvasView::pdfTextPress(CanvasPage& page, double x, double y) {
