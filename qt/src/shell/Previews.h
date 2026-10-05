@@ -17,9 +17,12 @@
  */
 #pragma once
 
+#include <functional>
+#include <optional>
 #include <utility>
 #include <vector>
 
+#include <QCborMap>
 #include <QImage>
 #include <QQuickAsyncImageProvider>
 #include <QString>
@@ -53,6 +56,15 @@ public:
     /// Remove the stored preview of a document, every version of it (in its folder's pack, written by the next flush,
     /// and outside the library): it was protected with a password (qt/docs/hybrid-pdf.md, "Encrypted PDFs").
     static void forget(const DocumentItem& item);
+    /// The stored preview of a document of the library as it is now: its pack entry ("stamp", "png"; the stamp
+    /// with the title page), else nothing (none, or of another version). Reads its folder's pack if needed. Any thread.
+    static std::optional<QCborMap> storedEntry(const DocumentItem& item);
+    /// What a stored preview shows, for these files as `stampOf` gives their stamps (sharing as a zip).
+    static QString stampWith(const DocumentItem& item, const std::function<QString(const fs::path&)>& stampOf,
+                             int titlePage);
+    /// Files of a document got other stamps with the same content (LibraryIndex adopted its entry: copied, unzipped):
+    /// its stored preview follows, if it showed them (`changes`: file stamp before, now).
+    static void adopt(const DocumentItem& item, const std::vector<std::pair<QString, QString>>& changes);
     /// Files and folders renamed or moved by the app (old, new): their previews follow.
     static void moved(const std::vector<std::pair<fs::path, fs::path>>& moves);
     /// Write the changed packs now (else a few seconds after the last change). Returns whether all could be written.

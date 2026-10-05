@@ -79,6 +79,12 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryArchive.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryArchive.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryShare.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryShare.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryUnzip.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryUnzip.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ZipFile.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ZipFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryMigration.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryMigration.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ShortcutsModel.h
@@ -142,6 +148,7 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTags.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppAdopt.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppEncryption.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppShareZip.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppToolbox.cpp
 
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AudioControl.h
@@ -209,6 +216,8 @@ set(XQT_QML_FILES
     src/app/qml/Snackbar.qml
     src/app/qml/SelectionMark.qml
     src/app/qml/HomeView.qml
+    src/app/qml/ShareZipDialog.qml
+    src/app/qml/OpenZipDialog.qml
     src/app/qml/FolderChooser.qml
     src/app/qml/DocumentCard.qml
     src/app/qml/BookmarksView.qml
@@ -418,6 +427,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFilesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryArchiveTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryShareTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFilterTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryKindsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFuzzyTest.cpp

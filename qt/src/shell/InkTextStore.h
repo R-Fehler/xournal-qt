@@ -86,6 +86,9 @@ public:
     void erase(const fs::path& file);
     /// A document was renamed or moved by the app: its entry follows.
     void moved(const fs::path& from, const fs::path& to);
+    /// A document's file has another stamp but the same content (copied, unzipped: LibraryIndex adopts its entry):
+    /// its entry read from the file stamped `from` now holds for `to`.
+    void restamp(const fs::path& file, const QString& from, const QString& to);
     /// Write the changed packs now (and wait for it).
     void flush();
     /// Forget what is not written, write nothing any more (the cache is being removed).

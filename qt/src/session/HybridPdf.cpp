@@ -4185,13 +4185,73 @@ void forgetHistory(QPDF& q) {
     }
 }
 
-bool compact(const fs::path& pdf, std::string& error, const fs::path& to) {
+bool compact(const fs::path& pdf, std::string& error, const fs::path& to) { return compact(pdf, error, to, false); }
+
+namespace {
+/// Remove the recordings a PDF with notes carries: their attachments (also from an archive's /AF) and /Audio.
+void dropRecordings(QPDF& q) {
+    QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
+    const auto list = audioListOf(marker);
+    if (list.empty()) {
+        return;
+    }
+    QPDFEmbeddedFileDocumentHelper efdh(q);
+    std::set<std::string> names;
+    for (const auto& [name, source]: list) {
+        efdh.removeEmbeddedFile(name);
+        names.insert(name);
+    }
+    if (QPDFObjectHandle af = q.getRoot().getKey("/AF"); af.isArray()) {
+        for (int i = af.getArrayNItems() - 1; i >= 0; --i) {
+            QPDFObjectHandle spec = af.getArrayItem(i);
+            for (const char* key: {"/UF", "/F"}) {
+                if (QPDFObjectHandle n = spec.isDictionary() ? spec.getKey(key) : QPDFObjectHandle::newNull();
+                    n.isString() && names.count(n.getUTF8Value())) {
+                    af.eraseItem(i);
+                    break;
+                }
+            }
+        }
+    }
+    marker.removeKey("/Audio");
+}
+}  // namespace
+
+uint64_t recordingBytes(const fs::path& pdf) {
+    try {
+        if (!isHybrid(pdf) || PdfEncryption::probe(pdf).isProtected()) {
+            return 0;
+        }
+        QPDF q;
+        q.setSuppressWarnings(true);
+        q.processFile(pdf.string().c_str());
+        const auto list = audioListOf(q.getRoot().getKey(MARKER));
+        QPDFEmbeddedFileDocumentHelper efdh(q);
+        uint64_t bytes = 0;
+        for (const auto& [name, source]: list) {
+            if (auto spec = efdh.getEmbeddedFile(name)) {
+                QPDFObjectHandle stream = spec->getEmbeddedFileStream();
+                const size_t size = QPDFEFStreamObjectHelper(stream).getSize();
+                QPDFObjectHandle length = stream.isStream() ? stream.getDict().getKey("/Length") : stream;
+                bytes += size > 0 ? size : (length.isInteger() ? length.getUIntValue() : 0);
+            }
+        }
+        return bytes;
+    } catch (const std::exception&) {
+        return 0;
+    }
+}
+
+bool compact(const fs::path& pdf, std::string& error, const fs::path& to, bool withoutRecordings) {
     try {
         const bool archive = isArchive(pdf);
         QPDF q;
         q.setSuppressWarnings(true);
         PdfEncryption::openQpdf(q, pdf);
         forgetHistory(q);
+        if (withoutRecordings) {
+            dropRecordings(q);
+        }
         ArchiveWrite how;
         how.on = archive;
         writePdfTo(q, to.empty() ? pdf : to, how);  // (a protected PDF stays encrypted, the same password)

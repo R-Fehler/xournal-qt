@@ -8,7 +8,9 @@
 
 #include <QCborArray>
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QElapsedTimer>
+#include <QFile>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
 
@@ -24,6 +26,8 @@
 #include "shell/InkTextStore.h"
 #include "shell/Library.h"
 #include "shell/LibraryInkJob.h"
+#include "shell/LibraryShare.h"
+#include "shell/LibraryUnzip.h"
 
 using namespace xqt;
 
@@ -271,5 +275,80 @@ TEST_F(InkLibraryTest, theLibrarysHandwritingIsReadOnMainsPower) {
     QCoreApplication::processEvents();
     EXPECT_FALSE(job.running());
     EXPECT_EQ(fake->calls(), 6);
+    LibraryInkJob::setPowerSource({});
+}
+
+TEST_F(InkLibraryTest, aSharedZipUnpackedWithOtherTimesIsNotReadAgain) {
+    // (qt/docs/library.md, "Sharing a folder or the library": the readings go along, and survive any unzip)
+    fs::create_directories(root / "Lib");
+    const fs::path a = writeNotes(tmp, "Lib/a.xopp", 2, 2, 1);
+    const fs::path b = writeNotes(tmp, "Lib/b.xopp", 1, 1, 7);
+    auto fake = std::make_shared<hwr::FakeRecognizer>();
+    fake->setScript([](const hwr::LineInput&, size_t word) -> hwr::FakeRecognizer::Readings {
+        return {{word == 2 ? QStringLiteral("turbine") : QStringLiteral("w%1").arg(word), 1.0f}};
+    });
+    hwr::InkRecognitionService service;
+    service.setRecognizer(fake);
+    LibraryInkJob::setPowerSource([] { return true; });
+    fs::path zip;
+    {
+        LibraryIndex index(root / "Lib");
+        index.update({itemOf(a), itemOf(b)});
+        index.waitForDone();
+        LibraryInkJob job(service);
+        job.setIndex(&index);
+        job.setEnabled(true);
+        job.check();
+        ASSERT_TRUE(waitFor([&] { return !job.running() && index.inkOf(a) && index.inkOf(b); }));
+        ASSERT_EQ(fake->calls(), 5);
+        job.setIndex(nullptr);
+        index.update({itemOf(a), itemOf(b)});  // (the content hashes, after the documents)
+        index.waitForDone();
+        zip = root / "Lib.zip";
+        std::string error;
+        const auto plan = LibraryShare::plan(root / "Lib", root / "Lib", "Lib", zip, {}, &index, error);
+        ASSERT_TRUE(error.empty()) << error;
+        std::atomic<bool> cancel{false};
+        const auto s = LibraryShare::run(plan, cancel);
+        ASSERT_TRUE(s.error.empty()) << s.error;
+        EXPECT_EQ(s.readings, 2);
+    }
+    // Unpacked by another app, which gives the files other times (Explorer: local time, two seconds)
+    const fs::path recv = root / "Recv";
+    std::atomic<bool> cancel{false};
+    const auto r = LibraryUnzip::unpack(zip, recv / "Inbox", CacheLocation(recv), {}, cancel);
+    ASSERT_TRUE(r.ok) << r.error;
+    for (const fs::path& f: {r.folder / "a.xopp", r.folder / "b.xopp"}) {
+        QFile file(QString::fromStdString(f.string()));
+        ASSERT_TRUE(file.open(QIODevice::ReadWrite));
+        file.setFileTime(QDateTime::currentDateTimeUtc().addSecs(-3600 * 5 + 1), QFileDevice::FileModificationTime);
+    }
+    const int before = fake->calls();
+    LibraryIndex received(recv);
+    received.update({itemOf(r.folder / "a.xopp"), itemOf(r.folder / "b.xopp")});
+    received.waitForDone();
+    EXPECT_EQ(received.entriesAdopted(), 2);
+    EXPECT_EQ(received.documentsRead(), 0);
+    EXPECT_TRUE(received.inkOf(r.folder / "a.xopp"));
+    EXPECT_EQ(received.search(QStringLiteral("turbine")).size(), 2u);
+    LibraryInkJob job(service);
+    job.setIndex(&received);
+    job.setEnabled(true);
+    job.check();
+    QCoreApplication::processEvents();
+    EXPECT_FALSE(job.running()) << "nothing to read";
+    EXPECT_EQ(fake->calls(), before) << "no line is recognised again";
+    // Another content (same name): read again
+    {
+        QTemporaryDir other;
+        const fs::path changed = writeNotes(other, "a.xopp", 1, 1, 30);
+        fs::copy_file(changed, r.folder / "a.xopp", fs::copy_options::overwrite_existing);
+    }
+    received.update({itemOf(r.folder / "a.xopp"), itemOf(r.folder / "b.xopp")});
+    received.waitForDone();
+    EXPECT_EQ(received.documentsRead(), 1);
+    job.check();
+    ASSERT_TRUE(waitFor([&] { return !job.running() && received.inkOf(r.folder / "a.xopp"); }));
+    EXPECT_GT(fake->calls(), before) << "its new handwriting is read";
     LibraryInkJob::setPowerSource({});
 }

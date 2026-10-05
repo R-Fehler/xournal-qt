@@ -539,6 +539,55 @@ void PreviewCache::forget(const DocumentItem& item) {
     changed(s);
 }
 
+std::optional<QCborMap> PreviewCache::storedEntry(const DocumentItem& item) {
+    if (!inLibrary(item) || !ensureLoaded(item.folder(), true)) {
+        return std::nullopt;
+    }
+    const QString stamp = stampOf(item);
+    const QByteArray png = lookup(item, stamp);
+    if (png.isEmpty()) {
+        return std::nullopt;
+    }
+    return QCborMap{{QStringLiteral("stamp"), stamp}, {QStringLiteral("png"), png}};
+}
+
+QString PreviewCache::stampWith(const DocumentItem& item, const std::function<QString(const fs::path&)>& stampOf,
+                                int titlePage) {
+    return documentStamp(item, stampOf) + QStringLiteral("title=") + QString::number(titlePage);
+}
+
+void PreviewCache::adopt(const DocumentItem& item, const std::vector<std::pair<QString, QString>>& changes) {
+    if (changes.empty() || !inLibrary(item) || !ensureLoaded(item.folder(), true)) {
+        return;
+    }
+    const QString now = stampOf(item);
+    auto& s = state();
+    std::lock_guard lock(s.mtx);
+    auto f = s.folders.find(item.folder());
+    if (f == s.folders.end() || s.discarded) {
+        return;
+    }
+    auto it = f->second.entries.find(QString::fromStdString(item.main().filename().string()));
+    if (it == f->second.entries.end() || it->second.stamp == now) {
+        return;
+    }
+    // The stamp is "<file stamp>;<file stamp>;…title=N": each file's stamp as a whole
+    QStringList parts = it->second.stamp.split(QLatin1Char(';'));
+    for (QString& part: parts) {
+        for (const auto& [was, is]: changes) {
+            if (part == was) {
+                part = is;
+                break;
+            }
+        }
+    }
+    if (parts.join(QLatin1Char(';')) == now) {
+        it->second.stamp = now;
+        f->second.stampsDirty = true;
+        changed(s);
+    }
+}
+
 void PreviewCache::moved(const std::vector<std::pair<fs::path, fs::path>>& moves) {
     auto& s = state();
     for (const auto& [from, to]: moves) {

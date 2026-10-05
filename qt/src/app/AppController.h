@@ -61,6 +61,8 @@ class LibraryInkJob;
 class HandwritingSettings;
 class CanvasView;
 class LibraryArchive;
+class LibraryShare;
+class LibraryUnzip;
 class LibraryBookmarksModel;
 class LibraryTodosModel;
 class LibraryTagsModel;
@@ -1177,6 +1179,32 @@ public:
     /// `into` is inside the library.
     Q_INVOKABLE bool exportLibraryArchive(const QUrl& into, bool currentFolderOnly);
     Q_INVOKABLE void cancelLibraryArchive();
+    // --- Sharing a folder or the library as a zip (qt/docs/library.md, "Sharing a folder or the library") ---
+    /// "Share folder…" / "Share library…" (LibraryShare: running, done, total, current, survey, passwordAvailable;
+    /// finished(summary)).
+    Q_PROPERTY(QObject* libraryShare READ libraryShareObject CONSTANT)
+    QObject* libraryShareObject() const;
+    /// Look at what the folder (relative to the library; "": the whole library) holds, for the dialog (survey).
+    Q_INVOKABLE void surveyShare(const QString& folder);
+    /// Share the folder (relative; "": the whole library) as a zip in the background. `options`: "format" ("app",
+    /// "xournal", "pdf"), "readings", "pdfText", "history", "recordings" (bools), "password". False (and a message)
+    /// if it cannot start.
+    Q_INVOKABLE bool shareAsZip(const QString& folder, const QVariantMap& options);
+    Q_INVOKABLE void cancelShareZip();
+    /// The written zip to the system (the file manager on the desktop), or a copy of it into `folder` (" (2)" when the
+    /// name is taken there). False (and a message) if that did not work.
+    Q_INVOKABLE bool handOverZip(const QString& zip);
+    Q_INVOKABLE bool saveZipCopy(const QString& zip, const QUrl& folder);
+    /// "Open in library…" for a zip (opened with the app, from the file dialog, dropped): zipOpened(path) asks where.
+    /// (LibraryUnzip: running, done, total, current; finished(result).)
+    Q_PROPERTY(QObject* libraryUnzip READ libraryUnzipObject CONSTANT)
+    QObject* libraryUnzipObject() const;
+    /// What a zip holds: "ok", "error", "files", "bytes", "encrypted", "supported", "share", "name".
+    Q_INVOKABLE QVariantMap inspectZip(const QString& zip) const;
+    /// Unpack it into the library's folder `folder` (relative; made if needed: "Inbox" by default) in the background;
+    /// the library then shows the new folder. False (and a message) if it cannot start.
+    Q_INVOKABLE bool unzipIntoLibrary(const QString& zip, const QString& folder, const QString& password);
+    Q_INVOKABLE void cancelUnzip();
     /// After hybridEditedElsewhere: take the other app's version of the changed annotations (or keep ours).
     Q_INVOKABLE bool importHybridChanges();
     Q_INVOKABLE void keepHybridData();
@@ -1722,6 +1750,11 @@ Q_SIGNALS:
     void sharedForXournal(const QStringList& files, const QString& text);
     /// An archive PDF was written: whether it is PDF/A-3b, else why not; what was changed in its source PDF.
     void archiveExported(const QString& path, bool pdfa, const QStringList& notPdfA, const QStringList& adjusted);
+    /// A zip was opened (the app started with it, the file dialog, a drop): the window asks where in the library it
+    /// goes ("Open in library…").
+    void zipOpened(const QString& path);
+    /// A zip was unpacked into the library: its new folder (relative), shown now.
+    void zipUnpacked(const QString& folder, int files, const QStringList& skipped);
     void archiveExportsChanged();
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
@@ -1781,6 +1814,8 @@ private:
     fs::path lastShareFolder;
     int archiveRunning = 0;
     std::unique_ptr<xqt::LibraryArchive> libraryArchiveTask;
+    std::unique_ptr<xqt::LibraryShare> libraryShareTask;
+    std::unique_ptr<xqt::LibraryUnzip> libraryUnzipTask;
     std::unique_ptr<xqt::LibraryMove> libraryMoveTask;
     /// The library shown when the move began, let go while it copies (its index would write into it)
     fs::path libraryBeforeMove;

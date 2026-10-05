@@ -3398,10 +3398,13 @@ ApplicationWindow {
         currentFolder: app.openFolder()
         nameFilters: [qsTr("Documents (*.xopp *.xoj *.pdf *.md *.png *.jpg *.jpeg *.webp *.heic *.heif)"),
                       qsTr("Xournal++ files (*.xopp *.xoj)"), qsTr("PDF files (*.pdf)"), qsTr("Markdown files (*.md)"),
-                      qsTr("Images (*.png *.jpg *.jpeg *.webp *.heic *.heif)"), qsTr("All files (*)")]
+                      qsTr("Images (*.png *.jpg *.jpeg *.webp *.heic *.heif)"),
+                      qsTr("Shared folders (*.zip)"), qsTr("All files (*)")]
         fileMode: FileDialog.OpenFiles
         onAccepted: app.openUrls(selectedFiles)
     }
+    // A zip opened (here, with the app, dropped): "Open in library…" (OpenZipDialog.qml)
+    OpenZipDialog { objectName: "openZip" }
     FileDialog {
         id: saveDialog
         objectName: "saveDialog"
