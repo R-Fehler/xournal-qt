@@ -61,6 +61,8 @@ public:
                            const LineStyle& lineStyle, fs::path filename, size_t timestamp) = 0;
     /// xournal-qt: the stroke's fill color (qt/pen-styles); after addStroke
     virtual void setStrokeFillColor(Color /*color*/) {}
+    /// xournal-qt: the group of the element begun last (stroke, text, image, teximage, link; qt/groups)
+    virtual void setElementGroup(uint32_t /*group*/) {}
     virtual void setStrokePoints(std::vector<Point> pointVector, bool hasPressure) = 0;
     virtual void finalizeStroke() = 0;
     virtual void addText(std::string font, double size, xoj::util::Matrix matrix, Color color,

@@ -136,6 +136,13 @@ void XmlParser::parserStartElement(GMarkupParseContext* context, const gchar* el
     if (parsingTable[tagType].start) {
         const auto attributes = XmlParserHelper::AttributeMap{attributeNames, attributeValues};
         (self->*parsingTable[tagType].start)(attributes);
+        // xournal-qt: the group of an element (qt/groups)
+        if (tagType == TagType::STROKE || tagType == TagType::TEXT || tagType == TagType::IMAGE ||
+            tagType == TagType::TEXIMAGE || tagType == TagType::LINK) {
+            if (const auto g = XmlParserHelper::getAttrib<uint32_t>(xoj::xml_attrs::GROUP_STR, attributes)) {
+                self->builder.setElementGroup(*g);
+            }
+        }
     }
 
     self->hierarchy.push_back(tagType);

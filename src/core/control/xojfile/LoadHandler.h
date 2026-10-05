@@ -103,6 +103,7 @@ private:
     void addStroke(StrokeTool tool, Color color, double width, int fill, StrokeCapStyle capStyle,
                    const LineStyle& lineStyle, fs::path filename, size_t timestamp) override;
     void setStrokeFillColor(Color color) override;  // xournal-qt
+    void setElementGroup(uint32_t group) override;  // xournal-qt
     void setStrokePoints(std::vector<Point> pointVector, bool hasPressure) override;
     void finalizeStroke() override;
     void addText(std::string font, double size, xoj::util::Matrix matrix, Color color, std::optional<double> wrap,

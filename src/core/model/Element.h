@@ -12,6 +12,7 @@
 #pragma once
 
 #include <cstddef>  // for ptrdiff_t
+#include <cstdint>  // for uint32_t (xournal-qt: group)
 #include <memory>   // for unique_ptr
 #include <vector>   // for vector
 
@@ -67,6 +68,11 @@ public:
     void setColor(Color color);
     Color getColor() const;
 
+    /// xournal-qt: the group the element belongs to in its layer (qt/groups; 0: none). Copied with the element, saved
+    /// as the attribute `xqt-group`; not in serialize() (upstream's clipboard data stays upstream's).
+    uint32_t getGroup() const { return group; }
+    void setGroup(uint32_t g) { group = g; }
+
     const xoj::util::Rectangle<double>& getSnappedBounds() const;
 
     const xoj::util::Rectangle<double>& getBoundingBox() const;
@@ -106,6 +112,8 @@ private:
 
     /// The color in RGB format
     Color color{0U};
+
+    uint32_t group = 0;  ///< xournal-qt: see getGroup()
 };
 
 namespace xoj {

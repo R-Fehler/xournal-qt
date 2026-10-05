@@ -184,6 +184,13 @@ static inline bool isMatrixPositiveScaling(const RectangularElement& e) {
     return nearEnough(m.yx, 0.) && nearEnough(m.xy, 0.) && m.xx > 0.;
 }
 
+// xournal-qt: the group of an element (qt/groups), only when it is in one
+static void writeGroup(XmlNode* node, const Element* e) {
+    if (e->getGroup() != 0) {
+        node->setAttrib(xoj::xml_attrs::GROUP_STR, static_cast<size_t>(e->getGroup()));
+    }
+}
+
 void SaveHandler::visitLayer(XmlNode* page, const Layer* l) {
     auto* layer = new XmlNode(TAG_NAMES[TagType::LAYER]);
     page->addChild(layer);
@@ -196,6 +203,7 @@ void SaveHandler::visitLayer(XmlNode* page, const Layer* l) {
             auto* s = dynamic_cast<const Stroke*>(e);
             auto* stroke = new XmlPointNode(TAG_NAMES[TagType::STROKE]);
             layer->addChild(stroke);
+            writeGroup(stroke, e);  // xournal-qt
             visitStroke(stroke, s);
         } else if (e->getType() == ELEMENT_TEXT) {
             const Text* t = dynamic_cast<const Text*>(e);
@@ -205,6 +213,7 @@ void SaveHandler::visitLayer(XmlNode* page, const Layer* l) {
             }
             auto* text = new XmlTextNode(TAG_NAMES[TagType::TEXT], t->getText());
             layer->addChild(text);
+            writeGroup(text, e);  // xournal-qt
 
             const XojFont& f = t->getFont();
 
@@ -235,6 +244,7 @@ void SaveHandler::visitLayer(XmlNode* page, const Layer* l) {
             auto* i = dynamic_cast<const Image*>(e);
             auto* image = new XmlImageNode(TAG_NAMES[TagType::IMAGE]);
             layer->addChild(image);
+            writeGroup(image, e);  // xournal-qt
 
             image->setImage(i->getImage());
             if (isMatrixPositiveScaling(*i)) {
@@ -254,6 +264,7 @@ void SaveHandler::visitLayer(XmlNode* page, const Layer* l) {
             auto* i = dynamic_cast<const TexImage*>(e);
             auto* image = new XmlTexNode(TAG_NAMES[TagType::TEXIMAGE], std::string(i->getBinaryData()));
             layer->addChild(image);
+            writeGroup(image, e);  // xournal-qt
 
             image->setAttrib(xoj::xml_attrs::TEXT_STR, i->getText().c_str());
             if (isMatrixPositiveScaling(*i)) {
@@ -273,6 +284,7 @@ void SaveHandler::visitLayer(XmlNode* page, const Layer* l) {
             auto* l = dynamic_cast<const Link*>(e);
             auto* link = new XmlTextNode(TAG_NAMES[TagType::LINK], l->getText());
             layer->addChild(link);
+            writeGroup(link, e);  // xournal-qt
 
             const XojFont& f = l->getFont();
 

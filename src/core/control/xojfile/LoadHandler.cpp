@@ -123,6 +123,17 @@ void LoadHandler::setStrokeFillColor(Color color) {
     this->stroke->setFillColor(color);
 }
 
+// xournal-qt: the group of the element begun last (qt/groups)
+void LoadHandler::setElementGroup(uint32_t group) {
+    for (Element* e: {static_cast<Element*>(stroke.get()), static_cast<Element*>(text.get()),
+                      static_cast<Element*>(image.get()), static_cast<Element*>(teximage.get()),
+                      static_cast<Element*>(link.get())}) {
+        if (e) {
+            e->setGroup(group);
+        }
+    }
+}
+
 void LoadHandler::finalizePage() {
     xoj_assert(this->page);
 

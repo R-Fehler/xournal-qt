@@ -185,6 +185,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentLinkTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/StickyNoteTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/StickerFileTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/GroupsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/NoteSpaceTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/CitationTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BookmarksTest.cpp)

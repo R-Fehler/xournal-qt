@@ -2899,3 +2899,11 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
       library, Copy to library… (another library's `Stickers/`), Delete (to the trash).
 - [ ] The library: the `Stickers` folder's card has a sticker mark; its stickers are cards with previews, the library
       search finds their text, a sticker opens as a document.
+
+## Groups (qt/groups, qt/docs/groups.md)
+
+- [ ] A document with groups (made below) saved, closed and opened again: the groups are still there (a tap on a member
+      selects all of it). Autosave / recovery after killing the app: the groups are back too.
+- [ ] The same `.xopp` (and the `.xopp` exported from a PDF with notes) opened in Xournal++ 1.2 / 1.3: no message,
+      every element there and drawn as here; selected one by one (Xournal++ has no groups). Saved there and opened
+      here again: the elements are all there, ungrouped.
