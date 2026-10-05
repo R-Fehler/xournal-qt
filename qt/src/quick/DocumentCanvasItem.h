@@ -62,6 +62,9 @@ class DocumentCanvasItem: public QQuickItem {
     /// Reading (qt/docs/toolbox.md): a drag or a fling up and down comes to rest on a row of pages, when the setting
     /// snapPages is on (CanvasView::setSnapVertically)
     Q_PROPERTY(bool snapVertically READ snapVertically WRITE setSnapVertically NOTIFY snapVerticallyChanged)
+    /// The canvas may be turned here (qt/docs/canvas-rotation.md; the reference beside the notes may not:
+    /// CanvasView::setRotatable)
+    Q_PROPERTY(bool rotatable READ rotatable WRITE setRotatable NOTIFY rotatableChanged)
     /// The mouse rests on a formula of a Markdown text that cannot be drawn: why (empty: none), and where it is (item
     /// coordinates). The window shows it as a tool tip.
     Q_PROPERTY(QString mathError READ mathError NOTIFY mathErrorChanged)
@@ -97,6 +100,8 @@ public:
     bool snapVertically() const { return verticalSnap; }
     void setSnapVertically(bool on);
     void setReadingOnly(bool on);
+    bool rotatable() const { return turnable; }
+    void setRotatable(bool on);
 
     QString mathError() const { return mathErrorText; }
     QVariantMap hoveredLink() const { return linkShown; }
@@ -197,6 +202,7 @@ Q_SIGNALS:
     void viewportChanged();
     void readingOnlyChanged();
     void snapVerticallyChanged();
+    void rotatableChanged();
     void mathErrorChanged();
     void hoveredLinkChanged();
     void hoveredLinkPointerChanged();
@@ -275,6 +281,7 @@ private:
     bool viewReplaced = false;
     bool reading = false;
     bool verticalSnap = false;
+    bool turnable = true;
     bool mouseElsewhere = false;  ///< a mouse drag that began outside the canvas (e.g. on a scroll bar)
     QTimer hoverTimer;            ///< the mouse rests (mouseHovers)
     QPointF hoverScenePos;

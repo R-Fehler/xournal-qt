@@ -865,6 +865,7 @@ void DocumentCanvasItem::setView(QObject* object) {
             canvasView->setShown(false);
             canvasView->setReadingOnly(false);
             canvasView->setSnapVertically(false);
+            canvasView->setRotatable(true);
         }
     }
     endLinkHover();
@@ -879,6 +880,7 @@ void DocumentCanvasItem::setView(QObject* object) {
         canvasView->setShown(true);
         canvasView->setReadingOnly(reading);
         canvasView->setSnapVertically(verticalSnap);
+        canvasView->setRotatable(turnable);
         // (a paste with the keys asks where the mouse rests: over a sticky note it goes into the note)
         canvasView->setMousePointerSource([this]() -> std::optional<QPointF> {
             if (!mouseOverWindow || !claims(hoverScenePos)) {
@@ -951,6 +953,17 @@ void DocumentCanvasItem::setReadingOnly(bool on) {
     }
     refreshPointer();  // (no eraser where nothing is erased)
     Q_EMIT readingOnlyChanged();
+}
+
+void DocumentCanvasItem::setRotatable(bool on) {
+    if (on == turnable) {
+        return;
+    }
+    turnable = on;
+    if (canvasView) {
+        canvasView->setRotatable(on);
+    }
+    Q_EMIT rotatableChanged();
 }
 
 void DocumentCanvasItem::setSnapVertically(bool on) {

@@ -2699,6 +2699,25 @@ ApplicationWindow {
                 enabled: app.pageNumber < app.pageCount
                 onClicked: app.nextPage()
             }
+            // The canvas turned (qt/docs/canvas-rotation.md): by how much; a tap turns it upright again
+            ToolButton {
+                objectName: "rotationChip"
+                visible: app.canvasRotation !== 0
+                readonly property int degrees: Math.round(app.canvasRotation > 180 ? app.canvasRotation - 360
+                                                                                   : app.canvasRotation)
+                text: "\u21ba " + degrees + "\u00b0"
+                font.pixelSize: 13
+                implicitHeight: 40
+                leftPadding: 8
+                rightPadding: 8
+                focusPolicy: Qt.NoFocus
+                Material.foreground: "#505050"
+                Accessible.name: qsTr("Turn the canvas upright")
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Turned by %1\u00b0: tap to turn it upright (two taps on the page or a fit do too)").arg(degrees)
+                ToolTip.delay: 600
+                onClicked: app.resetCanvasRotation()
+            }
             ToolSeparator { visible: !viewPill.tight }
             // The zoom, small. A tap: the fits (after the double-tap time, so a double tap does not flash the menu);
             // a double tap or a long press: the whole page. Pinch, Ctrl+wheel, Ctrl+plus / minus / 0 and the middle
@@ -5028,6 +5047,8 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("zoomIn"); enabled: docKeys; onActivated: app.zoomIn() }
     Shortcut { sequences: win.keysOf("zoomOut"); enabled: docKeys; onActivated: app.zoomOut() }
     Shortcut { sequences: win.keysOf("fitWidth"); enabled: docKeys; onActivated: app.fitWidth() }
+    Shortcut { sequences: win.keysOf("rotateRight"); enabled: docKeys && app.canRotateCanvas; onActivated: app.rotateCanvas(90) }
+    Shortcut { sequences: win.keysOf("rotateLeft"); enabled: docKeys && app.canRotateCanvas; onActivated: app.rotateCanvas(-90) }
     Shortcut { sequences: win.keysOf("realSize"); enabled: docKeys; onActivated: app.zoomToRealSize() }
     Shortcut { sequences: win.keysOf("quit"); onActivated: win.close() }
     ShortcutSheet {

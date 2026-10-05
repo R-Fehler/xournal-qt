@@ -134,6 +134,20 @@ public:
     /// taps follow links, they do not switch the check boxes of Markdown tasks; no undo from gestures. Nothing
     /// lands in the document.
     void setReadingOnly(bool on);
+
+    // --- the canvas turned (qt/docs/canvas-rotation.md) --------------------------------------------------------
+    /// The canvas may be turned (the gesture, Ctrl+[ / Ctrl+]): not while presenting, not in a text file or a text
+    /// document of notes (their text runs across the screen), not where the canvas item says no (the reference beside
+    /// the notes: setRotatable)
+    bool rotationAllowed() const;
+    /// Shown where it may be turned (the canvas item: the reference beside the notes may not). Not: upright again.
+    void setRotatable(bool on);
+    bool isRotatable() const { return rotatable; }
+    /// Turn the canvas by `degrees` (a step: from a free angle to the next multiple), about the middle. False: not
+    /// allowed here.
+    bool rotateCanvasBy(double degrees);
+    /// Upright again (the double tap, the fits, the chip): about a point of the screen, or the middle
+    void resetRotation(std::optional<QPointF> screenAnchor = std::nullopt);
     bool isReadingOnly() const { return readingOnly; }
 
     // --- memory (CanvasMemory) --------------------------------------------------------------------------------
@@ -624,6 +638,7 @@ private:
     std::vector<std::unique_ptr<CanvasPage>> pages;
     bool shown = false;
     bool readingOnly = false;
+    bool rotatable = true;
     bool snapVertically = false;
     std::pair<size_t, size_t> window{1, 0};
     /// The last plan trimmed this view (it was not the current one): it has no window of its own

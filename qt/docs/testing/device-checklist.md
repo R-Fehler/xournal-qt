@@ -3103,7 +3103,13 @@ offered).
       added. A `.md` or text document: nothing of this is offered.
 
 ## Turning the canvas (qt/canvas-rotate, qt/docs/canvas-rotation.md)
-(Ways to turn it come with Ctrl+[ / Ctrl+] and the gesture; until then the checks below need a turned canvas.)
+- [ ] Ctrl+] turns the canvas a quarter clockwise, Ctrl+[ counter-clockwise; the turn keeps the middle of the screen
+      where it is. The layout pill shows "↺ 90°" (or "↺ -90°"); a tap on it turns the canvas upright.
+- [ ] Turned: two taps on the page (or a middle click) turn it upright, the place tapped staying under the finger, and
+      zoom nothing; two taps again zoom as before. Fit the width / height / whole page (menu, Ctrl+0, double tap on
+      the zoom) turn it upright and fit; "Real size" keeps the angle.
+- [ ] F5 (presenting) shows the pages upright; Ctrl+[ / Ctrl+] do nothing while presenting, nor in a `.md` file or a
+      text document of notes. The reference beside the notes never turns (also after "swap").
 - [ ] Turned by 90° and by a free angle (about 30°): the pen writes exactly under its tip, also fast strokes and short
       dots; the stroke ends where the pen lifted. The same with the mouse and with a finger that draws.
 - [ ] Pen latency: on the Surface, writing on a turned canvas feels as direct as upright (no extra lag, no stutter

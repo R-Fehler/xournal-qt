@@ -364,6 +364,7 @@ void CanvasView::setPresenting(bool on) {
     }
     const size_t page = currentPageNo();
     if (on) {
+        viewController.setRotation(0);  // (presenting shows the pages upright)
         zoomBeforePresenting = viewController.zoom();
         fitBeforePresenting = viewController.keptFit();
     }
@@ -1131,6 +1132,11 @@ std::optional<QRectF> CanvasView::textColumnAt(size_t index, QPointF pagePoint) 
 }
 
 void CanvasView::doubleTapAt(QPointF viewPos) {
+    if (viewController.rotated()) {
+        // Turned: two taps turn it upright again, the point tapped staying where it is (qt/docs/canvas-rotation.md)
+        resetRotation(viewController.viewToScreen(viewPos));
+        return;
+    }
     const auto idx = layout.pageAt(viewController.viewToContent(viewPos), viewController.zoom());
     if (!idx) {
         return;
@@ -2456,6 +2462,34 @@ void CanvasView::setReadingOnly(bool on) {
     if (on) {
         endTextEditing();  // (a text being typed when the document became the reference: kept, as when it is left)
     }
+}
+
+bool CanvasView::rotationAllowed() const {
+    if (!rotatable || presenting || session.textFile() || session.isEditableText()) {
+        return false;
+    }
+    Document& doc = *session.getDocument();
+    std::shared_lock lock(doc);
+    return !TextDocument::isTextDocument(doc);
+}
+
+void CanvasView::setRotatable(bool on) {
+    rotatable = on;
+    if (!on) {
+        resetRotation();
+    }
+}
+
+bool CanvasView::rotateCanvasBy(double degrees) {
+    if (!rotationAllowed()) {
+        return false;
+    }
+    viewController.rotateBy(degrees);
+    return true;
+}
+
+void CanvasView::resetRotation(std::optional<QPointF> screenAnchor) {
+    viewController.setRotation(0, screenAnchor);
 }
 
 void CanvasView::setShown(bool value) {

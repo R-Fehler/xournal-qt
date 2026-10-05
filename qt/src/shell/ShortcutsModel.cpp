@@ -62,6 +62,9 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"fitWidth", tr("Fit the width"), view, {"Ctrl+0"}},
             // (Ctrl+0 fits the width here, as it long has; 1:1 as in image and drawing programs)
             {"realSize", tr("Real size (100 %, as large as the paper)"), view, {"Ctrl+1"}},
+            // (qt/docs/canvas-rotation.md: the canvas only, the pages stay as they are; a fit turns it upright)
+            {"rotateRight", tr("Turn the canvas clockwise (90°)"), view, {"Ctrl+]"}},
+            {"rotateLeft", tr("Turn the canvas counter-clockwise (90°)"), view, {"Ctrl+["}},
             {"fullScreen", tr("Full screen"), view, {"F11"}},
             {"present", tr("Present (full screen, page by page)"), view, {"F5"}},
             // (only the page: no pill, no tool square; again while presenting: the controls back)

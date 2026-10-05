@@ -106,6 +106,7 @@ Item {
             focus: true
             // For reading, unless the edit switch of its pill is on (per tab)
             readingOnly: !app.reference.editing
+            rotatable: false  // (only the notes turn: qt/docs/canvas-rotation.md)
             view: split.active ? app.reference.view : null
         }
 

@@ -229,6 +229,10 @@ class AppController: public QObject {
     Q_PROPERTY(QString penPillSide READ penPillSide WRITE setPenPillSide NOTIFY penPillChanged)
     Q_PROPERTY(double penPillOffset READ penPillOffset WRITE setPenPillOffset NOTIFY penPillChanged)
     Q_PROPERTY(int zoomPercent READ zoomPercent NOTIFY zoomChanged)
+    /// The canvas turned (qt/docs/canvas-rotation.md): degrees clockwise, in [0, 360); 0 upright
+    Q_PROPERTY(double canvasRotation READ canvasRotation NOTIFY canvasRotationChanged)
+    /// It may be turned here (not while presenting, not in a text file or a text document of notes)
+    Q_PROPERTY(bool canRotateCanvas READ canRotateCanvas NOTIFY canvasRotationChanged)
     Q_PROPERTY(int pageNumber READ pageNumber NOTIFY pageChanged)
     Q_PROPERTY(int pageCount READ pageCount NOTIFY pageChanged)
     // Search in the current document
@@ -1032,10 +1036,17 @@ public:
     Q_INVOKABLE void keepHybridData();
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
+    /// The fits also turn the canvas upright again (qt/docs/canvas-rotation.md)
     Q_INVOKABLE void fitWidth();
     /// The height of the current page fills the view, or the whole page fits into it.
     Q_INVOKABLE void fitHeight();
     Q_INVOKABLE void fitPage();
+    double canvasRotation() const;
+    bool canRotateCanvas() const;
+    /// Turn the canvas by a step (Ctrl+] clockwise: 90, Ctrl+[: -90; from a free angle to the next quarter)
+    Q_INVOKABLE void rotateCanvas(double degrees);
+    /// Upright again (the chip in the layout pill)
+    Q_INVOKABLE void resetCanvasRotation();
     /// The current page has another size than the page before or after it (then fitting it alone helps).
     Q_PROPERTY(bool currentPageDiffers READ currentPageDiffers NOTIFY pageChanged)
     bool currentPageDiffers() const;
@@ -1400,6 +1411,7 @@ Q_SIGNALS:
     /// The curtain came or went, or its handles did (also: another tab)
     void curtainChanged();
     void zoomChanged();
+    void canvasRotationChanged();
     void pageChanged();
     /// A sticky note was selected or unselected, or the selected one changed
     void noteSelectionChanged();

@@ -908,6 +908,8 @@ void AppController::currentTabChanged() {
                                              &AppController::zoomChanged));
         currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoom100Changed, this,
                                              &AppController::zoomChanged));
+        currentConnections.push_back(connect(&v->getViewController(), &ViewController::rotationChanged, this,
+                                             &AppController::canvasRotationChanged));
         // The play tool on ink with a recording (qt/docs/audio.md)
         currentConnections.push_back(connect(v, &CanvasView::playRequested, this, [this](const QString& name, qint64 ts) {
             if (audioControl) {
@@ -930,6 +932,7 @@ void AppController::currentTabChanged() {
     Q_EMIT savingChanged();
     Q_EMIT undoRedoChanged();
     Q_EMIT zoomChanged();
+    Q_EMIT canvasRotationChanged();
     Q_EMIT pageChanged();
     Q_EMIT searchChanged();
     Q_EMIT pageUndoChanged();
@@ -1308,6 +1311,7 @@ void AppController::setPresenting(bool on) {
     presentingOn = on;
     updatePresentedView();
     Q_EMIT presentingChanged();
+    Q_EMIT canvasRotationChanged();  // (none while presenting)
 }
 
 void AppController::updatePresentedView() {
@@ -4565,11 +4569,31 @@ void AppController::fitWidth() {
     if (referenceMode->focused()) {
         referenceMode->fitWidth();  // (the page in view there)
     } else if (canvas() && session()) {
+        canvas()->resetRotation();
         canvas()->getViewController().fitWidth(session()->getCurrentPageNo());
     }
 }
 
+double AppController::canvasRotation() const { return canvas() ? canvas()->getViewController().rotation() : 0.0; }
+
+bool AppController::canRotateCanvas() const { return canvas() && canvas()->rotationAllowed(); }
+
+void AppController::rotateCanvas(double degrees) {
+    if (canvas()) {
+        canvas()->rotateCanvasBy(degrees);
+    }
+}
+
+void AppController::resetCanvasRotation() {
+    if (canvas()) {
+        canvas()->resetRotation();
+    }
+}
+
 void AppController::fitHeight() {
+    if (canvas()) {
+        canvas()->resetRotation();
+    }
     if (canvas() && session() && canvas()->documentLayout().horizontal()) {
         canvas()->getViewController().fitHeight();  // sideways: all rows, and kept
     } else if (canvas() && session()) {
@@ -4579,6 +4603,7 @@ void AppController::fitHeight() {
 
 void AppController::fitPage() {
     if (canvas() && session()) {
+        canvas()->resetRotation();
         canvas()->getViewController().fitPage(session()->getCurrentPageNo(), true);
     }
 }
