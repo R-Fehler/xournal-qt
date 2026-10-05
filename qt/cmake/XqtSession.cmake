@@ -73,6 +73,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ByteDelta.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/VersionCache.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/VersionCache.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/VersionDiff.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/VersionDiff.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPdf.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPdf.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ArchivePdf.h
@@ -131,6 +133,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/DocumentLayout.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ViewController.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ViewController.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ScrollLock.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ScrollLock.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/AudienceRegion.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ScreenCalibration.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ScreenCalibration.cpp
@@ -224,6 +228,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/PdfRevisionsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/PdfHistoryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/ByteDeltaTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/VersionDiffTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BackgroundSaveTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TextFileTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentLinkTest.cpp
@@ -249,6 +254,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/CanvasReplayTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/DocumentLayoutTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/ScrollLockTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/GeometryToolPictureTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TextFlowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownSessionTest.cpp

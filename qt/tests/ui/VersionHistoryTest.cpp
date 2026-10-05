@@ -41,6 +41,12 @@
 #include "shell/TabManager.h"
 #include "shell/Thumbnails.h"
 #include "shell/VersionsModel.h"
+#include "shell/VersionCompare.h"
+#include "shell/PagesModel.h"
+#include "shell/ReferenceMode.h"
+#include "CanvasView.h"
+#include "ScrollLock.h"
+#include "ViewController.h"
 #include "undo/InsertUndoAction.h"
 #include "undo/UndoRedoHandler.h"
 
@@ -378,4 +384,139 @@ TEST_F(VersionHistoryTest, theSettingForNewPdfs) {
     ASSERT_EQ(listed.versions.size(), 2u);
     EXPECT_EQ(listed.versions[0].kind, xqt::PdfHistory::Kind::RECEIVED);
     settings->set("keepVersionsOfNewPdfs", false);
+}
+
+namespace {
+/// The page at the point a locked view is kept by
+size_t lockedPage(xqt::CanvasView* v) {
+    const auto& vc = v->getViewController();
+    return vc.placeAt(xqt::ScrollLock::anchorOf(vc))->page;
+}
+}  // namespace
+
+// "Compare with now" in a row's menu: the version beside the document (read-only), both scrolled together, the pages
+// that changed since marked in the page lists and counted in the comparison's bar, whose arrows go from change to
+// change on both sides
+TEST_F(VersionHistoryTest, compareWithNowMarksTheChangedPages) {
+    const fs::path notes = openedNotes();  // (two pages, a stroke on the first)
+    ASSERT_TRUE(controller->insertPages(2, 0, -1, false, 4));  // (six pages)
+    session()->setKeepsVersions(true);
+    ASSERT_TRUE(controller->saveInBackground());
+    waitSaved();
+    xqt::DocumentSession* now = session();
+    ASSERT_GE(now->getDocument()->getPageCount(), 5u);
+    drawStroke(*now, 3, 400);  // (not saved: "now" has it, the version not)
+    click(findItem("sidebarHistoryButton"));
+    auto* list = findItem("historyList");
+    ASSERT_NE(list, nullptr);
+    until([&] { return list->property("count").toInt() == 3; });
+    ASSERT_EQ(list->property("count").toInt(), 3) << "unsaved changes, the version saved, the file as it was";
+    QQuickItem* saved = nullptr;
+    QMetaObject::invokeMethod(list, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, saved), Q_ARG(int, 1));
+    ASSERT_NE(saved, nullptr);
+    click(saved);
+    QObject* item = find("historyCompareNow");
+    ASSERT_NE(item, nullptr);
+    QMetaObject::invokeMethod(item, "triggered");
+    QMetaObject::invokeMethod(find("historyRowMenu"), "close");
+    ASSERT_TRUE(waitOpened(find("historyRowMenu"), false));
+
+    auto& reference = controller->reference();
+    auto& compare = controller->versionCompare();
+    ASSERT_TRUE(reference.active());
+    EXPECT_EQ(session(), now) << "the document stays in its tab";
+    EXPECT_TRUE(reference.scrollLocked()) << "scrolled together";
+    EXPECT_FALSE(reference.editable()) << "a version is read-only";
+    EXPECT_FALSE(controller->viewingVersion());
+    ASSERT_TRUE(compare.shown());
+    until([&] { return !compare.busy() && compare.changeCount() > 0; });
+    ASSERT_EQ(compare.changeCount(), 1);
+    EXPECT_EQ(compare.summary(), "1 page changed");
+    auto* pages = qobject_cast<QAbstractItemModel*>(controller->pagesModel());
+    ASSERT_NE(pages, nullptr);
+    EXPECT_FALSE(pages->data(pages->index(0, 0), xqt::PagesModel::DiffersRole).toBool());
+    EXPECT_TRUE(pages->data(pages->index(3, 0), xqt::PagesModel::DiffersRole).toBool()) << "the page written on";
+    auto* refPages = qobject_cast<QAbstractItemModel*>(reference.pagesModel());
+    reference.setPagesShown(true);
+    EXPECT_TRUE(refPages->data(refPages->index(3, 0), xqt::PagesModel::DiffersRole).toBool())
+            << "marked on both sides";
+    EXPECT_FALSE(refPages->data(refPages->index(2, 0), xqt::PagesModel::DiffersRole).toBool());
+    reference.setPagesShown(false);
+    auto* bar = findItem("compareBar");
+    ASSERT_NE(bar, nullptr);
+    EXPECT_TRUE(bar->isVisible());
+    EXPECT_EQ(findItem("compareSummary")->property("text").toString(), "1 page changed");
+
+    // The next change: page 4 on both sides
+    xqt::CanvasView* main = controller->tabManager().currentView();
+    xqt::CanvasView* version = reference.canvas();
+    main->jumpToPage(0);
+    wait(50);
+    click(findItem("compareNextButton"));
+    EXPECT_EQ(compare.currentChange(), 1);
+    EXPECT_EQ(lockedPage(main), 3u);
+    EXPECT_EQ(lockedPage(version), 3u);
+    click(findItem("comparePreviousButton"));
+    EXPECT_EQ(compare.currentChange(), 1) << "the first one stays";
+
+    // Writing on: compared again
+    drawStroke(*now, 0, 600);
+    until([&] { return !compare.busy() && compare.changeCount() == 2; });
+    EXPECT_EQ(compare.changeCount(), 2);
+    EXPECT_TRUE(pages->data(pages->index(0, 0), xqt::PagesModel::DiffersRole).toBool());
+
+    // Ended: no marks, no split
+    click(findItem("compareCloseButton"));
+    EXPECT_FALSE(compare.active());
+    EXPECT_FALSE(reference.active());
+    EXPECT_FALSE(pages->data(pages->index(3, 0), xqt::PagesModel::DiffersRole).toBool());
+}
+
+// "Compare with another version…" then a tap on the other one: the newer one read-only in a tab of its own, the older
+// one beside it
+TEST_F(VersionHistoryTest, compareTwoVersionsPickedInTheList) {
+    const fs::path notes = openedNotes();
+    session()->setKeepsVersions(true);
+    ASSERT_TRUE(controller->saveWithMessage("First"));
+    waitSaved();
+    drawStroke(*session(), 1, 300);
+    drawStroke(*session(), 0, 500);
+    ASSERT_TRUE(controller->saveWithMessage("Second"));
+    waitSaved();
+    xqt::DocumentSession* document = session();
+    click(findItem("sidebarHistoryButton"));
+    auto* list = findItem("historyList");
+    ASSERT_NE(list, nullptr);
+    until([&] { return list->property("count").toInt() == 3; });
+    ASSERT_EQ(list->property("count").toInt(), 3);
+    QQuickItem* second = nullptr;
+    QQuickItem* first = nullptr;
+    QMetaObject::invokeMethod(list, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, second), Q_ARG(int, 0));
+    QMetaObject::invokeMethod(list, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, first), Q_ARG(int, 1));
+    ASSERT_NE(second, nullptr);
+    ASSERT_NE(first, nullptr);
+    click(second);
+    QObject* item = find("historyCompareTwo");
+    ASSERT_NE(item, nullptr);
+    QMetaObject::invokeMethod(item, "triggered");
+    QMetaObject::invokeMethod(find("historyRowMenu"), "close");
+    ASSERT_TRUE(waitOpened(find("historyRowMenu"), false));
+    auto* banner = findItem("historyPickBanner");
+    ASSERT_NE(banner, nullptr);
+    EXPECT_TRUE(banner->isVisible());
+    click(first);
+    wait(100);
+
+    auto& compare = controller->versionCompare();
+    ASSERT_TRUE(compare.shown()) << "active " << compare.active() << " reference " << controller->reference().active()
+                                 << " tabs " << controller->tabCount() << " file "
+                                 << session()->getFilePath().string();
+    EXPECT_NE(session(), document) << "the newer version in a tab of its own";
+    EXPECT_TRUE(controller->viewingVersion()) << "read-only";
+    EXPECT_TRUE(session()->isReadOnly());
+    EXPECT_TRUE(controller->reference().scrollLocked());
+    until([&] { return !compare.busy() && compare.changeCount() > 0; });
+    EXPECT_EQ(compare.changeCount(), 2) << "both pages were written on between the two";
+    EXPECT_EQ(compare.olderTitle(), "First") << "a milestone by its message";
+    EXPECT_EQ(compare.newerTitle(), "Second");
 }

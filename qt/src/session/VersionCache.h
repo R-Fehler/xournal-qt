@@ -4,7 +4,8 @@
  *
  * The owner of those files. Its limit: the last 5 versions used, at most 500 MB; older ones are removed as new ones
  * come, all of this process's when the app quits (clear()), and those other processes left behind (a crash) after a
- * day. Each lives in a folder of its own, under a readable name ("lecture (version 3).pdf"): it is what a tab shows.
+ * day. A version that is shown (a tab holds it: beside the document, compared, opened) is pinned (pin()): the limit
+ * never removes it and counts only the versions nobody shows; unpinned, it is an unused one again. Each lives in a folder of its own, under a readable name ("lecture (version 3).pdf"): it is what a tab shows.
  *
  * @license GNU GPLv2 or later
  */
@@ -12,6 +13,8 @@
 
 #include <cstdint>
 #include <list>
+#include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 
@@ -26,7 +29,13 @@ public:
     /// The file of version `id` of `pdf` as it is now (made when it is not there yet; any thread). Empty: it could
     /// not be made (`error`).
     fs::path get(const fs::path& pdf, int id, std::string& error);
-    /// Whether a file is one of these.
+    /// Keep the file of a version while what this returns is held (a tab that shows it; nothing for another file).
+    /// Released, the limit applies to it again.
+    using Pin = std::shared_ptr<void>;
+    Pin pin(const fs::path& file);
+    bool pinned(const fs::path& file) const;
+    /// Whether a file is one of these (any thread; cheap: documents of versions are shown read-only, and
+    /// DocumentSession::isReadOnly asks).
     bool contains(const fs::path& file) const;
     /// Remove every file of this process (when the app quits).
     void clear();
@@ -43,7 +52,9 @@ private:
         fs::path file;
         uint64_t bytes = 0;
     };
-    void trim();
+    void trim();  ///< (under `m`)
+    std::map<fs::path, int> pins;  ///< files shown, how many times
+    fs::path ownFolder;  ///< folder(), normalised
     mutable std::mutex m;
     std::list<Entry> entries;  ///< most recently used first
 };

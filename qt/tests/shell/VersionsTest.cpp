@@ -30,6 +30,7 @@
 #include "session/HybridPdf.h"
 #include "session/PdfHistory.h"
 #include "session/VersionCache.h"
+#include "shell/TabManager.h"
 #include "shell/VersionsModel.h"
 #include "undo/UndoRedoHandler.h"
 
@@ -261,6 +262,44 @@ TEST_F(VersionsTest, theVersionCacheKeepsTheLastFive) {
     EXPECT_EQ(cache.get(path("notes.pdf"), 8, error), files.back()) << "made once";
     cache.clear();
     EXPECT_FALSE(fs::exists(cache.folder()));
+}
+
+// A version shown in a tab (beside the document, compared) is in use: the limit never removes its file, it counts
+// only the versions nobody shows; closed, it is an unused one again
+TEST_F(VersionsTest, theVersionCacheKeepsAVersionThatIsShown) {
+    auto s = withThreeVersions();
+    for (int day = 7; day < 12; ++day) {
+        clockNow = at(day, 10);
+        drawOn(*s, 1, 100 + 40 * day);
+        ASSERT_TRUE(s->save().ok);
+    }
+    VersionCache& cache = VersionCache::instance();
+    TabManager tabs(*app);
+    std::string error;
+    const fs::path shown = cache.get(path("notes.pdf"), 1, error);
+    ASSERT_FALSE(shown.empty()) << error;
+    auto loaded = DocumentSession::loadFile(shown);
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    tabs.addTab(std::make_unique<DocumentSession>(*app, std::move(loaded.document)));
+    std::vector<fs::path> files;
+    for (int id = 2; id <= 8; ++id) {
+        files.push_back(cache.get(path("notes.pdf"), id, error));
+        ASSERT_FALSE(files.back().empty()) << error;
+    }
+    EXPECT_TRUE(fs::exists(shown)) << "the version shown in a tab stays";
+    auto again = DocumentSession::loadFile(shown);
+    ASSERT_TRUE(again.document) << again.error;
+    EXPECT_EQ(strokesOf(*again.document), 1u) << "and still reads";
+    size_t kept = 0;
+    for (const auto& f: files) {
+        kept += fs::exists(f) ? 1 : 0;
+    }
+    EXPECT_EQ(kept, 5u) << "the limit counts the versions nobody shows";
+    // Closed: an unused version again, the oldest used, and over the limit
+    tabs.closeTab(tabs.indexOfFile(shown));
+    EXPECT_FALSE(fs::exists(shown));
+    EXPECT_TRUE(fs::exists(files.back()));
+    cache.clear();
 }
 
 TEST_F(VersionsTest, theCliExportsAVersion) {

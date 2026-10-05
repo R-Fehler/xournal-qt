@@ -257,6 +257,8 @@ Rectangle {
             required property int searchHitCount
             /// Its bookmark as shown ("": none)
             required property string bookmark
+            /// It differs from the version it is compared with (app.compare)
+            required property bool differs
             width: list.width
             height: frame.height + pageLabel.height + 4
 
@@ -293,6 +295,17 @@ Rectangle {
                     }
                 }
                 SelectionMark { visible: entry.selected }
+                // Changed in a comparison (app.compare): a bar along its left edge
+                Rectangle {
+                    objectName: "sidebarDiffers"
+                    visible: entry.differs
+                    anchors.right: parent.left
+                    anchors.rightMargin: 3
+                    width: 5
+                    height: parent.height
+                    radius: 2
+                    color: "#9334e6"
+                }
                 HitBadge { count: entry.searchHitCount; anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 4 }
                 // A bookmarked page: the ribbon (qt/docs/bookmarks.md)
                 Image {

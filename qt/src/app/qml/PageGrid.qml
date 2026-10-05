@@ -135,6 +135,7 @@ Rectangle {
             required property int searchHitCount
             required property bool selected
             required property string bookmark
+            required property bool differs
             width: grid.cellWidth
             height: grid.cellHeight
 
@@ -188,6 +189,17 @@ Rectangle {
                     anchors.margins: 4
                 }
                 SelectionMark { visible: cell.selected }
+                // Changed in a comparison (app.compare): a bar along its left edge
+                Rectangle {
+                    objectName: "pageGridDiffers"
+                    visible: cell.differs
+                    anchors.right: parent.left
+                    anchors.rightMargin: 2
+                    width: 5
+                    height: parent.height
+                    radius: 2
+                    color: "#9334e6"
+                }
                 // A bookmarked page: the ribbon (qt/docs/bookmarks.md)
                 Image {
                     visible: cell.bookmark !== ""

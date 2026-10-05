@@ -72,6 +72,9 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"rotateRight", tr("Turn the canvas clockwise (90°)"), view, {"Ctrl+]"}},
             {"rotateLeft", tr("Turn the canvas counter-clockwise (90°)"), view, {"Ctrl+["}},
             {"fullScreen", tr("Full screen"), view, {"F11"}},
+            // (the reference view: both sides scrolled together; no key by default - Ctrl+Alt+L locks the screen on
+            // many desktops)
+            {"lockScroll", tr("Scroll the document and the reference together"), view, {}},
             {"present", tr("Present (full screen, page by page)"), view, {"F5"}},
             // (only the page: no pill, no tool square; again while presenting: the controls back)
             {"presentClean", tr("Present without controls"), view, {"Ctrl+F5"}},

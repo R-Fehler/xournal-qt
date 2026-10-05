@@ -11,6 +11,7 @@
 #include "DocumentFiles.h"
 #include "DocumentPlaces.h"
 #include "Previews.h"
+#include "session/VersionCache.h"
 #include "PageSketches.h"
 #include "Thumbnails.h"
 #include "model/Document.h"
@@ -213,6 +214,9 @@ void TabManager::tabDataChanged(const DocumentSession* s, const QList<int>& role
 int TabManager::addTab(std::unique_ptr<DocumentSession> session) {
     Tab tab;
     tab.view = std::make_unique<CanvasView>(*session);
+    if (session->hasFilePath()) {
+        tab.versionPin = VersionCache::instance().pin(session->getFilePath());
+    }
     tab.session = std::move(session);
     return insertTab(std::move(tab));
 }

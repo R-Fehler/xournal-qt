@@ -2395,7 +2395,8 @@ ApplicationWindow {
         height: referenceSplit.mainHeight
         clip: true  // zoomed-in pages must not paint over the sidebar
         view: app.view
-        readingOnly: win.reading || win.replaying
+        // (a version cut out of its file, compared or shown: read-only)
+        readingOnly: win.reading || win.replaying || app.viewingVersion
         snapVertically: win.reading
 
         // Picture files dropped on Markdown being written (a .md, a text document, Markdown on a page): saved with
@@ -5174,6 +5175,8 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("save"); enabled: docKeys; onActivated: if (!app.saveReferenceInHand()) saveOrAsk(null) }
     Shortcut { sequences: win.keysOf("saveAs"); enabled: docKeys; onActivated: openSaveDialog(null) }
     Shortcut { sequences: win.keysOf("saveWithMessage"); enabled: docKeys && !win.textDoc; onActivated: versionMessageDialog.openFor(-1) }
+    // (the reference view: scroll both sides together; no key by default, one can be given in the shortcuts)
+    Shortcut { sequences: win.keysOf("lockScroll"); enabled: app.reference.active && !app.homeVisible; onActivated: app.reference.toggleScrollLock() }
     Shortcut { sequences: win.keysOf("open"); onActivated: openDialog.open() }
     // Ctrl+N adds a page (what one needs while writing), Ctrl+Shift+N a document
     Shortcut { sequences: win.keysOf("addPage"); enabled: docKeys; onActivated: app.addPageAfterCurrent() }
