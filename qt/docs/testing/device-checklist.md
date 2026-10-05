@@ -3526,6 +3526,10 @@ Seen through the replay (⋮ → View → Replay the writing).
       `%LOCALAPPDATA%\xournal-qt\cache`) has its text or ink readable (`grep -r` for a word written in it; the
       `autosaves/*.autosave.pdf` asks for the password in another viewer). Kill the app (`kill -9`), start it again:
       recovery asks for the password and brings the unsaved ink back.
+- [ ] Print a protected document (Linux/macOS with CUPS): "without annotations" prints the pages without the ink,
+      "with": with it. While it prints, `ls /tmp/qt_temp-*` (or `$TMPDIR`) has the print folder only until `lp`
+      returned (a second or two), not ten minutes; Windows: gone right after printing. A printer that is off
+      (job queued): the file still goes once `lp` returned (CUPS keeps its own copy of the job).
 - [ ] Protect a document that was opened and edited before (its card had a picture, its words were found by the
       library search): afterwards the card shows the lock and no picture, the search does not find its words, and
       `~/.cache/xournal-qt/pages` has no folder of it.

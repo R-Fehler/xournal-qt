@@ -40,4 +40,5 @@ encrypted with the same password, its page pictures stay in memory, the library 
 lock and its text is not found by the library's search), and handwriting recognised in it is not kept. If the app
 crashes, the last automatic save is offered again and asks for the password.
 
-Printing sends an unencrypted copy to the printer, as every app does; it is removed a few minutes later.
+Printing sends an unencrypted copy to the printer, as every app does; it is removed as soon as the printing system has
+taken it. "Without annotations" prints the PDF's own pages only.

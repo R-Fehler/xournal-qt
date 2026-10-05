@@ -721,8 +721,8 @@ general."
 - [x] **No plaintext leaks** for an encrypted document: autosave and crash saves, thumbnails and previews, the
   library's text index, the handwriting cache, the version cache and the reference/compare copies either stay
   encrypted or are not written; the library shows a lock on its card and does not index what it cannot read.
-  (Built and tested; left: pictures of Markdown boxes and voice memos inside a protected PDF are taken out into the
-  cache while it is open.)
+  (Built and tested, also for a document protected later; pictures and voice memos taken out while it is open are
+  removed at close or at the next start after a crash.)
 - [x] Saving an encrypted PDF with notes: a full write through qpdf (the incremental appender does not encrypt); if
   encrypted appends with qpdf's primitives are feasible, they keep fast saves and version history, else version
   history is unavailable for encrypted files (said so in the History panel). (Feasible and built for AES-256: appends

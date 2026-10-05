@@ -5668,32 +5668,18 @@ bool AppController::printDocument(bool withAnnotations, const QString& range) {
     }
     s->clearSelectionEndText();
     s->waitForMerges();  // (pages pasted just now: their PDF pages)
-    // A protected document: the printer gets an unencrypted PDF of it (drawn through poppler, which has the password),
-    // removed a while after printing
-    const bool secret = s->isProtected();
-    // What is printed: the document as a PDF, or the PDF it annotates as it is
+    // What is printed: the document as a PDF, or the PDF it annotates as it is (a protected document's without its
+    // password: the printer cannot open it). The temporary folder goes when this returns, unless the spooler gets the
+    // file (then as soon as it took it)
     QTemporaryDir temporary;
     if (!temporary.isValid()) {
         Q_EMIT message(tr("Printing failed"), tr("No place for the file to print."), true);
         return false;
     }
-    temporary.setAutoRemove(false);  // (the printer reads it after we return)
     const fs::path file = fs::path(temporary.filePath("print.pdf").toStdString());
-    const fs::path background = s->getDocument()->getPdfFilepath();
-    try {
-        if (!withAnnotations && !background.empty() && !secret) {
-            fs::copy_file(background, file, fs::copy_options::overwrite_existing);
-        } else {
-            const std::string pages = range.trimmed().toStdString();
-            ExportHelper::exportPdf(s->getDocument(), file, pages.empty() ? nullptr : pages.c_str(), nullptr,
-                                    EXPORT_BACKGROUND_ALL, false, secret ? ExportBackend::CAIRO : ExportBackend::DEFAULT);
-        }
-        if (secret) {
-            const QString dir = temporary.path();
-            QTimer::singleShot(std::chrono::minutes(10), this, [dir] { QDir(dir).removeRecursively(); });
-        }
-    } catch (const std::exception& e) {
-        Q_EMIT message(tr("Printing failed"), QString::fromUtf8(e.what()), true);
+    if (const std::string error = xqt::writePrintFile(*s, withAnnotations, range.trimmed().toStdString(), file);
+        !error.empty()) {
+        Q_EMIT message(tr("Printing failed"), QString::fromStdString(error), true);
         return false;
     }
 
@@ -5739,7 +5725,9 @@ bool AppController::printDocument(bool withAnnotations, const QString& range) {
         arguments << "-o" << "print-color-mode=monochrome";
     }
     arguments << QString::fromStdString(file.string());
-    if (!QProcess::startDetached("lp", arguments)) {
+    // (lp returns once the job's data is in the spool: the file goes then, at the latest after ten minutes)
+    temporary.setAutoRemove(false);
+    if (!xqt::spoolAndRemove("lp", arguments, temporary.path(), std::chrono::minutes(10), this)) {
         Q_EMIT message(tr("Printing failed"), tr("Could not hand the document to the printer (lp)."), true);
         return false;
     }

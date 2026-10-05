@@ -3,6 +3,15 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <chrono>
+#include <cmath>
+#include <fstream>
+#include <functional>
+#include <mutex>
+
+#include <QCoreApplication>
+#include <QDir>
+#include <QElapsedTimer>
 #include <QPrinter>
 #include <QTemporaryDir>
 #include <QUrl>
@@ -10,6 +19,17 @@
 #include <gtest/gtest.h>
 #include <poppler.h>
 
+#include <qpdf/QPDF.hh>
+#include <qpdf/QPDFWriter.hh>
+
+#include "model/Document.h"
+#include "model/Layer.h"
+#include "model/Point.h"
+#include "model/Stroke.h"
+#include "model/XojPage.h"
+#include "session/AppContext.h"
+#include "session/DocumentSession.h"
+#include "session/PdfEncryption.h"
 #include "shell/PdfPrinting.h"
 
 namespace {
@@ -132,4 +152,85 @@ TEST(PdfPrinting, aFileThatIsNoPdfIsAnError) {
     QString error;
     EXPECT_FALSE(xqt::printPdfAsImages(dir.filePath("missing.pdf"), printer, &error));
     EXPECT_FALSE(error.isEmpty());
+}
+
+namespace {
+/// Wait (with events) until `done`
+bool waitUntil(const std::function<bool()>& done, int ms = 10000) {
+    QElapsedTimer t;
+    t.start();
+    while (!done() && t.elapsed() < ms) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+    }
+    return done();
+}
+}  // namespace
+
+// A protected document (qt/docs/hybrid-pdf.md, "Encrypted PDFs") printed without its annotations: its PDF as it is,
+// without the password (the printer cannot open an encrypted PDF), and no ink; with them: the ink too
+TEST(PrintFile, aProtectedDocumentIsPrintedWithOrWithoutItsAnnotations) {
+    QTemporaryDir tmp;
+    const fs::path dir(tmp.path().toStdString());
+    {
+        cairo_surface_t* surface = cairo_pdf_surface_create((dir / "white.pdf").string().c_str(), 595, 842);
+        cairo_t* cr = cairo_create(surface);
+        cairo_show_page(cr);
+        cairo_show_page(cr);
+        cairo_destroy(cr);
+        cairo_surface_destroy(surface);
+        QPDF q;
+        q.processFile((dir / "white.pdf").string().c_str());
+        QPDFWriter w(q, (dir / "locked.pdf").string().c_str());
+        w.setR6EncryptionParameters("pw", "owner", true, true, true, true, true, true, qpdf_r3p_full, true);
+        w.write();
+    }
+    QTemporaryDir config;
+    xqt::AppContext app(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(config.filePath("settings.xml").toStdString()), 1);
+    auto loaded = xqt::DocumentSession::loadFile(dir / "locked.pdf", false, "pw");
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    xqt::DocumentSession s(app, std::move(loaded.document));
+    ASSERT_TRUE(s.isProtected());
+    {
+        std::unique_lock lock(*s.getDocument());
+        auto stroke = std::make_unique<Stroke>();
+        stroke->setWidth(40);
+        stroke->setColor(Color(0xff000000U));
+        stroke->addPoint(Point(100, 100));
+        stroke->addPoint(Point(500, 700));
+        stroke->getBoundingBox();
+        s.getDocument()->getPage(0)->getSelectedLayer()->addElement(std::move(stroke));
+    }
+    const fs::path without = dir / "without.pdf", with = dir / "with.pdf";
+    EXPECT_EQ(xqt::writePrintFile(s, false, "", without), "");
+    EXPECT_EQ(xqt::writePrintFile(s, true, "", with), "");
+    for (const fs::path& f: {without, with}) {
+        EXPECT_FALSE(xqt::PdfEncryption::probe(f).encrypted) << f << ": the printer opens it";
+        EXPECT_EQ(pagesOf(QString::fromStdString(f.string())).size(), 2u);
+    }
+    EXPECT_EQ(darkShare(QString::fromStdString(without.string()), 0), 0.0) << "without the annotations";
+    EXPECT_GT(darkShare(QString::fromStdString(with.string()), 0), 0.01) << "with them";
+}
+
+// The print file goes as soon as the spooler took it (lp returns then), at the latest after the fallback; one that
+// cannot be handed over goes at once
+TEST(PrintFile, theTemporaryFileGoesWhenTheSpoolerTookIt) {
+    QObject context;
+    auto folderWithFile = [] {
+        QTemporaryDir t;
+        t.setAutoRemove(false);
+        std::ofstream(t.filePath("print.pdf").toStdString()) << "%PDF";
+        return t.path();
+    };
+    const QString spooled = folderWithFile();
+    ASSERT_TRUE(xqt::spoolAndRemove("true", {}, spooled, std::chrono::minutes(10), &context));
+    EXPECT_TRUE(waitUntil([&] { return !QDir(spooled).exists(); })) << "removed when the spooler finished";
+
+    const QString slow = folderWithFile();
+    ASSERT_TRUE(xqt::spoolAndRemove("sleep", {"30"}, slow, std::chrono::milliseconds(300), &context));
+    EXPECT_TRUE(QDir(slow).exists()) << "not while the spooler reads it";
+    EXPECT_TRUE(waitUntil([&] { return !QDir(slow).exists(); }, 5000)) << "the fallback";
+
+    const QString failed = folderWithFile();
+    EXPECT_FALSE(xqt::spoolAndRemove("no-such-spooler-xqt", {}, failed, std::chrono::minutes(10), &context));
+    EXPECT_FALSE(QDir(failed).exists());
 }

@@ -987,9 +987,10 @@
   sends; the plain PDF export of a protected document keeps its password. Nothing of a protected document stays
   unencrypted in the cache (the autosave is an encrypted PDF, no crash save, no stored previews, no library index or
   handwriting cache, clean copies and versions encrypted; tested by looking for a marker text in every cache file);
-  library cards show a lock ([hybrid-pdf.md](hybrid-pdf.md), "Encrypted PDFs"). Left: pictures of Markdown boxes and
-  voice memos inside a protected PDF are taken out into the cache while it is open; Acrobat, Preview and pdf.js on
-  the device.
+  library cards show a lock; protecting removes every picture, index entry and copy the caches kept of the
+  document before; pictures and voice memos taken out while it is open do not survive a crash (removed at the next
+  start); printing honours "without annotations" and removes the unencrypted print file once `lp` spooled it
+  ([hybrid-pdf.md](hybrid-pdf.md), "Encrypted PDFs"). Left: Acrobat, Preview and pdf.js on the device.
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):

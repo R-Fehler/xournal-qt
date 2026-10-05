@@ -3,7 +3,14 @@
 #include <algorithm>
 #include <cmath>
 
+#include <memory>
+#include <shared_mutex>
+
 #include <QCoreApplication>
+#include <QDir>
+#include <QPointer>
+#include <QProcess>
+#include <QTimer>
 #include <QImage>
 #include <QPainter>
 #include <QPrinter>
@@ -11,6 +18,11 @@
 
 #include <cairo.h>
 #include <poppler.h>
+
+#include "control/ExportHelper.h"
+#include "model/Document.h"
+#include "session/DocumentSession.h"
+#include "session/PdfEncryption.h"
 
 namespace xqt {
 
@@ -123,4 +135,57 @@ bool printPdfAsImages(const QString& pdfFile, QPrinter& printer, QString* error)
     return ok || fail(tr("The printer stopped taking pages."));
 }
 
+std::string writePrintFile(DocumentSession& session, bool withAnnotations, const std::string& range,
+                           const fs::path& file) {
+    const bool secret = session.isProtected();
+    Document* doc = session.getDocument();
+    fs::path background;
+    {
+        std::shared_lock lock(*doc);
+        background = doc->getPdfFilepath();
+    }
+    try {
+        if (!withAnnotations && !background.empty()) {
+            if (!secret) {
+                fs::copy_file(background, file, fs::copy_options::overwrite_existing);
+                return {};
+            }
+            std::string error;  // (its pages as they are, without the password)
+            return PdfEncryption::rewrite(background, PdfEncryption::passwordOf(background), file, nullptr, error)
+                           ? std::string()
+                           : error;
+        }
+        // (qpdf's backend reads the PDF file itself, without the password: the cairo backend draws through poppler)
+        ExportHelper::exportPdf(doc, file, range.empty() ? nullptr : range.c_str(), nullptr, EXPORT_BACKGROUND_ALL,
+                                false, secret ? ExportBackend::CAIRO : ExportBackend::DEFAULT);
+    } catch (const std::exception& e) {
+        return e.what();
+    }
+    return {};
+}
+
+bool spoolAndRemove(const QString& program, const QStringList& arguments, const QString& folder,
+                    std::chrono::milliseconds fallback, QObject* context) {
+    auto remove = std::make_shared<std::function<void()>>([folder] { QDir(folder).removeRecursively(); });
+    auto* process = new QProcess(context);
+    QObject::connect(process, &QProcess::finished, context, [process, remove](int, QProcess::ExitStatus) {
+        (*remove)();  // (lp is done with it: the job's data is in the spool, or it failed)
+        process->deleteLater();
+    });
+    QObject::connect(process, &QProcess::errorOccurred, context, [process, remove](QProcess::ProcessError e) {
+        if (e == QProcess::FailedToStart) {
+            (*remove)();
+            process->deleteLater();
+        }
+    });
+    QTimer::singleShot(fallback, context, [remove] { (*remove)(); });  // (at the latest)
+    process->start(program, arguments);
+    if (!process->waitForStarted(5000)) {
+        (*remove)();
+        return false;
+    }
+    return true;
+}
+
 }  // namespace xqt
+
