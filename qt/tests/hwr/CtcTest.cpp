@@ -5,6 +5,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
 #include <cmath>
 
 #include <QDir>
@@ -241,4 +242,24 @@ TEST(CtcTest, aLongLineIsDrawnWhole) {
         ink += grey[static_cast<size_t>(y * w + x)] < 128 ? 1 : 0;
     }
     EXPECT_GT(ink, 0);
+}
+
+// A model folder exported by the training (qt/research/hwr/train: export.py ... --kind ctc) is read by the app: its
+// manifest and files are accepted, it runs, and its words land on the ink's word boxes
+TEST(CtcTest, anExportedModelIsRead) {
+    const QString dir = qEnvironmentVariable("XQT_HWR_CTC_MODEL");
+    if (dir.isEmpty() || qEnvironmentVariableIsEmpty("XQT_ONNXRUNTIME")) {
+        GTEST_SKIP() << "set XQT_HWR_CTC_MODEL to an exported CTC model's folder and XQT_ONNXRUNTIME";
+    }
+    const ModelInfo info = ModelInfo::read(dir);
+    ASSERT_TRUE(info.valid());
+    CtcRecognizer rec(dir);
+    QString why;
+    ASSERT_TRUE(rec.ready(&why)) << why.toStdString();
+    const LineInput line = lineOf(3);
+    const auto result = rec.recognizeLine(line, {});
+    ASSERT_TRUE(result);
+    for (const auto& w: result->words) {
+        EXPECT_TRUE(std::any_of(line.words.begin(), line.words.end(), [&](const auto& in) { return in.box == w.box; }));
+    }
 }
