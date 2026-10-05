@@ -28,6 +28,8 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
     const QString tools = tr("Tools");
     actions = {
             {"newDocument", tr("New document"), document, QStringList{"Ctrl+Shift+N"} + standard(QKeySequence::AddTab)},
+            // (qt/docs/quick-note.md: a new note in the library's Inbox, or a line in today's Markdown note there)
+            {"quickNote", tr("Quick note"), document, {"Ctrl+Alt+N"}},
             {"open", tr("Open…"), document, standard(QKeySequence::Open)},
             {"save", tr("Save"), document, standard(QKeySequence::Save)},
             {"saveAs", tr("Save as…"), document, standard(QKeySequence::SaveAs)},

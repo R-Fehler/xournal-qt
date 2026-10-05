@@ -561,11 +561,14 @@ xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open 
     in Xournal++; orientation; it is saved at once in
     the current folder), "New Markdown file…" and "New text file…" (an empty `name.md` / `name.txt` there, opened to
     write in: [md-editor.md](md-editor.md)).
+  - Quick note (the lightning): a new note in the library's `Inbox/` named by the date and time, opened at once; or a
+    line in today's `Inbox/<date>.md` (a setting). Also Ctrl+Alt+N, ⋮ → Document in a document and `xournal-qt --quick-note`
+    ([quick-note.md](quick-note.md)).
   - Import: files, or a folder with all its subfolders (the Import button's menu); also dropping files or folders
     from the file manager. They are copied.
   - New folder
   - In a window too narrow for all these buttons (and on a phone, where it floats at the bottom right) they are one
-    button, **"+"**: New document…, New Markdown file…, New text file…, Import files…, Import a folder…, New folder…
+    button, **"+"**: Quick note, New document…, New Markdown file…, New text file…, Import files…, Import a folder…, New folder…
     (on Recent: Open a file…); the ways to show the cards (All documents at once, Kinds of files shown, Sort, Last
     page, the size of the cards) are in **View**; Favourites is the star of the switch at every size
     ([adaptive-layout.md](adaptive-layout.md), "The home screen and the tab overview").

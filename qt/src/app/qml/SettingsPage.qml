@@ -630,6 +630,20 @@ Popup {
                         text: qsTr("A PDF document opens in any PDF app and carries its text as a Markdown file inside. "
                                    + "Markdown files you have stay Markdown files.")
                     }
+                    // Quick note (qt/docs/quick-note.md): Ctrl+Alt+N, the home screen, ⋮, --quick-note
+                    ComboRow {
+                        objectName: "quickNoteRow"
+                        key: "quickNote"
+                        text: qsTr("Quick note")
+                        options: [
+                            { text: qsTr("A new note"), value: "note" },
+                            { text: qsTr("A line in today's Markdown note"), value: "daily" }
+                        ]
+                    }
+                    Hint {
+                        text: qsTr("Quick notes go into the folder “Inbox” of the library: a new note is named by the date "
+                                   + "and time; today's Markdown note by the date, a line with the time added each time.")
+                    }
                     SectionTitle { text: qsTr("Start") }
                     SwitchRow { key: "restoreSession"; text: qsTr("Reopen the documents of the last session") }
                     SwitchRow { key: "resumeAtLastPage"; text: qsTr("Open documents where they were left off") }

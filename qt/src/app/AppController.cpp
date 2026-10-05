@@ -2133,19 +2133,27 @@ fs::path AppController::journalFileFor(const Library& lib) {
 }
 
 bool AppController::createDocument(const QString& name, bool inLibrary) {
-    // The page template settings (background, size) are what the dialog changed.
+    if (!inLibrary || !library->available()) {
+        // The page template settings (background, size) are what the dialog changed.
+        tabs->addTab(std::make_unique<DocumentSession>(*app));
+        setHomeVisible(false);
+        return true;
+    }
+    fs::path path(library->newDocumentPath(name).toStdString());
+    if (pdfOnly()) {
+        // PDF files mode: a new document is "name.pdf", a PDF with notes (the name is free for every document type)
+        path.replace_extension(".pdf");
+    }
+    return createDocumentAt(path);
+}
+
+bool AppController::createDocumentAt(fs::path path) {
     auto s = std::make_unique<DocumentSession>(*app);
     DocumentSession* created = s.get();
     tabs->addTab(std::move(s));
     setHomeVisible(false);
-    if (!inLibrary || !library->available()) {
-        return true;
-    }
-    fs::path path(library->newDocumentPath(name).toStdString());
     DocumentSession::SaveResult r;
-    if (pdfOnly()) {
-        // PDF files mode: a new document is "name.pdf", a PDF with notes (the name is free for every document type)
-        path.replace_extension(".pdf");
+    if (path.extension() == ".pdf") {
         r = created->saveAsHybrid(path);
     } else {
         r = created->saveAs(path);

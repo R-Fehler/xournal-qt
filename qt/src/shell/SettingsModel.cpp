@@ -307,6 +307,18 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             DocumentMode::setNewTextDocuments(
                     s, v.toString() == "pdf" ? DocumentMode::TextKind::Pdf : DocumentMode::TextKind::Markdown);
         });
+    // Quick note (qt/docs/quick-note.md): "note" (the default: a new note in the library's Inbox, named by the date and
+    // time) or "daily" (a line "- HH:MM " added to today's Inbox/<date>.md)
+    add("quickNote",
+        [&s] {
+            std::string v;
+            s.getCustomElement("xournalQt").getString("quickNote", v);
+            return QVariant(v == "daily" ? QStringLiteral("daily") : QStringLiteral("note"));
+        },
+        [&s](const QVariant& v) {
+            s.getCustomElement("xournalQt").setString("quickNote", v.toString() == "daily" ? "daily" : "note");
+            s.customSettingsChanged();
+        });
     add("canvasMemory", [&s] { return QVariant(canvasMemory(s)); },
         [&s](const QVariant& v) {
             const int maxMb = static_cast<int>(CanvasMemory::maxLimit() / (1024 * 1024));

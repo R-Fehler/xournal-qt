@@ -71,7 +71,11 @@ bool SingleInstance::listen() {
                 }
                 socket->write("ok");
                 socket->flush();
+                const bool quickNote = paths.removeAll(QLatin1String(QUICK_NOTE)) > 0;
                 Q_EMIT filesRequested(paths);
+                if (quickNote) {
+                    Q_EMIT quickNoteRequested();
+                }
             });
         }
     });
