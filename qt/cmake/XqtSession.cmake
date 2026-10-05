@@ -99,6 +99,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementGroups.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementTimes.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementTimes.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/Timeline.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/Timeline.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageNoteSpace.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageNoteSpace.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/Citation.h
@@ -211,6 +213,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TemplateFileTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/GroupsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/ElementTimesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TimelineTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/NoteSpaceTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/CitationTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BookmarksTest.cpp

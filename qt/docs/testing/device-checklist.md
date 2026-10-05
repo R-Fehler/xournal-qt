@@ -3380,3 +3380,14 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
 - [ ] Erase across a stroke with the partial stroke eraser, recolour and move strokes: the replay shows them at the
       time they were first written (where they ended up).
 - [ ] The size of a long handwritten `.xopp` before and after this build (about 5 bytes more per stroke).
+
+## The timeline: order, sessions, recordings (qt/timeline, qt/docs/timeline.md)
+
+Seen through the replay (⋮ → View → Replay the writing).
+- [ ] A document written over two days: one session mark per day on the bar; pauses of a minute while writing take
+      about a second and a half.
+- [ ] A document recorded in xournal-qt with a pause of the recorder in the middle: the ink written after the pause
+      appears when the words that went with it are heard.
+- [ ] Xournal++'s own fixture with a recording (or a lecture recorded in Xournal++ 1.2 with its audio folder set in
+      Settings): the ink comes with the recording, in time.
+- [ ] An old document (no times): its ink comes first, page by page, within a few seconds.
