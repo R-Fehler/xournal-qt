@@ -4,6 +4,7 @@
 #include <cmath>
 #include <limits>
 #include <numeric>
+#include <optional>
 
 #include "model/Element.h"
 #include "model/Layer.h"
@@ -31,6 +32,36 @@ InkStroke InkStroke::of(std::vector<QPointF> points, float width, std::vector<fl
     return s;
 }
 
+namespace {
+/// A pen stroke as the layout takes it (none: not a pen stroke, or empty)
+std::optional<InkStroke> inkOf(const Element* e) {
+    if (e->getType() != ELEMENT_STROKE) {
+        return std::nullopt;
+    }
+    const auto* stroke = static_cast<const Stroke*>(e);
+    if (stroke->getToolType() != StrokeTool::PEN || stroke->getPointCount() == 0) {
+        return std::nullopt;
+    }
+    const std::vector<Point>& pts = stroke->getPointVector();
+    std::vector<QPointF> points;
+    points.reserve(pts.size());
+    std::vector<float> widths;
+    const bool pressure = std::any_of(pts.begin(), pts.end(), [](const Point& p) { return p.z != Point::NO_PRESSURE; });
+    if (pressure) {
+        widths.reserve(pts.size());
+    }
+    for (const Point& p: pts) {
+        points.emplace_back(p.x, p.y);
+        if (pressure) {
+            widths.push_back(static_cast<float>(p.z != Point::NO_PRESSURE ? p.z : stroke->getWidth()));
+        }
+    }
+    InkStroke s = InkStroke::of(std::move(points), static_cast<float>(stroke->getWidth()), std::move(widths));
+    s.filled = stroke->getFill() > 0;
+    return s;
+}
+}  // namespace
+
 std::vector<InkStroke> strokesOf(const XojPage& page) {
     std::vector<InkStroke> out;
     for (const Layer* layer: page.getLayersView()) {
@@ -38,32 +69,19 @@ std::vector<InkStroke> strokesOf(const XojPage& page) {
             continue;
         }
         for (const auto& e: layer->getElementsView()) {
-            if (e->getType() != ELEMENT_STROKE) {
-                continue;
+            if (auto s = inkOf(e)) {
+                out.push_back(std::move(*s));
             }
-            const auto* stroke = static_cast<const Stroke*>(e);
-            if (stroke->getToolType() != StrokeTool::PEN || stroke->getPointCount() == 0) {
-                continue;
-            }
-            const std::vector<Point>& pts = stroke->getPointVector();
-            std::vector<QPointF> points;
-            points.reserve(pts.size());
-            std::vector<float> widths;
-            const bool pressure = std::any_of(pts.begin(), pts.end(), [](const Point& p) {
-                return p.z != Point::NO_PRESSURE;
-            });
-            if (pressure) {
-                widths.reserve(pts.size());
-            }
-            for (const Point& p: pts) {
-                points.emplace_back(p.x, p.y);
-                if (pressure) {
-                    widths.push_back(static_cast<float>(p.z != Point::NO_PRESSURE ? p.z : stroke->getWidth()));
-                }
-            }
-            InkStroke s = InkStroke::of(std::move(points), static_cast<float>(stroke->getWidth()), std::move(widths));
-            s.filled = stroke->getFill() > 0;
-            out.push_back(std::move(s));
+        }
+    }
+    return out;
+}
+
+std::vector<InkStroke> strokesOf(const std::vector<const Element*>& elements) {
+    std::vector<InkStroke> out;
+    for (const Element* e: elements) {
+        if (auto s = inkOf(e)) {
+            out.push_back(std::move(*s));
         }
     }
     return out;

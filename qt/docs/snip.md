@@ -7,12 +7,14 @@ ask the user whether they also want to paste a link to the source document and p
 
 ## Using it
 
-- **Where:** the select button's list (press and hold, or right-click): "Snip a rectangle (copy its picture)" and
-  "Snip with the lasso"; the image button's list (press and hold, or right-click): "Snip from a page (copy a
-  picture)" and "Snip with the lasso" (a tap on it still opens the file picker); the keys **Shift+S** (rectangle) and
-  **Shift+L** (lasso), changeable in the shortcut sheet; with the toolbox, a **Snip** entry of one's own ("+" → Snip,
-  qt/ui-rework): its icon is its shape, a tap snips, a tap while it is armed takes the other shape (it keeps it). The snips are only in the list: a tap on the select button
-  still goes rectangle ↔ lasso, and a snip is never remembered as the button's variant.
+- **Where:** with the toolbox, a **fixed tool of the rail** after select (qt/copy-tools, the author: "Snip should be
+  one click away … not hidden behind the normal select tool"): its icon is its shape, a tap snips, a tap while it is
+  armed takes the other shape (remembered); held: both shapes and the resolution. In the classic tool bar: the select
+  button's list (press and hold, or right-click): "Snip a rectangle (copy its picture)" and "Snip with the lasso".
+  Everywhere: the image button's list (press and hold, or right-click): "Snip from a page (copy a picture)" and "Snip
+  with the lasso" (a tap on it still opens the file picker); the keys **Shift+S** (rectangle) and **Shift+L** (lasso),
+  changeable in the shortcut sheet; a **Snip** entry of one's own in the toolbox ("+" → Snip, qt/ui-rework). A tap on
+  the select button still goes rectangle ↔ lasso, and a snip is never remembered as the select button's variant.
 - **One snip per activation**, as screenshot tools do: the select tool of that shape is taken, the next rectangle or
   lasso dragged over a page is copied, and the tool in hand before comes back. "Copied picture" says it worked. A tap
   is no snip (it stays armed); Escape, the select button, a key or any other tool ends it (Escape gives the tool
@@ -27,9 +29,17 @@ ask the user whether they also want to paste a link to the source document and p
   layer: ink, text, images, Markdown boxes, sticky notes (a covering note that peeks is drawn as it peeks). Never what
   lies over the page on the screen only: the curtain and the spotlight, the hover pointer, a selection and its handles,
   the rectangle or lasso being drawn, the setsquare.
-- **Resolution:** the screen's (zoom × the screen's pixel ratio) but at least 200 dpi (`region::MIN_DPI`, the same as
-  `PageClipboard::IMAGE_DPI`: a page turned into a picture); at most about 4 megapixels (`region::MAX_PIXELS`): a big
-  area is drawn with less, whatever the screen shows. The PNG carries its resolution (dots per meter), so other apps
+- **Resolution:** a setting, chosen once and not asked with every snip (the author, 2026-10-05: "it should only be
+  adjusted, not asked every time the user does a snip"): Settings → Documents → "Pictures copied to the clipboard" →
+  Snip, the snip button's list (held), and a snip entry's editor (`snipResolution`: `screen`, `high`, `veryHigh`):
+  - **As sharp as the screen** (the default, as before): the screen's (zoom × the screen's pixel ratio) but at least
+    200 dpi (`region::MIN_DPI`, the same as `PageClipboard::IMAGE_DPI`), at most about 4 megapixels
+    (`region::MAX_PIXELS`);
+  - **High (300 dpi)** and **Very high (600 dpi)**: at least that (more where the screen shows more), at most 36
+    megapixels (`snip::HIGH_MAX_PIXELS`: A4 at 600 dpi is 34.8; a picture of 36 MP takes 144 MB while it is made and
+    copied, which a desktop takes in its stride).
+  A bigger area is drawn with fewer pixels. The note after a snip names the size, "Copied picture (1000×417 pixels,
+  300 dpi)", and says when it was made smaller: "… 600 dpi: the area is too large for more". The PNG carries its resolution (dots per meter), so other apps
   paste it at the size it had on the page.
 - **The lasso:** the picture is the lasso's bounding box, transparent outside its shape (an antialiased edge).
 - **On the clipboard:** the picture (Qt offers it as `image/png` and the platform's other picture formats; `image/png`
@@ -62,10 +72,13 @@ ask the user whether they also want to paste a link to the source document and p
 | `CanvasView::snip` / `snipped` | Draws the picture off the UI thread (`std::async`; the view waits for it when it goes). |
 | `CanvasView::pasteElements`, `insertImage` (`size`), `offerSnipLink` / `addSnipLink`, `MarkdownEditor` (Ctrl+V) | Pasting, the offer, the link. |
 | `qt/src/app/AppSnip.cpp` | Arming (`startSnip`, `cancelSnip`), the clipboard, giving the tool back, `addSnipLink`. |
-| `ToolGroups.qml`, `Main.qml` (`imageMenu`, the snackbar's offer, Shift+S / Shift+L, Escape) | The UI. |
+| `Snip.h` (`Resolution`, `minDpi`, `maxPixels`), `AppController::snipResolution` | The resolution (the setting `snipResolution`). |
+| `ToolGroups.qml` (`snip`, `snipResolutions`), `Main.qml` (`snipButton`, `imageMenu`, the snackbar's offer, Shift+S / Shift+L, Escape), `ToolCycleButton.qml` (the resolution in its list), `ToolEntryEditor.qml`, `SettingsPage.qml` | The UI. |
 
 Tests: `RegionRender.*` (`-L unit`: the ink and the PDF in the area at their place, only the part on the page, the
-background alone, the lasso's transparency, the scale and the size limit), `SnipTest.*` (`-L ui`: the select list and
+background alone, the lasso's transparency, the scale and the size limit), `CopyToolsTest.snipHasAButtonOfItsOwn`
+(`-L ui`: the rail's button, its cycle, Shift+S, not in the select list; the classic bar's list), `SnipTest.*` (`-L ui`:
+the resolution's effect on the picture's size and the note, the limit at the screen's; the select list and
 the image menu, the clipboard's formats and source, the tool given back, Escape and other tools, a view for reading
 only, the pasted size and the link marker, no offer without a file, the Markdown link in a `.md`).
 

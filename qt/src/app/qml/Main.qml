@@ -310,7 +310,7 @@ ApplicationWindow {
     readonly property bool toolsInFormatBar: textDoc && formatBar.shown && !sideToolbar && fullChrome && !app.toolbarHidden
                                              && !phoneChrome
     /// The cycling buttons' groups (ToolGroups.qml): the tool bar, the compact chrome's tools and the pen pill
-    readonly property ToolGroups toolGroups: ToolGroups {}
+    readonly property ToolGroups toolGroups: ToolGroups { snipButton: win.toolboxShown }
     /// Opens a menu from an entry of another one: on a phone once the sheet of that one has gone
     function openAfterMenus(menu) {
         if (!menuSheet.visible) {
@@ -957,7 +957,7 @@ ApplicationWindow {
         // (recording, qt/docs/audio.md: a fixed tool of the rail, so it is there docked, floating in full screen and while
         // presenting; it leaves the command bar then)
         fixedButtons: win.toolboxShown && !compact
-                      ? [handTool, selectTool, writeButton, geometryTool, pdfTextTool, touchDrawingTool]
+                      ? [handTool, selectTool, snipTool, writeButton, geometryTool, pdfTextTool, touchDrawingTool]
                         .concat(recordTool.offered ? [recordTool] : []) : []
         onAllToolsRequested: phoneToolSheet.open()
         onPagesRequested: pageGrid.open()
@@ -1214,7 +1214,7 @@ ApplicationWindow {
         readonly property var slots: ({
             undo: undoTool, redo: redoTool,
             pen: penTool, eraser: eraserTool, hand: handTool, touchDrawing: touchDrawingTool, select: selectTool,
-            text: textTool, write: writeButton, sticky: stickyTool, shape: shapeTool, geometry: geometryTool,
+            snip: snipTool, text: textTool, write: writeButton, sticky: stickyTool, shape: shapeTool, geometry: geometryTool,
             pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, sticker: stickerTool, record: recordTool, addPage: addPageTool,
             search: searchTool,
             fullScreen: fullScreenTool, present: presentTool, read: readTool, replay: replayTool, settings: settingsTool,
@@ -1223,7 +1223,7 @@ ApplicationWindow {
             share: shareTool, print: printTool, bookmark: bookmarkTool, favourite: favouriteTool, tags: tagsTool
         })
         readonly property var order: ["undo", "redo",
-                                      "pen", "eraser", "hand", "touchDrawing", "select", "text", "write", "sticky",
+                                      "pen", "eraser", "hand", "touchDrawing", "select", "snip", "text", "write", "sticky",
                                       "shape", "geometry", "pdfText", "emoji", "image", "sticker", "record", "addPage", "search",
                                       "fullScreen", "present", "read", "replay", "settings", "new", "open", "save",
                                       "milestone", "editAsNotes", "openExternally", "share", "print", "bookmark",
@@ -1850,6 +1850,9 @@ ApplicationWindow {
             onClicked: app.settings.set("touchDrawing", !checked)
         }
         ToolCycleButton { id: selectTool; objectName: "selectButton"; parent: toolBank; group: "select"; property bool offered: !win.textDoc }
+        // Snip (qt/docs/snip.md): one tap away, a fixed tool of the rail (qt/copy-tools); a tap while armed: the other
+        // shape. (The classic tool bar keeps the snips in the select list: a button more there squeezes the widths.)
+        ToolCycleButton { id: snipTool; objectName: "snipButton"; parent: toolBank; group: "snip"; property bool offered: !win.textDoc && win.toolboxShown }
         // A text box, written in Markdown and shown formatted (the only text box the bar offers; old plain texts are
         // still edited as they are). Tapped again, held or right-clicked: the font.
         IconButton {
@@ -1972,7 +1975,9 @@ ApplicationWindow {
         }
         ToolCycleButton { id: shapeTool; objectName: "shapeButton"; parent: toolBank; group: "shape"; property bool offered: !win.textDoc && !win.toolboxShown }
         ToolCycleButton { id: geometryTool; objectName: "geometryButton"; parent: toolBank; group: "geometry"; property bool offered: !win.textDoc }
-        // Marking PDF text: highlight, underline, strike through, select; tapped again or held: how it marks
+        // Text on the page (ToolGroups "text"): marking PDF text (highlight, underline, strike through, select) ↔ copying
+        // handwriting as text (one sweep over ink, then the tool before; qt/copy-tools). A tap while one is in use: the
+        // other; held or right-clicked: both, and how PDF text is marked
         IconButton {
             id: pdfTextTool
             objectName: "pdfTextButton"
@@ -1980,17 +1985,38 @@ ApplicationWindow {
             property bool offered: !win.textDoc
             readonly property var icons: ({ "highlight": "xqt-mark-text", "underline": "xqt-underline",
                                             "strikethrough": "xqt-strikethrough", "select": "xopp-select-pdf-text-area" })
-            iconName: icons[app.pdfTextMode] || "xqt-mark-text"
-            label: qsTr("Mark PDF text")
-            tip: qsTr("Mark PDF text (drag over the text; tap again or hold: how it marks)")
-            checked: app.tool === "selectPdfTextLinear" || app.tool === "selectPdfTextRect"
+            readonly property string currentKey: win.toolGroups.current("text")
+            readonly property bool copies: currentKey === "copyInkText"
+            iconName: copies ? "xqt-copy-ink-text" : icons[app.pdfTextMode] || "xqt-mark-text"
+            label: win.toolGroups.variant("text", currentKey).name
+            tip: copies ? qsTr("Copy handwriting as text (sweep over the words; tap again: mark PDF text; hold: more)")
+                        : qsTr("Mark PDF text (drag over the text; tap again: copy handwriting as text; hold: how it marks)")
+            checked: win.toolGroups.isActive("text")
             ownHold: true
-            onClicked: checked ? Popups.openAt(pdfTextMenu) : app.selectTool("selectPdfTextLinear")
+            onClicked: win.toolGroups.tap("text")
             onPressAndHold: Popups.openAt(pdfTextMenu)
             TapHandler {
                 acceptedButtons: Qt.RightButton
                 acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
                 onTapped: function(point) { Popups.openAt(pdfTextMenu, point.position) }
+            }
+            // (two variants: the dots of a cycling button)
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: Math.max(2, (parent.height - pdfTextTool.icon.height) / 2 - 8)
+                spacing: 3
+                Repeater {
+                    model: 2
+                    delegate: Rectangle {
+                        required property int index
+                        width: 4
+                        height: 4
+                        radius: 2
+                        color: index === (pdfTextTool.copies ? 1 : 0)
+                               ? (pdfTextTool.checked ? Material.accentColor : "#505050") : "#b4b8bd"
+                    }
+                }
             }
             AdaptiveMenu {
                 id: pdfTextMenu
@@ -2024,6 +2050,16 @@ ApplicationWindow {
                     checkable: true
                     checked: app.tool === "selectPdfTextRect"
                     onTriggered: app.selectTool(checked ? "selectPdfTextRect" : "selectPdfTextLinear")
+                }
+                MenuSeparator {}
+                // Handwriting: its words (as the handwriting search read them) to the clipboard as text
+                AdaptiveMenuItem {
+                    objectName: "copyInkTextItem"
+                    text: win.withKeys(qsTr("Copy handwriting as text"), "copyInkText")
+                    icon.source: app.iconUrl("xqt-copy-ink-text")
+                    checkable: true
+                    checked: app.inkCopy
+                    onTriggered: win.toolGroups.activate("text", "copyInkText")
                 }
             }
         }
@@ -3148,6 +3184,16 @@ ApplicationWindow {
     }
     // "Save as sticker…" of the pills (qt/docs/stickers.md)
     StickerSaveDialog { id: stickerSaveDialog }
+
+    // Handwriting copied as text (the text tools' second tool, "Copy as text" of the selection): the text near it
+    InkTextToast {
+        id: inkTextToast
+        objectName: "inkTextToast"
+        canvasItem: canvas
+        referenceItem: referenceSplit.referenceCanvas
+        roomTop: win.controlsTop
+        roomBottom: win.controlsBottom
+    }
 
     // Selected PDF text: mark or copy it (at the text, going along with it).
     PdfTextPill {
@@ -4958,6 +5004,22 @@ ApplicationWindow {
     Connections {
         target: app
         function onPageActionDone(text, undoable) { snackbar.show(text, undoable) }
+        // Copy handwriting as text (qt/copy-tools): the text near the words; why not, with the way to Settings
+        function onInkTextCopy(result) {
+            if (result.state === "reading" || result.state === "copied") {
+                inkTextToast.show(result)
+                return
+            }
+            inkTextToast.close()
+            if (result.state === "nothing") {
+                snackbar.show(qsTr("No handwriting there to copy"), false)
+            } else {
+                snackbar.show(result.state === "off"
+                              ? qsTr("Copying handwriting as text needs the handwriting search (Settings → Search)")
+                              : qsTr("No handwriting model to read it with (Settings → Search)"),
+                              false, qsTr("Settings"), function() { settingsPage.open(); settingsPage.showSearch() })
+            }
+        }
         // A snip pasted from a document with a file (qt/docs/snip.md): a link to its page, if wanted
         function onSnipLinkOffered(title) {
             snackbar.show(qsTr("Add a link to the source page (%1)?").arg(title), false, qsTr("Add link"),
@@ -5461,6 +5523,7 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("toolLasso"); enabled: toolKeys; onActivated: app.selectTool("selectRegion") }
     Shortcut { sequences: win.keysOf("snip"); enabled: toolKeys; onActivated: app.startSnip("rect") }
     Shortcut { sequences: win.keysOf("snipLasso"); enabled: toolKeys; onActivated: app.startSnip("lasso") }
+    Shortcut { sequences: win.keysOf("copyInkText"); enabled: toolKeys; onActivated: win.toolGroups.activate("text", "copyInkText") }
     Shortcut { sequences: win.keysOf("toolHand"); enabled: toolKeys; onActivated: app.selectTool("hand") }
     Shortcut { sequences: win.keysOf("insertImage"); enabled: toolKeys; onActivated: imageDialog.open() }
     // The curtain: out or away again (whatever is out); Esc hides its handles first

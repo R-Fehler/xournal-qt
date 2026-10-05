@@ -41,9 +41,11 @@ highlighted, let go: the rail goes there (remembered per window size, `layout/<c
 Toolbox position).
 
 **Head and tail.** Undo and redo lead the rail (one place: the view pill has them no more while the toolbox is shown).
-After the user's tools come the fixed tools: hand, select (rectangle ↔ lasso, the snips in its list), write on the
-page, setsquare / compass (curtain and spotlight in its list), mark PDF text, the finger draws, and **record audio**
-where the build can record ([audio.md](audio.md); its list: the play tool, the recordings). They are the window's own
+After the user's tools come the fixed tools: hand, select (rectangle ↔ lasso), **snip** (rectangle ↔ lasso, one tap
+away since qt/copy-tools; its list also holds the snips' resolution, [snip.md](snip.md)), write on the page, setsquare
+/ compass (curtain and spotlight in its list), **mark PDF text ↔ copy handwriting as text** (a cycle, the "text"
+group; its list says how PDF text is marked; [handwriting-search.md](handwriting-search.md)), the finger draws, and
+**record audio** where the build can record ([audio.md](audio.md); its list: the play tool, the recordings). They are the window's own
 buttons, lent to the rail (`Toolbox.fixedButtons`): one place each, so the command bar leaves them out. Recording is
 among them rather than in the command bar because the rail is the one element that stays in full screen and while
 presenting (floating): a lecture is recorded there too. Folded into a stack, the stack shows the record button while
@@ -52,8 +54,10 @@ it records. The recording and playback pills sit at the top of the page, below t
 ## Short rails
 
 `ToolboxPlan.js` is a pure function of the rail's length and its sections. When the tools do not fit, sections fold
-into **stacks**, one by one: the fixed tools first (one button showing the one in use; a tap lists them), then the
-user's sections from the end. A stack shows the entry of its section used last (the one in hand if it is there) with
+into **stacks**, one by one: the fixed tools first, from their end (qt/copy-tools: the last two go into one stack
+after the others, then one more at a time until all are in it; the stack shows the one of them in use; a tap lists
+them), then the user's sections from the end. At 1920×1080 with the first tools the mark-PDF-text button and the
+finger switch (and recording) are in that stack; at 1200 px high everything is on its own. A stack shows the entry of its section used last (the one in hand if it is there) with
 dots for how many it holds; a tap takes it, a tap on it while it is in hand or a long press opens the section's list
 beside it. Only when everything is folded and it still does not fit, the middle scrolls. A rail that grows unfolds only
 with 16 px to spare (no flicker at an edge).
@@ -103,7 +107,8 @@ Weighed and left where they are (one place each):
   page menu; `qt/version-compare` is reworking it (the reference view, the History panel), so the bar waits for it.
 - **The version history**: the History panel of the sidebar (its button); the bar has only the milestone, and only
   where versions are kept.
-- **Snip**: a tool, so the rail's (a toolbox entry, the select button's list) and the image button's list.
+- **Snip**: a tool, so the rail's (a fixed tool since qt/copy-tools, and a toolbox entry) and the image button's
+  list.
 - **Templates**: the add-a-page button's hold (the templates used last, all templates, save as template).
 - **Present, full screen, search, share**: already buttons of the bar.
 
@@ -219,7 +224,8 @@ tools. The last eraser cannot be removed.
 
 ## Tests
 
-`ToolboxModel.*` and `ToolboxApply.*` (`-L shell`), `ViewSnapping.*` (`-L canvas`), `ToolboxTest.*` (`-L ui`): docked
+`CopyToolsTest.*` (`-L ui`): the snip button among the fixed tools, not in the select list (the classic bar keeps
+them there), the text tools' cycle. `ToolboxModel.*` and `ToolboxApply.*` (`-L shell`), `ViewSnapping.*` (`-L canvas`), `ToolboxTest.*` (`-L ui`): docked
 at the right with undo / redo and the fixed tools, a tap and the tool in hand, the edges per size class, stacks in a
 short rail, the classic bar back, the editor, "+", the menu, carrying a tool and the grip, full screen and presenting,
 the phone's dock and sheet, the command bar's promoted entries, a text document's format bar, reading.

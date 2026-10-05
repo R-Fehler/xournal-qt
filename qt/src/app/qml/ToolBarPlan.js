@@ -26,7 +26,7 @@ var LADDER = PROMOTED.concat([
     // is how the file is edited)
     "new", "open", "save", "settings", "present", "fullScreen", "editAsNotes", "search", "sticker", "record",
     "openExternally",
-    "addPage", "image", "emoji", "pdfText", "geometry", "shape",
+    "snip", "addPage", "image", "emoji", "pdfText", "geometry", "shape",
     "colors:single",
     "sticky", "write", "text", "touchDrawing", "select", "hand"
 ])
@@ -36,7 +36,8 @@ var ROW_OF = { edit: 0, tools: 0, view: 0, colors: 1, widths: 1, insert: 1, doc:
 /// The groups of the buttons (the colors and widths are strips of their own)
 var GROUP_OF = {
     undo: "edit", redo: "edit",
-    pen: "tools", eraser: "tools", hand: "tools", touchDrawing: "tools", select: "tools", text: "tools", write: "tools",
+    pen: "tools", eraser: "tools", hand: "tools", touchDrawing: "tools", select: "tools", snip: "tools", text: "tools",
+    write: "tools",
     sticky: "tools", shape: "tools", geometry: "tools", pdfText: "tools", emoji: "tools",
     image: "insert", sticker: "insert", record: "insert", addPage: "insert",
     search: "view", fullScreen: "view", present: "view", read: "view", replay: "view", settings: "view",

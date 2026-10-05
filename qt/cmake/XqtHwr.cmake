@@ -25,6 +25,8 @@ add_library(xqt-hwr STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/InkRecognitionService.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/InkTextIndexer.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/InkTextIndexer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/InkCopy.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/InkCopy.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/HandwritingSearch.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/HandwritingSearch.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/BeamSearch.h
@@ -65,6 +67,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkLayoutTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/RecognizerTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkIndexerTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkCopyTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkLibraryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkTextLayerTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/ModelDownloadTest.cpp

@@ -27,6 +27,7 @@
 #include <QElapsedTimer>
 #include <QObject>
 #include <QPointF>
+#include <QPolygonF>
 #include <QRectF>
 #include <QSizeF>
 #include <QString>
@@ -295,6 +296,10 @@ public:
     bool snip(CanvasPage& page, const std::vector<xoj::util::Point<double>>& outline, bool rectangle);
     /// A snip is being drawn
     bool snipBusy() const;
+    /// The tool "Copy handwriting as text" (Snip.h, snip::Purpose::InkText) swept over a page: its path (page
+    /// coordinates; `tapped`: a tap, its first point) goes to the app (inkSwept), which reads the words there. False:
+    /// not a page of this view.
+    bool inkSweep(CanvasPage& page, const std::vector<xoj::util::Point<double>>& path, bool tapped);
 
     // --- stickers (qt/docs/stickers.md) ---
     /// What is selected, as a sticker's content: copies of the elements and notes (an element selection, several
@@ -643,8 +648,11 @@ Q_SIGNALS:
     /// The "Load image" of a web picture in a Markdown text was tapped (qt/docs/md-images.md): the UI shows the
     /// address and fetches it when the user agrees.
     void imageLoadRequested(const QString& url);
-    /// A snip's picture was drawn (null: nothing to copy): of the page (0-based), the area (page points)
-    void snipped(const QImage& image, int page, const QRectF& area);
+    /// A snip's picture was drawn (null: nothing to copy): of the page (0-based), the area (page points); `capped`:
+    /// with fewer pixels than the resolution asked for (the size limit)
+    void snipped(const QImage& image, int page, const QRectF& area, bool capped);
+    /// "Copy handwriting as text" swept over a page (0-based): the path, page points (one point: a tap)
+    void inkSwept(int page, const QPolygonF& path);
     /// A pasted snip came with a link to its source page (offerSnipLink): the UI offers to add it
     void snipLinkOffered(const QString& title);
 

@@ -307,10 +307,11 @@ Tools that do almost the same share one button (`ToolCycleButton.qml`, the logic
 | --- | --- | --- |
 | `pen` | pen ↔ highlighter (freehand) | the laser pointer and the laser highlighter |
 | `eraser` | standard ↔ whiteout ↔ whole strokes (`eraserMode`) | |
-| `select` | rectangle ↔ lasso | rectangle and lasso on all layers; the two snips (never remembered as its variant) |
+| `select` | rectangle ↔ lasso | rectangle and lasso on all layers; in the classic bar the two snips (never remembered as its variant) |
 | `shape` | line, rectangle, ellipse, arrow, double arrow, coordinate system, recognize shapes (the pen, or the highlighter in hand, draws them) | |
 | `geometry` | setsquare ↔ compass | the curtain and the spotlight (put out or taken away, beside the tool in hand); "Take it off the page" (also the × of the geometry pill) |
-| `snip` (qt/ui-rework) | snip a rectangle ↔ snip with the lasso (one picture to the clipboard, then the tool before; [snip.md](snip.md)) | |
+| `snip` (qt/ui-rework) | snip a rectangle ↔ snip with the lasso (one picture to the clipboard, then the tool before; [snip.md](snip.md)); a fixed tool of the rail since qt/copy-tools | the snips' resolution (a setting) |
+| `text` (qt/copy-tools) | mark PDF text ↔ copy handwriting as text (one sweep, its words to the clipboard, then the tool before; [handwriting-search.md](handwriting-search.md)) | how PDF text is marked (the PDF text button's own list) |
 
 **The groups reviewed** (qt/ui-rework, the author: "think of the cycling groups we currently have and whether we can
 have the snipping screenshots as a cycling tool in the toolbelt"):
@@ -319,8 +320,15 @@ have the snipping screenshots as a cycling tool in the toolbelt"):
   among the first tools), whose icon is its shape (`xqt-snip-rect`, `xqt-snip-lasso`) with two dots for the two. A tap
   snips with its shape; a tap while it is armed takes the other shape, which the entry keeps; its editor (Edit… in its
   menu) chooses the shape too. A snip is never the toolbox's active entry: the tool before stays the one that comes
-  back. Among the fixed tools the snips keep their one place, the select button's list (with Shift+S, Shift+L); the
-  image button's list keeps them as well, as an insert (a picture to paste). The classic bar is unchanged.
+  back. Among the fixed tools the snips have a button of their own since qt/copy-tools (the author: "Snip should be
+  one click away … not hidden behind the normal select tool"), after select, and left the select button's list (one
+  place each; Shift+S, Shift+L); the image button's list keeps them as well, as an insert (a picture to paste). The
+  classic bar keeps them in the select list: a button more there squeezes its widths and colors at common sizes.
+- **Mark PDF text ↔ copy handwriting as text** (qt/copy-tools, the author: "make it its own tool similar to select
+  pdf text (could be a cycle) to not interrupt the ink annotation flow"): one button, a cycle as suggested rather than
+  a fixed tool more (the rail is already full at 1080 px). A tap while one of them is in use takes the other; held:
+  both, and how PDF text is marked (which a tap again opened before). Copy handwriting is a one-shot tool like the
+  snips: the tool before comes back after its sweep. Shift+T.
 - **Curtain ↔ spotlight** stay in the setsquare's list (and ⋮ → View), not a group with a button: they are not tools
   but sheets over the page whatever tool is in hand, and are put out and taken away; a cycle (curtain → spotlight →
   none) on a button would hide which one is out. Their keys are B and Shift+B.
@@ -334,7 +342,7 @@ have the snipping screenshots as a cycling tool in the toolbelt"):
   the variant used last (remembered per group in the setting `toolVariants`; the eraser's is `eraserMode`).
 - The icon is the variant in use (or the one last used); small dots under it say how many there are and which one.
 - A long press (or a right click) lists all variants with icon and name, with the group's name on top: to pick one.
-- The keys (P, H, E, S, L; Shift+S and Shift+L for the snips) take a variant directly; the button follows and
+- The keys (P, H, E, S, L; Shift+S and Shift+L for the snips, Shift+T to copy handwriting) take a variant directly; the button follows and
   remembers it.
 - The pen pill of the compact chrome uses the same `pen` button (smaller); the tool square's popup holds the tool
   bar's buttons themselves.

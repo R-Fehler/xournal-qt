@@ -583,7 +583,12 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
         (void)this->selector->finalize(this->page, true, control.getDocument());  // (its picture goes)
         (void)this->selector->releaseElements();
         this->selector.reset();
-        if (!tapped && view.snip(*this, outline, rectangle)) {
+        if (snip::purpose() == snip::Purpose::InkText) {
+            // (the handwriting it went over, as text: CanvasView::inkSwept; a tap takes the word under it)
+            if (view.inkSweep(*this, outline, tapped)) {
+                snip::disarm();
+            }
+        } else if (!tapped && view.snip(*this, outline, rectangle)) {
             snip::disarm();
         }
         repaintPage();

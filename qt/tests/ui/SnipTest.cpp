@@ -6,6 +6,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <cmath>
 #include <fstream>
 #include <functional>
 #include <memory>
@@ -37,6 +38,7 @@
 #include "canvas/CanvasView.h"
 #include "canvas/MarkdownEditor.h"
 #include "canvas/Snip.h"
+#include "render/RegionRender.h"
 #include "markdown/MdBox.h"
 #include "session/DocumentSession.h"
 #include "shell/HitPages.h"
@@ -184,6 +186,7 @@ protected:
 };
 }  // namespace
 
+// (the classic tool bar: the snips in the select list; with the toolbox a button of their own, CopyToolsTest)
 TEST_F(SnipTest, aSnipFromTheSelectListCopiesThePictureWithItsSourceAndGivesTheToolBack) {
     makeSource("source.xopp");
     controller->selectTool("pen");
@@ -236,7 +239,11 @@ TEST_F(SnipTest, aSnipFromTheSelectListCopiesThePictureWithItsSourceAndGivesTheT
     until([&] { return controller->tool() == "pen"; });
     EXPECT_EQ(controller->tool(), "pen");
     EXPECT_EQ(controller->snipShape(), "");
-    EXPECT_EQ(snackbar(), "Copied picture");
+    EXPECT_EQ(snackbar(), QString("Copied picture (%1×%2 pixels, %3 dpi)")
+                                  .arg(image.width())
+                                  .arg(image.height())
+                                  .arg(std::lround(image.width() * 72.0 / source->area.width())))
+            << "its size named";
     EXPECT_FALSE(view()->getSelection()) << "nothing selected";
 }
 
@@ -385,4 +392,59 @@ TEST_F(SnipTest, inAMarkdownDocumentTheOfferIsAMarkdownLink) {
     const size_t link = text.find("[source, page 1](source.xopp#page=1");
     EXPECT_NE(link, std::string::npos) << text;
     EXPECT_GT(link, picture) << "after the picture";
+}
+
+// How sharp a snip is, a setting (Settings, the snip's list): the screen's (at least 200 dpi), 300 or 600 dpi; a
+// picture over the limit of its pixels gets fewer, and the note says so
+TEST_F(SnipTest, theResolutionChosenSetsThePicturesSize) {
+    makeSource("");
+    controller->selectTool("pen");
+    const double zoom = view()->getViewController().zoom();
+    auto widthAt = [&](const char* resolution) {
+        controller->setProperty("snipResolution", resolution);
+        QGuiApplication::clipboard()->clear();
+        snipRectangle();
+        const auto source = xqt::snip::decode(QGuiApplication::clipboard()->mimeData());
+        EXPECT_TRUE(source);
+        const QImage image = qvariant_cast<QImage>(QGuiApplication::clipboard()->mimeData()->imageData());
+        until([&] { return controller->tool() == "pen"; });
+        return std::pair<int, double>(image.width(), source ? source->area.width() : 1);
+    };
+    const auto [screen, area] = widthAt("screen");
+    EXPECT_NEAR(screen, area * std::max(zoom * window->devicePixelRatio(), 200 / 72.0), 2);
+    const auto [high, area2] = widthAt("high");
+    EXPECT_NEAR(high, area2 * 300 / 72.0, 2);
+    EXPECT_TRUE(snackbar().contains("300 dpi")) << snackbar().toStdString();
+    const auto [veryHigh, area3] = widthAt("veryHigh");
+    EXPECT_NEAR(veryHigh, area3 * 600 / 72.0, 2);
+    EXPECT_TRUE(snackbar().contains("600 dpi")) << snackbar().toStdString();
+    // Remembered in the settings; the snip button's list and Settings show it
+    EXPECT_EQ(controller->snipResolution(), "veryHigh");
+    auto* list = find<QObject>("snipButtonVariants");
+    ASSERT_NE(list, nullptr);
+    QObject* entry = entryOf(list, "snipResolution_veryHigh");
+    ASSERT_NE(entry, nullptr);
+    EXPECT_TRUE(entry->property("checked").toBool());
+    QMetaObject::invokeMethod(entryOf(list, "snipResolution_screen"), "triggered");
+    EXPECT_EQ(controller->snipResolution(), "screen");
+
+    // A large area at the screen's resolution: fewer pixels than asked (about 4 megapixels), and the note says so
+    controller->applyPageSize({0}, 1200, 1200);
+    wait(200);
+    view()->getViewController().fitPage(0, true);  // (all of it in view)
+    wait(200);
+    QGuiApplication::clipboard()->clear();
+    controller->startSnip("rect");
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, onPage(5, 5));
+    for (int k = 1; k <= 6; ++k) {
+        QTest::mouseMove(window, onPage(5 + 1100 * k / 6.0, 5 + 1100 * k / 6.0));
+        wait(5);
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, onPage(1105, 1105));
+    until([&] { return clipboardHasSnip(); });
+    ASSERT_TRUE(clipboardHasSnip());
+    const QImage big = qvariant_cast<QImage>(QGuiApplication::clipboard()->mimeData()->imageData());
+    EXPECT_LE(static_cast<double>(big.width()) * big.height(), xqt::region::MAX_PIXELS);
+    until([&] { return snackbar().contains("too large"); });
+    EXPECT_TRUE(snackbar().contains("too large")) << snackbar().toStdString();
 }

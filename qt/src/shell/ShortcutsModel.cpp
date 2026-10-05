@@ -96,6 +96,9 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             // (the snip tool: one picture of a rectangle or lasso to the clipboard, then the tool before; snip.md)
             {"snip", tr("Snip: copy the picture of a rectangle"), tools, {"Shift+S"}},
             {"snipLasso", tr("Snip with the lasso"), tools, {"Shift+L"}},
+            // (one sweep over handwriting: its words to the clipboard as text, then the tool before; the "Text"
+            // button's second tool, qt/docs/handwriting-search.md)
+            {"copyInkText", tr("Copy handwriting as text"), tools, {"Shift+T"}},
             {"toolHand", tr("Hand (scroll)"), tools, {"A"}},
             {"insertImage", tr("Insert an image…"), tools, {"I"}},
             // (B as PowerPoint's black screen: a black sheet over part of the page)

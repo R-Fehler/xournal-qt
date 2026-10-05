@@ -16,6 +16,9 @@
  * results stay searchable); their other lines are left out, and the result says it is not complete. A client that
  * goes cancels its jobs (a line being read is interrupted); the model is unloaded after a minute without work.
  *
+ * A job the user waits for (Job::urgent: copy as text, InkCopy.h) goes first; a job being worked on stops after its
+ * line and is queued again (the lines it read are known then), and the urgent one reads only the lines of its area.
+ *
  * Memory: the line cache (results by line hash) has a limit (setCacheLimit, default 16 MB): the least recently used
  * lines go. Jobs hold copies of strokes: clients keep few of them queued (InkTextIndexer: two at a time).
  *
@@ -92,6 +95,12 @@ public:
         std::vector<InkStroke> strokes;
         /// The document's plan of which models read its lines (LanguagePlan.h; null: all)
         std::shared_ptr<LanguagePlan> plan;
+        /// Only the lines whose box meets this area (page points) are read and handed back (copying the handwriting
+        /// under a sweep as text, InkCopy.h); empty: all lines
+        QRectF area;
+        /// Asked for by the user, who waits (copy as text): it goes before every job that is not, a job being worked
+        /// on gives way to it after its line, and it waits neither for the pages in view nor while the user writes
+        bool urgent = false;
     };
     using Done = std::function<void(PageResult)>;
     /// Read a page; `done` is called on `owner`'s thread (not if `owner` is gone or cancelled the job). Returns its id.
@@ -121,8 +130,9 @@ private:
         Done done;
     };
     void run();
-    /// Returns the lines it read with the recogniser
-    int process(Queued& q);
+    /// Returns the lines it read with the recogniser; `yielded`: it stopped for an urgent job (to be queued again)
+    int process(Queued& q, bool& yielded);
+    bool urgentWaiting() const;
     void touch(quint64 hash) const;
     void trim();
 

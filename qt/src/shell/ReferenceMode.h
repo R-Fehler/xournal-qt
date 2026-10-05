@@ -23,6 +23,7 @@
 #include <QMetaObject>
 #include <QObject>
 #include <QPointF>
+#include <QPolygonF>
 #include <QPointer>
 #include <QRectF>
 #include <QString>
@@ -243,8 +244,10 @@ Q_SIGNALS:
     void markdownRequested(int page);
     void markdownBoxRequested(int page, double x, double y);
     /// The snip tool in the reference (CanvasView::snipped, snipLinkOffered), with the view
-    void snipped(xqt::CanvasView* view, const QImage& image, int page, const QRectF& area);
+    void snipped(xqt::CanvasView* view, const QImage& image, int page, const QRectF& area, bool capped);
     void snipLinkOffered(xqt::CanvasView* view, const QString& title);
+    /// "Copy handwriting as text" swept over the reference (CanvasView::inkSwept), with the view
+    void inkSwept(xqt::CanvasView* view, int page, const QPolygonF& path);
 
 private:
     /// The current tab or its reference changed: follow the reference's view.

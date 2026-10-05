@@ -1,17 +1,21 @@
 /*
- * xournal-qt: the snip tool of the window (qt/snip, qt/docs/snip.md): armed from the select tools' list or the image
- * button, the next rectangle or lasso on a page (Snip.h, CanvasView::snip) puts its picture on the clipboard, with a
- * link to where it came from; then the tool used before comes back. Pasted into a document of the app, the window
- * offers to add that link next to the picture (CanvasView::addSnipLink).
+ * xournal-qt: the snip tool of the window (qt/snip, qt/docs/snip.md): armed from its button (a fixed tool of the
+ * rail, qt/copy-tools), the image button's list or a toolbox entry, the next rectangle or lasso on a page (Snip.h,
+ * CanvasView::snip) puts its picture on the clipboard, with a link to where it came from; then the tool used before
+ * comes back. Pasted into a document of the app, the window offers to add that link next to the picture
+ * (CanvasView::addSnipLink). "Copy handwriting as text" is armed the same way (AppInkCopy.cpp).
  *
  * @license GNU GPLv2 or later
  */
+#include <cmath>
+
 #include <QBuffer>
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QMimeData>
 
 #include "control/ToolHandler.h"
+#include "control/settings/Settings.h"
 #include "session/AppContext.h"
 #include "session/DocumentLink.h"
 #include "session/DocumentSession.h"
@@ -25,6 +29,9 @@
 using namespace xqt;
 
 QString AppController::snipShape() const {
+    if (snip::purpose() != snip::Purpose::Picture) {
+        return {};  // (copying handwriting as text: inkCopy)
+    }
     switch (snip::armed()) {
         case snip::Shape::Rectangle:
             return QStringLiteral("rect");
@@ -35,8 +42,13 @@ QString AppController::snipShape() const {
     }
 }
 
+bool AppController::inkCopyArmed() const { return snip::isArmed() && snip::purpose() == snip::Purpose::InkText; }
+
 void AppController::startSnip(const QString& shape) {
-    const bool lasso = shape == QLatin1String("lasso");
+    armSnip(shape == QLatin1String("lasso"), static_cast<int>(snip::Purpose::Picture));
+}
+
+void AppController::armSnip(bool lasso, int purpose) {
     if (!snip::isArmed()) {
         snipPreviousTool = tool();
     }
@@ -54,7 +66,7 @@ void AppController::startSnip(const QString& shape) {
     ToolHandler* th = app->getToolHandler();
     th->selectTool(snipTool);
     th->fireToolChanged();
-    snip::arm(lasso ? snip::Shape::Lasso : snip::Shape::Rectangle);
+    snip::arm(lasso ? snip::Shape::Lasso : snip::Shape::Rectangle, static_cast<snip::Purpose>(purpose));
     Q_EMIT snipChanged();
     Q_EMIT toolChanged();
 }
@@ -82,7 +94,33 @@ void AppController::followSnipTool() {
     }
 }
 
-void AppController::snipped(DocumentSession& s, const QImage& image, int page, const QRectF& area) {
+QString AppController::snipResolution() const {
+    std::string set;
+    app->getSettings()->getCustomElement("xournalQt").getString("snipResolution", set);
+    return set == "high" || set == "veryHigh" ? QString::fromStdString(set) : QStringLiteral("screen");
+}
+
+void AppController::setSnipResolution(const QString& resolution) {
+    if (resolution == snipResolution()) {
+        return;
+    }
+    app->getSettings()->getCustomElement("xournalQt").setString("snipResolution", resolution.toStdString());
+    app->getSettings()->customSettingsChanged();
+    applySnipResolution();
+}
+
+void AppController::applySnipResolution() {
+    const QString r = snipResolution();
+    const snip::Resolution wanted = r == QLatin1String("veryHigh") ? snip::Resolution::VeryHigh
+                                    : r == QLatin1String("high")   ? snip::Resolution::High
+                                                                   : snip::Resolution::Screen;
+    if (wanted != snip::resolution()) {
+        snip::setResolution(wanted);
+    }
+    Q_EMIT snipResolutionChanged();
+}
+
+void AppController::snipped(DocumentSession& s, const QImage& image, int page, const QRectF& area, bool capped) {
     endSnip(true);
     if (image.isNull()) {
         Q_EMIT pageActionDone(tr("Nothing of the page there to copy"), false);
@@ -111,7 +149,15 @@ void AppController::snipped(DocumentSession& s, const QImage& image, int page, c
     }
     mime->setData(QString::fromLatin1(snip::MIME), snip::encode(source));
     QGuiApplication::clipboard()->setMimeData(mime);
-    Q_EMIT pageActionDone(tr("Copied picture"), false);
+    // Its size (and when it was made smaller than the resolution asked for: the limit of a picture's pixels)
+    const int dpi = area.width() > 0 ? static_cast<int>(std::lround(image.width() * 72.0 / area.width())) : 0;
+    Q_EMIT pageActionDone(
+            capped ? tr("Copied picture (%1×%2 pixels, %3 dpi: the area is too large for more)")
+                             .arg(image.width())
+                             .arg(image.height())
+                             .arg(dpi)
+                   : tr("Copied picture (%1×%2 pixels, %3 dpi)").arg(image.width()).arg(image.height()).arg(dpi),
+            false);
 }
 
 bool AppController::addSnipLink() {

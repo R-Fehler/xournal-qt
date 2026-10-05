@@ -166,6 +166,9 @@ AppController::AppController(QObject* parent): QObject(parent) {
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::selectMoreChanged);  // (available)
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followSnipTool);
+    // How sharp snips are (a setting; Snip.h)
+    applySnipResolution();
+    connect(app.get(), &AppContext::settingsChanged, this, &AppController::applySnipResolution);
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followTodoStampTool);
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
@@ -334,6 +337,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::selectMoreChanged);  // (available)
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followSnipTool);
+    connect(app.get(), &AppContext::settingsChanged, this, &AppController::applySnipResolution);
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
     pages = std::make_unique<PagesModel>();
@@ -376,13 +380,15 @@ void AppController::makeTabs() {
     connect(referenceMode.get(), &ReferenceMode::markdownRequested, this, &AppController::markdownRequested);
     // A snip in the reference (it only reads), a snip pasted into it while it is written in
     connect(referenceMode.get(), &ReferenceMode::snipped, this,
-            [this](CanvasView* v, const QImage& image, int page, const QRectF& area) {
-                snipped(v->getSession(), image, page, area);
+            [this](CanvasView* v, const QImage& image, int page, const QRectF& area, bool capped) {
+                snipped(v->getSession(), image, page, area, capped);
             });
     connect(referenceMode.get(), &ReferenceMode::snipLinkOffered, this, [this](CanvasView* v, const QString& title) {
         snipLinkView = v;
         Q_EMIT snipLinkOffered(title);
     });
+    connect(referenceMode.get(), &ReferenceMode::inkSwept, this,
+            [this](CanvasView* v, int page, const QPolygonF& path) { inkSwept(v, page, path); });
     connect(referenceMode.get(), &ReferenceMode::markdownBoxRequested, this, &AppController::markdownBoxRequested);
     // Undo and redo act on the reference while it is written in and has the keys (editedReference): the buttons
     // follow its history then
@@ -940,13 +946,16 @@ void AppController::currentTabChanged() {
         }));
         // The snip tool (AppSnip.cpp): its picture onto the clipboard; a pasted snip's link offered
         currentConnections.push_back(connect(v, &CanvasView::snipped, this,
-                                             [this, v](const QImage& image, int page, const QRectF& area) {
-                                                 snipped(v->getSession(), image, page, area);
+                                             [this, v](const QImage& image, int page, const QRectF& area, bool capped) {
+                                                 snipped(v->getSession(), image, page, area, capped);
                                              }));
         currentConnections.push_back(connect(v, &CanvasView::snipLinkOffered, this, [this, v](const QString& title) {
             snipLinkView = v;
             Q_EMIT snipLinkOffered(title);
         }));
+        // Copy handwriting as text (AppInkCopy.cpp): the words swept over
+        currentConnections.push_back(connect(v, &CanvasView::inkSwept, this,
+                                             [this, v](int page, const QPolygonF& path) { inkSwept(v, page, path); }));
         currentConnections.push_back(connect(v, &CanvasView::messageRequested, this,
                                              [this](const QString& title, const QString& text) {
                                                  Q_EMIT message(title, text, true);

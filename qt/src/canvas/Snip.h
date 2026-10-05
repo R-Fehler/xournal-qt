@@ -25,12 +25,27 @@ class QMimeData;
 namespace xqt::snip {
 
 enum class Shape { None, Rectangle, Lasso };
+/// What a snip copies: the picture of the area, or the handwriting there as text (the tool "Copy handwriting as text",
+/// qt/docs/handwriting-search.md: the lasso's path is a sweep over the words, CanvasView::inkSwept)
+enum class Purpose { Picture, InkText };
 
 /// The next rectangle or lasso (of the select tools) is a snip of this shape. None: not armed.
-void arm(Shape shape);
+void arm(Shape shape, Purpose purpose = Purpose::Picture);
 void disarm();
 Shape armed();
+Purpose purpose();
 inline bool isArmed() { return armed() != Shape::None; }
+
+/// How sharp a snip's picture is (Settings → Documents → "Pictures copied to the clipboard", the snip's list;
+/// AppController::snipResolution): the screen's (at least region::MIN_DPI, at most region::MAX_PIXELS, as before), or
+/// at least 300 / 600 dpi with a higher limit (HIGH_MAX_PIXELS: A4 at 600 dpi fits). A picture over the limit is made
+/// smaller (the window says so).
+enum class Resolution { Screen, High, VeryHigh };
+inline constexpr double HIGH_MAX_PIXELS = 36.0 * 1000 * 1000;
+void setResolution(Resolution resolution);
+Resolution resolution();
+double minDpi(Resolution resolution);
+double maxPixels(Resolution resolution);
 
 /// The fork's clipboard entry beside the picture: where it came from.
 inline constexpr const char* MIME = "application/x-xournal-qt-snip";

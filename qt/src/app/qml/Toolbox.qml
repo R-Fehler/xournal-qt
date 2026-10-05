@@ -293,14 +293,15 @@ Rectangle {
     // --- the fixed tools (the window's buttons, lent to the rail) -----------------------------------------------------
     /// The buttons placed in the rail now (given back when they leave the list)
     property var placedFixed: []
+    /// How many of the fixed tools are shown on their own (the others are in the stack after them)
+    readonly property int fixedShown: plan.fixedShown === undefined ? fixedButtons.length : plan.fixedShown
     function placeFixed() {
-        const folded = plan.fixedFolded === true
         for (let i = 0; i < placedFixed.length; ++i) {
             if (fixedButtons.indexOf(placedFixed[i]) < 0) release(placedFixed[i])
         }
         for (let i = 0; i < fixedButtons.length; ++i) {
             const b = fixedButtons[i]
-            b.parent = folded ? fixedFlyoutGrid : fixedGrid
+            b.parent = i < fixedShown ? fixedGrid : fixedFlyoutGrid
             b.width = cell
             b.height = cell
         }
@@ -311,9 +312,9 @@ Rectangle {
         b.width = Qt.binding(function() { return b.implicitWidth })
         b.height = Qt.binding(function() { return b.implicitHeight })
     }
-    /// The fixed tool in use (a stack of them shows it)
+    /// The fixed tool in use among those in the stack (the stack shows it)
     readonly property Item fixedInUse: {
-        for (let i = 0; i < fixedButtons.length; ++i) if (fixedButtons[i].checked) return fixedButtons[i]
+        for (let i = fixedShown; i < fixedButtons.length; ++i) if (fixedButtons[i].checked) return fixedButtons[i]
         return null
     }
 
@@ -422,14 +423,14 @@ Rectangle {
                     property var entryItem: modelData
                 }
             }
-            // The fixed tools, after a divider: in a row of their own, or folded into one button
+            // The fixed tools, after a divider: in a row of their own, the last ones (or all) folded into one button
             Loader { active: box.fixedButtons.length > 0 && !box.compact; visible: active; sourceComponent: dividerComponent }
             Grid {
                 id: fixedGrid
                 objectName: "toolboxFixed"
                 columns: box.vertical ? 1 : -1
                 rows: box.vertical ? -1 : 1
-                visible: !box.plan.fixedFolded
+                visible: box.fixedShown > 0
             }
             IconButton {
                 id: fixedStack
@@ -440,7 +441,7 @@ Rectangle {
                 iconName: box.fixedInUse ? box.fixedInUse.iconName : "xqt-tools-more"
                 checked: box.fixedInUse !== null
                 label: qsTr("More tools")
-                tip: qsTr("Hand, select, write on the page, setsquare, mark PDF text, record audio")
+                tip: qsTr("More of the fixed tools (snip, write on the page, setsquare, mark PDF text, …)")
                 ownHold: true
                 onClicked: fixedFlyout.visible ? fixedFlyout.close() : fixedFlyout.open()
                 onPressAndHold: fixedFlyout.open()
