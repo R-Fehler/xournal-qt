@@ -3187,3 +3187,11 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
 - [ ] Phone (Fold 7 folded): the bar's two rows fit, the field gives way, the buttons are big enough for a finger; the
       soft keyboard stays up while replacing one by one.
 - [ ] After closing the bar (Esc), the search is the usual one again (the Fuzzy toggle is back).
+
+## New is the tab strip's "+"; the record button's place (qt/record-place)
+
+- [ ] A 1920 × 1080 screen, the window maximised, the classic tool bar (Settings → Pen → Tools), a build with Qt
+      Multimedia: one row with every button, all palette colors and "+", the five widths and the record button;
+      nothing in "more tools". The bar has no New button; the tab strip's "+" makes a new document.
+- [ ] Full screen (F11) with the classic bar: the tool square's tools have New (there is no tab strip there).
+- [ ] A phone (Fold 7 folded): "All tools" has New under "Document and view".

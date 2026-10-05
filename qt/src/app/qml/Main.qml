@@ -2129,10 +2129,13 @@ ApplicationWindow {
             tip: qsTr("Settings (Ctrl+,)")
             onClicked: settingsPage.open()
         }
+        // New: the tab strip's "+" where the tab strip is shown (one place for each action, qt/docs/adaptive-layout.md);
+        // a button of the bar where it is not (the compact chrome's tools, the phone's sheet)
         IconButton {
             id: newTool
             objectName: "newButton"
             parent: toolBank
+            property bool offered: !tabStrip.visible
             iconName: "xopp-document-new"
             label: qsTr("New document")
             tip: qsTr("New document (new tab)")

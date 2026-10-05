@@ -2063,6 +2063,27 @@ TEST_F(AdaptiveLayoutTest, colorsAndWidthsTakeTheRoomThereIs) {
     EXPECT_TRUE(opened(paletteSheet, false));
 }
 
+// New has one place (qt/docs/adaptive-layout.md, "One place for each action"): the tab strip's "+" where the tab strip
+// is shown; a button of the tools only where it is not (the compact chrome's tools, the phone's sheet)
+TEST_F(AdaptiveLayoutTest, newIsTheTabStripsPlusWhereThereIsOne) {
+    openDocument();
+    resize(1920, 1080);
+    auto* newButton = named("newButton");
+    ASSERT_NE(newButton, nullptr);
+    EXPECT_TRUE(shownInWindow(named("newTabButton")));
+    EXPECT_FALSE(newButton->property("offered").toBool());
+    EXPECT_FALSE(newButton->isVisible()) << "not in the bar too";
+    EXPECT_FALSE(overflowNames().contains("new"));
+    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
+    wait(200);
+    EXPECT_FALSE(named("newTabButton")->isVisible());
+    EXPECT_TRUE(newButton->property("offered").toBool()) << "the compact chrome's tools have it";
+    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
+    wait(200);
+    resize(412, 915);
+    EXPECT_TRUE(newButton->property("offered").toBool()) << "the phone's sheet has it";
+}
+
 // What does not fit goes into "more tools", next to ⋮: its buttons with their names; a button used there closes it
 TEST_F(AdaptiveLayoutTest, moreToolsHoldsWhatDoesNotFit) {
     openDocument();

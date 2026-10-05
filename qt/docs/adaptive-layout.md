@@ -245,8 +245,9 @@ offered for the document. `toolArea` in `Main.qml` lays the buttons out by it (t
 again when the room, the buttons or the colors change. Groups, in order of use: **edit** (undo and redo, at the head
 of the bar; never in "more tools", qt/undo-redo), **tools** (pen/highlighter, eraser,
 hand, the finger draws, select, text box, write on the page, sticky note, shapes, setsquare/compass, mark PDF text,
-the emoji while writing), **colors**, **widths**, **insert** (image, add a page), **view** (search, full screen,
-present, settings), **file** (new, open, save; a `.md`: edit as notes; a text file: open externally). ⋮ and "more
+the emoji while writing), **colors**, **widths**, **insert** (image, stickers, record audio where the build can
+record, add a page), **view** (search, full screen, present, settings), **file** (new where the tab strip has no "+",
+open, save; a `.md`: edit as notes; a text file: open externally). ⋮ and "more
 tools" are pinned at the end, outside the part that could scroll.
 
 The bar is a flexible space filler: each group has several forms, and the bar takes the richest that fits, in this
@@ -270,6 +271,12 @@ the second first; the end (⋮, "more tools") sits at the end of the first row. 
 show everything; at 720 px (a 2-in-1 at 125 %) the view buttons go into "more tools", the widths become one button and
 the colors the recent ones. The plan is deterministic; a bar that grows takes a richer plan only with 24 px to spare
 (no flicker at an edge), and nothing changes while a pointer is held (a stroke).
+
+**At 1920 px everything is expanded** (measured for `qt/record-place`, 2026-10-05): the bar has 1908 px; edit (98),
+the eleven tools (548), the ten palette colors and "+" (440), the five widths (200), insert with image, stickers,
+record and add a page (198), view (198), open and save (98), six dividers (66) and ⋮ (52) take 1898. With New in the
+bar too (it is the tab strip's "+") it took 1948, and the widths became one button. One button more needs room of its
+own, or two buttons out: a single button cut into "more tools" saves nothing, as "more tools" itself appears.
 
 The tools that are **never hidden** above phones (audit D3): pen, highlighter, eraser, hand and the finger draws,
 select (rectangle and lasso), the text box and writing on the page, the sticky note, the current color and at least
@@ -384,7 +391,8 @@ The author's rule: only one way to do things, to reduce menu clutter. No ⋮ ent
 | Present (was also ⋮ → View) | tool bar / more tools | F5 | the tool square's popup ("Present") | "All tools" |
 | Present without controls | ⋮ → View (it differs from Present) | Ctrl+F5; a long press on Present | | ⋮ → View; hold Present in "All tools" |
 | Settings (was also ⋮) | tool bar / more tools | Ctrl+, | the tool square's popup; the home screen's settings | "All tools" |
-| New, Open, Save | tool bar / more tools | Ctrl+Shift+N, Ctrl+O, Ctrl+S | the tab strip's + | "All tools"; new documents also in the tab overview and the library |
+| New | the tab strip's + (the full chrome: the bar has no New button there, since `qt/record-place`) | Ctrl+Shift+N | the compact chrome's tools (no tab strip there) | "All tools"; new documents also in the tab overview and the library |
+| Open, Save | tool bar / more tools | Ctrl+O, Ctrl+S | the tab strip's + (a new document) | "All tools" |
 | Edit as notes, Open externally (were also ⋮ → Document) | tool bar / more tools (a `.md`: more tools in the format bar) | | | "All tools" |
 | All pages (was also ⋮ → View) | view pill (the compact pill: its page number) | Ctrl+Alt+G | the view pill stays in the compact chrome | the dock's page number |
 | Contents overview (was the tool bar) | view pill | Ctrl+Alt+O | as above | the page grid's pill (the dock's page number) |
