@@ -256,6 +256,10 @@ void XmlParser::parsePageTag(const XmlParserHelper::AttributeMap& attributeMap) 
     if (const auto label = XmlParserHelper::getAttrib<std::string_view>(xoj::xml_attrs::BOOKMARK_STR, attributeMap)) {
         this->builder.setPageBookmark(std::string{*label});
     }
+    // xournal-qt: voice memos on the page (qt/docs/audio.md)
+    if (const auto memos = XmlParserHelper::getAttrib<std::string_view>(xoj::xml_attrs::PAGE_AUDIO_STR, attributeMap)) {
+        this->builder.setPageAudio(std::string{*memos});
+    }
 }
 
 void XmlParser::parseAudioTag(const XmlParserHelper::AttributeMap& attributeMap) {

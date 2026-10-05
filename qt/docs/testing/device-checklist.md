@@ -2985,3 +2985,41 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
 - [ ] First start after the update: the toolbox's first pen has the pen's color and width of before; the eraser
       erases as it did (standard, whiteout or whole strokes); the text box has the font of before.
 - [ ] Restart: the tool in hand is the entry taken last, with its color and width.
+
+## Audio recordings (qt/audio)
+
+Builds with Qt Multimedia only (`cmake` prints "Audio recordings: Qt Multimedia …"; without it recording is not
+offered).
+
+- [ ] `XQT_AUDIO_DEVICE=1 build-qt/xqt-audio-tests --gtest_filter=*RealMicrophone*` passes on Linux (PipeWire and
+      PulseAudio), Windows and macOS (it asks for the microphone there).
+- [ ] A microphone that only takes stereo or 44.1 kHz (a USB headset): the recording is mono and plays at the right
+      speed. A speaker that does not take the file's rate (some Bluetooth devices): the recording plays at the right
+      pitch and speed.
+- [ ] Unplug the headset while recording: the recording ends with a message and the file plays up to that moment.
+- [ ] A `.xopp` with recordings made here opens in Xournal++ without a message; its play tool plays the strokes'
+      recordings when Xournal++'s audio folder is set to the app's audio folder (see Settings → Audio).
+- [ ] A PDF with notes that has recordings, in Acrobat, Okular, Evince, Preview and pdf.js: the attachments panel
+      lists `audio-p001-….ogg` with its description; saved out of the PDF it plays in VLC and the system player.
+- [ ] Move pages in the app, Ctrl+S: the attachment's page numbers follow (check in Okular's attachments panel).
+- [ ] Export for Xournal++: open the exported `.xopp` in Xournal++ (its audio folder not set): the play tool plays the
+      strokes' recordings from `name.audio/`.
+- [ ] The microphone button is in the tool bar after the image button (wide window), in "more tools" when the bar is
+      short, and in the phone's "All tools" sheet under Insert. A tap: the red pill at the top with the time running
+      and the level moving when speaking; write with the pen: the stroke is tied (the play tool plays it later).
+- [ ] Mute the microphone (or pick a wrong one) and record: after 5 s "No sound: is the microphone on?"; speak: it goes.
+- [ ] Pause in the pill: the time stops, the dot blinks; go on: the recording has no gap for the pause.
+- [ ] Another tab while recording: the pill says "for <document>", ink there is not tied; close the recording's tab:
+      the recording ends with a message.
+- [ ] Hold the button: "Play tool": tap a stroke written 10 s into the recording: playing starts about 8 s in (the 2 s
+      lead-in; Settings → Documents → Audio recordings changes it); the slider has a tick per stroke; ±5 s; pause; ×.
+- [ ] "Recordings of this document…": pages, length, ink count; play; remove (the ink stays; Ctrl+Z brings it back).
+- [ ] With a pen on the Surface and the iPad: the record button and the pills are easy to hit; writing while
+      recording feels the same as without (no lag from the encoder).
+- [ ] Android: the first recording asks for the microphone; refused: the message, nothing recorded. Allowed: record,
+      switch to another app for a minute, come back: the notification was there, the recording has that minute.
+      Swipe the app away while recording: the notification goes; the file plays up to then.
+- [ ] macOS: the first recording asks for the microphone with the app's text (Info.plist).
+- [ ] Windows, macOS, Android: a package without Qt Multimedia's FFmpeg plugin (`windeployqt --skip-plugin-types
+      multimedia`, the macOS bundle without `PlugIns/multimedia`) still records and plays; if not, the plugin must
+      ship.

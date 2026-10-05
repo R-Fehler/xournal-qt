@@ -33,6 +33,7 @@ XojPage::XojPage(XojPage const& page):
         pdfBackgroundPage(page.pdfBackgroundPage),
         noteSpace(page.noteSpace),  // xournal-qt
         bookmark(page.bookmark),    // xournal-qt
+        audioMemos(page.audioMemos),  // xournal-qt
         backgroundColor(page.backgroundColor) {
     this->layer.reserve(page.layer.size());
     std::transform(begin(page.layer), end(page.layer), std::back_inserter(this->layer),
@@ -141,6 +142,10 @@ void XojPage::setNoteSpace(const NoteSpace& space) { this->noteSpace = space; }
 // xournal-qt: bookmarks (qt/docs/bookmarks.md)
 auto XojPage::getBookmark() const -> const std::optional<std::string>& { return this->bookmark; }
 void XojPage::setBookmark(std::optional<std::string> label) { this->bookmark = std::move(label); }
+
+// xournal-qt: voice memos (qt/docs/audio.md)
+auto XojPage::getAudioMemos() const -> const std::string& { return this->audioMemos; }
+void XojPage::setAudioMemos(std::string memos) { this->audioMemos = std::move(memos); }
 
 auto XojPage::isAnnotated() const -> bool {
     for (Layer* l: this->layer) {

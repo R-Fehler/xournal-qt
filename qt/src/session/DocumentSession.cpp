@@ -43,6 +43,7 @@
 #include "view/background/BackgroundFlags.h"
 
 #include "AppContext.h"
+#include "audio/DocumentAudio.h"
 #include "DocumentMode.h"
 #include "DocumentSaveTask.h"
 #include "DocumentImages.h"
@@ -854,6 +855,73 @@ void DocumentSession::applyBookmark(const PageRef& page, const std::optional<std
         page->setBookmark(label);
     }
     Q_EMIT bookmarksChanged();
+}
+
+// --- audio recordings (qt/docs/audio.md) -------------------------------------------------------------------------------
+
+void DocumentSession::setRecording(const std::string& name, std::function<size_t()> clock) {
+    recording = name;
+    recordingClock = name.empty() ? std::function<size_t()>() : std::move(clock);
+}
+
+bool DocumentSession::stampAudio(AudioContent& element) const {
+    if (recording.empty() || !recordingClock) {
+        return false;
+    }
+    audio::stamp(element, recording, recordingClock());
+    return true;
+}
+
+bool DocumentSession::addVoiceMemo(size_t page, const std::string& name) {
+    PageRef p;
+    std::string before, after;
+    {
+        std::shared_lock lock(*doc);
+        if (page >= doc->getPageCount() || name.empty()) {
+            return false;
+        }
+        p = doc->getPage(page);
+        before = p->getAudioMemos();
+        auto memos = audio::parseMemos(before);
+        if (std::find(memos.begin(), memos.end(), name) != memos.end()) {
+            return false;
+        }
+        memos.push_back(name);
+        after = audio::formatMemos(memos);
+    }
+    auto apply = [this](const PageRef& target, const std::string& memos) {
+        {
+            std::unique_lock lock(*doc);
+            target->setAudioMemos(memos);
+        }
+        Q_EMIT audioChanged();
+    };
+    apply(p, after);
+    undoRedo->addUndoAction(std::make_unique<audio::MemoUndoAction>(p, std::move(before), std::move(after),
+                                                                     _("Record audio"), std::move(apply)));
+    return true;
+}
+
+size_t DocumentSession::removeRecording(const std::string& name) {
+    audio::Removed removed;
+    {
+        std::unique_lock lock(*doc);
+        removed = audio::removeRecording(*doc, name);
+    }
+    if (removed.empty()) {
+        return 0;
+    }
+    const size_t n = removed.stamps.size() + removed.memos.size();
+    Q_EMIT audioChanged();
+    undoRedo->addUndoAction(std::make_unique<audio::RemoveRecordingUndoAction>(
+            std::move(removed), [this](const std::function<void()>& f) {
+                {
+                    std::unique_lock lock(*doc);
+                    f();
+                }
+                Q_EMIT audioChanged();
+            }));
+    return n;
 }
 
 void DocumentSession::movePageTowardsBeginning() {

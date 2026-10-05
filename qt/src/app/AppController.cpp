@@ -1,4 +1,5 @@
 #include "AppController.h"
+#include "AudioControl.h"
 
 #include "hwr/HandwritingSearch.h"
 #include "shell/HandwritingSettings.h"
@@ -210,6 +211,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     connect(app.get(), &AppContext::settingsChanged, this, &AppController::applyTodoRules);
     connect(library, &LibraryModel::favouriteToggled, this, &AppController::favouriteChanged);
     citations = std::make_unique<Citations>(*app->getSettings(), library);
+    makeAudioControl();
     // Open documents take the PDF text the library index read before (their search has all counts at once)
     DocumentTextIndex::setSeeder([lib = QPointer<LibraryModel>(library)](const fs::path& pdf) {
         LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
@@ -295,6 +297,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     shortcuts = mainWindow.shortcuts;
     library = mainWindow.library;
     citations = std::make_unique<Citations>(*app->getSettings(), library);
+    makeAudioControl();
     recent = mainWindow.recent;
     pageClipboard = mainWindow.pageClipboard;  // copied pages can be pasted in any window
     libraryBookmarks = mainWindow.libraryBookmarks;
@@ -407,6 +410,7 @@ AppController::~AppController() {
         disconnect(c);
     }
     flow.reset();  // (before the sessions)
+    audioControl.reset();  // (a recording ends, and its document is told, before the sessions go)
     pages->setSession(nullptr);
     outline->setSession(nullptr);
     annotations->setSession(nullptr);
@@ -904,6 +908,15 @@ void AppController::currentTabChanged() {
                                              &AppController::zoomChanged));
         currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoom100Changed, this,
                                              &AppController::zoomChanged));
+        // The play tool on ink with a recording (qt/docs/audio.md)
+        currentConnections.push_back(connect(v, &CanvasView::playRequested, this, [this](const QString& name, qint64 ts) {
+            if (audioControl) {
+                audioControl->playMoment(name, ts);
+            }
+        }));
+    }
+    if (audioControl) {
+        audioControl->currentChanged();
     }
     updatePresentedView();  // (another tab: it presents now)
     if (session() && session()->textFile()) {
@@ -3046,6 +3059,16 @@ void AppController::openReceived(const fs::path& folder, const std::vector<fs::p
 
 QObject* AppController::referenceObject() const { return referenceMode.get(); }
 QObject* AppController::citationsObject() const { return citations.get(); }
+QObject* AppController::audioObject() const { return audioControl.get(); }
+
+void AppController::makeAudioControl() {
+    audioControl = std::make_unique<AudioControl>(
+            [this] { return session(); },
+            [](DocumentSession* s) {
+                return s && s->hasFilePath() ? QString::fromStdU16String(s->getFilePath().filename().u16string())
+                                             : QCoreApplication::translate("AudioControl", "Untitled");
+            });
+}
 
 bool AppController::openAsReference(const QString& path) {
     DocumentSession* main = session();

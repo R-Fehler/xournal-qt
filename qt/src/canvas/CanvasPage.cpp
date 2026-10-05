@@ -217,6 +217,9 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
         this->inputHandler->onButtonPressEvent(pos, zoom);
         if (Stroke* stroke = this->inputHandler->getStroke()) {
             penfill::apply(*control.getSettings(), *h, *stroke);  // (its fill color, before its view is made)
+            if (h->getToolType() == TOOL_PEN) {
+                control.stampAudio(*stroke);  // (a recording runs: upstream's InputHandler::createStroke, qt/docs/audio.md)
+            }
         }
         this->overlayViews.emplace_back(this->inputHandler->createView(this));
     } else if (toolType == TOOL_LASER_POINTER_PEN || toolType == TOOL_LASER_POINTER_HIGHLIGHTER) {
@@ -256,6 +259,8 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
         leaveNote();  // (the text editor keeps the note's layer for its text)
     } else if (h->getToolType() == TOOL_SELECT_PDF_TEXT_LINEAR || h->getToolType() == TOOL_SELECT_PDF_TEXT_RECT) {
         view.pdfTextPress(*this, x, y);
+    } else if (h->getToolType() == TOOL_PLAY_OBJECT) {
+        view.playAt(*this, x, y);  // (upstream's PlayObject: the ink's recording, qt/docs/audio.md)
     } else if (h->getToolType() == TOOL_SELECT_OBJECT) {
         const bool aggregate = add && (view.getSelection() || together);
         selectObjectAt(x, y, false, aggregate);

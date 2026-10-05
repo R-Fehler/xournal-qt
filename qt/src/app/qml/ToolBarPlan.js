@@ -21,9 +21,10 @@ var PROMOTED = ["favourite", "bookmark", "print", "share"]
 var LADDER = PROMOTED.concat([
     "widths:single",
     "colors:recent",
-    // (Open externally after Search and the stickers: for a file shown here, a text file or an image, it is how the
-    // file is edited)
-    "new", "open", "save", "settings", "present", "fullScreen", "editAsNotes", "search", "sticker", "openExternally",
+    // (Open externally after Search, the stickers and recording: for a file shown here, a text file or an image, it
+    // is how the file is edited)
+    "new", "open", "save", "settings", "present", "fullScreen", "editAsNotes", "search", "sticker", "record",
+    "openExternally",
     "addPage", "image", "emoji", "pdfText", "geometry", "shape",
     "colors:single",
     "sticky", "write", "text", "touchDrawing", "select", "hand"
@@ -36,7 +37,7 @@ var GROUP_OF = {
     undo: "edit", redo: "edit",
     pen: "tools", eraser: "tools", hand: "tools", touchDrawing: "tools", select: "tools", text: "tools", write: "tools",
     sticky: "tools", shape: "tools", geometry: "tools", pdfText: "tools", emoji: "tools",
-    image: "insert", sticker: "insert", addPage: "insert",
+    image: "insert", sticker: "insert", record: "insert", addPage: "insert",
     search: "view", fullScreen: "view", present: "view", settings: "view",
     new: "file", open: "file", save: "file", editAsNotes: "file", openExternally: "file",
     share: "doc", print: "doc", bookmark: "doc", favourite: "doc"

@@ -90,6 +90,7 @@ private:
     void addPage(double width, double height) override;
     void setPageNoteSpace(double left, double top, double right, double bottom) override;  // xournal-qt
     void setPageBookmark(const std::string& label) override;                                // xournal-qt
+    void setPageAudio(const std::string& memos) override;                                   // xournal-qt
     void finalizePage() override;
     void addAudioAttachment(const fs::path& filename) override;
     void setBgName(const std::string& name) override;

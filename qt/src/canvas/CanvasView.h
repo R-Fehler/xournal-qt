@@ -406,6 +406,9 @@ public:
     CurtainLayer& curtain() { return curtainLayer; }
     const CurtainLayer& curtain() const { return curtainLayer; }
     void pdfTextPress(CanvasPage& page, double x, double y);
+    /// The play tool (upstream's TOOL_PLAY_OBJECT) tapped here: ink with a recording near it is played
+    /// (playRequested; qt/docs/audio.md). False if none is near.
+    bool playAt(CanvasPage& page, double x, double y);
     void pdfTextMove(CanvasPage& page, double x, double y);
     void pdfTextRelease(CanvasPage& page);
     /// Finish a PDF text selection with this style (tells the UI about it, or marks it right away).
@@ -526,6 +529,8 @@ public:
 Q_SIGNALS:
     /// Something visible changed: the canvas item should repaint.
     void updateRequested();
+    /// The play tool found ink tied to the recording `name` at the moment `ts` (ms; playAt)
+    void playRequested(const QString& name, qint64 ts);
     /// The set or geometry of pages changed.
     void pagesChanged();
     /// A selection was made or cleared.

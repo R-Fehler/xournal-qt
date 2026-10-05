@@ -33,6 +33,7 @@
 #endif
 
 #include "AppController.h"
+#include "AudioControl.h"
 #include "hwr/HandwritingSearch.h"
 #ifdef XQT_HWR_ONNX
 #include "hwr/TrocrRecognizer.h"
@@ -287,6 +288,8 @@ int main(int argc, char* argv[]) {
     // A phone without a pen (the Galaxy Fold 7) is written on with the finger: drawing with the finger is on at the
     // first start there, off where a stylus is attached (as on the desktop)
     controller.setFingerDrawingDefault(!xqt::android::hasStylus());
+    // A recording keeps the microphone in the background through a foreground service (qt/docs/audio.md)
+    xqt::AudioControl::setPlatformHook([](bool on) { xqt::android::setRecording(on); });
     // "Open with" and the share sheet: files other apps hand over, at start and while the app runs (the window
     // is there to show them and what went wrong)
     xqt::android::watchIncomingFiles([&controller](const QStringList& files) { controller.receiveFiles(files); });

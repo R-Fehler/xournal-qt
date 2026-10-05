@@ -19,6 +19,8 @@
 
 #include "model/PageRef.h"
 
+#include "filesystem.h"
+
 #include "MdPaginate.h"
 
 class Document;
@@ -75,6 +77,11 @@ struct Attachment {
     /// Its data never changes under its name (a picture): an incremental save keeps the one the file has, and adds
     /// it only when the file has none.
     bool fixed = false;
+    /// A recording (qt/docs/audio.md): its data is this file (read while the PDF is written, not kept in memory), and
+    /// `source` is its name in the document (upstream's fn). Its attachment's name carries its pages, so it is renamed
+    /// when they change; it is listed in the marker's /Audio (name, source), not /Files.
+    fs::path file;
+    std::string source;
 };
 /// What the PDF `pdfName` written from this document carries for other apps: a text document its "name.md" (the
 /// flow) and the pictures its Markdown links to (also in notes), under the paths the links name ("name.assets/…";

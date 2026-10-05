@@ -39,6 +39,10 @@
   <false/>
   <key>LSSupportsOpeningDocumentsInPlace</key>
   <true/>
+  <!-- Audio recordings (qt/docs/audio.md): macOS asks for the microphone with this text when the first recording
+       starts -->
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Xournal Qt records audio while you write, so that your notes play back what was said at that moment.</string>
 
   <!-- What the app opens (Finder hands them over as QFileOpenEvent, main.cpp). Xournal++'s own types are declared
        by Xournal++ (com.github.xournalpp.*), so they are imported here, not exported. -->

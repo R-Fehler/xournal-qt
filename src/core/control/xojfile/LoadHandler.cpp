@@ -117,6 +117,12 @@ void LoadHandler::setPageBookmark(const std::string& label) {
     this->page->setBookmark(label);
 }
 
+// xournal-qt: voice memos (qt/docs/audio.md)
+void LoadHandler::setPageAudio(const std::string& memos) {
+    xoj_assert(this->page);
+    this->page->setAudioMemos(memos);
+}
+
 // xournal-qt: the fill color of a stroke (qt/pen-styles)
 void LoadHandler::setStrokeFillColor(Color color) {
     xoj_assert(this->stroke);

@@ -127,6 +127,9 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
      in the catalog. **Deviation:** the hashes are in the marker, not in the `.xopp` (which stays exactly upstream's
      format). A hash covers what another app may change: `/Subtype`, `/Rect` and `/InkList` (to 0.1 pt), `/C`; not
      the appearance stream, which some apps write again on every save.
+   - Recordings ([audio.md](audio.md), "Storage"): each an embedded file `audio-p012-p015-<name>.ogg` (`audio/ogg`,
+     `/AFRelationship /Supplement` in an archive), listed in the marker as `/Audio [(attachment) (name in the
+     document) …]`, apart from `/Files`. The clean copy leaves them out; opening takes them out into the cache.
    - A merged-PDF mark (`/XournalQtPages`, `qt/pdf-pages`) that the background had is removed: a hybrid PDF is never
      rewritten as a merged PDF.
    - Written to a temporary file next to the target and renamed over it; object streams (smaller).

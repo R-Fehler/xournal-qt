@@ -170,6 +170,9 @@ struct Opened {
     fs::path base;  ///< the clean copy: the document's background PDF
     /// A folder with the pictures a text document carries, under their names ("name.assets/…"; qt/docs/md-images.md)
     fs::path pictures;
+    /// A folder with the recordings it carries, under their names in the document (qt/docs/audio.md); also registered
+    /// for the PDF with audio::setExtractedFolder, so they are found while it is open.
+    fs::path audio;
 };
 /// Open a hybrid PDF: its embedded document, with the clean copy as background PDF. The document's file path is
 /// `pdf`. Works on any thread.

@@ -835,6 +835,16 @@
   (`ToolboxModel`, JSON in the settings); the classic bar stays for one release (Settings → Pen → Tools)
   ([toolbox.md](toolbox.md)).
 
+- **Audio recordings, `qt/audio` (2026-10-04).** Mono Ogg Vorbis (vendored libogg/libvorbis, about 60 kbit/s, a page
+  flushed every second so a cut recording plays) through Qt Multimedia's `QAudioSource`/`QAudioSink` behind device
+  interfaces with fakes. Pen strokes and new texts are tied to the running recording as upstream (`ts`/`fn`), and a
+  recording is a voice memo of its page (`xqt-audio`, an upstream seam). `.xopp`: bare names in the app's audio
+  folder, as upstream. PDFs with notes carry each recording as `audio-p012-p015-<name>.ogg` (renamed in place by
+  Ctrl+S when pages move; `/Supplement` in archives); Export for Xournal++ copies them to `name.audio/` with absolute
+  names. UI: a record button (insert group, phone sheet, Ctrl+Shift+R), the recording and playback pills, the play
+  tool with a 2 s lead-in, the list of recordings; Android foreground service, microphone permission
+  ([audio.md](audio.md)). Built without Qt Multimedia here: recording is not offered in such a build.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

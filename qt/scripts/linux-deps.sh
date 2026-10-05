@@ -44,6 +44,7 @@ optional=(
     qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-dialogs
     qml6-module-qtquick-templates qml6-module-qtquick-window qml6-module-qtqml-workerscript
     libkf6syntaxhighlighting-dev
+    qt6-multimedia-dev  # (audio recordings: the microphone and the speaker; without it recording is not offered)
     fonts-dejavu-core fonts-noto-core
 )
 for package in "${optional[@]}"; do

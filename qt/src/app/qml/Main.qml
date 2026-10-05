@@ -1145,7 +1145,7 @@ ApplicationWindow {
             undo: undoTool, redo: redoTool,
             pen: penTool, eraser: eraserTool, hand: handTool, touchDrawing: touchDrawingTool, select: selectTool,
             text: textTool, write: writeButton, sticky: stickyTool, shape: shapeTool, geometry: geometryTool,
-            pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, sticker: stickerTool, addPage: addPageTool,
+            pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, sticker: stickerTool, record: recordTool, addPage: addPageTool,
             search: searchTool,
             fullScreen: fullScreenTool, present: presentTool, settings: settingsTool, new: newTool, open: openTool,
             save: saveTool, editAsNotes: editAsNotesTool, openExternally: openExternallyTool,
@@ -1153,7 +1153,7 @@ ApplicationWindow {
         })
         readonly property var order: ["undo", "redo",
                                       "pen", "eraser", "hand", "touchDrawing", "select", "text", "write", "sticky",
-                                      "shape", "geometry", "pdfText", "emoji", "image", "sticker", "addPage", "search",
+                                      "shape", "geometry", "pdfText", "emoji", "image", "sticker", "record", "addPage", "search",
                                       "fullScreen", "present", "settings", "new", "open", "save", "editAsNotes",
                                       "openExternally", "share", "print", "bookmark", "favourite"]
         /// The buttons in the bar now (an entry of ⋮ shown as a button is not in ⋮ too)
@@ -1975,6 +1975,8 @@ ApplicationWindow {
             property bool offered: !win.textDoc
             popupSide: toolArea.popupSide
         }
+        // Recording (qt/docs/audio.md): self-contained, the tool bar only places it
+        RecordButton { id: recordTool; parent: toolBank }
         IconButton {
             id: addPageTool
             objectName: "addPageButton"
@@ -4527,6 +4529,29 @@ ApplicationWindow {
         z: 57
     }
     // The curtain: its handles, taking it away (below the setsquare's pill when that is out too)
+    // A recording runs, a recording plays (qt/docs/audio.md): at the top of the canvas, in the middle
+    RecordingPill {
+        id: recordingPill
+        anchors.top: canvas.top
+        anchors.horizontalCenter: canvas.horizontalCenter
+        anchors.topMargin: 12 + win.canvasControlsTop - canvas.y
+        z: 57
+    }
+    PlaybackPill {
+        anchors.top: recordingPill.visible ? recordingPill.bottom : canvas.top
+        anchors.horizontalCenter: canvas.horizontalCenter
+        anchors.topMargin: recordingPill.visible ? 8 : 12 + win.canvasControlsTop - canvas.y
+        z: 57
+    }
+    Connections {
+        target: app.audio
+        function onMessage(text) { snackbar.show(text, false) }
+    }
+    Shortcut {
+        sequence: "Ctrl+Shift+R"
+        enabled: app.audio.available && !app.homeVisible
+        onActivated: app.audio.toggleRecording()
+    }
     CurtainPill {
         anchors.top: geometryPill.visible ? geometryPill.bottom : canvas.top
         anchors.right: canvas.right

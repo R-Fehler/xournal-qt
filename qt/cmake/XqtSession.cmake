@@ -99,7 +99,7 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfTitle.cpp
 )
 target_include_directories(xqt-session PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src" "${CMAKE_CURRENT_LIST_DIR}/../src/session")
-target_link_libraries(xqt-session PUBLIC Qt6::Core xoj-render xoj-core xqt-markdown)
+target_link_libraries(xqt-session PUBLIC Qt6::Core xoj-render xoj-core xqt-markdown xqt-audio)
 target_compile_definitions(xqt-session PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
 set_target_properties(xqt-session PROPERTIES AUTOMOC ON)
 
@@ -190,7 +190,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/StickerFileTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/NoteSpaceTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/CitationTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BookmarksTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BookmarksTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/AudioStorageTest.cpp)
     target_link_libraries(xqt-session-tests PRIVATE xqt-session Qt6::Test GTest::gtest)
     target_include_directories(xqt-session-tests PRIVATE "${TEST_CONFIG_DIR}")
     target_compile_definitions(xqt-session-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}"
@@ -218,7 +219,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/LinkMouseTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MiddleClickFitTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/CurtainTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PenStylesTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PenStylesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/AudioDocumentTest.cpp)
     target_link_libraries(xqt-canvas-tests PRIVATE xqt-canvas Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-canvas-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-canvas-tests PRIVATE "${TEST_CONFIG_DIR}")
