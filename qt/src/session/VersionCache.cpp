@@ -70,9 +70,22 @@ fs::path VersionCache::get(const fs::path& pdf, int id, std::string& error) {
         return {};
     }
     std::lock_guard lock(m);
-    entries.push_front({key, file, fs::file_size(file, ec)});
+    entries.push_front({key, file, fs::file_size(file, ec), pdf});
     trim();
     return file;
+}
+
+void VersionCache::forget(const fs::path& pdf) {
+    std::lock_guard lock(m);
+    for (auto it = entries.begin(); it != entries.end();) {
+        std::error_code ec;
+        if (it->source == pdf || fs::equivalent(it->source, pdf, ec)) {
+            fs::remove_all(it->file.parent_path(), ec);
+            it = entries.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 void VersionCache::trim() {

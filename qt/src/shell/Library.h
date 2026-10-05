@@ -329,6 +329,8 @@ public:
     /// How many versions an indexed PDF with notes keeps (version history; 0: none, or not indexed yet). A look-up,
     /// kept with its kind (from the marker, read with it).
     int versionsOf(const fs::path& file) const;
+    /// An indexed PDF that is protected with a password: the index never reads it (a lock on its card).
+    bool lockedOf(const fs::path& file) const;
     /// The indexed documents whose file name is `name`, case ignored (links whose path is gone, wiki links). With
     /// `withoutExtension`, `name` has no extension ("turbines" finds "turbines.md", "Turbines.xopp").
     std::vector<fs::path> filesNamed(const QString& name, bool withoutExtension = false) const;
@@ -425,6 +427,9 @@ private:
         /// A PDF with notes that keeps its versions (version history, PdfHistory.h): how many, read with its kind
         /// from the marker's /History (never the list itself); 0: it keeps none. Stored in "notes".
         int versions = 0;
+        /// A PDF protected with a password (PdfEncryption.h): not read (no text, no pages), a lock on its card. Stored
+        /// in "notes".
+        bool locked = false;
         bool isPdf() const;
         bool pdfKindMissing() const;
         int pageCount() const { return static_cast<int>(elementText.size()); }

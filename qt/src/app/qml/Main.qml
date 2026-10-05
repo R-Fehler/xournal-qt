@@ -1467,6 +1467,9 @@ ApplicationWindow {
                         MenuSeparator {}
                         // Its name (qt/rename): the file, and what belongs to it, as the library renames it
                         AdaptiveMenuItem { objectName: "renameDocumentItem"; text: qsTr("Rename…"); icon.source: app.iconUrl("xqt-pencil"); onTriggered: renameDocumentDialog.openFor(app.currentTab) }
+                        // A password to open it (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): AES-256, its PDF only
+                        AdaptiveMenuItem { objectName: "protectDocumentItem"; offered: app.canProtect && !app.protectedDocument; text: qsTr("Protect with a password…"); icon.source: app.iconUrl("xqt-lock"); onTriggered: protectDialog.openFor(false) }
+                        AdaptiveMenuItem { objectName: "changePasswordItem"; offered: app.canProtect && app.protectedDocument; text: qsTr("Change or remove the password…"); icon.source: app.iconUrl("xqt-lock-open"); onTriggered: protectDialog.openFor(true) }
                         // Version history (qt/docs/hybrid-pdf.md): the sidebar's History panel (off by default; what it
                         // is and the switch are there)
                         AdaptiveMenuItem { objectName: "versionHistoryItem"; offered: !win.textDoc; text: qsTr("Version history…"); icon.source: app.iconUrl("xqt-history"); onTriggered: win.showHistory() }
@@ -3319,6 +3322,206 @@ ApplicationWindow {
             }
         }
     }
+    // A PDF that needs a password to open (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): asked here, kept in memory only
+    // while the document is open. A wrong one is said so and asked again; Cancel leaves it closed.
+    AdaptiveDialog {
+        id: pdfPasswordDialog
+        objectName: "pdfPasswordDialog"
+        kind: "question"
+        property string file: ""
+        property bool wrong: false
+        preferredWidth: 420
+        title: qsTr("Password")
+        onOpened: pdfPasswordField.forceActiveFocus()
+        ColumnLayout {
+            width: pdfPasswordDialog.availableWidth
+            spacing: 8
+            Label {
+                objectName: "pdfPasswordText"
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: qsTr("%1 is protected with a password. Enter it to open the document.").arg(pdfPasswordDialog.file)
+            }
+            TextField {
+                id: pdfPasswordField
+                objectName: "pdfPasswordField"
+                Layout.fillWidth: true
+                echoMode: TextInput.Password
+                placeholderText: qsTr("Password")
+                onAccepted: pdfPasswordDialog.accept()
+            }
+            Label {
+                objectName: "pdfPasswordWrong"
+                Layout.fillWidth: true
+                visible: pdfPasswordDialog.wrong
+                wrapMode: Text.Wrap
+                color: "#b3261e"
+                text: qsTr("The password is not right. Try again.")
+            }
+        }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "pdfPasswordOpen"
+                text: qsTr("Open")
+                enabled: pdfPasswordField.text !== ""
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+            Button {
+                objectName: "pdfPasswordCancel"
+                text: qsTr("Cancel")
+                flat: true
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+        }
+        onAccepted: {
+            const password = pdfPasswordField.text
+            pdfPasswordField.text = ""  // (not kept in the window)
+            app.openWithPassword(password)
+        }
+        onRejected: {
+            pdfPasswordField.text = ""
+            app.cancelPassword()
+        }
+    }
+    Connections {
+        target: app
+        function onPasswordNeeded(file, wrong) {
+            pdfPasswordDialog.file = file
+            pdfPasswordDialog.wrong = wrong
+            pdfPasswordDialog.open()
+        }
+    }
+    // ⋮ → Document → "Protect with a password…" / "Change or remove the password…": AES-256 for its PDF, optional
+    // restrictions with a second password
+    AdaptiveDialog {
+        id: protectDialog
+        objectName: "protectDialog"
+        kind: "question"
+        /// The document is protected already: change or remove its password
+        property bool changing: false
+        readonly property string problem: {
+            if (protectPassword.text !== protectConfirm.text) return qsTr("The two passwords differ.")
+            return app.checkProtection(protectPassword.text, protectOwnerPassword.text, !restrictBox.checked || printBox.checked,
+                                       !restrictBox.checked || copyBox.checked, !restrictBox.checked || editBox.checked)
+        }
+        function openFor(change) {
+            changing = change
+            protectPassword.text = ""
+            protectConfirm.text = ""
+            protectOwnerPassword.text = ""
+            restrictBox.checked = false
+            printBox.checked = true
+            copyBox.checked = true
+            editBox.checked = true
+            open()
+            protectPassword.forceActiveFocus()
+        }
+        function clearFields() {
+            protectPassword.text = ""
+            protectConfirm.text = ""
+            protectOwnerPassword.text = ""
+        }
+        preferredWidth: 480
+        title: changing ? qsTr("Change or remove the password") : qsTr("Protect with a password")
+        ColumnLayout {
+            width: protectDialog.availableWidth
+            spacing: 6
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: qsTr("Anyone who opens %1 needs this password, in any PDF app. If it is forgotten, nobody can "
+                           + "open the document again, not even this app.").arg(app.title)
+            }
+            Label {
+                objectName: "protectVersionsNote"
+                Layout.fillWidth: true
+                visible: app.versions.on
+                wrapMode: Text.Wrap
+                color: "#b06000"
+                text: qsTr("The file is written anew: the earlier versions it keeps are removed.")
+            }
+            TextField {
+                id: protectPassword
+                objectName: "protectPassword"
+                Layout.fillWidth: true
+                echoMode: TextInput.Password
+                placeholderText: protectDialog.changing ? qsTr("New password") : qsTr("Password")
+            }
+            TextField {
+                id: protectConfirm
+                objectName: "protectConfirm"
+                Layout.fillWidth: true
+                echoMode: TextInput.Password
+                placeholderText: qsTr("The same password again")
+                onAccepted: if (protectDialog.problem === "") protectDialog.accept()
+            }
+            CheckBox {
+                id: restrictBox
+                objectName: "protectRestrict"
+                Layout.fillWidth: true
+                text: qsTr("Restrict what others can do with it")
+            }
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: 28
+                visible: restrictBox.checked
+                spacing: 2
+                CheckBox { id: printBox; objectName: "protectAllowPrint"; text: qsTr("Allow printing"); checked: true }
+                CheckBox { id: copyBox; objectName: "protectAllowCopy"; text: qsTr("Allow copying text"); checked: true }
+                CheckBox { id: editBox; objectName: "protectAllowEdit"; text: qsTr("Allow changes (notes, forms, pages)"); checked: true }
+                TextField {
+                    id: protectOwnerPassword
+                    objectName: "protectOwnerPassword"
+                    Layout.fillWidth: true
+                    echoMode: TextInput.Password
+                    placeholderText: qsTr("A second password, to lift the restrictions")
+                }
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    color: "#6b6f75"
+                    text: qsTr("PDF apps that respect restrictions (Acrobat, Preview) apply them; others may not.")
+                }
+            }
+            Label {
+                objectName: "protectProblem"
+                Layout.fillWidth: true
+                visible: protectPassword.text !== "" && protectDialog.problem !== ""
+                wrapMode: Text.Wrap
+                color: "#b3261e"
+                text: protectDialog.problem
+            }
+        }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "protectRemove"
+                visible: protectDialog.changing
+                text: qsTr("Remove the password")
+                flat: true
+                onClicked: {
+                    protectDialog.clearFields()
+                    protectDialog.close()
+                    app.removeProtection()
+                }
+            }
+            Button {
+                objectName: "protectAccept"
+                text: protectDialog.changing ? qsTr("Change") : qsTr("Protect")
+                enabled: protectPassword.text !== "" && protectDialog.problem === ""
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+            Button { text: qsTr("Cancel"); flat: true; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+        }
+        onAccepted: {
+            const password = protectPassword.text
+            const owner = protectOwnerPassword.text
+            const restricted = restrictBox.checked
+            clearFields()
+            app.protectDocument(password, owner, !restricted || printBox.checked, !restricted || copyBox.checked,
+                                !restricted || editBox.checked)
+        }
+        onRejected: clearFields()
+    }
     // Share…: the PDF with notes (shown in the file manager, or copied), or a copy for Xournal++ users
     AdaptiveDialog {
         id: shareDialog
@@ -3334,7 +3537,18 @@ ApplicationWindow {
             textFile = app.sharedTextFile(path)
             keepsVersions = textFile === "" && app.sharedKeepsVersions(path)
             withHistoryBox.checked = false
+            shareProtectBox.checked = app.protectedDocument
+            sharePasswordField.text = ""
             open()
+        }
+        function share(toClipboard) {
+            if (sharePasswordField.visible) {
+                const password = sharePasswordField.text
+                sharePasswordField.text = ""
+                app.sharePdfProtected(password, toClipboard)
+            } else {
+                win.sharePdfOf(file, toClipboard, withHistoryBox.checked)
+            }
         }
         preferredWidth: 460
         title: qsTr("Share")
@@ -3369,21 +3583,41 @@ ApplicationWindow {
                 ToolTip.text: qsTr("Off (recommended): the PDF goes as it is now. On: with every version it keeps, "
                                    + "also ink that was deleted since.")
             }
+            // "Protect with a password": the PDF with notes shared as a copy that needs this password (AES-256). A
+            // protected document is shared with its own password anyway.
+            CheckBox {
+                id: shareProtectBox
+                objectName: "shareProtect"
+                Layout.fillWidth: true
+                visible: shareDialog.textFile === "" && shareDialog.file === ""
+                enabled: !app.protectedDocument
+                checked: app.protectedDocument
+                text: app.protectedDocument ? qsTr("Protected with its password") : qsTr("Protect with a password")
+            }
+            TextField {
+                id: sharePasswordField
+                objectName: "sharePassword"
+                Layout.fillWidth: true
+                visible: shareProtectBox.visible && shareProtectBox.checked && !app.protectedDocument
+                echoMode: TextInput.Password
+                placeholderText: qsTr("Password to open it")
+            }
             ShareChoice {
                 objectName: "sharePdfChoice"
                 visible: shareDialog.textFile === ""
                 text: qsTr("PDF with notes (opens in any app)")
                 detail: app.canShare ? qsTr("Shown in the file manager, to send it on.")
                                      : qsTr("Not available on this system yet.")
-                enabled: app.canShare
-                onClicked: { shareDialog.close(); win.sharePdfOf(shareDialog.file, false, withHistoryBox.checked) }
+                enabled: app.canShare && (!sharePasswordField.visible || sharePasswordField.text !== "")
+                onClicked: { shareDialog.close(); shareDialog.share(false) }
             }
             ShareChoice {
                 objectName: "shareCopyChoice"
                 visible: shareDialog.textFile === ""
                 text: qsTr("Copy the PDF with notes")
                 detail: qsTr("Paste it into another app or a chat.")
-                onClicked: { shareDialog.close(); win.sharePdfOf(shareDialog.file, true, withHistoryBox.checked) }
+                enabled: !sharePasswordField.visible || sharePasswordField.text !== ""
+                onClicked: { shareDialog.close(); shareDialog.share(true) }
             }
             ShareChoice {
                 objectName: "shareArchiveChoice"
@@ -3500,6 +3734,16 @@ ApplicationWindow {
                 text: qsTr("A PDF made for keeping (PDF/A-3). It stays readable for decades in any PDF viewer. "
                            + "Your ink is merged into the pages, so no viewer can hide or lose it. The full Xournal "
                            + "data is embedded, so this app can still open it for editing.")
+            }
+            // (PDF/A allows no encryption: an archive PDF of a protected document has no password)
+            Label {
+                objectName: "archiveNotProtected"
+                Layout.fillWidth: true
+                visible: archiveDialog.file === "" && app.protectedDocument
+                wrapMode: Text.Wrap
+                color: "#b06000"
+                text: qsTr("This document is protected with a password. An archive PDF cannot be (PDF/A does not "
+                           + "allow it): it is written without a password.")
             }
             Label {
                 Layout.fillWidth: true

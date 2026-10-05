@@ -9,6 +9,7 @@
 #pragma once
 
 #include <map>
+#include <deque>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -40,6 +41,8 @@
 #include "filesystem.h"
 #include "model/PageRef.h"
 
+#include "session/DocumentSession.h"  // (LoadResult: openLoaded)
+#include "session/PdfEncryption.h"
 #include "session/TextMatch.h"
 
 class QQuickTextDocument;
@@ -165,6 +168,14 @@ class AppController: public QObject {
     Q_PROPERTY(bool textContinuous READ textContinuous WRITE setTextContinuous NOTIFY textLayoutChanged)
     /// The document is saved as a hybrid PDF (Ctrl+S writes it again).
     Q_PROPERTY(bool isHybrid READ isHybrid NOTIFY titleChanged)
+    // --- encrypted PDFs (AppEncryption.cpp; qt/docs/hybrid-pdf.md, "Encrypted PDFs")
+    /// The current document is protected with a password (its PDF, or the PDF its notes are on).
+    Q_PROPERTY(bool protectedDocument READ protectedDocument NOTIFY titleChanged)
+    /// Its password can be set, changed or removed here: its file is a PDF (not an archive PDF).
+    Q_PROPERTY(bool canProtect READ canProtect NOTIFY titleChanged)
+    /// Its PDF allows printing / copying its text (one opened without its owner password may not).
+    Q_PROPERTY(bool printAllowed READ printAllowed NOTIFY titleChanged)
+    Q_PROPERTY(bool copyAllowed READ copyAllowed NOTIFY titleChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY undoRedoChanged)
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY undoRedoChanged)
     Q_PROPERTY(QString tool READ tool NOTIFY toolChanged)
@@ -1055,6 +1066,29 @@ public:
     Q_INVOKABLE bool saveAs(const QUrl& url);
     // Hybrid PDF (qt/docs/hybrid-pdf.md)
     bool isHybrid() const;
+    bool protectedDocument() const;
+    bool canProtect() const;
+    bool printAllowed() const;
+    bool copyAllowed() const;
+    /// The PDF waiting for its password (passwordNeeded): opened with this one. False: not opened (a wrong one asks
+    /// again, passwordNeeded with `wrong`).
+    Q_INVOKABLE bool openWithPassword(const QString& password);
+    /// The password is not given: the PDF stays closed (the next one waiting is asked for).
+    Q_INVOKABLE void cancelPassword();
+    /// Why this protection cannot be written ("" when it can): for the dialog.
+    Q_INVOKABLE QString checkProtection(const QString& password, const QString& ownerPassword, bool allowPrint,
+                                        bool allowCopy, bool allowEdit) const;
+    /// Protect the current document's PDF with a password (AES-256), or change it: unsaved changes are saved into
+    /// it first, then the whole file is written anew encrypted (earlier versions go) and opened again. `ownerPassword`
+    /// with restrictions only. False (and a message) when it could not be done.
+    Q_INVOKABLE bool protectDocument(const QString& password, const QString& ownerPassword, bool allowPrint,
+                                     bool allowCopy, bool allowEdit);
+    /// Remove the password of the current document's PDF (written anew without encryption, opened again).
+    Q_INVOKABLE bool removeProtection();
+    /// Share → a PDF with notes protected with `password` (Share's "Protect with a password"): a copy of the document
+    /// written into the app cache, encrypted (AES-256), then shown in the file manager or put on the clipboard. The
+    /// document keeps its file and its own protection.
+    Q_INVOKABLE bool sharePdfProtected(const QString& password, bool toClipboard);
     /// Save as → "PDF with notes": the document's own hybrid PDF; for an annotated PDF "name.notes.pdf" next to it, or the
     /// PDF itself with the setting "Save notes into the PDF itself"; else the .xopp suggestion as .pdf.
     Q_INVOKABLE QUrl suggestedHybridFile() const;
@@ -1594,6 +1628,9 @@ Q_SIGNALS:
     void markdownBoxRequested(int page, double x, double y);
     /// The hybrid PDF just opened was edited in another app: its ink differs from the Xournal data.
     void hybridEditedElsewhere(const QString& file);
+    /// A PDF needs a password to be opened (`file`: its name; `wrong`: the one given was not right): the window asks
+    /// (openWithPassword, cancelPassword).
+    void passwordNeeded(const QString& file, bool wrong);
     /// Files were exported for Xournal++ and shown (`text` says where): the window offers to copy them.
     void sharedForXournal(const QStringList& files, const QString& text);
     /// An archive PDF was written: whether it is PDF/A-3b, else why not; what was changed in its source PDF.
@@ -1842,6 +1879,27 @@ private:
     /// The text file's new bytes are shown (the cursor stays where it was, as far as it can).
     void reloadText(xqt::DocumentSession* s, std::string bytes);
     std::unique_ptr<QFileSystemWatcher> textWatcher;
+
+    // --- encrypted PDFs (AppEncryption.cpp) ---
+    /// A file waiting for its password: opened (openLoaded), or a recovered autosave (`recoverTo`: its document).
+    struct PendingPassword {
+        fs::path file;
+        QString path;
+        bool shown = false;
+        fs::path recoverTo;
+        bool recovering = false;
+        fs::path passwordFile;  ///< the PDF that needs it (the file, or the PDF of a .xopp)
+    };
+    std::deque<PendingPassword> pendingPasswords;
+    /// The encryption of the next save startSave starts (SaveRequest::encryption)
+    std::optional<xqt::PdfEncryption::Encryption> nextSaveEncryption;
+    /// Ask the window for the password of this file (after those asked for already).
+    void askPassword(PendingPassword pending);
+    /// The rest of openPath: the loaded file in a new tab.
+    bool openLoaded(const fs::path& file, const QString& path, xqt::DocumentSession::LoadResult result, bool shown,
+                    std::unique_ptr<xqt::DocumentSession> textSession = nullptr);
+    /// protectDocument, removeProtection
+    bool applyProtection(xqt::DocumentSession* s, const xqt::PdfEncryption::Protection* protection);
 
     // --- links between documents (AppLinks.cpp) ---
     /// A link followed from the document `from` (the file holding the link; empty: the current document).

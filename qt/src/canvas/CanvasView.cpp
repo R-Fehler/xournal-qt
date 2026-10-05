@@ -79,6 +79,7 @@
 #include "session/Timeline.h"
 #include "session/StickyNote.h"
 #include "audio/DocumentAudio.h"
+#include "session/PdfEncryption.h"
 
 namespace xqt {
 
@@ -2879,7 +2880,7 @@ PdfCache* CanvasView::rasterPdfCache(bool background) const {
             XojPdfDocument own;
             GError* error = nullptr;
             // (not loadable, e.g. with a password, or changed on disk: the document's own instance)
-            if (own.load(path, "", &error) && own.getPageCount() == count) {
+            if (own.load(path, PdfEncryption::passwordOf(path), &error) && own.getPageCount() == count) {
                 backgroundPdfCache = std::make_unique<PdfCache>(own, nullptr);  // (keeps nothing: size 0)
             }
             if (error) {

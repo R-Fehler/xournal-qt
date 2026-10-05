@@ -75,6 +75,10 @@ LoadHandler::LoadHandler(std::vector<std::string>* errorMessages):
 
 LoadHandler::~LoadHandler() = default;
 
+#ifdef XOJ_NO_GTK
+std::string (*LoadHandler::pdfPassword)(const fs::path& pdf) = nullptr;  // xournal-qt
+#endif
+
 auto LoadHandler::isAttachedPdfMissing() const -> bool { return this->attachedPdfMissing; }
 
 auto LoadHandler::getMissingPdfFilename() const -> const fs::path& { return this->missingPdf; }
@@ -238,8 +242,13 @@ void LoadHandler::setBgSolid(const PageType& bg, Color color) {
 
 void LoadHandler::setBgPixmap(bool attach, const fs::path& filename) {
     BackgroundImage img;
+#ifdef XOJ_NO_GTK
+    const bool fromMemory = attach && this->memoryAttachment;  // xournal-qt: read as from a zip archive
+#else
+    const bool fromMemory = false;
+#endif
 
-    if (this->isGzFile || !attach) {
+    if ((this->isGzFile || !attach) && !fromMemory) {
         const fs::path fileToLoad = getAbsoluteFilepath(filename, attach);
 
         xoj::util::GErrorGuard error{};
@@ -302,6 +311,11 @@ void LoadHandler::loadBgPdf(bool attach, const fs::path& filename) {
 
         // pdfFilepath should point to the background PDF file
         if (fs::is_regular_file(pdfFilepath)) {
+#ifdef XOJ_NO_GTK
+            if (pdfPassword) {  // xournal-qt: an encrypted PDF
+                this->doc->setPdfPassword(pdfPassword(pdfFilepath));
+            }
+#endif
             this->doc->readPdf(pdfFilepath, false, attach);
 
             if (!this->doc->getLastErrorMsg().empty()) {
@@ -724,6 +738,25 @@ auto LoadHandler::loadDocument(fs::path const& filepath) -> std::unique_ptr<Docu
 }
 
 
+#ifdef XOJ_NO_GTK
+auto LoadHandler::loadDocument(std::unique_ptr<xoj::util::InputStream> xml, fs::path const& filepath,
+                               std::function<std::unique_ptr<std::string>(const fs::path&)> attachment)
+        -> std::unique_ptr<Document> {  // xournal-qt
+    this->xournalFilepath = filepath;
+    this->isGzFile = true;
+    this->memoryAttachment = std::move(attachment);
+    parseXml(std::move(xml));
+    this->memoryAttachment = nullptr;
+
+    xoj_assert(this->doc);
+    this->doc->setCreateBackupOnSave(true);
+    const bool keepName = this->fileVersion != 1 && !(this->errorMessages && !this->errorMessages->empty());
+    this->doc->setFilepath(keepName ? filepath : fs::path());
+    return std::move(this->doc);
+}
+#endif
+
+
 void LoadHandler::fixNullPressureValues(std::vector<Point> pts) {
     /*
      * Due to various bugs (see e.g. https://github.com/xournalpp/xournalpp/issues/3643), old files may contain strokes
@@ -774,6 +807,15 @@ void LoadHandler::fixNullPressureValues(std::vector<Point> pts) {
 }
 
 auto LoadHandler::readZipAttachment(fs::path const& filename) -> std::unique_ptr<std::string> {
+#ifdef XOJ_NO_GTK
+    if (this->memoryAttachment) {  // xournal-qt: a document loaded from memory
+        auto data = this->memoryAttachment(filename);
+        if (!data) {
+            logError(FS(_F("Could not open attachment: {1}") % filename.u8string()));
+        }
+        return data;
+    }
+#endif
     zip_stat_t attachmentFileStat;
     const int statStatus = zip_stat(this->zipFp.get(), char_cast(filename.u8string().c_str()), 0, &attachmentFileStat);
     if (statStatus != 0) {

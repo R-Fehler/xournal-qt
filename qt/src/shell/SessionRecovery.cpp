@@ -315,9 +315,11 @@ std::vector<SessionRecovery::Candidate> SessionRecovery::findCandidates(const Jo
                                                            : fs::path();
         const fs::path emergency = t.text ? DocumentSession::textEmergencyPath(t.pid, t.serial)
                                           : DocumentSession::emergencyPath(t.pid, t.serial);
+        // A protected document's autosave: an encrypted PDF with notes (recovered once its password is given)
+        const fs::path encrypted = t.text ? fs::path() : DocumentSession::protectedAutosavePath(t.pid, t.serial);
         const QDateTime saved = fileExists(t.file) ? modificationTime(t.file) : QDateTime();
         Candidate best;
-        for (const fs::path& f: {emergency, autosave, cached}) {
+        for (const fs::path& f: {emergency, autosave, cached, encrypted}) {
             if (f.empty()) {
                 continue;
             }
@@ -362,6 +364,11 @@ int SessionRecovery::emergencySaveAll() {
             out.write(text.data(), static_cast<std::streamsize>(text.size()));
             saved += out.good() ? 1 : 0;
             continue;
+        }
+        // (no locking, as below)
+        if (const auto ext = s->getDocument()->getFilepath().extension(); s->isProtected() && ext != ".xopp" &&
+                                                                         ext != ".xoj") {
+            continue;  // (a protected PDF: never written unencrypted; its last encrypted autosave is what is recovered)
         }
         const fs::path target = DocumentSession::emergencyPath(Util::getPid(), s->serial());
         // Like upstream's emergencySave: no locking (the crashed thread may hold the document lock).

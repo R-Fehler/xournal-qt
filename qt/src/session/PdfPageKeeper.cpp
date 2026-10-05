@@ -23,6 +23,7 @@
 #include "util/Util.h"
 
 #include "DocumentSession.h"
+#include "PdfEncryption.h"
 
 namespace xqt {
 
@@ -88,7 +89,7 @@ bool PdfPageKeeper::switchTo(const fs::path& pdf, std::string& error) {
         // Load it once on its own first: a PDF that does not load must not take the document's PDF away.
         XojPdfDocument probe;
         GError* e = nullptr;
-        const bool ok = probe.load(pdf, "", &e);
+        const bool ok = probe.load(pdf, PdfEncryption::passwordOf(pdf), &e);
         if (e) {
             error = e->message;
             g_error_free(e);
@@ -207,7 +208,7 @@ void PdfPageKeeper::writeMerge(Merge& m) {
     // Load it once on its own first: a PDF that does not load must not take the document's PDF away
     XojPdfDocument probe;
     GError* e = nullptr;
-    m.loads = probe.load(m.target, "", &e);
+    m.loads = probe.load(m.target, PdfEncryption::passwordOf(m.target), &e);
     if (e) {
         m.result.error = e->message;
         g_error_free(e);
@@ -628,10 +629,11 @@ void PdfPageKeeper::writePlanned(SavePlan& plan) {
             return;
         }
     }
+    PdfEncryption::derive(plan.writeTo, plan.bg);  // (a protected PDF's pages: encrypted as it is)
     {
         XojPdfDocument probe;  // (before the pages are renumbered: it must load)
         GError* e = nullptr;
-        const bool ok = probe.load(plan.writeTo, "", &e);
+        const bool ok = probe.load(plan.writeTo, PdfEncryption::passwordOf(plan.writeTo), &e);
         if (e) {
             g_warning("Could not load the PDF pages of the document: %s", e->message);
             g_error_free(e);

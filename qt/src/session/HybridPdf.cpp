@@ -4,6 +4,7 @@
 #include "InkTextLayer.h"
 
 #include <algorithm>
+#include <cstring>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -39,6 +40,7 @@
 #include <qpdf/QPDFPageDocumentHelper.hh>
 #include <qpdf/QPDFPageObjectHelper.hh>
 #include <qpdf/QPDFWriter.hh>
+#include <zlib.h>
 
 #include "control/xml/XmlNode.h"
 #include "control/xojfile/LoadHandler.h"
@@ -53,6 +55,7 @@
 #include "model/Stroke.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
+#include "util/InputStream.h"
 #include "util/OutputStream.h"
 #include "util/PathUtil.h"
 #include "util/Util.h"
@@ -69,6 +72,7 @@
 #include "IncrementalPdf.h"
 #include "MdBox.h"
 #include "MergedPdf.h"
+#include "PdfEncryption.h"
 #include "PdfKeywords.h"
 #include "PageBookmarks.h"
 #include "ByteDelta.h"
@@ -140,6 +144,80 @@ std::string bytesOf(const fs::path& p) {
     return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
+/// Gzipped (the .xopp of a protected document, made in memory).
+std::string gzipped(const std::string& data) {
+    z_stream z{};
+    if (deflateInit2(&z, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+        throw std::runtime_error("Could not compress the Xournal data");
+    }
+    std::string out(deflateBound(&z, static_cast<uLong>(data.size())) + 32, '\0');
+    z.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
+    z.avail_in = static_cast<uInt>(data.size());
+    z.next_out = reinterpret_cast<Bytef*>(out.data());
+    z.avail_out = static_cast<uInt>(out.size());
+    const int rc = deflate(&z, Z_FINISH);
+    out.resize(z.total_out);
+    deflateEnd(&z);
+    if (rc != Z_STREAM_END) {
+        throw std::runtime_error("Could not compress the Xournal data");
+    }
+    return out;
+}
+
+/// Gunzipped (also data that is not compressed: as it is).
+std::string gunzipped(const std::string& data) {
+    if (data.size() < 2 || static_cast<unsigned char>(data[0]) != 0x1f || static_cast<unsigned char>(data[1]) != 0x8b) {
+        return data;
+    }
+    z_stream z{};
+    if (inflateInit2(&z, 15 + 32) != Z_OK) {
+        throw std::runtime_error("Could not read the Xournal data");
+    }
+    std::string out;
+    char buf[64 * 1024];
+    z.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
+    z.avail_in = static_cast<uInt>(data.size());
+    int rc = Z_OK;
+    while (rc != Z_STREAM_END) {
+        z.next_out = reinterpret_cast<Bytef*>(buf);
+        z.avail_out = sizeof buf;
+        rc = inflate(&z, Z_NO_FLUSH);
+        if (rc != Z_OK && rc != Z_STREAM_END) {
+            inflateEnd(&z);
+            throw std::runtime_error("Could not read the Xournal data");
+        }
+        out.append(buf, sizeof buf - z.avail_out);
+    }
+    inflateEnd(&z);
+    return out;
+}
+
+/// The .xopp's XML from memory (LoadHandler).
+class StringInputStream final: public xoj::util::InputStream {
+public:
+    explicit StringInputStream(std::string data): data(std::move(data)) {}
+    ~StringInputStream() override { std::fill(data.begin(), data.end(), '\0'); }
+    int read(char* buffer, unsigned int len) noexcept override {
+        const size_t n = std::min<size_t>(len, data.size() - at);
+        std::memcpy(buffer, data.data() + at, n);
+        at += n;
+        return static_cast<int>(n);
+    }
+    void close() override {}
+
+private:
+    std::string data;
+    size_t at = 0;
+};
+
+/// The .xopp written into memory (SaveHandler), not into a file.
+class StringOutputStream final: public OutputStream {
+public:
+    void write(const char* d, size_t len) override { data.append(d, len); }
+    void close() override {}
+    std::string data;
+};
+
 bool writeFile(const fs::path& p, const std::string& data) {
     std::ofstream out(p, std::ios::binary | std::ios::trunc);
     out.write(data.data(), static_cast<std::streamsize>(data.size()));
@@ -157,6 +235,8 @@ fs::path partOf(const fs::path& target) {
 struct ArchiveWrite {
     bool on = false;
     bool recompress = false;
+    /// Not an archive: how it is encrypted (nullptr: as the PDF written has it). An archive PDF never is.
+    const PdfEncryption::Encryption* encryption = nullptr;
 };
 
 void writePdfTo(QPDF& pdf, const fs::path& target, ArchiveWrite archive = {}) {
@@ -168,6 +248,9 @@ void writePdfTo(QPDF& pdf, const fs::path& target, ArchiveWrite archive = {}) {
         // The streams of the PDF as they are (decoding and compressing them again doubled the time); new streams
         // without a filter are still compressed
         w.setDecodeLevel(archive.recompress ? qpdf_dl_generalized : qpdf_dl_none);
+        if (!archive.on && archive.encryption) {
+            PdfEncryption::apply(w, pdf, *archive.encryption);
+        }
         if (archive.on) {
             w.setPreserveEncryption(false);
             w.setMinimumPDFVersion("1.7");
@@ -899,6 +982,7 @@ struct Prepared {
     std::vector<TextDocument::Attachment> attachments;        ///< files for other apps (a text document's "name.md")
     std::vector<std::vector<InkTextLayer::Word>> inkWords;    ///< per page: its text layer (InkTextLayer.h)
     std::string error;
+    PdfEncryption::Encryption encryption;  ///< how the file is encrypted when written in full (WriteOptions)
 };
 
 /// The words of the text layer of each page (`pages`: the recognised handwriting per page; may be null).
@@ -1072,8 +1156,17 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
             return out;
         }
     }
-    // The .xopp
-    h.saveTo(xopp);
+    // The .xopp (of a protected document: in memory, never in a file; PdfEncryption.h)
+    const bool secret = PdfEncryption::isProtected(docFile) || PdfEncryption::isProtected(out.bg);
+    std::string inMemory;
+    if (secret) {
+        StringOutputStream mem;
+        h.saveTo(&mem, xopp);  // (attached background images still go next to it, into the work folder)
+        inMemory = gzipped(mem.data);
+        std::fill(mem.data.begin(), mem.data.end(), '\0');
+    } else {
+        h.saveTo(xopp);
+    }
     {
         std::unique_lock lock(doc);
         h.updateDocumentInfo(&doc);
@@ -1082,7 +1175,7 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
         out.error = h.getErrorMessage();
         return out;
     }
-    out.xopp = bytesOf(xopp);
+    out.xopp = secret ? std::move(inMemory) : bytesOf(xopp);
     std::error_code ec;
     const std::string prefix = std::string(DATA_NAME) + ".";
     for (auto it = fs::directory_iterator(work, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
@@ -1613,7 +1706,7 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
     const bool fromBg = std::any_of(prep.pages.begin(), prep.pages.end(),
                                     [](auto& p) { return p.pdfPage != npos || p.annotsFrom != npos; });
     if (fromBg) {
-        out.processFile(prep.bg.string().c_str());
+        PdfEncryption::openQpdf(out, prep.bg);
         if (out.getRoot().hasKey(MARKER)) {
             strip(out);  // (a hybrid PDF as the background; a PDF without our marker has no annotations of ours)
         }
@@ -1743,7 +1836,7 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
         // The file written over keeps its keywords: its tags (qt/docs/tags.md; given to the file, not to the document,
         // so a background without them would drop them)
         if (std::error_code ec; fs::exists(target, ec) && !fs::equivalent(target, prep.bg, ec)) {
-            const QString keywords = pdfkeywords::read(target).info;
+            const QString keywords = pdfkeywords::read(target, /*session=*/true).info;
             if (!keywords.isEmpty()) {
                 info.replaceKey("/Keywords", QPDFObjectHandle::newUnicodeString(keywords.toStdString()));
             }
@@ -1751,6 +1844,7 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
     }
     step("annotations, data, marker");
     ArchiveWrite how;
+    how.encryption = &prep.encryption;
     if (!archive) {
         ArchivePdf::dropPdfAClaim(out);  // (a hybrid PDF is never PDF/A, even when its source PDF was)
     }
@@ -1864,12 +1958,12 @@ std::unique_ptr<Existing> openExisting(const fs::path& target, const Revision& r
     QPDF& q = *e->q;
     Steps step;
     q.setSuppressWarnings(true);
-    q.processFile(target.string().c_str());
+    PdfEncryption::openQpdf(q, target);
     step("  read the file");
     e->update = std::make_unique<IncrementalPdf::Update>(q);  // (before anything is changed)
     step("  count its objects");
-    if (q.isEncrypted()) {
-        why = "the file is encrypted";
+    if (PdfEncryption::Encrypter enc(q); enc.encrypted() && !enc.supported()) {
+        why = "the file is encrypted: " + enc.why();  // (AES-256 files are appended to, encrypted: PdfEncryption.h)
         return nullptr;
     }
     e->root = q.getRoot();
@@ -2312,7 +2406,7 @@ private:
         if (!source) {
             source = std::make_unique<QPDF>();
             source->setSuppressWarnings(true);
-            source->processFile(prep.bg.string().c_str());
+            PdfEncryption::openQpdf(*source, prep.bg);
             if (source->getRoot().hasKey(MARKER)) {  // (never: the background is a clean copy or the user's PDF)
                 throw std::runtime_error("the background PDF has our annotations");
             }
@@ -3102,6 +3196,33 @@ static std::string titleOf(const fs::path& pdf) {
 
 // --- public ---------------------------------------------------------------------------------------------------------
 
+void dropExtracted(const fs::path& base) {
+    std::error_code ec;
+    fs::remove_all(base.parent_path() / PICTURES_NAME, ec);
+    fs::remove_all(base.parent_path() / AUDIO_NAME, ec);
+}
+
+int forgetCopies(const fs::path& pdf) {
+    const std::string prefix = entryOf(pdf, "").filename().string();  // (the path's hash and "-")
+    std::lock_guard lock(cacheMutex);
+    std::error_code ec;
+    int removed = 0;
+    for (auto it = fs::directory_iterator(cacheFolder(), ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+        const fs::path dir = it->path();
+        if (dir.filename().string().rfind(prefix, 0) != 0 || !it->is_directory()) {
+            continue;
+        }
+        if (std::any_of(retained().begin(), retained().end(),
+                        [&](const auto& r) { return r.first.parent_path() == dir.lexically_normal(); })) {
+            continue;
+        }
+        std::error_code rec;
+        fs::remove_all(dir, rec);
+        removed += !rec;
+    }
+    return removed;
+}
+
 std::string nameOf(size_t page, size_t layer) {
     return std::string(NAME_PREFIX) + "p" + std::to_string(page + 1) + "-l" + std::to_string(layer + 1);
 }
@@ -3155,7 +3276,7 @@ Revision revisionAfterFull(const fs::path& target, const Prepared& prep) {
     Revision rev;
     QPDF q;
     q.setSuppressWarnings(true);
-    q.processFile(target.string().c_str());
+    PdfEncryption::openQpdf(q, target);
     // (the kids of the page tree's root: written flat; reading the pages themselves reads most of a long file: 0.5 s
     // for pgfmanual with qpdf 12.4, 2.7 s with 10.6)
     QPDFObjectHandle kids = q.getRoot().getKey("/Pages").getKey("/Kids");
@@ -3209,12 +3330,16 @@ void keepCleanCopy(const fs::path& target, const std::string& was, const Prepare
         ec.clear();
         fs::copy_file(from / CLEAN_NAME, to / CLEAN_NAME, fs::copy_options::overwrite_existing, ec);
     }
-    if (ec || !writeFile(to / PAGES_NAME, list) || !writeFile(to / DATA_NAME, prep.xopp)) {
+    // (a protected PDF: not its Xournal data, which is read from the file at each opening)
+    const bool secret = PdfEncryption::isProtected(target);
+    if (ec || !writeFile(to / PAGES_NAME, list) || (!secret && !writeFile(to / DATA_NAME, prep.xopp))) {
         fs::remove_all(to, ec);
         return;
     }
     for (const auto& [name, data]: prep.extras) {
-        writeFile(to / name, data);
+        if (!secret) {
+            writeFile(to / name, data);
+        }
     }
     const fs::path tmp = partOf(to / CHECK_NAME);
     writeFile(tmp, "");
@@ -3279,7 +3404,7 @@ bool rewriteFrom(const fs::path& target, uint64_t from, std::string& error,
     {
         QPDF q;
         q.setSuppressWarnings(true);
-        q.processFile(target.string().c_str());
+        PdfEncryption::openQpdf(q, target);
         IncrementalPdf::Update u(q);
         if (change) {
             change(q, u);
@@ -3313,6 +3438,7 @@ Result appendWhole(const Prepared& prep, const fs::path& target, const std::stri
     if (!r.ok) {
         return r;
     }
+    PdfEncryption::derive(full, target);  // (encrypted like the file: read with its password below)
     step("the whole document written");
     IncrementalPdf::Tail tail;
     if (!IncrementalPdf::readTail(target, tail, r.error)) {
@@ -3323,16 +3449,16 @@ Result appendWhole(const Prepared& prep, const fs::path& target, const std::stri
     {
         QPDF q;
         q.setSuppressWarnings(true);
-        q.processFile(target.string().c_str());
-        if (q.isEncrypted()) {
-            throw std::runtime_error("the file is encrypted");
+        PdfEncryption::openQpdf(q, target);
+        if (PdfEncryption::Encrypter enc(q); enc.encrypted() && !enc.supported()) {
+            throw std::runtime_error("the file is encrypted: " + enc.why());
         }
         IncrementalPdf::Update u(q);
         u.indexReuse();
         step("the file's streams");
         QPDF f;
         f.setSuppressWarnings(true);
-        f.processFile(full.string().c_str());
+        PdfEncryption::openQpdf(f, full);
         QPDFObjectHandle root = q.getRoot();
         u.touch(root);
         replaceAll(root, u.copyAll(f.getRoot()));
@@ -3391,7 +3517,7 @@ bool storeAsDelta(const fs::path& target, const PdfHistory::Listed& listed, std:
     {
         QPDF q;
         q.setSuppressWarnings(true);
-        q.processFile(target.string().c_str());
+        PdfEncryption::openQpdf(q, target);
         gz = embeddedXoppOf(q);
     }
     bool ok = false;
@@ -3450,6 +3576,7 @@ Result writeKeeping(Document& doc, const fs::path& target, const BasePageOf& bas
         Prepared prep = prepare(doc, target.filename().string(), work, baseOf, pdfPageCount, false,
                                 target.parent_path(), nullptr, reuse);
         addInkWords(prep, options.inkText);
+        prep.encryption = options.encryption;
         if (!prep.error.empty()) {
             throw std::runtime_error(prep.error);
         }
@@ -3511,7 +3638,7 @@ Result writeKeeping(Document& doc, const fs::path& target, const BasePageOf& bas
         }
         QPDF q;
         q.setSuppressWarnings(true);
-        q.processFile(target.string().c_str());
+        PdfEncryption::openQpdf(q, target);
         if (const std::string xopp = embeddedXoppOf(q); !xopp.empty()) {
             v0.sha = xoppSha(xopp);
         }
@@ -3615,6 +3742,7 @@ bool writeVersion(const fs::path& pdf, int id, const fs::path& out, std::string&
         if (!PdfRevisions::extract(pdf, it->end, out, error)) {
             return false;
         }
+        PdfEncryption::derive(out, pdf);  // (a prefix of a protected file: encrypted, the same password)
         if (xopp.empty()) {
             return true;  // (the file as it was saved then: its own document.xopp, or the PDF as received)
         }
@@ -3627,7 +3755,7 @@ bool writeVersion(const fs::path& pdf, int id, const fs::path& out, std::string&
         {
             QPDF q;
             q.setSuppressWarnings(true);
-            q.processFile(out.string().c_str());
+            PdfEncryption::openQpdf(q, out);
             IncrementalPdf::Update u(q);
             QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
             QPDFObjectHandle name = marker.getKey("/Data");
@@ -3674,7 +3802,7 @@ bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, 
         {
             QPDF q;
             q.setSuppressWarnings(true);
-            q.processFile(pdf.string().c_str());
+            PdfEncryption::openQpdf(q, pdf);
             IncrementalPdf::Update u(q);
             QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
             u.touch(marker.isIndirect() ? marker : q.getRoot());
@@ -3751,6 +3879,7 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, si
                     Prepared prep = prepare(doc, target.filename().string(), work.path, baseOf, pdfPageCount, false,
                                             target.parent_path(), nullptr, &existing->reuse);
                     addInkWords(prep, options.inkText);
+        prep.encryption = options.encryption;
                     step("draw what changed and write the .xopp");
                     if (!prep.error.empty()) {
                         r.error = prep.error;
@@ -3784,6 +3913,7 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, si
         Prepared prep =
                 prepare(doc, target.filename().string(), work.path, baseOf, pdfPageCount, false, target.parent_path());
         addInkWords(prep, options.inkText);
+        prep.encryption = options.encryption;
         step("draw and write the .xopp");
         if (!prep.error.empty()) {
             r.error = prep.error;
@@ -3928,7 +4058,7 @@ Kind kindOf(const fs::path& pdf) {
     try {
         QPDF q;
         q.setSuppressWarnings(true);
-        q.processFile(pdf.string().c_str());
+        PdfEncryption::openQpdf(q, pdf);
         QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
         if (marker.isDictionary()) {
             QPDFObjectHandle archive = marker.getKey("/Archive");
@@ -3948,7 +4078,10 @@ Kind kindOf(const fs::path& pdf) {
             }
         }
         kind.revisions = q.getTrailer().hasKey("/Prev");
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
+        if (PdfEncryption::isPasswordError(e)) {
+            return Kind();  // (a protected PDF: not remembered, it is read once its password is known)
+        }
         kind = Kind();
     }
     std::lock_guard lock(m);
@@ -3973,22 +4106,29 @@ Marker markerOf(const fs::path& pdf) {
 
 int markerReads() { return kindReads.load(); }
 
+void forgetHistory(QPDF& q) {
+    if (QPDFObjectHandle marker = q.getRoot().getKey(MARKER); marker.isDictionary()) {
+        for (const char* key: {"/Base", "/Updates", "/History", "/Versions"}) {
+            if (marker.hasKey(key)) {
+                marker.removeKey(key);
+            }
+        }
+    }
+}
+
 bool compact(const fs::path& pdf, std::string& error, const fs::path& to) {
     try {
         const bool archive = isArchive(pdf);
         QPDF q;
         q.setSuppressWarnings(true);
-        q.processFile(pdf.string().c_str());
-        if (QPDFObjectHandle marker = q.getRoot().getKey(MARKER); marker.isDictionary()) {
-            for (const char* key: {"/Base", "/Updates", "/History", "/Versions"}) {
-                if (marker.hasKey(key)) {
-                    marker.removeKey(key);
-                }
-            }
-        }
+        PdfEncryption::openQpdf(q, pdf);
+        forgetHistory(q);
         ArchiveWrite how;
         how.on = archive;
-        writePdfTo(q, to.empty() ? pdf : to, how);
+        writePdfTo(q, to.empty() ? pdf : to, how);  // (a protected PDF stays encrypted, the same password)
+        if (!to.empty()) {
+            PdfEncryption::derive(to, pdf);
+        }
         return true;
     } catch (const std::exception& e) {
         error = e.what();
@@ -4023,7 +4163,7 @@ fs::path xoppExportOf(const fs::path& pdf) {
     try {
         QPDF q;
         q.setSuppressWarnings(true);
-        q.processFile(pdf.string().c_str());
+        PdfEncryption::openQpdf(q, pdf);
         QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
         if (!marker.isDictionary()) {
             return {};
@@ -4111,11 +4251,15 @@ Opened open(const fs::path& pdf) {
         }
         const fs::path dir = entryOf(pdf, stamp);
         const fs::path base = dir / CLEAN_NAME, xopp = dir / DATA_NAME, check = dir / CHECK_NAME;
+        // A protected PDF (PdfEncryption.h): its Xournal data is read into memory on every opening, never written into
+        // the cache; the clean copy there is encrypted like the file (qt/docs/hybrid-pdf.md, "Encrypted PDFs")
+        const bool secret = PdfEncryption::isProtected(pdf);
+        std::vector<std::pair<std::string, std::string>> files;  // (the .xopp and its attached files, by their names)
         std::error_code ec;
-        if (!fs::exists(check, ec)) {
+        if (!fs::exists(check, ec) || secret) {
             QPDF q;
             q.setSuppressWarnings(true);
-            q.processFile(pdf.string().c_str());
+            PdfEncryption::openQpdf(q, pdf);
             QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
             if (!marker.isDictionary()) {
                 o.error = "The PDF has no Xournal data.";
@@ -4135,7 +4279,6 @@ Opened open(const fs::path& pdf) {
             }
             fs::create_directories(dir, ec);
             // The embedded files first (strip() removes them)
-            std::vector<std::pair<std::string, std::string>> files;
             for (const auto& [n, s]: efdh.getEmbeddedFiles()) {
                 if (n == name || n.rfind(name + ".", 0) == 0) {
                     auto buffer = s->getEmbeddedFileStream().getStreamData(qpdf_dl_all);
@@ -4144,45 +4287,54 @@ Opened open(const fs::path& pdf) {
                                                    buffer->getSize()));
                 }
             }
+            // (a protected PDF: its pictures and recordings are taken out while it is open, the Markdown renderer and
+            // the player read files; DocumentSession removes them when it is closed)
             extractPictures(q, marker, dir);  // (before strip(): it removes them)
             extractAudio(q, marker, dir);
-            std::vector<QPDFObjectHandle> pages;  // (the clean copy's page k is this page of the file)
-            for (auto& p: QPDFPageDocumentHelper(q).getAllPages()) {
-                pages.push_back(p.getObjectHandle());
-            }
-            writeFile(dir / PAGES_NAME, pagesText(pages));
-            const std::vector<std::string> changed = strip(q);
-            MergedPdf::mark(q, MergedPdf::Kind::Own);  // ("Save as" .xopp puts it next to the .xopp)
-            writePdfTo(q, base);
-            for (const auto& [n, data]: files) {
-                const fs::path tmp = partOf(dir / n);
-                if (!writeFile(tmp, data)) {
-                    throw std::runtime_error("Could not write into the cache: " + (dir / n).string());
+            if (!fs::exists(check, ec)) {
+                std::vector<QPDFObjectHandle> pages;  // (the clean copy's page k is this page of the file)
+                for (auto& p: QPDFPageDocumentHelper(q).getAllPages()) {
+                    pages.push_back(p.getObjectHandle());
                 }
-                fs::rename(tmp, dir / n, ec);
+                writeFile(dir / PAGES_NAME, pagesText(pages));
+                const std::vector<std::string> changed = strip(q);
+                MergedPdf::mark(q, MergedPdf::Kind::Own);  // ("Save as" .xopp puts it next to the .xopp)
+                writePdfTo(q, base);  // (encrypted as the file is)
+                if (!secret) {
+                    for (const auto& [n, data]: files) {
+                        const fs::path tmp = partOf(dir / n);
+                        if (!writeFile(tmp, data)) {
+                            throw std::runtime_error("Could not write into the cache: " + (dir / n).string());
+                        }
+                        fs::rename(tmp, dir / n, ec);
+                    }
+                }
+                std::string list;
+                for (const auto& c: changed) {
+                    list += c + "\n";
+                }
+                const fs::path tmp = partOf(check);
+                writeFile(tmp, list);
+                fs::rename(tmp, check, ec);  // last: the entry is complete
+            } else {
+                touch(base);
             }
-            std::string list;
-            for (const auto& c: changed) {
-                list += c + "\n";
-            }
-            const fs::path tmp = partOf(check);
-            writeFile(tmp, list);
-            fs::rename(tmp, check, ec);  // last: the entry is complete
         } else {
             touch(base);
             if (!fs::exists(dir / PICTURES_NAME, ec)) {  // (an entry made before pictures were carried)
                 QPDF q;
                 q.setSuppressWarnings(true);
-                q.processFile(pdf.string().c_str());
+                PdfEncryption::openQpdf(q, pdf);
                 extractPictures(q, q.getRoot().getKey(MARKER), dir);
             }
             if (!fs::exists(dir / AUDIO_NAME, ec)) {  // (an entry made before recordings were carried)
                 QPDF q;
                 q.setSuppressWarnings(true);
-                q.processFile(pdf.string().c_str());
+                PdfEncryption::openQpdf(q, pdf);
                 extractAudio(q, q.getRoot().getKey(MARKER), dir);
             }
         }
+        PdfEncryption::derive(base, pdf);  // (the clean copy opens with the file's password)
         o.pictures = dir / PICTURES_NAME;
         o.audio = dir / AUDIO_NAME;
         audio::setExtractedFolder(pdf, o.audio);
@@ -4195,12 +4347,32 @@ Opened open(const fs::path& pdf) {
             }
         }
         LoadHandler handler(&o.warnings);
-        o.document = handler.loadDocument(xopp);
+        if (secret) {
+            std::string data;
+            for (auto& [n, d]: files) {
+                if (n == DATA_NAME) {
+                    data = gunzipped(d);
+                }
+            }
+            auto attached = [&files](const fs::path& name) -> std::unique_ptr<std::string> {
+                const std::string wanted = std::string(DATA_NAME) + "." + name.string();
+                for (const auto& [n, d]: files) {
+                    if (n == wanted) {
+                        return std::make_unique<std::string>(d);
+                    }
+                }
+                return nullptr;
+            };
+            o.document = handler.loadDocument(std::make_unique<StringInputStream>(std::move(data)), xopp, attached);
+        } else {
+            o.document = handler.loadDocument(xopp);
+        }
         if (!o.document) {
             o.error = "The Xournal data of this PDF cannot be read.";
             return o;
         }
         {  // (also without PDF pages: the annotations of other apps on its pages are kept from it)
+            o.document->setPdfPassword(PdfEncryption::passwordOf(base));
             if (!o.document->readPdf(base, /*initPages=*/false, /*attachToDocument=*/false)) {
                 o.error = "The pages of this PDF cannot be read: " + o.document->getLastErrorMsg();
                 o.document.reset();
@@ -4225,11 +4397,12 @@ fs::path importCopy(const fs::path& pdf, const std::vector<std::string>& keep, s
         fs::create_directories(dir, ec);
         QPDF q;
         q.setSuppressWarnings(true);
-        q.processFile(pdf.string().c_str());
+        PdfEncryption::openQpdf(q, pdf);
         strip(q, std::set<std::string>(keep.begin(), keep.end()));
         MergedPdf::mark(q, MergedPdf::Kind::Own);
         const fs::path target = dir / ("imported-" + hex(fnv(stamp + std::to_string(keep.size()))) + ".pdf");
         writePdfTo(q, target);
+        PdfEncryption::derive(target, pdf);
         return target;
     } catch (const std::exception& e) {
         error = e.what();

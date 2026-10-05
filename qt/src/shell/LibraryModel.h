@@ -138,6 +138,8 @@ public:
         TagsRole,
         /// A PDF with notes that keeps its versions (version history): how many, from the index (0: none)
         VersionsRole,
+        /// A PDF protected with a password: the index does not read it (a lock on the card)
+        LockedRole,
     };
 
     explicit LibraryModel(QObject* parent = nullptr);

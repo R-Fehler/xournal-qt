@@ -30,6 +30,8 @@ public:
     bool contains(const fs::path& file) const;
     /// Remove every file of this process (when the app quits).
     void clear();
+    /// Remove the versions cut out of `pdf` (it was protected with a password: no unencrypted copy of it stays).
+    void forget(const fs::path& pdf);
     /// The folder of this process's files.
     fs::path folder() const;
 
@@ -42,6 +44,7 @@ private:
         std::string key;
         fs::path file;
         uint64_t bytes = 0;
+        fs::path source;  ///< the PDF it was cut out of
     };
     void trim();
     mutable std::mutex m;

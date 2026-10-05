@@ -15,6 +15,7 @@
 #include "render/RenderService.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "session/PdfEncryption.h"
 #include "util/PathUtil.h"
 
 #include "CanvasMemory.h"
@@ -41,8 +42,8 @@ QThreadPool& sketchPool(int workers) {
 /// Folder of the stored previews of a document as its files are now (empty: not saved)
 fs::path folderOf(DocumentSession& session) {
     const fs::path file = session.documentFile();
-    if (file.empty()) {
-        return {};
+    if (file.empty() || PdfEncryption::isProtected(file)) {
+        return {};  // (a protected PDF: its pages are never stored unencrypted; qt/docs/hybrid-pdf.md)
     }
     fs::path pdf;
     {
@@ -599,7 +600,7 @@ std::unique_ptr<XojPdfDocument> PageSketches::takePdf(quint64 session, const fs:
     }
     auto pdf = std::make_unique<XojPdfDocument>();
     GError* error = nullptr;
-    const bool loaded = pdf->load(path, "", &error);
+    const bool loaded = pdf->load(path, PdfEncryption::passwordOf(path), &error);
     if (error) {
         g_error_free(error);
     }

@@ -22,6 +22,8 @@
 
 #include "util/Util.h"
 
+#include "PdfEncryption.h"
+
 namespace xqt::IncrementalPdf {
 
 std::function<bool(uint64_t)> failWriteAt;
@@ -48,6 +50,39 @@ std::string rawData(OH stream) {
 
 /// What an object of the file is: its text (a stream: its dictionary).
 std::string textOf(OH o) { return o.isStream() ? o.getDict().unparse() : o.unparseResolved(); }
+
+/// An object as PDF syntax with its strings encrypted (an object of an encrypted file written outside an object
+/// stream, or a stream's dictionary). References stay references.
+std::string unparseEncrypted(OH o, const PdfEncryption::Encrypter& enc, bool top) {
+    if (!top && o.isIndirect()) {
+        return o.unparse();
+    }
+    if (o.isString()) {
+        static const char* digits = "0123456789abcdef";
+        const std::string data = enc.encrypt(o.getStringValue());
+        std::string out = "<";
+        for (unsigned char c: data) {
+            out.push_back(digits[c >> 4]);
+            out.push_back(digits[c & 15]);
+        }
+        return out + ">";
+    }
+    if (o.isArray()) {
+        std::string out = "[";
+        for (int i = 0; i < o.getArrayNItems(); ++i) {
+            out += " " + unparseEncrypted(o.getArrayItem(i), enc, false);
+        }
+        return out + " ]";
+    }
+    if (o.isDictionary()) {
+        std::string out = "<<";
+        for (const auto& k: o.getKeys()) {
+            out += " " + OH::newName(k).unparse() + " " + unparseEncrypted(o.getKey(k), enc, false);
+        }
+        return out + " >>";
+    }
+    return o.unparseResolved();
+}
 
 /// The indirect objects a direct object (or a stream's dictionary) refers to.
 void referencesOf(OH o, std::vector<OH>& out, bool top = true) {
@@ -344,6 +379,14 @@ std::string Update::serialize(const Tail& tail, Stats* stats) { return serialize
 std::string Update::serializeOver(const Over& over, Stats* stats) { return serializeWith(over.prefix, &over, stats); }
 
 std::string Update::serializeWith(const Tail& tail, const Over* over, Stats* stats) {
+    // An encrypted file: strings and streams of the update encrypted with the file's key (AES-256 only; else the
+    // caller writes the file in full). qt/docs/hybrid-pdf.md, "Encrypted PDFs"
+    const PdfEncryption::Encrypter enc(pdf);
+    if (enc.encrypted() && !enc.supported()) {
+        throw std::runtime_error("Cannot append to this encrypted file: " + enc.why());
+    }
+    const bool encrypt = enc.supported();
+    auto text = [&](OH o) { return encrypt ? unparseEncrypted(o, enc, true) : o.unparseResolved(); };
     // What is written: the changed objects of the file, and the new objects they reach. Over earlier revisions: also
     // what they define (objects of the prefix they changed always; their new ones when reached)
     std::map<QPDFObjGen, OH> written;
@@ -433,7 +476,7 @@ std::string Update::serializeWith(const Tail& tail, const Over* over, Stats* sta
                 continue;
             }
             xref[og.getObj()] = {1, base + out.size(), og.getGen()};
-            out += std::to_string(og.getObj()) + " " + std::to_string(og.getGen()) + " obj\n" + o.unparseResolved() +
+            out += std::to_string(og.getObj()) + " " + std::to_string(og.getGen()) + " obj\n" + text(o) +
                    "\nendobj\n";
             continue;
         }
@@ -449,10 +492,14 @@ std::string Update::serializeWith(const Tail& tail, const Over* over, Stats* sta
                 dict.removeKey("/DecodeParms");
             }
         }
+        if (encrypt && !(metadata && !enc.encryptMetadata())) {
+            data = enc.encrypt(data);
+        }
         dict.replaceKey("/Length", OH::newInteger(static_cast<long long>(data.size())));
         xref[og.getObj()] = {1, base + out.size(), og.getGen()};
         // (an end of line before "endstream", which PDF/A wants and /Length does not count)
-        out += std::to_string(og.getObj()) + " " + std::to_string(og.getGen()) + " obj\n" + dict.unparse() +
+        out += std::to_string(og.getObj()) + " " + std::to_string(og.getGen()) + " obj\n" +
+               (encrypt ? unparseEncrypted(dict, enc, true) : dict.unparse()) +
                "\nstream\n" + data + "\nendstream\nendobj\n";
     }
     // Object streams (a cross-reference stream only), 100 objects each, as qpdf writes them
@@ -466,7 +513,10 @@ std::string Update::serializeWith(const Tail& tail, const Over* over, Stats* sta
             xref[packed[i].getObjectID()] = {2, static_cast<uint64_t>(id), static_cast<int>(i - first)};
         }
         header += "\n";
-        const std::string data = deflate(header + body);
+        std::string data = deflate(header + body);  // (the objects in it: their strings as they are)
+        if (encrypt) {
+            data = enc.encrypt(data);
+        }
         xref[id] = {1, base + out.size(), 0};
         out += std::to_string(id) + " 0 obj\n<< /Type /ObjStm /N " + std::to_string(last - first) + " /First " +
                std::to_string(header.size()) + " /Filter /FlateDecode /Length " + std::to_string(data.size()) +
@@ -497,6 +547,9 @@ std::string Update::serializeWith(const Tail& tail, const Over* over, Stats* sta
     }
     dict.replaceKey("/ID", ids);
     dict.replaceKey("/Prev", OH::newInteger(static_cast<long long>(tail.startxref)));
+    if (encrypt) {
+        dict.replaceKey("/Encrypt", trailer.getKey("/Encrypt"));  // (the same dictionary: the same key)
+    }
     const uint64_t xrefAt = base + out.size();
     if (!tail.xrefStream) {
         dict.replaceKey("/Size", OH::newInteger(std::max<long long>(size, nextId)));

@@ -244,6 +244,11 @@ bool keepOriginalInCache(const fs::path& pdf, const fs::path& original, std::err
 
 // --- the interface -------------------------------------------------------------------------------------------------
 
+void DocumentSession::forgetOriginal(const fs::path& pdf) {
+    std::error_code ec;
+    fs::remove_all(originalInCacheFor(pdf).parent_path(), ec);
+}
+
 bool DocumentSession::isSaving() const { return (saveTask && !saveTask->merge) || !saveQueue.empty(); }
 
 bool DocumentSession::mergingPdfPages() const { return (saveTask && saveTask->merge) || !mergeQueue.empty(); }
@@ -523,6 +528,7 @@ void DocumentSession::planFiles() {
                     if (!t.ownCopy.empty()) {
                         fs::create_directories(t.ownCopy.parent_path(), ec);
                         fs::copy_file(t.target, t.ownCopy, fs::copy_options::overwrite_existing, ec);
+                        PdfEncryption::derive(t.ownCopy, t.target);  // (a protected PDF: the same password)
                         if (ec) {
                             t.result.error = FS(_F("Could not copy the PDF \"{1}\" before writing into it: {2}") %
                                                 t.target.u8string() % ec.message());
@@ -645,7 +651,8 @@ void DocumentSession::takeSnapshot() {
             // received) and a new file; saves before sharing (SaveRequest::compact) and over another file without
             std::error_code ec;
             const bool own = t.request.kind == SaveKind::Save || !t.ownCopy.empty() || !fs::exists(t.target, ec);
-            t.history.on = keepsVersions() && !t.request.compact && own;  // (never on top of another file)
+            // (never on top of another file; a file with older encryption is written in full: PdfEncryption.h)
+            t.history.on = keepsVersions() && !t.request.compact && own && !hasOlderEncryption();
             t.history.message = t.request.message.empty() ? restoredMessage : t.request.message;
             t.history.newVersion = !restoredMessage.empty();
             t.historyChoice = versionsChoice.has_value();
@@ -664,6 +671,9 @@ void DocumentSession::takeSnapshot() {
             }
         }
     }
+    // Encrypted PDFs: as asked (protect, change or remove the password), else a protected document's files stay
+    // encrypted with its password, also a copy (qt/docs/hybrid-pdf.md, "Encrypted PDFs")
+    t.encryption = t.request.encryption ? *t.request.encryption : encryptionForSave();
     if (!t.hybrid && !exporting && pdfPages->hasStaged()) {
         t.stagedAs = pdfPages->stagedName();
         t.staged = t.snapshot->getPdfFilepath();
@@ -724,6 +734,7 @@ void DocumentSession::takeSnapshot() {
                     options.written = exporting ? nullptr : &t.written;
                     options.inkText = &t.inkText;
                     options.history = exporting ? nullptr : &t.history;
+                    options.encryption = t.encryption;
                     const auto r = HybridPdf::write(*t.snapshot, t.target, baseOf, t.pdfPageCount,
                                                     exporting ? fs::path() : t.request.recordExport, options);
                     if (!r.ok) {

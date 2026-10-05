@@ -18,6 +18,7 @@
 #include <zlib.h>
 
 #include "util/Util.h"
+#include "PdfEncryption.h"
 
 namespace xqt::PdfRevisions {
 
@@ -651,7 +652,7 @@ std::shared_ptr<InputSource> prefixSource(const fs::path& file, uint64_t end) {
 
 void open(QPDF& q, const fs::path& file, uint64_t end) {
     q.setSuppressWarnings(true);
-    q.processInputSource(prefixSource(file, end));
+    PdfEncryption::openQpdf(q, prefixSource(file, end), file);  // (an encrypted file: with its password)
 }
 
 std::string isoOfPdfDate(const std::string& pdfDate) {

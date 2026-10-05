@@ -499,7 +499,8 @@ means reading most of the file (seconds). An incremental save reads only what it
   background drawn), or more than a quarter of the file's pages were removed (their dead weight would stay).
 - When there is nothing to build on: the file changed since it was written or opened (another app saved it), it was
   edited in another app (its hash check found a change), the other app's version was imported, the file is
-  encrypted, its page tree is not flat or passes attributes on, the embedded images changed, or anything unexpected
+  encrypted with an older method than AES-256 (AES-256 files are appended to encrypted: "Encrypted PDFs" below), its
+  page tree is not flat or passes attributes on, the embedded images changed, or anything unexpected
   (an exception): the save falls back to the full write, which is always correct. `XQT_HYBRID_TIMES=1` prints why.
 
 ### The clean copy and "edited in another app"
@@ -748,3 +749,118 @@ is 62 KB gzipped at the end). Eleven versions: 532 KB in all.
 - Signed revisions are not looked for (our appender never cuts a revision that is not ours and the last).
 - A cheaper version 0 for long PDFs: the first save appends our page tree with references to the original's streams;
   page dictionaries and resources are copied (small next to the content, but not nothing).
+
+## Encrypted PDFs (`qt/pdf-encryption`)
+
+The author (2026-10-05): "support pdf encryption and opening of encrypted PDFs using qpdf". Code:
+`qt/src/session/PdfEncryption.*` (qpdf), the window's part `qt/src/app/AppEncryption.cpp`; tests
+`PdfEncryptionTest` (session) and `PdfPasswordTest` (UI). The encrypted fixtures are made in the tests with qpdf.
+
+### Opening
+
+- `DocumentSession::loadFile(path, attachPdf, password)` first asks qpdf what the PDF's encryption is
+  (`PdfEncryption::probe`: the trailer and the cross-reference table). A PDF with a **user password** opens only with
+  it: without one the result says `needsPassword` (`wrongPassword` for a wrong one) and nothing is opened. A `.xopp`
+  whose background PDF has one is the same (`passwordFile` is that PDF: LoadHandler asks for its password through a
+  hook, `LoadHandler::pdfPassword`).
+- The window asks (`pdfPasswordDialog`: the file's name, the password hidden, "The password is not right. Try again."
+  for a wrong one, Cancel leaves it closed). Several waiting (a recovery) are asked one after the other.
+- A PDF with **only an owner password** (restrictions) opens without asking. Anyone can read it, so it is not treated
+  as confidential (cached, indexed like any PDF). Its restrictions are **honoured for printing and copying text**
+  (Print says the author does not allow it; copying PDF text says so); changing it is allowed (we write notes as
+  annotations, and saving keeps its encryption and restrictions as they are). pdf.js and Chrome ignore restrictions;
+  Acrobat and Preview honour them.
+- **The password lives in memory only** (`PdfEncryption`'s registry): while a document of the file is open
+  (`PdfEncryption::hold`), for the file and the files the app makes from it in its cache (the clean copy, a merged PDF
+  of pasted pages, a version cut out of the file, the autosave), each encrypted with the same key. Never in settings,
+  recent files, the session journal, logs or crash reports; overwritten when it is forgotten. Closing the last tab of
+  the file forgets it: opening it again asks again.
+- poppler gets it through upstream's `Document::password` (a seam: `setPdfPassword`), qpdf through
+  `PdfEncryption::openQpdf` everywhere the session's files are read (`HybridPdf`, `MergedPdf`, `PdfRevisions`).
+- Only code that works for an open document reads through the registry. The library's index, its previews, the tags
+  and titles of cards, and every other background reader open files without a password: they never read a protected
+  PDF, also while it is open (decided: the library does not index it, not even in memory). The card shows a lock
+  ("Protected with a password"; `LibraryIndex::lockedOf`, stored in the folder's notes).
+
+### A PDF with notes, encrypted
+
+- The embedded `document.xopp` is encrypted with the file (an embedded file stream). Opening a protected PDF with notes
+  reads it **into memory** every time (`LoadHandler::loadDocument` from an input stream, a seam; attached background
+  images from memory too); the cache entry holds only the clean copy (written by qpdf with the file's encryption) and
+  the list of its pages, never the `.xopp`. Saving writes the `.xopp` in memory (`SaveHandler` into a string, gzipped
+  here).
+- **Saving keeps the encryption.** A full write takes the file's encryption parameters (`PdfEncryption::Encryption`,
+  `CopyOf` the protected file; qpdf's `copyEncryptionParameters`, which needs no owner password). Save as `.pdf` and
+  "Save a PDF copy" keep the password; Save as `.xopp`, the `.xopp` export for Xournal++ and "Keep it updated for
+  Xournal++" are refused for a protected document (a `.xopp` cannot be encrypted).
+- **Appending stays fast, encrypted.** With AES-256 (V5, R5/R6, the standard crypt filter) every object has the
+  file's key itself, so the appender (`IncrementalPdf`) encrypts what it writes with qpdf's public API: the key
+  (`QPDF::getEncryptionKey`), AES (`QPDFCryptoProvider`'s rijndael, CBC with a random IV and PKCS#5 padding done by
+  us): strings of objects outside object streams (as hex strings), stream data (after compression), whole object
+  streams (their objects' strings not separately), never the cross-reference stream; metadata streams follow
+  `/EncryptMetadata`; the trailer refers to the same `/Encrypt` dictionary and keeps the first `/ID`. Ctrl+S, the
+  day's version and version history work as before. Tested: `qpdf --check` with the password after each save, poppler
+  draws every page, every earlier revision cut out of the file opens with the password, the strings decrypt to what
+  was written (our annotations' hash check), and nothing of the file reads without it. Files with older encryption
+  (RC4, AES-128) are written in full instead, keeping their encryption.
+- Measured (2026-10-05, the container, `XQT_BENCH_ENCRYPTED=1 xqt-session-tests --gtest_filter='*benchLong*'`; the
+  1,321-page pgfmanual is not in the container, so a generated PDF of 1,321 text pages, 320 KB, protected, a stroke on
+  every 25th page): opening it with the password 0.1 s; the first save into it (in full, encrypted) 0.26 s; Ctrl+S
+  after one stroke 50–80 ms, about 5 KB appended (encrypted); opening the PDF with notes again 0.13 s; protecting it
+  anew (the whole file) 0.08 s. Encryption adds no measurable time to an appended save; on pgfmanual a full write
+  is 1.4 s (above), which is what protecting and files with older encryption cost.
+
+### Protecting, changing, removing
+
+- ⋮ → Document → **Protect with a password…** (a PDF, a PDF with notes; not an archive PDF: PDF/A allows no
+  encryption) and **Change or remove the password…** (`protectDialog`): the password twice; "Restrict what others can
+  do with it" with Allow printing / copying text / changes and a second (owner) password, which must differ.
+- AES-256 (R6) through qpdf (`QPDFWriter::setR6EncryptionParameters`), the metadata encrypted. **Without restrictions
+  the owner password is random** and known to nobody: there is nothing to lift, and anyone with the password has every
+  right (decided; with the same password for both some readers misbehave, qpdf warns). Other apps then cannot change
+  its security settings (Acrobat asks for the owner password); this app only needs the password to open it.
+- Unsaved changes are saved into the PDF first; then the whole file is written anew encrypted
+  (`PdfEncryption::rewrite`, atomic), its version history removed (earlier revisions would keep the old password or
+  none: the dialog says so when it keeps versions), and the document is opened again from it (its undo history starts
+  anew). The copies the app made of the unencrypted file are removed: clean copies of every version
+  (`HybridPdf::forgetCopies`), the stored page previews, versions shown, the original kept in PDF files mode. A
+  `name.original.pdf` kept next to the file earlier (Xournal++ files mode) is the user's file and stays.
+- Removing the password writes the file anew without encryption (the version history goes too).
+- **Share → "Protect with a password"**: the PDF with notes goes as a copy encrypted with the password typed there
+  (written into the app cache, then shown or copied; `sharePdfProtected`); the document keeps its file. A protected
+  document is shared with its own password. **Export as plain PDF** of a protected document is protected with the
+  same password (drawn through the cairo backend, which reads the PDF with poppler; qpdf's backend reads the file
+  itself). The archive export of a protected document has no password (PDF/A forbids encryption; its dialog says so).
+  "For Xournal++" is refused (Xournal++ cannot open encrypted PDFs).
+
+### Nothing unencrypted on disk
+
+For a protected document (its file, or the PDF its `.xopp` annotates):
+
+| what | how |
+| --- | --- |
+| autosave | an encrypted PDF with notes in the cache, `<pid>-<serial>.autosave.pdf`, the same password, written in the background like a PDF copy; recovery after a crash asks for the password |
+| crash (emergency) save | not written (no qpdf in a crash handler); the last autosave is what is recovered |
+| clean copy, merged PDF of pasted pages, the copy a save reads pages from | encrypted like the file (qpdf keeps the encryption it read) |
+| the embedded `.xopp` | in memory only, when opening and saving |
+| page previews on disk (PageSketches) | not stored; thumbnails and previews stay in memory |
+| the library's text index, tags, card preview | not read (the file opens only with the password) |
+| the document's search | in memory (its own poppler instance gets the password) |
+| handwriting | recognised in memory, never handed to the library's cache |
+| version cache, "Show beside the document" | a version is a prefix of the encrypted file, opened with the password |
+| Share, PDF copy, export | encrypted (above) |
+| printing | an unencrypted PDF for the printer in a temporary folder, removed ten minutes later |
+
+Known gaps: pictures of Markdown boxes and voice memos the PDF carries are taken out into the app cache while it is
+open (the renderer and the player read files) and removed when it is closed; an attached page-background image passes
+through a temporary file of the save's work folder (removed at once). Tested by `PdfEncryptionTest
+.nothingOfAProtectedDocumentStaysUnencryptedInTheCache`: after opening, editing, autosaving, saving, a copy and
+opening again, no file in the cache holds a marker text of the document readable (as bytes, gunzipped, or in a PDF
+that opens without a password).
+
+### Other platforms
+
+Nothing platform-specific: qpdf and poppler do the work on every system. Windows: the protected file is replaced by a
+rename as every save is (see "PDF files mode"). Android: the password dialog uses the system keyboard; whether it
+offers to remember the password (autofill) depends on the keyboard (the field is a password field).
+

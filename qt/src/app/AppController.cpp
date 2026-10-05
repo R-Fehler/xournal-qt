@@ -11,6 +11,7 @@
 #include <QPointer>
 #include <QThreadPool>
 #include <QTimer>
+#include <QDir>
 
 #include <algorithm>
 #include <cctype>
@@ -112,6 +113,7 @@
 #include "session/ArchivePdf.h"
 #include "session/HybridPdf.h"
 #include "session/MergedPdf.h"
+#include "session/PdfEncryption.h"
 #include "session/PageNoteSpace.h"
 #include "session/TextFile.h"
 #include "shell/PageClipboard.h"
@@ -2966,7 +2968,10 @@ void AppController::recover(bool accept) {
                 }
             }
         }
-        fs::remove(c.recoveryFile, ec);
+        if (std::none_of(pendingPasswords.begin(), pendingPasswords.end(),
+                         [&](const PendingPassword& p) { return p.recovering && p.file == c.recoveryFile; })) {
+            fs::remove(c.recoveryFile, ec);  // (one waiting for its password goes when it is recovered or not)
+        }
     }
     recoveryPending = false;
     Q_EMIT recoveryChanged();
@@ -2991,6 +2996,17 @@ void AppController::reopenTabs(const std::vector<std::pair<fs::path, int>>& last
             }
         } else if (auto it = recovered.find(i); it != recovered.end()) {
             auto result = DocumentSession::loadFile(it->second.first);
+            if (result.needsPassword) {
+                // A protected document's autosave (an encrypted PDF): recovered once its password is given
+                PendingPassword p;
+                p.file = it->second.first;
+                p.path = QString::fromStdString(p.file.string());
+                p.recoverTo = it->second.second;
+                p.recovering = true;
+                p.passwordFile = it->second.second.empty() ? result.passwordFile : it->second.second;
+                askPassword(std::move(p));
+                continue;
+            }
             if (result.document) {
                 const int pristine = tabs->isPristine(tabs->currentIndex()) ? tabs->currentIndex() : -1;
                 tabs->addTab(std::make_unique<DocumentSession>(*app, std::move(result.document)));
@@ -3343,7 +3359,21 @@ bool AppController::openPath(const QString& path) {
         Q_EMIT message(tr("Cannot open file"), QString::fromStdString(textError), true);
         return false;
     }
-    auto result = textSession ? DocumentSession::LoadResult{} : shown ? loadShownFile(file) : DocumentSession::loadFile(file);
+    // (a file the app made from a protected document, e.g. one of its versions: with the password known for it; else a
+    // protected PDF is asked for below)
+    auto result = textSession ? DocumentSession::LoadResult{}
+                  : shown     ? loadShownFile(file)
+                              : DocumentSession::loadFile(file, false, PdfEncryption::passwordOf(file));
+    if (!textSession && result.needsPassword) {
+        // An encrypted PDF (or the PDF of these notes): the window asks for its password (openWithPassword)
+        askPassword(PendingPassword{file, path, shown, {}, false, result.passwordFile});
+        return false;
+    }
+    return openLoaded(file, path, std::move(result), shown, std::move(textSession));
+}
+
+bool AppController::openLoaded(const fs::path& file, const QString& path, xqt::DocumentSession::LoadResult result,
+                               bool shown, std::unique_ptr<xqt::DocumentSession> textSession) {
     if (!textSession && !result.document) {
         Q_EMIT message(tr("Cannot open file"), QString::fromStdString(result.error), true);
         return false;
@@ -3352,6 +3382,7 @@ bool AppController::openPath(const QString& path) {
     // An untouched new document is replaced instead of keeping an empty tab around.
     const int pristine = replacePristine && tabs->isPristine(tabs->currentIndex()) ? tabs->currentIndex() : -1;
     auto opened = textSession ? std::move(textSession) : std::make_unique<DocumentSession>(*app, std::move(result.document));
+    opened->setPermissions(result.allowPrint, result.allowCopy);  // (a PDF opened without its owner password)
     if (shown && !opened->textFile()) {
         opened->setShownFile(file, !DocumentFiles::isImageFile(file));
     }
@@ -3421,6 +3452,16 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
     if (s->textFile() && !s->hasFilePath() && way != SaveWay::Save) {
         return false;  // (a text file is saved as itself: no other name, no hybrid PDF, no .xopp)
     }
+    if (s->isProtected() && (way == SaveWay::ExportXopp || way == SaveWay::ShareXopp ||
+                             (way == SaveWay::SaveAs && lowerExtension(target) != ".pdf"))) {
+        // A protected document: never written as a .xopp (it cannot be encrypted; qt/docs/hybrid-pdf.md)
+        Q_EMIT message(tr("Not saved"),
+                       tr("This document is protected with a password, and Xournal++ files (.xopp) cannot be. Save it "
+                          "as a PDF with notes, or remove the password first (⋮ → Document → Change or remove the "
+                          "password…)."),
+                       true);
+        return false;
+    }
     if (way == SaveWay::Save && !s->hasFilePath() && !s->isEditableText()) {
         // "Save notes into the PDF itself": an annotated PDF is saved into it, as a hybrid PDF
         if (!savesWithoutDialog(s)) {
@@ -3452,6 +3493,7 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
     }
     request.target = target;
     request.compact = compact;
+    request.encryption = std::exchange(nextSaveEncryption, std::nullopt);  // (a protected copy: sharePdfProtected)
     request.message = std::exchange(nextSaveMessage, std::string());
     const bool hybrid = way == SaveWay::Hybrid || (way == SaveWay::Save && s->isHybrid());
     // A document saved as "name.xopp" becomes a PDF with notes: what happens to the .xopp (asked by the window, or
@@ -3518,6 +3560,11 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
         }
         xopp.replace_extension(".xopp");
         request.exportXopp = xopp;
+    }
+    if (s->isProtected()) {
+        // A protected document: no .xopp for Xournal++ beside it (it would hold its notes unprotected)
+        request.exportXopp.clear();
+        request.recordExport.clear();
     }
     QPointer<DocumentSession> guard(s);
     request.done = [this, guard, way, target, previous, choice, keptBecause, firstIntoPdf,
@@ -3663,7 +3710,9 @@ bool AppController::openVersionAsCopy(int id) {
     }
     std::string error;
     const fs::path file = VersionCache::instance().get(s->getFilePath(), id, error);
-    auto loaded = file.empty() ? DocumentSession::LoadResult{} : DocumentSession::loadFile(file);
+    // (a protected PDF's version: encrypted, with its password; PdfEncryption.h)
+    auto loaded = file.empty() ? DocumentSession::LoadResult{}
+                               : DocumentSession::loadFile(file, false, PdfEncryption::passwordOf(file));
     if (!loaded.document) {
         Q_EMIT message(tr("The version cannot be opened"),
                        QString::fromStdString(error.empty() ? loaded.error : error), true);
@@ -3824,6 +3873,9 @@ bool AppController::save() {
 }
 
 void AppController::handOverToLibrary(DocumentSession& s) {
+    if (s.isProtected()) {
+        return;  // (a protected document: nothing of it goes into the library's index or caches)
+    }
     // Its library entry from the document in memory: the index does not read the file again
     if (LibraryIndex* index = library->searchIndex()) {
         index->documentSaved(s.getFilePath(), *s.getDocument(), s.search().textIndex().pdfTexts());
@@ -3835,8 +3887,8 @@ void AppController::handOverHandwriting(DocumentSession& s) {
     // The handwriting it read goes to the library's cache (searched there; not read again when it is opened next)
     LibraryIndex* index = library->searchIndex();
     hwr::InkTextIndexer* indexer = handwriting ? handwriting->indexerOf(&s) : nullptr;
-    if (!index || !indexer || !s.hasFilePath()) {
-        return;
+    if (!index || !indexer || !s.hasFilePath() || s.isProtected()) {
+        return;  // (a protected document: its handwriting is read into memory only, never into the library's cache)
     }
     const auto pages = indexer->pages();
     if (pages.empty() || !std::all_of(pages.begin(), pages.end(), [](const auto& p) { return p.known; })) {
@@ -3887,8 +3939,10 @@ bool AppController::savesWithoutDialog(const DocumentSession* s) const {
     }
     // Notes on a PDF go into it: the setting "Save notes into the PDF itself", and always in PDF files mode
     const fs::path pdf = s->annotatedPdf();
-    return !pdf.empty() && (settingOn(app->getSettings(), "hybridIntoPdf") || pdfOnly()) && !HybridPdf::inCache(pdf) &&
-           !MergedPdf::inCache(pdf);
+    // (notes on a protected PDF go into it too: there they are protected with it; a .xopp could not be)
+    return !pdf.empty() &&
+           (settingOn(app->getSettings(), "hybridIntoPdf") || pdfOnly() || PdfEncryption::isProtected(pdf)) &&
+           !HybridPdf::inCache(pdf) && !MergedPdf::inCache(pdf);
 }
 
 QUrl AppController::suggestedHybridFile() const {
@@ -4160,6 +4214,15 @@ bool AppController::sharePdfCopy(const QUrl& target, bool toClipboard) {
 bool AppController::shareForXournal(const QUrl& folder, const QString& file) {
     const fs::path dir(folder.toLocalFile().toStdString());
     DocumentSession* s = file.isEmpty() ? session() : nullptr;
+    if (s && s->isProtected()) {
+        // (Xournal++ cannot open an encrypted PDF, and a .xopp cannot be encrypted: nothing is written unprotected)
+        Q_EMIT message(tr("For Xournal++"),
+                       tr("This document is protected with a password. Xournal++ cannot open protected PDFs, and its "
+                          ".xopp files cannot be protected. Remove the password first (⋮ → Document → Change or "
+                          "remove the password…)."),
+                       true);
+        return false;
+    }
     if (dir.empty() || (file.isEmpty() && !s) ||
         (s && s->textFile() && !s->hasFilePath())) {  // (a text file: never as a PDF or .xopp)
         return false;
@@ -4904,6 +4967,11 @@ QStringList AppController::shownDocumentFiles() const {
 QString AppController::selectedText() const { return canvas() ? canvas()->selectedText() : QString(); }
 
 bool AppController::copyPdfText() {
+    if (session() && !session()->allowsCopying()) {
+        // A PDF whose owner does not allow copying its text (opened without its owner password): honoured
+        Q_EMIT pageActionDone(tr("The author of this PDF does not allow copying its text"), false);
+        return false;
+    }
     const bool ok = canvas() && canvas()->copyPdfText();
     if (ok) {
         canvas()->clearPdfTextSelection();
@@ -5390,14 +5458,41 @@ bool AppController::exportPdf(const QUrl& url) {
     if (target.extension() != ".pdf") {
         target += ".pdf";
     }
+    // A protected document (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): its PDF is drawn through poppler, which has
+    // its password (qpdf's backend reads the file itself), and the export is protected with the same password
+    const bool secret = session()->isProtected();
     try {
         // Port of PdfExportJob: upstream blocks the UI while exporting, too.
-        ExportHelper::exportPdf(session()->getDocument(), target, nullptr, nullptr, EXPORT_BACKGROUND_ALL, false);
+        ExportHelper::exportPdf(session()->getDocument(), target, nullptr, nullptr, EXPORT_BACKGROUND_ALL, false,
+                                secret ? ExportBackend::CAIRO : ExportBackend::DEFAULT);
+        if (secret) {
+            fs::path from;
+            {
+                std::shared_lock lock(*session()->getDocument());
+                from = session()->getDocument()->getFilepath();
+                if (!PdfEncryption::isProtected(from)) {
+                    from = session()->getDocument()->getPdfFilepath();
+                }
+            }
+            PdfEncryption::Protection p;
+            p.password = PdfEncryption::passwordOf(from);
+            std::string error;
+            const bool ok = PdfEncryption::rewrite(target, "", target, &p, error);
+            std::fill(p.password.begin(), p.password.end(), '\0');
+            if (!ok) {
+                std::error_code ec;
+                fs::remove(target, ec);  // (never left without its password)
+                throw std::runtime_error(error);
+            }
+        }
     } catch (const std::exception& e) {
         Q_EMIT message(tr("Export failed"), QString::fromUtf8(e.what()), true);
         return false;
     }
-    Q_EMIT pageActionDone(tr("Exported to %1").arg(QString::fromStdString(target.filename().string())), false);
+    Q_EMIT pageActionDone(secret ? tr("Exported to %1, protected with the document's password")
+                                           .arg(QString::fromStdString(target.filename().string()))
+                                 : tr("Exported to %1").arg(QString::fromStdString(target.filename().string())),
+                          false);
     return true;
 }
 
@@ -5490,8 +5585,19 @@ bool AppController::printDocument(bool withAnnotations, const QString& range) {
     if (!s) {
         return false;
     }
+    if (!s->allowsPrinting()) {
+        // A PDF whose owner does not allow printing (it was opened without its owner password): honoured
+        Q_EMIT message(tr("Printing is not allowed"),
+                       tr("The author of this PDF does not allow printing it. Whoever has its owner password can "
+                          "remove that restriction."),
+                       true);
+        return false;
+    }
     s->clearSelectionEndText();
     s->waitForMerges();  // (pages pasted just now: their PDF pages)
+    // A protected document: the printer gets an unencrypted PDF of it (drawn through poppler, which has the password),
+    // removed a while after printing
+    const bool secret = s->isProtected();
     // What is printed: the document as a PDF, or the PDF it annotates as it is
     QTemporaryDir temporary;
     if (!temporary.isValid()) {
@@ -5502,12 +5608,16 @@ bool AppController::printDocument(bool withAnnotations, const QString& range) {
     const fs::path file = fs::path(temporary.filePath("print.pdf").toStdString());
     const fs::path background = s->getDocument()->getPdfFilepath();
     try {
-        if (!withAnnotations && !background.empty()) {
+        if (!withAnnotations && !background.empty() && !secret) {
             fs::copy_file(background, file, fs::copy_options::overwrite_existing);
         } else {
             const std::string pages = range.trimmed().toStdString();
             ExportHelper::exportPdf(s->getDocument(), file, pages.empty() ? nullptr : pages.c_str(), nullptr,
-                                    EXPORT_BACKGROUND_ALL, false);
+                                    EXPORT_BACKGROUND_ALL, false, secret ? ExportBackend::CAIRO : ExportBackend::DEFAULT);
+        }
+        if (secret) {
+            const QString dir = temporary.path();
+            QTimer::singleShot(std::chrono::minutes(10), this, [dir] { QDir(dir).removeRecursively(); });
         }
     } catch (const std::exception& e) {
         Q_EMIT message(tr("Printing failed"), QString::fromUtf8(e.what()), true);

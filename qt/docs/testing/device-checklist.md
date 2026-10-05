@@ -3461,3 +3461,40 @@ Seen through the replay (⋮ → View → Replay the writing).
 - [ ] Help → Introduction: the first page has "Go back to earlier versions" (the History button, Ctrl+Alt+S); on the
       phone the page still fits without scrolling past its buttons. Help → Tutorial → section 15 "Versions": the steps
       work on the tutorial itself (turn on, Ctrl+Alt+S, show, restore, copy). Fill its screenshot placeholder.
+
+## Encrypted PDFs (qt/pdf-encryption, qt/docs/hybrid-pdf.md "Encrypted PDFs")
+
+- [ ] A PDF protected with a password in Acrobat (or `qpdf --encrypt user owner 256 -- in.pdf locked.pdf`): opening it
+      asks for the password (the field hides it); a wrong one says "The password is not right. Try again."; Cancel
+      leaves no tab; the right one opens it. Close it and open it again: asked again. The same from the library card
+      (it has a lock) and from Recent.
+- [ ] A PDF with only an owner password and "no printing, no copying" (`qpdf --encrypt "" owner 256 --print=none
+      --extract=n -- in.pdf r.pdf`): opens without asking; Print says the author does not allow it; copying selected
+      PDF text says so too; writing on it and Ctrl+S work, and Acrobat still shows its restrictions.
+- [ ] ⋮ → Document → "Protect with a password…" on a PDF with notes (with unsaved ink): the two fields, "Protect";
+      the document is opened again, protected. Acrobat (Windows), Preview (macOS, iPad), Firefox/Chrome (pdf.js), Okular
+      and Xodo ask for the password and show the pages and the ink; the notes stay editable here. With "Restrict what
+      others can do with it" (no printing) and a second password: Acrobat and Preview refuse to print, Acrobat lifts it
+      with the second password.
+- [ ] "Change or remove the password…": a new password works in Acrobat, the old one not; "Remove the password": the
+      PDF opens everywhere without one.
+- [ ] A protected PDF with notes saved many times (Ctrl+S after each stroke): each save is quick (appended, encrypted);
+      Acrobat, Preview and pdf.js open it with the password after a week of saves; with "Keep versions" on, the History
+      panel works as for any PDF with notes, and "Show beside the document" opens an earlier version without asking
+      again.
+- [ ] A PDF protected by Acrobat (AES-256) annotated here and saved: Acrobat opens it with the same password and shows
+      the ink. One protected with the older AES-128 or RC4 (Acrobat's "compatible with Acrobat 6"): it opens, saves keep
+      its encryption (written in full), and the History panel says it keeps no versions.
+- [ ] Share → "Protect with a password" on an unprotected document: the shared PDF asks for that password on the
+      phone (Android share sheet) and in Acrobat; the document itself stays unprotected. Share of a protected document:
+      the box is checked and greyed ("Protected with its password").
+- [ ] Export as plain PDF of a protected document: the snackbar says it is protected with the document's password;
+      Acrobat asks for it. Export for the archive: the dialog says it is written without a password.
+- [ ] While a protected document is open and edited for a few minutes: nothing in `~/.cache/xournal-qt` (Windows:
+      `%LOCALAPPDATA%\xournal-qt\cache`) has its text or ink readable (`grep -r` for a word written in it; the
+      `autosaves/*.autosave.pdf` asks for the password in another viewer). Kill the app (`kill -9`), start it again:
+      recovery asks for the password and brings the unsaved ink back.
+- [ ] The library on Android (Fold 7): a protected PDF in the library folder shows a lock on its card, no preview of its
+      pages, and the library search does not find its words; the password dialog shows the keyboard and does not
+      offer to store the password in a password manager unasked.
+
