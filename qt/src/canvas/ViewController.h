@@ -9,6 +9,8 @@
  */
 #pragma once
 
+#include <array>
+#include <cmath>
 #include <optional>
 
 #include <cstddef>
@@ -41,8 +43,69 @@ public:
     double minZoom() const;
     double maxZoom() const { return 7.0 * z100; }  // upstream DEFAULT_ZOOM_MAX
 
+    /// The size of the (upright) view the layout is seen through: the screen's (the canvas item's), or while the canvas
+    /// is turned the bounding box of the turned screen (qt/docs/canvas-rotation.md). Everything of the view (scroll
+    /// position, anchors, pinch, fits) works in this upright view; only input and what is shown over the canvas are
+    /// mapped between it and the screen (screenToView, viewToScreen).
     QSizeF viewSize() const { return view; }
-    void setViewSize(QSizeF size);
+    /// The size of the canvas on the screen (item pixels)
+    QSizeF screenSize() const { return screen; }
+    void setViewSize(QSizeF screenSize);
+
+    // --- the canvas turned (qt/docs/canvas-rotation.md) -------------------------------------------------------
+    /// Degrees clockwise the canvas is turned on the screen, in [0, 360)
+    double rotation() const { return angle; }
+    bool rotated() const { return angle != 0; }
+    /// Turned by a multiple of 90° (also not at all): the screen's pixels are the view's pixels
+    bool rightAngled() const { return std::fmod(angle, 90.0) == 0; }
+    /// Turn the canvas; the document point under `screenAnchor` (screen coordinates; none: the middle of the screen)
+    /// stays where it is on the screen
+    void setRotation(double degrees, std::optional<QPointF> screenAnchor = std::nullopt);
+    /// Turn it by a step (Ctrl+[ / Ctrl+]: 90°): from a free angle to the next multiple of the step that way
+    void rotateBy(double degrees, std::optional<QPointF> screenAnchor = std::nullopt);
+    /// The nearest multiple of 90° when `degrees` is within SNAP_DEGREES of it, else `degrees` (normalised)
+    static double snapAngle(double degrees);
+    /// A turn of the fingers (or the touchpad's) smaller than this is not a rotation: pinching and scrolling do not
+    /// turn the canvas by accident
+    static constexpr double ROTATE_START_DEGREES = 12;
+    static constexpr double SNAP_DEGREES = 6;
+    /// Screen (canvas item) coordinates to the upright view and back; deltas (a wheel, a drag) only turn
+    QPointF screenToView(QPointF p) const {
+        if (angle == 0) {
+            return p;  // (exactly: an upright canvas is not touched by rounding)
+        }
+        const QPointF d = p - screenCentre;
+        return QPointF(d.x() * cosA + d.y() * sinA, -d.x() * sinA + d.y() * cosA) + viewCentre;
+    }
+    QPointF viewToScreen(QPointF p) const {
+        if (angle == 0) {
+            return p;
+        }
+        const QPointF d = p - viewCentre;
+        return QPointF(d.x() * cosA - d.y() * sinA, d.x() * sinA + d.y() * cosA) + screenCentre;
+    }
+    QPointF screenDeltaToView(QPointF d) const { return QPointF(d.x() * cosA + d.y() * sinA, -d.x() * sinA + d.y() * cosA); }
+    QPointF viewDeltaToScreen(QPointF d) const { return QPointF(d.x() * cosA - d.y() * sinA, d.x() * sinA + d.y() * cosA); }
+    /// The bounding box on the screen of a rectangle of the view (itself when the canvas is upright)
+    QRectF viewToScreen(const QRectF& r) const;
+    /// The corners of the screen in the view (top left, top right, bottom right, bottom left): what of the view's
+    /// bounding box is shown
+    std::array<QPointF, 4> screenInView() const;
+    /// The cosine and sine of the angle (exact at multiples of 90°)
+    double rotationCos() const { return cosA; }
+    double rotationSin() const { return sinA; }
+
+    /// A turn of two fingers began (they are at this angle, degrees) / they turned to this angle: the canvas turns
+    /// with them once the turn exceeds ROTATE_START_DEGREES, snapping to multiples of 90° (SNAP_DEGREES). Used by
+    /// pinchBegin / pinchUpdate and the touchpad's rotate gesture (twistBy).
+    void twistBegin(double fingerDegrees);
+    void twistTo(double fingerDegrees, QPointF screenAnchor);
+    /// The touchpad turned by this many degrees (clockwise) about a screen point
+    void twistBy(double deltaDegrees, QPointF screenAnchor);
+    /// The fingers left (the touchpad's gesture ended)
+    void twistEnd() { twistActive = false; }
+    /// The canvas turns with the fingers (tests)
+    bool twisting() const { return twistActive && twistEngaged; }
     /// Whether the last change was a jump (to a page, a fit, a new size) and not plain scrolling or zooming: those
     /// are looked at right away, the continuous ones only every few milliseconds (CanvasView::viewChanged).
     bool takeJumped() {
@@ -88,8 +151,10 @@ public:
     /// Make a rectangle of a page (in page points) visible, centred if it has to scroll (e.g. a search hit).
     void scrollToPageRect(size_t page, QRectF rectPt);
 
-    void pinchBegin(QPointF centroid, double distance);
-    void pinchUpdate(QPointF centroid, double distance);
+    /// Two fingers: `centroid` in screen coordinates (the canvas item's; the view's while it is upright). With
+    /// `fingerDegrees` (the angle of the line between the fingers) the canvas also turns with them (twistBegin).
+    void pinchBegin(QPointF centroid, double distance, std::optional<double> fingerDegrees = std::nullopt);
+    void pinchUpdate(QPointF centroid, double distance, std::optional<double> fingerDegrees = std::nullopt);
     /// The fingers are lifted: the zoom is stable now (zoomSettled right away, not after the delay).
     void pinchEnd();
     /// A zoom gesture ended (a pinch, a touchpad pinch): the zoom is stable now.
@@ -137,6 +202,8 @@ public:
 
 Q_SIGNALS:
     void changed();
+    /// The canvas was turned (rotation())
+    void rotationChanged();
     /// Emitted after every zoom change (the render service defers re-renders for a while).
     void zoomChanged();
     /// What is 100 % changed (the zoom did not)
@@ -189,6 +256,21 @@ private:
     double z100 = 96.0 / 72.0;
     QPointF scrollPos;  ///< content coordinate of the view's top-left corner (when content is larger than the view)
     QSizeF view;
+    QSizeF screen;
+    double angle = 0;  ///< degrees clockwise, [0, 360)
+    double cosA = 1, sinA = 0;
+    QPointF screenCentre, viewCentre;
+    /// The angle without moving anything (view size, centres); the caller keeps an anchor
+    void applyAngle(double degrees);
+    double twistStartAngle = 0;   ///< the canvas's angle when the twist began
+    double twistStartFinger = 0;  ///< the fingers' angle then
+    double twistOffset = 0;       ///< the part of the turn before it engaged (the canvas lags behind by it)
+    double twistTotal = 0;        ///< the turn so far (degrees, unwrapped: more than half a turn is possible)
+    double twistLastFinger = 0;   ///< the fingers' angle at the last update
+    /// The angle the canvas takes for a turn of the fingers so far (none: not engaged yet)
+    std::optional<double> twistTarget();
+    bool twistEngaged = false;
+    bool twistActive = false;
     bool initialized = false;
     std::optional<size_t> pendingPage;
 
