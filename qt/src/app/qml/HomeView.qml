@@ -916,6 +916,7 @@ Rectangle {
                         hasXopp: model.hasXopp
                         kind: model.kind
                         pdfKind: model.pdfKind
+                        versions: model.versions || 0
                         fileIcon: model.fileIcon
                         hits: model.hits
                         conflicts: model.conflicts ? model.conflicts.length : 0
@@ -1124,6 +1125,7 @@ Rectangle {
                         hasXopp: model.hasXopp
                         kind: model.kind
                         pdfKind: model.pdfKind
+                        versions: model.versions || 0
                         width: recentGrid.cellWidth
                         height: recentGrid.cellHeight
                         twoLineName: home.twoLineNames(recentGrid.cellWidth)

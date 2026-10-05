@@ -153,7 +153,7 @@ void LibraryModel::openCache() {
         }
         if (!rows.empty()) {
             Q_EMIT dataChanged(index(0), index(static_cast<int>(rows.size()) - 1),
-                               {PageCountRole, PdfKindRole, TagsRole});
+                               {PageCountRole, PdfKindRole, TagsRole, VersionsRole});
         }
     });
 }
@@ -791,6 +791,8 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             return !r.isFolder && r.item.hybrid;
         case PdfKindRole:
             return r.isFolder || !idx ? QString() : QString::fromLatin1(pdfKindName(idx->pdfKind(r.path)));
+        case VersionsRole:
+            return r.isFolder || !idx ? 0 : idx->versionsOf(r.path);
         case HitPassageListRole: {
             QVariantList passages;
             passages.reserve(static_cast<qsizetype>(r.hit.blockHits.size()));
@@ -860,6 +862,7 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {KindRole, "kind"},
             {HybridRole, "hybrid"},
             {PdfKindRole, "pdfKind"},
+            {VersionsRole, "versions"},
             {HitPassageListRole, "hitPassageList"},
             {HitPassageBaseRole, "hitPassageBase"},
             {SizeRole, "size"},

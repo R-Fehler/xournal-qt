@@ -310,6 +310,8 @@ QVariant RecentFiles::data(const QModelIndex& i, int role) const {
             case PreviewRole:
             case PdfKindRole:
                 return QString();
+            case VersionsRole:
+                return 0;
             case LastPageRole:
                 return -1;
             case LocationRole:
@@ -349,6 +351,8 @@ QVariant RecentFiles::data(const QModelIndex& i, int role) const {
             return DocumentPlaces::lastPage(DocumentPlaces::keyOf(r.item));
         case PdfKindRole:
             return QString::fromLatin1(pdfKindName(pdfKinds ? pdfKinds(r.item.main()) : PdfKind::Unknown));
+        case VersionsRole:
+            return versionCounts ? versionCounts(r.item.main()) : 0;
         default:
             return {};
     }
@@ -358,14 +362,14 @@ void RecentFiles::setPdfKinds(std::function<PdfKind(const fs::path&)> lookup) { 
 
 void RecentFiles::pdfKindsChanged() {
     if (!rows.empty()) {
-        Q_EMIT dataChanged(index(0), index(count() - 1), {PdfKindRole});
+        Q_EMIT dataChanged(index(0), index(count() - 1), {PdfKindRole, VersionsRole});
     }
 }
 
 QHash<int, QByteArray> RecentFiles::roleNames() const {
     return {{NameRole, "name"},     {PathRole, "path"},     {LocationRole, "location"}, {PreviewRole, "preview"},
             {OpenedRole, "opened"}, {HasPdfRole, "hasPdf"}, {HasXoppRole, "hasXopp"},   {SelectedRole, "selected"}, {LastPageRole, "lastPage"},
-            {KindRole, "kind"}, {IsLibraryRole, "isLibrary"}, {PdfKindRole, "pdfKind"}};
+            {KindRole, "kind"}, {IsLibraryRole, "isLibrary"}, {PdfKindRole, "pdfKind"}, {VersionsRole, "versions"}};
 }
 
 }  // namespace xqt

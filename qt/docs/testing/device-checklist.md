@@ -3401,3 +3401,6 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
       On: the file itself.
 - [ ] The phone (Fold 7 folded): the History button fits in the sidebar's row; the row menu is a sheet; Ctrl+Alt+S
       on a keyboard cover works.
+- [ ] The library (and Recent): the card of a PDF with notes that keeps versions has a small clock under its "PDF ✎"
+      badge; its tooltip says how many ("Keeps its versions (7)"). A PDF with notes without versions has none. The
+      library lists as fast as before (the number comes from the marker the index reads anyway).

@@ -287,6 +287,10 @@ AppController::AppController(QObject* parent): QObject(parent) {
         LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
         return index ? index->pdfKind(file) : PdfKind::Unknown;
     });
+    recent->setVersionCounts([lib = QPointer<LibraryModel>(library)](const fs::path& file) {
+        LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
+        return index ? index->versionsOf(file) : 0;
+    });
     connect(library, &LibraryModel::indexChanged, recent, [this] {
         if (!library->indexing()) {
             recent->pdfKindsChanged();

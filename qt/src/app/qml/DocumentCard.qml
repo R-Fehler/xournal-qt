@@ -38,6 +38,8 @@ Item {
     /// A document whose file is a PDF: what the PDF is (the library index knows it): "plain", "notes" (a PDF with
     /// notes), "text" (a PDF text document), "archive", "archive-text"; "" while not known
     property string pdfKind
+    /// A PDF with notes that keeps its versions (version history): how many (0: none). A clock on the preview.
+    property int versions: 0
     readonly property bool pdfText: pdfKind === "text" || pdfKind === "archive-text"
     readonly property bool pdfArchive: pdfKind === "archive" || pdfKind === "archive-text"
     /// A text or other file: the icon of its type (shown instead of a preview for other files)
@@ -267,11 +269,39 @@ Item {
                     ToolTip.text: description
                 }
                 HitBadge {
+                    id: hitBadge
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: 6
                     anchors.topMargin: pdfBadge.visible ? 26 : 6
                     count: card.hits
+                }
+                // It keeps its versions (version history): a clock under the badge, the number in its tooltip
+                Rectangle {
+                    id: versionsMark
+                    objectName: "versionsMark"
+                    visible: !card.isFolder && card.versions > 0
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 6
+                    anchors.topMargin: (pdfBadge.visible ? 26 : 6) + (hitBadge.visible ? hitBadge.height + 4 : 0)
+                    width: 18
+                    height: 18
+                    radius: 9
+                    color: "#ffffff"
+                    border.color: "#c4c7c5"
+                    readonly property string description: qsTr("Keeps its versions (%n)", "", card.versions)
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: description
+                    Image {
+                        anchors.centerIn: parent
+                        source: app.iconUrl("xqt-history")
+                        sourceSize: Qt.size(12, 12)
+                    }
+                    HoverHandler { id: versionsHover }
+                    ToolTip.visible: versionsHover.hovered
+                    ToolTip.delay: 500
+                    ToolTip.text: description
                 }
                 // Last read in this app, and at which page - a tag like "PDF", in the accent of "Last page"
                 Rectangle {

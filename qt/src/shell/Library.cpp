@@ -340,6 +340,11 @@ bool isPdfFile(const fs::path& p) {
 /// and remembered, so no second read). A text document is a PDF with notes that carries its "name.md", or - read by
 /// a build before it carried one - whose document (`doc`, locked by the caller; nullptr: not read) starts with the
 /// page's Markdown text.
+/// How many versions it keeps (version history: the marker's /History, read with the kind; 0: none).
+int versionsOfPdf(const fs::path& pdf) {
+    const HybridPdf::Marker m = HybridPdf::markerOf(pdf);
+    return m.history ? std::max(1, m.versions) : 0;
+}
 PdfKind kindOfPdf(const fs::path& pdf, Document* doc) {
     const HybridPdf::Marker m = HybridPdf::markerOf(pdf);
     if (!m.hybrid) {
@@ -507,6 +512,9 @@ QCborMap LibraryIndex::notesOf(const Entry& e) const {
     if (e.pdfKind != PdfKind::Unknown) {
         notes.insert(QStringLiteral("pdfKind"), QLatin1String(pdfKindName(e.pdfKind)));
     }
+    if (e.versions > 0) {
+        notes.insert(QStringLiteral("versions"), e.versions);
+    }
     if (!e.bookmarks.empty()) {
         QCborMap marks;
         for (const auto& [page, label]: e.bookmarks) {
@@ -636,6 +644,7 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
     }
     // What its PDF is (added 2026-09: an entry without it gets only that read, from the PDF's marker)
     e->pdfKind = e->isPdf() ? pdfKindNamed(notes.value(QStringLiteral("pdfKind")).toString()) : PdfKind::Unknown;
+    e->versions = e->isPdf() ? static_cast<int>(notes.value(QStringLiteral("versions")).toInteger(0)) : 0;
     // Its to-dos (added 2026-10 with qt/todos: an entry without them is read again once; a plain PDF has none)
     e->todosRead = notes.contains(QStringLiteral("todos")) || e->kind == QLatin1String("image") ||
                    e->kind == QLatin1String("text") || e->pdfKind == PdfKind::Plain;
@@ -747,8 +756,8 @@ void LibraryIndex::put(const EntryPtr& e) {
         f.textChanged = true;
         f.changedText.insert(qstr(e->file.filename()));
     }
-    if ((slot ? slot->pdfKind : PdfKind::Unknown) != e->pdfKind) {
-        ++kindChanges;
+    if ((slot ? slot->pdfKind : PdfKind::Unknown) != e->pdfKind || (slot ? slot->versions : 0) != e->versions) {
+        ++kindChanges;  // (the cards show both)
     }
     if ((slot ? slot->bookmarks : std::map<int, QString>()) != e->bookmarks) {
         ++markChanges;
@@ -1014,6 +1023,7 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
             lock = std::shared_lock<Document>(*carried);
         }
         e->pdfKind = kindOfPdf(e->file, carried);
+        e->versions = versionsOfPdf(e->file);
     }
     if (!loaded.document) {
         return e;  // unreadable: empty, not read again until it changes
@@ -1401,6 +1411,7 @@ void LibraryIndex::run(std::vector<DocumentItem> items, quint64 gen) {
             }
             if (completed->pdfKindMissing()) {
                 completed->pdfKind = kindOfPdf(completed->file, nullptr);
+                completed->versions = versionsOfPdf(completed->file);
                 ++kindReads;
             }
             if (!completed->tagsRead) {
@@ -2080,6 +2091,12 @@ int LibraryIndex::pageCount(const fs::path& file) const {
     std::lock_guard lock(mtx);
     const EntryPtr e = find(file);
     return e && !pageless(e->kind) ? e->pageCount() : -1;
+}
+
+int LibraryIndex::versionsOf(const fs::path& file) const {
+    std::lock_guard lock(mtx);
+    const EntryPtr e = find(file);
+    return e ? e->versions : 0;
 }
 
 PdfKind LibraryIndex::pdfKind(const fs::path& file) const {
