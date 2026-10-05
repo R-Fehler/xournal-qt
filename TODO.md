@@ -784,6 +784,12 @@ section "Confirmed by the author" (it overrides the plan's steps where they diff
   full suite at a load of about 15 and passed 6 of 6 alone. Make its limit relative (for example to one render's
   time), or measure the waiting rather than wall time.
 
+- [ ] A test leaves a settings file named `non-existing-file-path` in the current folder (found by `qt/timeline`,
+  2026-10-05, in its worktree root): a test writes to the working directory instead of a temporary folder. Find it
+  and point it at a temporary path.
+- [ ] `StickerFileTest.thePictureBehindLiesAtTheBottom` fails in the full session run and passes alone (depends on
+  test order; `qt/timeline`, 2026-10-05, also on master-qt's build).
+
 ### Platform research
 Done 2026-09-24: [qt/docs/platform-research.md](qt/docs/platform-research.md) covers native libraries and PDF
 engines, with a recommendation and cheap experiments to decide.
