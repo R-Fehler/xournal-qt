@@ -51,7 +51,9 @@ public:
         /// URL of the page's sketch, shown at once under the thumbnail (PageSketches); empty while it has none
         SketchRole,
         /// The page's bookmark as shown ("Page N" for the automatic one); "": not bookmarked (qt/docs/bookmarks.md)
-        BookmarkRole
+        BookmarkRole,
+        /// The page differs from the document it is compared with (VersionCompare: changed, added or removed)
+        DiffersRole
     };
 
     static constexpr int MAX_THUMBNAIL_HITS = 50;

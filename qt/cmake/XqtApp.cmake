@@ -109,6 +109,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/AnnotationsModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/VersionsModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/VersionsModel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/VersionCompare.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/VersionCompare.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/MdSnippets.h

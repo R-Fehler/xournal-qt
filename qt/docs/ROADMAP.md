@@ -967,6 +967,16 @@
   written again when unchanged. A lecture of 20 pages: 5–7 KB a day with deltas instead of 25–32 KB
   ([hybrid-pdf.md](hybrid-pdf.md), "Version history"). Left: compare and play (on `qt/timeline`'s play bar), pruning.
 
+- **Locked scrolling and comparing versions, `qt/version-compare` (2026-10-05).** The reference view's pill has "Scroll
+  both sides together" (any two documents, a document beside itself, a version beside now; remembered per pair for
+  the session): scrolling, page jumps and zoom on either side move the other, by page with the offset of when it was
+  switched on and by the place within the page relative to its size, zoom relative to each half's fitting width
+  (`ScrollLock`). The History panel's "Compare with now" and "Compare with another version…" show the two locked
+  side by side (versions read-only); the pages that differ are found from what they hold, without drawing
+  (`VersionDiff`: aligned so inserted and removed pages mark only themselves, moved pages are no change), marked in
+  the page lists, counted in a bar with next and previous change ([reference-view.md](reference-view.md)). Left: the
+  added and removed elements of a changed page highlighted; the version scrubber.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

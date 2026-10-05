@@ -30,6 +30,7 @@ VersionCache& VersionCache::instance() {
 }
 
 VersionCache::VersionCache() {
+    ownFolder = (Util::getCacheSubfolder("versions") / std::to_string(Util::getPid())).lexically_normal();
     // What other processes left behind (a crash): after a day
     std::error_code ec;
     const fs::path root = Util::getCacheSubfolder("versions");
@@ -92,8 +93,11 @@ void VersionCache::trim() {
 }
 
 bool VersionCache::contains(const fs::path& file) const {
+    if (file.empty()) {
+        return false;
+    }
     const fs::path f = file.lexically_normal();
-    return f.parent_path().parent_path() == folder().lexically_normal();
+    return f.parent_path().parent_path() == ownFolder;
 }
 
 void VersionCache::clear() {

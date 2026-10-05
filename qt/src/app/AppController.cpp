@@ -93,6 +93,7 @@
 #include "shell/ShortcutsModel.h"
 #include "shell/OutlineModel.h"
 #include "shell/AnnotationsModel.h"
+#include "shell/VersionCompare.h"
 #include "shell/VersionsModel.h"
 #include "session/VersionCache.h"
 #include "shell/LocalUrl.h"
@@ -352,6 +353,7 @@ void AppController::makeTabs() {
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::syncHandwriting);
     connect(tabs.get(), &TabManager::countChanged, this, &AppController::syncHandwriting);
     referenceMode = std::make_unique<ReferenceMode>(*tabs, app->getSettings());
+    compareMode = std::make_unique<VersionCompare>(*tabs, *referenceMode);
     presenter = std::make_unique<PresenterConsole>(*app);
     connect(referenceMode.get(), &ReferenceMode::openExternal, this, &AppController::openLink);
     connect(referenceMode.get(), &ReferenceMode::openDocumentLink, this, [this](const QString& uri, const QString& from) {
@@ -443,6 +445,7 @@ AppController::~AppController() {
     layers->setSession(nullptr);
     recovery.reset();  // unregisters the sessions from the crash handler before they go away
     presenter.reset();  // (the audience's view of a session)
+    compareMode.reset();
     referenceMode.reset();
     if (handwriting) {
         handwriting->setSessions(this, {}, nullptr);
@@ -3159,6 +3162,7 @@ void AppController::openReceived(const fs::path& folder, const std::vector<fs::p
 }
 
 QObject* AppController::referenceObject() const { return referenceMode.get(); }
+QObject* AppController::compareObject() const { return compareMode.get(); }
 QObject* AppController::presenterObject() const { return presenter.get(); }
 QObject* AppController::citationsObject() const { return citations.get(); }
 QObject* AppController::audioObject() const { return audioControl.get(); }
@@ -3361,7 +3365,9 @@ bool AppController::openPath(const QString& path) {
     }
     watchTextFiles();  // (changes by other programs: a text file, a .xopp, a PDF)
     app->getSettings()->setLastOpenPath(fs::path(path.toStdString()).parent_path());
-    recent->add(file);
+    if (!VersionCache::instance().contains(file)) {  // (a version cut out of its file is gone when the app quits)
+        recent->add(file);
+    }
     DocumentPlaces::setRead(DocumentPlaces::keyOf(file));
     // "Open documents where they were left off": at the page it was left at (setting, off by default)
     if (bool resume = false;
@@ -3654,6 +3660,69 @@ bool AppController::viewVersion(int id) {
         return false;
     }
     return openAsReference(QString::fromStdString(file.string()));
+}
+
+bool AppController::viewingVersion() const {
+    const DocumentSession* s = session();
+    return s && s->hasFilePath() && VersionCache::instance().contains(s->getFilePath());
+}
+
+bool AppController::compareWithNow(int id) {
+    DocumentSession* s = session();
+    if (!s || !s->isHybrid()) {
+        return false;
+    }
+    // (a milestone by its message, else by its date)
+    QString title = versions->messageOf(id).isEmpty() ? versions->titleOf(id) : versions->messageOf(id);
+    if (title.isEmpty()) {
+        title = tr("Version %1").arg(id);
+    }
+    if (!viewVersion(id)) {
+        return false;
+    }
+    CanvasView* shown = referenceMode->canvas();
+    DocumentSession* old = shown ? &shown->getSession() : nullptr;
+    if (!old || old == s || session() != s) {
+        return false;
+    }
+    compareMode->start(s, old, tr("Now"), title);
+    return true;
+}
+
+bool AppController::compareVersions(int first, int second) {
+    DocumentSession* s = session();
+    if (!s || !s->isHybrid() || first == second) {
+        return false;
+    }
+    // (the ids of versions grow with time)
+    const int olderId = std::min(first, second), newerId = std::max(first, second);
+    auto titleOf = [this](int id) {  // (a milestone by its message, else by its date)
+        const QString t = versions->messageOf(id).isEmpty() ? versions->titleOf(id) : versions->messageOf(id);
+        return t.isEmpty() ? tr("Version %1").arg(id) : t;
+    };
+    const QString olderTitle = titleOf(olderId), newerTitle = titleOf(newerId);
+    std::string error;
+    const fs::path newerFile = VersionCache::instance().get(s->getFilePath(), newerId, error);
+    const fs::path olderFile = newerFile.empty() ? fs::path() : VersionCache::instance().get(s->getFilePath(), olderId, error);
+    if (newerFile.empty() || olderFile.empty()) {
+        Q_EMIT message(tr("The versions cannot be compared"), QString::fromStdString(error), true);
+        return false;
+    }
+    // The newer one in a tab of its own (read-only), the older one beside it
+    replacePristine = false;
+    const bool opened = openPath(QString::fromStdString(newerFile.string()));
+    replacePristine = true;
+    DocumentSession* newerSession = opened ? session() : nullptr;
+    if (!newerSession || newerSession == s || !openAsReference(QString::fromStdString(olderFile.string()))) {
+        return false;
+    }
+    CanvasView* shown = referenceMode->canvas();
+    DocumentSession* olderSession = shown ? &shown->getSession() : nullptr;
+    if (!olderSession || olderSession == newerSession) {
+        return false;
+    }
+    compareMode->start(newerSession, olderSession, newerTitle, olderTitle);
+    return true;
 }
 
 bool AppController::openVersionAsCopy(int id) {

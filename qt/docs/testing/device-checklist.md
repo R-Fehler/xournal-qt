@@ -3461,3 +3461,33 @@ Seen through the replay (⋮ → View → Replay the writing).
 - [ ] Help → Introduction: the first page has "Go back to earlier versions" (the History button, Ctrl+Alt+S); on the
       phone the page still fits without scrolling past its buttons. Help → Tutorial → section 15 "Versions": the steps
       work on the tutorial itself (turn on, Ctrl+Alt+S, show, restore, copy). Fill its screenshot placeholder.
+
+## Scrolling both sides together, and comparing versions (qt/version-compare, qt/docs/reference-view.md)
+
+- [ ] Two PDFs side by side (Open as reference): the pill's "Scroll both sides together" button (two pages with arrows)
+      lights up. Scroll the notes with a finger, the pen (hand tool), the wheel and the touchpad: the reference moves
+      along smoothly, no stutter, no jumping back; scroll the reference: the notes move. A fling carries both.
+- [ ] Page 3 of the notes beside page 1 of the reference, then on: page 7 here is beside page 5 there. "Go to page"
+      on either pill, a tap in the sidebar or the grid, Back: the other side goes along.
+- [ ] Slides (landscape) beside an A4 script: the tops of the pages stay together while scrolling; at the end of the
+      shorter document it stops, the other goes on.
+- [ ] Pinch on one side: the other zooms as much (relative to its half); Fit width on one: both fit. Drag the divider:
+      neither side jumps. Turn the tablet (side by side ↔ top and bottom): still together.
+- [ ] Off again: each side scrolls on its own. Another tab and back, the reference closed and shown again: still on
+      for that pair; a new pair starts off.
+- [ ] "Show this document beside" (the same document twice): the toggle works there too.
+- [ ] The phone (Fold 7 folded): the ⋮ of the reference's pill has "Scroll both sides together" (checked when on).
+- [ ] Settings → Shortcuts: "Scroll the document and the reference together" has no key; give it one (e.g.
+      Ctrl+Shift+K): it toggles while a reference is shown.
+- [ ] A PDF with notes that keeps versions, written on since the last save: History → a version's menu → "Compare with
+      now": the version on the side (no pen button on its pill, writing there does nothing), scrolled together; a bar at
+      the top of it says "<date> → Now" and how many pages changed; those pages have a violet bar in the sidebar, the
+      page grid and the reference's grid. ▼ goes to the next change on both sides, ▲ back.
+- [ ] Insert a page in the middle and compare again: only that page is marked (the ones after it are not), the
+      version side shows where it would be. Delete a page: "1 removed".
+- [ ] Write on another page while comparing: a moment later it is marked too. ✕ on the bar: marks gone, split closed.
+- [ ] "Compare with another version…", then tap another row: a new tab with the newer version (read-only), the older
+      one beside it, locked, marked. The document's own tab is still there and unchanged.
+- [ ] A long document (300+ pages with handwriting): "Compare with now" shows the bar at once ("Comparing…") and the
+      count within a second or two; scrolling stays smooth meanwhile.
+- [ ] Recent does not list "name (version N).pdf" files after showing or comparing versions.

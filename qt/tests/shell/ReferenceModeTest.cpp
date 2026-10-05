@@ -3,6 +3,8 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
+
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QPointer>
@@ -21,6 +23,9 @@
 #include "session/DocumentSession.h"
 #include "shell/ReferenceMode.h"
 #include "shell/TabManager.h"
+#include "session/VersionCache.h"
+#include "ScrollLock.h"
+#include "ViewController.h"
 
 #include "AppController.h"
 #include "CanvasView.h"
@@ -491,4 +496,96 @@ TEST(ReferenceMode, aLinkToAPageOfTheDocumentOpensInTheReference) {
     // A PDF link to a page ("In the reference" of the link popup)
     t.ref().showBeside(2);
     EXPECT_EQ(t.ref().pageNumber(), 3);
+}
+
+namespace {
+/// The page at the point a locked view is kept by (ScrollLock::anchorOf)
+size_t lockedPage(CanvasView* v) {
+    const auto& vc = v->getViewController();
+    return vc.placeAt(ScrollLock::anchorOf(vc))->page;
+}
+}  // namespace
+
+// Locked scrolling (ScrollLock, qt/docs/reference-view.md): either side moves the other, by page from where the two
+// were when it was switched on; off for a new pair, remembered per pair for the session, a document beside itself too
+TEST(ReferenceMode, scrollingTogetherIsLockedPerPairAndRemembered) {
+    ThreeTabs t;
+    t.c.insertPages(1, 0, -1, false, 9);  // (tab 0: ten pages)
+    t.c.setCurrentTab(2);
+    t.c.insertPages(1, 0, -1, false, 9);  // (tab 2: ten pages)
+    t.c.setCurrentTab(0);
+    CanvasView* main = t.tabs().view(0);
+    main->getViewController().setViewSize(QSizeF(600, 800));
+    t.ref().showTab(2);
+    CanvasView* book = t.tabs().view(2);
+    book->getViewController().setViewSize(QSizeF(500, 800));
+    QCoreApplication::processEvents();
+    EXPECT_FALSE(t.ref().scrollLocked()) << "off for a new pair";
+    main->jumpToPage(3);
+    t.ref().goToPage(1);
+    QSignalSpy lockChanged(&t.ref(), &ReferenceMode::scrollLockChanged);
+    t.ref().setScrollLocked(true);
+    EXPECT_TRUE(t.ref().scrollLocked());
+    EXPECT_GE(lockChanged.count(), 1);
+    EXPECT_EQ(t.ref().scrollLock().pageOffset(), -2);
+    main->jumpToPage(6);
+    EXPECT_EQ(lockedPage(book), 4u) << "page 4 beside page 2: page 7 beside page 5";
+    t.ref().goToPage(7);
+    EXPECT_EQ(lockedPage(main), 9u) << "the reference moves the notes too";
+    t.ref().zoomIn();
+    EXPECT_NEAR(main->getViewController().zoom() / main->getViewController().fitWidthZoom(9),
+                book->getViewController().zoom() / book->getViewController().fitWidthZoom(7), 1e-6)
+            << "zoomed the same, relative to the width of each half";
+
+    // Another tab (no reference): nothing locked; back: the pair is locked again
+    t.c.setCurrentTab(1);
+    EXPECT_FALSE(t.ref().scrollLocked());
+    t.c.setCurrentTab(0);
+    EXPECT_TRUE(t.ref().scrollLocked()) << "remembered for the pair";
+    main->jumpToPage(4);
+    EXPECT_EQ(lockedPage(book), 2u);
+    // The reference closed and shown again: still locked
+    t.ref().close();
+    EXPECT_FALSE(t.ref().scrollLocked());
+    t.ref().showTab(2);
+    QCoreApplication::processEvents();
+    EXPECT_TRUE(t.ref().scrollLocked());
+
+    // Switched off: each on its own again
+    t.ref().setScrollLocked(false);
+    EXPECT_FALSE(t.ref().scrollLocked());
+    const size_t bookPage = lockedPage(book);
+    main->jumpToPage(8);
+    EXPECT_EQ(lockedPage(book), bookPage);
+
+    // The document beside itself: a pair of its own
+    t.ref().showTab(0);
+    ASSERT_TRUE(t.ref().isSelf());
+    t.ref().canvas()->getViewController().setViewSize(QSizeF(500, 800));
+    QCoreApplication::processEvents();
+    EXPECT_FALSE(t.ref().scrollLocked());
+    t.ref().setScrollLocked(true);
+    ASSERT_TRUE(t.ref().scrollLocked());
+    const int offset = t.ref().scrollLock().pageOffset();
+    main->jumpToPage(2);
+    EXPECT_EQ(static_cast<int>(lockedPage(t.ref().canvas())), std::clamp(2 + offset, 0, 9));
+}
+
+// A version cut out of its file (VersionCache) is read-only: no writing in it beside the document either
+TEST(ReferenceMode, aVersionBesideTheDocumentCannotBeWrittenIn) {
+    ThreeTabs t;
+    t.ref().showTab(2);
+    EXPECT_TRUE(t.ref().editable());
+    t.ref().setEditing(true);
+    EXPECT_TRUE(t.ref().editing());
+    t.ref().setEditing(false);
+    // (a file in the version cache's folder)
+    const fs::path file = VersionCache::instance().folder() / "key-1" / "lecture (version 1).pdf";
+    t.tabs().session(2)->getDocument()->lock();
+    t.tabs().session(2)->getDocument()->setFilepath(file);
+    t.tabs().session(2)->getDocument()->unlock();
+    EXPECT_TRUE(t.tabs().session(2)->isReadOnly());
+    EXPECT_FALSE(t.ref().editable());
+    t.ref().setEditing(true);
+    EXPECT_FALSE(t.ref().editing());
 }

@@ -29,7 +29,10 @@
 #include <QUrl>
 
 #include <memory>
+#include <utility>
 #include <vector>
+
+#include "ScrollLock.h"
 
 class Settings;
 
@@ -84,6 +87,12 @@ class ReferenceMode final: public QObject {
     Q_PROPERTY(double ratio READ ratio WRITE setRatio NOTIFY layoutChanged)
     /// The reference is on the left of the main document (else on the right).
     Q_PROPERTY(bool onLeft READ onLeft WRITE setOnLeft NOTIFY layoutChanged)
+    /// Locked scrolling (ScrollLock): scrolling, paging and zooming either side moves the other, by page with the
+    /// offset of when it was locked. Remembered per pair of documents for the session (also a document beside itself).
+    Q_PROPERTY(bool scrollLocked READ scrollLocked WRITE setScrollLocked NOTIFY scrollLockChanged)
+    /// The reference can be written in (not a version of a document cut out of its file, nothing read-only): the edit
+    /// switch is offered
+    Q_PROPERTY(bool editable READ editable NOTIFY changed)
 public:
     static constexpr double MIN_RATIO = 0.2;
     static constexpr double MAX_RATIO = 0.8;
@@ -134,6 +143,12 @@ public:
     void setRatio(double ratio);
     bool onLeft() const;
     void setOnLeft(bool left);
+    bool scrollLocked() const;
+    void setScrollLocked(bool on);
+    Q_INVOKABLE void toggleScrollLock() { setScrollLocked(!scrollLocked()); }
+    /// The two views kept together (the main view and the reference's), while locked
+    ScrollLock& scrollLock() { return lock; }
+    bool editable() const;
 
     /// Show the document of tab `index` beside the current tab's. The current tab itself: its own document, in a
     /// second view with a page, a zoom and a selection of its own (qt/self-reference), starting where the tab is.
@@ -206,6 +221,7 @@ Q_SIGNALS:
     void navigationChanged();
     void layoutChanged();
     void pagesShownChanged();
+    void scrollLockChanged();
     /// What undo and redo can do in the reference changed (its document's history, or the Markdown written in it).
     void undoRedoChanged();
     /// A link was tapped in the reference: uri (external) or page of the reference; rect in its canvas coordinates.
@@ -233,6 +249,10 @@ Q_SIGNALS:
 private:
     /// The current tab or its reference changed: follow the reference's view.
     void update();
+    /// Lock the main view and the reference's when their pair is locked, else unlock (nothing while showTab places
+    /// a new reference)
+    void relock();
+    bool pairLocked(const DocumentSession* x, const DocumentSession* y) const;
 
     TabManager& tabs;
     Settings* settings;
@@ -242,6 +262,10 @@ private:
     std::vector<QMetaObject::Connection> connections;
     bool focus = false;
     bool gridShown = false;
+    ScrollLock lock;
+    /// The pairs of documents locked this session (in either order; a document with itself: beside itself)
+    std::vector<std::pair<QPointer<DocumentSession>, QPointer<DocumentSession>>> lockedPairs;
+    bool placing = false;  ///< showTab places a new reference (not locked yet)
 };
 
 }  // namespace xqt

@@ -26,7 +26,8 @@ public:
     /// The file of version `id` of `pdf` as it is now (made when it is not there yet; any thread). Empty: it could
     /// not be made (`error`).
     fs::path get(const fs::path& pdf, int id, std::string& error);
-    /// Whether a file is one of these.
+    /// Whether a file is one of these (any thread; cheap: documents of versions are shown read-only, and
+    /// DocumentSession::isReadOnly asks).
     bool contains(const fs::path& file) const;
     /// Remove every file of this process (when the app quits).
     void clear();
@@ -44,6 +45,7 @@ private:
         uint64_t bytes = 0;
     };
     void trim();
+    fs::path ownFolder;  ///< folder(), normalised
     mutable std::mutex m;
     std::list<Entry> entries;  ///< most recently used first
 };

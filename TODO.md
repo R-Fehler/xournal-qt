@@ -693,15 +693,19 @@ section "Confirmed by the author" (it overrides the plan's steps where they diff
 "Implement comparing two versions using the reference view but add a locked scroll toggle so both canvases are
 scrolled at the same time. Make this generic so we can use that toggle in the reference view to compare PDFs in
 general."
-- [ ] A **locked scroll** toggle in the reference view, for any two documents (two PDFs, a document and itself, a
+- [x] A **locked scroll** toggle in the reference view, for any two documents (two PDFs, a document and itself, a
   version and now): while on, scrolling, paging and zooming one side moves the other the same way. The pairing is
   by page, with the offset the two had when it was switched on (page 3 here beside page 1 there stays so), and
   the position within the page relative to its size (pages of other sizes still line up); remembered per pair.
-- [ ] **Compare a version**: in the History panel, "Compare with now" opens the version in the reference view
+  (Built: `ScrollLock`, zoom relative to each half's fitting width; no default key. Left: the device checks.)
+- [x] **Compare a version**: in the History panel, "Compare with now" opens the version in the reference view
   beside the current document, locked; the pages that changed between the two are marked (from the layer sigs),
   with next/previous change. Also "Compare two versions" (pick two in the list).
+  (Built: "Compare with now", "Compare with another version…"; pages compared by what they hold, `VersionDiff`, not
+  by the marker's sigs: they miss unsaved changes and change with the app's version. Left: the device checks.)
 - [ ] If cheap: on a changed page, what was added and what was removed highlighted (elements matched by their
-  serialized form, `xqt-created` helping), as a toggle.
+  serialized form, `xqt-created` helping), as a toggle. (Not built: needs an overlay on the canvas pages; the
+  per-element signatures are there in `VersionDiff`.)
 
 ### Encrypted PDFs (the author, 2026-10-05; `qt/pdf-encryption`)
 "Support pdf encryption and opening of encrypted PDFs using qpdf."
