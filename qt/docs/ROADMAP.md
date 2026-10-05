@@ -1003,6 +1003,19 @@
   editor's dashed and dotted line buttons drew a plain line (Canvas dashes from a model are ignored), and the editor
   went to the window's corner when something was chosen in it (the rail rebuilt its buttons) ([toolbox.md](toolbox.md)).
 
+- **Annotations of other apps made editable, `qt/adopt-annotations` (2026-10-05).** A PDF (plain, or with notes) that
+  another app marked up asks once per file "This PDF has N annotations from GoodNotes. Make them editable?" (the app
+  named from AnnotationKit's keys or the file's producer, as a label only); ⋮ → Document → "Adopt annotations from
+  other apps…" and a line at the top of the Annotations panel offer it any time. The standard types as ISO 32000
+  defines them become ours: `/Ink` strokes (`/BS /W`, `/C`; translucent ink a highlighter), highlight / underline /
+  strike out / squiggly as highlighter strokes over `/QuadPoints`, `/FreeText` text boxes (`/DA`, `/DS`), squares,
+  circles, lines with arrow heads, polygons and polylines as strokes, `/Text` notes and the comments of the others as
+  sticky notes, `/Stamp` pictures drawn by poppler; placed through the crop box, `/Rotate` and the space for notes
+  (checked against poppler for all four turns). A layer "From <app>" per page; the originals leave the background
+  (a copy without them: the next save writes ours in their place), one undo step brings them back
+  ([adopt-annotations.md](adopt-annotations.md)). Left: real exports of GoodNotes, Drawboard and Preview to confirm
+  what was assumed (pressure, highlighter, signatures), app-specific handling where they need it.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

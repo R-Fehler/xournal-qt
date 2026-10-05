@@ -276,6 +276,18 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
    "Export as .xopp for Xournal++…" (next to the hybrid PDF) left the ⋮ menu: the one-time export is Share's, and
    the `.xopp` kept beside the PDF is "Keep it updated for Xournal++" (or the global setting).
 
+## Annotations of other apps made editable (`qt/adopt-annotations`)
+
+Annotations other apps added to the PDF (their highlights, ink, text boxes, notes) are shown by the background and
+kept when saving (above). With the user's consent they become ours instead
+([adopt-annotations.md](adopt-annotations.md)): converted into a layer "From <app>" per page and sticky notes, and
+the document's background PDF becomes a copy without them (`adopt::prepare`; the same pages under the same numbers).
+So the next save of a PDF with notes writes our annotations in their place, written in full (the incremental base is
+dropped, as after importing changes); a `.xopp` gets the copy beside it as `.name.pages.pdf` (the copy is a merged PDF
+`WithSource`); the user's PDF itself is not written (in the PDF itself mode its original is kept as for any first
+save). Undo takes the earlier background back (a hard link to the user's PDF's bytes in the cache, should the file be
+written meanwhile). Our own annotations (`xopp:` names, the private key) are never adopted.
+
 ## Archive PDF (`qt/archive-export`)
 
 The author asked for an export meant for keeping (TODO.md, "Archive export"): a **PDF/A-3b** file that stays readable

@@ -774,8 +774,10 @@ especially interested in importing annotations that come from the GoodNotes PDF 
 - Additions (the author, 2026-10-05 evening): exported PNG pages also go to the clipboard, and "Copy page as image" at a high resolution (a setting, not asked each time); the snip's resolution is a setting too. B8 builds
   only what the PDF standard makes clear until the author's sample exports arrive. B7 (a folder as one notebook PDF)
   is parked (brittle, unclear order); sharing a folder or the library as a zip is to be discussed.
-- [ ] `qt/adopt-annotations`: B8, annotations made in other apps become editable ink, text and highlights (consent,
+- [x] `qt/adopt-annotations`: B8, annotations made in other apps become editable ink, text and highlights (consent,
   Annotations panel); GoodNotes exports first, Drawboard PDF second, Preview and the standard annotation types too.
+  (The standard types, consent once per file, ⋮ → Document, the panel's offer, a layer "From <app>", undo; left: real
+  GoodNotes / Drawboard / Preview exports to confirm the assumptions and any app-specific handling they need.)
 
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message

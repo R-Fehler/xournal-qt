@@ -1554,6 +1554,17 @@ ApplicationWindow {
                             AdaptiveMenuItem { objectName: "handwritingLanguageDe"; checkable: true; checked: handwritingLanguageMenu.current === "de"; text: qsTr("German"); onTriggered: app.handwritingLanguage = "de" }
                             AdaptiveMenuItem { objectName: "handwritingLanguageBoth"; checkable: true; checked: handwritingLanguageMenu.current === "both"; text: qsTr("Both"); onTriggered: app.handwritingLanguage = "both" }
                         }
+                        // Marks other apps put into the PDF made editable (qt/docs/adopt-annotations.md)
+                        AdaptiveMenuItem {
+                            objectName: "adoptAnnotationsItem"
+                            offered: !win.textDoc
+                            enabled: !app.adopting
+                            text: app.adoptableCount > 0 ? qsTr("Adopt annotations from other apps (%1)…").arg(app.adoptableCount)
+                                                         : qsTr("Adopt annotations from other apps…")
+                            icon.source: app.iconUrl("xopp-tool-highlighter")
+                            onTriggered: app.adoptableCount > 0 ? adoptDialog.openFor(app.adoptableCount, app.adoptableApp, false)
+                                                                : app.adoptAnnotations()
+                        }
                         AdaptiveMenuItem { objectName: "linkedFromItem"; text: qsTr("Linked from…"); icon.source: app.iconUrl("xqt-link"); onTriggered: backlinksDialog.show() }
                         AdaptiveMenuItem { objectName: "copyPageLinkItem"; text: qsTr("Copy link to this page"); icon.source: app.iconUrl("xqt-copy"); onTriggered: app.copyPageLink(-1) }
                     }
@@ -4059,8 +4070,53 @@ ApplicationWindow {
         }
         onAccepted: app.keepHybridData()
     }
+    // Annotations of another app in the PDF: make them editable? (qt/docs/adopt-annotations.md; asked once per file)
+    AdaptiveDialog {
+        id: adoptDialog
+        objectName: "adoptDialog"
+        kind: "question"
+        property int count: 0
+        property string appName: ""
+        property bool offered: false
+        function openFor(n, appName, offered) {
+            adoptDialog.count = n
+            adoptDialog.appName = appName
+            adoptDialog.offered = offered
+            open()
+        }
+        preferredWidth: 480
+        title: qsTr("Annotations from another app")
+        Label {
+            width: adoptDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: (adoptDialog.appName !== ""
+                   ? qsTr("This PDF has %n annotation(s) from %1.", "", adoptDialog.count).arg(adoptDialog.appName)
+                   : qsTr("This PDF has %n annotation(s) from another app.", "", adoptDialog.count))
+                  + " " + qsTr("Make them editable?") + "\n\n"
+                  + qsTr("Ink, highlights, text boxes, shapes and pictures go into a layer of their own on each page, "
+                         + "notes become sticky notes. Their originals leave the PDF when it is saved, replaced by "
+                         + "these. Undo brings them back.")
+        }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "adoptNotNowButton"
+                text: qsTr("Not now")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+            Button {
+                objectName: "adoptMakeEditableButton"
+                text: qsTr("Make editable")
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+        }
+        onAccepted: app.adoptAnnotations()
+        onRejected: if (offered) app.declineAdoption()
+    }
     Connections {
         target: app
+        function onAnnotationsToAdopt(count, appName, file) {
+            adoptDialog.openFor(count, appName, true)
+        }
         function onHybridEditedElsewhere(file) {
             hybridEditedDialog.file = file
             hybridEditedDialog.open()

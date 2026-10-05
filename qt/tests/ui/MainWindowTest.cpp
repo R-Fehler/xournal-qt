@@ -7551,6 +7551,58 @@ TEST_F(MainWindowTest, inkChangedInAnotherAppIsAskedAbout) {
     EXPECT_EQ(strokesOn(*s->getDocument(), 0), 1u);
 }
 
+// A PDF marked up in another app (qt/docs/adopt-annotations.md): the window asks once whether to make the marks
+// editable; "Not now" is remembered for the file, ⋮ → Document offers it again, and Undo brings the originals back.
+TEST_F(MainWindowTest, annotationsOfAnotherAppAreOfferedOnceAndMadeEditable) {
+    QTemporaryDir dir;
+    const QString pdf = dir.filePath("marked.pdf");
+    makeLecturePdf(pdf, 2);
+    {  // GoodNotes (as its Editable export is assumed to write ink) marked it up
+        QPDF q;
+        q.processFile(pdf.toUtf8().constData());
+        QPDFObjectHandle info = q.makeIndirectObject(QPDFObjectHandle::parse("<< /Producer (GoodNotes 6) >>"));
+        q.getTrailer().replaceKey("/Info", info);
+        QPDFObjectHandle page = QPDFPageDocumentHelper(q).getAllPages().at(0).getObjectHandle();
+        QPDFObjectHandle ink = q.makeIndirectObject(QPDFObjectHandle::parse(
+                "<< /Type /Annot /Subtype /Ink /Rect [90 590 210 710] /C [0 0 1] /BS << /W 2 >> "
+                "/InkList [[100 600 150 650 200 700]] >>"));
+        page.replaceKey("/Annots", QPDFObjectHandle::newArray(std::vector<QPDFObjectHandle>{ink}));
+        QPDFWriter w(q, (pdf + ".tmp").toUtf8().constData());
+        w.write();
+        QFile::remove(pdf);
+        QFile::rename(pdf + ".tmp", pdf);
+    }
+    QObject* dialog = find("adoptDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(controller->openPath(pdf));
+    ASSERT_TRUE(waitOpened(dialog, true));
+    EXPECT_EQ(controller->property("adoptableCount").toInt(), 1);
+    EXPECT_EQ(controller->property("adoptableApp").toString(), QStringLiteral("GoodNotes"));
+    click(findItem("adoptNotNowButton"));
+    ASSERT_TRUE(waitOpened(dialog, false));
+    controller->closeTab(controller->currentTab());
+
+    // Opened again: not asked again (it knows them), but ⋮ → Document offers it
+    ASSERT_TRUE(controller->openPath(pdf));
+    until([&] { return controller->property("adoptableCount").toInt() == 1; });
+    QTest::qWait(200);
+    EXPECT_FALSE(dialog->property("visible").toBool()) << "asked once per file";
+    QMetaObject::invokeMethod(find<QObject>("adoptAnnotationsItem"), "triggered");
+    ASSERT_TRUE(waitOpened(dialog, true));
+    click(findItem("adoptMakeEditableButton"));
+    ASSERT_TRUE(waitOpened(dialog, false));
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    until([&] { return strokesOn(*s->getDocument(), 0) == 1; });
+    EXPECT_EQ(strokesOn(*s->getDocument(), 0), 1u) << "the other app's ink, editable";
+    until([&] { return controller->property("adoptableCount").toInt() == 0; });
+    EXPECT_EQ(controller->property("adoptableCount").toInt(), 0);
+    EXPECT_TRUE(controller->modified());
+    controller->undo();
+    EXPECT_EQ(strokesOn(*s->getDocument(), 0), 0u);
+    until([&] { return controller->property("adoptableCount").toInt() == 1; });
+    EXPECT_EQ(controller->property("adoptableCount").toInt(), 1) << "the originals are back";
+}
+
 namespace {
 /// Holds a save on its worker just before it writes the .xopp (PdfPageKeeper::stopSaveAt, step 1) until released.
 struct HeldSave {

@@ -50,6 +50,9 @@ class TextFile;
 namespace HybridPdf {
 struct Revision;
 }
+namespace adopt {
+struct Prepared;
+}
 struct PdfMerge;
 
 class AppContext;
@@ -208,6 +211,34 @@ public:
     /// Take the other app's version of those annotations: they stay in the PDF as plain annotations (shown by the
     /// background), and the layers they stood for are emptied (undoable). False if that failed (`error`).
     bool importHybridChanges(std::string& error);
+    // --- annotations of other apps made editable (AdoptAnnotations.h, qt/docs/adopt-annotations.md) --------------
+    /// What adopting needs from the document (planAdoption, UI thread), for the work on a worker (adopt::prepare with
+    /// pdf, pdfPages, copy and mark).
+    struct AdoptPlan {
+        bool ok = false;               ///< the document shows pages of a background PDF
+        fs::path pdf;                  ///< its background PDF
+        std::vector<size_t> pdfPages;  ///< the PDF pages it shows (on PDF pages, and generated pages of a hybrid PDF)
+        std::vector<size_t> pageOf;    ///< per page of the document: the PDF page it shows (npos: none)
+        fs::path copy;                 ///< where the PDF without the converted annotations goes
+        int mark = -1;                 ///< the copy's merged-PDF mark (MergedPdf::Kind; -1: the source's)
+        quint64 numbering = 0;         ///< (the PDF page numbers are valid while pdfNumbering() is this)
+    };
+    AdoptPlan planAdoption() const;
+    /// The document takes what was prepared: on each page that had some, a layer "From <app>" with the converted marks
+    /// (above its layers, below its sticky notes) and the notes as sticky notes; the background PDF becomes the copy
+    /// without the originals (one undo step: undone, the original annotations are back). False with `error` if the
+    /// document's background PDF changed meanwhile. Nothing converted: true, nothing changed.
+    bool applyAdoption(adopt::Prepared prepared, const AdoptPlan& plan, std::string& error);
+    /// planAdoption, adopt::prepare and applyAdoption at once (on this thread). `converted`: how many.
+    bool adoptAnnotations(std::string& error, size_t* converted = nullptr);
+    /// The background PDF and what the merged-PDF keeper knows of it (adopting swaps them, undo swaps them back).
+    struct BackgroundState {
+        fs::path pdf, madeFrom, grownFrom;
+    };
+    BackgroundState backgroundState() const;
+    /// Take this background (the same pages under the same numbers); the next save of a PDF with notes writes the
+    /// file in full. False with `error` (nothing changed).
+    bool setBackgroundState(const BackgroundState& state, std::string& error);
     /// Export for Xournal++: a plain `xopp` next to the hybrid PDF with the base pages as its PDF (the merged-PDF
     /// rules of qt/pdf-pages: "name.pdf" if free, else ".name.pages.pdf"). The document keeps its file.
     SaveResult exportXopp(const fs::path& xopp);

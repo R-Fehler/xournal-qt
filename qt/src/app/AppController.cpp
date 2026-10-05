@@ -893,7 +893,14 @@ void AppController::currentTabChanged() {
                 connect(&s->search(), &DocumentSearch::changed, this, &AppController::searchChanged));
         currentConnections.push_back(
                 connect(&s->search(), &DocumentSearch::finished, this, &AppController::searchChanged));
+        // Annotations of other apps: looked at again when the background PDF changed (adopted, undone, saved)
+        currentConnections.push_back(connect(s, &DocumentSession::undoRedoStateChanged, this, [this, s] {
+            scanAdoptable(s, false);
+            Q_EMIT adoptableChanged();
+        }));
     }
+    scanAdoptable(session(), false);
+    Q_EMIT adoptableChanged();
     pages->setSession(session());
     outline->setSession(session());
     annotations->setSession(session());
@@ -3436,6 +3443,8 @@ bool AppController::openLoaded(const fs::path& file, const QString& path, xqt::D
         tabs->currentSession()->setHybridChanges(hybridChanged);
         Q_EMIT hybridEditedElsewhere(QString::fromStdString(file.filename().string()));
     }
+    // Marks of other apps in its PDF: asked once whether to make them editable (qt/docs/adopt-annotations.md)
+    scanAdoptable(tabs->currentSession(), true);
     return true;
 }
 

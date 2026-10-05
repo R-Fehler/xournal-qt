@@ -141,6 +141,8 @@ void setRead(const fs::path& document, qint64 when) {
 
 bool favourite(const fs::path& document) { return get(document, "star", 0) != 0; }
 void setFavourite(const fs::path& document, bool on) { set(document, "star", on ? 1 : 0, 0); }
+int adoptionOffered(const fs::path& document) { return static_cast<int>(get(document, "adopt", 0)); }
+void setAdoptionOffered(const fs::path& document, int count) { set(document, "adopt", std::max(0, count), 0); }
 
 void moved(const std::vector<std::pair<fs::path, fs::path>>& moves) {
     for (const auto& [from, to]: moves) {
