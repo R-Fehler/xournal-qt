@@ -993,6 +993,16 @@
   start); printing honours "without annotations" and removes the unencrypted print file once `lp` spooled it
   ([hybrid-pdf.md](hybrid-pdf.md), "Encrypted PDFs"). Left: Acrobat, Preview and pdf.js on the device.
 
+- **Pages as files, `qt/page-files` (2026-10-05).** "Insert pages from a file…" (the add-page button's list, ⋮ →
+  Page, the page menus): a PDF, a PDF with notes or a `.xopp`, all pages, a range or pages ticked on their pictures,
+  before or after a page; inserted as pasted pages (their PDF text searchable, their notes along, one undo step); a
+  protected PDF asks for its password in the dialog. "Extract to a new document…": the selection as a PDF with notes
+  or a `.xopp` next to the document, opened in a tab, optionally removed (one undo step); "Split…" every N pages, at
+  the selected pages or at the chapters. A protected document gives PDFs protected with its password, never a `.xopp`.
+  "Export pages as pictures…": PNG or JPEG, 72–600 dpi, a transparent background for ink, `name-p003.png`, always the
+  normal colours (also `xournal-qt-cli --png-dir`); one page exported is on the clipboard too. "Copy page as image"
+  (Ctrl+Shift+C): the page as a 300 dpi PNG on the clipboard (the resolution a setting) ([page-files.md](page-files.md)).
+
 - **The adaptive UI reworked, `qt/ui-rework` (2026-10-05).** Reading is read only, a toggle of full screen and
   presenting (the floating toolbox's ⋯, the compact chrome's tools, Ctrl+Alt+R; ⋮ → View → Read and the command
   bar's Read enter full screen with it): no ink, the tools away, a lock to write again, and big tap fields at the left

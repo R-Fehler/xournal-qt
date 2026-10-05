@@ -3576,3 +3576,32 @@ Seen through the replay (⋮ → View → Replay the writing).
       and Share last (each is in the bar or in ⋮, never both). The classic tool bar has none of these buttons.
 - [ ] Read in the command bar: full screen read only. Replay: the timeline bar. Milestone: the message dialog. Tags:
       the document's tags.
+
+## Pages as files (qt/page-files, qt/docs/page-files.md)
+
+- [ ] Hold the add-page button → "Insert pages from a file…" → a long PDF (pgfmanual): the dialog shows its page
+      pictures quickly while scrolling; tick three pages, "after page N": they come after the current page, their text
+      is found by the search and can be selected; Ctrl+Z takes all three away. A range "10-12, 20" works the same; "0"
+      or "99999" says why not.
+- [ ] Insert from a PDF with notes made in the app: its ink comes as ink (editable), its Markdown boxes and pictures
+      too. From a `.xopp` annotating a PDF: the same.
+- [ ] Insert from a protected PDF: the dialog asks for the password; a wrong one says so; the right one shows the page
+      numbers (no pictures) and inserts.
+- [ ] Select pages 2-4 in the grid → ⋯ → Extract to a new document… → PDF with notes: the new file is next to the
+      document in the library, opens in a tab, Acrobat/Okular/Xodo show the pages with the ink; with "Remove the
+      pages from this document": gone here, Ctrl+Z brings them back at once. As `.xopp`: Xournal++ opens it with its PDF.
+- [ ] Split a lecture with a table of contents "At the chapters": one file per chapter, named after them; "Every 10
+      pages" on pgfmanual: the parts open, their text is searchable, the source is unchanged.
+- [ ] A protected PDF with notes → Extract: the new PDF asks for the same password in Acrobat; the `.xopp` choice is
+      greyed out; Export as pictures says why not.
+- [ ] Export pages as pictures: all pages at 300 dpi into a folder: `name-p001.png` … in page order, sharp in an image
+      viewer, their DPI shown by GIMP/Photoshop; JPEG works; "Transparent background" on a page of ink on ruled paper:
+      only the ink is opaque (a checkerboard in GIMP); with dark pages on, the pictures still have the normal colours.
+- [ ] Ctrl+Shift+C on a slide: the toast "Page N copied as an image (2480×3509)"; paste it into LibreOffice, Word,
+      GIMP, a chat app (Signal, Slack, Teams): it arrives sharp (zoom in: no screenshot blur) and at the page's size in
+      Office. Settings → Storage → Pages as pictures → 600 dpi: an A4 page says it is smaller than asked (the pixel
+      limit); the same from the page menu's copy icon and the grid's ⋯ menu. Windows: paste into Paint and Word.
+- [ ] Export one page as pictures: it is on the clipboard too (paste it).
+- [ ] `xournal-qt-cli --png-dir=out --export-range=1-3 doc.xopp`: `out/doc-p001.png` … `doc-p003.png`.
+- [ ] Android: Export as pictures into the default Pictures folder works and the gallery shows them; a folder chosen
+      in the system picker (a `content://` folder) is a known gap.

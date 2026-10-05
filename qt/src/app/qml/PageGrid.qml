@@ -342,6 +342,53 @@ Rectangle {
                 enabled: app.pages.selectionCount > 0 && app.pages.selectionCount < app.pages.count
                 onClicked: app.deletePages(app.pages.selectedPages())
             }
+            // The selected pages as files (qt/docs/page-files.md): a new document, split there, pictures; from a file
+            IconButton {
+                id: filesButton
+                objectName: "pageGridFilesButton"
+                visible: typeof win !== "undefined" && win !== null && win.openPageFiles !== undefined
+                iconName: "xqt-more"
+                tip: qsTr("Copy as image, extract, split, export as pictures, insert from a file")
+                implicitWidth: 44; implicitHeight: 44
+                onClicked: filesMenu.openMenu()
+                AdaptiveMenu {
+                    id: filesMenu
+                    objectName: "pageGridFilesMenu"
+                    title: qsTr("Pages as files")
+                    readonly property var chosen: app.pages.selectionCount > 0 ? app.pages.selectedPages() : []
+                    AdaptiveMenuItem {
+                        objectName: "pageGridCopyImageItem"
+                        text: qsTr("Copy as image (%1 dpi)").arg(app.pageImageDpi)
+                        icon.source: app.iconUrl("xqt-copy")
+                        onTriggered: app.copyPagesAsImage(filesMenu.chosen)
+                    }
+                    AdaptiveMenuItem {
+                        objectName: "pageGridExtractItem"
+                        text: qsTr("Extract to a new document…")
+                        icon.source: app.iconUrl("xqt-file-output")
+                        onTriggered: win.openPageFiles("extract", filesMenu.chosen)
+                    }
+                    AdaptiveMenuItem {
+                        objectName: "pageGridSplitItem"
+                        text: qsTr("Split…")
+                        icon.source: app.iconUrl("xqt-page-break")
+                        onTriggered: win.openPageFiles("split", filesMenu.chosen)
+                    }
+                    AdaptiveMenuItem {
+                        objectName: "pageGridImagesItem"
+                        text: qsTr("Export as pictures…")
+                        icon.source: app.iconUrl("xqt-file-image")
+                        onTriggered: win.openPageFiles("images", filesMenu.chosen)
+                    }
+                    AdaptiveMenuItem {
+                        objectName: "pageGridInsertFileItem"
+                        offered: app.canInsertTemplate
+                        text: qsTr("Insert pages from a file…")
+                        icon.source: app.iconUrl("xqt-import")
+                        onTriggered: win.openPageFiles("insert", filesMenu.chosen)
+                    }
+                }
+            }
             ToolSeparator {}
             IconButton {
                 iconName: "xopp-edit-undo"; tip: qsTr("Undo page change (Ctrl+Z)")

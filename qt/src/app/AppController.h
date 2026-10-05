@@ -1374,6 +1374,51 @@ public:
     /// A new document that starts with a template's page (else as createDocument); read off the UI thread, then
     /// created (templateInserted)
     Q_INVOKABLE bool createDocumentFromTemplate(const QString& name, bool inLibrary, const QString& path);
+    // --- pages as files (AppPageFiles.cpp, qt/docs/page-files.md) ---
+    /// Insert pages from a file (A6): read `file` (a PDF, a PDF with notes, a .xopp) off the UI thread and keep it
+    /// until insertPagesFromFile or closePageFile; pageFileRead says what it is: { ok, name, pages, thumbnails (the URL
+    /// of its pages' pictures, "/<page>" appended; "" for a protected file), protectedFile, needsPassword,
+    /// wrongPassword, error }. `password`: for a protected PDF (asked when needsPassword). False: nothing to insert into.
+    Q_INVOKABLE bool readPageFile(const QUrl& file, const QString& password = QString());
+    /// Why a range of pages of a document of `count` pages is not one ("": it is; "1-3, 5", "8-").
+    Q_INVOKABLE QString checkPageRange(const QString& range, int count) const;
+    /// Insert pages of the file read before page `position` of the current document: `picked` (0-based) when not
+    /// empty, else the pages of `range` ("": all). As pasting copied pages: one undo step, PDF pages into the
+    /// document's merged PDF (their text stays searchable). Copied off the UI thread (pagesFromFileInserted); the
+    /// file is let go then.
+    Q_INVOKABLE bool insertPagesFromFile(const QString& range, const QList<int>& picked, int position);
+    /// Let go of the file read (the dialog was closed)
+    Q_INVOKABLE void closePageFile();
+    /// Extract or split (A7): where and as what pages of the current document would go: { offered, name (suggested,
+    /// for `pages`), folder (shown), asPdf (the default type), xoppAllowed (not for a protected document), count,
+    /// range ("3-5") }
+    Q_INVOKABLE QVariantMap extractDraft(const QList<int>& pages) const;
+    /// Write `pages` as a new document `name` (a PDF with notes, or a .xopp with its PDF) next to the current one (or
+    /// in the library), off the UI thread, then open it in a tab; with `remove` they leave this document (one undo
+    /// step). pagesExtracted says where, or why not. A protected document gives a PDF protected the same way.
+    Q_INVOKABLE bool extractPages(const QList<int>& pages, const QString& name, bool asPdf, bool remove);
+    /// How the current document would be split: `mode` "every" (`every` pages each), "selected" (a part starts at
+    /// each of `pages`) or "chapters" (at each chapter of its table of contents): { parts: [{ name, range, count }],
+    /// error }
+    Q_INVOKABLE QVariantMap splitPlan(const QString& mode, int every, const QList<int>& pages) const;
+    /// Write those parts as documents next to it (the document stays as it is), off the UI thread; pagesExtracted.
+    Q_INVOKABLE bool splitDocument(const QString& mode, int every, const QList<int>& pages, bool asPdf);
+    /// Export pages as pictures (A8): { offered, refused (why not: a protected document), name, folder (the last one
+    /// used, else the pictures folder), dpi (the last one used, else 200) }
+    Q_INVOKABLE QVariantMap imageExportDraft() const;
+    /// Write `pages` (empty: the current page) as "name-p003.png" (or ".jpg" for `format` "jpg") into `folder` at
+    /// `dpi`, in the normal colours; `transparent`: no paper (colour and ruling) behind the ink, PNG only. Off the UI
+    /// thread (pageImagesExported).
+    Q_INVOKABLE bool exportPageImages(const QList<int>& pages, const QUrl& folder, int dpi, bool transparent,
+                                      const QString& format);
+    /// The resolution of pages as pictures (remembered, 300 at first): exported, and copied as an image
+    Q_PROPERTY(int pageImageDpi READ pageImageDpi WRITE setPageImageDpi NOTIFY pageImageDpiChanged)
+    int pageImageDpi() const;
+    void setPageImageDpi(int dpi);
+    /// "Copy page as image" (Ctrl+Shift+C): the first of `pages` (empty: the current page) as a PNG on the clipboard
+    /// at pageImageDpi (less for a page so large it would be more than about 32 megapixels), on white paper, drawn off
+    /// the UI thread; a toast says its size (pageImageCopied).
+    Q_INVOKABLE bool copyPagesAsImage(const QList<int>& pages);
     /// Put the setsquare ("setsquare") or the compass ("compass") on the page, or take it away again.
     Q_INVOKABLE void toggleGeometryTool(const QString& which);
     /// For the screenshot hook (it calls methods without arguments)
@@ -1599,6 +1644,18 @@ Q_SIGNALS:
     void templateSaved(const QString& path, const QString& error);
     /// A template's page was added (`pages` of them), or a document made from it; or (`error`) not
     void templateInserted(const QString& path, int pages, const QString& error);
+    /// readPageFile: the file read, or why not (see there)
+    void pageFileRead(const QVariantMap& info);
+    /// insertPagesFromFile: `pages` inserted, or why not
+    void pagesFromFileInserted(int pages, const QString& error);
+    /// extractPages, splitDocument: the documents written, or why not
+    void pagesExtracted(const QStringList& files, const QString& error);
+    /// exportPageImages: the pictures written, or why not
+    void pageImagesExported(const QStringList& files, const QString& error);
+    /// copyPagesAsImage (and an export of one page): the picture of page `page` on the clipboard, `size` pixels at
+    /// `dpi`; or why not
+    void pageImageCopied(int page, const QSize& size, int dpi, const QString& error);
+    void pageImageDpiChanged();
     /// A snip from a document with a file was pasted: the window offers to add a link to its page (addSnipLink)
     void snipLinkOffered(const QString& title);
     void fontChanged();
@@ -1762,6 +1819,22 @@ private:
     /// A new document just made: saved in the library's current folder as `name` (createDocument)
     bool saveNewDocument(xqt::DocumentSession& doc, const QString& name, bool inLibrary);
     bool saveNewDocumentAt(xqt::DocumentSession& doc, const std::filesystem::path& path);
+    // --- pages as files (AppPageFiles.cpp) ---
+    /// The file read to insert pages from (one at a time, let go when the dialog closes)
+    std::shared_ptr<struct PageFileSource> pageFile;
+    quint64 pageFileReads = 0;  ///< (a later read wins)
+    /// A picture of a page on the clipboard (copyPagesAsImage, an export of one page), with the toast
+    void putPageImage(const QImage& image, const QByteArray& png, int page, int dpi, int pages, bool capped,
+                      bool announce = true);
+    /// Where extracted and split documents go: next to the document, else the library's current folder
+    std::filesystem::path pageFilesFolder(xqt::DocumentSession& s) const;
+    /// The parts of a split (splitPlan) with their names
+    std::vector<std::pair<std::string, std::vector<size_t>>> splitParts(const QString& mode, int every,
+                                                                        const QList<int>& pages,
+                                                                        QString* error) const;
+    /// Write documents of pages of `s` off the UI thread; `then` gets the files written, or the error
+    void writePageFiles(xqt::DocumentSession& s, std::vector<std::pair<std::filesystem::path, std::vector<size_t>>> files,
+                        std::function<void(const QStringList&, const QString&)> then);
     // --- page templates (AppTemplates.cpp) ---
     mutable std::unique_ptr<xqt::StickersModel> templateList;
     void syncTemplates() const;

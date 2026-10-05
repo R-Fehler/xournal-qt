@@ -8,6 +8,8 @@
  *   --dump                 print a structural summary of the document (pages, layers, elements)
  *   --bench-render=ZOOM    render every page at ZOOM and print timings
  *   --pdf-dir=DIR          export every FILE as DIR/<name>.pdf (many documents in one go)
+ *   --png-dir=DIR          export the pages of every FILE as pictures DIR/<name>-p001.png, ... (as the app names
+ *                          them, qt/docs/page-files.md; --export-range, --export-png-dpi, default 300 as in the app)
  * and commands:
  *   hwr-lines DOC --out DIR [--text FILE] [--lang de] [--writer ID] [--licence ID]
  *                          the handwriting of DOC as a line dataset (qt/src/hwr/LineDataset.h; this command links Qt)
@@ -17,6 +19,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <clocale>
@@ -42,6 +45,7 @@
 #include "model/Stroke.h"
 #include "model/XojPage.h"
 #include "pdf/base/PdfExportBackend.h"
+#include "util/ElementRange.h"
 #include "util/PathUtil.h"
 #include "util/PlaceholderString.h"
 #include "util/VersionInfo.h"
@@ -109,6 +113,41 @@ int exportPdf(const fs::path& infile, const fs::path& outfile, const char* range
         std::exit(-3);
     }
     return 0;
+}
+
+/// `--png-dir`: every page of RANGE (all: none given) as "DIR/<name>-p001.png", one file per page, numbered as the app
+/// numbers them (at least three digits, the page's number in the document).
+int exportPngPages(const fs::path& infile, const fs::path& dir, const char* range, const char* layerRange, int dpi,
+                   ExportBackgroundType exportBackground) {
+    auto doc = loadDocumentOrExit(infile, exportBackground);
+    const size_t count = doc->getPageCount();
+    PageRangeVector pages;
+    if (range) {
+        pages = ElementRange::parse(range, count);
+    } else if (count > 0) {
+        pages.emplace_back(0, count - 1);
+    }
+    const int digits = std::max(3, static_cast<int>(std::to_string(std::max<size_t>(count, 1)).size()));
+    const std::string stem = infile.stem().string();
+    int written = 0;
+    try {
+        for (const auto& entry: pages) {
+            for (size_t p = entry.first; p <= entry.last && p < count; ++p) {
+                std::string number = std::to_string(p + 1);
+                number.insert(0, static_cast<size_t>(std::max(0, digits - static_cast<int>(number.size()))), '0');
+                const fs::path target = dir / (stem + "-p" + number + ".png");
+                // (one page: upstream's export names the file as given)
+                ExportHelper::exportImg(doc.get(), target, std::to_string(p + 1).c_str(), layerRange,
+                                        dpi > 0 ? dpi : 300, -1, -1, exportBackground);
+                std::cout << target.string() << std::endl;
+                ++written;
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cerr << FS(_F("Error exporting image: {1}") % e.what()) << std::endl;
+        std::exit(-3);
+    }
+    return written > 0 ? 0 : -3;
 }
 
 /// Upstream `--save`: create a .xopp with the given PDF as background.
@@ -358,6 +397,7 @@ int main(int argc, char* argv[]) {
 
     gchar** optFilename = nullptr;
     gchar* pdfDir = nullptr;
+    gchar* pngDir = nullptr;
     gchar* pdfFilename = nullptr;
     gchar* imgFilename = nullptr;
     gchar* docFilename = nullptr;
@@ -406,6 +446,9 @@ int main(int argc, char* argv[]) {
                          nullptr},
             GOptionEntry{"pdf-dir", 0, 0, G_OPTION_ARG_FILENAME, &pdfDir,
                          "[xournal-qt] Export every FILE as PDF into DIR (batch)", "DIR"},
+            GOptionEntry{"png-dir", 0, 0, G_OPTION_ARG_FILENAME, &pngDir,
+                         "[xournal-qt] Export the pages of every FILE as DIR/<name>-p001.png, ... (default 300 dpi)",
+                         "DIR"},
             GOptionEntry{"bench-render", 0, 0, G_OPTION_ARG_DOUBLE, &benchZoom,
                          "[xournal-qt] Time rendering every page of FILE at ZOOM", "ZOOM"},
             GOptionEntry{nullptr}};
@@ -472,6 +515,25 @@ int main(int argc, char* argv[]) {
             }
         }
         std::cout << done << " exported, " << failed << " failed" << std::endl;
+        return failed == 0 ? 0 : -3;
+    }
+    // The pages of every document as pictures, named as the app names them
+    if (pngDir) {
+        const fs::path directory = Util::fromGFilename(pngDir);
+        std::error_code ec;
+        fs::create_directories(directory, ec);
+        if (!fs::is_directory(directory, ec)) {
+            std::cerr << "Not a directory: " << directory.string() << std::endl;
+            return 1;
+        }
+        const ExportBackgroundType pngBg = exportNoBackground ? EXPORT_BACKGROUND_NONE :
+                                           exportNoRuling     ? EXPORT_BACKGROUND_UNRULED :
+                                                                EXPORT_BACKGROUND_ALL;
+        int failed = 0;
+        for (gchar** file = optFilename; *file; ++file) {
+            failed += exportPngPages(Util::fromGFilename(*file), directory, exportRange, exportLayerRange,
+                                     exportPngDpi, pngBg) != 0;
+        }
         return failed == 0 ? 0 : -3;
     }
     const ExportBackgroundType bg = exportNoBackground ? EXPORT_BACKGROUND_NONE :

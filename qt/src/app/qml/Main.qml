@@ -106,6 +106,14 @@ ApplicationWindow {
     /// What was chosen by hand in this size class ("": the automatic choice): "sidebar", "chrome", later "toolbar"
     /// "Save page as template…" for page index `page` (qt/docs/templates.md; the page menus)
     function openTemplateSave(page) { templateSaveDialog.openForPage(page) }
+    /// Pages as files (PageFiles.qml, qt/docs/page-files.md), from the page menus: "insert" (from a file, after page
+    /// `pages[0]`), "extract", "split", "images" (the pages, or the selection)
+    function openPageFiles(what, pages) {
+        if (what === "insert") pageFiles.chooseFile(pages.length > 0 ? pages[pages.length - 1] : app.pageNumber - 1, true)
+        else if (what === "extract") pageFiles.openExtract(pages)
+        else if (what === "split") pageFiles.openSplit(pages)
+        else if (what === "images") pageFiles.openImages(pages)
+    }
     function layoutChoice(what) { return (app.settings.revision, app.settings.layoutChoice(adaptive.layoutClass, what)) }
     function chooseLayout(what, value) { app.settings.setLayoutChoice(adaptive.layoutClass, what, value) }
     /// The bottom sheet that the menus (AdaptiveMenu) become in the phone classes, one for the window
@@ -1564,6 +1572,8 @@ ApplicationWindow {
                         // A plain PDF: the notes drawn into the pages (a PDF with notes that stays editable is a type
                         // of Save as)
                         AdaptiveMenuItem { objectName: "exportPdfItem"; text: qsTr("Export as plain PDF…"); icon.source: app.iconUrl("xopp-document-export-pdf"); onTriggered: openExportDialog() }
+                        // Pages as PNG or JPEG pictures (qt/docs/page-files.md)
+                        AdaptiveMenuItem { objectName: "exportImagesItem"; offered: !win.textDoc; text: qsTr("Export pages as pictures…"); icon.source: app.iconUrl("xqt-file-image"); onTriggered: pageFiles.openImages(app.pages.selectionCount > 0 ? app.pages.selectedPages() : []) }
                         // A PDF/A for keeping: the ink merged into the pages, the Xournal data inside
                         AdaptiveMenuItem {
                             objectName: "exportArchiveItem"
@@ -1588,6 +1598,11 @@ ApplicationWindow {
                         iconName: "xqt-file"
                         offered: !win.textDoc
                         AdaptiveMenuItem { objectName: "insertPagesItem"; text: qsTr("Insert pages…"); icon.source: app.iconUrl("xopp-page-add"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
+                        // Pages as files (qt/docs/page-files.md): from a file, into a new document, split
+                        AdaptiveMenuItem { objectName: "insertFromFileItem"; offered: app.canInsertTemplate; text: qsTr("Insert pages from a file…"); icon.source: app.iconUrl("xqt-import"); onTriggered: pageFiles.chooseFile(app.pageNumber - 1, true) }
+                        AdaptiveMenuItem { objectName: "copyPageImageItem"; text: qsTr("Copy page as image"); icon.source: app.iconUrl("xqt-copy"); onTriggered: app.copyPagesAsImage(app.pages.selectionCount > 0 ? app.pages.selectedPages() : []) }
+                        AdaptiveMenuItem { objectName: "extractPagesItem"; text: qsTr("Extract to a new document…"); icon.source: app.iconUrl("xqt-file-output"); onTriggered: pageFiles.openExtract(app.pages.selectionCount > 0 ? app.pages.selectedPages() : []) }
+                        AdaptiveMenuItem { objectName: "splitDocumentItem"; text: qsTr("Split the document…"); icon.source: app.iconUrl("xqt-page-break"); onTriggered: pageFiles.openSplit(app.pages.selectionCount > 0 ? app.pages.selectedPages() : []) }
                         // Page templates (qt/docs/templates.md): this page saved to be added again; one added
                         AdaptiveMenuItem { objectName: "saveTemplateItem"; text: qsTr("Save page as template…"); icon.source: app.iconUrl("xqt-file-plus"); onTriggered: templateSaveDialog.openForPage(app.pageNumber - 1) }
                         AdaptiveMenuItem { objectName: "insertTemplateItem"; offered: app.canInsertTemplate; text: qsTr("Add a page from a template…"); icon.source: app.iconUrl("xopp-page-add"); onTriggered: templatePicker.openToInsert(app.pageNumber) }
@@ -2158,6 +2173,12 @@ ApplicationWindow {
                     text: qsTr("From a template…")
                     icon.source: app.iconUrl("xqt-file-plus")
                     onTriggered: templatePicker.openToInsert(app.pageNumber)
+                }
+                AdaptiveMenuItem {
+                    objectName: "addPageFromFileItem"
+                    text: qsTr("Insert pages from a file…")
+                    icon.source: app.iconUrl("xqt-import")
+                    onTriggered: pageFiles.chooseFile(app.pageNumber - 1, true)
                 }
                 AdaptiveMenuItem {
                     objectName: "addPageSaveTemplateItem"
@@ -5336,6 +5357,7 @@ ApplicationWindow {
     // Page templates (qt/docs/templates.md): the picker (in the middle of the window, a sheet on a phone) and saving
     StickerPicker { id: templatePicker; mode: "templates" }
     TemplateSaveDialog { id: templateSaveDialog; parent: Overlay.overlay }
+    PageFiles { id: pageFiles }
     PrintDialog { id: printDialog }
     ChapterDialog { id: chapterDialog }
     RenameDialog { id: renameDocumentDialog }
@@ -5580,6 +5602,8 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("selectAll"); enabled: docKeys; onActivated: app.selectAllOnPage() }
     Shortcut { sequences: win.keysOf("group"); enabled: docKeys; onActivated: app.groupSelection() }
     Shortcut { sequences: win.keysOf("ungroup"); enabled: docKeys; onActivated: app.ungroupSelection() }
+    // The page (the first selected page) as a high-resolution picture on the clipboard (qt/docs/page-files.md)
+    Shortcut { sequences: win.keysOf("copyPageImage"); enabled: docKeys && !win.textDoc; onActivated: app.copyPagesAsImage(app.pages.selectionCount > 0 ? app.pages.selectedPages() : []) }
     Shortcut { sequence: "Escape"; enabled: docKeys && (app.hasSelection || app.noteSelected) && !win.sidebarDrawerOpen && !app.curtainHandles; onActivated: app.clearSelection() }
     Shortcut { sequences: win.keysOf("findNext"); enabled: docKeys; onActivated: app.searchNext() }
     Shortcut { sequences: win.keysOf("findPrevious"); enabled: docKeys; onActivated: app.searchPrevious() }

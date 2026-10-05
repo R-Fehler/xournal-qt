@@ -107,6 +107,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/StickerFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TemplateFile.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TemplateFile.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageFiles.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementGroups.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementGroups.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementTimes.h

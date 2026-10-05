@@ -769,8 +769,10 @@ especially interested in importing annotations that come from the GoodNotes PDF 
 - [ ] `qt/dark-pages`: dark mode for pages (inverted on the GPU, pictures kept) with ink and highlighter colors shown
   as their dark equivalents (palette roles), readable in both; curated page colors (black, grey, illustration paper,
   textured paper) for `.xopp` and PDFs, with a printing warning for dark pages.
-- [ ] `qt/page-files`: A6 insert pages from a PDF file, A7 extract or split selected pages into a new document or
-  PDF, A8 export pages as PNG.
+- [x] `qt/page-files`: A6 insert pages from a PDF file, A7 extract or split selected pages into a new document or
+  PDF, A8 export pages as PNG; plus "Copy page as image" (Ctrl+Shift+C, a high-resolution PNG on the clipboard)
+  ([page-files.md](qt/docs/page-files.md)). Left: the device checks; exporting pictures into an Android `content://`
+  folder.
 - [ ] `qt/adopt-annotations`: B8, annotations made in other apps become editable ink, text and highlights (consent,
   Annotations panel); GoodNotes exports first, Drawboard PDF second, Preview and the standard annotation types too.
 
