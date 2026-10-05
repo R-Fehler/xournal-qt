@@ -869,6 +869,15 @@
   sticker picker in template mode), the Insert pages dialog (several at once) and New document; one undo step
   ([templates.md](templates.md)).
 
+- **Turning the canvas, `qt/canvas-rotate` (2026-10-05).** The canvas turns like Krita's, not the pages: two fingers
+  twisted past 12° (and the touchpad's rotate gesture) turn it, snapping within 6° of quarter turns, anchored under
+  the fingers; Ctrl+] / Ctrl+[ turn it by a quarter; a chip "↺ 37°" in the layout pill, two taps on the page and the
+  fits turn it upright; a setting turns the gesture off. Not while presenting, in text files and text documents, or in
+  the reference. Built as an upright virtual view (the bounding box of the turned screen) behind one transform of the
+  canvas's root node: page rasters stay upright, input is mapped through one 2×2 matrix, the window's overlays and
+  scroll bars are mapped to the screen, tiles are culled against the turned screen, quarter turns stay pixel exact
+  ([canvas-rotation.md](canvas-rotation.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

@@ -1661,6 +1661,9 @@ void DocumentCanvasItem::updateGeometryNode(QSGNode* rootNode, double zoom, doub
     const QPointF displayAt = pageAt + displayMiddle * zoom;
     QMatrix4x4 d;
     d.translate(static_cast<float>(snap(displayAt.x(), dpr)), static_cast<float>(snap(displayAt.y(), dpr)));
+    if (const double turned = canvasView->getViewController().rotation(); turned != 0) {
+        d.rotate(static_cast<float>(-turned), 0, 0, 1);  // (the canvas turned: the number upright on the screen)
+    }
     d.scale(static_cast<float>(zoom));
     g->displayAt->setMatrix(d);
 
@@ -1830,7 +1833,13 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
     {
         QMatrix4x4 turn;  // (the identity while upright)
         if (vc.rotated()) {
-            const QPointF at = vc.viewToScreen(QPointF(0, 0));  // where the view's origin is on the screen
+            QPointF at = vc.viewToScreen(QPointF(0, 0));  // where the view's origin is on the screen
+            if (vc.rightAngled()) {
+                // A quarter turn maps whole device pixels onto whole device pixels, once the view's origin lies on
+                // one: the tiles are shown pixel for pixel, as upright (qt/docs/hidpi.md). (Input is mapped without
+                // this, less than a device pixel away.)
+                at = snapPoint(at, dpr);
+            }
             const auto c = static_cast<float>(vc.rotationCos()), s = static_cast<float>(vc.rotationSin());
             turn = QMatrix4x4(c, -s, 0, static_cast<float>(at.x()), s, c, 0, static_cast<float>(at.y()), 0, 0, 1, 0,
                               0, 0, 0, 1);
@@ -1850,6 +1859,12 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
     int tileBudget = moving ? TILES_WHILE_MOVING : TILES_WHEN_STILL;
     const int budgetOfTheFrame = tileBudget;
     const QRectF viewport = viewRect.adjusted(-TILE, -TILE, TILE, TILE);
+    // Turned, the view is the bounding box of the screen: a tile is composed only when it meets the screen itself (the
+    // separating axes of two rectangles: the view's, then the screen's)
+    const QRectF screenport = QRectF(QPointF(0, 0), vc.screenSize()).adjusted(-TILE, -TILE, TILE, TILE);
+    const auto meetsScreen = [&](const QRectF& inView) {
+        return inView.intersects(viewport) && (!vc.rotated() || vc.viewToScreen(inView).intersects(screenport));
+    };
     bool more = false;  // tiles left for the next frame
 
     std::unordered_map<const xqt::CanvasPage*, PageNode*> keep;
@@ -1943,7 +1958,7 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             const QRectF inItem(r.x() + (origin.x() + px.x() / info.dpiScale) * scale,
                                 r.y() + (origin.y() + px.y() / info.dpiScale) * scale,
                                 px.width() / info.dpiScale * scale, px.height() / info.dpiScale * scale);
-            if (!inItem.intersects(viewport)) {
+            if (!meetsScreen(inItem)) {
                 continue;  // (composed when it comes into view)
             }
             if (tileBudget <= 0) {

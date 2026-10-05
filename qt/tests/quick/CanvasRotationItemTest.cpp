@@ -37,7 +37,10 @@
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
 
+#include "CanvasPage.h"
 #include "CanvasView.h"
+#include "GeometryToolLayer.h"
+#include "model/GeometryTool.h"
 #include "DevicePixels.h"
 #include "DocumentCanvasItem.h"
 
@@ -471,4 +474,83 @@ TEST_F(CanvasRotationItemTest, theTouchpadsRotateGestureTurnsTheCanvas) {
     send(Qt::RotateNativeGesture, -15);  // -37 + 12 = -25: 3, snaps to 0
     EXPECT_EQ(vc().rotation(), 0);
     send(Qt::EndNativeGesture, 0);
+}
+
+// Turned by a free angle the view is the bounding box of the screen: only the tiles that meet the screen itself are
+// composed, not those in the bounding box's corners
+TEST_F(CanvasRotationItemTest, onlyTheTilesOnTheTurnedScreenAreComposed) {
+    zoomIn();
+    vc().setRotation(45);
+    wait(300);  // (what is in view is composed from the pictures there are)
+    vc().setZoom(vc().zoom() * 1.2, QPointF(vc().viewSize().width() / 2, vc().viewSize().height() / 2));
+    canvas->forgetFrameStats();
+    // Rendered at the new zoom, then composed in a few frames (until no more tiles come)
+    QElapsedTimer clock;
+    clock.start();
+    auto rendered = [&] {
+        const auto [first, last] = view->visiblePages();
+        for (size_t i = first; i <= last && i < view->pageCount(); ++i) {
+            if (const auto info = view->getPage(i)->bufferInfo(); !info.valid || info.zoom != vc().zoom()) {
+                return false;
+            }
+        }
+        return true;
+    };
+    while (!rendered() && clock.elapsed() < 8000) {
+        wait(20);
+    }
+    for (qint64 before = -1; before != canvas->frameStats().tiles && clock.elapsed() < 10000;) {
+        before = canvas->frameStats().tiles;
+        canvas->update();
+        wait(200);
+    }
+    const QRectF viewport = QRectF(QPointF(0, 0), vc().viewSize()).adjusted(-256, -256, 256, 256);
+    const QRectF screenport = QRectF(QPointF(0, 0), vc().screenSize()).adjusted(-256, -256, 256, 256);
+    int inBox = 0, onScreen = 0;
+    const auto [first, last] = view->visiblePages();
+    for (size_t i = first; i <= last && i < view->pageCount(); ++i) {
+        const auto info = view->getPage(i)->bufferInfo();
+        ASSERT_TRUE(info.valid);
+        ASSERT_DOUBLE_EQ(info.zoom, vc().zoom()) << "rendered at the new zoom";
+        const QRectF r = view->pageViewRect(i);
+        const int cols = (info.pixelSize.width() + 255) / 256, rows = (info.pixelSize.height() + 255) / 256;
+        for (int y = 0; y < rows; ++y) {
+            for (int x = 0; x < cols; ++x) {
+                const QRect px = QRect(x * 256, y * 256, 256, 256).intersected(QRect(QPoint(0, 0), info.pixelSize));
+                const QRectF tile(r.x() + info.origin.x() + px.x() / info.dpiScale,
+                                  r.y() + info.origin.y() + px.y() / info.dpiScale, px.width() / info.dpiScale,
+                                  px.height() / info.dpiScale);
+                if (tile.intersects(viewport)) {
+                    ++inBox;
+                    onScreen += vc().viewToScreen(tile).intersects(screenport);
+                }
+            }
+        }
+    }
+    ASSERT_LT(onScreen, inBox) << "some tiles lie only in the corners of the bounding box: no test";
+    EXPECT_LE(canvas->frameStats().tiles, onScreen) << "tiles off the turned screen were composed";
+    EXPECT_GT(canvas->frameStats().tiles, onScreen / 2) << "the tiles on the screen were composed";
+}
+
+// The setsquare's angle display stays upright on the screen, whichever way the canvas is turned
+TEST_F(CanvasRotationItemTest, theSetsquaresReadoutStaysUprightOnTheScreen) {
+    view->geometryTool().toggle(GeometryToolType::SETSQUARE);
+    ASSERT_TRUE(view->geometryTool().visible());
+    wait(100);
+    for (const double angle: {30.0, 90.0}) {
+        vc().setRotation(angle);
+        // (the setsquare's middle in the middle of the screen)
+        const QRectF page = view->pageViewRect(0);
+        const QPointF middle = page.topLeft() + view->geometryTool().middle() * vc().zoom();
+        vc().setScrollPosition(vc().scrollPosition() + middle - QPointF(vc().viewSize().width() / 2,
+                                                                         vc().viewSize().height() / 2));
+        canvas->update();
+        wait(150);
+        const auto shown = canvas->geometryShown();
+        ASSERT_TRUE(shown.shown);
+        // The display's own x axis, in the view and then on the screen
+        const QPointF a = shown.display.map(QPointF(0, 0)), b = shown.display.map(QPointF(10, 0));
+        const QPointF across = vc().viewDeltaToScreen(b - a);
+        EXPECT_NEAR(std::atan2(across.y(), across.x()), 0, 1e-5) << "upright at " << angle << "°";
+    }
 }

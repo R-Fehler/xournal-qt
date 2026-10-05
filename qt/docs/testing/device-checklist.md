@@ -3141,3 +3141,10 @@ offered).
       start and snapping.
 - [ ] Settings → Touch → "Turn the canvas with two fingers" off: twisting only pans and zooms; Ctrl+[ / Ctrl+] and
       the chip still work. On again: twisting turns it.
+- [ ] At a free angle, scrolling and zooming a big PDF stay as smooth as upright (only the tiles on the turned screen
+      are composed: `XQT_PERF=1` shows no more tiles per second than upright). At 90° at 125 % or 150 % the text of
+      a PDF is as crisp as upright.
+- [ ] The setsquare and the compass on a turned canvas: they move and turn with two fingers as upright; the number of
+      their angle display stays upright on the screen.
+- [ ] The curtain and the snip on a turned canvas: the curtain's handles work where they are shown; a snip's
+      rectangle is a rectangle of the page (turned on the screen) and the picture is what it encloses.

@@ -12,6 +12,7 @@
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QQmlApplicationEngine>
+#include <QQmlProperty>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QTemporaryDir>
@@ -32,6 +33,7 @@
 
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "ViewController.h"
 #include "CurtainLayer.h"
 #include "DevicePixels.h"
 #include "DocumentCanvasItem.h"
@@ -158,6 +160,50 @@ TEST_F(FractionalScaleCanvas, pageTilesAreShownPixelForPixel) {
     }
     EXPECT_GT(inked, 20) << "the block has the strokes";
     EXPECT_EQ(differing, 0) << "pixels blended: the tiles are not on whole device pixels (dpr " << dpr << ")";
+}
+
+// Turned by a quarter (qt/docs/canvas-rotation.md) the tiles still land on whole device pixels: the window shows the
+// rendered pixels unchanged, turned. The canvas here is not a whole number of device pixels wide (as a half of the
+// window beside a reference can be): the turn's translation has to be put on a whole pixel.
+TEST_F(FractionalScaleCanvas, pageTilesAreShownPixelForPixelTurnedByAQuarter) {
+    QQmlProperty(canvas, "anchors.fill").write(QVariant::fromValue<QQuickItem*>(nullptr));
+    canvas->setSize(QSizeF(999.63, 800));
+    settle(100);
+    ASSERT_FALSE(whole(canvas->width() * dpr)) << "a whole number of device pixels: no test";
+    zoomToAnOddPlace();
+    addStroke(QPointF(100, 100.3), QPointF(300, 100.3));
+    addStroke(QPointF(100.6, 60), QPointF(100.6, 160));
+    ViewController& vc = view->getViewController();
+    vc.setRotation(90, QPointF(300, 300));
+    settle(400);
+    CanvasPage* page = view->getPage(0);
+    const auto info = page->bufferInfo();
+    ASSERT_TRUE(info.valid);
+    ASSERT_TRUE(info.whole);
+    // Where the view's origin and the page's top left are, in device pixels (as the canvas places them)
+    const QPointF origin = vc.viewToScreen(QPointF(0, 0));
+    const QPoint at(static_cast<int>(std::round(origin.x() * dpr)), static_cast<int>(std::round(origin.y() * dpr)));
+    const QPointF pageAt = view->pageViewRect(0).topLeft();
+    const QPoint topLeft(static_cast<int>(std::round(pageAt.x() * dpr)), static_cast<int>(std::round(pageAt.y() * dpr)));
+    const QRect block(QPoint(static_cast<int>(90 * info.zoom * dpr), static_cast<int>(90 * info.zoom * dpr)),
+                      QSize(48, 48));
+    const QImage tile = page->composeTile(block).convertToFormat(QImage::Format_RGB32);
+    const QImage shot = window->grabWindow().convertToFormat(QImage::Format_RGB32);
+    int differing = 0, inked = 0;
+    for (int y = 0; y < block.height(); ++y) {
+        for (int x = 0; x < block.width(); ++x) {
+            // A quarter clockwise: the view's device pixel (vx, vy) is the screen's (at.x - vy - 1, at.y + vx)
+            const QPoint v = topLeft + block.topLeft() + QPoint(x, y);
+            const QPoint screen(at.x() - v.y() - 1, at.y() + v.x());
+            ASSERT_TRUE(shot.rect().contains(screen)) << "the block is off the window: no test";
+            const QRgb want = tile.pixel(x, y);
+            const QRgb got = shot.pixel(screen);
+            differing += std::abs(qGray(want) - qGray(got)) > 2;
+            inked += qGray(want) < 128;
+        }
+    }
+    EXPECT_GT(inked, 20) << "the block has the strokes";
+    EXPECT_EQ(differing, 0) << "pixels blended: the turned tiles are not on whole device pixels (dpr " << dpr << ")";
 }
 
 // The selection (its frame and handles) is a picture of its own over the page. It is drawn with whole device pixels
