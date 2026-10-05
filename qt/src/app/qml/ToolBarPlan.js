@@ -21,9 +21,10 @@ var PROMOTED = ["favourite", "bookmark", "print", "share"]
 var LADDER = PROMOTED.concat([
     "widths:single",
     "colors:recent",
-    // (Open externally after Search: for a file shown here, a text file or an image, it is how the file is edited)
-    "new", "open", "save", "settings", "present", "fullScreen", "editAsNotes", "search", "openExternally",
-    "addPage", "sticker", "image", "emoji", "pdfText", "geometry", "shape",
+    // (Open externally after Search and the stickers: for a file shown here, a text file or an image, it is how the
+    // file is edited)
+    "new", "open", "save", "settings", "present", "fullScreen", "editAsNotes", "search", "sticker", "openExternally",
+    "addPage", "image", "emoji", "pdfText", "geometry", "shape",
     "colors:single",
     "sticky", "write", "text", "touchDrawing", "select", "hand"
 ])
