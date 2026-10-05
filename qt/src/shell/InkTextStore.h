@@ -9,7 +9,9 @@
  * An entry (by file name): the stamp of the document's main file when its pages were read (a .xopp, or a PDF with
  * notes), the recogniser's id (results of another model are read again), whether every line was read, per page its
  * lines (hash and origin, 0.1 pt), and per line hash its words: [x, y, w, h (0.1 pt, relative to the line's origin),
- * confidence (0-255), reading, share (0-255), reading, share, ...]. A line written on several pages is stored once.
+ * confidence (0-255), reading, share, reading, share, ...] (a share: 0-255, plus the models that gave the reading
+ * times 256 when several models read the line, ink::Candidate::models), then those models as a number. A line
+ * written on several pages is stored once.
  * About 2-5 KB per page of handwriting, compressed. An entry of over 1 MB gets a file of its own (Packs).
  *
  * Entries are written when the app saves a document whose handwriting it read (the hand-over of its open indexer) and

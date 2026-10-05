@@ -2820,6 +2820,10 @@ scripted models (`xqt-hwr-tests`); the steps below need the real models.
       handwriting (umlauts, ß) is found by Ctrl+F; `XQT_HWR_MODEL_DE=<folder> XQT_ONNXRUNTIME=<the .so>
       build-qt/xqt-hwr-tests --gtest_filter='Ctc*'` passes. A line wider than the model's `max_width` (a long
       line on a landscape page) is still found word by word.
+- [ ] Both models in use, a page with English and German lines: Ctrl+F finds German words ("Straße", "Verstärkung")
+      and English ones; a word both models read ("Kalman", "Test") is marked once, not twice; the library's search
+      finds the document by either. Close and open it again: nothing is read again (the pack keeps both models'
+      readings).
 - [ ] With `XQT_HWR_MODEL_DE=<folder>` the German row says the model is that folder and offers neither download nor
       removal.
 

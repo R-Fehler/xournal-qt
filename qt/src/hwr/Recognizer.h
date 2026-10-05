@@ -47,6 +47,11 @@ struct Capabilities {
     /// The recogniser and its model ("trocr-small-hw-int8/<hash of the model files>/seg1"): results of another one are
     /// read again
     QString id;
+    /// Several models (MultiRecognizer): their ids and languages, by their bit in ink::Candidate::models
+    QStringList models;
+    std::vector<QStringList> modelLanguages;
+    /// The languages of the models with these bits (all languages for 0)
+    QStringList languagesOf(uint32_t bits) const;
 };
 
 struct Context {

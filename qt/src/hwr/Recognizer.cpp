@@ -4,6 +4,23 @@
 
 namespace xqt::hwr {
 
+QStringList Capabilities::languagesOf(uint32_t bits) const {
+    if (bits == 0 || modelLanguages.empty()) {
+        return languages;
+    }
+    QStringList out;
+    for (size_t i = 0; i < modelLanguages.size() && i < 32; ++i) {
+        if (bits & (1u << i)) {
+            for (const QString& l: modelLanguages[i]) {
+                if (!out.contains(l)) {
+                    out << l;
+                }
+            }
+        }
+    }
+    return out;
+}
+
 LineInput LineInput::of(const std::vector<InkStroke>& page, const Layout& layout, const InkLine& line) {
     LineInput in;
     in.hash = line.hash;

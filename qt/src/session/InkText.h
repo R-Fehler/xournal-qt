@@ -19,6 +19,9 @@
  * Readings are kept by their numbers in the dictionary of words (Vocabulary.h: words::idOf), so a term is matched once
  * per distinct word (words::Matches), not per reading.
  *
+ * Several models may read the same handwriting (English and German, hwr/MultiRecognizer.h): their readings of a word
+ * are one list of candidates, each with the models that read it; the matching does not look at them.
+ *
  * LineResult is what a recogniser gives for one line, with boxes relative to the line's origin (its top-left): a line
  * moved by the lasso keeps its result. PageText is a page's lines put together (page points), as DocumentTextIndex
  * keeps it per page next to the PDF text and the text elements.
@@ -56,6 +59,9 @@ struct Candidate {
     /// Its letters and digits, case folded and joined (TextMatch::words): its number in the dictionary (NO_WORD: none)
     words::Id word = words::NO_WORD;
     float p = 0;  ///< its share of the recogniser's guesses for this word (0..1)
+    /// The models that read it, when several read the line (bit i: model i of the set, hwr/MultiRecognizer.h; their
+    /// languages say which language it is); 0: one model read the line
+    uint8_t models = 0;
 };
 
 struct Word {
@@ -74,6 +80,8 @@ QString folded(QStringView text);
 /// What a recogniser read in one line of ink.
 struct LineResult {
     std::vector<Word> words;  ///< left to right; boxes relative to the line's origin
+    /// The models that read the line, when several may (bit i: model i of the set); 0: one model
+    uint32_t models = 0;
     size_t bytes() const;
 };
 

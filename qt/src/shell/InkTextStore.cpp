@@ -70,11 +70,15 @@ QCborMap InkTextStore::encode(const InkDoc& doc) {
             QCborArray word{tenths(w.box.x()), tenths(w.box.y()), tenths(w.box.width()), tenths(w.box.height()),
                             bytes255(w.conf)};
             for (size_t i = 0; i < w.candidates.size(); ++i) {
-                // (the best reading as recognised, the others as their letters: what the search matches)
+                // (the best reading as recognised, the others as their letters: what the search matches; the share
+                // with the models that read it above its 8 bits)
                 word.append(i == 0 ? w.text : words::textOf(w.candidates[i].word));
-                word.append(bytes255(w.candidates[i].p));
+                word.append(bytes255(w.candidates[i].p) | (static_cast<qint64>(w.candidates[i].models) << 8));
             }
             line.append(word);
+        }
+        if (result->models != 0) {
+            line.append(static_cast<qint64>(result->models));  // (the models that read the line: not a word)
         }
         results.append(line);
     }
@@ -101,6 +105,10 @@ std::shared_ptr<InkDoc> InkTextStore::decode(const QCborMap& map) {
         }
         auto result = std::make_shared<ink::LineResult>();
         for (qsizetype k = 1; k < line.size(); ++k) {
+            if (line.at(k).isInteger()) {
+                result->models = static_cast<uint32_t>(line.at(k).toInteger());
+                continue;
+            }
             const QCborArray word = line.at(k).toArray();
             if (word.size() < 7) {
                 continue;
@@ -113,7 +121,10 @@ std::shared_ptr<InkDoc> InkTextStore::decode(const QCborMap& map) {
                 if (i == 5) {
                     w.text = text;
                 }
-                w.candidates.push_back(ink::candidate(text, from255(word.at(i + 1))));
+                const qint64 v = word.at(i + 1).toInteger();
+                ink::Candidate c = ink::candidate(text, static_cast<float>(v & 0xff) / 255.0f);
+                c.models = static_cast<uint8_t>((v >> 8) & 0xff);
+                w.candidates.push_back(c);
             }
             result->words.push_back(std::move(w));
         }

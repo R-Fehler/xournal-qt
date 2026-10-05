@@ -1,6 +1,8 @@
 #include "MultiRecognizer.h"
 
 #include <algorithm>
+#include <bit>
+#include <cmath>
 #include <map>
 
 namespace xqt::hwr {
@@ -11,10 +13,10 @@ MultiRecognizer::MultiRecognizer(std::vector<std::shared_ptr<Recognizer>> member
 
 Capabilities MultiRecognizer::capabilities() const {
     Capabilities c;
-    QStringList ids;
     for (const auto& r: all) {
         const Capabilities m = r->capabilities();
-        ids << m.id;
+        c.models << m.id;
+        c.modelLanguages.push_back(m.languages);
         c.strokes = c.strokes || m.strokes;
         for (const QString& l: m.languages) {
             if (!c.languages.contains(l)) {
@@ -23,7 +25,7 @@ Capabilities MultiRecognizer::capabilities() const {
         }
         c.topK = std::max(c.topK, m.topK);
     }
-    c.id = ids.join(u'+');
+    c.id = c.models.join(u'+');
     return c;
 }
 
@@ -45,32 +47,46 @@ bool MultiRecognizer::ready(QString* why) const {
 }
 
 std::optional<ink::LineResult> MultiRecognizer::recognizeLine(const LineInput& line, const Context& context) {
-    std::vector<std::optional<ink::LineResult>> read(all.size());
-    bool any = false;
+    std::vector<ink::LineResult> read;
     for (size_t i = 0; i < all.size(); ++i) {
         if (context.cancelled && context.cancelled()) {
             return std::nullopt;
         }
         if (!all[i]->ready()) {
+            continue;  // (its lines are read when it is: the line does not have its bit)
+        }
+        auto r = all[i]->recognizeLine(line, context);
+        if (!r) {
+            if (context.cancelled && context.cancelled()) {
+                return std::nullopt;
+            }
             continue;
         }
-        read[i] = all[i]->recognizeLine(line, context);
-        if (!read[i] && context.cancelled && context.cancelled()) {
-            return std::nullopt;
-        }
-        any = any || read[i].has_value();
+        read.push_back(tagged(std::move(*r), i));
     }
-    if (!any) {
+    if (read.empty()) {
         return std::nullopt;
     }
     std::vector<const ink::LineResult*> results;
     for (const auto& r: read) {
-        results.push_back(r ? &*r : nullptr);
+        results.push_back(&r);
     }
     return merge(results, capabilities().topK);
 }
 
+ink::LineResult MultiRecognizer::tagged(ink::LineResult result, size_t member) {
+    const auto bit = static_cast<uint8_t>(member < 8 ? 1u << member : 0u);
+    result.models = bit;
+    for (ink::Word& w: result.words) {
+        for (ink::Candidate& c: w.candidates) {
+            c.models = bit;
+        }
+    }
+    return result;
+}
+
 ink::LineResult MultiRecognizer::merge(const std::vector<const ink::LineResult*>& results, int topK) {
+    ink::LineResult out;
     // Per word box (the members align their readings to the same boxes of the layout)
     struct Box {
         QRectF box;
@@ -81,6 +97,7 @@ ink::LineResult MultiRecognizer::merge(const std::vector<const ink::LineResult*>
         if (!r) {
             continue;
         }
+        out.models |= r->models;
         for (const ink::Word& w: r->words) {
             auto it = std::find_if(boxes.begin(), boxes.end(), [&](const Box& b) {
                 return std::abs(b.box.left() - w.box.left()) < 0.05 && std::abs(b.box.right() - w.box.right()) < 0.05;
@@ -92,28 +109,44 @@ ink::LineResult MultiRecognizer::merge(const std::vector<const ink::LineResult*>
             it->words.push_back(&w);
         }
     }
-    std::sort(boxes.begin(), boxes.end(), [](const Box& a, const Box& b) { return a.box.left() < b.box.left(); });
-    ink::LineResult out;
+    std::stable_sort(boxes.begin(), boxes.end(), [](const Box& a, const Box& b) { return a.box.left() < b.box.left(); });
     for (const Box& b: boxes) {
         ink::Word w;
         w.box = b.box;
-        std::map<words::Id, float> best;  ///< a reading's share: the most any model gave it
+        struct Reading {
+            double miss = 1;  ///< the probability that none of the models that gave it is right
+            uint8_t models = 0;
+            size_t order = 0;  ///< (ties: as the first model listed it)
+        };
+        std::map<words::Id, Reading> readings;
+        size_t order = 0;
+        int sources = 0;
         for (const ink::Word* m: b.words) {
             w.conf = std::max(w.conf, m->conf);
+            uint8_t bits = 0;
             for (const ink::Candidate& c: m->candidates) {
-                float& p = best[c.word];
-                p = std::max(p, c.p);
+                auto [it, fresh] = readings.try_emplace(c.word);
+                if (fresh) {
+                    it->second.order = order;
+                }
+                ++order;
+                it->second.miss *= 1.0 - std::clamp(static_cast<double>(c.p), 0.0, 1.0);
+                it->second.models |= c.models;
+                bits |= c.models;
             }
+            sources += std::max(1, std::popcount(static_cast<unsigned>(bits)));
         }
-        for (const auto& [id, p]: best) {
-            w.candidates.push_back({id, p});
+        for (const auto& [id, r]: readings) {
+            w.candidates.push_back({id, static_cast<float>(1.0 - r.miss), r.models});
         }
-        std::stable_sort(w.candidates.begin(), w.candidates.end(),
-                         [](const ink::Candidate& x, const ink::Candidate& y) { return x.p > y.p; });
-        if (w.candidates.size() > static_cast<size_t>(std::max(1, topK))) {
-            w.candidates.resize(static_cast<size_t>(std::max(1, topK)));
+        std::stable_sort(w.candidates.begin(), w.candidates.end(), [&](const ink::Candidate& x, const ink::Candidate& y) {
+            return x.p != y.p ? x.p > y.p : readings[x.word].order < readings[y.word].order;
+        });
+        const size_t keep = static_cast<size_t>(std::max(1, topK)) * static_cast<size_t>(std::max(1, sources));
+        if (w.candidates.size() > keep) {
+            w.candidates.resize(keep);
         }
-        // The best reading as one of the models wrote it
+        // The best reading as the model that gave it wrote it
         for (const ink::Word* m: b.words) {
             if (!w.candidates.empty() && !m->candidates.empty() && m->candidates.front().word == w.candidates.front().word) {
                 w.text = m->text;
