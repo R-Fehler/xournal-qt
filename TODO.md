@@ -31,7 +31,7 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
         Firefox, Okular, Evince, with the sample `~/xournal_qt_workspace/samples/hybrid-sample.pdf`. See the
         device checklist.
       - [ ] Not handled yet: a page deleted in another app; encrypted, rotated or cropped source PDFs (in code,
-        untested); audio attachments; a "has notes" badge. Writing into the PDF itself renames over the file
+        untested); a "has notes" badge (audio attachments: done in `qt/audio`). Writing into the PDF itself renames over the file
         while it is read, which may fail on Windows.
    3. ~~`qt/hybrid-flow`~~: merged 2026-09-24 (see ROADMAP). Left: a hybrid flag in the index, since same-name `.xopp` + PDF pairs now get one qpdf check per listing. As planned:
       - **Save as with a format choice:** "Xournal notes (.xopp)" or "PDF with notes, editable (.pdf)", replacing the
@@ -558,9 +558,12 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   shared, viewed and copied to other libraries; a sticker tool opens a grid (last used or own order, subfolders);
   choosing one pastes it into the page, selected. Grouping elements: upstream has none, so a proposal for how a
   group can be stored without breaking `.xopp` in upstream.
-- [?] `qt/audio`: recordings tied to pages or strokes, compatible with upstream's audio (`ts`/`fn` on strokes and
+- [x] `qt/audio`: recordings tied to pages or strokes, compatible with upstream's audio (`ts`/`fn` on strokes and
   texts). In a PDF with notes the audio files are attachments with the page number in their names, so they can be
-  found without the app.
+  found without the app. Built (qt/docs/audio.md). Left: build and check the Qt Multimedia backend (the cloud env
+  has no Qt Multimedia: add conda-forge `qt6-multimedia`), the Android/macOS parts and the device checks; the play
+  tool's fading of ink without a recording, a speaker chip on pages/thumbnails, "Play from here" in the selection
+  pill, a settings field for Xournal++'s audio folder.
 - [x] `qt/hwr-search`: an MVP of handwriting search on Linux from the research (`qt/docs/research/
   handwriting-recognition.md`): search only, no training on user data, fuzzy matching over the model's candidates.
   Where the results live: the library's dot folder cache, the `.xopp`, and an invisible text layer in PDFs with
