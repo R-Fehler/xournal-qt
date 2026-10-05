@@ -1069,6 +1069,16 @@
   Left: the device checks (Explorer, Finder, Android and iOS Files, 7-Zip and Keka with a password); the platform
   share sheet for the zip on Android.
 
+- **The rail fills its room, `qt/rail-fill` (2026-10-05).** The author on 0.6.0, a Galaxy Fold 7 unfolded: the rail
+  showed one item with plenty of room. The plan followed the rail's length alone: a change of the insets at one size
+  (the insets of a phone unfolded arriving after its new size, the navigation bar or task bar) kept the plan of before,
+  so the rail stayed all stacks with half of it empty, or cut its last cells off; and it counted 22 px more room than
+  the middle had (at 900 × 1000 with the touch profile the last tool was cut off and the rail scrolled). Now the plan's
+  length is the middle's room as laid out (every change of the length, the insets, the keyboard or the tail plans
+  anew; 16 px only against flicker), and what a fold frees beyond the need goes back to the sections before it, then to
+  the fixed tools. Tested at the Fold's sizes with the touch profile and a phone's insets, and folded → unfolded →
+  turned → folded ([toolbox.md](toolbox.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

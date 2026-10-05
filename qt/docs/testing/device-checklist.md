@@ -3039,6 +3039,12 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
       screen. F5: it stays (write on the slides); the corner field hides it and shows it again.
 - [ ] Phone (Fold 7 folded): the dock has undo, redo, the first tools, "My tools", the page number; the tool in hand is
       always in the dock; "My tools" lists all, "Add a tool" works; sideways the dock is a rail at the right.
+- [ ] The rail fills its room (qt/rail-fill), Fold 7: open a document folded (the dock: as many tools as fit, then "My
+      tools"), unfold: the rail at the right shows every tool of the first start on its own (at most the last fixed
+      tools in one stack), no empty stretch longer than a tool and no tool cut off at its end. Turn it (landscape): a
+      section may fold into a stack, the rail still full. Fold it again: the dock; unfold again: the same rail as
+      before. Open the keyboard (a text box) and close it: the rail folds and comes back. With the task bar shown and
+      hidden (One UI's setting): the rail follows.
 - [ ] The command bar at 1920 has share, print, bookmark, favourite as buttons and ⋮ does not list them; at 1024 they
       are back in ⋮.
 - [ ] A `.md` document at 1366: undo and redo at the start of the format bar, search, full screen, save before »;

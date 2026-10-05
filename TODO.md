@@ -819,11 +819,13 @@ user. Also when replay is on the classic toolbar appears again."
 ### The rail on an unfolded phone (the author, 2026-10-05, on 0.6.0; `qt/rail-fill`)
 "On an unfolded / wide android phone the rail is just showing one item although there is plenty space on the rail.
 I would expect the toolbelt rail to fill up the space and maybe even allow scrolling of the rail on bigger screens."
-- [ ] Bug: reproduce at the Fold 7's sizes (900×1000 unfolded, 1000×900 turned, Android's scale and safe areas) and
-  fix why the rail shows one item.
-- [ ] The rail always uses the room it has: every tool on its own while they fit; when they do not, sections fold into
+- [x] Bug: reproduce at the Fold 7's sizes (900×1000 unfolded, 1000×900 turned, Android's scale and safe areas) and
+  fix why the rail shows one item. (The plan followed the rail's length alone: insets changing at one size kept the
+  old plan, and it counted 22 px too much room. Left: the check on the device.)
+- [x] The rail always uses the room it has: every tool on its own while they fit; when they do not, sections fold into
   stacks one by one (as designed); scrolling only as the last resort. The phone dock likewise shows as many tools as
-  fit.
+  fit. (Freed room goes back to earlier sections, then the fixed tools. Left: the dock held sideways has room for one
+  or two tools beside undo, redo, "My tools" and the page number.)
 
 ### Recording on Windows, macOS and Android (the author, 2026-10-05; `qt/audio-platforms`)
 The release packages for Windows, macOS and Android were built without Qt Multimedia, so they offer no recording and

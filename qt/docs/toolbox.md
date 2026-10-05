@@ -53,14 +53,26 @@ it records. The recording and playback pills sit at the top of the page, below t
 
 ## Short rails
 
-`ToolboxPlan.js` is a pure function of the rail's length and its sections. When the tools do not fit, sections fold
+The rail always uses all the room it has: every tool on its own while they fit; when they do not, sections fold into
+stacks one by one (each tool stays one tap away, nothing is hidden off the rail); only when everything is folded and
+it still does not fit, the middle scrolls. On a phone the dock likewise shows as many of the user's tools as fit, then
+"My tools".
+
+`ToolboxPlan.js` is a pure function of the room of the rail's middle and its sections. When the tools do not fit, sections fold
 into **stacks**, one by one: the fixed tools first, from their end (qt/copy-tools: the last two go into one stack
 after the others, then one more at a time until all are in it; the stack shows the one of them in use; a tap lists
 them), then the user's sections from the end. At 1920×1080 with the first tools the mark-PDF-text button and the
 finger switch (and recording) are in that stack; at 1200 px high everything is on its own. A stack shows the entry of its section used last (the one in hand if it is there) with
 dots for how many it holds; a tap takes it, a tap on it while it is in hand or a long press opens the section's list
-beside it. Only when everything is folded and it still does not fit, the middle scrolls. A rail that grows unfolds only
-with 16 px to spare (no flicker at an edge).
+beside it. What a fold frees beyond the need goes back: first to the user's sections before it (from the start), then
+to the fixed tools, one at a time. Only when everything is folded and it still does not fit, the middle scrolls.
+
+The plan's length is the room the middle has as laid out (`Toolbox.middleRoom`: the rail's length less the grip, the
+head, the tail, the gaps and the insets at its ends), and the plan is made anew on every change of it: a resize,
+folding or unfolding a phone, turning it, a change of the safe area (the navigation bar, a task bar), the soft
+keyboard, another edge, the dock becoming a rail. A rail that grows unfolds only with 16 px to spare (no flicker at an
+edge); nothing else keeps a plan of before (qt/rail-fill: the plan followed the rail's length alone, so the insets of
+a Fold 7 unfolded, which arrive after its new size, left it folded with half the rail empty).
 
 ## Where it is
 
@@ -229,7 +241,10 @@ tools. The last eraser cannot be removed.
 them there), the text tools' cycle. `ToolboxModel.*` and `ToolboxApply.*` (`-L shell`), `ViewSnapping.*` (`-L canvas`), `ToolboxTest.*` (`-L ui`): docked
 at the right with undo / redo and the fixed tools, a tap and the tool in hand, the edges per size class, stacks in a
 short rail, the classic bar back, the editor, "+", the menu, carrying a tool and the grip, full screen and presenting,
-the phone's dock and sheet, the command bar's promoted entries, a text document's format bar, reading.
+the phone's dock and sheet, the command bar's promoted entries, a text document's format bar, reading; the rail fills
+its room at the Fold 7's sizes (900 × 1000, 1000 × 900, the dock at 412 × 915 and 915 × 412) with the touch profile,
+with and without a phone's insets, and plans anew when folded, unfolded, turned and when the insets change at one
+size (`theRailFillsItsRoomAtTheFoldsSizes`, `theRailPlansAnewWhenThePhoneIsFoldedUnfoldedAndTurned`).
 `ToolboxAudioTest.*` (fake microphone): the record button among the fixed tools and not in the command bar, the
 recording pill clear of the rail, docked and floating at the top in full screen (the stack shows the recording), the
 phone's sheet; `ToolboxNoAudioTest.*`: without an audio backend nothing offers recording.

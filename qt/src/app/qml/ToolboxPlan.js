@@ -1,11 +1,12 @@
 // What the toolbox shows in the room it has (qt/docs/toolbox.md, "Short rails"): a pure function of the rail's length
 // and its sections. The head (undo, redo) and the tail ("+", ⋯) are pinned; in between are the user's sections (split
-// at the dividers) and the fixed tools (hand, select, snip, write on the page, …). When they do not fit, sections
-// become stacks, one by one: the fixed tools first, from their end (the last ones go into one stack after the others,
-// one more at a time, until all of them are in it; qt/copy-tools), then the user's sections from the end. A stack takes one cell: the entry
-// used last of that section (the active one, if it is there) with dots for how many it holds; a tap uses it, a tap
-// again or a long press opens its list. Only when every section is a stack and it still does not fit, the middle
-// scrolls.
+// at the dividers) and the fixed tools (hand, select, snip, write on the page, …). The rail uses all the room it has:
+// every tool on its own while they fit. When they do not, sections become stacks, one by one: the fixed tools first,
+// from their end (the last ones go into one stack after the others, one more at a time, until all of them are in it;
+// qt/copy-tools), then the user's sections from the end; what a fold freed beyond the need goes back to the sections
+// before it, then to the fixed tools (qt/rail-fill). A stack takes one cell: the entry used last of that section (the
+// active one, if it is there) with dots for how many it holds; a tap uses it, a tap again or a long press opens its
+// list. Only when every section is a stack and it still does not fit, the middle scrolls.
 .pragma library
 
 /// input: { length, cell, divider (the room a divider takes), head (cells), tail (cells),
@@ -31,6 +32,22 @@ function plan(input) {
         fixedShown = fixedShown === input.fixed ? Math.max(0, input.fixed - 2) : fixedShown - 1
     for (let i = sections.length - 1; i >= 0 && need() > room; --i) {
         if (sections[i] > 1) folded[i] = true
+    }
+    // A section folded may have freed more than was needed: the room left goes back, to the user's sections first
+    // (from the start: the tools one reaches for first), then to the fixed tools, one at a time
+    for (let i = 0; i < sections.length; ++i) {
+        if (!folded[i]) continue
+        folded[i] = false
+        if (need() > room) folded[i] = true
+    }
+    while (fixedShown < input.fixed) {
+        const was = fixedShown
+        // (all but one on their own and the stack take as much room as all of them)
+        fixedShown = was + 1 >= input.fixed - 1 ? input.fixed : was + 1
+        if (need() > room) {
+            fixedShown = was
+            break
+        }
     }
     const n = need()
     return { folded: folded, fixedShown: fixedShown, fixedFolded: fixedShown < input.fixed, scroll: n > input.length,

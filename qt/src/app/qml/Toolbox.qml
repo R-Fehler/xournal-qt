@@ -5,8 +5,9 @@
 //   middle the user's tools, in sections (dividers between them); then the fixed tools (hand, select, write on the
 //          page, setsquare and curtain, mark PDF text, the finger draws: the window's own buttons, lent to the rail)
 //   tail   "+" (add a tool), ⋯ (full screen: what the tab strip and the command bar hold there) (pinned)
-// When the rail is short, sections fold into stacks (ToolboxPlan.js): the fixed tools first, then the user's sections
-// from the end. A stack shows the entry used last of its section; a tap uses it, a tap again or a long press opens the
+// The rail uses all the room it has: every tool on its own while they fit; when they do not, sections fold into stacks
+// (ToolboxPlan.js): the fixed tools first, then the user's sections from the end; only when all are folded the middle
+// scrolls. A stack shows the entry used last of its section; a tap uses it, a tap again or a long press opens the
 // section's list. The entry in hand is always shown.
 // A tap on a tool picks it up (AppController::applyToolEntry); a tap on the one in hand opens its editor; a long press
 // or a right click its menu; the wheel over it changes its width.
@@ -75,20 +76,33 @@ Rectangle {
     property var plan: ({ folded: [], fixedFolded: false, scroll: false })
     property var lastPlanInput: null
     readonly property real length: vertical ? height : width
-    readonly property var planKey: [length, cell, sections.map(function(s) { return s.length }).join(","),
-                                    fixedButtons.length, moreShown]
+    /// What the rail takes along its length besides the middle: its start (an inset, the grip), the head, the gaps, the
+    /// tail, the inset at its end and the middle's own margin. None of it depends on the rail's length.
+    readonly property real overhead: (vertical ? headGrid.y + headGrid.height : headGrid.x + headGrid.width) + 9 + 9
+                                     + (vertical ? tailGrid.height : tailGrid.width) + 4 + endInset + 8
+    /// The room the middle has for its cells as laid out now: the plan's length (qt/rail-fill: the plan followed the
+    /// rail's length alone, 22 px more than the middle really had, and a change of the insets at one length — the
+    /// navigation bar, the insets of a phone unfolded arriving after its new size — left the plan of before: the rail
+    /// stayed folded with the room to spare, or cut its last cells off)
+    readonly property real middleRoom: length - overhead
+    readonly property var planKey: [middleRoom, cell, sections.map(function(s) { return s.length }).join(","),
+                                    fixedButtons.length]
     onPlanKeyChanged: Qt.callLater(relayout)
     Component.onCompleted: { relayout(); syncItems() }
+    function planInput(room) {
+        return { length: room, cell: cell, divider: 9, head: 0, tail: 0,
+                 sections: sections.map(function(s) { return s.length }), fixed: fixedButtons.length, slack: 0 }
+    }
+    /// The plan anew for the room there is: on every change of it (a resize, folding or unfolding the phone, turning
+    /// it, the safe area, the keyboard, another edge). A rail that grows unfolds only with 16 px to spare, against
+    /// flicker at an edge; nothing else keeps a plan of before.
     function relayout() {
-        const input = {
-            length: length - startInset - endInset - 22, cell: cell, divider: 9, head: 2, tail: moreShown ? 2 : 1,
-            sections: sections.map(function(s) { return s.length }), fixed: fixedButtons.length, slack: 0
-        }
+        const input = planInput(middleRoom)
         let p = ToolboxPlan.plan(input)
-        // (a rail that grows unfolds only with room to spare: no flicker at an edge)
         const last = lastPlanInput
-        if (plan && last && last.sections.join() === input.sections.join() && last.fixed === input.fixed
-                && input.length > last.length && ToolboxPlan.cells(input, p) > ToolboxPlan.cells(last, plan)) {
+        if (plan && plan.need !== undefined && last && last.sections.join() === input.sections.join()
+                && last.fixed === input.fixed && last.cell === input.cell && input.length > last.length
+                && ToolboxPlan.cells(input, p) > ToolboxPlan.cells(last, plan)) {
             const lean = ToolboxPlan.plan(Object.assign({}, input, { slack: 16 }))
             if (ToolboxPlan.cells(input, lean) <= ToolboxPlan.cells(last, plan) && plan.need <= input.length)
                 p = plan
@@ -98,10 +112,7 @@ Rectangle {
         placeFixed()
     }
     /// Its length with nothing folded (a floating rail is no longer than that)
-    readonly property real naturalLength: ToolboxPlan.plan({
-        length: 1e9, cell: cell, divider: 9, head: 2, tail: moreShown ? 2 : 1,
-        sections: sections.map(function(s) { return s.length }), fixed: fixedButtons.length, slack: 0
-    }).need + 22 + startInset + endInset
+    readonly property real naturalLength: ToolboxPlan.plan(planInput(1e9)).need + overhead
     /// The items of the middle part: entries, dividers, stacks
     readonly property var itemsNow: {
         const out = []
@@ -109,8 +120,7 @@ Rectangle {
         if (compact) {
             // As many of the user's tools as fit, in their order; the one in hand replaces the last if it is further on
             const all = store.tools()
-            const room = (vertical ? middle.height : middle.width) - 8
-            const n = Math.max(0, Math.min(all.length, Math.floor(room / cell)))
+            const n = Math.max(0, Math.min(all.length, Math.floor(middleRoom / cell)))
             let shown = all.slice(0, n)
             const inHandAt = all.findIndex(function(e) { return e.id === act })
             if (n > 0 && inHandAt >= n) shown[n - 1] = all[inHandAt]
