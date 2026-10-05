@@ -17,6 +17,9 @@ AdaptiveDialog {
     property int bgIndex: 0
     property int paper: -1  // -1: like the page
     property bool landscape: false
+    /// The paper (qt/docs/dark-pages.md): like the page, a page of the PDF: the paper of new pages
+    property color paperColor: "#ffffff"
+    property bool textured: false
     /// "From a template": the template's file ("": new pages)
     property bool fromTemplate: false
     property string templatePath: ""
@@ -32,6 +35,8 @@ AdaptiveDialog {
         const current = app.currentPageFormat()
         bgIndex = current.background >= 0 ? current.background : Math.max(0, app.settings.get("pageBackground"))
         landscape = current.landscape === true
+        paperColor = current.pdf === false ? current.paper : app.settings.get("pageColor")
+        textured = current.pdf === false ? current.textured === true : app.settings.get("pageTexture") === true
         paper = -1
         countBox.value = 1
         fromTemplate = false
@@ -44,7 +49,8 @@ AdaptiveDialog {
             }
             app.insertTemplate(templatePath, after ? page + 1 : page, countBox.value)
         } else {
-            app.insertPages(after ? page + 1 : page, bgIndex, paper, landscape, countBox.value)
+            app.insertPages(after ? page + 1 : page, bgIndex, paper, landscape, countBox.value, paperColor,
+                            textured ? 1 : 0)
         }
         dlg.close()
     }
@@ -113,7 +119,16 @@ AdaptiveDialog {
             Layout.fillWidth: true
             selected: dlg.bgIndex
             landscape: dlg.landscape
+            paper: dlg.paperColor
             onChosen: function(index) { dlg.bgIndex = index }
+        }
+        PaperSwatches {
+            visible: !dlg.fromTemplate
+            Layout.fillWidth: true
+            paper: dlg.paperColor
+            textured: dlg.textured
+            onChosen: function(c) { dlg.paperColor = c }
+            onTexturedToggled: function(on) { dlg.textured = on }
         }
         // Paper and orientation, then how many and where: in two rows each in a narrow window (a phone)
         GridLayout {

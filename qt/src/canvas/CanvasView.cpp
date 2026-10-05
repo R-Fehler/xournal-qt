@@ -13,6 +13,7 @@
 #include <QDateTime>
 #include <QThreadPool>
 
+#include "PagePictures.h"
 #include "control/PdfCache.h"
 #include "model/LineStyle.h"
 #include "model/Point.h"
@@ -203,6 +204,14 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
 
     updateRenderParams();
     CanvasMemory::instance().add(this);
+}
+
+PdfPictures& CanvasView::pdfPictures() {
+    if (!pictures) {
+        pictures = std::make_unique<PdfPictures>();
+        connect(pictures.get(), &PdfPictures::known, this, &CanvasView::updateRequested);
+    }
+    return *pictures;
 }
 
 CanvasView::~CanvasView() {

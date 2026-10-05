@@ -92,6 +92,9 @@ class DocumentCanvasItem: public QQuickItem {
     /// A sticky note's text is written with the cursor below the note's bottom: where the note is (item coordinates;
     /// empty otherwise). The window says that the text is longer than the note (qt/docs/sticky-notes.md).
     Q_PROPERTY(QRectF noteTextHint READ noteTextHint NOTIFY noteTextHintChanged)
+    /// Dark pages (qt/docs/dark-pages.md): the pages shown dark, their pictures kept, ink in its dark equivalent. Only
+    /// what is shown: the document does not change.
+    Q_PROPERTY(bool darkPages READ darkPages WRITE setDarkPages NOTIFY darkPagesChanged)
 public:
     explicit DocumentCanvasItem(QQuickItem* parent = nullptr);
     ~DocumentCanvasItem() override;
@@ -107,6 +110,10 @@ public:
     void setReadingOnly(bool on);
     bool rotatable() const { return turnable; }
     void setRotatable(bool on);
+    bool darkPages() const { return darkShown; }
+    void setDarkPages(bool on);
+    /// The last frame turned dark pages dark on the GPU (a shader), not on the CPU (tests)
+    Q_INVOKABLE bool darkOnGpuShown() const { return darkOnGpu; }
 
     QString mathError() const { return mathErrorText; }
     QVariantMap hoveredLink() const { return linkShown; }
@@ -211,6 +218,7 @@ Q_SIGNALS:
     void edgeTapped(int side);
     void snapVerticallyChanged();
     void rotatableChanged();
+    void darkPagesChanged();
     void mathErrorChanged();
     void hoveredLinkChanged();
     void hoveredLinkPointerChanged();
@@ -291,6 +299,8 @@ private:
     qreal edgeWidth = 0;
     bool verticalSnap = false;
     bool turnable = true;
+    bool darkShown = false;
+    std::atomic<bool> darkOnGpu{false};
     bool mouseElsewhere = false;  ///< a mouse drag that began outside the canvas (e.g. on a scroll bar)
     QTimer hoverTimer;            ///< the mouse rests (mouseHovers)
     QPointF hoverScenePos;

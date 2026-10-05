@@ -4,15 +4,19 @@ import QtQuick
 Canvas {
     id: preview
     property string format: "plain"
-    property color lineColor: "#8fb4dc"
+    /// The paper's color; on dark paper the lines are light
+    property color paper: "#ffffff"
+    readonly property bool darkPaper: (0.2126 * paper.r + 0.7152 * paper.g + 0.0722 * paper.b) < 0.45
+    property color lineColor: darkPaper ? Qt.lighter(paper, 2.2) : "#8fb4dc"
     onFormatChanged: requestPaint()
+    onPaperChanged: requestPaint()
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()
 
     onPaint: {
         const ctx = getContext("2d")
         ctx.reset()
-        ctx.fillStyle = "#ffffff"
+        ctx.fillStyle = paper
         ctx.fillRect(0, 0, width, height)
         ctx.strokeStyle = lineColor
         ctx.fillStyle = lineColor

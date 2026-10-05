@@ -3,6 +3,7 @@
 #include "EmojiNames.h"
 #include "AdaptiveLayout.h"
 #include "TouchGestures.h"
+#include "DarkTileMaterial.h"
 
 #include <algorithm>
 #include <cmath>
@@ -27,6 +28,7 @@
 #include <QPixmap>
 #include <QQuickWindow>
 #include <QSGClipNode>
+#include <QSGRendererInterface>
 #include <QSGFlatColorMaterial>
 #include <QSGGeometry>
 #include <QSGSimpleRectNode>
@@ -41,6 +43,7 @@
 #include "CanvasInput.h"
 #include "InputLog.h"
 #include "CanvasPage.h"
+#include "DarkPages.h"
 #include "Perf.h"
 #include "MarkdownBoxResize.h"
 #include "CanvasView.h"
@@ -70,6 +73,35 @@ constexpr int HOVER_RESTS_MS = 400;
 class TileNode final: public QSGSimpleTextureNode {
 public:
     ~TileNode() override { delete texture(); }
+    /// Shown dark on the GPU (dark pages: DarkTileMaterial) with `table`, or as it is (nullptr). Call again after
+    /// setTexture.
+    void setDark(QSGTexture* table) {
+        if (!light) {
+            light = material();
+            lightOpaque = opaqueMaterial();
+        }
+        if (!table) {
+            if (material() != light) {
+                setMaterial(light);
+                setOpaqueMaterial(lightOpaque);
+                markDirty(QSGNode::DirtyMaterial);
+            }
+            return;
+        }
+        if (material() != &dark || dark.tile != texture() || dark.table != table) {
+            dark.tile = texture();
+            dark.table = table;
+            setMaterial(&dark);
+            setOpaqueMaterial(&dark);
+            markDirty(QSGNode::DirtyMaterial);
+        }
+    }
+    bool shownDark() const { return material() == &dark; }
+    DarkTileMaterial dark;
+
+private:
+    QSGMaterial* light = nullptr;
+    QSGMaterial* lightOpaque = nullptr;
 };
 
 /// Scene graph of one page: a transform (position, and buffer zoom -> current zoom) with texture tiles.
@@ -98,7 +130,9 @@ public:
         cols = rows = 0;
     }
     /// The page's preview (drawn in advance) over the whole page, until it is rendered; null image: none
-    void showPreview(QQuickWindow* window, const QImage& image, QSizeF size) {
+    /// `cpuDark`: the preview turned dark on the CPU first (dark pages on the software renderer; on the GPU the
+    /// caller sets the preview's material)
+    void showPreview(QQuickWindow* window, const QImage& image, QSizeF size, bool cpuDark = false) {
         if (image.isNull()) {
             hidePreview();
             return;
@@ -108,12 +142,17 @@ public:
             preview->setFiltering(QSGTexture::Linear);
         }
 
-        if (previewKey != image.cacheKey()) {
+        if (previewKey != image.cacheKey() || previewDark != cpuDark) {
             xqt::Perf::add(xqt::Perf::Previews);
             QSGTexture* previous = preview->texture();
-            preview->setTexture(window->createTextureFromImage(image, QQuickWindow::TextureIsOpaque));
+            QImage shown = image;
+            if (cpuDark) {
+                xqt::dark::apply(shown, tone.paper);
+            }
+            preview->setTexture(window->createTextureFromImage(shown, QQuickWindow::TextureIsOpaque));
             delete previous;
             previewKey = image.cacheKey();
+            previewDark = cpuDark;
         }
         preview->setRect(QRectF(QPointF(0, 0), size));
         if (!preview->parent()) {
@@ -138,6 +177,12 @@ public:
     std::vector<TileNode*> tiles;
     TileNode* preview = nullptr;
     qint64 previewKey = 0;
+    bool previewDark = false;
+    /// Dark pages: how the page is shown (CanvasPage::darkTone; not dark: as it is), and whether its tiles are turned
+    /// dark on the GPU (else on the CPU when composed)
+    xqt::CanvasPage::DarkTone tone;
+    bool toneOnGpu = false;
+    QSGTexture* darkTable = nullptr;  ///< (the root's, while toneOnGpu)
     int cols = 0, rows = 0;
     double bufferZoom = 0;
     double dpiScale = 0;
@@ -402,7 +447,12 @@ public:
     double selectionZoom = 0;
     double selectionDpr = 0;  ///< the pixel ratio it was drawn for (a window moved to another screen: drawn anew)
     QRectF selectionRegion;   ///< in the selection page's view pixels (whole device pixels)
+    bool selectionDark = false;  ///< drawn dark (dark pages)
     std::unordered_map<const xqt::CanvasPage*, PageNode*> pages;
+    /// Dark pages on the GPU: the table (DarkPages.h) as a texture, made anew when it changes
+    QSGTexture* darkTable = nullptr;
+    quint64 darkTableGeneration = ~quint64(0);
+    ~CanvasRootNode() override { delete darkTable; }
 };
 
 QRect tileRect(int index, int cols, QSize pixelSize) {
@@ -969,6 +1019,15 @@ void DocumentCanvasItem::setEdgeTapWidth(qreal px) {
     Q_EMIT edgeTapWidthChanged();
 }
 
+void DocumentCanvasItem::setDarkPages(bool on) {
+    if (on == darkShown) {
+        return;
+    }
+    darkShown = on;
+    update();  // (no page is drawn again: the tiles are turned dark where they are composed)
+    Q_EMIT darkPagesChanged();
+}
+
 void DocumentCanvasItem::setRotatable(bool on) {
     if (on == turnable) {
         return;
@@ -1530,8 +1589,11 @@ void DocumentCanvasItem::updateSelectionNode(QSGNode* rootNode, double zoom, dou
     // Where the page's tiles are: on a whole device pixel
     const QRectF pageRect = canvasView->pageViewRect(*idx);
     const QPointF pageOrigin(snap(pageRect.x(), dpr), snap(pageRect.y(), dpr));
+    // Dark pages: the selection's picture as its page is shown (on the CPU: it is drawn only when it changes)
+    xqt::CanvasPage* selPage = canvasView->getPage(*idx);
+    const xqt::CanvasPage::DarkTone tone = darkShown && selPage ? selPage->darkTone() : xqt::CanvasPage::DarkTone{};
     if (!root->selection || root->selectionRevision != canvasView->selectionRevision() || root->selectionZoom != zoom ||
-        root->selectionDpr != dpr) {
+        root->selectionDpr != dpr || root->selectionDark != tone.dark) {
         // Upstream's XournalWidget draws the selection in its page's pixel coordinates: selection->paint(cr, zoom).
         // Render the part around it (handles, rotation) into a texture, of whole device pixels from the page's top
         // left (so it lands on the screen's pixels as the tiles do, also at 125 % or 150 %).
@@ -1553,6 +1615,10 @@ void DocumentCanvasItem::updateSelectionNode(QSGNode* rootNode, double zoom, dou
         canvasView->boxResize().paintOverSelection(cr, zoom);  // (a Markdown text box: its right knob sets the width)
         cairo_destroy(cr);
         cairo_surface_destroy(surface);
+        if (tone.dark) {
+            xqt::dark::apply(img, tone.paper);
+        }
+        root->selectionDark = tone.dark;
         const bool fresh = !root->selection;
         if (fresh) {
             root->selection = new TileNode;
@@ -1881,6 +1947,22 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
     };
     bool more = false;  // tiles left for the next frame
 
+    // Dark pages (qt/docs/dark-pages.md): the tiles turned dark where they are composed, by a shader (one lookup in a
+    // table per pixel; the software renderer has no shaders: the same table on the CPU, when a tile is composed)
+    const bool gpu = DarkTileMaterial::available() && window() &&
+                     window()->rendererInterface()->graphicsApi() != QSGRendererInterface::Software;
+    QSGTexture* darkTable = nullptr;
+    if (darkShown && gpu) {
+        const quint64 generation = xqt::dark::tableGeneration();
+        if (!root->darkTable || root->darkTableGeneration != generation) {
+            delete root->darkTable;
+            root->darkTable = window()->createTextureFromImage(xqt::dark::table());
+            root->darkTableGeneration = generation;
+        }
+        darkTable = root->darkTable;
+    }
+    darkOnGpu = gpu;
+
     std::unordered_map<const xqt::CanvasPage*, PageNode*> keep;
     for (size_t i = first; i <= last && i < canvasView->pageCount(); ++i) {
         xqt::CanvasPage* page = canvasView->getPage(i);
@@ -1898,6 +1980,35 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
 
         const QRectF r = canvasView->pageViewRect(i);
         const auto info = page->bufferInfo();
+        // How it is shown dark (not at all: as it is)
+        const xqt::CanvasPage::DarkTone tone = darkShown ? page->darkTone() : xqt::CanvasPage::DarkTone{};
+        const bool toneOnGpu = tone.dark && darkTable;
+        const bool wasCpuDark = node->tone.dark && !node->toneOnGpu;
+        const bool toneChanged = !(tone == node->tone) || toneOnGpu != node->toneOnGpu ||
+                                 (toneOnGpu && node->darkTable != darkTable);
+        node->tone = tone;
+        node->toneOnGpu = toneOnGpu;
+        node->darkTable = darkTable;
+        const bool cpuDark = tone.dark && !toneOnGpu;
+        {
+            const QColor paper = tone.dark ? QColor(xqt::dark::darkPaper()) : QColor(Qt::white);
+            if (node->placeholder->color() != paper) {
+                node->placeholder->setColor(paper);
+            }
+        }
+        // A tile (or the preview) on the GPU: dark with the pictures in it kept, or as it is
+        const auto gpuTone = [&](TileNode* tile, std::vector<QRectF> keepRects) {
+            tile->setDark(toneOnGpu ? darkTable : nullptr);
+            if (toneOnGpu) {
+                const QRgb p = tone.paper;
+                const auto k = [](int v) { return 255.0f / static_cast<float>(std::max(v, 16)); };
+                const QVector4D balance(k(qRed(p)), k(qGreen(p)), k(qBlue(p)), 1);
+                if (tile->dark.setKeep(keepRects) || tile->dark.balance != balance) {
+                    tile->dark.balance = balance;
+                    tile->markDirty(QSGNode::DirtyMaterial);
+                }
+            }
+        };
         bool all = false;
         std::vector<QRect> dirty;
         if (info.valid) {
@@ -1914,7 +2025,10 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             node->placeholder->setRect(QRectF(QPointF(0, 0), r.size()));
             node->shadow->setRect(QRectF(QPointF(2, 2), r.size()));
             // Not rendered yet: its preview (drawn in advance, never in front of the page), else white
-            node->showPreview(window(), canvasView->preview(i), r.size());
+            node->showPreview(window(), canvasView->preview(i), r.size(), cpuDark);
+            if (node->preview) {
+                gpuTone(node->preview, {});
+            }
             continue;
         }
         const double scale = zoom / info.zoom;
@@ -1946,7 +2060,8 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
                 node->tiles.push_back(tile);
             }
             node->composed.assign(node->tiles.size(), false);
-        } else if (all) {
+        } else if (all || (toneChanged && (cpuDark || wasCpuDark))) {
+            // (dark pages on the CPU: composed anew, dark or as they are)
             node->composed.assign(node->tiles.size(), false);
         } else {
             for (const QRect& d: dirty) {
@@ -1958,6 +2073,35 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
                             node->composed[static_cast<size_t>(t)] = false;
                         }
                     }
+                }
+            }
+        }
+        // The pictures kept (dark pages) in a tile: its pixels
+        const auto keptIn = [&](const QRect& px) {
+            std::vector<QRectF> out;
+            for (const QRectF& k: tone.keep) {
+                const QRectF b((k.left() * info.zoom - origin.x()) * info.dpiScale - px.x(),
+                               (k.top() * info.zoom - origin.y()) * info.dpiScale - px.y(),
+                               k.width() * info.zoom * info.dpiScale, k.height() * info.zoom * info.dpiScale);
+                const QRectF in = b.intersected(QRectF(0, 0, px.width(), px.height()));
+                if (!in.isEmpty()) {
+                    out.push_back(in);
+                }
+            }
+            return out;
+        };
+        const auto texCoords = [](std::vector<QRectF> rects, const QRect& px) {
+            for (QRectF& k: rects) {
+                k = QRectF(k.x() / px.width(), k.y() / px.height(), k.width() / px.width(), k.height() / px.height());
+            }
+            return rects;
+        };
+        if (toneChanged && !cpuDark) {
+            // On the GPU (or as they are): the composed tiles keep their pictures, only their material changes
+            for (int t = 0; t < static_cast<int>(node->tiles.size()); ++t) {
+                if (node->composed[static_cast<size_t>(t)]) {
+                    const QRect px = tileRect(t, node->cols, info.pixelSize);
+                    gpuTone(node->tiles[static_cast<size_t>(t)], texCoords(keptIn(px), px));
                 }
             }
         }
@@ -1981,10 +2125,18 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             }
             --tileBudget;
             TileNode* tile = node->tiles[static_cast<size_t>(t)];
-            const QImage img = page->composeTile(px);
+            QImage img = page->composeTile(px);
+            if (cpuDark) {
+                std::vector<QRect> kept;
+                for (const QRectF& k: keptIn(px)) {
+                    kept.push_back(k.toAlignedRect());
+                }
+                xqt::dark::apply(img, tone.paper, kept);
+            }
             QSGTexture* previous = tile->texture();
             tile->setTexture(window()->createTextureFromImage(img, QQuickWindow::TextureIsOpaque));
             delete previous;
+            gpuTone(tile, texCoords(keptIn(px), px));
             node->composed[static_cast<size_t>(t)] = true;
             xqt::Perf::add(xqt::Perf::Tiles);
             ++statTiles;
@@ -2003,7 +2155,10 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             uncovered = !inView.isEmpty() && !drawn.adjusted(-1, -1, 1, 1).contains(inView);
         }
         if (missing > 0 || uncovered) {
-            node->showPreview(window(), canvasView->preview(i), bufferLogical);
+            node->showPreview(window(), canvasView->preview(i), bufferLogical, cpuDark);
+            if (node->preview) {
+                gpuTone(node->preview, {});
+            }
             more = true;
         } else {
             node->hidePreview();

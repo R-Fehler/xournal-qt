@@ -24,6 +24,7 @@
 #include "Library.h"
 #include "Previews.h"
 #include "Thumbnails.h"
+#include "DarkPages.h"
 
 namespace xqt {
 
@@ -778,11 +779,16 @@ void PageSketches::setDelays(int shown, int edited) {
 }
 
 QImage SketchProvider::requestImage(const QString& id, QSize* size, const QSize&) {
-    const QStringList parts = id.split('/');
+    QString plain = id;
+    const bool darkPage = dark::takeSuffix(plain);  // (dark pages: "~dark", as the canvas shows the page)
+    const QStringList parts = plain.split('/');
     QImage img = PageSketches::instance().image(parts.value(0).toULongLong(), parts.value(1).toULongLong());
     if (img.isNull()) {  // (gone meanwhile: a white page, no warning)
         img = QImage(1, 1, QImage::Format_RGB16);
         img.fill(Qt::white);
+    }
+    if (darkPage) {
+        dark::apply(img, dark::paperOfImage(img));
     }
     if (size) {
         *size = img.size();

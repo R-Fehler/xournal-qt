@@ -6,6 +6,7 @@
 #include <glib.h>  // for g_warning
 
 #include "model/Stroke.h"    // for Stroke, StrokeTool::HIGHLIGHTER
+#include "view/PaperTone.h"  // xournal-qt: the highlighter on dark paper
 #include "util/Assert.h"     // for xoj_assert
 #include "util/Color.h"      // for cairo_set_source_rgbi
 #include "util/Rectangle.h"  // for Rectangle
@@ -119,8 +120,9 @@ void StrokeView::draw(const Context& ctx) const {
         /**
          * Highlighter without filling.
          */
-        Util::cairo_set_source_rgbi(cr, s->getColor(), OPACITY_HIGHLIGHTER);
-        cairo_set_operator(cr, CAIRO_OPERATOR_MULTIPLY);
+        // xournal-qt: on dark paper it lightens (view/PaperTone.h)
+        Util::cairo_set_source_rgbi(cr, s->getColor(), highlighterOpacity(OPACITY_HIGHLIGHTER));
+        cairo_set_operator(cr, highlighterOperator());
     } else {
         /**
          * Normal pen
@@ -151,7 +153,8 @@ void StrokeView::draw(const Context& ctx) const {
          * Highlighter (filled)    : s->getFill() / 255
          */
         double groupAlpha =
-                highlighter ? (filledHighlighter ? static_cast<double>(s->getFill()) / 255.0 : OPACITY_HIGHLIGHTER) :
+                highlighter ? (filledHighlighter ? static_cast<double>(s->getFill()) / 255.0 :
+                                                   highlighterOpacity(OPACITY_HIGHLIGHTER)) :  // xournal-qt
                               1.0;
 
         // If the stroke has no audio attached, we draw it (even more) translucent
@@ -161,7 +164,7 @@ void StrokeView::draw(const Context& ctx) const {
         }
 
         // Blit the mask onto the given cairo context
-        cairo_set_operator(ctx.cr, highlighter ? CAIRO_OPERATOR_MULTIPLY : CAIRO_OPERATOR_OVER);
+        cairo_set_operator(ctx.cr, highlighter ? highlighterOperator() : CAIRO_OPERATOR_OVER);  // xournal-qt
 
         Util::cairo_set_source_rgbi(ctx.cr, s->getColor(), groupAlpha);
 

@@ -10,6 +10,8 @@ Flow {
     /// Index in the settings' pageBackgrounds
     property int selected: 0
     property bool landscape: false
+    /// The paper's color the patterns are shown on
+    property color paper: "#ffffff"
     signal chosen(int index)
     spacing: 8
     readonly property var s: app.settings
@@ -32,7 +34,7 @@ Flow {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: chooser.landscape ? 72 : 52
                     Layout.preferredHeight: chooser.landscape ? 52 : 72
-                    color: "#ffffff"
+                    color: chooser.paper
                     border.width: chooser.selected === bgButton.index ? 3 : 1
                     border.color: chooser.selected === bgButton.index ? Material.accentColor : "#c9ccd1"
                     radius: 3
@@ -40,6 +42,7 @@ Flow {
                         anchors.fill: parent
                         anchors.margins: parent.border.width
                         format: bgButton.format
+                        paper: chooser.paper
                     }
                 }
                 Label {

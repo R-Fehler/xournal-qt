@@ -123,6 +123,7 @@
 #include "shell/PagesModel.h"
 #include "shell/SessionRecovery.h"
 #include "shell/SettingsModel.h"
+#include "render/PaperTexture.h"
 #include "shell/ToolboxModel.h"
 #include "shell/SystemApps.h"
 #include "shell/PresenterConsole.h"
@@ -169,6 +170,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followTodoStampTool);
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
+    setUpDarkPages();
     loadCustomWidths();
     SettingsModel::applyPreviewMemory(*app->getSettings());
     SettingsModel::applyCanvasMemory(*app->getSettings());
@@ -336,6 +338,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followSnipTool);
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
+    setUpDarkPages();
     pages = std::make_unique<PagesModel>();
     filteredPages = std::make_unique<PageFilterModel>(*pages);
     outline = std::make_unique<OutlineModel>();
@@ -2205,6 +2208,7 @@ int AppController::pageNumber() const { return session() ? static_cast<int>(sess
 int AppController::pageCount() const { return canvas() ? static_cast<int>(canvas()->pageCount()) : 0; }
 
 void AppController::newDocument() {
+    inkForPaper(toQColor(app->getSettings()->getPageTemplateSettings().getBackgroundColor()));
     tabs->addTab(std::make_unique<DocumentSession>(*app));
     setHomeVisible(false);
 }
@@ -2232,6 +2236,8 @@ fs::path AppController::journalFileFor(const Library& lib) {
 }
 
 bool AppController::createDocument(const QString& name, bool inLibrary) {
+    // Ink that reads on the new document's paper (qt/docs/dark-pages.md)
+    inkForPaper(toQColor(app->getSettings()->getPageTemplateSettings().getBackgroundColor()));
     if (!inLibrary || !library->available()) {
         // The page template settings (background, size) are what the dialog changed.
         tabs->addTab(std::make_unique<DocumentSession>(*app));
@@ -5095,7 +5101,8 @@ void AppController::clearNavigation() {
 }
 
 // Upstream's page operations work on the current page: select the page first.
-bool AppController::insertPages(int position, int background, int paper, bool landscape, int count) {
+bool AppController::insertPages(int position, int background, int paper, bool landscape, int count,
+                                const QColor& paperColor, int textured) {
     if (textPagesFixed()) {
         return false;  // (a text file: its pages are its text)
     }
@@ -5114,11 +5121,12 @@ bool AppController::insertPages(int position, int background, int paper, bool la
     if (landscape) {
         size.transpose();
     }
-    const Color bgColor = app->getSettings()->getPageTemplateSettings().getBackgroundColor();
+    Color bgColor;  // (the paper: qt/docs/dark-pages.md)
+    const PageType type = paperTypeOf(background, paperColor, textured, bgColor);
     std::vector<PageRef> pages;
     for (int i = 0; i < count; ++i) {
         auto page = std::make_shared<XojPage>(size.width(), size.height());
-        page->setBackgroundType(types[static_cast<size_t>(background)]->page);
+        page->setBackgroundType(type);
         page->setBackgroundColor(bgColor);
         pages.push_back(std::move(page));
     }
@@ -5344,7 +5352,8 @@ bool AppController::pagesHavePdfBackground(const QList<int>& pages) const {
     return false;
 }
 
-bool AppController::changePageBackground(const QList<int>& pages, int background) {
+bool AppController::changePageBackground(const QList<int>& pages, int background, const QColor& paperColor,
+                                         int textured) {
     if (textPagesFixed()) {
         return false;  // (a text file: its pages are its text)
     }
@@ -5353,8 +5362,8 @@ bool AppController::changePageBackground(const QList<int>& pages, int background
     if (!s || background < 0 || background >= static_cast<int>(types.size())) {
         return false;
     }
-    const PageType& type = types[static_cast<size_t>(background)]->page;
-    const Color bgColor = app->getSettings()->getPageTemplateSettings().getBackgroundColor();
+    Color bgColor;  // (the paper: qt/docs/dark-pages.md)
+    const PageType type = paperTypeOf(background, paperColor, textured, bgColor);
     Document* doc = s->getDocument();
     std::vector<size_t> changed;
     auto group = std::make_unique<GroupUndoAction>();
@@ -5397,13 +5406,20 @@ QVariantMap AppController::currentPageFormat() const {
     const PageRef p = doc->getPage(std::min(session()->getCurrentPageNo(), doc->getPageCount() - 1));
     int background = -1;
     const auto& types = app->getPageTypes()->getPageTypes();
+    const PageType pt = p->getBackgroundType();
     for (size_t i = 0; i < types.size(); ++i) {
-        if (types[i]->page == p->getBackgroundType()) {
+        // (its paper's texture and ruling colors aside)
+        if (types[i]->page.format == pt.format &&
+            paper::baseConfig(types[i]->page.config) == paper::baseConfig(pt.config)) {
             background = static_cast<int>(i);
             break;
         }
     }
-    return {{"background", background}, {"landscape", p->getWidth() > p->getHeight()}};
+    return {{"background", background},
+            {"landscape", p->getWidth() > p->getHeight()},
+            {"paper", pt.isSpecial() ? QColor(Qt::white) : toQColor(p->getBackgroundColor())},
+            {"textured", !pt.isSpecial() && paper::textured(pt.config)},
+            {"pdf", pt.isSpecial()}};
 }
 
 void AppController::insertPageBefore(int index) {

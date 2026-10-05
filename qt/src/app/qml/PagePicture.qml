@@ -10,6 +10,9 @@ Item {
     property int sourceWidth: 160  // (logical pixels: Qt Quick asks the provider for this times the pixel ratio)
     readonly property alias sourceSize: sharp.sourceSize
     property bool racing: false
+    /// Dark pages: the picture as the canvas shows the page (the providers turn it dark: "~dark")
+    property bool dark: app.darkPagesShown
+    readonly property string darkSuffix: dark ? "~dark" : ""
     property bool sharpWanted: false
     readonly property bool sharpShown: sharp.status === Image.Ready
 
@@ -20,7 +23,7 @@ Item {
         objectName: "pageSketch"
         anchors.fill: parent
         visible: !picture.sharpShown
-        source: picture.sketch
+        source: picture.sketch !== "" ? picture.sketch + picture.darkSuffix : ""
         cache: false
         fillMode: Image.PreserveAspectFit
         smooth: true
@@ -29,7 +32,7 @@ Item {
         id: sharp
         objectName: "pageSharp"
         anchors.fill: parent
-        source: picture.sharpWanted ? picture.thumbnail : ""
+        source: picture.sharpWanted && picture.thumbnail !== "" ? picture.thumbnail + picture.darkSuffix : ""
         asynchronous: true
         cache: false
         sourceSize.width: picture.sourceWidth

@@ -4,8 +4,12 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <shared_mutex>
+
 #include <QFile>
+#include <QGuiApplication>
 #include <QSignalSpy>
+#include <QStyleHints>
 #include <gtest/gtest.h>
 
 #include "model/Document.h"
@@ -15,12 +19,16 @@
 #include "shell/TabManager.h"
 
 #include "AppController.h"
+#include "DarkPages.h"
+#include "render/PaperTexture.h"
+#include "shell/SettingsModel.h"
 
 using namespace xqt;
 using Kind = ColorPalettes::Kind;
 
 namespace {
 QString hex(const std::optional<QColor>& c) { return c ? c->name().toUpper() : QString("none"); }
+SettingsModel* settingsOf(AppController& c) { return static_cast<SettingsModel*>(c.settingsModel()); }
 }  // namespace
 
 TEST(ColorPalettes, theSpecIsCompiledIn) {
@@ -226,5 +234,114 @@ TEST(ColorPalettes, aColorTakenFromAPaletteRemembersItsRole) {
     EXPECT_EQ(c.followPalette("marker:headings", "colorblind-6", false), QColor("#0072B2"));
     EXPECT_FALSE(c.followPalette("marker:ideas", "colorblind-6", false).isValid());
     c.setColorPalette("classic");
+    c.shutdown();
+}
+
+// --- dark pages and page colors (qt/docs/dark-pages.md) ---------------------------------------------------------------
+
+// Every role of the light palettes shows on a dark page as the Dark palette's color of the same role
+TEST(ColorPalettes, darkPagesShowEachRoleInTheDarkPalettesColor) {
+    const ColorPalettes& p = ColorPalettes::builtIn();
+    const auto pairs = p.darkPairs();
+    std::vector<dark::RolePair> roles;
+    for (const auto& d: pairs) {
+        roles.push_back({d.light.rgb(), d.dark.rgb(), d.opacity});
+    }
+    dark::setRoles(roles);
+    const ColorPalette* darkPalette = p.palette("dark");
+    ASSERT_NE(darkPalette, nullptr);
+    int checked = 0;
+    for (const ColorPalette& palette: p.palettes()) {
+        if (palette.dark) {
+            continue;
+        }
+        for (const PaletteRole& role: palette.roles) {
+            const PaletteRole* d = darkPalette->role(role.key);
+            ASSERT_NE(d, nullptr) << role.key.toStdString();
+            // (a color two palettes share is paired once, with the first palette's role: the same role in all of them)
+            const QColor shown(dark::map(role.ink.rgb()));
+            const auto owner = std::find_if(pairs.begin(), pairs.end(), [&](const auto& x) { return x.light == role.ink; });
+            ASSERT_NE(owner, pairs.end());
+            EXPECT_EQ(shown, owner->dark) << palette.id.toStdString() << ":" << role.key.toStdString();
+            ++checked;
+        }
+    }
+    EXPECT_EQ(checked, 38);  // (five light palettes: four of eight roles, one of six)
+    // The highlight colors: at the opacity dark paper wants (0.8) where upstream draws 0.47
+    const QColor classicKeyTerms = *p.color("classic", "keyTerms", Kind::Highlight);
+    const auto pair = std::find_if(pairs.begin(), pairs.end(), [&](const auto& x) { return x.light == classicKeyTerms; });
+    ASSERT_NE(pair, pairs.end());
+    EXPECT_EQ(pair->dark, *p.color("dark", "keyTerms", Kind::Highlight));
+    EXPECT_NEAR(pair->opacity, 0.8 / 0.47, 1e-9);
+    dark::setRoles({});
+}
+
+TEST(ColorPalettes, darkPagesAreASettingForEveryWindow) {
+    AppController c;
+    c.setDarkPagesMode("off");
+    QSignalSpy changed(&c, &AppController::darkPagesChanged);
+    EXPECT_FALSE(c.darkPagesShown());
+    c.setDarkPagesMode("on");
+    EXPECT_EQ(c.darkPagesMode(), "on");
+    EXPECT_TRUE(c.darkPagesShown());
+    EXPECT_EQ(changed.count(), 1);
+    c.setDarkPagesMode("nonsense");
+    EXPECT_EQ(c.darkPagesMode(), "off");
+    c.setDarkPagesMode("system");
+    EXPECT_EQ(c.darkPagesShown(), QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark);
+    c.setDarkPagesMode("off");
+    c.shutdown();
+}
+
+// A new document on dark paper starts with ink that reads on it: the Dark palette, a pen of one's own that would not
+// show becomes its body ink; a new document on light paper goes back to the light palette
+TEST(ColorPalettes, aNewDocumentOnDarkPaperTakesInkThatReadsOnIt) {
+    AppController c;
+    c.setColorPalette("marker");
+    c.selectTool("pen");
+    c.setColor(QColor("#000000"));
+    c.selectTool("highlighter");
+    c.setPaletteColor("marker", "keyTerms");
+    ASSERT_EQ(c.colorPalette(), "marker");
+    settingsOf(c)->set("pageColor", QColor("#161616"));
+    c.newDocument();
+    EXPECT_EQ(c.colorPalette(), "dark");
+    EXPECT_EQ(c.colorRoleOf("highlighter"), "dark:keyTerms") << "a role follows to the Dark palette";
+    c.selectTool("pen");
+    EXPECT_EQ(c.color(), *ColorPalettes::builtIn().color("dark", "body", Kind::Ink)) << "black ink would not show";
+    settingsOf(c)->set("pageColor", QColor("#ffffff"));
+    c.newDocument();
+    EXPECT_EQ(c.colorPalette(), "marker") << "the light palette chosen before";
+    EXPECT_EQ(c.color(), *ColorPalettes::builtIn().color("marker", "body", Kind::Ink));
+    c.setColorPalette("classic");
+    c.shutdown();
+}
+
+TEST(ColorPalettes, pagesGetAPaperColorAndTexture) {
+    AppController c;
+    const QVariantList swatches = c.paperSwatches();
+    ASSERT_EQ(swatches.size(), 8);
+    EXPECT_EQ(swatches.front().toMap().value("id"), "white");
+    EXPECT_TRUE(swatches.back().toMap().value("dark").toBool()) << "black";
+    c.newDocument();
+    DocumentSession* s = c.tabManager().currentSession();
+    ASSERT_NE(s, nullptr);
+    const int graph = static_cast<int>(settingsOf(c)->pageBackgroundFormats().indexOf("graph"));
+    ASSERT_GE(graph, 0);
+    ASSERT_TRUE(c.changePageBackground({0}, graph, QColor("#2b2d31"), 1));
+    QVariantMap format = c.currentPageFormat();
+    EXPECT_EQ(format.value("background").toInt(), graph) << "the pattern, its paper aside";
+    EXPECT_EQ(format.value("paper").value<QColor>(), QColor("#2b2d31"));
+    EXPECT_TRUE(format.value("textured").toBool());
+    EXPECT_TRUE(c.printUsesDarkPaper(""));
+    EXPECT_TRUE(c.printUsesDarkPaper("1"));
+    ASSERT_TRUE(c.insertPages(1, graph, -1, false, 1, QColor("#f2e6cb"), 0));
+    EXPECT_FALSE(c.printUsesDarkPaper("2")) << "illustration paper";
+    {
+        Document* doc = s->getDocument();
+        std::shared_lock lock(*doc);
+        EXPECT_EQ(uint32_t(doc->getPage(1)->getBackgroundColor()) & 0xffffff, 0xf2e6cbu);
+        EXPECT_FALSE(paper::textured(doc->getPage(1)->getBackgroundType().config));
+    }
     c.shutdown();
 }

@@ -114,7 +114,7 @@ The workflow's steps:
 
 1. **MSYS2** (`msys2/setup-msys2`, `UCRT64`, updated): `toolchain`, `cmake`, `ninja`, `ccache`, `glib2`, `cairo`,
    `pango`, `gdk-pixbuf2`, `poppler`, `qpdf`, `libxml2`, `libzip`, `zlib`, `qt6-base`, `qt6-declarative`,
-   `qt6-svg`. The step after it prints the versions and where Qt's tools are.
+   `qt6-svg`, `qt6-shadertools` (the shader of dark pages, qt/docs/dark-pages.md). The step after it prints the versions and where Qt's tools are.
 2. **Configure**: `cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DXQT_BUILD_TESTS=OFF
    -DXQT_BUILD_SPIKES=OFF -DXQT_BUILD_CLI=ON`. The dependencies are found as on the other platforms
    ([XojDeps.cmake](../cmake/XojDeps.cmake)): libxml2, libzip and qpdf as CMake packages, the GNOME libraries through
@@ -171,7 +171,7 @@ The unit tests are not built on Windows yet: they use POSIX headers and `/proc` 
 The same steps work in an MSYS2 UCRT64 shell (install MSYS2 from msys2.org, open "MSYS2 UCRT64"):
 
 ```sh
-pacman -S --needed mingw-w64-ucrt-x86_64-{toolchain,cmake,ninja,ccache,glib2,cairo,pango,gdk-pixbuf2,poppler,qpdf,libxml2,libzip,zlib,qt6-base,qt6-declarative,qt6-svg}
+pacman -S --needed mingw-w64-ucrt-x86_64-{toolchain,cmake,ninja,ccache,glib2,cairo,pango,gdk-pixbuf2,poppler,qpdf,libxml2,libzip,zlib,qt6-base,qt6-declarative,qt6-svg,qt6-shadertools}
 cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DXQT_BUILD_TESTS=OFF -DXQT_BUILD_SPIKES=OFF
 cmake --build build
 ./build/xournal-qt.exe                                      # from the build tree, with MSYS2's DLLs on the PATH

@@ -16,6 +16,8 @@
 #include <vector>
 
 #include <QImage>
+#include <QPointF>
+#include <QRgb>
 #include <QRect>
 #include <QRectF>
 #include <QString>
@@ -95,6 +97,16 @@ public:
         QRectF area;
     };
     BufferInfo bufferInfo();
+    /// How the page is shown dark (dark pages, DarkPages.h): whether it is (its paper is not dark already), the paper
+    /// it is balanced by, and its pictures kept as they are (page coordinates). Read from the document (kept until the
+    /// page's revision changes) and, for a PDF page, from its picture's corners and the PDF's pictures. UI thread.
+    struct DarkTone {
+        bool dark = false;
+        QRgb paper = 0xffffffff;
+        std::vector<QRectF> keep;
+        bool operator==(const DarkTone&) const = default;
+    };
+    DarkTone darkTone();
     /// Buffer + overlay views for a rectangle of buffer pixels (from the buffer's top left, BufferInfo::origin; call
     /// on the UI thread / during scene graph sync).
     QImage composeTile(const QRect& pixelRect);
@@ -199,6 +211,16 @@ private:
     bool selectNotesAndElements(bool add);
 
     std::optional<std::vector<LinkSpot>> links;  ///< linkSpots()
+    /// darkTone() from the document, at this page revision (pictures of the document's own, paper, PDF page)
+    struct DarkModel {
+        quint64 revision = ~quint64(0);
+        bool pdf = false;
+        int pdfPage = -1;
+        QPointF pdfAt;  ///< where the PDF page is on the page (space for notes)
+        QRgb paper = 0xffffffff;
+        std::vector<QRectF> images;
+    };
+    DarkModel darkModel;
 
     mutable std::vector<Range> dirtyRanges;  ///< page coordinates
     mutable bool allDirty = true;

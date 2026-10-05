@@ -3576,3 +3576,35 @@ Seen through the replay (⋮ → View → Replay the writing).
       and Share last (each is in the bar or in ⋮, never both). The classic tool bar has none of these buttons.
 - [ ] Read in the command bar: full screen read only. Replay: the timeline bar. Milestone: the message dialog. Tags:
       the document's tags.
+
+## Dark pages and page colors (qt/dark-pages, qt/docs/dark-pages.md)
+
+On the Surface Pro 8 (Windows, Direct3D) and the Linux laptop (OpenGL), and on the Fold 7 (Vulkan or OpenGL ES).
+
+- [ ] ⋮ → View → Dark pages → On: every page in view turns dark at once, without a flash of white and without the
+      pages being drawn again (`XQT_PERF=1`: no renders when toggling). Black ink is light grey, Classic's red is
+      Dark's red, a heading blue is Dark's blue, a yellow highlighter is a dark yellow band that still shows, the text
+      under it readable. Off: as before, at once.
+- [ ] A PDF with photos (a paper with figures, a magazine): the photos keep their colors while the text and the vector
+      figures turn dark; the photos appear in their colors a moment after the page (their places are read in the
+      background). A scanned PDF turns dark whole.
+- [ ] A PDF of dark slides: stays as it is. A `.xopp` page on black paper: stays as it is. Illustration paper: dark.
+- [ ] While dark: write with the pen and the highlighter (the stroke shows in its dark color while it is drawn and
+      after), erase, select and move ink (the selection is dark too), zoom in far (a poster drawn in parts), scroll
+      fast: no white tiles, no stutter compared to light pages.
+- [ ] The page sidebar, the page grid and the overview show the pages dark; the reference beside the notes too; the
+      audience's screen of the presenter view shows them as they are.
+- [ ] "With the system's dark mode": switch the system between light and dark (Windows: Settings → Personalisation →
+      Colours; GNOME/KDE: the dark style): the pages follow.
+- [ ] Export a PDF and print while dark pages are on: the result is the document as it is (white pages).
+- [ ] The background dialog (⋮ → Page → Background of this page…): the swatches (white, illustration paper, kraft,
+      soft green, soft blue, grey, dark grey, black), "Textured paper"; the pattern previews take the paper's color.
+      OK: the page has that paper; ruled and graph lines stay visible on grey, dark grey and black; undo.
+- [ ] Textured paper at 100 %, 300 % and on the phone: a subtle grain, no visible repeat, no moiré when zooming; print
+      a textured page: the grain is on the paper (faint).
+- [ ] A new document on black paper (New document dialog): the pen writes light grey (Dark palette), the highlighter
+      is Dark's; a highlighter stroke on black paper shows (it lightens). Then a new document on white paper: the light
+      palette comes back. Open the black-paper document in Xournal++: the black color and the lines show, the texture
+      does not (a plain color), the highlights are invisible there (Xournal++ multiplies).
+- [ ] Insert pages and the Settings → New pages paper: the same swatches; new pages copy the paper of the page before.
+- [ ] Print a document with black pages: the print dialog says it uses a lot of ink; white pages: nothing is said.

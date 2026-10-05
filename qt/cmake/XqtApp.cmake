@@ -21,9 +21,22 @@ add_library(xqt-quick STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/InputLog.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/InputLog.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/EmojiNames.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/EmojiNames.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/EmojiNames.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/DarkTileMaterial.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/DarkTileMaterial.cpp)
 target_include_directories(xqt-quick PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src/quick)
 target_link_libraries(xqt-quick PUBLIC Qt6::Quick Qt6::Qml xqt-canvas)
+# Dark pages on the GPU (qt/docs/dark-pages.md): the tiles' shader, compiled by Qt Shader Tools. Without them the
+# canvas turns the tiles dark on the CPU (as on the software renderer).
+find_package(Qt6 QUIET OPTIONAL_COMPONENTS ShaderTools)
+if(TARGET Qt6::ShaderTools)
+    qt_add_shaders(xqt-quick "xqt_dark_shaders" BATCHABLE PREFIX "/xqt-shaders" BASE "${CMAKE_CURRENT_LIST_DIR}/../src/quick/shaders"
+        FILES "${CMAKE_CURRENT_LIST_DIR}/../src/quick/shaders/darktile.vert"
+              "${CMAKE_CURRENT_LIST_DIR}/../src/quick/shaders/darktile.frag")
+    target_compile_definitions(xqt-quick PRIVATE XQT_DARK_SHADER)
+else()
+    message(STATUS "Qt Shader Tools not found: dark pages are drawn on the CPU")
+endif()
 set_target_properties(xqt-quick PROPERTIES AUTOMOC ON)
 
 # Application shell: tabs, single instance
@@ -142,6 +155,7 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTags.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppEncryption.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppToolbox.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppPaper.cpp
 
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AudioControl.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AudioControl.cpp
@@ -221,6 +235,7 @@ set(XQT_QML_FILES
     src/app/qml/BackgroundPreview.qml
     src/app/qml/HighlightColors.qml
     src/app/qml/BackgroundChooser.qml
+    src/app/qml/PaperSwatches.qml
     src/app/qml/InsertPagesDialog.qml
     src/app/qml/NoteSpaceDialog.qml
     src/app/qml/PageSizeDialog.qml
@@ -334,7 +349,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CurtainCanvasTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/ReferenceCanvasTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/FractionalScaleTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CanvasRotationItemTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CanvasRotationItemTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/DarkPagesCanvasTest.cpp)
     target_link_libraries(xqt-quick-tests PRIVATE xqt-quick Qt6::QuickControls2 Qt6::GuiPrivate Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-quick-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     gtest_discover_tests(xqt-quick-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS quick
@@ -346,6 +362,15 @@ if(XQT_BUILD_TESTS)
     add_test(NAME FractionalScaleCanvas.quick@167 COMMAND xqt-quick-tests --gtest_filter=FractionalScaleCanvas.*)
     set_tests_properties(FractionalScaleCanvas.quick@167 PROPERTIES LABELS quick
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=1.6666667")
+
+    # Dark pages drawn by their shader (qt/docs/dark-pages.md): OpenGL through Mesa's llvmpipe under Xvfb, where there is one
+    find_program(XQT_XVFB_RUN xvfb-run)
+    if(XQT_XVFB_RUN AND TARGET Qt6::ShaderTools)
+        add_test(NAME DarkPagesCanvas.quick@gl COMMAND ${XQT_XVFB_RUN} -a $<TARGET_FILE:xqt-quick-tests>
+            -platform offscreen:enable_glx --gtest_filter=DarkPagesCanvas.*)
+        set_tests_properties(DarkPagesCanvas.quick@gl PROPERTIES LABELS quick
+            ENVIRONMENT "QT_QUICK_BACKEND=rhi;QSG_RHI_BACKEND=opengl;XQT_EXPECT_GPU=1")
+    endif()
 
     # The real window (Main.qml) with an AppController, off-screen: shortcuts, sheets, tab overview.
     add_executable(xqt-ui-tests
@@ -365,6 +390,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/TimelineUiTest.cpp
 
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/TemplateToolTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/DarkPagesUiTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AnnotationsPanelTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/VersionHistoryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/PdfPasswordTest.cpp

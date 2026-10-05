@@ -18,6 +18,7 @@
 #include "util/Util.h"                    // for cairo_set_dash_from_vector
 
 #include "Mask.h"          // for Mask
+#include "PaperTone.h"     // xournal-qt: the highlighter on dark paper
 #include "StrokeView.h"    // for StrokeView, StrokeView::CAI...
 #include "config-debug.h"  // for DEBUG_ERASABLE_STROKE_BOXES
 
@@ -219,7 +220,7 @@ void ErasableStrokeView::paintFilledHighlighter(cairo_t* cr) const {
     xoj_assert(matrix.xx == matrix.yy && matrix.xy == 0 && matrix.yx == 0);
 
     // Initialise the cairo context
-    cairo_set_operator(cr, CAIRO_OPERATOR_MULTIPLY);
+    cairo_set_operator(cr, xoj::view::highlighterOperator());  // xournal-qt: dark paper (view/PaperTone.h)
     Util::cairo_set_source_rgbi(cr, stroke.getColor(), static_cast<double>(stroke.getFill()) / 255.0);
 
     const std::vector<Point>& data = stroke.getPointVector();

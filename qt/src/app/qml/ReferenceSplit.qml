@@ -103,6 +103,7 @@ Item {
             id: referenceCanvas
             objectName: "referenceCanvas"
             anchors.fill: parent
+            darkPages: app.darkPagesShown
             clip: true
             focus: true
             // For reading, unless the edit switch of its pill is on (per tab)

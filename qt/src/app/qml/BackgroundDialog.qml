@@ -16,6 +16,9 @@ AdaptiveDialog {
     /// 0-based page numbers
     property var pages: []
     property int bgIndex: 0
+    /// The paper (qt/docs/dark-pages.md): its color and texture
+    property color paper: "#ffffff"
+    property bool textured: false
     readonly property bool overPdf: app.pagesHavePdfBackground(pages)
 
     function openFor(list) {
@@ -23,9 +26,12 @@ AdaptiveDialog {
         const current = app.currentPageFormat()
         bgIndex = current && current.background >= 0 ? current.background
                                                      : Math.max(0, app.settings.get("pageBackground"))
+        // A page of the PDF has no paper of its own: the paper of new pages
+        paper = current && current.pdf === false ? current.paper : app.settings.get("pageColor")
+        textured = current && current.pdf === false ? current.textured === true : app.settings.get("pageTexture") === true
         open()
     }
-    onAccepted: app.changePageBackground(pages, bgIndex)
+    onAccepted: app.changePageBackground(pages, bgIndex, paper, textured ? 1 : 0)
 
     ColumnLayout {
         width: dlg.availableWidth
@@ -53,7 +59,16 @@ AdaptiveDialog {
             id: chooser
             Layout.fillWidth: true
             selected: dlg.bgIndex
+            paper: dlg.paper
             onChosen: function(index) { dlg.bgIndex = index }
+        }
+        Label { text: qsTr("Paper"); font.weight: Font.DemiBold }
+        PaperSwatches {
+            Layout.fillWidth: true
+            paper: dlg.paper
+            textured: dlg.textured
+            onChosen: function(c) { dlg.paper = c }
+            onTexturedToggled: function(on) { dlg.textured = on }
         }
     }
 }

@@ -9,6 +9,7 @@
 #include "model/Layer.h"                     // for Layer
 #include "model/XojPage.h"                   // for XojPage
 #include "view/DebugShowRepaintBounds.h"     // for IF_DEBUG_REPAINT
+#include "view/PaperTone.h"                  // xournal-qt: the highlighter on dark paper
 #include "view/View.h"                       // for EditionTreatment, NORMAL...
 #include "view/background/BackgroundView.h"  // for BackgroundFlags, Backgro...
 
@@ -61,6 +62,13 @@ void DocumentView::finializeDrawing() {
 /**
  * Draw the background
  */
+namespace {
+/// xournal-qt: the page's paper is dark (a page of a PDF or an image: light; view/PaperTone.h)
+bool paperIsDark(const ConstPageRef& page) {
+    return !page->getBackgroundType().isSpecial() && xoj::view::isDarkPaper(page->getBackgroundColor());
+}
+}  // namespace
+
 void DocumentView::drawBackground(xoj::view::BackgroundFlags bgFlags) const {
     auto bgView = xoj::view::BackgroundView::createForPage(page, bgFlags, pdfCache);
     bgView->draw(cr);
@@ -68,6 +76,7 @@ void DocumentView::drawBackground(xoj::view::BackgroundFlags bgFlags) const {
 
 void DocumentView::drawPage(ConstPageRef page, cairo_t* cr, bool dontRenderEditingStroke,
                             xoj::view::BackgroundFlags flags) {
+    const xoj::view::PaperToneScope tone(paperIsDark(page));  // xournal-qt: highlighters on dark paper
     initDrawing(page, cr, dontRenderEditingStroke);
 
     drawBackground(flags);
@@ -87,6 +96,7 @@ void DocumentView::drawPage(ConstPageRef page, cairo_t* cr, bool dontRenderEditi
 
 void DocumentView::drawLayersOfPage(const LayerRangeVector& layerRange, ConstPageRef page, cairo_t* cr,
                                     bool dontRenderEditingStroke, xoj::view::BackgroundFlags flags) {
+    const xoj::view::PaperToneScope tone(paperIsDark(page));  // xournal-qt: highlighters on dark paper
     initDrawing(page, cr, dontRenderEditingStroke);
 
     drawBackground(flags);

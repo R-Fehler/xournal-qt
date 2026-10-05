@@ -60,6 +60,7 @@
 #include "hwr/LineDataset.h"
 #endif
 #ifdef XQT_CLI_SESSION
+#include "render/PaperTexture.h"
 #include "session/PdfHistory.h"
 #endif
 
@@ -354,6 +355,7 @@ int main(int argc, char* argv[]) {
     if (argc >= 2 && std::string(argv[1]) == "export-xopp") {
         return exportVersion(argc, argv);
     }
+    xqt::paper::install();  // textured paper in exports, as the app draws it (qt/docs/dark-pages.md)
 #endif
 
     gchar** optFilename = nullptr;

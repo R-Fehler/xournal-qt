@@ -1486,29 +1486,15 @@ Popup {
                         key: "landscape"; text: qsTr("Landscape")
                         enabled: !(sheet.s.revision, sheet.s.get("copyLastPageSize"))
                     }
-                    RowLayout {
+                    // The paper of new pages (qt/docs/dark-pages.md, "Page colors")
+                    Label { text: qsTr("Paper"); Layout.fillWidth: true }
+                    PaperSwatches {
                         Layout.fillWidth: true
                         enabled: !(sheet.s.revision, sheet.s.get("copyLastPageSettings"))
-                        Label { text: qsTr("Paper color"); Layout.fillWidth: true }
-                        Repeater {
-                            model: ["#ffffff", "#fdf6e3", "#f1f3f4", "#e8f0fe", "#fef7e0"]
-                            delegate: AbstractButton {
-                                required property string modelData
-                                implicitWidth: 44
-                                implicitHeight: 44
-                                onClicked: sheet.s.set("pageColor", modelData)
-                                contentItem: Item {
-                                    Rectangle {
-                                        anchors.centerIn: parent
-                                        width: 30; height: 30; radius: 15
-                                        color: modelData
-                                        border.width: Qt.colorEqual((sheet.s.revision, sheet.s.get("pageColor")),
-                                                                    modelData) ? 3 : 1
-                                        border.color: border.width > 1 ? Material.accentColor : "#9e9e9e"
-                                    }
-                                }
-                            }
-                        }
+                        paper: (sheet.s.revision, sheet.s.get("pageColor"))
+                        textured: (sheet.s.revision, sheet.s.get("pageTexture")) === true
+                        onChosen: function(c) { sheet.s.set("pageColor", c) }
+                        onTexturedToggled: function(on) { sheet.s.set("pageTexture", on) }
                     }
                     Item { Layout.preferredHeight: 16 }
                 }

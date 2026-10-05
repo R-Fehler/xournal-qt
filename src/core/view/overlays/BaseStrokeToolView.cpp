@@ -7,6 +7,7 @@
 #include "model/Stroke.h"
 #include "util/Range.h"
 #include "view/Mask.h"
+#include "view/PaperTone.h"  // xournal-qt: the highlighter on dark paper
 #include "view/Repaintable.h"
 #include "view/overlays/OverlayView.h"
 
@@ -14,7 +15,7 @@ using namespace xoj::view;
 
 BaseStrokeToolView::BaseStrokeToolView(Repaintable* parent, const Stroke& stroke):
         ToolView(parent),
-        cairoOp(stroke.getToolType() == StrokeTool::HIGHLIGHTER ? CAIRO_OPERATOR_MULTIPLY : CAIRO_OPERATOR_OVER),
+        cairoOp(stroke.getToolType() == StrokeTool::HIGHLIGHTER ? highlighterOperator() : CAIRO_OPERATOR_OVER),
         strokeColor(strokeColorWithAlpha(stroke)),
         fillColor(stroke.getFillColor().value_or(strokeColor)),  // xournal-qt
         lineStyle(stroke.getLineStyle()),
@@ -25,7 +26,9 @@ BaseStrokeToolView::~BaseStrokeToolView() noexcept = default;
 Color BaseStrokeToolView::strokeColorWithAlpha(const Stroke& s) {
     Color c = s.getColor();
     if (s.getToolType() == StrokeTool::HIGHLIGHTER) {
-        c.alpha = s.getFill() == -1 ? 120U : static_cast<uint8_t>(s.getFill());
+        // xournal-qt: on dark paper more opaque (view/PaperTone.h)
+        c.alpha = s.getFill() == -1 ? static_cast<uint8_t>(std::lround(255 * highlighterOpacity(120 / 255.0))) :
+                                      static_cast<uint8_t>(s.getFill());
     } else {
         c.alpha = 255U;
     }

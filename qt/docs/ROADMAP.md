@@ -1003,6 +1003,17 @@
   editor's dashed and dotted line buttons drew a plain line (Canvas dashes from a model are ignored), and the editor
   went to the window's corner when something was chosen in it (the rail rebuilt its buttons) ([toolbox.md](toolbox.md)).
 
+- **Dark pages and page colors, `qt/dark-pages` (2026-10-05).** ⋮ → View → Dark pages (off, on, with the system's dark
+  mode): the pages shown dark by a shader where the canvas composes its tiles (one lookup in a 33³ table: palette
+  roles to the Dark palette's colors, highlighters at 0.8, other colors with their hue kept and their lightness
+  flipped), no page drawn again; pictures of the document and of a PDF page (poppler's image mapping, read in the
+  background) keep their colors; pages with dark paper stay; the CPU does the same on the software renderer. Page
+  lists follow. Curated page colors (white, illustration paper, kraft, soft green and blue, grey, dark grey, black)
+  and textured paper (a deterministic grain, `xqt-texture=paper` in upstream's page config) in the background, new
+  document, insert pages and settings; ruling colored for the paper (upstream's f1/af1); a new document on dark
+  paper takes the Dark palette; the highlighter lightens on dark paper (seam); the print dialog warns about ink
+  ([dark-pages.md](dark-pages.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

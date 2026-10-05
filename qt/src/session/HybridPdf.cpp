@@ -60,6 +60,7 @@
 #include "util/PathUtil.h"
 #include "util/Util.h"
 #include "view/LayerView.h"
+#include "view/PaperTone.h"
 #include "view/View.h"
 #include "view/background/BackgroundFlags.h"
 #include "view/background/BackgroundView.h"
@@ -1136,6 +1137,9 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
                 if (!reuse || !reuse->layers.count(a.sig)) {
                     cairo_pdf_surface_set_size(surface, spec.width, spec.height);
                     cairo_save(cr);
+                    // (a highlighter on dark paper lightens: view/PaperTone.h)
+                    const xoj::view::PaperToneScope tone(!p->getBackgroundType().isSpecial() &&
+                                                         xoj::view::isDarkPaper(p->getBackgroundColor()));
                     xoj::view::LayerView(layer).draw(xoj::view::Context::createDefault(cr));
                     cairo_restore(cr);
                     cairo_show_page(cr);

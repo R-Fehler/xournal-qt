@@ -766,9 +766,10 @@ especially interested in importing annotations that come from the GoodNotes PDF 
 - [ ] `qt/copy-tools`: snip one tap away (a fixed tool of its own on the rail, not only in the select list); copy
   handwriting as text: a tool of its own (beside / cycling with mark PDF text) that copies the readings of the ink
   it is drawn over, and "Copy as text" on a selection of ink; a small popup shows the text now in the clipboard.
-- [ ] `qt/dark-pages`: dark mode for pages (inverted on the GPU, pictures kept) with ink and highlighter colors shown
+- [x] `qt/dark-pages`: dark mode for pages (inverted on the GPU, pictures kept) with ink and highlighter colors shown
   as their dark equivalents (palette roles), readable in both; curated page colors (black, grey, illustration paper,
-  textured paper) for `.xopp` and PDFs, with a printing warning for dark pages.
+  textured paper) for `.xopp` and PDFs, with a printing warning for dark pages (2026-10-05, qt/docs/dark-pages.md;
+  left: the device pass, no "print with white pages", thumbnails turn their pictures dark too).
 - [ ] `qt/page-files`: A6 insert pages from a PDF file, A7 extract or split selected pages into a new document or
   PDF, A8 export pages as PNG.
 - [ ] `qt/adopt-annotations`: B8, annotations made in other apps become editable ink, text and highlights (consent,

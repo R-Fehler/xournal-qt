@@ -50,10 +50,21 @@ Where it is:
   on the cycling color button in the single form (the phone dock: as a sheet);
 - the pen pill of the compact chrome (`PenPill.qml`): its "+", with the pill's colors in the first tab.
 
+## Dark pages and dark paper ([dark-pages.md](dark-pages.md))
+
+- **Dark pages** (a view setting) show each role's colors of the light palettes as the **Dark** palette's colors of the
+  same role: `ColorPalettes::darkPairs()` gives the pairs (ink → ink; highlight → highlight with `opacity = 0.8 / 0.47`,
+  the dark-paper rule over upstream's 0.47), the canvas's table maps them; other colors flip their lightness and keep
+  their hue.
+- **On dark paper** (a page color whose luminance is below 0.18) a highlighter is drawn at 0.8 and lightens
+  (`CAIRO_OPERATOR_SCREEN`) instead of multiplying (which showed nothing on black paper): the opacity follows the
+  paper of the page being drawn (`view/PaperTone.h`), so no opacity per stroke is needed. On light paper it stays
+  upstream's 0.47, multiplied.
+- **A new document on dark paper** takes the Dark palette (the tools with a role follow; a pen of one's own that does
+  not read on it gets the body ink); one on light paper goes back to the light palette chosen before.
+
 ## What is not done
 
-- Strokes are still drawn with upstream's fixed highlighter opacity (0.47, multiplied with the page), which is the
-  light-paper rule. Drawing them at 0.8 on dark paper needs an opacity per stroke, which upstream's renderer and file
-  format do not have (the color's alpha is discarded on load; `StrokeView` uses a constant). Left for the author to
-  decide (a seam in `StrokeView`, `SaveHandler` and `XmlParserHelper`); the chooser already shows the rule.
+- On light paper strokes keep upstream's highlighter opacity (0.47, not the spec's 0.5): the difference is small, and
+  the same file looks the same in Xournal++.
 - The tool bar's own colors do not follow a palette (they are colors, not roles).
