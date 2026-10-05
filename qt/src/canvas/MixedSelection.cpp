@@ -33,6 +33,7 @@
 #include "CanvasView.h"
 #include "MdBox.h"
 #include "StickyNotes.h"
+#include "session/ElementGroups.h"
 #include "session/DocumentSession.h"
 
 using xoj::util::Rectangle;
@@ -450,6 +451,8 @@ bool MixedSelection::dropOnOtherPage() {
                 e->move(dx - already.x(), dy - already.y());
                 movedItems.push_back({into, e});
             }
+            // xournal-qt: not joined to a group of that page with their number (qt/docs/groups.md)
+            groups::separate(moved, *into, *doc);
         }
         steps->add(std::make_unique<MoveUndoAction>(layer, fromRef, std::move(moved), dx, dy, into, toRef));
     }

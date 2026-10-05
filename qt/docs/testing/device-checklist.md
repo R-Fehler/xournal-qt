@@ -2916,3 +2916,11 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
       shortcuts sheet (F1) under Editing and can be changed in Settings; Ctrl+G does not jump to the next search hit
       any more (F3 does).
 - [ ] The reference beside the notes, written in: its selection pill has the same buttons; for reading only: none.
+- [ ] A tap with the select tool (rectangle, lasso, object select) on any member of a group selects the whole group;
+      a rectangle that touches only one member takes the whole group. Move, scale, rotate, recolour, delete it: all of
+      it, one undo step as before.
+- [ ] Select more (Ctrl+tap or the pill's toggle): a tap on a member adds the whole group, a second tap takes the
+      whole group away.
+- [ ] Erase across a grouped stroke with the stroke eraser's partial mode: the pieces still belong to the group.
+- [ ] Duplicate a page with a group, drag the group from the first page onto the copy: there they are two groups (a
+      tap selects only the dragged one).

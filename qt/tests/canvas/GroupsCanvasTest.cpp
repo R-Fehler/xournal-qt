@@ -229,3 +229,85 @@ TEST_F(GroupsCanvasTest, notInAViewForReading) {
     EXPECT_FALSE(view->ungroupSelection());
 }
 
+// --- selecting (any member selects the group) -------------------------------------------------------------------
+
+// A tap on any member selects the whole group; a loose element alone
+TEST_F(GroupsCanvasTest, aTapOnAMemberSelectsTheWholeGroup) {
+    Stroke* a = addStroke(100, 100, 200, 100, 4);
+    Stroke* b = addStroke(100, 300, 200, 300, 4);
+    Stroke* loose = addStroke(400, 100, 500, 100);
+    app->getToolHandler()->selectTool(TOOL_SELECT_RECT);
+    tap(0, QPointF(150, 300));
+    const auto both = selected();
+    ASSERT_EQ(both.size(), 2u);
+    EXPECT_EQ(std::set<const Element*>(both.begin(), both.end()), (std::set<const Element*>{a, b}));
+    EXPECT_TRUE(view->groupState().oneGroup);
+    view->clearSelection();
+    tap(0, QPointF(450, 100));
+    ASSERT_EQ(selected().size(), 1u);
+    EXPECT_EQ(selected().front(), loose);
+    view->clearSelection();
+    // The object select tool too
+    app->getToolHandler()->selectTool(TOOL_SELECT_OBJECT);
+    tap(0, QPointF(150, 100));
+    EXPECT_EQ(selected().size(), 2u);
+}
+
+// A rectangle around one member selects the whole group (its other members far outside it)
+TEST_F(GroupsCanvasTest, aRectangleAroundOneMemberSelectsTheWholeGroup) {
+    addStroke(100, 100, 200, 120, 4);
+    addStroke(500, 700, 600, 720, 4);
+    addStroke(300, 300, 350, 320);
+    app->getToolHandler()->selectTool(TOOL_SELECT_RECT);
+    drag(0, QPointF(80, 80), 0, QPointF(220, 140));
+    EXPECT_EQ(selected().size(), 2u);
+    view->clearSelection();
+    EXPECT_EQ(groupsOnPage(), (std::vector<uint32_t>{4, 4, 0}));
+}
+
+// Select more: a tap on a member adds the whole group, a second tap takes the whole group away again
+TEST_F(GroupsCanvasTest, selectMoreAddsAndTakesAwayWholeGroups) {
+    Stroke* loose = addStroke(400, 100, 500, 100);
+    Stroke* a = addStroke(100, 100, 200, 100, 4);
+    addStroke(100, 300, 200, 300, 4);
+    app->getToolHandler()->selectTool(TOOL_SELECT_RECT);
+    tap(0, QPointF(450, 100));
+    ASSERT_EQ(selected().size(), 1u);
+    CanvasPage& page = *view->getPage(0);
+    view->toggleSelected(page, nullptr, a);
+    EXPECT_EQ(selected().size(), 3u);
+    view->toggleSelected(page, nullptr, a);
+    ASSERT_EQ(selected().size(), 1u);
+    EXPECT_EQ(selected().front(), loose);
+}
+
+// A group dragged onto another page where a group has its number (a duplicated page) stays a group of its own
+TEST_F(GroupsCanvasTest, aGroupMovedToAnotherPageDoesNotJoinAGroupThere) {
+    session->insertNewPage(1);
+    processEvents();
+    addStroke(100, 100, 200, 100, 4);
+    addStroke(100, 140, 200, 140, 4);
+    addStroke(100, 100, 200, 100, 4, 1);
+    addStroke(100, 140, 200, 140, 4, 1);
+    app->getToolHandler()->selectTool(TOOL_SELECT_RECT);
+    tap(0, QPointF(150, 100));
+    ASSERT_EQ(selected().size(), 2u);
+    const std::vector<const Element*> moved = selected();
+    drag(0, QPointF(150, 100), 1, QPointF(150, 400));
+    view->clearSelection();
+    ASSERT_EQ(layer(0)->getElementsView().size(), 0u) << "moved";
+    ASSERT_EQ(layer(1)->getElementsView().size(), 4u);
+    std::vector<uint32_t> movedGroups, stayedGroups;
+    for (const Element* e: layer(1)->getElementsView()) {
+        (std::find(moved.begin(), moved.end(), e) != moved.end() ? movedGroups : stayedGroups).push_back(e->getGroup());
+    }
+    EXPECT_EQ(stayedGroups, (std::vector<uint32_t>{4, 4}));
+    ASSERT_EQ(movedGroups.size(), 2u);
+    EXPECT_NE(movedGroups[0], 4u) << "a new number";
+    EXPECT_NE(movedGroups[0], 0u);
+    EXPECT_EQ(movedGroups[0], movedGroups[1]);
+    // Selected again: only the moved two
+    tap(1, QPointF(150, 400));
+    EXPECT_EQ(selected().size(), 2u);
+}
+
