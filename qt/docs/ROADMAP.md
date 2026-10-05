@@ -956,6 +956,14 @@
   the stroke being written (grown along its length) are drawn over them as the pen's stroke is. Audio plays where it
   overlaps at 1×; a tap on ink goes to its moment; leaving changes nothing ([timeline.md](timeline.md)).
 
+- **The replay's play bar reworked, `qt/replay-polish` (2026-10-05).** From the author's test of 0.6.0: in the
+  toolbox mode a replay showed the classic tool bar (the command bar took the hidden toolbox's tools back; on a phone
+  the dock its classic tools): now the tool bar, its tab and the dock are put away while it replays, in both modes.
+  The play bar: "Replay" and "12:04 · 3 Oct, 14:20", a filled play button, a visible track with its elapsed part
+  filled, a large handle with the time above it while held, the sessions as ticks; 48 px controls in the touch
+  profile, two rows on a phone, above the navigation bar and off the screen's edges; a hint at the first replay
+  (once, `replayHintSeen`) ([timeline.md](timeline.md), "The play bar").
+
 - **Version history inside PDFs with notes, `qt/pdf-history` (2026-10-05).** Off by default, found in the page
   sidebar's History panel (what it is and the switch), ⋮ → Document → Version history… and Settings → Documents ("Keep
   versions of new PDFs with notes"); documents that keep versions have a clock on their library card. One version per

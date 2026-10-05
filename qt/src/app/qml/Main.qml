@@ -271,7 +271,9 @@ ApplicationWindow {
     /// The tools are put away: nothing over the page (hudHidden), or read only (the page, its number and zoom)
     readonly property bool toolsHidden: hudHidden || readOnlyOn
     /// The document's timeline is replayed (qt/docs/timeline.md): the page as of a moment and the play bar at the
-    /// bottom, read-only; no tools (as reading), the play bar's keys
+    /// bottom, read-only; no tools (as reading), the play bar's keys. The tool bar (classic or the toolbox's command bar,
+    /// at any edge) and the phone's dock are put away meanwhile: with the toolbox hidden, the bar would otherwise take
+    /// the tools back and show the classic tool bar (qt/replay-polish)
     readonly property bool replaying: app.timeline.active
     function chooseChrome(mode) { chooseLayout("chrome", mode === chromeAuto ? "" : mode) }
 
@@ -287,7 +289,7 @@ ApplicationWindow {
     /// in landscape); in phone portrait always at the bottom
     readonly property bool dockVertical: adaptive.orientation === "landscape" && adaptive.layoutClass !== "phonePortrait"
     /// (not while the soft keyboard is open: the format bar takes its place above the keyboard)
-    readonly property bool dockShown: phoneChrome && !app.homeVisible && !keyboardOpen
+    readonly property bool dockShown: phoneChrome && !app.homeVisible && !keyboardOpen && !replaying
     /// The dock beside the page (a rail): what sits at the window's right edge ends at it
     readonly property bool dockRail: dockShown && dockVertical
 
@@ -758,7 +760,7 @@ ApplicationWindow {
         objectName: "topTools"
         width: parent.width
         visible: !app.homeVisible && win.toolbarPosition === "top" && !win.noToolbar && !win.toolsInFormatBar
-                 && !win.phoneChrome
+                 && !win.phoneChrome && !win.replaying
         Material.background: "#ffffff"
         Material.foreground: "#303030"
         height: win.twoToolRows ? 106 : 56
@@ -797,7 +799,7 @@ ApplicationWindow {
         objectName: "bottomTools"
         width: parent.width
         visible: !app.homeVisible && win.toolbarPosition === "bottom" && !win.noToolbar && !win.toolsInFormatBar
-                 && !win.phoneChrome
+                 && !win.phoneChrome && !win.replaying
         Material.background: "#ffffff"
         Material.foreground: "#303030"
         height: visible ? 106 + (win.keyboardOpen ? 0 : win.safeBottom) : 0
@@ -905,7 +907,7 @@ ApplicationWindow {
         objectName: "sideTools"
         /// The toolbox docked at a side (else the classic bar as a rail)
         readonly property bool holdsToolbox: win.toolboxDocked && win.toolboxVertical
-        visible: holdsToolbox || (!app.homeVisible && win.sideToolbar && !win.noToolbar && !win.phoneChrome)
+        visible: holdsToolbox || (!app.homeVisible && win.sideToolbar && !win.noToolbar && !win.phoneChrome && !win.replaying)
         width: !visible ? 0 : (holdsToolbox ? toolboxPane.thickness : 104) + (win.sideEdge === "right" ? win.safeRight : win.safeLeft)
         anchors.top: parent.top
         anchors.bottom: parent.bottom
@@ -5097,6 +5099,7 @@ ApplicationWindow {
     Item {
         objectName: "toolbarToggle"
         visible: !app.homeVisible && win.fullChrome && !app.toolbarHidden && !win.toolsInFormatBar && !win.phoneChrome
+                 && !win.replaying
         z: 58
         readonly property string edge: win.toolbarPosition
         readonly property bool side: edge === "left" || edge === "right"
@@ -5136,7 +5139,7 @@ ApplicationWindow {
     Rectangle {
         id: toolbarShow
         objectName: "toolbarShow"
-        visible: !app.homeVisible && win.fullChrome && app.toolbarHidden && !win.phoneChrome
+        visible: !app.homeVisible && win.fullChrome && app.toolbarHidden && !win.phoneChrome && !win.replaying
         readonly property string side: win.toolbarPosition
         z: 60  // over the edge of the pen pill, which sits at the right edge by default
         width: side === "top" || side === "bottom" ? 96 : 16
@@ -5197,13 +5200,17 @@ ApplicationWindow {
         target: app.audio
         function onMessage(text) { snackbar.show(text, false) }
     }
-    // The replay of the timeline (qt/docs/timeline.md): its play bar at the bottom of the page
+    // The replay of the timeline (qt/docs/timeline.md): its play bar at the bottom of the page, above the navigation
+    // bar and clear of a cut-out (the safe area), off the side edges (where Android's back gesture starts); the view
+    // pill, the tools and the phone's dock are put away meanwhile (hudHidden, dockShown)
     TimelineBar {
         id: timelineBar
+        touch: win.adaptive.touchProfile
+        readonly property real side: win.phoneLayout ? 12 : 16
         anchors.bottom: canvas.bottom
-        anchors.horizontalCenter: canvas.horizontalCenter
-        anchors.bottomMargin: 16 + canvas.y + canvas.height - win.canvasControlsBottom
-        width: Math.min(canvas.width - 32, 960)
+        anchors.bottomMargin: (win.phoneLayout ? 10 : 16) + canvas.y + canvas.height - win.canvasControlsBottom
+        x: Math.round((win.canvasControlsLeft + win.canvasControlsRight - width) / 2)
+        width: Math.min(win.canvasControlsRight - win.canvasControlsLeft - 2 * side, 960)
         z: 92
     }
     Connections {

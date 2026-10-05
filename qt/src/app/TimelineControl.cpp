@@ -13,6 +13,7 @@
 #include "canvas/TimelineReplay.h"
 #include "model/Document.h"
 #include "session/DocumentSession.h"
+#include "session/ElementTimes.h"
 #include "session/Timeline.h"
 
 #include "AudioControl.h"
@@ -112,6 +113,22 @@ QString TimelineControl::timeText() const {
 }
 
 QString TimelineControl::positionText() const { return clockText(at) + QStringLiteral(" / ") + clockText(duration()); }
+
+QString TimelineControl::elapsedText() const { return line ? clockText(at) : QString(); }
+
+QString TimelineControl::durationText() const { return line ? clockText(duration()) : QString(); }
+
+QString TimelineControl::momentText() const {
+    if (!line) {
+        return {};
+    }
+    if (const auto when = line->wallTime(at)) {
+        const QDateTime t = QDateTime::fromMSecsSinceEpoch(*when);
+        const bool thisYear = t.date().year() == QDateTime::fromMSecsSinceEpoch(timeline::now()).date().year();
+        return QLocale().toString(t, thisYear ? QStringLiteral("d MMM, HH:mm") : QStringLiteral("d MMM yyyy, HH:mm"));
+    }
+    return line->events().empty() ? QString() : tr("Before the times were kept");
+}
 
 int TimelineControl::shownCount() const {
     const TimelineReplay* r = view ? view->replay() : nullptr;

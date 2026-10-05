@@ -3420,6 +3420,30 @@ Seen through the replay (⋮ → View → Replay the writing).
 - [ ] A document with sticky notes: a note appears when it was put on the page, its ink after it.
 - [ ] Another tab while replaying: the replay ends; closing the tab while replaying: no crash.
 
+## The replay's play bar (qt/replay-polish, qt/docs/timeline.md "The play bar")
+
+- [ ] The toolbox (the default): ⋮ → View → Replay the writing (or Replay in the command bar): no tool bar at the top
+      (neither the command bar nor the classic tools, colors and widths), no toolbox, no tab to put the bar away; ✕:
+      the command bar and the toolbox as before, no classic tools. The same in full screen (no floating toolbox, no
+      tool square) and on the Fold 7 (no dock while it replays, the dock with "My tools" afterwards).
+- [ ] The classic tool bar (Settings → Pen → Tools): replaying puts it away too; ✕ brings it back where it was (top,
+      two rows, bottom, a rail).
+- [ ] The first replay: a card above the bar says what replay is and how it is used; "Got it" closes it; the next
+      replay has none (also after restarting the app); a tap on "Replay" on the bar shows it again.
+- [ ] The bar reads "Replay" and "12:04 · 3 Oct, 14:20" (the time on the bar and when that moment was written); its
+      tip (the mouse) has the long forms. A document of last year: the year is in it. An old document: "Before the
+      times were kept" while its first part plays.
+- [ ] Android (Fold 7, folded and open, upright and sideways, gesture navigation and the three buttons): the bar sits
+      above the navigation bar, not under it, and clear of the camera cut-out held sideways; folded, two rows (the
+      slider on its own row). Every button is easy to hit with a thumb.
+- [ ] Android: drag the handle with a finger, slowly and fast, from either end of the slider: the replay follows, the
+      time shows above the finger, the page does not scroll, the system's back gesture and the home gesture do not
+      start (also starting the drag at the slider's very ends). A tap on the track jumps there.
+- [ ] The Surface Pro 8 with a finger (the touch profile): 48 px buttons and the large handle; with the mouse: the
+      smaller bar, the tip of a session's tick shows its date.
+- [ ] The bar is easy to see on a white page, a dark page (dark backgrounds), a PDF page with a dark picture at the
+      bottom: its edge and shadow set it off; the elapsed part of the track is clearly filled.
+
 ## Version history inside PDFs with notes (qt/pdf-history, qt/docs/hybrid-pdf.md "Version history")
 
 - [ ] `xournal-qt-cli export-xopp notes.pdf --version 2 -o v2.xopp` on a PDF with notes that kept versions over a

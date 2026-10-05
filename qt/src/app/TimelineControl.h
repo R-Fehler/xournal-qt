@@ -49,6 +49,11 @@ class TimelineControl: public QObject {
     Q_PROPERTY(QString timeText READ timeText NOTIFY positionChanged)
     /// "1:23 / 4:56"
     Q_PROPERTY(QString positionText READ positionText NOTIFY positionChanged)
+    /// The play bar's short forms (qt/replay-polish): the bar's time "12:04", its length "45:10", and the clock time of
+    /// the moment "3 Oct, 14:20" (with the year when it is not this one; "Before the times were kept" in the prelude)
+    Q_PROPERTY(QString elapsedText READ elapsedText NOTIFY positionChanged)
+    Q_PROPERTY(QString durationText READ durationText NOTIFY activeChanged)
+    Q_PROPERTY(QString momentText READ momentText NOTIFY positionChanged)
     /// A recording is heard now
     Q_PROPERTY(bool hearing READ hearing NOTIFY hearingChanged)
     /// How many elements are shown now, of all
@@ -70,6 +75,9 @@ public:
     QVariantList tracks() const;
     QString timeText() const;
     QString positionText() const;
+    QString elapsedText() const;
+    QString durationText() const;
+    QString momentText() const;
     bool hearing() const { return heard; }
     int shownCount() const;
     int elementCount() const;

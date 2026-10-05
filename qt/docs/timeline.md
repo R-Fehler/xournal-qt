@@ -83,12 +83,12 @@ short.
 
 - **Entered** from ⋮ → View → **Replay the writing** (not in text files), or from the playback pill's replay button
   (the replay starts where the recording is heard and plays on). The document is replayed from the start, paused.
-- **The play bar** at the bottom of the page (`timelineBar`): ✕ (`timelineClose`, also Esc), the start of this or the
-  previous session and the next one (`timelinePreviousMark`, `timelineNextMark`), play/pause (`timelinePlay`, also
-  Space), a slider (`timelineSlider`) with a mark where each session begins (its date on hover) and a red band where a
-  recording is (grey: its file is not here), the bar's time ("1:23 / 4:56") and the clock time of the moment ("Sun 4
-  Oct 2026, 14:03"; "Written before the times were kept" in the prelude), the speed (`timelineSpeed`: ½×, 1×, 2×, 4×,
-  8×). ← and → go 5 s, Home and End to the ends. The tools, the tool bar and the pills are hidden, as in reading.
+- **The play bar** at the bottom of the page (`timelineBar`, below "The play bar"). ← and → go 5 s, Home and End to
+  the ends, Space plays and pauses, Esc leaves. **The tools are put away** (`win.replaying`): the toolbox (docked or
+  floating), the tool bar at any edge (the classic one, or the toolbox's command bar) with its tab, the phone's dock,
+  the classic tool square and the pen pill, the view pill and the pills; the tab strip and a phone's app bar (with ⋮)
+  stay. (Before qt/replay-polish only the toolbox was hidden: the command bar then took its tools back and showed the
+  classic tool bar, the phone's dock its classic tools; `TimelineUiTest.theToolboxModeShowsNoClassicToolBarDuringOrAfterAReplay`.)
 - **Audio** plays where it overlaps, through `app.audio` (the same player as the playback pill, which is hidden
   meanwhile): at 1× only (at other speeds the replay is silent); the clock follows what is heard when they drift
   apart by more than 250 ms; a recording that ended or cannot be played is not started again until the next jump.
@@ -126,10 +126,56 @@ the slider, the speed, play, the pen writes nothing, ✕ and Esc, the document t
 same undo step and page revision; a tap on ink; another tab ends it; a recording heard where it is (the fake speaker),
 the playback pill's replay button.
 
+## The play bar (`qt/replay-polish`)
+
+The author's test of 0.6.0: "The replay scrollbar is hard to use on Android, or generally not easy to see and
+understand for the first time user." `TimelineBar.qml`, placed by `Main.qml`.
+
+- **What it shows**: a title, **Replay** (accent, bold), over the time **"12:04 · 3 Oct, 14:20"**: the bar's time
+  (`app.timeline.elapsedText`) and the clock time of the moment shown (`momentText`: day, month, hour; the year too
+  when it is not this one; "Before the times were kept" in the prelude). Its tip has the long forms ("1:23 / 4:56",
+  "Sun 4 Oct 2026, 14:03"). Then the session before (`timelinePreviousMark`), **play/pause** (`timelinePlay`, a filled
+  accent circle), the next session (`timelineNextMark`), the **slider** (`timelineSlider`), the speed (`timelineSpeed`:
+  ½×, 1×, 2×, 4×, 8×) and ✕ (`timelineClose`).
+- **The slider**: a track you can see (`timelineTrack`, grey) with the elapsed part filled in the accent
+  (`timelineElapsed`), a large round handle (`timelineHandle`: 18 px, 26 px in the touch profile, larger while held)
+  with a ring of the bar's color; while it is held, the time is shown above it (`timelineBubble`), where a finger does
+  not cover it. Each session's start is a **tick across the track** (`timelineMark`; with the mouse or the pen its
+  date as a tip, "A session: Sun 4 Oct 2026, 14:03"), each recording a red band under it (grey: its file is not here).
+  The slider takes the row's whole height (48 px in the touch profile), so the finger needs not hit the handle.
+- **Sizes**: every control 40 px with the mouse, **48 px in the touch profile** (`win.adaptive.touchProfile`; play 52).
+- **Layout**: one row on a wide bar (title and time, ⏮ ▶ ⏭, the slider, speed, ✕); **two rows** under 640 px (a phone,
+  a narrow window): the slider on its own row with "Replay" before it, then the time and the buttons. The bar is as
+  wide as the page's area allows (at most 960 px), centred in it, 16 px (a phone: 12) off its sides, so the slider's
+  ends are well away from the screen's edges (Android's back gesture starts there), and above the bottom of the page
+  by 16 px (10) **plus the safe area** (`win.canvasControlsBottom`: above Android's navigation or gesture bar and the
+  soft keyboard; clear of a cut-out at a side). The phone's dock, the view pill and the tools are put away meanwhile,
+  so it meets none of them. The bar takes every press, wheel and finger on it (the page under it does not scroll);
+  the gap above it is the page's (`inputTransparent`).
+- **Contrast**: an opaque surface with a 1 px edge and a soft shadow, so it stands out on a white, a dark or a PDF page;
+  dark colors when the theme is dark (`Material.theme`; the app is light today, the presenter's panel dark).
+- **First use**: the first replay shows a small card above the bar (`timelineHint`): "Replaying how this document was
+  written; your document isn't changed." and "Drag the bar or press ▶ to play. The marks on the bar are the sessions
+  it was written in. ✕ leaves the replay." "Got it" (`timelineHintClose`) closes it. It is shown once (the setting
+  `replayHintSeen`, set when it is shown); a tap on the title (`timelineTitle`, `timelineTitleShort` in two rows)
+  shows it again.
+
+Tests (`TimelineUiTest`, label `ui`): the title and "0:02 · 4 Oct, 08:00", the elapsed part, the mark, one row and
+40 px with the mouse, 48 px and the slider 48 high with the touch profile, inside the page
+(`thePlayBarSaysWhatItIsAndItsControlsAreSizedForTheInput`); the hint once, again from the title
+(`theFirstReplayShowsAHintOnce`); no classic tool bar in the toolbox mode during and after a replay, in a window, in
+full screen and in a phone's chrome (`theToolboxModeShowsNoClassicToolBarDuringOrAfterAReplay`). On a phone's screen
+(`TimelinePhone.ui@phone`, `offscreen-phone.json`, the touch profile, a navigation bar of 40 px): two rows, every
+control 48 px under the slider's row, the time not cut, above the navigation bar, off the edges, no dock and no view
+pill; a finger drags the handle: the replay's time moves, the time is shown above the finger, the page does not scroll;
+the same in full screen.
+
 ## Not built (later)
 
 - Level 3 (erasing, moving, recolouring, page changes replayed): it waits for the version history (B6).
 - Times per point (a stroke grows evenly along its length).
 - Speech at other speeds than 1× (pitch-kept time stretching).
+- Android's gesture exclusion (`View.setSystemGestureExclusionRects`) for the slider: not set; the slider keeps off the
+  screen's side edges instead. If the back gesture still takes a drag on a device, this is the next step.
 - A replay of the audience's screen while presenting (the presenter's view replays, the audience's shows the
   document).

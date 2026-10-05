@@ -393,6 +393,10 @@ if(XQT_BUILD_TESTS)
     add_test(NAME ReadingPhone.ui@phone COMMAND xqt-ui-tests --gtest_filter=ReadingPhoneTest.*)
     set_tests_properties(ReadingPhone.ui@phone PROPERTIES LABELS ui ENVIRONMENT
         "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_LIST_DIR}/../tests/ui/offscreen-phone.json")
+    # The replay's play bar on a phone (qt/docs/timeline.md, "The play bar"): touch-sized, above the navigation bar
+    add_test(NAME TimelinePhone.ui@phone COMMAND xqt-ui-tests --gtest_filter=TimelinePhoneTest.*)
+    set_tests_properties(TimelinePhone.ui@phone PROPERTIES LABELS ui ENVIRONMENT
+        "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_LIST_DIR}/../tests/ui/offscreen-phone.json")
     # The presenter view with two screens (qt/docs/presenter-view.md): a laptop and a projector, off-screen
     add_test(NAME PresenterView.ui@2screens COMMAND xqt-ui-tests --gtest_filter=PresenterView.*)
     set_tests_properties(PresenterView.ui@2screens PROPERTIES LABELS ui ENVIRONMENT
