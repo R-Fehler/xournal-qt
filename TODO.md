@@ -599,10 +599,11 @@ The other ideas (A3–A9, A15, B1–B8) stay in that file to decide later.
   home button / "+", ⋮ → Document, Ctrl+Alt+N, `--quick-note` through `SingleInstance` (also the `.desktop` file's action), an
   Android launcher shortcut. Left: the Android shortcut is untested on a device (no Android build here); no toolbox
   button (by the spec).
-- [ ] `qt/templates` (A12): "Save page as template" (the page's content, and if wanted its background, a PDF page
+- [x] `qt/templates` (A12): "Save page as template" (the page's content, and if wanted its background, a PDF page
   included, so using it is the same as copying that page) into a `Templates/` folder of the library (and an app-wide
   set), chosen when adding pages (the add-page button's list, Insert pages dialog, new document). After `qt/stickers`
-  (same folder model and picker).
+  (same folder model and picker). Built (qt/docs/templates.md). Left: templates of several pages, previews in the
+  Insert pages / New document dialogs, the device checks.
 - [ ] `qt/tags` (A13): `#tag` in typed text, Markdown and sticky notes, XMP/Info keywords in PDFs; indexed per folder;
   a Tags chip in the library like Favourites (list of tags with counts, filter), `tag:name` in the fuzzy syntax,
   shown on cards. After `qt/todos` (both extend the index's notes pack).

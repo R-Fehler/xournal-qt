@@ -21,7 +21,7 @@ namespace xqt::stickers {
 
 namespace {
 std::mutex appSetMutex;
-fs::path appSetOverride;
+std::map<Kind, fs::path> appSetOverride;
 
 std::string lower(std::string s) {
     std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -59,8 +59,8 @@ bool writeJson(const fs::path& file, const QJsonObject& object) {
 }
 
 /// The order file names one sticker by another name now (or no more: `to` empty)
-void renameInOrder(const fs::path& folder, const std::string& from, const std::string& to) {
-    std::vector<std::string> names = readOrder(folder);
+void renameInOrder(const fs::path& folder, const std::string& from, const std::string& to, Kind kind) {
+    std::vector<std::string> names = readOrder(folder, kind);
     const auto at = std::find(names.begin(), names.end(), from);
     if (at == names.end()) {
         return;
@@ -70,25 +70,65 @@ void renameInOrder(const fs::path& folder, const std::string& from, const std::s
     } else {
         *at = to;
     }
-    writeOrder(folder, names);
+    writeOrder(folder, names, kind);
+}
+
+/// The files of a .xopp follow it to `target` (moved, or copied)
+void carryCompanions(const fs::path& from, const fs::path& target, bool copy) {
+    for (const auto& [file, suffix]: companionsOf(from)) {
+        fs::path to = target.parent_path() / (target.filename().string() + suffix);
+        std::error_code ec;
+        if (!copy) {
+            fs::rename(file, to, ec);
+            if (!ec) {
+                continue;
+            }
+            ec.clear();
+        }
+        fs::copy_file(file, to, fs::copy_options::overwrite_existing, ec);
+        if (!copy && !ec) {
+            fs::remove(file, ec);
+        }
+    }
 }
 }  // namespace
 
-fs::path librarySet(const fs::path& libraryRoot) { return libraryRoot / FOLDER; }
+const char* orderFile(Kind kind) { return kind == Kind::Templates ? TEMPLATE_ORDER_FILE : ORDER_FILE; }
 
-fs::path appSet() {
-    {
-        std::lock_guard lock(appSetMutex);
-        if (!appSetOverride.empty()) {
-            return appSetOverride;
-        }
-    }
-    return fs::path(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation).toStdString()) / "stickers";
+fs::path librarySet(const fs::path& libraryRoot, Kind kind) {
+    return libraryRoot / (kind == Kind::Templates ? TEMPLATES_FOLDER : FOLDER);
 }
 
-void setAppSet(const fs::path& folder) {
+fs::path appSet(Kind kind) {
+    {
+        std::lock_guard lock(appSetMutex);
+        if (const auto it = appSetOverride.find(kind); it != appSetOverride.end() && !it->second.empty()) {
+            return it->second;
+        }
+    }
+    return fs::path(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation).toStdString()) /
+           (kind == Kind::Templates ? "templates" : "stickers");
+}
+
+void setAppSet(const fs::path& folder, Kind kind) {
     std::lock_guard lock(appSetMutex);
-    appSetOverride = folder;
+    appSetOverride[kind] = folder;
+}
+
+std::vector<std::pair<fs::path, std::string>> companionsOf(const fs::path& file) {
+    std::vector<std::pair<fs::path, std::string>> out;
+    if (lower(file.extension().string()) != ".xopp") {
+        return out;
+    }
+    const std::string name = file.filename().string();
+    std::error_code ec;
+    if (fs::path pdf = file.parent_path() / (name + ".bg.pdf"); fs::exists(pdf, ec)) {
+        out.emplace_back(pdf, ".bg.pdf");
+    }
+    for (const fs::path& img: DocumentFiles::imageAttachmentsOf(file)) {
+        out.emplace_back(img, img.filename().string().substr(name.size()));
+    }
+    return out;
 }
 
 bool isPicture(const fs::path& file) {
@@ -96,7 +136,7 @@ bool isPicture(const fs::path& file) {
     return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".webp";
 }
 
-bool isStickerFile(const fs::path& file) {
+bool isStickerFile(const fs::path& file, Kind kind) {
     if (hidden(file)) {
         return false;
     }
@@ -104,10 +144,10 @@ bool isStickerFile(const fs::path& file) {
     if (!name.empty() && name.back() == '~') {
         return false;
     }
-    return lower(file.extension().string()) == ".xopp" || isPicture(file);
+    return lower(file.extension().string()) == ".xopp" || (kind == Kind::Stickers && isPicture(file));
 }
 
-std::vector<Entry> list(const fs::path& set) {
+std::vector<Entry> list(const fs::path& set, Kind kind) {
     std::vector<Entry> entries;
     std::error_code ec;
     if (!fs::is_directory(set, ec)) {
@@ -122,7 +162,7 @@ std::vector<Entry> list(const fs::path& set) {
             }
             continue;
         }
-        if (!isStickerFile(p) || !it->is_regular_file(ec)) {
+        if (!isStickerFile(p, kind) || !it->is_regular_file(ec)) {
             continue;
         }
         if (isPicture(p)) {
@@ -176,7 +216,7 @@ fs::path uniqueTarget(const fs::path& folder, const std::string& name, const std
                 return true;
             }
         }
-        return fs::exists(folder / (stem + ext), ec);
+        return fs::exists(folder / (stem + ext), ec) || fs::exists(folder / (stem + ".xopp.bg.pdf"), ec);
     };
     std::string stem = name.empty() ? std::string("Sticker") : name;
     for (int i = 2; taken(stem) && i < 10000; ++i) {
@@ -187,9 +227,9 @@ fs::path uniqueTarget(const fs::path& folder, const std::string& name, const std
 
 // --- the own order ------------------------------------------------------------------------------------------------
 
-std::vector<std::string> readOrder(const fs::path& folder) {
+std::vector<std::string> readOrder(const fs::path& folder, Kind kind) {
     std::vector<std::string> names;
-    for (const QJsonValue& v: readJson(folder / ORDER_FILE).value(QStringLiteral("order")).toArray()) {
+    for (const QJsonValue& v: readJson(folder / orderFile(kind)).value(QStringLiteral("order")).toArray()) {
         if (v.isString()) {
             names.push_back(v.toString().toStdString());
         }
@@ -197,24 +237,24 @@ std::vector<std::string> readOrder(const fs::path& folder) {
     return names;
 }
 
-bool writeOrder(const fs::path& folder, const std::vector<std::string>& names) {
+bool writeOrder(const fs::path& folder, const std::vector<std::string>& names, Kind kind) {
     QJsonArray order;
     for (const std::string& n: names) {
         order.append(QString::fromStdString(n));
     }
     QJsonObject root;
     root.insert(QStringLiteral("order"), order);
-    return writeJson(folder / ORDER_FILE, root);
+    return writeJson(folder / orderFile(kind), root);
 }
 
-std::vector<Entry> ordered(std::vector<Entry> entries) {
+std::vector<Entry> ordered(std::vector<Entry> entries, Kind kind) {
     // Per folder: the names of its order file, each with its place
     std::map<std::string, std::map<std::string, size_t>> places;
     for (const Entry& e: entries) {
         const std::string folder = e.path.parent_path().string();
         if (!places.count(folder)) {
             auto& p = places[folder];
-            const auto names = readOrder(e.path.parent_path());
+            const auto names = readOrder(e.path.parent_path(), kind);
             for (size_t i = 0; i < names.size(); ++i) {
                 p.emplace(names[i], i);
             }
@@ -241,20 +281,20 @@ std::vector<Entry> ordered(std::vector<Entry> entries) {
     return entries;
 }
 
-bool moveInOrder(const fs::path& sticker, int delta) {
+bool moveInOrder(const fs::path& sticker, int delta, Kind kind) {
     const fs::path folder = sticker.parent_path();
     // The folder's stickers (not its subfolders') in their order now
     std::vector<Entry> here;
     std::error_code ec;
     for (const auto& entry: fs::directory_iterator(folder, ec)) {
-        if (entry.is_regular_file(ec) && isStickerFile(entry.path())) {
+        if (entry.is_regular_file(ec) && isStickerFile(entry.path(), kind)) {
             Entry e;
             e.path = entry.path();
             e.name = entry.path().stem().string();
             here.push_back(std::move(e));
         }
     }
-    here = ordered(std::move(here));
+    here = ordered(std::move(here), kind);
     const auto at = std::find_if(here.begin(), here.end(), [&](const Entry& e) { return e.path == sticker; });
     if (at == here.end()) {
         return false;
@@ -269,7 +309,7 @@ bool moveInOrder(const fs::path& sticker, int delta) {
     for (const Entry& e: here) {
         names.push_back(e.path.filename().string());
     }
-    return writeOrder(folder, names);
+    return writeOrder(folder, names, kind);
 }
 
 // --- last used ------------------------------------------------------------------------------------------------
@@ -330,7 +370,7 @@ void LastUsed::moved(const fs::path& from, const fs::path& to) {
 
 // --- changes ------------------------------------------------------------------------------------------------------
 
-std::optional<fs::path> rename(const fs::path& sticker, const std::string& name) {
+std::optional<fs::path> rename(const fs::path& sticker, const std::string& name, Kind kind) {
     if (DocumentFiles::nameProblem(name) != DocumentFiles::RenameProblem::None || name.front() == '.') {
         return std::nullopt;
     }
@@ -348,12 +388,13 @@ std::optional<fs::path> rename(const fs::path& sticker, const std::string& name)
     if (ec) {
         return std::nullopt;
     }
-    renameInOrder(sticker.parent_path(), sticker.filename().string(), target.filename().string());
+    carryCompanions(sticker, target, false);
+    renameInOrder(sticker.parent_path(), sticker.filename().string(), target.filename().string(), kind);
     PreviewCache::moved({{sticker, target}});
     return target;
 }
 
-std::optional<fs::path> moveTo(const fs::path& sticker, const fs::path& folder) {
+std::optional<fs::path> moveTo(const fs::path& sticker, const fs::path& folder, Kind kind) {
     if (sticker.parent_path() == folder) {
         return sticker;
     }
@@ -369,7 +410,8 @@ std::optional<fs::path> moveTo(const fs::path& sticker, const fs::path& folder) 
         }
         fs::remove(sticker, ec);
     }
-    renameInOrder(sticker.parent_path(), sticker.filename().string(), {});
+    carryCompanions(sticker, target, false);
+    renameInOrder(sticker.parent_path(), sticker.filename().string(), {}, kind);
     PreviewCache::moved({{sticker, target}});
     return target;
 }
@@ -381,18 +423,22 @@ std::optional<fs::path> copyTo(const fs::path& sticker, const fs::path& folder) 
     if (!fs::copy_file(sticker, target, ec) || ec) {
         return std::nullopt;
     }
+    carryCompanions(sticker, target, true);
     return target;
 }
 
-bool trash(const fs::path& sticker) {
+bool trash(const fs::path& sticker, Kind kind) {
     const DocumentItem item = DocumentFiles::itemOf(sticker);
     bool ok = item.valid() && DocumentFiles::trash(item).ok;
     std::error_code ec;
     if (!ok && fs::exists(sticker, ec)) {
+        for (const auto& c: companionsOf(sticker)) {
+            fs::remove(c.first, ec);
+        }
         ok = fs::remove(sticker, ec);
     }
     if (ok) {
-        renameInOrder(sticker.parent_path(), sticker.filename().string(), {});
+        renameInOrder(sticker.parent_path(), sticker.filename().string(), {}, kind);
     }
     return ok;
 }
@@ -403,14 +449,15 @@ namespace xqt {
 
 using namespace stickers;
 
-StickersModel::StickersModel(QObject* parent): QAbstractListModel(parent) {}
+StickersModel::StickersModel(Kind kind, QObject* parent): QAbstractListModel(parent), setKind(kind) {}
 
 void StickersModel::setLibrary(const fs::path& root, const fs::path& configDir) {
     libraryRoot = root;
-    fs::path usedFile = configDir.empty() ? fs::path() : configDir / "stickers.json";
+    const char* usedName = setKind == Kind::Templates ? "templates.json" : "stickers.json";
+    fs::path usedFile = configDir.empty() ? fs::path() : configDir / usedName;
     if (usedFile.empty()) {
         usedFile = fs::path(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation).toStdString()) /
-                   "stickers.json";
+                   usedName;
     }
     lastUsed = LastUsed(usedFile);
     if (libraryRoot.empty() && scopeName == QLatin1String("library")) {
@@ -422,9 +469,9 @@ void StickersModel::setLibrary(const fs::path& root, const fs::path& configDir) 
 
 fs::path StickersModel::rootOf(const QString& scope) const {
     if (scope == QLatin1String("app")) {
-        return appSet();
+        return appSet(setKind);
     }
-    return libraryRoot.empty() ? fs::path() : librarySet(libraryRoot);
+    return libraryRoot.empty() ? fs::path() : librarySet(libraryRoot, setKind);
 }
 
 int StickersModel::rowCount(const QModelIndex& parent) const {
@@ -503,7 +550,7 @@ void StickersModel::setSort(const QString& sort) {
 
 void StickersModel::refresh() {
     const fs::path set = currentSet();
-    all = set.empty() ? std::vector<Entry>() : list(set);
+    all = set.empty() ? std::vector<Entry>() : list(set, setKind);
     allCount = all.size();
     folderNames = set.empty() ? QStringList() : folders(set);
     if (!folderName.isEmpty() && !folderNames.contains(folderName)) {
@@ -532,7 +579,7 @@ void StickersModel::apply() {
         return DocumentFiles::compareNames(QString::fromStdString(a.name), QString::fromStdString(b.name)) < 0;
     };
     if (sortName == QLatin1String("own")) {
-        shown = ordered(std::move(shown));
+        shown = ordered(std::move(shown), setKind);
     } else if (sortName == QLatin1String("name")) {
         std::stable_sort(shown.begin(), shown.end(), byName);
     } else if (sortName == QLatin1String("added")) {
@@ -564,8 +611,33 @@ void StickersModel::markUsed(const QString& path) {
     }
 }
 
+QVariantList StickersModel::recent(int count) const {
+    std::vector<std::pair<qint64, Entry>> used;
+    for (const QString scope: {QStringLiteral("library"), QStringLiteral("app")}) {
+        const fs::path set = rootOf(scope);
+        if (set.empty()) {
+            continue;
+        }
+        for (Entry& e: list(set, setKind)) {
+            if (const qint64 when = lastUsed.when(e.path); when > 0) {
+                used.emplace_back(when, std::move(e));
+            }
+        }
+    }
+    std::stable_sort(used.begin(), used.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+    QVariantList out;
+    for (const auto& [when, e]: used) {
+        if (out.size() >= count) {
+            break;
+        }
+        out.append(QVariantMap{{QStringLiteral("name"), QString::fromStdString(e.name)},
+                               {QStringLiteral("path"), QString::fromStdString(e.path.string())}});
+    }
+    return out;
+}
+
 bool StickersModel::moveBy(const QString& path, int delta) {
-    if (!moveInOrder(fs::path(path.toStdString()), delta)) {
+    if (!moveInOrder(fs::path(path.toStdString()), delta, setKind)) {
         return false;
     }
     if (sortName != QLatin1String("own")) {
@@ -583,7 +655,7 @@ bool StickersModel::rename(const QString& path, const QString& name) {
     if (wanted.empty() || stickers::fileNameOf(wanted) != wanted) {
         return false;
     }
-    const auto to = stickers::rename(from, wanted);
+    const auto to = stickers::rename(from, wanted, setKind);
     if (!to) {
         return false;
     }
@@ -607,7 +679,7 @@ bool StickersModel::moveToFolder(const QString& path, const QString& folder) {
         }
         into /= name;
     }
-    const auto to = moveTo(from, into);
+    const auto to = moveTo(from, into, setKind);
     if (!to) {
         return false;
     }
@@ -633,12 +705,12 @@ bool StickersModel::copyToLibrary(const QString& path, const QString& library) {
     if (library.isEmpty()) {
         return false;
     }
-    return copyTo(fs::path(path.toStdString()), librarySet(fs::path(library.toStdString()))).has_value();
+    return copyTo(fs::path(path.toStdString()), librarySet(fs::path(library.toStdString()), setKind)).has_value();
 }
 
 bool StickersModel::remove(const QString& path) {
     const fs::path file(path.toStdString());
-    if (!stickers::trash(file)) {
+    if (!stickers::trash(file, setKind)) {
         return false;
     }
     lastUsed.moved(file, {});

@@ -1,5 +1,6 @@
 // Insert new pages with a chosen background (blank, ruled, graph, ...), paper size and orientation, before or after
-// a page. By default like the current page.
+// a page. By default like the current page. Or "From a template" (qt/docs/templates.md): the template's page, as many
+// times as asked, as a pasted copy of it (one undo step).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -16,6 +17,10 @@ AdaptiveDialog {
     property int bgIndex: 0
     property int paper: -1  // -1: like the page
     property bool landscape: false
+    /// "From a template": the template's file ("": new pages)
+    property bool fromTemplate: false
+    property string templatePath: ""
+    property string templateName: ""
 
     function openAt(position) {
         // position: before this page index (page count: at the end)
@@ -29,17 +34,82 @@ AdaptiveDialog {
         landscape = current.landscape === true
         paper = -1
         countBox.value = 1
+        fromTemplate = false
     }
     function insert() {
-        app.insertPages(after ? page + 1 : page, bgIndex, paper, landscape, countBox.value)
+        if (fromTemplate) {
+            if (templatePath === "") {
+                picker.open()
+                return
+            }
+            app.insertTemplate(templatePath, after ? page + 1 : page, countBox.value)
+        } else {
+            app.insertPages(after ? page + 1 : page, bgIndex, paper, landscape, countBox.value)
+        }
         dlg.close()
+    }
+
+    StickerPicker {
+        id: picker
+        mode: "templates"
+        pickOnly: true
+        onChosen: function(path) {
+            dlg.templatePath = path
+            dlg.templateName = path.replace(/^.*[\\/]/, "").replace(/\.xopp$/i, "")
+            dlg.fromTemplate = true
+        }
     }
 
     ColumnLayout {
         width: dlg.availableWidth
         spacing: 12
-        Label { text: qsTr("Background"); font.weight: Font.DemiBold }
+        // New pages, or a template's page
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            ButtonGroup { id: kind }
+            Button {
+                objectName: "insertNewPages"
+                text: qsTr("New pages")
+                checkable: true
+                checked: !dlg.fromTemplate
+                flat: true
+                ButtonGroup.group: kind
+                onClicked: dlg.fromTemplate = false
+            }
+            Button {
+                objectName: "insertFromTemplate"
+                text: qsTr("From a template")
+                checkable: true
+                checked: dlg.fromTemplate
+                flat: true
+                ButtonGroup.group: kind
+                onClicked: {
+                    dlg.fromTemplate = true
+                    if (dlg.templatePath === "") picker.open()
+                }
+            }
+        }
+        RowLayout {
+            visible: dlg.fromTemplate
+            Layout.fillWidth: true
+            spacing: 12
+            Label {
+                objectName: "insertTemplateName"
+                Layout.fillWidth: true
+                elide: Text.ElideMiddle
+                text: dlg.templatePath === "" ? qsTr("No template chosen") : dlg.templateName
+                font.weight: Font.DemiBold
+            }
+            Button {
+                objectName: "insertChooseTemplate"
+                text: qsTr("Choose…")
+                onClicked: picker.open()
+            }
+        }
+        Label { visible: !dlg.fromTemplate; text: qsTr("Background"); font.weight: Font.DemiBold }
         BackgroundChooser {
+            visible: !dlg.fromTemplate
             Layout.fillWidth: true
             selected: dlg.bgIndex
             landscape: dlg.landscape
@@ -47,6 +117,7 @@ AdaptiveDialog {
         }
         // Paper and orientation, then how many and where: in two rows each in a narrow window (a phone)
         GridLayout {
+            visible: !dlg.fromTemplate
             Layout.fillWidth: true
             columns: dlg.availableWidth < 520 ? 1 : 2
             columnSpacing: 12

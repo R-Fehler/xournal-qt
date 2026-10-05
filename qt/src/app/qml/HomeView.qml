@@ -904,6 +904,7 @@ Rectangle {
                         path: model.path
                         isFolder: model.isFolder
                         isStickers: model.isFolder && model.path === app.stickers.libraryFolder
+                        isTemplates: model.isFolder && model.path === app.templates.libraryFolder
                         preview: model.preview
                         hasPdf: model.hasPdf
                         lastRead: model.lastRead ? home.formatDate(model.lastRead) : ""

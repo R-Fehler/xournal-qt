@@ -2165,6 +2165,22 @@ bool AppController::createDocumentAt(fs::path path) {
     DocumentSession* created = s.get();
     tabs->addTab(std::move(s));
     setHomeVisible(false);
+    return saveNewDocumentAt(*created, path);
+}
+
+bool AppController::saveNewDocument(DocumentSession& doc, const QString& name, bool inLibrary) {
+    if (!inLibrary || !library->available()) {
+        return true;
+    }
+    fs::path path(library->newDocumentPath(name).toStdString());
+    if (pdfOnly()) {
+        path.replace_extension(".pdf");  // (PDF files mode, as createDocument)
+    }
+    return saveNewDocumentAt(doc, path);
+}
+
+bool AppController::saveNewDocumentAt(DocumentSession& doc, const fs::path& path) {
+    DocumentSession* created = &doc;
     DocumentSession::SaveResult r;
     if (path.extension() == ".pdf") {
         r = created->saveAsHybrid(path);

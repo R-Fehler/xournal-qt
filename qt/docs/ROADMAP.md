@@ -860,6 +860,15 @@
   step and is not kept; over nothing it stays a stroke; the shape test passes no stroke of the handwriting fixture.
   Both in `GestureStrokeHandler` (upstream's `StrokeHandler`, unmodified) ([pen-gestures.md](pen-gestures.md)).
 
+- **Page templates, `qt/templates` (2026-10-05).** "Save page as template…" (⋮ → Page, the page menus, the add-page
+  button's list) saves a page as a one-page `.xopp` in the library's visible `Templates/` folder or the app-wide set,
+  with or without its background and its content. A PDF page goes along as upstream's attached PDF of one page
+  (`name.xopp.bg.pdf`), so adding the template is pasting a copy of that page: its PDF page joins the document's merged
+  PDF, its text searchable, saved right in a `.xopp` and in a PDF with notes. Without the background the page gets
+  the background of new pages there. Added from the add-page button's list (the five used last), the picker (the
+  sticker picker in template mode), the Insert pages dialog (several at once) and New document; one undo step
+  ([templates.md](templates.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

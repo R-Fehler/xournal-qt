@@ -31,8 +31,8 @@ std::string stampOf(const fs::path& p) {
 }  // namespace
 
 void PageClipboard::copy(DocumentSession& session, const std::vector<size_t>& indices, bool withPdf) {
-    Document& doc = *session.getDocument();
     if (withPdf) {
+        Document& doc = *session.getDocument();
         // Pages pasted just now from another PDF: their PDF pages are taken along once they are in the merged PDF
         bool pending = false;
         {
@@ -49,6 +49,31 @@ void PageClipboard::copy(DocumentSession& session, const std::vector<size_t>& in
             session.waitForMerges();
         }
     }
+    copyPages(*session.getDocument(), indices, withPdf);
+    sourceSession = session.serial();
+    sourceNumbering = session.pdfNumbering();
+}
+
+void PageClipboard::copy(Document& doc, const std::vector<size_t>& indices, bool withPdf) {
+    copyPages(doc, indices, withPdf);
+    sourceSession = 0;  // (no session: serials count from 1)
+    sourceNumbering = 0;
+}
+
+PageClipboard::Copied PageClipboard::copied(size_t i) const {
+    Copied c;
+    if (i >= pages.size()) {
+        return c;
+    }
+    c.page = std::make_shared<XojPage>(*pages[i]);
+    c.pdfPage = pdfPages[i];
+    if (pages.size() == 1 && pdfIndex[i] == 0) {
+        c.pdf = pdfData;
+    }
+    return c;
+}
+
+void PageClipboard::copyPages(Document& doc, const std::vector<size_t>& indices, bool withPdf) {
     std::vector<size_t> numbers;  // the PDF pages to take along
     {
         std::shared_lock lock(doc);
@@ -58,8 +83,6 @@ void PageClipboard::copy(DocumentSession& session, const std::vector<size_t>& in
         pdfData.clear();
         merged = {};
         pdfFile = doc.getPdfFilepath();
-        sourceSession = session.serial();
-        sourceNumbering = session.pdfNumbering();
         for (size_t i: indices) {
             if (i >= doc.getPageCount()) {
                 continue;

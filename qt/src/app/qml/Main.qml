@@ -104,6 +104,8 @@ ApplicationWindow {
         touchSetting: (app.settings.revision, app.settings.get("touchProfile"))
     }
     /// What was chosen by hand in this size class ("": the automatic choice): "sidebar", "chrome", later "toolbar"
+    /// "Save page as template…" for page index `page` (qt/docs/templates.md; the page menus)
+    function openTemplateSave(page) { templateSaveDialog.openForPage(page) }
     function layoutChoice(what) { return (app.settings.revision, app.settings.layoutChoice(adaptive.layoutClass, what)) }
     function chooseLayout(what, value) { app.settings.setLayoutChoice(adaptive.layoutClass, what, value) }
     /// The bottom sheet that the menus (AdaptiveMenu) become in the phone classes, one for the window
@@ -1478,6 +1480,9 @@ ApplicationWindow {
                         iconName: "xqt-file"
                         offered: !win.textDoc
                         AdaptiveMenuItem { objectName: "insertPagesItem"; text: qsTr("Insert pages…"); icon.source: app.iconUrl("xopp-page-add"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
+                        // Page templates (qt/docs/templates.md): this page saved to be added again; one added
+                        AdaptiveMenuItem { objectName: "saveTemplateItem"; text: qsTr("Save page as template…"); icon.source: app.iconUrl("xqt-file-plus"); onTriggered: templateSaveDialog.openForPage(app.pageNumber - 1) }
+                        AdaptiveMenuItem { objectName: "insertTemplateItem"; offered: app.canInsertTemplate; text: qsTr("Add a page from a template…"); icon.source: app.iconUrl("xopp-page-add"); onTriggered: templatePicker.openToInsert(app.pageNumber) }
                         AdaptiveMenuItem { objectName: "pageBackgroundItem"; text: qsTr("Background of this page…"); icon.source: app.iconUrl("xqt-palette"); onTriggered: backgroundDialog.openFor([app.pageNumber - 1]) }
                         // Another paper size for this page, the selected pages or all of them (PageSizeDialog)
                         AdaptiveMenuItem { objectName: "pageSizeItem"; text: qsTr("Page size…"); icon.source: app.iconUrl("xqt-scaling"); onTriggered: pageSizeDialog.openFor([app.pageNumber - 1]) }
@@ -1995,14 +2000,55 @@ ApplicationWindow {
             property bool offered: !win.textDoc  // (a text file: no pages to add)
             iconName: "xopp-page-add"
             label: qsTr("Add a page")
-            tip: qsTr("Add a page after the current one (press and hold: background, size, several pages)")
+            tip: qsTr("Add a page after the current one (press and hold: a template, background, size, several pages)")
             ownHold: true
             onClicked: app.addPageAfterCurrent()
-            onPressAndHold: insertPagesDialog.openAt(app.pageNumber)
+            onPressAndHold: Popups.openAt(addPageMenu)
             TapHandler {
                 acceptedButtons: Qt.RightButton
                 acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
-                onTapped: insertPagesDialog.openAt(app.pageNumber)
+                onTapped: function(point) { Popups.openAt(addPageMenu, point.position) }
+            }
+            // Its list: the templates used last (qt/docs/templates.md), all templates, the Insert pages dialog
+            AdaptiveMenu {
+                id: addPageMenu
+                objectName: "addPageMenu"
+                title: qsTr("Add a page")
+                titleShown: true
+                property var recent: []
+                onAboutToShow: recent = app.templates.recent(5)
+                AdaptiveMenuItem {
+                    objectName: "addPageInsertPagesItem"
+                    text: qsTr("Background, size, several pages…")
+                    icon.source: app.iconUrl("xopp-page-add")
+                    onTriggered: insertPagesDialog.openAt(app.pageNumber)
+                }
+                MenuSeparator {}
+                Instantiator {
+                    model: addPageMenu.recent
+                    delegate: AdaptiveMenuItem {
+                        required property var modelData
+                        objectName: "addPageTemplate_" + modelData.name
+                        text: modelData.name
+                        icon.source: app.iconUrl("xqt-file-plus")
+                        onTriggered: app.insertTemplate(modelData.path, app.pageNumber, 1)
+                    }
+                    // (after the dialog's entry and the line)
+                    onObjectAdded: function(index, object) { addPageMenu.insertItem(index + 2, object) }
+                    onObjectRemoved: function(index, object) { addPageMenu.removeItem(object) }
+                }
+                AdaptiveMenuItem {
+                    objectName: "addPageFromTemplateItem"
+                    text: qsTr("From a template…")
+                    icon.source: app.iconUrl("xqt-file-plus")
+                    onTriggered: templatePicker.openToInsert(app.pageNumber)
+                }
+                AdaptiveMenuItem {
+                    objectName: "addPageSaveTemplateItem"
+                    text: qsTr("Save this page as template…")
+                    icon.source: app.iconUrl("xqt-file-plus")
+                    onTriggered: templateSaveDialog.openForPage(app.pageNumber - 1)
+                }
             }
         }
         IconButton {
@@ -4737,6 +4783,9 @@ ApplicationWindow {
     }
 
     InsertPagesDialog { id: insertPagesDialog }
+    // Page templates (qt/docs/templates.md): the picker (in the middle of the window, a sheet on a phone) and saving
+    StickerPicker { id: templatePicker; mode: "templates" }
+    TemplateSaveDialog { id: templateSaveDialog; parent: Overlay.overlay }
     PrintDialog { id: printDialog }
     ChapterDialog { id: chapterDialog }
     RenameDialog { id: renameDocumentDialog }

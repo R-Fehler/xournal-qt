@@ -21,6 +21,8 @@
 
 #include "filesystem.h"
 
+class Document;
+
 namespace xqt {
 
 class DocumentSession;
@@ -29,6 +31,9 @@ class PageClipboard {
 public:
     /// Copy these pages of a document (indices). `withPdf`: also copy their PDF pages (for pasting elsewhere).
     void copy(DocumentSession& session, const std::vector<size_t>& pages, bool withPdf = true);
+    /// The same for a document that is not open in a session (a template file read on a worker: TemplateFile.h).
+    /// Any thread.
+    void copy(Document& doc, const std::vector<size_t>& pages, bool withPdf = true);
     bool isEmpty() const { return pages.empty(); }
     size_t size() const { return pages.size(); }
     /// New copies of the pages, ready to be inserted into `target`. `addedToMergedPdf`: their PDF pages were added to
@@ -38,7 +43,18 @@ public:
     /// Resolution of PDF pages turned into image backgrounds.
     static constexpr double IMAGE_DPI = 200;
 
+    /// (a page saved as a template, qt/docs/templates.md) The copied page `i` as copied, its PDF background page
+    /// (nullptr: none) and, when the clipboard holds this one page, its PDF page as a PDF of one page (empty: none, or
+    /// it could not be copied).
+    struct Copied {
+        PageRef page;
+        XojPdfPageSPtr pdfPage;
+        std::string pdf;
+    };
+    Copied copied(size_t i) const;
+
 private:
+    void copyPages(Document& doc, const std::vector<size_t>& pages, bool withPdf);
     std::vector<PageRef> pages;
     std::vector<XojPdfPageSPtr> pdfPages;  ///< per page: its PDF background page, or nullptr
     fs::path pdfFile;                       ///< the PDF of the source document
