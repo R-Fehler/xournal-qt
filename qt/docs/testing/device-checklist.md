@@ -3412,3 +3412,6 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
       write the file anew). Preview on iPad/iPhone the same.
 - [ ] An older version cut out of the file (`head -c <end> file.pdf > old.pdf`, the end from "Show beside the
       document"'s file in the cache) opens in Okular, Firefox and Acrobat with the ink of that day.
+- [ ] Help → Introduction: the first page has "Go back to earlier versions" (the History button, Ctrl+Alt+S); on the
+      phone the page still fits without scrolling past its buttons. Help → Tutorial → section 15 "Versions": the steps
+      work on the tutorial itself (turn on, Ctrl+Alt+S, show, restore, copy). Fill its screenshot placeholder.

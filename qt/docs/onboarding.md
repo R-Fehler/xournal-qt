@@ -17,7 +17,7 @@ screen on a phone, qt/docs/adaptive-layout.md).
 
 | Page | Title | What it says |
 | --- | --- | --- |
-| 1 | Write on notes and PDFs | pen, highlighter, eraser; **PDFs are not read-only here** (write on them, mark their text, add pages and room for notes, move and delete pages); everything stays editable; pen writes, finger scrolls |
+| 1 | Write on notes and PDFs | pen, highlighter, eraser; **PDFs are not read-only here** (write on them, mark their text, add pages and room for notes, move and delete pages); everything stays editable; pen writes, finger scrolls; **go back to earlier versions** (a PDF with notes keeps its versions when turned on with the sidebar's History button; Ctrl+Alt+S for a milestone; qt/pdf-history) |
 | 2 | Markdown: text that stays text | Markdown shown formatted while typing; `.md` files as documents; **a text inside a PDF with notes** (write on it with the pen, keep editing the text; ⋮ → Document → Open as PDF document) |
 | 3 | Your folders are your library | any folder is a library, nothing imported; search on three levels, Fuzzy; tabs and the reference |
 | 4 | How do you want to keep your documents? | the two cards of `DocumentModeCards` (PDF files / Xournal++ files), as the first-start question and Settings → Documents show them |
@@ -67,6 +67,9 @@ as Qt resources (`:/xqt-help/…`, `qt/cmake/XqtApp.cmake`). Help → **Tutorial
 - Each section ends with a page break (`<div style="page-break-after: always"></div>`), so each exercise starts on a
   page of its own with room below it to write. Handwriting stays where it was drawn when text above it changes (as in
   every text document); the page breaks keep that to one page.
+- Section 15, **Versions** (qt/pdf-history): turn on "Keep versions of this document" in the sidebar's History
+  panel on the tutorial itself (it is a PDF with notes), save a milestone with Ctrl+Alt+S, show, restore or copy a
+  version; the setting for new PDFs and Share without the versions.
 - Test: `MainWindowTest.theTutorialOpensAsACopy` (the resource is there and is Markdown with sections and
   placeholders; Help → Tutorial makes and opens the copy in the app data folder as a text document; a second time
   opens the same file; "start again" makes a fresh one). The tests set `XDG_DATA_HOME` to a temporary folder

@@ -238,7 +238,25 @@ PDF/A for the archive, Markdown).
 
 <div style="page-break-after: always"></div>
 
-## 15. The library
+## 15. Versions
+
+A PDF with notes can keep its **versions** inside itself: one for each day you save it, plus **milestones** you name.
+They travel with the file; other PDF apps still show it as it is now. It is off until you turn it on.
+
+- Open the sidebar's **History** (the clock after the highlighter button at the top of the sidebar; also ⋮ → Document
+  → Version history…) and turn on **Keep versions of this document**. This tutorial is a PDF with notes: try it here.
+- Write something and press **Ctrl+Alt+S** ("Save with a message…"): type what you did, e.g. "My first milestone".
+  It is listed with a flag. Ctrl+S on the same day keeps one version for the day.
+- Tap a version in the list: **Show beside the document**, **Restore this version…** (Undo brings today's back) or
+  **Open as a copy**.
+- Settings → Documents → **Keep versions of new PDFs with notes** turns it on for every new one. Share sends a PDF
+  without its versions unless you tick "With its version history".
+
+> **PLACEHOLDER · SCREENSHOT:** the History panel with three versions, one of them a milestone with its message.
+
+<div style="page-break-after: always"></div>
+
+## 16. The library
 
 The **library** is a folder; its subfolders and documents are what you see on the home screen (the button with the
 library's name at the left end of the tab strip, or **Ctrl+Shift+L**).

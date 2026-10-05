@@ -8725,6 +8725,11 @@ TEST_F(MainWindowTest, theIntroductionIsInHelp) {
     EXPECT_FALSE(intro->property("firstStart").toBool());
     auto* pages = findItem("introPages");
     EXPECT_EQ(pages->property("currentIndex").toInt(), 0);
+    // Version history is off by default: the first page says it is there and where (qt/pdf-history)
+    auto* versions = findItem("introVersions");
+    ASSERT_NE(versions, nullptr);
+    EXPECT_TRUE(versions->property("text").toString().contains("History"));
+    EXPECT_TRUE(versions->property("text").toString().contains("Ctrl+Alt+S"));
     click(findItem("introSkip"));
     ASSERT_TRUE(waitOpened(intro, false)) << "Skip closes it";
     EXPECT_TRUE(controller->introSeen());
@@ -8774,6 +8779,10 @@ TEST_F(MainWindowTest, theTutorialOpensAsACopy) {
     EXPECT_TRUE(text.startsWith("# Tutorial"));
     EXPECT_GE(text.count(QRegularExpression("^## ", QRegularExpression::MultilineOption)), 10) << "short sections";
     EXPECT_TRUE(text.contains("> **PLACEHOLDER · INK:**"));
+    // (version history, qt/pdf-history: a section of its own that tries it on the tutorial itself)
+    EXPECT_TRUE(text.contains("## 15. Versions"));
+    EXPECT_TRUE(text.contains("Keep versions of this document"));
+    EXPECT_TRUE(text.contains("Ctrl+Alt+S"));
     EXPECT_TRUE(text.contains("> **PLACEHOLDER · SCREENSHOT:**"));
 
     const QString file = controller->tutorialFile();

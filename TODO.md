@@ -684,7 +684,7 @@ section "Confirmed by the author" (it overrides the plan's steps where they diff
   and play (the scrubber on `qt/timeline`'s play bar); "Save a copy with history" (Share can send the file itself).
 - [x] A mark on library cards of documents with history on. Left: nothing (the library has cards only, no rows).
 - [x] Background-image attachments not written again when unchanged. Done.
-- [ ] The introduction and the tutorial explain version history.
+- [x] The introduction and the tutorial explain version history. Left: the tutorial's screenshot placeholder.
 
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
