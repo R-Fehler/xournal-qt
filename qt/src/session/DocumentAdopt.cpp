@@ -42,7 +42,9 @@ std::string stampOf(const fs::path& file) {
     if (ec) {
         return {};
     }
-    const auto time = fs::last_write_time(file, ec).time_since_epoch().count();
+    // (libc++'s file clock counts in a 128-bit integer, which std::to_string does not take; nanoseconds since 1970 fit
+    // into 64 bits until 2262)
+    const auto time = static_cast<long long>(fs::last_write_time(file, ec).time_since_epoch().count());
     return std::to_string(size) + ":" + std::to_string(time);
 }
 

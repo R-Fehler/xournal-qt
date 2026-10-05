@@ -140,6 +140,28 @@ if [[ -d "$bin/multimedia" ]]; then
     rm -rf "$bin/multimedia"
     echo "removed bin/multimedia (not needed for audio in and out)"
 fi
+# windeployqt also copies the FFmpeg plugin's own DLLs into bin/ (avcodec, avformat, avutil, swresample, ...): they
+# go too, unless a binary that stays imports one of them
+shopt -s nullglob
+ffmpeg_dlls=("$bin"/avcodec-*.dll "$bin"/avformat-*.dll "$bin"/avutil-*.dll "$bin"/avfilter-*.dll "$bin"/avdevice-*.dll
+             "$bin"/swresample-*.dll "$bin"/swscale-*.dll "$bin"/postproc-*.dll)
+shopt -u nullglob
+if (( ${#ffmpeg_dlls[@]} )); then
+    others=$(find "$bin" -type f \( -name '*.dll' -o -name '*.exe' \) | grep -viE '/(avcodec|avformat|avutil|avfilter|avdevice|swresample|swscale|postproc)-[0-9]+\.dll$' || true)
+    used=""
+    while IFS= read -r f; do
+        [[ -n "$f" ]] && used+=$(objdump -p "$f" 2> /dev/null | tr -d '\r' | sed -n 's/^[[:space:]]*DLL Name: //p')$'\n'
+    done <<< "$others"
+    for dll in "${ffmpeg_dlls[@]}"; do
+        name=$(basename "$dll")
+        if grep -qix "$name" <<< "$used"; then
+            warn "$name is imported by a binary that stays: kept"
+        else
+            rm -f "$dll"
+            echo "removed $name (FFmpeg, only for the media plugins)"
+        fi
+    done
+fi
 exe_imports=$(objdump -p "$bin/xournal-qt.exe" 2> /dev/null | tr -d '\r' || true)
 if grep -qi 'DLL Name: Qt6Multimedia.dll' <<< "$exe_imports"; then
     echo "xournal-qt.exe uses Qt6Multimedia.dll: recording is built"
