@@ -751,6 +751,29 @@ of the screen."
   bottom of the screen) goes. (`qt/ui-rework`; left: the edges with the canvas turned are those of the turned view;
   on device: the feel of the fields' width and of the hint.)
 
+### Round of 2026-10-05 evening (the author)
+"Snip should be one click away, I think it can be highly useful, so make sure it's not hidden behind the normal
+select tool. Let's build: copy handwritten text but make it its own tool similar to select pdf text (could be a
+cycle) to not interrupt the ink annotation flow. Or maybe when selecting inked words with the select tool offer to
+copy the text in addition to normal copy and give the user a small popup with the text that is now in the clipboard.
+No need for markdown box conversion. Dark mode sounds good: adapt the ink and highlighter colors to use the dark mode
+equivalent so we can see them well in both normal and dark mode. Additionally we could offer a curated selection of
+non-white document background colors for xopp or pdf documents, including black and other aesthetic colors such as
+the yellowy browny color used in illustration paper (blank and maybe texturized as well for artsy paper feel), grey,
+black (warn the user that printing that pdf will use tons of ink). A6-A8 sound good. [...] B8 sounds very good, I am
+especially interested in importing annotations that come from the GoodNotes PDF exports (no. 1) and Drawboard PDF
+(no. 2); the rest like Mac Preview or iOS Preview and other PDF annotations hopefully work as well."
+- [ ] `qt/copy-tools`: snip one tap away (a fixed tool of its own on the rail, not only in the select list); copy
+  handwriting as text: a tool of its own (beside / cycling with mark PDF text) that copies the readings of the ink
+  it is drawn over, and "Copy as text" on a selection of ink; a small popup shows the text now in the clipboard.
+- [ ] `qt/dark-pages`: dark mode for pages (inverted on the GPU, pictures kept) with ink and highlighter colors shown
+  as their dark equivalents (palette roles), readable in both; curated page colors (black, grey, illustration paper,
+  textured paper) for `.xopp` and PDFs, with a printing warning for dark pages.
+- [ ] `qt/page-files`: A6 insert pages from a PDF file, A7 extract or split selected pages into a new document or
+  PDF, A8 export pages as PNG.
+- [ ] `qt/adopt-annotations`: B8, annotations made in other apps become editable ink, text and highlights (consent,
+  Annotations panel); GoodNotes exports first, Drawboard PDF second, Preview and the standard annotation types too.
+
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
    when a save falls back to a full write, and a check in MuPDF and pdf.js).
