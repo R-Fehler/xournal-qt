@@ -32,7 +32,7 @@ add_library(xqt-hwr STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/CtcDecode.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/CtcDecode.cpp)
 target_include_directories(xqt-hwr PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src" "${CMAKE_CURRENT_LIST_DIR}/../src/hwr")
-target_link_libraries(xqt-hwr PUBLIC xqt-session)
+target_link_libraries(xqt-hwr PUBLIC xqt-session Qt6::Gui)  # (QImage: the line dataset writes PNGs)
 set_target_properties(xqt-hwr PROPERTIES AUTOMOC ON)
 
 # The CLI's "hwr-lines": a document's handwriting as a line dataset (LineDataset.h; Qt only for this command)
