@@ -1487,6 +1487,20 @@ ApplicationWindow {
                             icon.source: app.iconUrl("xqt-tag")
                             onTriggered: documentTagsDialog.openFor(app.currentDocumentPath())
                         }
+                        // Which handwriting models read this document (qt/docs/handwriting-search.md): found from its
+                        // first lines, or chosen; kept in the library's cache
+                        AdaptiveMenu {
+                            id: handwritingLanguageMenu
+                            objectName: "handwritingLanguageMenu"
+                            title: qsTr("Handwriting language")
+                            iconName: "xqt-pencil"
+                            offered: app.handwriting.enabled && !win.textDoc
+                            readonly property string current: (app.currentTab, app.handwritingLanguage)
+                            AdaptiveMenuItem { objectName: "handwritingLanguageAuto"; checkable: true; checked: handwritingLanguageMenu.current === "auto"; text: qsTr("Automatic"); onTriggered: app.handwritingLanguage = "auto" }
+                            AdaptiveMenuItem { objectName: "handwritingLanguageEn"; checkable: true; checked: handwritingLanguageMenu.current === "en"; text: qsTr("English"); onTriggered: app.handwritingLanguage = "en" }
+                            AdaptiveMenuItem { objectName: "handwritingLanguageDe"; checkable: true; checked: handwritingLanguageMenu.current === "de"; text: qsTr("German"); onTriggered: app.handwritingLanguage = "de" }
+                            AdaptiveMenuItem { objectName: "handwritingLanguageBoth"; checkable: true; checked: handwritingLanguageMenu.current === "both"; text: qsTr("Both"); onTriggered: app.handwritingLanguage = "both" }
+                        }
                         AdaptiveMenuItem { objectName: "linkedFromItem"; text: qsTr("Linked from…"); icon.source: app.iconUrl("xqt-link"); onTriggered: backlinksDialog.show() }
                         AdaptiveMenuItem { objectName: "copyPageLinkItem"; text: qsTr("Copy link to this page"); icon.source: app.iconUrl("xqt-copy"); onTriggered: app.copyPageLink(-1) }
                     }

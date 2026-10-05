@@ -5,6 +5,8 @@
 #include <cmath>
 #include <map>
 
+#include "LanguagePlan.h"
+
 namespace xqt::hwr {
 
 MultiRecognizer::MultiRecognizer(std::vector<std::shared_ptr<Recognizer>> members): all(std::move(members)) {
@@ -46,28 +48,93 @@ bool MultiRecognizer::ready(QString* why) const {
     return false;
 }
 
-std::optional<ink::LineResult> MultiRecognizer::recognizeLine(const LineInput& line, const Context& context) {
-    std::vector<ink::LineResult> read;
-    for (size_t i = 0; i < all.size(); ++i) {
-        if (context.cancelled && context.cancelled()) {
-            return std::nullopt;
-        }
-        if (!all[i]->ready()) {
-            continue;  // (its lines are read when it is: the line does not have its bit)
-        }
-        auto r = all[i]->recognizeLine(line, context);
-        if (!r) {
-            if (context.cancelled && context.cancelled()) {
-                return std::nullopt;
-            }
-            continue;
-        }
-        read.push_back(tagged(std::move(*r), i));
+namespace {
+uint32_t bitsOf(size_t n) { return n >= 32 ? ~0u : (1u << n) - 1; }
+}  // namespace
+
+float MultiRecognizer::scoreOf(const ink::LineResult& result) {
+    if (result.words.empty()) {
+        return 0;
     }
-    if (read.empty()) {
+    double sum = 0;
+    for (const ink::Word& w: result.words) {
+        sum += w.conf;
+    }
+    return static_cast<float>(sum / static_cast<double>(result.words.size()));
+}
+
+bool MultiRecognizer::enough(const ink::LineResult& known, const Context& context) const {
+    uint32_t able = 0;
+    for (size_t i = 0; i < all.size() && i < 32; ++i) {
+        if (all[i]->ready()) {
+            able |= 1u << i;
+        }
+    }
+    const uint32_t everyone = bitsOf(all.size());
+    const uint32_t wanted = (context.plan ? context.plan->first(capabilities().modelLanguages) : everyone) & able;
+    const uint32_t have = known.models != 0 ? known.models : everyone;  // (0: read before there were several)
+    return (wanted & ~have) == 0;
+}
+
+std::optional<ink::LineResult> MultiRecognizer::recognizeLine(const LineInput& line, const Context& context) {
+    const std::vector<QStringList> languages = capabilities().modelLanguages;
+    const uint32_t everyone = bitsOf(all.size());
+    const uint32_t have = context.before ? (context.before->models != 0 ? context.before->models : everyone) : 0;
+    std::vector<ink::LineResult> read;
+    std::vector<std::optional<float>> scores(all.size());
+    uint32_t done = have;
+    auto readBy = [&](uint32_t members) -> bool {
+        for (size_t i = 0; i < all.size() && i < 32; ++i) {
+            const uint32_t bit = 1u << i;
+            if (!(members & bit) || (done & bit)) {
+                continue;
+            }
+            if (context.cancelled && context.cancelled()) {
+                return false;
+            }
+            if (!all[i]->ready()) {
+                continue;  // (its lines are read when it is: the line does not have its bit)
+            }
+            auto r = all[i]->recognizeLine(line, context);
+            if (!r) {
+                if (context.cancelled && context.cancelled()) {
+                    return false;
+                }
+                continue;
+            }
+            done |= bit;
+            scores[i] = scoreOf(*r);
+            read.push_back(tagged(std::move(*r), i));
+        }
+        return true;
+    };
+    const uint32_t first = context.plan ? context.plan->first(languages) : everyone;
+    if (!readBy(first)) {
         return std::nullopt;
     }
+    if (context.plan) {
+        // How sure the first ones are (read now, or before)
+        double sum = 0;
+        int n = 0;
+        for (size_t i = 0; i < scores.size(); ++i) {
+            if (scores[i] && (first & (1u << i))) {
+                sum += *scores[i];
+                ++n;
+            }
+        }
+        const float sure = n > 0 ? static_cast<float>(sum / n) : context.before ? scoreOf(*context.before) : 1.0f;
+        if (context.plan->othersToo(sure) && !readBy(everyone & ~first)) {
+            return std::nullopt;
+        }
+        context.plan->observe(scores, languages);
+    }
+    if (read.empty()) {
+        return context.before ? std::optional<ink::LineResult>(*context.before) : std::nullopt;
+    }
     std::vector<const ink::LineResult*> results;
+    if (context.before) {
+        results.push_back(context.before);
+    }
     for (const auto& r: read) {
         results.push_back(&r);
     }

@@ -19,8 +19,10 @@ constexpr size_t AT_ONCE = 2;  ///< pages with the worker at a time
 
 void InkTextIndexer::setDelay(int ms) { delayMs = ms; }
 
-InkTextIndexer::InkTextIndexer(DocumentSession& session, InkRecognitionService& service, QObject* parent):
-        QObject(parent), session(session), service(service) {
+InkTextIndexer::InkTextIndexer(DocumentSession& session, InkRecognitionService& service, QObject* parent,
+                               std::shared_ptr<LanguagePlan> plan):
+        QObject(parent), session(session), service(service),
+        languages(plan ? std::move(plan) : std::make_shared<LanguagePlan>()) {
     timer.setSingleShot(true);
     connect(&timer, &QTimer::timeout, this, [this] {
         started = true;
@@ -52,6 +54,20 @@ void InkTextIndexer::start() {
     started = true;
     scan();
     pump();
+}
+
+void InkTextIndexer::setLanguageChoice(LanguagePlan::Choice choice) {
+    if (choice == languages->choice()) {
+        return;
+    }
+    languages->setChoice(choice);
+    // Every page again (the worker reads only what the choice is missing)
+    for (const auto& [page, entry]: indexed) {
+        dirty.insert(page);
+    }
+    if (started) {
+        pump();
+    }
 }
 
 void InkTextIndexer::setFocused(bool f) {
@@ -137,6 +153,7 @@ void InkTextIndexer::pump() {
         InkRecognitionService::Job job;
         job.priority = priorityOf(index);
         job.strokes = std::move(strokes);
+        job.plan = languages;
         const quint64 id = service.submit(this, std::move(job), [this](PageResult r) {
             const quint64 jobId = r.id;
             received(jobId, std::move(r));

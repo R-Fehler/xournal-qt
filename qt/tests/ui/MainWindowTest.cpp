@@ -7477,6 +7477,30 @@ TEST_F(MainWindowTest, settingsSearchTabSwitchesTheHandwritingSearch) {
     ASSERT_TRUE(waitOpened(sheet, false));
 }
 
+// ⋮ → Document → Handwriting language: offered while the handwriting search is on; the choice is the document's (kept
+// in the library's cache, not in the file)
+TEST_F(MainWindowTest, theHandwritingLanguageIsChosenPerDocument) {
+    QObject* hw = controller->property("handwriting").value<QObject*>();
+    ASSERT_NE(hw, nullptr);
+    hw->setProperty("enabled", false);
+    auto* menu = find<QObject>("handwritingLanguageMenu");
+    ASSERT_NE(menu, nullptr);
+    EXPECT_FALSE(menu->property("offered").toBool()) << "only while the handwriting search is on";
+    hw->setProperty("enabled", true);
+    until([&] { return menu->property("offered").toBool(); });
+    EXPECT_TRUE(menu->property("offered").toBool());
+    EXPECT_EQ(controller->property("handwritingLanguage").toString(), QStringLiteral("auto"));
+    EXPECT_TRUE(find<QObject>("handwritingLanguageAuto")->property("checked").toBool());
+    QMetaObject::invokeMethod(find<QObject>("handwritingLanguageDe"), "triggered");
+    EXPECT_EQ(controller->property("handwritingLanguage").toString(), QStringLiteral("de"));
+    until([&] { return find<QObject>("handwritingLanguageDe")->property("checked").toBool(); });
+    EXPECT_TRUE(find<QObject>("handwritingLanguageDe")->property("checked").toBool());
+    EXPECT_FALSE(find<QObject>("handwritingLanguageAuto")->property("checked").toBool());
+    QMetaObject::invokeMethod(find<QObject>("handwritingLanguageAuto"), "triggered");
+    EXPECT_EQ(controller->property("handwritingLanguage").toString(), QStringLiteral("auto"));
+    hw->setProperty("enabled", false);
+}
+
 // A hybrid PDF whose ink another app moved: the window says so and offers to keep ours or import theirs.
 TEST_F(MainWindowTest, inkChangedInAnotherAppIsAskedAbout) {
     QTemporaryDir dir;

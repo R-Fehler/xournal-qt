@@ -222,15 +222,20 @@ AppController::AppController(QObject* parent): QObject(parent) {
         return index ? index->knownPdfText(pdf) : std::map<int, QString>();
     });
     // ... and the handwriting it read before (opening a document reads none of it again)
+    // (and its handwriting language: the user's choice, and the language decided for these models)
     hwr::HandwritingSearch::setSeeder([lib = QPointer<LibraryModel>(library)](const fs::path& file,
                                                                               const QString& recognizer) {
-        hwr::HandwritingSearch::LineResults out;
+        hwr::HandwritingSearch::Seeded out;
         LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
+        if (auto entry = index ? index->inkText().find(file) : nullptr) {
+            out.choice = entry->languageChoice;
+            out.decided = entry->recognizer == recognizer ? entry->language : QString();
+        }
         if (auto doc = index ? index->inkOf(file) : nullptr; doc && doc->recognizer == recognizer) {
             for (const auto& page: doc->pages) {
                 for (const hwr::LineRef& l: page) {
                     if (l.result) {
-                        out.emplace_back(l.hash, l.result);
+                        out.lines.emplace_back(l.hash, l.result);
                     }
                 }
             }
@@ -431,6 +436,26 @@ AppController::~AppController() {
 }
 
 QObject* AppController::handwritingSettings() const { return handwritingView; }
+
+QString AppController::handwritingLanguage() const {
+    DocumentSession* s = tabs ? tabs->currentSession() : nullptr;
+    return hwr::LanguagePlan::nameOf(handwriting && s ? handwriting->languageChoiceOf(s)
+                                                      : hwr::LanguagePlan::Choice::Automatic);
+}
+
+void AppController::setHandwritingLanguage(const QString& language) {
+    DocumentSession* s = tabs ? tabs->currentSession() : nullptr;
+    if (!s || !handwriting || !handwriting->indexerOf(s)) {
+        return;
+    }
+    const hwr::LanguagePlan::Choice choice = hwr::LanguagePlan::choiceNamed(language);
+    handwriting->setLanguageChoice(s, choice);
+    // Kept in the library's cache (the file stays as Xournal++ writes it)
+    if (LibraryIndex* index = library ? library->searchIndex() : nullptr; index && s->hasFilePath()) {
+        index->inkText().setLanguageChoice(s->getFilePath(), hwr::LanguagePlan::nameOf(choice));
+    }
+    Q_EMIT handwritingLanguageChanged();
+}
 
 void AppController::syncHandwriting() {
     if (!handwriting || !tabs) {
@@ -3736,6 +3761,7 @@ void AppController::handOverHandwriting(DocumentSession& s) {
     doc.stamp = fileStamp(s.getFilePath());
     doc.recognizer = handwriting->service().recognizerId();
     doc.complete = std::all_of(pages.begin(), pages.end(), [](const auto& p) { return p.complete; });
+    doc.language = indexer->plan()->decided();
     for (const auto& p: pages) {
         doc.pages.push_back(p.lines);
     }

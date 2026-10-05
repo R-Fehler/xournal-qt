@@ -11,6 +11,8 @@ add_library(xqt-hwr STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/FakeRecognizer.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/ModelInfo.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/ModelInfo.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/LanguagePlan.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/LanguagePlan.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/MultiRecognizer.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/MultiRecognizer.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/LineImage.h

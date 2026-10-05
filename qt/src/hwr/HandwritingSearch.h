@@ -89,9 +89,15 @@ public:
     static void setFactory(Factory factory);
 
     /// What was read before in a document's lines (the library's cache), for the recogniser with this id: the worker
-    /// takes them, so opening a document reads none of it again.
+    /// takes them, so opening a document reads none of it again; and the document's language (LanguagePlan.h): the
+    /// user's choice ("auto", "en", "de", "both") and the language decided for this recogniser ("": none yet).
     using LineResults = std::vector<std::pair<quint64, std::shared_ptr<const ink::LineResult>>>;
-    using Seeder = std::function<LineResults(const fs::path& file, const QString& recognizer)>;
+    struct Seeded {
+        LineResults lines;
+        QString choice;
+        QString decided;
+    };
+    using Seeder = std::function<Seeded(const fs::path& file, const QString& recognizer)>;
     static void setSeeder(Seeder seeder);
 
     /// Read the settings again (switched on or off, another model).
@@ -109,6 +115,10 @@ public:
     int pagesWaiting() const;
     /// The indexer of an open document (null: none, the search is off).
     InkTextIndexer* indexerOf(const DocumentSession* session) const;
+    /// The handwriting language chosen for an open document (Automatic while the search is off).
+    LanguagePlan::Choice languageChoiceOf(const DocumentSession* session) const;
+    /// Choose it (the caller keeps it in the library's cache).
+    void setLanguageChoice(const DocumentSession* session, LanguagePlan::Choice choice);
 
 Q_SIGNALS:
     void enabledChanged();

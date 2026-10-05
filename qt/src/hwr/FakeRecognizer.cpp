@@ -12,6 +12,11 @@ void FakeRecognizer::setScript(Script s) {
     script = std::move(s);
 }
 
+void FakeRecognizer::setConfidence(Confidence c) {
+    std::lock_guard lock(mtx);
+    confidence = std::move(c);
+}
+
 void FakeRecognizer::setLine(quint64 hash, std::vector<Readings> words) {
     std::lock_guard lock(mtx);
     lines[hash] = std::move(words);
@@ -52,10 +57,12 @@ std::optional<ink::LineResult> FakeRecognizer::recognizeLine(const LineInput& li
         return std::nullopt;
     }
     Script s;
+    Confidence sure;
     std::vector<Readings> scripted;
     {
         std::lock_guard lock(mtx);
         s = script;
+        sure = confidence;
         if (auto it = lines.find(line.hash); it != lines.end()) {
             scripted = it->second;
         }
@@ -75,7 +82,7 @@ std::optional<ink::LineResult> FakeRecognizer::recognizeLine(const LineInput& li
         }
         ink::Word w;
         w.box = line.words[i].box;
-        w.conf = 0.9f;
+        w.conf = sure ? sure(line, i) : 0.9f;
         w.text = readings.front().first;
         for (const auto& [text, p]: readings) {
             w.candidates.push_back(ink::candidate(text, p));

@@ -11,6 +11,7 @@
 #include "hwr/FakeRecognizer.h"
 #include "hwr/InkRecognitionService.h"
 #include "hwr/InkTextIndexer.h"
+#include "hwr/LanguagePlan.h"
 #include "hwr/MultiRecognizer.h"
 #include "model/Document.h"
 #include "model/Layer.h"
@@ -235,4 +236,159 @@ TEST(MultiRecognizerTest, theLibrarysPackKeepsTheModels) {
     ASSERT_TRUE(plain && plain->pages[0][0].result);
     EXPECT_EQ(plain->pages[0][0].result->models, 0u);
     EXPECT_EQ(plain->pages[0][0].result->words[0].candidates[0].models, 0);
+}
+
+// --- which models read a document's lines (LanguagePlan) ---------------------------------------------------------
+
+namespace {
+/// One page of `lines` lines; German lines (`german(l)`) have four words, English ones three.
+std::unique_ptr<Document> mixed(int lines, const std::function<bool(int)>& german) {
+    auto doc = std::make_unique<Document>(nullptr);
+    auto page = std::make_shared<XojPage>(595, 1100);
+    page->setBackgroundType(PageType(PageTypeFormat::Plain));
+    for (int l = 0; l < lines; ++l) {
+        for (int w = 0; w < (german(l) ? 4 : 3); ++w) {
+            page->getSelectedLayer()->addElement(written(50 + 60 * w, 60 + 40 * l, l + 1));
+        }
+    }
+    doc->addPage(std::move(page));
+    return doc;
+}
+
+bool germanLine(const LineInput& line) { return line.words.size() == 4; }
+
+class LanguageDetectionTest: public MultiModelTest {
+protected:
+    void SetUp() override {
+        MultiModelTest::SetUp();
+        // Each model is sure of its language's lines and unsure of the other's
+        english->setConfidence([](const LineInput& line, size_t) { return germanLine(line) ? 0.3f : 0.9f; });
+        german->setConfidence([](const LineInput& line, size_t) { return germanLine(line) ? 0.9f : 0.3f; });
+        german->setScript([](const LineInput&, size_t word) -> FakeRecognizer::Readings {
+            switch (word) {
+            case 0: return {{QStringLiteral("Kalman"), 0.5f}};
+            case 1: return {{QStringLiteral("dumm"), 0.8f}};
+            case 2: return {{QStringLiteral("Straße"), 0.9f}};
+            default: return {{QStringLiteral("Verstärkung"), 0.9f}};
+            }
+        });
+    }
+    /// Reads the document; the number of lines it has
+    std::unique_ptr<DocumentSession> read(int lines, const std::function<bool(int)>& german,
+                                          std::shared_ptr<LanguagePlan> plan = nullptr) {
+        auto s = std::make_unique<DocumentSession>(*app, mixed(lines, german));
+        indexer = std::make_unique<InkTextIndexer>(*s, *service, nullptr, std::move(plan));
+        EXPECT_TRUE(waitFor([&] { return indexer->done() && indexer->pagesRead() == 1; }));
+        return s;
+    }
+    std::unique_ptr<InkTextIndexer> indexer;
+};
+}  // namespace
+
+TEST(LanguagePlanTest, aClearlyBetterModelDecidesTheLanguage) {
+    const std::vector<QStringList> models{{QStringLiteral("en")}, {QStringLiteral("de")}};
+    LanguagePlan plan;
+    EXPECT_EQ(plan.first(models), 3u);  // (both, until decided)
+    for (int i = 0; i < LanguagePlan::PROBE_LINES - 1; ++i) {
+        plan.observe({0.9f, 0.4f}, models);
+    }
+    EXPECT_EQ(plan.decided(), QString());
+    plan.observe({0.9f, 0.4f}, models);
+    EXPECT_EQ(plan.decided(), QStringLiteral("en"));
+    EXPECT_EQ(plan.first(models), 1u);
+    EXPECT_FALSE(plan.othersToo(0.8f));
+    EXPECT_TRUE(plan.othersToo(0.3f));
+    // Alike: no decision, both go on
+    LanguagePlan alike;
+    for (int i = 0; i < 2 * LanguagePlan::PROBE_LINES; ++i) {
+        alike.observe({0.8f, 0.75f}, models);
+    }
+    EXPECT_EQ(alike.decided(), QString());
+    EXPECT_EQ(alike.first(models), 3u);
+    // The user's choice wins, and nothing is decided meanwhile
+    LanguagePlan chosen(LanguagePlan::Choice::German, QStringLiteral("en"));
+    EXPECT_EQ(chosen.first(models), 2u);
+    EXPECT_FALSE(chosen.othersToo(0.0f));
+    chosen.setChoice(LanguagePlan::Choice::Both);
+    EXPECT_EQ(chosen.first(models), 3u);
+    // A language no model reads: what there is
+    LanguagePlan none(LanguagePlan::Choice::German);
+    EXPECT_EQ(none.first({{QStringLiteral("en")}}), 1u);
+    for (const auto c: {LanguagePlan::Choice::Automatic, LanguagePlan::Choice::English, LanguagePlan::Choice::German,
+                        LanguagePlan::Choice::Both}) {
+        EXPECT_EQ(LanguagePlan::choiceNamed(LanguagePlan::nameOf(c)), c);
+    }
+    EXPECT_EQ(LanguagePlan::choiceNamed(QString()), LanguagePlan::Choice::Automatic);
+}
+
+// An English document: both models read its first lines, then only the English one
+TEST_F(LanguageDetectionTest, anEnglishDocumentStopsRunningTheGermanModel) {
+    auto s = read(16, [](int) { return false; });
+    EXPECT_EQ(english->calls(), 16);
+    EXPECT_EQ(german->calls(), LanguagePlan::PROBE_LINES);
+    EXPECT_EQ(indexer->plan()->decided(), QStringLiteral("en"));
+    EXPECT_EQ(hits(*s, QStringLiteral("dumb")), 16);
+    EXPECT_EQ(hits(*s, QStringLiteral("dumm")), LanguagePlan::PROBE_LINES);  // (German read only the first lines)
+}
+
+// A mixed document: decided for English by its first lines, the German model still reads the lines the English one is
+// unsure of, so every German word is found
+TEST_F(LanguageDetectionTest, aMixedDocumentKeepsBothOnUnsureLines) {
+    auto german = [](int l) { return l >= LanguagePlan::PROBE_LINES && l % 2 == 1; };
+    auto s = read(16, german);
+    EXPECT_EQ(english->calls(), 16);
+    EXPECT_EQ(this->german->calls(), LanguagePlan::PROBE_LINES + 5);
+    EXPECT_EQ(indexer->plan()->decided(), QStringLiteral("en"));
+    EXPECT_EQ(hits(*s, QStringLiteral("Verstärkung")), 5);  // every German line
+}
+
+// English first, then German: the English model's confidence drops, both read again, and German is decided
+TEST_F(LanguageDetectionTest, theDecisionIsRevisitedWhenConfidenceDrops) {
+    auto s = read(24, [](int l) { return l >= LanguagePlan::PROBE_LINES; });
+    EXPECT_EQ(indexer->plan()->decided(), QStringLiteral("de"));
+    EXPECT_EQ(german->calls(), 24);
+    // 6 probing, 6 unsure ones (then both again), 6 probing again; none after German was decided
+    EXPECT_EQ(english->calls(), 3 * LanguagePlan::PROBE_LINES);
+    EXPECT_EQ(hits(*s, QStringLiteral("Verstärkung")), 18);
+}
+
+// The document's choice wins over the detection; a new choice reads only what it is missing
+TEST_F(LanguageDetectionTest, theUsersChoiceWins) {
+    auto s = read(8, [](int) { return false; }, std::make_shared<LanguagePlan>(LanguagePlan::Choice::German));
+    EXPECT_EQ(english->calls(), 0);
+    EXPECT_EQ(german->calls(), 8);
+    EXPECT_EQ(hits(*s, QStringLiteral("dumb")), 0);
+    indexer->setLanguageChoice(LanguagePlan::Choice::Both);
+    ASSERT_TRUE(waitFor([&] { return english->calls() == 8 && indexer->done(); }));
+    EXPECT_EQ(german->calls(), 8);  // (not again)
+    EXPECT_EQ(hits(*s, QStringLiteral("dumb")), 8);
+    EXPECT_EQ(hits(*s, QStringLiteral("dumm")), 8);
+}
+
+// Kept in the library's cache: the decision with the results, the user's choice whatever is put later
+TEST(LanguagePlanTest, theLibrarysCacheKeepsTheLanguage) {
+    QTemporaryDir dir;
+    InkTextStore store(CacheLocation(fs::path(dir.path().toStdString())));
+    const fs::path file = fs::path(dir.filePath(QStringLiteral("notes.xopp")).toStdString());
+    store.setLanguageChoice(file, QStringLiteral("de"));
+    auto entry = store.find(file);
+    ASSERT_TRUE(entry);
+    EXPECT_EQ(entry->languageChoice, QStringLiteral("de"));
+    EXPECT_TRUE(entry->pages.empty());
+    InkDoc doc;
+    doc.stamp = QStringLiteral("7");
+    doc.recognizer = QStringLiteral("a+b");
+    doc.language = QStringLiteral("en");
+    store.put(file, doc);
+    entry = store.find(file);
+    EXPECT_EQ(entry->languageChoice, QStringLiteral("de"));
+    EXPECT_EQ(entry->language, QStringLiteral("en"));
+    const auto back = InkTextStore::decode(InkTextStore::encode(*entry));
+    ASSERT_TRUE(back);
+    EXPECT_EQ(back->language, QStringLiteral("en"));
+    EXPECT_EQ(back->languageChoice, QStringLiteral("de"));
+    store.setLanguageChoice(file, QStringLiteral("auto"));
+    EXPECT_EQ(store.find(file)->languageChoice, QString());
+    EXPECT_EQ(store.find(file)->stamp, QStringLiteral("7"));
+    store.discard();
 }

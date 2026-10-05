@@ -281,12 +281,15 @@ void HandwritingSearch::update() {
     for (const auto& [s, inFront]: all) {
         auto& indexer = indexers[s];
         if (!indexer) {
+            auto plan = std::make_shared<LanguagePlan>();
             if (seeder() && s->hasFilePath()) {
-                for (auto& [hash, result]: seeder()(s->getFilePath(), worker.recognizerId())) {
+                Seeded seeded = seeder()(s->getFilePath(), worker.recognizerId());
+                for (auto& [hash, result]: seeded.lines) {
                     worker.remember(hash, std::move(result));
                 }
+                plan = std::make_shared<LanguagePlan>(LanguagePlan::choiceNamed(seeded.choice), seeded.decided);
             }
-            indexer = new InkTextIndexer(*s, worker, s);  // (goes with its document)
+            indexer = new InkTextIndexer(*s, worker, s, std::move(plan));  // (goes with its document)
             connect(indexer, &InkTextIndexer::progress, this, &HandwritingSearch::progress);
         }
         indexer->setFocused(inFront);
@@ -304,6 +307,17 @@ int HandwritingSearch::pagesWaiting() const {
 InkTextIndexer* HandwritingSearch::indexerOf(const DocumentSession* session) const {
     auto it = indexers.find(session);
     return it != indexers.end() ? it->second.data() : nullptr;
+}
+
+LanguagePlan::Choice HandwritingSearch::languageChoiceOf(const DocumentSession* session) const {
+    const InkTextIndexer* indexer = indexerOf(session);
+    return indexer ? indexer->plan()->choice() : LanguagePlan::Choice::Automatic;
+}
+
+void HandwritingSearch::setLanguageChoice(const DocumentSession* session, LanguagePlan::Choice choice) {
+    if (InkTextIndexer* indexer = indexerOf(session)) {
+        indexer->setLanguageChoice(choice);
+    }
 }
 
 }  // namespace xqt::hwr

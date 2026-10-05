@@ -10,6 +10,7 @@
 
 #include "model/Document.h"
 #include "model/XojPage.h"
+#include "hwr/LanguagePlan.h"
 #include "session/DocumentSession.h"
 
 #include "Library.h"
@@ -71,6 +72,7 @@ struct LibraryInkJob::Current {
     std::vector<std::vector<hwr::LineRef>> lines;
     std::map<quint64, size_t> jobs;  ///< job id -> page
     bool complete = true;
+    std::shared_ptr<hwr::LanguagePlan> plan = std::make_shared<hwr::LanguagePlan>();
 };
 
 LibraryInkJob::LibraryInkJob(hwr::InkRecognitionService& service, QObject* parent):
@@ -177,11 +179,14 @@ void LibraryInkJob::loaded(std::shared_ptr<Current> doc) {
         doc->pages = doc->doc->getPageCount();
     }
     doc->lines.resize(doc->pages);
-    // Lines read before (an older version of the file) are not read again
-    if (auto before = index->inkText().find(doc->file); before && before->recognizer == service.recognizerId()) {
+    // Lines read before (an older version of the file) are not read again; its language as chosen, or as decided
+    if (auto before = index->inkText().find(doc->file)) {
+        const bool same = before->recognizer == service.recognizerId();
+        doc->plan = std::make_shared<hwr::LanguagePlan>(hwr::LanguagePlan::choiceNamed(before->languageChoice),
+                                                        same ? before->language : QString());
         for (const auto& page: before->pages) {
             for (const hwr::LineRef& l: page) {
-                if (l.result) {
+                if (l.result && same) {
                     service.remember(l.hash, l.result);
                 }
             }
@@ -208,6 +213,7 @@ void LibraryInkJob::pump() {
         hwr::InkRecognitionService::Job job;
         job.priority = LIBRARY_PRIORITY + static_cast<double>(page);
         job.strokes = std::move(strokes);
+        job.plan = c.plan;
         const quint64 id = service.submit(this, std::move(job), [this, doc = current](hwr::PageResult r) {
             if (doc != current) {
                 return;
@@ -237,6 +243,7 @@ void LibraryInkJob::finish() {
         doc.stamp = c.stamp;
         doc.recognizer = service.recognizerId();
         doc.complete = c.complete;
+        doc.language = c.plan->decided();
         doc.pages = std::move(c.lines);
         index->inkText().put(c.file, std::move(doc));
     }

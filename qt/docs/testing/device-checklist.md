@@ -2824,6 +2824,15 @@ scripted models (`xqt-hwr-tests`); the steps below need the real models.
       and English ones; a word both models read ("Kalman", "Test") is marked once, not twice; the library's search
       finds the document by either. Close and open it again: nothing is read again (the pack keeps both models'
       readings).
+- [ ] Language per document (both models in use): open an English `.xopp` with a page or more of handwriting;
+      with `XQT_PERF=1` or `top`, the reading takes about as long per line as with English alone after the first
+      six lines (the German model only reads lines the English one is unsure of). A German document: the same the
+      other way round. A document with English and German paragraphs: German words in the German paragraphs are
+      found.
+- [ ] ⋮ → Document → "Handwriting language" (only with the search on): Automatic is checked; choose German: the
+      English model stops reading this document, the German one reads what it had not read; close and reopen it:
+      German is still checked (kept in `.xournal_library/ink-text.pack`, the `.xopp` is unchanged: `git diff` or a
+      checksum of the file). Back to Automatic.
 - [ ] With `XQT_HWR_MODEL_DE=<folder>` the German row says the model is that folder and offers neither download nor
       removal.
 
