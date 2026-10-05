@@ -179,7 +179,8 @@ TEST_F(VersionsTest, restoreIsOneUndoStepAndTheNextSaveANewVersion) {
     ASSERT_EQ(strokesOf(*s->getDocument()), 3u);
     QSignalSpy restored(&m, &VersionsModel::restored);
     ASSERT_TRUE(m.restore(1));
-    ASSERT_TRUE(restored.wait(20000));
+    EXPECT_TRUE(QTest::qWaitFor([&] { return restored.count() > 0; }, 20000));
+    ASSERT_EQ(restored.count(), 1);
     ASSERT_TRUE(restored.first().at(0).toBool()) << restored.first().at(1).toString().toStdString();
     EXPECT_EQ(strokesOf(*s->getDocument()), 1u) << "the pages of version 1";
     EXPECT_EQ(s->getDocument()->getPageCount(), 3u);

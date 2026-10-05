@@ -3380,3 +3380,24 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
       `--version`: the latest. A version that is not in the file: a message, exit code 253 (-3).
 - [ ] `pdfdetach -list notes.pdf` (or Acrobat's attachments) after several days of saves: `document.xopp` is there
       and is the latest version; older versions are not listed as attachments.
+- [ ] Open a PDF with notes. The sidebar has a clock button after the highlighter (Version history): it explains what
+      versions are and has the switch "Keep versions of this document" (off). ⋮ → Document → "Version history…" opens
+      the same. Turn it on: "Versions are kept from the next save" with "Save now"; after it the list shows the file as
+      it was and the version saved now.
+- [ ] Write on two days (or change the system date): each day is one version; several Ctrl+S on one day keep one
+      version for that day (the list does not grow, the newest row's time changes). The file does not grow by the
+      whole .xopp for each older day (`ls -l` over a week of saves of a long lecture).
+- [ ] Ctrl+Alt+S: "Save with a message"; type "Before the exam", Save: the row has a flag and the message in bold. A
+      save after it is a new version. "Milestones" shows only flagged rows. A row's menu → "Add a message…" changes a
+      message later (the next Ctrl+S is still fast).
+- [ ] A row's menu → "Show beside the document": that version opens on the side, read-only, with the ink of then.
+      "Open as a copy": a new tab "name (version N)", not saved. "Restore this version…": the pages are those of
+      then, Undo brings today's back; the next Ctrl+S adds a version "Restored the version of …".
+- [ ] Settings → Documents → "Keep versions of new PDFs with notes" (off by default). On: annotate a plain PDF and
+      save it in PDF files mode: the History panel lists "The PDF as it was received" and the first version; the
+      first bytes of the file are the original PDF (`cmp -n <size> original.pdf file.pdf`).
+- [ ] Share… on a PDF with notes that keeps versions: a check box "With its version history" (off). Off: the shared
+      file is a copy (in the app cache) with one revision (`grep -c startxref`), the file itself keeps its versions.
+      On: the file itself.
+- [ ] The phone (Fold 7 folded): the History button fits in the sidebar's row; the row menu is a sheet; Ctrl+Alt+S
+      on a keyboard cover works.

@@ -4077,9 +4077,33 @@ bool AppController::handOver(const QStringList& given, bool toClipboard) {
     return true;
 }
 
-bool AppController::sharePdf(bool toClipboard) {
+bool AppController::sharedKeepsVersions(const QString& file) const {
+    if (!file.isEmpty()) {
+        const fs::path f(file.toStdString());
+        return lowerExtension(f) == ".pdf" && HybridPdf::markerOf(f).history;
+    }
+    const DocumentSession* s = session();
+    return s && s->isHybrid() && s->keepsVersions();
+}
+
+bool AppController::sharePdf(bool toClipboard, bool withHistory) {
     DocumentSession* s = session();
     const QString step = shareStep();
+    if (s && s->isHybrid() && s->keepsVersions() && (step == "share" || step == "save")) {
+        // Version history: the file keeps its versions, never written anew for sharing; what is shared is a copy
+        // without them (shareFile), or the file itself when they go along
+        QPointer<DocumentSession> guard(s);
+        auto share = [this, guard, toClipboard, withHistory](bool ok) {
+            if (ok && guard) {
+                shareFile(QString::fromStdString(guard->getFilePath().string()), toClipboard, withHistory);
+            }
+        };
+        if (!s->isModified() && !s->isSaving()) {
+            share(true);
+            return true;
+        }
+        return startSave(SaveWay::Save, {}, share);
+    }
     if (step == "share") {
         const fs::path file = s->isHybrid() ? s->getFilePath() : s->annotatedPdf();
         return handOver({QString::fromStdString(file.string())}, toClipboard);
@@ -4339,11 +4363,39 @@ void AppController::cancelLibraryArchive() {
     }
 }
 
-bool AppController::shareFile(const QString& path, bool toClipboard) {
+bool AppController::shareFile(const QString& path, bool toClipboard, bool withHistory) {
     if (!QFileInfo::exists(path)) {
         return false;
     }
     const fs::path file(path.toStdString());
+    if (lowerExtension(file) == ".pdf" && HybridPdf::markerOf(file).history) {
+        if (withHistory) {
+            return handOver({path}, toClipboard);  // (as it is: its versions go along)
+        }
+        // Without its versions: a copy written anew in one piece, in the app cache (the file keeps them)
+        const fs::path copy = Util::getCacheSubfolder("share") / file.filename();
+        QPointer<AppController> guard(this);
+        QThreadPool::globalInstance()->start([guard, file, copy, toClipboard] {
+            std::string error;
+            std::error_code ec;
+            fs::create_directories(copy.parent_path(), ec);
+            const bool ok = HybridPdf::compact(file, error, copy);
+            QMetaObject::invokeMethod(
+                    guard.data(),
+                    [guard, copy, toClipboard, ok, error] {
+                        if (!guard) {
+                            return;
+                        }
+                        if (!ok) {
+                            Q_EMIT guard->message(tr("Share"), QString::fromStdString(error), true);
+                            return;
+                        }
+                        guard->handOver({QString::fromStdString(copy.string())}, toClipboard);
+                    },
+                    Qt::QueuedConnection);
+        });
+        return true;
+    }
     if (lowerExtension(file) == ".pdf" && HybridPdf::isHybrid(file) && HybridPdf::hasEarlierRevisions(file)) {
         // A PDF with notes saved incrementally: written anew in one piece first (on a worker), so that no earlier
         // revision with deleted ink goes along

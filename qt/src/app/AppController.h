@@ -1074,7 +1074,12 @@ public:
     Q_INVOKABLE QString shareStep() const;
     /// The steps "share" and "save": then the PDF goes to the system (SystemApps::share: the file manager on the
     /// desktop) or, `toClipboard`, onto the clipboard. False for the other steps (the window asks).
-    Q_INVOKABLE bool sharePdf(bool toClipboard);
+    /// A PDF with notes that keeps its versions (version history) is shared without them (a copy written anew in the
+    /// app cache; the file keeps them), unless `withHistory`.
+    Q_INVOKABLE bool sharePdf(bool toClipboard, bool withHistory = false);
+    /// The PDF with notes that Share would send keeps its versions (`file`: a PDF of the library; "": the current
+    /// document): Share then offers to send them along.
+    Q_INVOKABLE bool sharedKeepsVersions(const QString& file) const;
     /// A PDF with notes as a copy at `target` (empty: in the app cache), the document keeps its file and format; then
     /// shared or copied.
     Q_INVOKABLE bool sharePdfCopy(const QUrl& target, bool toClipboard);
@@ -1083,7 +1088,8 @@ public:
     /// (a library card) instead of the current document.
     Q_INVOKABLE bool shareForXournal(const QUrl& folder, const QString& file = QString());
     /// A file as it is (a library card's PDF): shared or copied.
-    Q_INVOKABLE bool shareFile(const QString& path, bool toClipboard);
+    /// One that keeps its versions: without them unless `withHistory` (see sharePdf).
+    Q_INVOKABLE bool shareFile(const QString& path, bool toClipboard, bool withHistory = false);
     /// The text file Share… offers as it is: the current document's (a .md, a text file; "" if it is none), or for a
     /// library card's path the file itself if it is a Markdown or text file. Never a PDF with notes for those.
     Q_INVOKABLE QString sharedTextFile(const QString& path = QString()) const;

@@ -221,6 +221,7 @@ set(XQT_QML_FILES
     src/app/qml/ContentsOverview.qml
     src/app/qml/OutlineList.qml
     src/app/qml/AnnotationList.qml
+    src/app/qml/HistoryPanel.qml
     src/app/qml/TextFlowPanel.qml
     src/app/qml/MarkdownPanel.qml
     src/app/qml/EmojiSuggestions.qml
@@ -357,6 +358,7 @@ if(XQT_BUILD_TESTS)
 
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/TemplateToolTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AnnotationsPanelTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/VersionHistoryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/CitationsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.h
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.cpp
