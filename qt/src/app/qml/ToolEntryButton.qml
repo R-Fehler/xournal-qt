@@ -7,6 +7,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
+import "LineStyles.js" as LineStyles
 
 AbstractButton {
     id: button
@@ -41,7 +42,6 @@ AbstractButton {
 
     readonly property string type: entry && entry.type ? entry.type : ""
     readonly property real width_: entry && entry.width ? entry.width : 1
-    readonly property var dashes: ({ "plain": [], "dash": [6, 3], "dashdot": [6, 3, 0.5, 3], "dot": [0.5, 3] })
 
     implicitWidth: cell
     implicitHeight: cell
@@ -134,6 +134,7 @@ AbstractButton {
         // translucent; an eraser's a gray dot of its size; a text box's "Aa" in its font and color
         Canvas {
             id: sample
+            objectName: "toolSample"
             visible: button.type !== "sticky" && button.type !== "text"
             anchors.horizontalCenter: parent.horizontalCenter
             y: Math.round(parent.height / 2 + 6)
@@ -169,9 +170,9 @@ AbstractButton {
                 }
                 ctx.strokeStyle = button.inkColor
                 ctx.lineWidth = highlighter ? Math.max(w, 6) : w
-                ctx.lineCap = highlighter ? "butt" : "round"
-                const d = button.dashes[button.entry.lineStyle || "plain"] || []
-                ctx.setLineDash(d.map(function(x) { return x * Math.max(1, 3 / ctx.lineWidth) }))
+                const style = button.entry.lineStyle || "plain"
+                ctx.lineCap = highlighter ? "butt" : LineStyles.sampleCap(style, "round")
+                ctx.setLineDash(LineStyles.sampleDashes(style, ctx.lineWidth))
                 ctx.beginPath()
                 ctx.moveTo(4 + ctx.lineWidth / 2, height / 2)
                 ctx.lineTo(width - 4 - ctx.lineWidth / 2, height / 2)

@@ -98,6 +98,16 @@ pages while reading (`ViewController::setSnappingVertically`): a row taller than
 top at the view's top at the latest), a fling at its end goes on to the next row's top, a row that fits rests in the
 middle. Outside reading, up and down scrolls freely as before.
 
+## Line styles
+
+The samples of a line style (the editor's four buttons, its preview, the ink of a tool on the rail, the classic pen's
+options) are drawn by `LineStyles.js`. Two things of Qt's Canvas made them all solid once (the author, 2026-10-05:
+"the dashed and dotted line buttons just show a regular line"): `setLineDash()` takes only a JavaScript array, and a
+list that came through a model (a Repeater's `modelData.dashes`) is silently ignored; and, like `QPen`, it measures
+the dashes in widths of the line, not in pixels, so upstream's `[6, 3]` on a 2.6 px sample of 17 px is one dash. The
+short samples use dashes in pixels (at least two dashes or three dots fit) with butt caps; the editor's preview draws
+upstream's dashes as the pen does.
+
 ## Storage
 
 `ToolboxModel` (qt/src/shell): the entries as JSON in the settings (`toolbox` in the xournalQt part, per device),

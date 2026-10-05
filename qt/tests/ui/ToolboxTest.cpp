@@ -16,6 +16,8 @@
 #include <QTemporaryDir>
 #include <QElapsedTimer>
 #include <QGuiApplication>
+#include <QImage>
+#include <QtMath>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickItem>
@@ -171,6 +173,39 @@ protected:
         QMetaObject::invokeMethod(menu, "close");
         until([&] { return !menu->property("visible").toBool(); });
         wait(250);  // (its closing transition)
+    }
+    /// An item named `name` inside `root` (the first one, depth first)
+    static QQuickItem* under(QQuickItem* root, const QString& name) {
+        if (!root) {
+            return nullptr;
+        }
+        for (QQuickItem* c: root->childItems()) {
+            if (c->objectName() == name) {
+                return c;
+            }
+            if (QQuickItem* f = under(c, name)) {
+                return f;
+            }
+        }
+        return nullptr;
+    }
+    /// The strokes of ink along the middle line of an item, in the window's picture (a solid line: 1; dashed: more)
+    int inkRuns(QQuickItem* item) const {
+        if (!item) {
+            return -1;
+        }
+        const QImage picture = window->grabWindow();
+        const qreal dpr = picture.devicePixelRatio();
+        const QRectF r = rectOf(item);
+        const int y = qRound(r.center().y() * dpr);
+        int runs = 0;
+        bool inInk = false;
+        for (int x = qCeil(r.left() * dpr); x < qFloor(r.right() * dpr); ++x) {
+            const bool ink = qGray(picture.pixel(x, y)) < 160;
+            runs += ink && !inInk ? 1 : 0;
+            inInk = ink;
+        }
+        return runs;
     }
     QObject* editor() const { return find<QObject>("toolEntryEditor"); }
     bool editorOpen() const { return editor() && editor()->property("visible").toBool(); }
@@ -401,6 +436,34 @@ TEST_F(ToolboxTest, aTapOnTheToolInHandOpensItsEditorAndAChangeIsTakenAtOnce) {
     until([&] { return tools()->entry(pen).value("width").toDouble() > before; });
     EXPECT_NEAR(tools()->entry(pen).value("width").toDouble(), before * 1.25, 0.01);
     EXPECT_NEAR(controller->customWidth(), before * 1.25, 0.01);
+}
+
+TEST_F(ToolboxTest, theLineStylesShowTheirDashesInTheEditorAndOnTheRail) {
+    // (the author, 2026-10-05: "the dashed and dotted line buttons just show a regular line")
+    const QString pen = nth("pen");
+    controller->applyToolEntry(pen);
+    click(entry(pen));
+    until([&] { return editorOpen(); });
+    ASSERT_TRUE(editorOpen());
+    wait(300);  // (opened, painted)
+    auto sample = [&](const char* key) { return under(find(QString("editorLineStyle_") + key), "lineStyleSample"); };
+    ASSERT_NE(sample("dash"), nullptr);
+    EXPECT_EQ(inkRuns(sample("plain")), 1) << "solid: one line";
+    EXPECT_GE(inkRuns(sample("dash")), 2) << "dashed: dashes";
+    EXPECT_GE(inkRuns(sample("dashdot")), 3) << "dash-dot: a dash, a dot, a dash";
+    EXPECT_GE(inkRuns(sample("dot")), 3) << "dotted: dots";
+    QTest::keyClick(window, Qt::Key_Escape);
+    until([&] { return !editorOpen(); });
+
+    // The tool on the rail: a sample of its ink, dashed as it draws
+    tools()->update(pen, {{"lineStyle", "dash"}});
+    const QString dotted = tools()->duplicate(pen);
+    tools()->update(dotted, {{"lineStyle", "dot"}});
+    controller->applyToolEntry(nth("highlighter"));  // (neither is lifted in hand)
+    until([&] { return shown(entry(dotted)); });
+    wait(300);
+    EXPECT_GE(inkRuns(under(entry(pen), "toolSample")), 2) << "a dashed pen on the rail";
+    EXPECT_GE(inkRuns(under(entry(dotted), "toolSample")), 3) << "a dotted pen on the rail";
 }
 
 TEST_F(ToolboxTest, plusAddsAToolPrefilledFromTheLastOfItsKind) {

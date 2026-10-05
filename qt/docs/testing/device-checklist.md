@@ -3461,3 +3461,9 @@ Seen through the replay (⋮ → View → Replay the writing).
 - [ ] Help → Introduction: the first page has "Go back to earlier versions" (the History button, Ctrl+Alt+S); on the
       phone the page still fits without scrolling past its buttons. Help → Tutorial → section 15 "Versions": the steps
       work on the tutorial itself (turn on, Ctrl+Alt+S, show, restore, copy). Fill its screenshot placeholder.
+
+## The adaptive UI reworked (qt/ui-rework)
+
+- [ ] The toolbox: tap the pen in hand; in its editor the four line buttons show a solid, a dashed, a dash-dot and a
+      dotted line. Choose "Dashed": the pen on the rail shows a dashed ink sample; "Dotted": dots. The same in the
+      classic tool bar's pen menu (hold the pen button).

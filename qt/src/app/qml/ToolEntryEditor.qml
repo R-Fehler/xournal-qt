@@ -11,6 +11,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Dialogs
 import QtQuick.Layouts
+import "LineStyles.js" as LineStyles
 
 Popup {
     id: editor
@@ -204,8 +205,7 @@ Popup {
                     ctx.strokeStyle = editor.shownColor
                     ctx.lineWidth = w
                     ctx.lineCap = editor.highlights ? "butt" : "round"
-                    const d = { "dash": [6, 3], "dashdot": [6, 3, 0.5, 3], "dot": [0.5, 3] }[e.lineStyle] || []
-                    ctx.setLineDash(d)
+                    ctx.setLineDash(LineStyles.dashes(e.lineStyle))  // (as it draws: in widths of the line)
                     ctx.beginPath()
                     if (fill) {
                         ctx.ellipse(width / 2 - 50, 6, 100, height - 12)
@@ -485,8 +485,8 @@ Popup {
                 spacing: 2
                 Label { text: qsTr("Line"); Layout.fillWidth: true; color: "#5f6368" }
                 Repeater {
-                    model: [{ key: "plain", dashes: [], name: qsTr("Solid") }, { key: "dash", dashes: [6, 3], name: qsTr("Dashed") },
-                            { key: "dashdot", dashes: [6, 3, 0.5, 3], name: qsTr("Dash-dot") }, { key: "dot", dashes: [0.5, 3], name: qsTr("Dotted") }]
+                    model: [{ key: "plain", name: qsTr("Solid") }, { key: "dash", name: qsTr("Dashed") },
+                            { key: "dashdot", name: qsTr("Dash-dot") }, { key: "dot", name: qsTr("Dotted") }]
                     delegate: AbstractButton {
                         id: styleButton
                         required property var modelData
@@ -508,15 +508,17 @@ Popup {
                                 border.color: Material.accentColor
                             }
                             Canvas {
+                                objectName: "lineStyleSample"
                                 anchors.centerIn: parent
                                 width: 32; height: 12
                                 onPaint: {
                                     const ctx = getContext("2d")
                                     ctx.reset()
+                                    const key = styleButton.modelData.key
                                     ctx.lineWidth = 2.5
-                                    ctx.lineCap = "round"
+                                    ctx.lineCap = LineStyles.sampleCap(key, "round")
                                     ctx.strokeStyle = "#303030"
-                                    ctx.setLineDash(styleButton.modelData.dashes)
+                                    ctx.setLineDash(LineStyles.sampleDashes(key, ctx.lineWidth))
                                     ctx.beginPath()
                                     ctx.moveTo(2.5, height / 2)
                                     ctx.lineTo(width - 2.5, height / 2)
