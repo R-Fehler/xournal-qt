@@ -1576,6 +1576,40 @@ TEST_F(IncrementalSaveTest, ctrlSAppendsOnlyWhatChanged) {
     EXPECT_LT(again.appended, 8000u);
 }
 
+// The embedded .xopp is the same bytes when the same document is written again (version history stores older
+// versions as byte deltas of it, qt/docs/hybrid-pdf.md "Version history"): written twice in full, and saved again
+// without a change through the session (which puts a preview of the first page into it)
+TEST_F(IncrementalSaveTest, theEmbeddedXoppIsTheSameBytesForTheSameDocument) {
+    auto embedded = [](const fs::path& pdf) {
+        QPDF q;
+        q.processFile(pdf.string().c_str());
+        auto spec = QPDFEmbeddedFileDocumentHelper(q).getEmbeddedFile(HybridPdf::DATA_NAME);
+        EXPECT_TRUE(spec);
+        if (!spec) {
+            return std::string();
+        }
+        auto buffer = spec->getEmbeddedFileStream().getStreamData();
+        return std::string(reinterpret_cast<const char*>(buffer->getBuffer()), buffer->getSize());
+    };
+    auto doc = annotated(path("lecture.pdf"));
+    ASSERT_TRUE(HybridPdf::write(*doc, path("once.pdf")).ok);
+    const std::string first = embedded(path("once.pdf"));
+    ASSERT_GT(first.size(), 100u);
+    ASSERT_TRUE(HybridPdf::write(*doc, path("once.pdf")).ok);
+    EXPECT_EQ(embedded(path("once.pdf")), first) << "written in full twice";
+
+    const fs::path out = path("notes.pdf");
+    auto s = savedLecture(out);
+    const std::string saved = embedded(out);
+    const auto again = s->save();
+    ASSERT_TRUE(again.ok) << again.error;
+    EXPECT_TRUE(again.incremental);
+    EXPECT_EQ(embedded(out), saved) << "saved again without a change, with the preview";
+    drawOn(*s, 0, 500);
+    ASSERT_TRUE(s->save().ok);
+    EXPECT_NE(embedded(out), saved);
+}
+
 // An image attached as a page's background (document.xopp.bg_1.png) is not written again by a save that did not change
 // it; a new image is
 TEST_F(IncrementalSaveTest, attachedBackgroundImagesAreNotWrittenAgainWhenUnchanged) {
