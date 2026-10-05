@@ -32,6 +32,11 @@ encrypted with AES-256. **If the password is forgotten, nobody can open the docu
   have a password, so the archive export of a protected document has none (its dialog says so). Xournal++ cannot open
   protected PDFs: "For Xournal++" asks you to remove the password first, and a protected document is never saved as a
   `.xopp`.
+- **Extract to a new document** and **Split** of a protected document give PDFs with notes protected with the same
+  password (never a `.xopp`). **Export pages as pictures** is not offered for it: pictures cannot have a password.
+  **Copy page as image** works as the snip does (the clipboard is not a file).
+- **Insert pages from a file** asks for the password of a protected PDF. The pages inserted are then part of your
+  document, protected only if your document is.
 
 ## What stays private
 

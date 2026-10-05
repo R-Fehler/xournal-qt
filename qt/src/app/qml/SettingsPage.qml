@@ -960,6 +960,20 @@ Popup {
                         }
                     }
                     Hint { text: qsTr("%F is the date (2026-09-19), %H-%M the time.") }
+                    // Pages as pictures (qt/docs/page-files.md): "Copy page as image" and the export use it
+                    SectionTitle { text: qsTr("Pages as pictures") }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label { text: qsTr("Resolution"); Layout.preferredWidth: sheet.narrow ? -1 : 220 }
+                        ComboBox {
+                            objectName: "pageImageDpiBox"
+                            readonly property var dpis: [150, 200, 300, 400, 600]
+                            model: dpis.map(function(d) { return qsTr("%1 dpi").arg(d) })
+                            currentIndex: Math.max(0, dpis.indexOf(app.pageImageDpi))
+                            onActivated: app.pageImageDpi = dpis[currentIndex]
+                        }
+                    }
+                    Hint { text: qsTr("Copy page as image (Ctrl+Shift+C) puts the page on the clipboard at this resolution; a screenshot has the screen's. Export as pictures starts with it.") }
                     // Audio recordings (qt/docs/audio.md)
                     SectionTitle { visible: app.audio.available; text: qsTr("Audio recordings") }
                     RowLayout {

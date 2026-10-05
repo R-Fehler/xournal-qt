@@ -769,8 +769,10 @@ especially interested in importing annotations that come from the GoodNotes PDF 
 - [ ] `qt/dark-pages`: dark mode for pages (inverted on the GPU, pictures kept) with ink and highlighter colors shown
   as their dark equivalents (palette roles), readable in both; curated page colors (black, grey, illustration paper,
   textured paper) for `.xopp` and PDFs, with a printing warning for dark pages.
-- [ ] `qt/page-files`: A6 insert pages from a PDF file, A7 extract or split selected pages into a new document or
-  PDF, A8 export pages as PNG.
+- [x] `qt/page-files`: A6 insert pages from a PDF file, A7 extract or split selected pages into a new document or
+  PDF, A8 export pages as PNG; plus "Copy page as image" (Ctrl+Shift+C, a high-resolution PNG on the clipboard)
+  ([page-files.md](qt/docs/page-files.md)). Left: the device checks; exporting pictures into an Android `content://`
+  folder.
 - Additions (the author, 2026-10-05 evening): exported PNG pages also go to the clipboard, and "Copy page as image" at a high resolution (a setting, not asked each time); the snip's resolution is a setting too. B8 builds
   only what the PDF standard makes clear until the author's sample exports arrive. B7 (a folder as one notebook PDF)
   is parked (brittle, unclear order); sharing a folder or the library as a zip is to be discussed.

@@ -48,6 +48,8 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"addPage", tr("Add a page"), pages, {"Ctrl+N"}},
             {"pageGrid", tr("All pages"), pages, {"Ctrl+Alt+G"}},
             {"contents", tr("Contents overview"), pages, {"Ctrl+Alt+O"}},
+            // (qt/docs/page-files.md: the page as a high-resolution PNG on the clipboard)
+            {"copyPageImage", tr("Copy the page as an image"), pages, {"Ctrl+Shift+C"}},
 
             {"undo", tr("Undo"), edit, standard(QKeySequence::Undo)},
             {"redo", tr("Redo"), edit, standard(QKeySequence::Redo)},  // (Qt already has Ctrl+Y in there)

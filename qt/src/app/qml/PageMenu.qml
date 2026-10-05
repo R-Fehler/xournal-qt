@@ -1,7 +1,8 @@
 // What can be done with a page, from the sidebar or the page grid: it acts on the selection when the page is
 // selected, else on the page itself. The everyday actions are a small grid of icons, every one with its tool tip,
 // so the whole thing stays short; only what an icon cannot tell is written out. Inserting somewhere else, or
-// several pages at once, is in the "Insert pages…" dialog (it asks where, how many, background and size).
+// several pages at once, is in the "Insert pages…" dialog (it asks where, how many, background and size). Extracting,
+// splitting, pictures of the pages and pages from a file are in PageFiles.qml (the window's).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -33,6 +34,8 @@ Popup {
     readonly property int lastPage: pages[pages.length - 1]
     /// Turning them (AppController::rotationOf): possible, and why not (PDF pages in a .xopp)
     readonly property var rotation: visible ? app.rotationOf(pages) : ({})
+    /// The window's dialogs for pages as files are there (PageFiles.qml)
+    readonly property bool pageFiles: typeof win !== "undefined" && win !== null && win.openPageFiles !== undefined
 
     /// Open it where the page was pressed (`x`, `y` in the coordinates of `item`), and keep it inside the window.
     /// In the phone classes: a sheet at the bottom instead.
@@ -217,6 +220,16 @@ Popup {
                 text: qsTr("Insert pages…")
                 onClicked: { app.requestInsertPages(menu.lastPage + 1); menu.close() }
             }
+            // Pages from a file after this one (PageFiles.qml, qt/docs/page-files.md)
+            PageAction {
+                objectName: "pageMenuInsertFile"
+                visible: menu.pageFiles
+                implicitHeight: menu.asSheet ? Math.max(48, menu.target) : 38
+                iconName: "xqt-import"
+                tip: qsTr("Insert pages from a file after this one…")
+                enabled: app.canInsertTemplate
+                onClicked: { win.openPageFiles("insert", [menu.lastPage]); menu.close() }
+            }
             PageAction {
                 objectName: "pageMenuRotateLeft"
                 implicitHeight: menu.asSheet ? Math.max(48, menu.target) : 38
@@ -270,10 +283,49 @@ Popup {
                 tip: qsTr("Save page as template…")
                 onClicked: { win.openTemplateSave(menu.page); menu.close() }
             }
+            // The page as a high-resolution picture on the clipboard (qt/docs/page-files.md)
+            PageAction {
+                objectName: "pageMenuCopyImage"
+                implicitHeight: menu.asSheet ? Math.max(48, menu.target) : 38
+                iconName: "xqt-copy"
+                tip: menu.pages.length > 1 ? qsTr("Copy the first page as an image (%1 dpi)").arg(app.pageImageDpi)
+                                           : qsTr("Copy as an image (%1 dpi)").arg(app.pageImageDpi)
+                onClicked: { app.copyPagesAsImage(menu.pages); menu.close() }
+            }
         }
-        PageLine {
-            text: qsTr("Select all pages")
-            onClicked: { app.pages.selectAll(); menu.close() }
+        // Selecting all; the page or the selection as files of their own (PageFiles.qml, qt/docs/page-files.md)
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 0
+            PageLine {
+                text: qsTr("Select all pages")
+                onClicked: { app.pages.selectAll(); menu.close() }
+            }
+            PageAction {
+                objectName: "pageMenuExtract"
+                visible: menu.pageFiles
+                implicitHeight: menu.asSheet ? Math.max(48, menu.target) : 38
+                iconName: "xqt-file-output"
+                tip: qsTr("Extract %1 to a new document…").arg(menu.what)
+                onClicked: { win.openPageFiles("extract", menu.pages); menu.close() }
+            }
+            PageAction {
+                objectName: "pageMenuSplit"
+                visible: menu.pageFiles
+                implicitHeight: menu.asSheet ? Math.max(48, menu.target) : 38
+                iconName: "xqt-page-break"
+                tip: menu.pages.length > 1 ? qsTr("Split the document at the selected pages…")
+                                           : qsTr("Split the document…")
+                onClicked: { win.openPageFiles("split", menu.pages); menu.close() }
+            }
+            PageAction {
+                objectName: "pageMenuImages"
+                visible: menu.pageFiles
+                implicitHeight: menu.asSheet ? Math.max(48, menu.target) : 38
+                iconName: "xqt-file-image"
+                tip: qsTr("Export %1 as pictures…").arg(menu.what)
+                onClicked: { win.openPageFiles("images", menu.pages); menu.close() }
+            }
         }
     }
     BookmarkDialog { id: bookmarkDialog }

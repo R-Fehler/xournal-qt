@@ -97,6 +97,9 @@ xoj::util::CairoSurfaceSPtr render(Document& doc, const PageRef& page, const Req
             cairo_restore(cr);
         }
         flags.showPDF = xoj::view::HIDE_PDF_BACKGROUND;
+    } else if (!request.paper) {
+        flags.showRuling = xoj::view::HIDE_RULING_BACKGROUND;  // (and no colour: nothing where nothing is drawn)
+        flags.forceVisible = xoj::view::FORCE_VISIBLE;          // (not the screen's checkerboard either)
     } else {
         // (a hidden background layer: the paper's color, not the screen's checkerboard)
         flags.forceBackgroundColor = xoj::view::FORCE_AT_LEAST_BACKGROUND_COLOR;

@@ -880,6 +880,7 @@ For a protected document (its file, or the PDF its `.xopp` annotates):
 | handwriting | recognised in memory, never handed to the library's cache |
 | version cache, "Show beside the document" | a version is a prefix of the encrypted file, opened with the password |
 | Share, PDF copy, export | encrypted (above) |
+| extract, split ([page-files.md](page-files.md)) | PDFs with notes encrypted with the same password, never a `.xopp`; pages as pictures refused (copying a page as an image to the clipboard is allowed, as the snip) |
 | printing | an unencrypted PDF for the printer in a temporary folder (without annotations: its PDF decrypted, as it is); removed as soon as `lp` has spooled it (it returns then), at the latest after ten minutes, at once after printing on Windows (Qt's print engine) or to a file, or when cancelled |
 
 Pictures of Markdown boxes and voice memos the PDF carries are taken out into the app cache while it is open (the
