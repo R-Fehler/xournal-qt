@@ -89,6 +89,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Todos.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryTodos.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryTodos.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryTags.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryTags.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/TodoCalendar.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/TodoCalendar.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentChapters.h
@@ -130,6 +132,7 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppSnip.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppStickers.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTodos.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTags.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppToolbox.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppRename.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppBookmarks.cpp
@@ -187,6 +190,7 @@ set(XQT_QML_FILES
     src/app/qml/DocumentCard.qml
     src/app/qml/BookmarksView.qml
     src/app/qml/TodosView.qml
+    src/app/qml/TagsView.qml
     src/app/qml/BookmarkDialog.qml
     src/app/qml/NewDocumentDialog.qml
     src/app/qml/DocumentModeCards.qml
@@ -324,6 +328,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/SnipTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/StickerToolTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/TodosTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/TagsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ToolboxTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AnnotationsPanelTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/CitationsTest.cpp

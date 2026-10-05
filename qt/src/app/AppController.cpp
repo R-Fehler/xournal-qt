@@ -82,6 +82,7 @@
 #include "shell/LibraryMigration.h"
 #include "shell/LibraryBookmarks.h"
 #include "shell/LibraryTodos.h"
+#include "shell/LibraryTags.h"
 #include "shell/LibraryModel.h"
 #include "shell/Stickers.h"
 #include "shell/DocumentChapters.h"
@@ -204,6 +205,8 @@ AppController::AppController(QObject* parent): QObject(parent) {
     library = ownLibrary.get();
     ownLibraryBookmarks = std::make_unique<LibraryBookmarksModel>(library);
     libraryBookmarks = ownLibraryBookmarks.get();
+    ownLibraryTags = std::make_unique<LibraryTagsModel>(library);
+    libraryTags = ownLibraryTags.get();
     ownLibraryTodos = std::make_unique<LibraryTodosModel>(library);
     libraryTodos = ownLibraryTodos.get();
     applyTodoRules();
@@ -299,6 +302,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     pageClipboard = mainWindow.pageClipboard;  // copied pages can be pasted in any window
     libraryBookmarks = mainWindow.libraryBookmarks;
     libraryTodos = mainWindow.libraryTodos;
+    libraryTags = mainWindow.libraryTags;
     handwriting = mainWindow.handwriting;
     handwritingView = mainWindow.handwritingView;
     connect(library, &LibraryModel::favouriteToggled, this, &AppController::favouriteChanged);

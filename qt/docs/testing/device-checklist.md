@@ -3000,3 +3000,16 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
       pages button of a hit marks `#course` where it is written. Fuzzy off: `tag:exam lecture` lists the documents
       with the tag whose text has "lecture"; `tag:exam` alone all of them.
 - [ ] The help of the Fuzzy button (long press) has the `tag:` row.
+
+## Tags: the Tags tab and the cards (qt/tags)
+- [ ] The library's switch has Tags (the tag icon) between Favourites and Bookmarks at 1920 and 1366; on the Fold 7
+      folded (a phone) it is not in the switch but in the library's ▾ menu ("Tags").
+- [ ] The Tags tab lists `#course` with "2 documents" and an arrow: a tap on the arrow unfolds `#math` under it;
+      "Unfold all" / "Fold all"; the text field filters (a nested tag shows with its parent). Show → without PDFs: the
+      counts of PDF keywords go; the Favourites star: only starred documents count; "Only in <folder>" counts the
+      library's current folder.
+- [ ] A tap on a tag: the library lists the documents with it (also from subfolders, no folders), a blue chip "#tag ✕"
+      beside the breadcrumbs; going into a folder narrows the list; Show and the star still filter; a tap on the chip
+      shows the folder as before.
+- [ ] Cards show their tags on the preview, above "last read": 1 on a narrow card, up to 3 on a wide one, then "+N";
+      the mouse over them lists all in a tip.

@@ -41,6 +41,11 @@ QDateTime modifiedOf(const DocumentItem& item) {
     }
     return t;
 }
+/// `file` is in `dir` or one of its subfolders
+bool inside(const fs::path& file, const fs::path& dir) {
+    const fs::path rel = file.parent_path().lexically_normal().lexically_relative(dir.lexically_normal());
+    return !rel.empty() && *rel.begin() != "..";
+}
 bool isOtherKind(const DocumentItem& item) {
     const auto k = item.kind();
     return k == DocumentItem::Kind::Text || k == DocumentItem::Kind::Other;
@@ -57,8 +62,9 @@ LibraryModel::LibraryModel(QObject* parent): QAbstractListModel(parent) {
     kindsTimer.setSingleShot(true);
     kindsTimer.setInterval(500);
     connect(&kindsTimer, &QTimer::timeout, this, [this] {
-        if (idx && filter.kindMatters() && idx->pdfKindChanges() != kindsSeen) {
-            rebuild();  // (the index found out what PDFs are: the filter shows them now, or not)
+        if (idx && ((filter.kindMatters() && idx->pdfKindChanges() != kindsSeen) ||
+                    (!onlyTag.isEmpty() && idx->tagChanges() != tagsSeen))) {
+            rebuild();  // (the index found out what PDFs are, or their tags: the filters show them now, or not)
         }
     });
 }
@@ -77,6 +83,10 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
     lib = std::move(library);
     currentFolder.clear();
     query.clear();
+    if (!onlyTag.isEmpty()) {
+        onlyTag.clear();
+        Q_EMIT tagFilterChanged();
+    }
     cacheUsage = {-1, 0};
     cachesRemoved = false;
     filter = lib ? lib->showFilter() : ShowFilter();
@@ -136,11 +146,14 @@ void LibraryModel::openCache() {
         if (!query.isEmpty() && !searchTimer.isActive()) {
             searchTimer.start();  // new text: search again (not on every document)
         }
-        if (filter.kindMatters() && idx->pdfKindChanges() != kindsSeen && !kindsTimer.isActive()) {
+        if (((filter.kindMatters() && idx->pdfKindChanges() != kindsSeen) ||
+             (!onlyTag.isEmpty() && idx->tagChanges() != tagsSeen)) &&
+            !kindsTimer.isActive()) {
             kindsTimer.start();  // (not on every document)
         }
         if (!rows.empty()) {
-            Q_EMIT dataChanged(index(0), index(static_cast<int>(rows.size()) - 1), {PageCountRole, PdfKindRole});
+            Q_EMIT dataChanged(index(0), index(static_cast<int>(rows.size()) - 1),
+                               {PageCountRole, PdfKindRole, TagsRole});
         }
     });
 }
@@ -270,6 +283,18 @@ void LibraryModel::setFavouritesOnly(bool on) {
     if (on != onlyFavourites) {
         onlyFavourites = on;
         Q_EMIT favouritesOnlyChanged();
+        rebuild();
+    }
+}
+
+void LibraryModel::setTagFilter(const QString& tag) {
+    QString t = tag.trimmed();
+    while (t.startsWith(u'#')) {
+        t.remove(0, 1);
+    }
+    if (t != onlyTag) {
+        onlyTag = t;
+        Q_EMIT tagFilterChanged();
         rebuild();
     }
 }
@@ -516,6 +541,7 @@ bool LibraryModel::shown(const DocumentItem& item) const {
 
 void LibraryModel::rebuild() {
     kindsSeen = idx ? idx->pdfKindChanges() : 0;
+    tagsSeen = idx ? idx->tagChanges() : 0;
     std::vector<Row> newRows;
     marks = query;
     if (lib && fuzzy && !query.trimmed().isEmpty()) {
@@ -600,8 +626,14 @@ void LibraryModel::rebuild() {
             std::move(otherRows.begin(), otherRows.end(), std::back_inserter(newRows));
         } else {
             std::vector<Row> folderRows, docRows;
-            if (flatView || onlyFavourites) {
+            if (flatView || onlyFavourites || !onlyTag.isEmpty()) {
+                // (a tag: the documents of the current folder and its subfolders that have it, see setRows)
+                const bool inFolder = !flatView && !onlyFavourites;
+                const fs::path dir = currentDir();
                 for (const auto& item: allShown()) {
+                    if (inFolder && !inside(item.main(), dir)) {
+                        continue;
+                    }
                     docRows.push_back(itemRow(item));
                 }
             } else {
@@ -636,7 +668,7 @@ void LibraryModel::rebuild() {
                 auto newer = [](const Row& a, const Row& b) { return a.modified > b.modified; };
                 std::stable_sort(folderRows.begin(), folderRows.end(), newer);
                 std::stable_sort(docRows.begin(), docRows.end(), newer);
-            } else if (flatView || onlyFavourites) {
+            } else if (flatView || onlyFavourites || !onlyTag.isEmpty()) {
                 std::stable_sort(docRows.begin(), docRows.end(), [](const Row& a, const Row& b) {
                     return DocumentFiles::namesLess(a.name, b.name);
                 });
@@ -654,6 +686,10 @@ void LibraryModel::setRows(std::vector<Row> newRows) {
         std::erase_if(newRows, [](const Row& r) {
             return r.isFolder || !DocumentPlaces::favourite(DocumentPlaces::keyOf(r.item));
         });
+    }
+    if (!onlyTag.isEmpty()) {
+        // Only documents with the tag (no folders), whatever lists them
+        std::erase_if(newRows, [this](const Row& r) { return r.isFolder || !idx || !idx->hasTag(r.path, onlyTag); });
     }
     std::set<fs::path> shown;
     for (const auto& r: newRows) {
@@ -786,6 +822,8 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
         }
         case FavouriteRole:
             return !r.isFolder && DocumentPlaces::favourite(DocumentPlaces::keyOf(r.item));
+        case TagsRole:
+            return r.isFolder || !idx ? QStringList() : idx->tagsOf(r.path);
         case ConflictsRole: {
             QStringList list;
             for (const fs::path& c: r.item.conflicts) {
@@ -828,7 +866,8 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {FileIconRole, "fileIcon"},
             {NameMarksRole, "nameMarks"},
             {ConflictsRole, "conflicts"},
-            {FavouriteRole, "favourite"}};
+            {FavouriteRole, "favourite"},
+            {TagsRole, "tags"}};
 }
 
 void LibraryModel::setShowFilter(const ShowFilter& f) {

@@ -54,6 +54,7 @@ class CanvasView;
 class LibraryArchive;
 class LibraryBookmarksModel;
 class LibraryTodosModel;
+class LibraryTagsModel;
 class LibraryMove;
 namespace LibraryMigration {
 struct Plan;
@@ -772,6 +773,11 @@ public:
     QObject* libraryBookmarksModel() const;
 
     // --- to-dos (AppTodos.cpp, qt/docs/todos.md) ---
+    // --- tags (AppTags.cpp, qt/docs/tags.md) ---
+    /// The library's Tags view (LibraryTagsModel)
+    Q_PROPERTY(QObject* libraryTags READ libraryTagsModel CONSTANT)
+    QObject* libraryTagsModel() const;
+
     /// The library's To-dos view (LibraryTodosModel)
     Q_PROPERTY(QObject* libraryTodos READ libraryTodosModel CONSTANT)
     QObject* libraryTodosModel() const;
@@ -1617,6 +1623,8 @@ private:
     std::unique_ptr<xqt::LibraryModel> ownLibrary;
     std::unique_ptr<xqt::LibraryBookmarksModel> ownLibraryBookmarks;
     xqt::LibraryBookmarksModel* libraryBookmarks = nullptr;
+    std::unique_ptr<xqt::LibraryTagsModel> ownLibraryTags;
+    xqt::LibraryTagsModel* libraryTags = nullptr;
     std::unique_ptr<xqt::LibraryTodosModel> ownLibraryTodos;
     xqt::LibraryTodosModel* libraryTodos = nullptr;
     /// Documents that are not open, loaded to tick a to-do in them and saved (gone once saved)
