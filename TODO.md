@@ -719,6 +719,24 @@ general."
   encrypted appends with qpdf's primitives are feasible, they keep fast saves and version history, else version
   history is unavailable for encrypted files (said so in the History panel).
 
+### The adaptive UI reworked (the author, 2026-10-05; `qt/ui-rework`)
+"The classic toolbar can be ignored for now, I believe the new approach is better. The main toolbar is now very
+empty. Populate it with the important new tools. Also think of the cycling groups we currently have and whether we
+can have the snipping screenshots as a cycling tool in the toolbelt for example. Also for the toolbelt, the dashed
+and dotted line buttons just show a regular line. When I select something on the toolbelt popup the popup moves to
+the upper left position of the window instead of staying at the toolbelt. The reader mode sucks. The menu is half
+cut off the lower part of the screen and I feel like we should just reuse the full screen or present mode with a
+read only / readmode toggle that allows skipping to next prev page with big touch areas on the left and right side
+of the screen."
+- [ ] The command bar (the top bar in the toolbox mode) carries the important tools added since it was made, in the
+  ladder's order of priority (the classic tool bar is left as it is).
+- [ ] The cycling groups reviewed; the snips (rectangle ↔ lasso) a cycling tool that can be put in the toolbox.
+- [ ] Bug: the toolbox popup shows dashed and dotted line styles as a plain line.
+- [ ] Bug: choosing something in a toolbox popup moves the popup to the window's top left.
+- [ ] Reading replaced: full screen and presenting get a read-only toggle; while on, big tap areas at the left and
+  right edges go to the previous and next page; ⋮ → View → Read enters it. The reading pill (its menu cut off at the
+  bottom of the screen) goes.
+
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
    when a save falls back to a full write, and a check in MuPDF and pdf.js).
