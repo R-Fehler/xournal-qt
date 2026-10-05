@@ -120,6 +120,31 @@ Rectangle {
             onToggled: app.settings.set("presenterShowNotes", checked)
             Layout.fillWidth: true
         }
+        // Zooming and scrolling the page here shows the audience the same part (a frame on the page shows what they
+        // see); "Fit": both back to the whole slide
+        RowLayout {
+            spacing: 8
+            Switch {
+                objectName: "presenterFollowView"
+                text: qsTr("The audience follows my zoom")
+                checked: panel.console.followView
+                focusPolicy: Qt.NoFocus
+                padding: 0
+                onToggled: app.settings.set("presenterFollowView", checked)
+                Layout.fillWidth: true
+            }
+            Button {
+                objectName: "presenterFit"
+                text: qsTr("Fit")
+                focusPolicy: Qt.NoFocus
+                flat: true
+                onClicked: panel.console.fitPage()
+                ToolTip.visible: hovered
+                ToolTip.text: panel.console.showNotes ? qsTr("The whole page on both screens")
+                                                      : qsTr("The whole slide on both screens")
+                Accessible.name: ToolTip.text
+            }
+        }
         Label {
             text: qsTr("Audience: %1").arg(panel.console.audienceScreenName)
             visible: panel.console.audienceScreenName !== ""

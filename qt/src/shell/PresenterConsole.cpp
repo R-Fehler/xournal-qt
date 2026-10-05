@@ -6,6 +6,7 @@
 #include "PresenterConsole.h"
 
 #include <QGuiApplication>
+#include <QScopedValueRollback>
 #include <QScreen>
 #include <QWindow>
 
@@ -15,6 +16,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
 
+#include "AudienceRegion.h"
 #include "CanvasView.h"
 #include "PageSketches.h"
 #include "Thumbnails.h"
@@ -26,6 +28,7 @@ namespace {
 constexpr const char* ENABLED_KEY = "presenterView";
 constexpr const char* SWAP_KEY = "presenterSwapScreens";
 constexpr const char* NOTES_KEY = "presenterShowNotes";
+constexpr const char* FOLLOW_KEY = "presenterFollowView";
 
 bool setting(Settings& s, const char* key, bool fallback) {
     bool on = fallback;
@@ -55,13 +58,15 @@ PresenterConsole::PresenterConsole(AppContext& app, QObject* parent): QObject(pa
     connect(&app, &AppContext::settingsChanged, this, [this] {
         Q_EMIT screensChanged();  // (swap screens)
         update();
-        if (showNotes() != notesShown) {
+        if (showNotes() != notesShown || followView() != followed) {
             notesShown = showNotes();
+            followed = followView();
             Q_EMIT optionsChanged();
-            follow();  // (at once: the audience sees the space for notes now, or not any more)
+            follow();  // (at once: the audience sees the space for notes now, or not any more; follows, or not)
         }
     });
     notesShown = showNotes();
+    followed = followView();
     wasAvailable = available();
 }
 
@@ -94,6 +99,41 @@ void PresenterConsole::setShowNotes(bool on) {
         app.getSettings()->getCustomElement("xournalQt").setBool(NOTES_KEY, on);
         app.getSettings()->customSettingsChanged();
         Q_EMIT app.settingsChanged();
+    }
+}
+
+bool PresenterConsole::followView() const { return setting(*app.getSettings(), FOLLOW_KEY, true); }
+
+void PresenterConsole::setFollowView(bool on) {
+    if (on != followView()) {
+        app.getSettings()->getCustomElement("xournalQt").setBool(FOLLOW_KEY, on);
+        app.getSettings()->customSettingsChanged();
+        Q_EMIT app.settingsChanged();
+    }
+}
+
+QSizeF PresenterConsole::audienceSize() const {
+    if (!windowSize.isEmpty()) {
+        return windowSize;
+    }
+    if (QScreen* s = audienceScreen()) {
+        return s->geometry().size();
+    }
+    return QSizeF(16, 9);
+}
+
+void PresenterConsole::setAudienceSize(QSizeF size) {
+    if (size != windowSize) {
+        windowSize = size;
+        Q_EMIT audienceSizeChanged();
+        place(false);
+    }
+}
+
+void PresenterConsole::fitPage() {
+    if (presented && presented->pageCount() > 0) {
+        presented->resetRotation();
+        presented->getViewController().fitPresentedPage(std::min(presented->currentPageNo(), presented->pageCount() - 1));
     }
 }
 
@@ -176,9 +216,13 @@ void PresenterConsole::update() {
     presented->setMirror(audience.get());
     CanvasView* a = audience.get();
     connections.push_back(connect(presented.data(), &CanvasView::currentPageChanged, this, &PresenterConsole::follow));
+    // (the presenter zooms or scrolls: the audience follows, without rendering anything for it but what it shows)
+    connections.push_back(connect(&presented->getViewController(), &ViewController::changed, this, [this] {
+        place(false);
+    }));
     // (pages inserted, deleted, resized, their space for notes changed: the slide's place on its page)
     connections.push_back(connect(a, &CanvasView::pagesChanged, this, &PresenterConsole::follow));
-    connections.push_back(connect(&session, &DocumentSession::pageRevisionsChanged, this, &PresenterConsole::follow));
+    connections.push_back(connect(&session, &DocumentSession::pageRevisionsChanged, this, [this] { place(false); }));
     connections.push_back(connect(&session, &DocumentSession::pageRevisionsChanged, this, &PresenterConsole::pageChanged));
     connections.push_back(connect(&PageSketches::instance(), &PageSketches::changed, this, [a, id](qulonglong of) {
         if (of == id) {
@@ -202,6 +246,10 @@ void PresenterConsole::tearDown() {
     if (presented) {
         presented->setMirror(nullptr);
     }
+    if (!frameOnConsole.isEmpty()) {
+        frameOnConsole = {};
+        Q_EMIT audienceFrameChanged();
+    }
     if (!audience) {
         return;
     }
@@ -211,27 +259,62 @@ void PresenterConsole::tearDown() {
     goes.reset();
 }
 
-void PresenterConsole::follow() {
-    if (!audience || !presented) {
+void PresenterConsole::place(bool force) {
+    if (!audience || !presented || placing) {
         return;
     }
     const size_t count = presented->pageCount();
     if (count == 0) {
         return;
     }
+    QScopedValueRollback guard(placing, true);
     const size_t page = std::min(presented->currentPageNo(), count - 1);
-    audience->setCurrentPageNo(page);
-    const QRectF region = frameOf(page);
-    audience->getViewController().fitPageRect(page, region);
     const bool moved = static_cast<int>(page) != shownPage;
+    ViewController& presenterView = presented->getViewController();
+    const bool follows = followView();
+    if (moved && follows && presenterZoomedIn(page)) {
+        // Another page: both screens show it whole (the audience is never left on a part of the page before)
+        presenterView.fitPresentedPage(page);
+    }
+    const QRectF frame = frameOf(page);
+    QRectF region = frame;
+    if (follows && presenterZoomedIn(page)) {
+        // What the presenter sees of the page (the bounding box of it, were the canvas turned), widened to the
+        // audience's screen's shape, within the slide (or the page)
+        const auto seen = presented->viewOnPage(page);
+        region = presenter::audienceRegion(frame, QRectF(seen.x, seen.y, seen.width, seen.height), audienceSize());
+    }
+    if (force || moved || region != shown) {
+        audience->setCurrentPageNo(page);
+        audience->getViewController().fitPageRect(page, region);
+    }
     shownPage = static_cast<int>(page);
     if (region != shown) {
         shown = region;
         Q_EMIT shownChanged();
     }
+    // The frame on the console: what the audience sees, while it is a part of the page
+    QRectF onConsole;
+    if (region != frame && !region.isEmpty()) {
+        const double z = presenterView.zoom();
+        const QRectF p = presented->pageViewRect(page);
+        onConsole = QRectF(p.topLeft() + region.topLeft() * z, region.size() * z);
+    }
+    if (onConsole != frameOnConsole) {
+        frameOnConsole = onConsole;
+        Q_EMIT audienceFrameChanged();
+    }
     if (moved) {
         Q_EMIT pageChanged();
     }
+}
+
+bool PresenterConsole::presenterZoomedIn(size_t page) const {
+    if (!presented->isPresenting()) {
+        return false;  // (not yet, or not any more: its zoom is the editor's)
+    }
+    const ViewController& v = presented->getViewController();
+    return v.keptFit() != ViewController::Fit::Page && v.zoom() > v.presentedZoom(page) * 1.01;
 }
 
 QRectF PresenterConsole::frameOf(size_t page) const {

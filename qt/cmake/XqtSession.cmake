@@ -119,6 +119,7 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/DocumentLayout.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ViewController.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ViewController.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/AudienceRegion.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ScreenCalibration.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ScreenCalibration.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasPage.h

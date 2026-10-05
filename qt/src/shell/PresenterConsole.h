@@ -70,6 +70,15 @@ class PresenterConsole final: public QObject {
     /// What the audience's window shows of the current page, in points (the slide, or the whole page with showNotes):
     /// its canvas has this shape, as large as the screen allows
     Q_PROPERTY(QSizeF shownSize READ shownSize NOTIFY shownChanged)
+    /// The setting "presenterFollowView" (on by default): zoomed in on the console, the audience sees the same part of
+    /// the page (fitted to its screen's shape, never less than the presenter sees); off, it always sees the whole slide
+    Q_PROPERTY(bool followView READ followView WRITE setFollowView NOTIFY optionsChanged)
+    /// The audience's window's size (AudienceWindow tells it; the audience's screen's until then): the shape the
+    /// part the audience sees is widened to
+    Q_PROPERTY(QSizeF audienceSize READ audienceSize WRITE setAudienceSize NOTIFY audienceSizeChanged)
+    /// Following a presenter zoomed in: what the audience sees, in the presenter's canvas (its view coordinates) for
+    /// the frame drawn there; empty when the audience sees the whole slide (or page)
+    Q_PROPERTY(QRectF audienceFrame READ audienceFrame NOTIFY audienceFrameChanged)
     /// The picture of the next page (a thumbnail's URL; "" after the last page) and its shape (height / width)
     Q_PROPERTY(QString nextPicture READ nextPicture NOTIFY pageChanged)
     Q_PROPERTY(qreal nextAspect READ nextAspect NOTIFY pageChanged)
@@ -103,6 +112,13 @@ public:
     /// The part of the current page the audience's view shows (page points)
     QRectF shownRect() const { return shown; }
     QSizeF shownSize() const { return shown.isEmpty() ? slideSize() : shown.size(); }
+    bool followView() const;
+    void setFollowView(bool on);
+    QSizeF audienceSize() const;
+    void setAudienceSize(QSizeF size);
+    QRectF audienceFrame() const { return frameOnConsole; }
+    /// Both screens back to the whole slide (or page): the presenter's view fitted as when presenting starts
+    Q_INVOKABLE void fitPage();
     QString nextPicture() const;
     qreal nextAspect() const;
 
@@ -134,12 +150,19 @@ Q_SIGNALS:
     void timerChanged();
     void optionsChanged();
     void shownChanged();
+    void audienceSizeChanged();
+    void audienceFrameChanged();
 
 private:
     void update();
     void tearDown();
-    /// The audience's view to the presenter's page, the slide (or the whole page with showNotes) filling it
-    void follow();
+    /// The audience's view to the presenter's page, the slide (or the whole page with showNotes) filling it, or the
+    /// part the presenter sees when zoomed in (followView). `force`: fitted again even when the part is the same (the
+    /// page or the pages changed).
+    void place(bool force);
+    void follow() { place(true); }
+    /// The presenter's view zoomed in further than the page filling it (presenting's fit)
+    bool presenterZoomedIn(size_t page) const;
     /// What the audience sees of a page when it shows all of it: the slide, or the whole page with showNotes
     QRectF frameOf(size_t page) const;
 
@@ -150,6 +173,10 @@ private:
     int shownPage = 0;
     QRectF shown;  ///< the part of the page the audience's view shows (points)
     bool notesShown = false;  ///< showNotes as the audience's view was last fitted
+    bool followed = true;     ///< followView as last seen
+    bool placing = false;     ///< in place() (fitting the presenter's view there calls it again)
+    QSizeF windowSize;        ///< the audience's window's (audienceSize)
+    QRectF frameOnConsole;    ///< audienceFrame
     bool wasAvailable = false;
 
     bool running = false;

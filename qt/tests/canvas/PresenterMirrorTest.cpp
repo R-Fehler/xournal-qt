@@ -25,6 +25,7 @@
 #include "session/DocumentSession.h"
 #include "session/PageNoteSpace.h"
 
+#include "AudienceRegion.h"
 #include "CanvasInput.h"
 #include "CanvasPage.h"
 #include "CanvasView.h"
@@ -267,4 +268,63 @@ TEST_F(PresenterMirror, theCurtainShowsOnTheAudiencesScreenWithoutHandles) {
     EXPECT_TRUE(theirs.visible());
     presenter->setMirror(nullptr);
     EXPECT_FALSE(theirs.active());
+}
+
+// Following the presenter's zoom (qt/docs/presenter-view.md): what the audience sees is what the presenter sees of the
+// slide, widened to the audience's screen's shape, kept within the slide, never less than the presenter sees
+TEST(AudienceRegion, widenedToTheScreensShapeWithinTheSlide) {
+    using presenter::audienceRegion;
+    const QRectF slide(0, 0, 960, 540);  // 16:9
+    const QSizeF wide(1600, 900);
+    const QSizeF fourThree(1024, 768);
+    auto contains = [](QRectF outer, QRectF inner) {
+        return outer.adjusted(-1e-9, -1e-9, 1e-9, 1e-9).contains(inner);
+    };
+
+    // Seen: the whole slide (or more) - the whole slide
+    EXPECT_EQ(audienceRegion(slide, QRectF(-100, -50, 2000, 1000), wide), slide);
+    // Nothing of the slide seen (the presenter looks at the space for notes): the whole slide
+    EXPECT_EQ(audienceRegion(slide, QRectF(1000, 0, 300, 300), wide), slide);
+
+    // A square in the middle on a 16:9 screen: as high, wider, the same middle
+    const QRectF square(380, 170, 200, 200);
+    const QRectF r = audienceRegion(slide, square, wide);
+    EXPECT_TRUE(contains(r, square));
+    EXPECT_NEAR(r.height(), 200, 1e-6);
+    EXPECT_NEAR(r.width() / r.height(), 16.0 / 9.0, 1e-6);
+    EXPECT_NEAR(r.center().x(), square.center().x(), 1e-6);
+    EXPECT_NEAR(r.center().y(), square.center().y(), 1e-6);
+
+    // A wide strip on a 4:3 screen: as wide, taller
+    const QRectF strip(100, 200, 400, 100);
+    const QRectF t = audienceRegion(slide, strip, fourThree);
+    EXPECT_TRUE(contains(t, strip));
+    EXPECT_NEAR(t.width(), 400, 1e-6);
+    EXPECT_NEAR(t.width() / t.height(), 4.0 / 3.0, 1e-6);
+
+    // At the slide's corner: moved into the slide, not cut (it is smaller than the slide), what is seen still in it
+    const QRectF corner(0, 0, 150, 150);
+    const QRectF c = audienceRegion(slide, corner, wide);
+    EXPECT_TRUE(contains(slide, c));
+    EXPECT_TRUE(contains(c, corner));
+    EXPECT_NEAR(c.left(), 0, 1e-6);
+    EXPECT_NEAR(c.top(), 0, 1e-6);
+    EXPECT_NEAR(c.width() / c.height(), 16.0 / 9.0, 1e-6);
+
+    // Partly beside the slide (the space for notes at the right in view too): only the slide's part counts
+    const QRectF beside(800, 100, 400, 200);
+    const QRectF b = audienceRegion(slide, beside, wide);
+    EXPECT_TRUE(contains(slide, b));
+    EXPECT_TRUE(contains(b, beside.intersected(slide)));
+
+    // A tall part on a wide screen, taller than the slide allows to widen: cut to the slide (letterboxed there)
+    const QRectF tall(400, 0, 100, 540);
+    const QRectF l = audienceRegion(slide, tall, QSizeF(3200, 900));
+    EXPECT_EQ(l, slide);
+
+    // A slide inside a larger page (space for notes on the left and at the top): within the slide, in page points
+    const QRectF offset(72, 36, 960, 540);
+    const QRectF o = audienceRegion(offset, QRectF(50, 20, 100, 100), wide);
+    EXPECT_TRUE(contains(offset, o));
+    EXPECT_TRUE(contains(o, QRectF(72, 36, 78, 84)));
 }

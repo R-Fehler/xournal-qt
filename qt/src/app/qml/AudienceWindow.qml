@@ -20,7 +20,8 @@ Window {
 
     // Only the slide: the canvas has the slide's shape, as large as the screen allows, in the middle; the view shows
     // exactly the slide in it (ViewController::fitPageRect), so its space for notes stays out of view. With the notes
-    // shown too, the canvas has the whole page's shape and shows all of it.
+    // shown too, the canvas has the whole page's shape and shows all of it. Following the presenter zoomed in, it has
+    // the shape of the part shown (the screen's, unless the slide's edge cuts it).
     DocumentCanvas {
         id: audienceCanvas
         objectName: "audienceCanvas"
@@ -34,6 +35,14 @@ Window {
         enabled: false  // (nothing is written here: the presenter writes on the console)
         readingOnly: true
         view: audience.console.active ? audience.console.audienceView : null
+    }
+
+    // (the shape the part the audience sees is widened to, when it follows the presenter's zoom)
+    Binding {
+        target: audience.console
+        property: "audienceSize"
+        value: Qt.size(audience.width, audience.height)
+        when: audience.visible && audience.width > 0 && audience.height > 0
     }
 
     Item {
