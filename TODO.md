@@ -812,6 +812,15 @@ user. Also when replay is on the classic toolbar appears again."
 - [ ] The play bar easy to see and to use, with a finger too: touch-sized controls and handle, clear contrast,
   above the system bars (safe areas), what it is said at first use, the time and the session marks readable.
 
+### The rail on an unfolded phone (the author, 2026-10-05, on 0.6.0; `qt/rail-fill`)
+"On an unfolded / wide android phone the rail is just showing one item although there is plenty space on the rail.
+I would expect the toolbelt rail to fill up the space and maybe even allow scrolling of the rail on bigger screens."
+- [ ] Bug: reproduce at the Fold 7's sizes (900×1000 unfolded, 1000×900 turned, Android's scale and safe areas) and
+  fix why the rail shows one item.
+- [ ] The rail always uses the room it has: every tool on its own while they fit; when they do not, sections fold into
+  stacks one by one (as designed); scrolling only as the last resort. The phone dock likewise shows as many tools as
+  fit.
+
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
    when a save falls back to a full write, and a check in MuPDF and pdf.js).
