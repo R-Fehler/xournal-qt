@@ -92,8 +92,12 @@ public:
     int readCount() const { return reads; }
     /// Folder of the stored previews of a session's document (empty: none, e.g. not saved or changed; tests)
     fs::path diskFolder(quint64 session) const;
-    /// Delete the stored previews used longest ago beyond `bytes` (any thread; runs once after the start with 1 GB)
+    /// Delete the stored previews used longest ago beyond `bytes` (any thread; runs once after the start with 1 GB),
+    /// and folders of the old layout (named without the document's prefix: never read again)
     static void trimDisk(qint64 bytes);
+    /// Delete the stored previews of every version of this document (it was protected with a password: no picture of
+    /// its pages stays on disk; qt/docs/hybrid-pdf.md, "Encrypted PDFs"). Returns how many folders.
+    int forgetFile(const fs::path& file);
     static constexpr qint64 DISK_LIMIT = qint64(1024) * 1024 * 1024;
 
 Q_SIGNALS:

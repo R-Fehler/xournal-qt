@@ -3526,6 +3526,9 @@ Seen through the replay (⋮ → View → Replay the writing).
       `%LOCALAPPDATA%\xournal-qt\cache`) has its text or ink readable (`grep -r` for a word written in it; the
       `autosaves/*.autosave.pdf` asks for the password in another viewer). Kill the app (`kill -9`), start it again:
       recovery asks for the password and brings the unsaved ink back.
+- [ ] Protect a document that was opened and edited before (its card had a picture, its words were found by the
+      library search): afterwards the card shows the lock and no picture, the search does not find its words, and
+      `~/.cache/xournal-qt/pages` has no folder of it.
 - [ ] The library on Android (Fold 7): a protected PDF in the library folder shows a lock on its card, no preview of its
       pages, and the library search does not find its words; the password dialog shows the keyboard and does not
       offer to store the password in a password manager unasked.

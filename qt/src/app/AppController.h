@@ -1913,6 +1913,9 @@ private:
     /// The rest of openPath: the loaded file in a new tab.
     bool openLoaded(const fs::path& file, const QString& path, xqt::DocumentSession::LoadResult result, bool shown,
                     std::unique_ptr<xqt::DocumentSession> textSession = nullptr);
+    /// Remove what the app made of `file` in its caches (previews, page pictures, clean copies, versions, the library's
+    /// entry and handwriting, shared copies): after its password was set, changed or removed.
+    void forgetDerivatives(const fs::path& file, bool locked);
     /// protectDocument, removeProtection
     bool applyProtection(xqt::DocumentSession* s, const xqt::PdfEncryption::Protection* protection);
 

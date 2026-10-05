@@ -5,9 +5,12 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <fstream>
 #include <functional>
+#include <iterator>
 
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QElapsedTimer>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -19,16 +22,23 @@
 #include <cairo.h>
 #include <gtest/gtest.h>
 #include <qpdf/QPDF.hh>
+#include <qpdf/QPDFObjectHandle.hh>
+#include <zlib.h>
 #include <qpdf/QPDFWriter.hh>
 
 #include "model/Document.h"
 #include "model/Layer.h"
 #include "model/Point.h"
+#include "model/Font.h"
 #include "model/Stroke.h"
+#include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
 #include "session/PdfEncryption.h"
+#include "shell/DocumentFiles.h"
 #include "shell/HitPages.h"
+#include "shell/Library.h"
+#include "shell/LibraryModel.h"
 #include "shell/MdSnippets.h"
 #include "shell/PageSketches.h"
 #include "shell/Previews.h"
@@ -79,6 +89,127 @@ void drawStroke(xqt::DocumentSession& s, size_t pageNo, double y) {
     layer->addElement(std::move(stroke));
     s.getDocument()->unlock();
     s.getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, layer, raw));
+}
+
+void addText(xqt::DocumentSession& s, size_t pageNo, const std::string& text) {
+    auto page = s.getDocument()->getPage(pageNo);
+    auto t = std::make_unique<Text>();
+    t->setText(text);
+    t->setFont(XojFont("Sans", 14));
+    t->setColor(Color(0xff000080U));
+    t->move(80, 400);
+    t->getBoundingBox();
+    const Text* raw = t.get();
+    Layer* layer = page->getSelectedLayer();
+    s.getDocument()->lock();
+    layer->addElement(std::move(t));
+    s.getDocument()->unlock();
+    s.getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, layer, raw));
+}
+
+std::string bytesOf(const fs::path& p) {
+    std::ifstream in(p, std::ios::binary);
+    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
+std::string gunzip(const std::string& data) {
+    if (data.size() < 2 || static_cast<unsigned char>(data[0]) != 0x1f || static_cast<unsigned char>(data[1]) != 0x8b) {
+        return {};
+    }
+    z_stream z{};
+    if (inflateInit2(&z, 15 + 32) != Z_OK) {
+        return {};
+    }
+    std::string out;
+    char buf[65536];
+    z.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
+    z.avail_in = static_cast<uInt>(data.size());
+    while (true) {
+        z.next_out = reinterpret_cast<Bytef*>(buf);
+        z.avail_out = sizeof buf;
+        const int rc = inflate(&z, Z_NO_FLUSH);
+        out.append(buf, sizeof buf - z.avail_out);
+        if (rc != Z_OK) {
+            break;
+        }
+    }
+    inflateEnd(&z);
+    return out;
+}
+
+/// What can be read of a file without a password: its bytes, gunzipped, a library pack uncompressed, a PDF's strings
+/// and streams (decoded, an embedded .xopp gunzipped).
+std::string readable(const fs::path& file) {
+    const std::string bytes = bytesOf(file);
+    std::string all = bytes + gunzip(bytes);
+    if (bytes.rfind("XQPK", 0) == 0 && bytes.size() > 6) {
+        const QByteArray body = QByteArray::fromStdString(bytes.substr(6));
+        all += (bytes[5] & 1) ? qUncompress(body).toStdString() : body.toStdString();
+    }
+    if (bytes.rfind("%PDF", 0) == 0) {
+        try {
+            QPDF q;
+            q.setSuppressWarnings(true);
+            q.processFile(file.string().c_str());
+            for (QPDFObjectHandle o: q.getAllObjects()) {
+                all += o.isStream() ? o.getDict().unparse() : o.unparseResolved();
+                if (o.isStream()) {
+                    try {
+                        auto b = o.getStreamData(qpdf_dl_all);
+                        const std::string data(reinterpret_cast<const char*>(b->getBuffer()), b->getSize());
+                        all += data + gunzip(data);
+                    } catch (const std::exception&) {
+                    }
+                }
+            }
+        } catch (const std::exception&) {
+        }
+    }
+    return all;
+}
+
+/// The files under these folders in which `marker` can be read without a password
+std::vector<fs::path> leaks(const std::vector<fs::path>& dirs, const std::string& marker) {
+    std::vector<fs::path> out;
+    for (const fs::path& dir: dirs) {
+        std::error_code ec;
+        for (auto it = fs::recursive_directory_iterator(dir, ec); !ec && it != fs::recursive_directory_iterator();
+             it.increment(ec)) {
+            if (it->is_regular_file() && readable(it->path()).find(marker) != std::string::npos) {
+                out.push_back(it->path());
+            }
+        }
+    }
+    return out;
+}
+
+/// The files in a folder and below
+size_t filesIn(const fs::path& dir) {
+    size_t n = 0;
+    std::error_code ec;
+    for (auto it = fs::recursive_directory_iterator(dir, ec); !ec && it != fs::recursive_directory_iterator();
+         it.increment(ec)) {
+        n += it->is_regular_file() ? 1 : 0;
+    }
+    return n;
+}
+
+/// The pictures of a document's pages stored on disk (PageSketches: its folders are named after its path first)
+size_t storedPagesOf(const fs::path& cache, const fs::path& file) {
+    const std::string prefix =
+            QCryptographicHash::hash(QByteArray::fromStdString(file.lexically_normal().string()), QCryptographicHash::Sha1)
+                    .toHex()
+                    .left(12)
+                    .toStdString() +
+            "-";
+    size_t n = 0;
+    std::error_code ec;
+    for (auto it = fs::directory_iterator(cache / "pages", ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+        if (it->path().filename().string().rfind(prefix, 0) == 0) {
+            n += filesIn(it->path());
+        }
+    }
+    return n;
 }
 
 struct FakeApps: xqt::SystemApps {
@@ -317,3 +448,59 @@ TEST_F(PdfPasswordTest, shareProtectsACopy) {
     EXPECT_FALSE(xqt::PdfEncryption::probe(dir / "lecture.pdf").encrypted) << "the document's own file is not";
     EXPECT_TRUE(session()->isModified()) << "the document keeps its unsaved changes";
 }
+
+// A document of the library that was not protected (its text indexed, its card's picture and its pages' pictures
+// stored, a clean copy, a copy shared), then protected: nothing of it stays readable in the caches, and no picture of
+// its pages is kept
+TEST_F(PdfPasswordTest, protectingRemovesEverythingTheCachesKeptOfIt) {
+    const std::string marker = "cachemarkerK4W";
+    const fs::path lib = dir / "lib";
+    fs::create_directories(lib);
+    const fs::path pdf = lib / "lecture.pdf";
+    makePdf(pdf);
+    controller->setLibraryRoot(lib);
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    ASSERT_NE(library, nullptr);
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(pdf.string())));
+    addText(*session(), 0, marker);
+    ASSERT_TRUE(controller->saveAsHybrid(QUrl::fromLocalFile(QString::fromStdString(pdf.string()))));
+    waitSaved();
+    drawStroke(*session(), 1, 300);  // (a second version of the file)
+    ASSERT_TRUE(controller->saveInBackground());
+    waitSaved();
+    // What the caches keep of it while it has no password
+    const fs::path cache = fs::path(qEnvironmentVariable("XDG_CACHE_HOME").toStdString()) / "xournal-qt";
+    const xqt::DocumentItem item = xqt::DocumentFiles::itemOf(pdf);
+    library->refresh();
+    xqt::LibraryIndex* index = library->searchIndex();
+    ASSERT_NE(index, nullptr);
+    until([&] { return !index->search(QString::fromStdString(marker)).empty(); }, 20000);
+    ASSERT_FALSE(index->search(QString::fromStdString(marker)).empty()) << "indexed";
+    index->flush();
+    EXPECT_FALSE(xqt::PreviewCache::preview(item).isNull());
+    xqt::PreviewCache::flush();
+    until([&] { return storedPagesOf(cache, pdf) > 0; }, 20000);
+    EXPECT_GT(storedPagesOf(cache, pdf), 0u) << "pictures of its pages stored";
+    ASSERT_TRUE(controller->sharePdfCopy(QUrl(), false));
+    waitSaved();
+    until([&] { return !apps.shared.isEmpty(); });
+    const fs::path packs = index->location().dirOf(lib);  // (the library's packs of that folder)
+    const std::vector<fs::path> dirs{cache, packs};
+    ASSERT_FALSE(leaks(dirs, marker).empty()) << "the check finds what the caches keep";
+    ASSERT_NE(readable(packs / "previews.pack").find("lecture.pdf"), std::string::npos) << "its card's picture";
+
+    ASSERT_TRUE(controller->protectDocument("kept secret", "", true, true, true));
+    waitSaved();
+    until([&] { return controller->protectedDocument(); });
+    ASSERT_TRUE(controller->protectedDocument());
+    index->flush();
+    xqt::PreviewCache::flush();
+    const auto found = leaks(dirs, marker);
+    EXPECT_TRUE(found.empty()) << "readable in " << (found.empty() ? std::string() : found.front().string());
+    EXPECT_EQ(storedPagesOf(cache, pdf), 0u) << "no picture of its pages";
+    EXPECT_TRUE(xqt::PreviewCache::stored(item).isNull()) << "no picture of its card";
+    EXPECT_EQ(readable(packs / "previews.pack").find("lecture.pdf"), std::string::npos) << "not in the pack either";
+    EXPECT_TRUE(index->lockedOf(pdf));
+    EXPECT_TRUE(index->search(QString::fromStdString(marker)).empty());
+}
+

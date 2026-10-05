@@ -13,11 +13,15 @@
 
 #include "AppController.h"
 #include "model/Document.h"
+#include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
 #include "session/HybridPdf.h"
 #include "session/PdfEncryption.h"
 #include "session/VersionCache.h"
+#include "shell/DocumentFiles.h"
+#include "shell/Library.h"
 #include "shell/LibraryModel.h"
+#include "shell/Previews.h"
 #include "shell/PageSketches.h"
 #include "shell/TabManager.h"
 #include "shell/Thumbnails.h"
@@ -203,27 +207,43 @@ bool AppController::applyProtection(DocumentSession* s, const PdfEncryption::Pro
     } else {
         PdfEncryption::unset(file);
     }
-    // Its stored page previews, written while it had no password or another one
-    const fs::path stored = PageSketches::instance().diskFolder(ThumbnailProvider::idOf(s));
+    // Tabs that show versions of it (cut out of the file before, with no password or another one): closed
+    for (int i = tabs->count() - 1; i >= 0; --i) {
+        DocumentSession* t = tabs->session(i);
+        if (t && t != s && VersionCache::instance().sourceOf(t->documentFile()) == file) {
+            closeTab(i);
+        }
+    }
     if (!reloadDocument(s)) {
         return false;
     }
-    if (protection) {
-        // No unencrypted copy of it stays in the app cache: clean copies, versions shown, the kept original, previews
-        std::error_code ec;
-        if (!stored.empty()) {
-            fs::remove_all(stored, ec);
-        }
-        HybridPdf::forgetCopies(file);
-        DocumentSession::forgetOriginal(file);
-        VersionCache::instance().forget(file);
-    }
+    // Nothing the app made of it before stays in its caches: written with no password or another one (also when the
+    // password is changed or removed: they belong to a file that is gone)
+    forgetDerivatives(file, protection != nullptr);
     library->refresh();  // (its card: a lock, its text out of the index; or read again)
     Q_EMIT titleChanged();
     Q_EMIT pageActionDone(protection ? tr("%1 is protected with a password").arg(name)
                                      : tr("The password of %1 was removed").arg(name),
                           false);
     return true;
+}
+
+void AppController::forgetDerivatives(const fs::path& file, bool locked) {
+    std::error_code ec;
+    PageSketches::instance().forgetFile(file);  // (the pictures of its pages, every version)
+    HybridPdf::forgetCopies(file);              // (clean copies with their .xopp, pictures and recordings)
+    DocumentSession::forgetOriginal(file);      // (the original kept in PDF files mode)
+    VersionCache::instance().forget(file);      // (versions cut out of it)
+    fs::remove_all(DocumentImages::workFolder(file), ec);  // (the pictures its Markdown carried)
+    const fs::path share = Util::getCacheSubfolder("share");  // (copies shared from it)
+    fs::remove(share / file.filename(), ec);
+    const DocumentItem item = DocumentFiles::itemOf(file);
+    PreviewCache::forget(item);  // (its card's picture, in the library's pack or for Recent)
+    PreviewCache::flush();
+    if (LibraryIndex* index = library->searchIndex(); index && locked) {
+        index->documentProtected(file);  // (its text, title, tags, handwriting: an empty, locked entry)
+        index->flush();
+    }
 }
 
 bool AppController::sharePdfProtected(const QString& password, bool toClipboard) {

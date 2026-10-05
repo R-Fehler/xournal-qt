@@ -50,6 +50,9 @@ public:
     static QString url(const DocumentItem& item);
     /// Forget the previews of documents that are not among these (in the folders read so far).
     static void prune(const std::vector<DocumentItem>& items);
+    /// Remove the stored preview of a document, every version of it (in its folder's pack, written by the next flush,
+    /// and outside the library): it was protected with a password (qt/docs/hybrid-pdf.md, "Encrypted PDFs").
+    static void forget(const DocumentItem& item);
     /// Files and folders renamed or moved by the app (old, new): their previews follow.
     static void moved(const std::vector<std::pair<fs::path, fs::path>>& moves);
     /// Write the changed packs now (else a few seconds after the last change). Returns whether all could be written.

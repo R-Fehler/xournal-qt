@@ -1203,6 +1203,31 @@ void LibraryIndex::numberTodos(Entry& e) {
     }
 }
 
+bool LibraryIndex::documentProtected(const fs::path& file) {
+    const DocumentItem item = DocumentFiles::itemOf(file);
+    if (discarded || !item.valid() || !where.contains(item.main())) {
+        return false;
+    }
+    inks->erase(item.main());
+    auto e = std::make_shared<Entry>();
+    e->file = item.main();
+    e->kind = entryKind(item);
+    e->name = QString::fromStdString(item.name());
+    e->xoppStamp = ownStamp(item);
+    e->sample = contentSample(item.main());
+    e->locked = true;
+    if (e->isPdf()) {
+        e->pdfKind = kindOfPdf(e->file, nullptr);  // (what it is: not read again for it)
+    }
+    std::lock_guard lock(mtx);
+    auto f = folders.find(item.main().parent_path());
+    if (f == folders.end() || !f->second.loaded) {
+        return false;
+    }
+    put(e);
+    return true;
+}
+
 bool LibraryIndex::documentSaved(const fs::path& file, Document& doc, const std::map<int, QString>& pdfText) {
     const DocumentItem item = DocumentFiles::itemOf(file);
     if (discarded || !item.valid() || item.xopp.empty() || !where.contains(item.main())) {

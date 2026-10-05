@@ -832,9 +832,18 @@ The author (2026-10-05): "support pdf encryption and opening of encrypted PDFs u
 - Unsaved changes are saved into the PDF first; then the whole file is written anew encrypted
   (`PdfEncryption::rewrite`, atomic), its version history removed (earlier revisions would keep the old password or
   none: the dialog says so when it keeps versions), and the document is opened again from it (its undo history starts
-  anew). The copies the app made of the unencrypted file are removed: clean copies of every version
-  (`HybridPdf::forgetCopies`), the stored page previews, versions shown, the original kept in PDF files mode. A
-  `name.original.pdf` kept next to the file earlier (Xournal++ files mode) is the user's file and stays.
+  anew). Everything the app made of the file before (unencrypted, or with the old password) is removed
+  (`AppController::forgetDerivatives`, also when the password is changed or removed): clean copies of every version
+  with their `.xopp`, pictures and recordings (`HybridPdf::forgetCopies`), the stored pictures of its pages of every
+  version (`PageSketches::forgetFile`: their folders are named after the document first, `<hash of its path>-…`;
+  folders of the older naming are removed at the next start), its card's picture (the library's previews pack, or the
+  one for Recent), its library entry (text, title, tags, to-dos: an empty, locked entry written at once,
+  `LibraryIndex::documentProtected`) and its handwriting, versions cut out of it (tabs showing them are closed),
+  the original kept in PDF files mode, the Markdown work folder, copies shared from it. A `name.original.pdf` kept
+  next to the file earlier (Xournal++ files mode) is the user's file and stays. Tested:
+  `PdfPasswordTest.protectingRemovesEverythingTheCachesKeptOfIt` (a library document indexed, previewed, its pages
+  stored, a clean copy and a shared copy, then protected: its marker text is readable nowhere in the cache or the
+  library's packs, no picture of it is left).
 - Removing the password writes the file anew without encryption (the version history goes too).
 - **Share → "Protect with a password"**: the PDF with notes goes as a copy encrypted with the password typed there
   (written into the app cache, then shown or copied; `sharePdfProtected`); the document keeps its file. A protected
