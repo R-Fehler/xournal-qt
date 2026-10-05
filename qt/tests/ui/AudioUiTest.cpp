@@ -44,9 +44,15 @@ namespace fs = std::filesystem;
 namespace {
 class AudioUiTest: public ::testing::Test {
 protected:
+    /// The fake microphone and speaker; false: as a build without any audio backend
+    virtual bool withAudio() const { return true; }
     void SetUp() override {
         ASSERT_TRUE(tmp.isValid());
-        xqt::audio::useFakeDevices(true);
+        if (withAudio()) {
+            xqt::audio::useFakeDevices(true);
+        } else {
+            xqt::audio::useNoDevices(true);
+        }
         xqt::audio::fake::reset();
         xqt::audio::setAppFolder(fs::path(tmp.filePath("audio").toStdString()));
         controller = std::make_unique<AppController>();
@@ -152,6 +158,10 @@ protected:
     std::unique_ptr<AppController> controller;
     std::unique_ptr<QQmlApplicationEngine> engine;
     QQuickWindow* window = nullptr;
+};
+class NoAudioUiTest: public AudioUiTest {
+protected:
+    bool withAudio() const override { return false; }
 };
 }  // namespace
 
@@ -264,4 +274,32 @@ TEST_F(AudioUiTest, aRecordingBelongsToItsTab) {
     // Its tab closes: the recording ends
     controller->closeTab(0);
     EXPECT_TRUE(until([&] { return !audio()->property("recording").toBool(); }));
+}
+
+// A build without any audio backend offers no recording: no record button in the classic bar (it has room for
+// everything at 1920 then too), none in the phone's sheet, Ctrl+Shift+R does nothing
+TEST_F(NoAudioUiTest, nothingOffersRecording) {
+    controller->newDocument();
+    wait(200);
+    ASSERT_FALSE(audio()->property("available").toBool());
+    auto* record = find<QQuickItem>("recordButton");
+    ASSERT_NE(record, nullptr);
+    EXPECT_FALSE(record->property("offered").toBool());
+    EXPECT_FALSE(record->isVisible());
+    EXPECT_EQ(find<QQuickItem>("widthStrip")->property("mode").toString(), "full");
+    EXPECT_EQ(find<QQuickItem>("colorStrip")->property("mode").toString(), "full");
+    EXPECT_FALSE(find<QQuickItem>("moreToolsButton")->isVisible());
+    QTest::keyClick(window, Qt::Key_R, Qt::ControlModifier | Qt::ShiftModifier);
+    wait(100);
+    EXPECT_FALSE(audio()->property("recording").toBool());
+    EXPECT_FALSE(find<QQuickItem>("recordingPill")->isVisible());
+    // The phone's sheet of every tool
+    window->resize(412, 915);
+    wait(400);
+    auto* sheet = find<QObject>("phoneToolSheet");
+    ASSERT_NE(sheet, nullptr);
+    QMetaObject::invokeMethod(sheet, "open");
+    ASSERT_TRUE(until([&] { return sheet->property("visible").toBool(); }));
+    EXPECT_NE(itemIn(window->contentItem(), "toolCell_image"), nullptr);
+    EXPECT_EQ(itemIn(window->contentItem(), "toolCell_record"), nullptr);
 }

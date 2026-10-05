@@ -844,6 +844,9 @@
   names. UI: a record button (insert group, phone sheet, Ctrl+Shift+R), the recording and playback pills, the play
   tool with a 2 s lead-in, the list of recordings; Android foreground service, microphone permission
   ([audio.md](audio.md)). Built without Qt Multimedia here: recording is not offered in such a build.
+  Its place after the toolbox (`qt/record-place`, 2026-10-05): a fixed tool of the toolbox's rail (so also in full
+  screen and while presenting), the classic bar's insert group; New left the bar for the tab strip's "+", which gives
+  the classic bar at 1920 px its five widths back (measured in [adaptive-layout.md](adaptive-layout.md)).
 
 - **Quick note, `qt/quick-note` (2026-10-05).** One action makes a note to write on: a new document in the library's
   `Inbox/` (made on first use, a fixed English name) named by the date and time (`2026-10-04 21-30.xopp`, or `.pdf`

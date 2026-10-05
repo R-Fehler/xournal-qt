@@ -3195,3 +3195,12 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
       nothing in "more tools". The bar has no New button; the tab strip's "+" makes a new document.
 - [ ] Full screen (F11) with the classic bar: the tool square's tools have New (there is no tab strip there).
 - [ ] A phone (Fold 7 folded): "All tools" has New under "Document and view".
+- [ ] The toolbox (the default), a build with Qt Multimedia: the record button is among the fixed tools after "the
+      finger draws", not in the command bar. A tap records; the red pill is at the top of the page, clear of the rail.
+- [ ] A short window (the fixed tools folded into one stack): while recording, the stack shows the record button (red);
+      a tap on the stack lists the fixed tools with it; a tap on it stops.
+- [ ] Full screen (F11) and presenting (F5) with the toolbox: the floating toolbox has the record button; move the
+      toolbox to the top edge (its grip): the recording and playback pills sit below it, not under it.
+- [ ] Phone (Fold 7 folded), toolbox: "My tools" → Insert has "Record audio"; the pill is visible above the page.
+- [ ] A build without Qt Multimedia: no record button in the classic bar, the toolbox or the sheets; Ctrl+Shift+R does
+      nothing; documents with recordings still open and keep them.

@@ -401,7 +401,7 @@ Rectangle {
                 iconName: box.fixedInUse ? box.fixedInUse.iconName : "xqt-tools-more"
                 checked: box.fixedInUse !== null
                 label: qsTr("More tools")
-                tip: qsTr("Hand, select, write on the page, setsquare, mark PDF text")
+                tip: qsTr("Hand, select, write on the page, setsquare, mark PDF text, record audio")
                 ownHold: true
                 onClicked: fixedFlyout.visible ? fixedFlyout.close() : fixedFlyout.open()
                 onPressAndHold: fixedFlyout.open()

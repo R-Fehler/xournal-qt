@@ -38,6 +38,8 @@ Backend backend() {
 
 void useFakeDevices(bool on) { forced = on ? static_cast<int>(Backend::Fake) : -1; }
 
+void useNoDevices(bool on) { forced = on ? static_cast<int>(Backend::None) : -1; }
+
 std::unique_ptr<AudioInput> makeInput() {
     switch (backend()) {
         case Backend::Fake:

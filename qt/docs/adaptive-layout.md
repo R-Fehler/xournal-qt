@@ -393,6 +393,7 @@ The author's rule: only one way to do things, to reduce menu clutter. No ⋮ ent
 | Settings (was also ⋮) | tool bar / more tools | Ctrl+, | the tool square's popup; the home screen's settings | "All tools" |
 | New | the tab strip's + (the full chrome: the bar has no New button there, since `qt/record-place`) | Ctrl+Shift+N | the compact chrome's tools (no tab strip there) | "All tools"; new documents also in the tab overview and the library |
 | Open, Save | tool bar / more tools | Ctrl+O, Ctrl+S | the tab strip's + (a new document) | "All tools" |
+| Record audio (hold: the play tool, the recordings) | tool bar / more tools; with the toolbox: its fixed tools (docked and floating) | Ctrl+Shift+R | the compact chrome's tools; the toolbox floating | "All tools" / "My tools" → Insert |
 | Edit as notes, Open externally (were also ⋮ → Document) | tool bar / more tools (a `.md`: more tools in the format bar) | | | "All tools" |
 | All pages (was also ⋮ → View) | view pill (the compact pill: its page number) | Ctrl+Alt+G | the view pill stays in the compact chrome | the dock's page number |
 | Contents overview (was the tool bar) | view pill | Ctrl+Alt+O | as above | the page grid's pill (the dock's page number) |

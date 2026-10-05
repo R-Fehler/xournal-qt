@@ -929,7 +929,11 @@ ApplicationWindow {
         // (a rail's end clear of the navigation bar)
         endInset: vertical && !floating ? Math.max(0, win.contentItem.height - win.controlsBottom) : 0
         // (the phone's dock: they are in the sheet of every tool)
-        fixedButtons: win.toolboxShown && !compact ? [handTool, selectTool, writeButton, geometryTool, pdfTextTool, touchDrawingTool] : []
+        // (recording, qt/docs/audio.md: a fixed tool of the rail, so it is there docked, floating in full screen and while
+        // presenting; it leaves the command bar then)
+        fixedButtons: win.toolboxShown && !compact
+                      ? [handTool, selectTool, writeButton, geometryTool, pdfTextTool, touchDrawingTool]
+                        .concat(recordTool.offered ? [recordTool] : []) : []
         onAllToolsRequested: phoneToolSheet.open()
         onPagesRequested: pageGrid.open()
         onEditRequested: function(entry, button) { toolEditor.openFor(entry, button, edge) }
@@ -4639,17 +4643,21 @@ ApplicationWindow {
     }
     // The curtain: its handles, taking it away (below the setsquare's pill when that is out too)
     // A recording runs, a recording plays (qt/docs/audio.md): at the top of the canvas, in the middle
+    // (below the toolbox where it floats at the top, in the middle too: full screen, presenting)
+    readonly property real audioPillsTop: toolboxPane.visible && toolboxPane.floating && toolboxPane.edge === "top"
+                                          ? Math.max(canvasControlsTop, toolboxPane.y + toolboxPane.height - 4)
+                                          : canvasControlsTop
     RecordingPill {
         id: recordingPill
         anchors.top: canvas.top
         anchors.horizontalCenter: canvas.horizontalCenter
-        anchors.topMargin: 12 + win.canvasControlsTop - canvas.y
+        anchors.topMargin: 12 + win.audioPillsTop - canvas.y
         z: 57
     }
     PlaybackPill {
         anchors.top: recordingPill.visible ? recordingPill.bottom : canvas.top
         anchors.horizontalCenter: canvas.horizontalCenter
-        anchors.topMargin: recordingPill.visible ? 8 : 12 + win.canvasControlsTop - canvas.y
+        anchors.topMargin: recordingPill.visible ? 8 : 12 + win.audioPillsTop - canvas.y
         z: 57
     }
     Connections {

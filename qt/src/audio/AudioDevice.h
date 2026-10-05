@@ -67,6 +67,8 @@ enum class Backend { None, Fake, Qt };
 Backend backend();
 /// Tests: use the fakes (true) or the default again (false).
 void useFakeDevices(bool on);
+/// Tests: as a build without any backend (true: recording is not offered) or the default again (false).
+void useNoDevices(bool on);
 /// Whether recording and playing are offered at all.
 inline bool available() { return backend() != Backend::None; }
 /// Whether this build has the Qt Multimedia backend.
