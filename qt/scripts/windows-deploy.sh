@@ -5,7 +5,9 @@
 #
 # What ends up in the program folder:
 #   bin/                xournal-qt.exe, xournal-qt-cli.exe, the Qt and MinGW DLLs, Qt's plugins (platforms/, styles/,
-#                       imageformats/, ...), the QML modules (qml/), qt.conf
+#                       imageformats/, ...), the QML modules (qml/), qt.conf. Qt6Multimedia.dll for the recordings,
+#                       without Qt's media plugins (multimedia/: FFmpeg and Windows Media Foundation players, not
+#                       needed for audio in and out, see qt/docs/audio.md) and so without FFmpeg's DLLs
 #   share/xournal-qt/   page templates, palettes, icons (AppContext looks for them next to bin/)
 #   share/poppler/      poppler's encoding data (poppler finds it relative to its DLL)
 #   lib/gdk-pixbuf-2.0/ gdk-pixbuf's image loaders
@@ -128,6 +130,22 @@ done
 for f in imageformats/qsvg.dll iconengines/qsvgicon.dll; do
     ensure_file "$qt_plugins/$f" "$bin/$f"
 done
+
+# Recordings (qt/docs/audio.md, "Platforms"): QAudioSource and QAudioSink are in Qt6Multimedia.dll itself (WASAPI).
+# windeployqt adds Qt's media plugins because the program links Qt Multimedia; they are for players, cameras and
+# video, and the FFmpeg one would bring FFmpeg's DLLs (tens of MB) along. Taken out before the DLLs are collected.
+step "Qt Multimedia: the library, without the media plugins"
+if [[ -d "$bin/multimedia" ]]; then
+    ls "$bin/multimedia"
+    rm -rf "$bin/multimedia"
+    echo "removed bin/multimedia (not needed for audio in and out)"
+fi
+exe_imports=$(objdump -p "$bin/xournal-qt.exe" 2> /dev/null | tr -d '\r' || true)
+if grep -qi 'DLL Name: Qt6Multimedia.dll' <<< "$exe_imports"; then
+    echo "xournal-qt.exe uses Qt6Multimedia.dll: recording is built"
+else
+    warn "xournal-qt.exe does not use Qt6Multimedia.dll: this build offers no recording"
+fi
 
 # Qt finds its plugins and QML modules next to the program, whatever MSYS2's Qt was built for.
 step "qt.conf"

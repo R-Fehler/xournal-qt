@@ -96,6 +96,21 @@ newer, arm64) into the draft, and (also since 0.4.0) the unsigned **macOS** `.dm
 - **Windows**: a first build exists (`xqt-windows.yml`, [windows.md](windows.md)): MSYS2 (UCRT64) packages,
   `windeployqt --qmldir qt/src/app/qml`, a portable zip, no installer yet. Upstream's `windows-setup/` builds an
   NSIS installer that can be reused ([windows-roadmap.md](windows-roadmap.md)).
+- **Recording** ([audio.md](audio.md), "Platforms"; since `qt/audio-platforms`): every package offers it. Windows,
+  macOS and Android are built with Qt Multimedia (`mingw-w64-ucrt-x86_64-qt6-multimedia`, Homebrew `qtmultimedia`,
+  aqt `-m qtmultimedia`) and configured with `-DXQT_REQUIRE_AUDIO=ON`, so a Qt without it fails the job. What each
+  package carries for it:
+
+  | Package | For recording |
+  | --- | --- |
+  | Windows zip | `bin\Qt6Multimedia.dll` (WASAPI), no media plugins, no FFmpeg DLLs |
+  | macOS `.dmg` | `QtMultimedia.framework` (Core Audio), no media plugins, no FFmpeg; `NSMicrophoneUsageDescription` in `Info.plist` |
+  | Android APK | Qt Multimedia's library and Java part (AAudio/OpenSL ES), no media plugins; `RECORD_AUDIO`, the microphone foreground service and its notification |
+  | Linux `.deb` | depends on the distribution's Qt Multimedia (`qt6-multimedia-dev` at build time) |
+
+  The Windows and macOS smoke tests check the library is there, that no media plugin or FFmpeg library is, and
+  that `xournal-qt --audio-info` says "recording: available". A release whose notes mention recording on these
+  systems wants the device checklist's recording items walked through first.
 - Open questions on both: the pen and touch input (Qt's tablet events on Windows Ink and on macOS), the file
   associations (declared in the macOS bundle, untested; none on Windows yet), and the places where the fork writes
   its settings and cache (`Util::getCacheSubfolder`: GLib's XDG folders, `~/.config` and `~/.cache` on macOS).

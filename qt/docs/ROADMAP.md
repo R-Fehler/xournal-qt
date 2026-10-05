@@ -865,6 +865,12 @@
   Its place after the toolbox (`qt/record-place`, 2026-10-05): a fixed tool of the toolbox's rail (so also in full
   screen and while presenting), the classic bar's insert group; New left the bar for the tab strip's "+", which gives
   the classic bar at 1920 px its five widths back (measured in [adaptive-layout.md](adaptive-layout.md)).
+  On Windows, macOS and Android (`qt/audio-platforms`, 2026-10-05): the packages are built with Qt Multimedia
+  (MSYS2, Homebrew, aqt; `XQT_REQUIRE_AUDIO` fails a job without it) and ship only its library, not its media
+  plugins or FFmpeg; `xournal-qt --audio-info` and the smoke tests check it. The microphone permission is asked
+  before the first recording, a refusal opens a dialog with the way to the system's settings; on Android the
+  recording's foreground service shows the time with Pause/Resume and Stop (back through JNI), holds a wake lock,
+  and Qt's event loop runs in the background, so recording goes on with the screen off. Untried on the devices.
 
 - **Quick note, `qt/quick-note` (2026-10-05).** One action makes a note to write on: a new document in the library's
   `Inbox/` (made on first use, a fixed English name) named by the date and time (`2026-10-04 21-30.xopp`, or `.pdf`

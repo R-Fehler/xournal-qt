@@ -251,6 +251,14 @@ runs low; the library then reads its documents once again.
   backend for PDFs with fonts that are not embedded. It also lists the app's own fonts (`share/xournal-qt/fonts`: the
   colour emoji font, `qt/resources/fonts/README.md`) with the rules that take emoji from it and scale its bitmaps
   (Android has no `conf.d`); the font travels in the APK as a big resource (10.7 MB).
+- **Audio recordings** ([audio.md](audio.md), "Android"): Qt Multimedia from aqt (`-m qtmultimedia`; locally the
+  Maintenance Tool's "Qt Multimedia" for Android, or `aqt install-qt linux android 6.11.2 android_arm64_v8a -m
+  qtmultimedia`), its audio devices only: `qt_import_plugins(xournal-qt EXCLUDE_BY_TYPE multimedia)` keeps its media
+  plugins and FFmpeg out of the APK. Without Qt Multimedia the APK builds and offers no recording;
+  `XQT_REQUIRE_AUDIO=ON` (the CI) makes that a failure. The microphone permission is asked at the first recording;
+  while recording, a foreground service of type microphone (`RecordingService.java`) with a notification (time,
+  Pause/Resume, Stop) and a partial wake lock keeps it going with the screen off, and the activity's
+  `android.app.background_running` keeps Qt's event loop running in the background.
 - **Folders**: `XDG_CONFIG_HOME`, `XDG_CACHE_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME`, `HOME` and `TMPDIR` point to
   the app's own folders before GLib first reads them, so upstream's `Util::getConfigFolder()` and friends work.
 
@@ -258,7 +266,7 @@ runs low; the library then reads its documents once again.
 
 `.github/workflows/xqt-android.yml` builds the same APK on GitHub Actions: started by hand (Actions → "xournal-qt
 Android" → Run workflow) or by a push to the `qt/android-build` branch. It runs `qt/scripts/android-build.sh deps`
-and `apk` with Qt 6.11.2 from aqt, NDK r27c, JDK 17 and vcpkg at the manifest's baseline. The first run builds the C
+and `apk` with Qt 6.11.2 from aqt (with Qt Multimedia, `-m qtmultimedia`), NDK r27c, JDK 17 and vcpkg at the manifest's baseline. The first run builds the C
 libraries (an hour or two); they are cached for the next runs. The APK is the artifact `xournal-qt-android-arm64`.
 
 Signing: an update installs over an app only when both are signed with the same key. Without a key in the
@@ -278,7 +286,7 @@ never in the repository.
 | Single instance (local socket per library) | Android starts one activity (`singleTop`) |
 | A document in a window of its own (a tab dragged off the strip, "Move to a window of its own") | one window (`AdaptiveLayout.mobilePlatform`); tabs are moved about in the strip only |
 | Crash handlers (`SessionRecovery::installCrashHandlers`) | they replace the system's handlers, and a crash would leave no backtrace in logcat; to be chained later |
-| Audio, Lua plugins, X11, gtksourceview | already off in the Qt build |
+| Lua plugins, X11, gtksourceview | already off in the Qt build |
 | Floating point `std::from_chars` | missing in the NDK's libc++; upstream's `g_ascii_strtod` fallback is used (the same check as upstream's CMake) |
 | Edge to edge (target SDK 35+): the status bar, the gesture bar and a camera cut-out lie over the window, and the window may not be made smaller for the soft keyboard any more | `main.cpp` reads `QWindow::safeAreaMargins()` into `win.safeInsets` (the controls keep clear, the page is drawn under the bars); the window makes room for the keyboard itself (`win.keyboardTop` from `Qt.inputMethod.keyboardRectangle`, in the screen's pixels) and keeps the text cursor above it (qt/safe-areas-keyboard; adaptive-layout.md, "Safe areas and the soft keyboard") |
 

@@ -13,6 +13,9 @@
 #      with and without the UTF-8 C locale, and with fontconfig
 #   4. the app off-screen: opens a library and a document, saves a screenshot of its window after 5 s, quits; then
 #      a library given as a Windows path with backslashes
+#   5. recording (qt/docs/audio.md, "Platforms"): Qt6Multimedia.dll is in the folder and Qt's FFmpeg media plugin and
+#      FFmpeg's DLLs are not; `xournal-qt --audio-info` says "recording: available" (the runner has no microphone:
+#      the devices it lists are for information)
 #
 # When a step fails (not when it hangs), it runs again under gdb, which stops at the crash, abort() or exit() and
 # prints the backtraces and the loaded DLLs into <step>.gdb.log. A failing text export also runs with FC_DEBUG=1 and
@@ -228,6 +231,30 @@ cp "$fixtures/load/strokes.xopp" "$downloads/"
 attempt app-windows-path 300 "${app_env[@]}" "XQT_SCREENSHOT=$(win "$out/app-windows-path.png")" \
     "$bin/xournal-qt.exe" "$(cygpath -w "$downloads")" || failures=$((failures + 1))
 expect_file app-windows-path "$out/app-windows-path.png"
+
+# --- Recording -------------------------------------------------------------------------------------------------------
+printf '\n=== recording: what the folder has\n'
+if [[ -f "$bin/Qt6Multimedia.dll" ]]; then
+    echo "Qt6Multimedia.dll: $(stat -c %s "$bin/Qt6Multimedia.dll") bytes; it imports:"
+    objdump -p "$bin/Qt6Multimedia.dll" 2> /dev/null | tr -d '\r' | sed -n 's/^[[:space:]]*DLL Name: /  /p'
+else
+    echo "::error::recording: no Qt6Multimedia.dll in bin/ (the build has no Qt Multimedia, or the deploy left it out)"
+    failures=$((failures + 1))
+fi
+# Audio in and out need no media plugin (qt/docs/audio.md): the FFmpeg plugin and FFmpeg's DLLs stay out
+ffmpeg=$(find "$bin" -maxdepth 2 \( -ipath '*/multimedia/*' -o -iname 'avcodec-*.dll' -o -iname 'avformat-*.dll' \
+    -o -iname 'avutil-*.dll' -o -iname 'swresample-*.dll' \) | sort)
+if [[ -n "$ffmpeg" ]]; then
+    echo "::error::recording: media plugins or FFmpeg DLLs in the folder, which audio does not need:"
+    echo "$ffmpeg"
+    failures=$((failures + 1))
+fi
+if attempt audio-info 60 QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 "$bin/xournal-qt.exe" --audio-info; then
+    grep -q '^recording: available (Qt Multimedia' "$out/audio-info.log" ||
+        { echo "::error::audio-info: recording is not available through Qt Multimedia"; failures=$((failures + 1)); }
+else
+    failures=$((failures + 1))
+fi
 
 printf '\n=== %d failure(s)\n' "$failures"
 ((failures == 0))

@@ -1,7 +1,8 @@
 /*
  * xournal-qt: recording and playing in the real window (qt/docs/audio.md, "In the app"), with the fake microphone and
  * speaker (their timers run as real devices would): the record button in the tool bar, the recording pill, ink tied
- * to the recording, the play tool and the playback pill, the list of recordings.
+ * to the recording, the play tool and the playback pill, the list of recordings; the microphone permission (refused,
+ * asked) and what the platform's hook hears (Android's notification) with its commands.
  *
  * @license GNU GPLv2 or later
  */
@@ -38,6 +39,7 @@
 #include "shell/Thumbnails.h"
 
 #include "AppController.h"
+#include "AudioControl.h"
 
 namespace fs = std::filesystem;
 
@@ -74,6 +76,9 @@ protected:
         wait(100);
     }
     void TearDown() override {
+        xqt::AudioControl::setPermissionAccess({});
+        xqt::AudioControl::setSettingsOpener({});
+        xqt::AudioControl::setPlatformHook({});
         controller->shutdown();
         engine.reset();
         controller.reset();
@@ -274,6 +279,145 @@ TEST_F(AudioUiTest, aRecordingBelongsToItsTab) {
     // Its tab closes: the recording ends
     controller->closeTab(0);
     EXPECT_TRUE(until([&] { return !audio()->property("recording").toBool(); }));
+}
+
+// The system refuses the microphone (macOS, Android: asked earlier, or turned off in its settings): nothing records,
+// a dialog says so plainly and where it is allowed, and opens that page of the settings
+TEST_F(AudioUiTest, aRefusedMicrophoneSaysWhereToAllowIt) {
+    using P = xqt::AudioControl::Permission;
+    int asked = 0;
+    xqt::AudioControl::setPermissionAccess({[] { return P::Denied; },
+                                            [&asked](QObject*, std::function<void(bool)>) { ++asked; }});
+    int opened = 0;
+    xqt::AudioControl::setSettingsOpener([&opened] {
+        ++opened;
+        return true;
+    });
+    controller->newDocument();
+    wait(200);
+    auto* record = find<QQuickItem>("recordButton");
+    ASSERT_NE(record, nullptr);
+    ASSERT_TRUE(until([&] { return record->isVisible(); }));
+    click(record);
+    auto* dialog = find<QObject>("microphoneDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(until([&] { return dialog->property("visible").toBool(); }));
+    EXPECT_FALSE(audio()->property("recording").toBool());
+    EXPECT_FALSE(record->property("checked").toBool());
+    EXPECT_EQ(asked, 0) << "refused once, the system does not ask again: the settings do";
+    EXPECT_FALSE(xqt::audio::fake::inputRunning()) << "the microphone was not opened";
+    auto* text = itemIn(dialog->property("contentItem").value<QQuickItem*>(), "microphoneDialogText");
+    ASSERT_NE(text, nullptr);
+    EXPECT_TRUE(text->property("text").toString().contains(audio()->property("microphoneSettingsPath").toString()));
+    auto* settings = itemIn(dialog->property("footer").value<QQuickItem*>(), "microphoneSettingsButton");
+    ASSERT_NE(settings, nullptr);
+    EXPECT_TRUE(settings->isVisible()) << "a way to the settings";
+    click(settings);
+    EXPECT_EQ(opened, 1);
+    EXPECT_TRUE(until([&] { return !dialog->property("visible").toBool(); }));
+    EXPECT_FALSE(audio()->property("microphoneDenied").toBool());
+
+    // Allowed in the settings meanwhile: the next tap records, without the dialog
+    xqt::AudioControl::setPermissionAccess({[] { return P::Granted; }, {}});
+    click(record);
+    EXPECT_TRUE(until([&] { return audio()->property("recording").toBool(); }));
+    EXPECT_FALSE(dialog->property("visible").toBool());
+    QMetaObject::invokeMethod(audio(), "stopRecording");
+}
+
+// Not asked yet: the system's question comes first, the recording starts with a yes; a no opens the dialog (Linux,
+// where there is no settings page to open: without its button)
+TEST_F(AudioUiTest, theMicrophoneIsAskedForBeforeTheFirstRecording) {
+    using P = xqt::AudioControl::Permission;
+    P status = P::Undetermined;
+    bool answer = true;
+    std::function<void(bool)> pending;
+    xqt::AudioControl::setPermissionAccess(
+            {[&status] { return status; },
+             [&pending](QObject*, std::function<void(bool)> a) { pending = std::move(a); }});
+    controller->newDocument();
+    wait(200);
+    QMetaObject::invokeMethod(audio(), "startRecording");
+    ASSERT_TRUE(pending) << "the system asks";
+    EXPECT_FALSE(audio()->property("recording").toBool()) << "not before the answer";
+    QMetaObject::invokeMethod(audio(), "startRecording");  // (a second tap while the question is open)
+    status = P::Granted;
+    std::exchange(pending, {})(answer);
+    EXPECT_TRUE(audio()->property("recording").toBool()) << "yes: it records";
+    QMetaObject::invokeMethod(audio(), "stopRecording");
+    EXPECT_FALSE(pending) << "asked once";
+
+    status = P::Undetermined;
+    answer = false;
+    QMetaObject::invokeMethod(audio(), "startRecording");
+    ASSERT_TRUE(pending);
+    status = P::Denied;
+    std::exchange(pending, {})(answer);
+    EXPECT_FALSE(audio()->property("recording").toBool());
+    auto* dialog = find<QObject>("microphoneDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(until([&] { return dialog->property("visible").toBool(); }));
+    auto* settings = itemIn(dialog->property("footer").value<QQuickItem*>(), "microphoneSettingsButton");
+    ASSERT_NE(settings, nullptr);
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN)
+    EXPECT_FALSE(settings->isVisible()) << "no settings page to open here";
+#endif
+    auto* close = itemIn(dialog->property("footer").value<QQuickItem*>(), "microphoneCloseButton");
+    ASSERT_NE(close, nullptr);
+    click(close);
+    EXPECT_TRUE(until([&] { return !dialog->property("visible").toBool(); }));
+    EXPECT_FALSE(audio()->property("microphoneDenied").toBool());
+}
+
+// The platform's hook (Android: the foreground service and its notification) hears of the start, pause, resume and
+// end, with the time and the document's title; the notification's Pause, Resume and Stop reach the recording
+TEST_F(AudioUiTest, thePlatformHearsOfTheRecordingAndControlsIt) {
+    using State = xqt::AudioControl::PlatformState;
+    using Command = xqt::AudioControl::PlatformCommand;
+    std::vector<State> heard;
+    xqt::AudioControl::setPlatformHook([&heard](const State& s) { heard.push_back(s); });
+    controller->newDocument();
+    wait(200);
+    auto* control = qobject_cast<xqt::AudioControl*>(audio());
+    ASSERT_NE(control, nullptr);
+    ASSERT_TRUE(control->startRecording());
+    ASSERT_TRUE(until([&] { return heard.size() == 1; }));
+    EXPECT_TRUE(heard[0].recording);
+    EXPECT_FALSE(heard[0].paused);
+    EXPECT_FALSE(heard[0].title.isEmpty()) << "the document's title";
+    ASSERT_TRUE(until([&] { return control->recordedMs() >= 300; }));
+    wait(100);
+    EXPECT_EQ(heard.size(), 1u) << "the time alone is no news (the notification's clock runs by itself)";
+
+    control->platformCommand(Command::Pause);
+    EXPECT_TRUE(control->recordingPaused());
+    ASSERT_TRUE(until([&] { return heard.size() == 2; }));
+    EXPECT_TRUE(heard[1].recording);
+    EXPECT_TRUE(heard[1].paused);
+    EXPECT_GE(heard[1].recordedMs, 300) << "where it paused";
+    const qint64 pausedAt = control->recordedMs();
+    wait(200);
+    EXPECT_EQ(control->recordedMs(), pausedAt);
+
+    control->platformCommand(Command::Resume);
+    EXPECT_FALSE(control->recordingPaused());
+    ASSERT_TRUE(until([&] { return heard.size() == 3; }));
+    EXPECT_FALSE(heard[2].paused);
+    EXPECT_EQ(heard[2].recordedMs, pausedAt) << "the clock goes on from the recorded time";
+
+    control->platformCommand(Command::Stop);
+    EXPECT_FALSE(control->recording());
+    ASSERT_TRUE(until([&] { return heard.size() == 4; }));
+    EXPECT_FALSE(heard[3].recording);
+    wait(100);
+    EXPECT_EQ(heard.size(), 4u);
+
+    // A recording that ends with its tab, or with the window, is reported ended too
+    ASSERT_TRUE(control->startRecording());
+    ASSERT_TRUE(until([&] { return heard.size() == 5 && heard[4].recording; }));
+    controller->closeTab(0);
+    ASSERT_TRUE(until([&] { return heard.size() == 6; }));
+    EXPECT_FALSE(heard[5].recording);
 }
 
 // A build without any audio backend offers no recording: no record button in the classic bar (it has room for

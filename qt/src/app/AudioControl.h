@@ -12,6 +12,12 @@
  * Self-contained so the tool bar's owner can place its button anywhere (RecordButton.qml, RecordingPill.qml,
  * PlaybackPill.qml).
  *
+ * The platforms (qt/docs/audio.md, "Platforms"): the microphone permission is asked before the first recording
+ * (Qt's QMicrophonePermission: macOS and Android ask the user; Linux and Windows grant it), and refused it opens
+ * MicrophoneDialog.qml with a way to the system's settings. A running recording is reported to the platform's hook
+ * (Android: the foreground service and its notification), whose Pause, Resume and Stop come back through
+ * platformCommand().
+ *
  * @license GNU GPLv2 or later
  */
 #pragma once
@@ -56,7 +62,42 @@ class AudioControl: public QObject {
     /// Played from the ink: this much earlier (ms; a setting)
     Q_PROPERTY(int leadInMs READ leadInMs WRITE setLeadInMs NOTIFY leadInChanged)
 
+    /// The system refused the microphone when a recording was to start (MicrophoneDialog.qml shows it until closed)
+    Q_PROPERTY(bool microphoneDenied READ microphoneDenied NOTIFY microphoneDeniedChanged)
+    /// Where the microphone is allowed on this system, e.g. "System Settings → Privacy & Security → Microphone"
+    Q_PROPERTY(QString microphoneSettingsPath READ microphoneSettingsPath CONSTANT)
+    /// openMicrophoneSettings() can show that page (macOS, Windows, Android; read again whenever microphoneDenied
+    /// changes, since main.cpp sets Android's opener after this object exists)
+    Q_PROPERTY(bool canOpenMicrophoneSettings READ canOpenMicrophoneSettings NOTIFY microphoneDeniedChanged)
+
 public:
+    /// The microphone permission as the system reports it (Qt's Qt::PermissionStatus, also where Qt has none)
+    enum class Permission { Granted, Denied, Undetermined };
+    /// How the microphone permission is checked and asked for. The default: Qt's QMicrophonePermission for the
+    /// Qt Multimedia backend (granted for the fakes, and where Qt has no permission API); XQT_FAKE_MIC_PERMISSION=
+    /// denied | ask-deny | ask-grant pretends one (to try the refused path on Linux).
+    struct PermissionAccess {
+        std::function<Permission()> check;
+        /// Shows the system's question; `answer(granted)` later, on the UI thread
+        std::function<void(QObject* context, std::function<void(bool granted)> answer)> request;
+    };
+    /// Tests: another way of checking and asking (an empty one: the default again).
+    static void setPermissionAccess(PermissionAccess access);
+    /// Opens the system's page where the app may be allowed the microphone; false if there is none. The default:
+    /// macOS's and Windows's privacy pages by URL; Android's is set by main.cpp (the app's page, by JNI).
+    static void setSettingsOpener(std::function<bool()> open);
+
+    /// A running recording as the platform shows it (Android: the foreground service's notification)
+    struct PlatformState {
+        bool recording = false;
+        bool paused = false;
+        qint64 recordedMs = 0;  ///< at this moment (the notification's clock runs on from it while not paused)
+        QString title;          ///< the document's
+        bool operator==(const PlatformState&) const = default;
+    };
+    /// What the platform's controls ask for (the notification's buttons)
+    enum class PlatformCommand { Pause = 1, Resume = 2, Stop = 3 };
+
     /// `current`: the document of the current tab (nullptr: none); `page`: its current page; `title`: its title.
     AudioControl(std::function<DocumentSession*()> current, std::function<QString(DocumentSession*)> title,
                  QObject* parent = nullptr);
@@ -78,6 +119,9 @@ public:
     QVariantList playTicks() const { return ticks; }
     int leadInMs() const { return leadIn; }
     void setLeadInMs(int ms);
+    bool microphoneDenied() const { return denied; }
+    QString microphoneSettingsPath() const;
+    bool canOpenMicrophoneSettings() const;
 
     /// Starts recording for the current document (a voice memo of its current page). False: see message().
     Q_INVOKABLE bool startRecording();
@@ -86,6 +130,9 @@ public:
     Q_INVOKABLE void resumeRecording();
     /// Start, or stop the one that runs
     Q_INVOKABLE void toggleRecording();
+    /// The system's page for the microphone permission (and the notice closes)
+    Q_INVOKABLE bool openMicrophoneSettings();
+    Q_INVOKABLE void dismissMicrophoneNotice();
 
     /// Plays the recording `name` of the current document from `fromMs`.
     Q_INVOKABLE bool play(const QString& name, qint64 fromMs = 0);
@@ -107,8 +154,11 @@ public:
     void currentChanged();
 
     /// The platform's part of a running recording (Android: the foreground service that keeps the microphone in the
-    /// background; main.cpp sets it). Called with true when one starts, false when it ends.
-    static void setPlatformHook(std::function<void(bool recording)> hook);
+    /// background, with its notification; main.cpp sets it). Called when a recording starts, pauses, resumes and
+    /// ends.
+    static void setPlatformHook(std::function<void(const PlatformState&)> hook);
+    /// The platform's controls of the recording (Android: the notification's Pause, Resume and Stop).
+    void platformCommand(PlatformCommand command);
 
 Q_SIGNALS:
     void recordingChanged();
@@ -117,11 +167,20 @@ Q_SIGNALS:
     void playbackChanged();
     void playPositionChanged();
     void leadInChanged();
+    void microphoneDeniedChanged();
     /// Something to tell the user (a failure, where a recording went)
     void message(const QString& text);
 
 private:
     void endRecording();
+    /// Starts once the microphone is allowed (false: refused, or asked and the answer is to come)
+    bool microphoneAllowed();
+    void setDenied(bool on);
+    /// Tells the platform's hook what changed since it was told last
+    void syncPlatform();
+    PlatformState told;
+    bool denied = false;
+    bool asking = false;
     std::function<DocumentSession*()> current;
     std::function<QString(DocumentSession*)> titleOf;
     std::unique_ptr<audio::Recorder> recorder;

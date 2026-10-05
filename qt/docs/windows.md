@@ -114,9 +114,12 @@ The workflow's steps:
 
 1. **MSYS2** (`msys2/setup-msys2`, `UCRT64`, updated): `toolchain`, `cmake`, `ninja`, `ccache`, `glib2`, `cairo`,
    `pango`, `gdk-pixbuf2`, `poppler`, `qpdf`, `libxml2`, `libzip`, `zlib`, `qt6-base`, `qt6-declarative`,
-   `qt6-svg`, `qt6-shadertools` (the shader of dark pages, qt/docs/dark-pages.md). The step after it prints the versions and where Qt's tools are.
+   `qt6-svg`, `qt6-shadertools` (the shader of dark pages, qt/docs/dark-pages.md), `qt6-multimedia` (the microphone
+   and the speaker of the audio recordings, [audio.md](audio.md)). The step after it prints the versions and where
+   Qt's tools are.
 2. **Configure**: `cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DXQT_BUILD_TESTS=OFF
-   -DXQT_BUILD_SPIKES=OFF -DXQT_BUILD_CLI=ON`. The dependencies are found as on the other platforms
+   -DXQT_BUILD_SPIKES=OFF -DXQT_BUILD_CLI=ON -DXQT_REQUIRE_AUDIO=ON` (without Qt Multimedia the configure step fails
+   rather than build a zip without recording). The dependencies are found as on the other platforms
    ([XojDeps.cmake](../cmake/XojDeps.cmake)): libxml2, libzip and qpdf as CMake packages, the GNOME libraries through
    pkg-config, and on Windows also libintl (gettext is not part of the C library there).
 3. **Build** with ccache (its folder is cached between runs), `ninja -k 0`: it keeps going after an error, so one run
@@ -128,6 +131,9 @@ The workflow's steps:
      (`QtQml`, `QtQuick` with Controls, Material, Layouts, Dialogs, ...) by hand, and says so as a warning;
    - the SVG image and icon plugins (the icons are SVG files, and the program does not link Qt Svg itself, so
      windeployqt would leave them out), the off-screen platform plugin (for scripted runs);
+   - Qt Multimedia's media plugins (`bin\multimedia\`: FFmpeg and Media Foundation players, which windeployqt adds
+     because the program links Qt Multimedia) are removed again: the recordings need only `Qt6Multimedia.dll`, whose
+     audio devices use WASAPI. So FFmpeg's DLLs (GPL-built in MSYS2, tens of MB) are not in the zip;
    - `bin\qt.conf`, so that Qt looks for plugins and QML modules next to the program;
    - the data of poppler, gdk-pixbuf and fontconfig;
    - every DLL from MSYS2 that any `.exe` or `.dll` in the folder imports, recursively (read with `objdump -p`;
@@ -139,7 +145,9 @@ The workflow's steps:
    background to PDF); then the app itself, off-screen with Qt Quick's software renderer, opening a library and a
    document and saving a screenshot of its window after 5 s. Last, `text-probe` ([qt/tools/text-probe.c](../tools/text-probe.c)),
    Pango and Cairo alone drawing text into a PNG and a PDF with the folder's DLLs, with each of Pango's font backends
-   and with and without the UTF-8 C locale.
+   and with and without the UTF-8 C locale. Then recording: `Qt6Multimedia.dll` is in `bin\` (its imports are
+   listed), no media plugin and no FFmpeg DLL is, and `xournal-qt --audio-info` says "recording: available (Qt
+   Multimedia …)" (the runner has no microphone; the devices it lists are for information).
 
    A step that fails runs again under **gdb** (`<step>.gdb.log`: the backtraces of every thread, stopped at the
    crash, `abort()` or `exit()`, and the loaded DLLs; the build has `-g1` for function names). A failing text export
@@ -171,7 +179,7 @@ The unit tests are not built on Windows yet: they use POSIX headers and `/proc` 
 The same steps work in an MSYS2 UCRT64 shell (install MSYS2 from msys2.org, open "MSYS2 UCRT64"):
 
 ```sh
-pacman -S --needed mingw-w64-ucrt-x86_64-{toolchain,cmake,ninja,ccache,glib2,cairo,pango,gdk-pixbuf2,poppler,qpdf,libxml2,libzip,zlib,qt6-base,qt6-declarative,qt6-svg,qt6-shadertools}
+pacman -S --needed mingw-w64-ucrt-x86_64-{toolchain,cmake,ninja,ccache,glib2,cairo,pango,gdk-pixbuf2,poppler,qpdf,libxml2,libzip,zlib,qt6-base,qt6-declarative,qt6-svg,qt6-shadertools,qt6-multimedia}
 cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DXQT_BUILD_TESTS=OFF -DXQT_BUILD_SPIKES=OFF
 cmake --build build
 ./build/xournal-qt.exe                                      # from the build tree, with MSYS2's DLLs on the PATH
@@ -195,6 +203,9 @@ qt/scripts/windows-smoke.sh dist/xournal-qt smoke           # its smoke test
 - **Paths**: the code joins paths with `std::filesystem`, which is fine, but a few places build or compare path
   strings with `/`. Library folders, the `.assets` folders of Markdown files and links between documents need a
   check with backslashes and with drive letters.
+- **Recording** has not been tried on Windows yet (device checklist): the microphone through WASAPI, Windows's
+  privacy switch for desktop apps (off: the microphone cannot be opened and the recording says so), and whether
+  `Qt6Multimedia.dll` starts on Windows N editions without the Media Feature Pack.
 - **Markdown code blocks** have no syntax colours (KSyntaxHighlighting is not installed in the CI yet).
 - **The unit tests** do not build on Windows yet.
 - **Pango's Windows font backend is not used** (it dies drawing text into images, see "Text and fonts"); fontconfig

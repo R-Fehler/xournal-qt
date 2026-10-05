@@ -59,6 +59,7 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-declarative
             mingw-w64-ucrt-x86_64-qt6-svg
             mingw-w64-ucrt-x86_64-qt6-shadertools
+            mingw-w64-ucrt-x86_64-qt6-multimedia
 
       - name: What was installed
         run: |
@@ -68,7 +69,7 @@ jobs:
           cmake --version | head -1
           ninja --version
           ccache --version | head -1
-          pacman -Q | grep -E 'qt6-(base|declarative|svg)|poppler|qpdf|cairo|pango|glib2|libzip|libxml2|gettext' || true
+          pacman -Q | grep -E 'qt6-(base|declarative|svg|multimedia)|poppler|qpdf|cairo|pango|glib2|libzip|libxml2|gettext' || true
           echo "Qt tools:"
           ls "$MINGW_PREFIX/share/qt6/bin" 2> /dev/null || true
           command -v windeployqt6 windeployqt-qt6 windeployqt qtpaths6 qtpaths-qt6 qtpaths || true
@@ -87,7 +88,7 @@ jobs:
           # -g1: function names and lines for gdb's backtraces in the smoke test (no local variables; a few MB).
           cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
             "-DCMAKE_C_FLAGS_RELEASE=-O2 -g1 -DNDEBUG" "-DCMAKE_CXX_FLAGS_RELEASE=-O2 -g1 -DNDEBUG" \
-            -DXQT_BUILD_TESTS=OFF -DXQT_BUILD_SPIKES=OFF -DXQT_BUILD_CLI=ON \
+            -DXQT_BUILD_TESTS=OFF -DXQT_BUILD_SPIKES=OFF -DXQT_BUILD_CLI=ON -DXQT_REQUIRE_AUDIO=ON \
             2>&1 | tee build-logs/configure.log
 
       - name: Build

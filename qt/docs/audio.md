@@ -172,19 +172,84 @@ no record button anywhere, the classic bar at 1920 px with everything expanded, 
 
 ## Platforms
 
-- **Microphone permission**: asked the first time a recording starts (Qt's `QMicrophonePermission`; with the Qt
-  Multimedia backend only). Refused: a message says to allow it in the system's settings.
-- **Android**: `RECORD_AUDIO`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MICROPHONE`, `POST_NOTIFICATIONS` in the
-  manifest; while a recording runs a **foreground service** of type microphone (`RecordingService.java`, started and
-  stopped through `XournalActivity.setRecording`, `AudioControl::setPlatformHook` in `main.cpp`) shows a notification
-  and keeps the microphone when the app is in the background (Android stops it otherwise). Swiping the app away ends
-  the service; the recording file plays up to that moment (see "Format").
-- **macOS**: `NSMicrophoneUsageDescription` in `Info.plist.in` (without it macOS ends the app when the microphone is
-  opened).
-- **Builds**: Qt Multimedia is needed for recording (`qt6-multimedia-dev` in `qt/scripts/linux-deps.sh`; MSYS2
-  `mingw-w64-ucrt-x86_64-qt6-multimedia`; Homebrew's `qt` has it; conda-forge `qt6-multimedia`). Without it the app
-  builds and runs and does not offer recording. Only `QAudioSource`/`QAudioSink` are used: whether a deployment
-  without Qt Multimedia's FFmpeg plugin still opens the devices is to be checked per platform (device checklist);
-  if one needs the plugin, ship it there.
-- Not built or compiled here: the Android and macOS parts (no SDK in the build container), the Qt Multimedia backend
-  (`QtAudioDevice.cpp`: the build container's Qt has no Qt Multimedia; checked against stub headers only).
+Recording is offered on Linux, Windows, macOS and Android (`qt/audio-platforms`, 2026-10-05). Qt Multimedia is
+LGPLv3/GPL like the other Qt modules, so no licence is in the way.
+
+### Qt Multimedia without its media plugins
+
+The recordings use only `QAudioSource` and `QAudioSink`. Since Qt 6.5 the audio devices are in the Qt Multimedia
+library itself, on every platform (PulseAudio or PipeWire, WASAPI, Core Audio, AAudio/OpenSL ES); its plugins
+(FFmpeg, Windows Media Foundation, AVFoundation, GStreamer, Android's media backend) are for players, cameras and
+video. Checked with Qt 6.9 here: without any plugin Qt says "No QtMultimedia backends found. Only QMediaDevices,
+QAudioDevice, QSoundEffect, QAudioSink, and QAudioSource are available." and the PulseAudio devices are in use.
+So the packages leave the media plugins out, and with them FFmpeg (tens of MB, and a GPL build in MSYS2 and
+Homebrew):
+
+| Package | Qt Multimedia from | What it carries for recording |
+| --- | --- | --- |
+| Windows zip | MSYS2 `mingw-w64-ucrt-x86_64-qt6-multimedia` | `bin\Qt6Multimedia.dll`; `windows-deploy.sh` removes the `multimedia\` plugin folder windeployqt adds, so no FFmpeg DLLs follow |
+| macOS `.dmg` | Homebrew `qtmultimedia` | `QtMultimedia.framework`; `macos-deploy.sh` removes `PlugIns/multimedia` and every library only those plugins used (FFmpeg and its codecs) |
+| Android APK | aqt `-m qtmultimedia` | `libQt6Multimedia` and its Java part (devices); `qt_import_plugins(xournal-qt EXCLUDE_BY_TYPE multimedia)` keeps the media plugins out of the APK |
+| Linux `.deb` | `qt6-multimedia-dev` (`linux-deps.sh`) | the distribution's Qt Multimedia, as a dependency |
+| AppImage | the build machine's Qt | whatever linuxdeploy's Qt plugin bundles |
+
+`XqtAudio.cmake` logs "recording is built" or "recording is NOT built" when configuring. The Windows, macOS and
+Android jobs configure with `-DXQT_REQUIRE_AUDIO=ON`: a Qt without Qt Multimedia fails the build instead of shipping
+a package without recording. `xournal-qt --audio-info` prints what recording runs on ("recording: available (Qt
+Multimedia, Qt 6.x)", the microphones and speakers found; exit code 1 when recording is not offered); the Windows and
+macOS smoke tests check it, that the Qt Multimedia library is in the package, and that no media plugin or FFmpeg
+library is.
+
+### The microphone permission
+
+Asked before the first recording through Qt's `QMicrophonePermission` (`AudioControl::startRecording`): macOS and
+Android show the system's question; Linux and Windows report it granted (on Windows the privacy switch "Let desktop
+apps access your microphone" is not a Qt permission: switched off, the microphone cannot be opened and the recording
+says so). The recording starts once the answer is yes. Refused, then or earlier, a dialog (`MicrophoneDialog.qml`)
+says plainly that recording needs the microphone and where it is allowed, with **Open settings** where the system has
+such a page: macOS's Privacy & Security → Microphone (`x-apple.systempreferences:` URL), Windows's privacy page
+(`ms-settings:privacy-microphone`), Android's page of the app (`ACTION_APPLICATION_DETAILS_SETTINGS`, by JNI).
+
+`AudioControl::setPermissionAccess` replaces the check and the question in tests; `XQT_FAKE_MIC_PERMISSION=denied`,
+`ask-deny` or `ask-grant` pretends one in the app (to look at the dialog on Linux, with `XQT_FAKE_AUDIO=1`).
+
+### macOS
+
+- `NSMicrophoneUsageDescription` in `Info.plist.in` (without it macOS ends the app when the microphone is opened): the
+  text of the system's question.
+- The `.dmg` has an ad-hoc signature without the hardened runtime, which needs no entitlement for the microphone.
+  Once it is signed with a Developer ID and the hardened runtime ([macos.md](macos.md), "Signing and
+  notarization"), the entitlements must include `com.apple.security.device.audio-input`.
+
+### Android
+
+- `RECORD_AUDIO` (asked at the first recording through `QMicrophonePermission`), `FOREGROUND_SERVICE`,
+  `FOREGROUND_SERVICE_MICROPHONE`, `POST_NOTIFICATIONS`, `WAKE_LOCK` in the manifest. Min SDK 28, target SDK 36 as
+  before.
+- **A foreground service of type microphone while recording** (`RecordingService.java`): Android takes the microphone
+  away from an app in the background otherwise. The native side reports every start, pause, resume and end
+  (`AudioControl::setPlatformHook` in `main.cpp` → `XournalActivity.setRecording`); the service starts with the
+  recording (from the record button, so the app is in front, as Android 14+ wants for a microphone service), is told
+  of pauses and resumes, and stops when the recording ends. Swiping the app away ends the service; the recording file
+  plays up to that moment (see "Format").
+- **The notification**: "Recording", the document's title and the time (Android's chronometer, set from the recorded
+  time, so paused time is not counted; while paused: "Recording paused · 4:07"), **Pause**/**Resume** and **Stop**.
+  The buttons are intents to the service, which hands them to the native side (`XournalActivity.recordingCommand`,
+  registered by `android::watchRecordingCommands`; `AudioControl::platformCommand`). A tap on the notification
+  brings the app back. Its texts are translated on the native side and handed over.
+- **Notifications permission** (Android 13+): asked once, at the first recording. Refused, the service runs all the
+  same and its notification shows only in the task manager.
+- **Screen off and background**: the service holds a partial wake lock while it runs (at most 12 h), and the
+  activity's `android.app.background_running` meta-data keeps Qt's event loop running in the background, which takes
+  the microphone's samples (Qt blocks it there otherwise, and the recording would have gaps or stop). The window draws
+  nothing while it is not shown.
+
+Tests (`AudioUiTest`, label `ui`): a refused microphone opens the dialog, nothing records, the microphone stays
+closed and **Open settings** calls the settings; allowed later, the next tap records; a question first, recording on
+yes, asked once for two taps, the dialog on no (without the settings button where there is no page); the platform's
+hook hears start, pause (with the time), resume (from the same time) and stop, not the time alone, and the end of a
+recording whose tab closes; the hook's commands pause, resume and stop. `RecorderTest.theDescriptionSaysWhatRecordingRunsOn`
+(label `audio`): `--audio-info`'s text for each backend.
+
+Not built or checked here: the Windows, macOS and Android packages (no SDKs in the build container; the next
+release run builds them); the Java checked only against stubs of the Android API. See the device checklist.

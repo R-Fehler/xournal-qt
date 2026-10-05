@@ -9,7 +9,8 @@
 # The bundle:
 #   Contents/MacOS/                 xournal-qt, xournal-qt-cli
 #   Contents/Frameworks/            Qt's frameworks and every Homebrew library they and the program use (macdeployqt)
-#   Contents/PlugIns/               Qt's plugins (cocoa, offscreen for scripted runs, SVG icons, image formats, ...)
+#   Contents/PlugIns/               Qt's plugins (cocoa, offscreen for scripted runs, SVG icons, image formats, ...);
+#                                   not Qt Multimedia's media plugins (the recordings need only its framework)
 #   Contents/Resources/qml/         the QML modules the QML files import (macdeployqt -qmldir)
 #   Contents/Resources/share/xournal-qt/   page templates, palettes, icons, fonts (AppContext looks there)
 #   Contents/Resources/xournal-qt.icns     the program's icon (qt/packaging/xournal-qt.svg)
@@ -112,6 +113,50 @@ step "macdeployqt"
 # XournalQt is compiled into the program (a static QML module): macdeployqt may report it as not found, which is
 # expected.
 "$macdeployqt" "$app" -qmldir="$qml_sources" -verbose=1 ${extra[@]+"${extra[@]}"}
+
+# --- Qt Multimedia: the framework, not the media plugins ------------------------------------------------------------
+# The recordings (qt/docs/audio.md, "Platforms") use QAudioSource and QAudioSink, which are in QtMultimedia.framework
+# itself (Core Audio). macdeployqt adds Qt's media plugins because the program links it (FFmpeg's and the
+# AVFoundation one: players, cameras, video), and with the FFmpeg plugin FFmpeg and its codecs' libraries. They go
+# again: the plugins, then every library only they used (none that anything else in the bundle refers to).
+step "Qt Multimedia: the framework, without the media plugins"
+if [[ -d "$contents/PlugIns/multimedia" ]]; then
+    plugin_libs=$(find "$contents/PlugIns/multimedia" -type f -name '*.dylib' -exec otool -L {} \; 2> /dev/null |
+        awk 'NR > 1 && /^\t/ {print $1}' | xargs -n1 basename 2> /dev/null | sort -u || true)
+    ls "$contents/PlugIns/multimedia"
+    rm -rf "$contents/PlugIns/multimedia"
+    echo "removed PlugIns/multimedia (not needed for audio in and out)"
+    # Libraries in Frameworks that only the plugins (and libraries only they used) referred to, until none is left
+    candidates=$plugin_libs
+    for pass in 1 2 3 4 5 6 7 8; do
+        all_refs=$(find "$contents" -type f \( -perm -u+x -o -name '*.dylib' \) -exec otool -L {} \; 2> /dev/null |
+            awk '/^\t/ {print $1}' | xargs -n1 basename 2> /dev/null | sort | uniq -c || true)
+        removed=0
+        next=""
+        for lib in $candidates; do
+            f="$contents/Frameworks/$lib"
+            [[ -f "$f" && "$lib" != *.framework* ]] || continue
+            # (a library names itself once, as its own id)
+            refs=$(awk -v n="$lib" '$2 == n {print $1}' <<< "$all_refs")
+            if [[ -z "$refs" || "$refs" -le 1 ]]; then
+                next="$next $(otool -L "$f" | awk 'NR > 1 {print $1}' | xargs -n1 basename 2> /dev/null || true)"
+                rm -f "$f"
+                echo "  removed Frameworks/$lib (used only by the media plugins)"
+                removed=$((removed + 1))
+            fi
+        done
+        candidates=$(tr ' ' '\n' <<< "$next" | sort -u || true)
+        ((removed == 0)) && break
+    done
+else
+    echo "no PlugIns/multimedia"
+fi
+exe_libs=$(otool -L "$contents/MacOS/xournal-qt" || true)
+if grep -q 'QtMultimedia.framework' <<< "$exe_libs"; then
+    echo "xournal-qt uses QtMultimedia.framework: recording is built"
+else
+    warn "xournal-qt does not use QtMultimedia.framework: this build offers no recording"
+fi
 
 # --- What macdeployqt leaves out -------------------------------------------------------------------------------------
 # macdeployqt copies the libraries that the program and Qt name by their full path, but not those that Homebrew's

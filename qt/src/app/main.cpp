@@ -10,6 +10,7 @@
  * @license GNU GPLv2 or later
  */
 #include <clocale>
+#include <cstdio>
 
 #include <QCommandLineParser>
 #include <QFontDatabase>
@@ -34,6 +35,7 @@
 
 #include "AppController.h"
 #include "AudioControl.h"
+#include "audio/AudioDevice.h"
 #include "hwr/HandwritingSearch.h"
 #include "hwr/ModelInfo.h"
 #ifdef XQT_HWR_ONNX
@@ -167,7 +169,17 @@ int main(int argc, char* argv[]) {
             "quick-note", "Make a quick note: a new note in the library's Inbox, named by the date and time (or a line "
                           "in today's Markdown note there, as Settings - Documents says)");
     parser.addOption(quickNoteOption);
+    // What recording runs on (qt/docs/audio.md, "Platforms"; the CI's smoke tests of the packages ask)
+    const QCommandLineOption audioInfoOption(
+            "audio-info", "Print whether recording is offered and the microphones and speakers found, then exit "
+                          "(exit code 1: recording is not offered)");
+    parser.addOption(audioInfoOption);
     parser.process(qapp);
+    if (parser.isSet(audioInfoOption)) {
+        std::fputs(xqt::audio::describe().c_str(), stdout);
+        std::fflush(stdout);
+        return xqt::audio::available() ? 0 : 1;
+    }
     const bool quickNote = parser.isSet(quickNoteOption);
 
     QStringList files;
@@ -306,8 +318,23 @@ int main(int argc, char* argv[]) {
     // A phone without a pen (the Galaxy Fold 7) is written on with the finger: drawing with the finger is on at the
     // first start there, off where a stylus is attached (as on the desktop)
     controller.setFingerDrawingDefault(!xqt::android::hasStylus());
-    // A recording keeps the microphone in the background through a foreground service (qt/docs/audio.md)
-    xqt::AudioControl::setPlatformHook([](bool on) { xqt::android::setRecording(on); });
+    // A recording keeps the microphone in the background through a foreground service, whose notification shows
+    // its time with Pause/Resume and Stop (qt/docs/audio.md, "Android"); refused, the microphone is allowed on the
+    // app's page of the system's settings
+    xqt::AudioControl::setPlatformHook([](const xqt::AudioControl::PlatformState& state) {
+        xqt::android::setRecording(state.recording, state.paused, state.recordedMs, state.title,
+                                   {QCoreApplication::translate("AudioControl", "Recording"),
+                                    QCoreApplication::translate("AudioControl", "Recording paused"),
+                                    QCoreApplication::translate("AudioControl", "Pause"),
+                                    QCoreApplication::translate("AudioControl", "Resume"),
+                                    QCoreApplication::translate("AudioControl", "Stop")});
+    });
+    xqt::android::watchRecordingCommands([&controller](int command) {
+        if (auto* audio = qobject_cast<xqt::AudioControl*>(controller.audioObject())) {
+            audio->platformCommand(static_cast<xqt::AudioControl::PlatformCommand>(command));
+        }
+    });
+    xqt::AudioControl::setSettingsOpener([] { return xqt::android::openAppSettings(); });
     // "Open with" and the share sheet: files other apps hand over, at start and while the app runs (the window
     // is there to show them and what went wrong)
     // The launcher's shortcut "Quick note" (qt/docs/quick-note.md) comes the same way, as an entry of its own.

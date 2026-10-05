@@ -40,3 +40,11 @@ set_target_properties(xournal-qt PROPERTIES
     # QML imports: scan the app's QML only (not the spikes and tests under qt/).
     QT_QML_ROOT_PATH "${CMAKE_CURRENT_LIST_DIR}/../src/app/qml")
 
+
+# Audio recordings (qt/docs/audio.md, "Android"): Qt Multimedia's audio devices (AAudio, OpenSL ES) are in its library
+# and its Java part; its media plugins (FFmpeg, the Android media backend: players, cameras, video) are not used, and
+# the FFmpeg one would bring FFmpeg's libraries into the APK. For shared plugins on Android qt_import_plugins decides
+# what androiddeployqt packs.
+if(TARGET Qt6::Multimedia)
+    qt_import_plugins(xournal-qt EXCLUDE_BY_TYPE multimedia)
+endif()

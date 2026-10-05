@@ -5276,6 +5276,8 @@ ApplicationWindow {
         target: app.audio
         function onMessage(text) { snackbar.show(text, false) }
     }
+    // The microphone refused by the system (macOS, Android): where to allow it
+    MicrophoneDialog {}
     // The replay of the timeline (qt/docs/timeline.md): its play bar at the bottom of the page
     TimelineBar {
         id: timelineBar

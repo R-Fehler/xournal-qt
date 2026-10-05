@@ -14,6 +14,8 @@
 #   XQT_JAVA_HOME     ~/.local/jdk-17             QT_ANDROID        ~/Qt/6.11.2/android_arm64_v8a
 #   QT_HOST           ~/Qt/6.11.2/gcc_64          VCPKG_ROOT        <workspace>/vcpkg (cloned when missing)
 #   XQT_ANDROID_BUILD <checkout>/build-android    VCPKG_BINARY_CACHE ~/.cache/vcpkg/archives
+#   XQT_REQUIRE_AUDIO OFF (the CI: ON; recording needs Qt Multimedia in QT_ANDROID: aqt's -m qtmultimedia, or the
+#                     Qt Maintenance Tool's "Qt Multimedia" for Android)
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -155,7 +157,8 @@ apk() {
         -DQT_CHAINLOAD_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
         -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
         -DVCPKG_INSTALLED_DIR="$build/vcpkg_installed" \
-        -DKF6SyntaxHighlighting_DIR="$build/kf6/android/lib/cmake/KF6SyntaxHighlighting"
+        -DKF6SyntaxHighlighting_DIR="$build/kf6/android/lib/cmake/KF6SyntaxHighlighting" \
+        -DXQT_REQUIRE_AUDIO="${XQT_REQUIRE_AUDIO:-OFF}"
     heavy cmake --build "$build" --target apk -j "$jobs"
     local out="$build/android-build/build/outputs/apk/debug/android-build-debug.apk"
     [ -f "$out" ] || out="$(find "$build" -name '*.apk' -newer "$build/CMakeCache.txt" | head -1)"

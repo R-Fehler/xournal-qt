@@ -7,13 +7,18 @@
 // - whether the device has a stylus (the default of "draw with the finger").
 // - "All files access" (MANAGE_EXTERNAL_STORAGE; the storage permission before Android 11), asked for when the user
 //   opens a folder of the shared storage as a library: whether the app has it, and the system's page to allow it.
+// - a recording (qt/docs/audio.md, "Android"): the foreground service with its notification (RecordingService), whose
+//   Pause/Resume and Stop come back to the native side; the notification permission (Android 13+), asked once; the
+//   app's page in the settings, where the microphone is allowed after a refusal.
 // See qt/docs/android.md.
 package org.xournalqt.app;
 
 import android.Manifest;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
@@ -46,6 +51,10 @@ public class XournalActivity extends QtActivity {
     /// The running activity (for the static methods the native side calls).
     private static WeakReference<XournalActivity> current = new WeakReference<>(null);
     private static final int STORAGE_REQUEST = 4711;
+    private static final int NOTIFICATIONS_REQUEST = 4712;
+
+    /// Registered by the native side (AndroidActivity.cpp, watchRecordingCommands): the notification's buttons.
+    private static native void recordingCommand(int command);
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -194,21 +203,67 @@ public class XournalActivity extends QtActivity {
         }
     }
 
-    /// A recording runs (true) or ended (false): the foreground service that keeps the microphone in the background
-    /// (RecordingService, qt/docs/audio.md) is started or stopped.
-    public static void setRecording(boolean on) {
+    /// A recording runs, paused or ended (the native side, AndroidActivity.cpp): the foreground service that keeps the
+    /// microphone in the background (RecordingService, qt/docs/audio.md) starts with the first, shows the others in
+    /// its notification, and stops with the end. `labels`: the notification's texts (RecordingService.LABEL_*).
+    public static void setRecording(boolean on, boolean paused, long recordedMs, String title, String[] labels) {
         final XournalActivity a = current.get();
         if (a == null) {
             return;
         }
         Intent service = new Intent(a, RecordingService.class);
         if (!on) {
+            RecordingService.update(false, false, 0, title, labels);
             a.stopService(service);
-        } else if (Build.VERSION.SDK_INT >= 26) {
-            a.startForegroundService(service);
-        } else {
-            a.startService(service);
+            return;
         }
+        if (RecordingService.update(true, paused, recordedMs, title, labels)) {
+            return;  // (it runs: its notification shows the news)
+        }
+        // Started while the app is in front (the record button), as Android wants for a microphone service
+        a.startForegroundService(service);
+        a.askForNotificationsOnce();
+    }
+
+    /// Called by RecordingService for the notification's buttons: 1 pause, 2 resume, 3 stop.
+    static void sendRecordingCommand(int command) {
+        try {
+            recordingCommand(command);
+        } catch (UnsatisfiedLinkError e) {  // (the native side is not there yet, or any more)
+        }
+    }
+
+    /// Android 13+: without the permission the recording's notification is only in the task manager, not in the
+    /// drawer (the service runs either way). Asked once, at the first recording.
+    private void askForNotificationsOnce() {
+        if (Build.VERSION.SDK_INT < 33
+            || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        SharedPreferences prefs = getSharedPreferences("xournal-qt", Context.MODE_PRIVATE);
+        if (prefs.getBoolean("askedNotifications", false)) {
+            return;
+        }
+        prefs.edit().putBoolean("askedNotifications", true).apply();
+        runOnUiThread(() -> requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS},
+                                               NOTIFICATIONS_REQUEST));
+    }
+
+    /// The app's page in the system's settings (Permissions → Microphone there), after the microphone was refused.
+    public static boolean openAppSettings() {
+        final XournalActivity a = current.get();
+        if (a == null) {
+            return false;
+        }
+        a.runOnUiThread(() -> {
+            try {
+                a.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                           Uri.parse("package:" + a.getPackageName())));
+            } catch (ActivityNotFoundException e) {
+                a.startActivity(new Intent(Settings.ACTION_SETTINGS));
+            }
+        });
+        return true;
     }
 
     /// A pen digitizer is attached (a built-in S Pen layer or a Bluetooth stylus). Touch screens of phones without a

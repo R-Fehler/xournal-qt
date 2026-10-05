@@ -295,7 +295,21 @@ private:
     std::string err;
 };
 
+/// "microphones: 2 (default: Built-in Microphone)"
+std::string deviceLine(const char* what, const QList<QAudioDevice>& all, const QAudioDevice& preferred) {
+    std::string line = std::string(what) + ": " + std::to_string(all.size());
+    if (!preferred.isNull()) {
+        line += " (default: " + preferred.description().toStdString() + ")";
+    }
+    return line + "\n";
+}
+
 }  // namespace
+
+std::string describeQtDevices() {
+    return deviceLine("microphones", QMediaDevices::audioInputs(), QMediaDevices::defaultAudioInput()) +
+           deviceLine("speakers", QMediaDevices::audioOutputs(), QMediaDevices::defaultAudioOutput());
+}
 
 std::unique_ptr<AudioInput> makeQtInput() { return std::make_unique<QtInput>(); }
 
