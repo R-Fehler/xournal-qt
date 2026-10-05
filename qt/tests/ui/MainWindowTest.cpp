@@ -2095,7 +2095,7 @@ TEST_F(HomeScreenTest, theFuzzySearchButtonOpensItsHelp) {
     EXPECT_FALSE(library->fuzzySearch()) << "not toggled by it";
     auto* rows = findItem("fuzzyHelpRows");
     ASSERT_NE(rows, nullptr);
-    EXPECT_EQ(rows->property("count").toInt(), 11) << "the syntax, a row each";
+    EXPECT_EQ(rows->property("count").toInt(), 12) << "the syntax, a row each (tag: too)";
     if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
         wait(800);
         window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));

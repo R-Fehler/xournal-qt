@@ -45,15 +45,18 @@ Rectangle {
     /// The row's width (16 px margin at the left, 8 at the right)
     readonly property real headerRoom: width - 24
     readonly property real searchMinimum: 150 + 6 + 48
-    /// The switch as icons: the library's name, its ▾, Recent, Favourites, Bookmarks, To-dos
-    readonly property real switchNeed: libraryTab.implicitWidth + libraryMenuButton.implicitWidth + 4 * 40 + 5 * 2 + 8
+    /// The switch as icons: the library's name, its ▾, Recent, Favourites, Tags (not on a phone: in the ▾ menu there),
+    /// Bookmarks, To-dos
+    readonly property real switchNeed: libraryTab.implicitWidth + libraryMenuButton.implicitWidth
+                                       + (phoneLayout ? 4 : 5) * 40 + (phoneLayout ? 5 : 6) * 2 + 8
     /// What the words beside the icons of Recent, Favourites and Bookmarks add
     readonly property real switchWords: recentWord.advanceWidth + favouritesWord.advanceWidth + bookmarksWord.advanceWidth
-                                        + todosWord.advanceWidth + 4 * 12
+                                        + todosWord.advanceWidth + (phoneLayout ? 0 : tagsWord.advanceWidth + 12) + 4 * 12
     TextMetrics { id: recentWord; text: qsTr("Recent") }
     TextMetrics { id: favouritesWord; text: qsTr("Favourites") }
     TextMetrics { id: bookmarksWord; text: qsTr("Bookmarks") }
     TextMetrics { id: todosWord; text: qsTr("To-dos") }
+    TextMetrics { id: tagsWord; text: qsTr("Tags") }
     /// What the expanded row needs: the switch, a search wide enough for its placeholder (300; below that the grouped
     /// row with a wider search is better), New, Quick note, Last page, Import, New folder, Flat, Show, Sort, − and +
     /// with their separators, Settings, and the spacing between them
@@ -74,7 +77,7 @@ Rectangle {
     /// selection bar's row does not fit
     readonly property bool selectionAtBottom: phoneLayout || selectionFull.implicitWidth + selectionLabel.implicitWidth + 96 > width
     /// 0: library, 1: recent documents, 2: the library's bookmarks (qt/docs/bookmarks.md), 3: its to-dos
-    /// (qt/docs/todos.md)
+    /// (qt/docs/todos.md), 4: its tags (qt/docs/tags.md)
     property int page: app.library.available ? 0 : 1
     /// Changes when a star is set or taken away (the Recent cards ask for theirs)
     property int favouriteRevision: 0
@@ -128,7 +131,8 @@ Rectangle {
     }
     function pagesText(n) { return n < 0 ? "" : (n === 1 ? qsTr("1 page") : qsTr("%1 pages").arg(n)) }
     function focusGrid() {
-        (page === 0 ? libraryGrid : page === 2 ? bookmarksView : page === 3 ? todosView : recentGrid).forceActiveFocus()
+        (page === 0 ? libraryGrid : page === 2 ? bookmarksView : page === 3 ? todosView : page === 4 ? tagsView
+                                                                                               : recentGrid).forceActiveFocus()
     }
     function focusSearch() {
         page = 0
@@ -924,6 +928,7 @@ Rectangle {
                         hitPassageBase: model.hitPassageBase
                         stripHeight: home.extendedView && !model.isFolder ? libraryGrid.stripHeight : 0
                         favourite: model.favourite
+                        tags: model.tags ? model.tags : []
                         onFavouriteToggled: app.library.setFavourite(model.path, !model.favourite)
                         onPageActivated: function(pageNo) { app.openSearchHitAt(model.path, home.lib.searchQuery, pageNo) }
                         onPassageActivated: function(passage) {
@@ -985,11 +990,12 @@ Rectangle {
                         color: "#5f6368"
                         text: home.searching ? (app.library.indexing ? qsTr("Nothing found yet (still indexing)") : qsTr("Nothing found"))
                               : app.library.favouritesOnly ? qsTr("No favourites yet: tap the star on a document")
+                              : app.library.tagFilter !== "" ? qsTr("No documents tagged #%1 here").arg(app.library.tagFilter)
                               : app.library.folder !== "" ? qsTr("This folder is empty")
                               : qsTr("Your library is empty")
                     }
                     Label {
-                        visible: !home.searching && !app.library.favouritesOnly
+                        visible: !home.searching && !app.library.favouritesOnly && app.library.tagFilter === ""
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
                         wrapMode: Text.Wrap
@@ -998,7 +1004,7 @@ Rectangle {
                     }
                     // (one below the other when they do not fit side by side)
                     GridLayout {
-                        visible: !home.searching && !app.library.favouritesOnly
+                        visible: !home.searching && !app.library.favouritesOnly && app.library.tagFilter === ""
                         Layout.alignment: Qt.AlignHCenter
                         columns: emptyNew.implicitWidth + emptyImport.implicitWidth + emptyImportFolder.implicitWidth
                                  + 2 * columnSpacing <= parent.width ? 3 : 1
@@ -1178,6 +1184,14 @@ Rectangle {
                 id: todosView
                 shown: home.visible && home.page === 3
                 bottomSpace: home.fabSpace
+            }
+
+            // --- the library's tags: a tap shows the documents with the tag ---
+            TagsView {
+                id: tagsView
+                shown: home.visible && home.page === 4
+                bottomSpace: home.fabSpace
+                onTagChosen: home.page = 0
             }
         }
 
@@ -1543,6 +1557,15 @@ Rectangle {
                                 onObjectRemoved: function(index, object) { libraryMenu.removeItem(object) }
                             }
                             MenuSeparator {}
+                            // The library's tags (on a phone the switch has no room for their tab)
+                            AdaptiveMenuItem {
+                                objectName: "libraryMenuTags"
+                                text: qsTr("Tags")
+                                icon.source: app.iconUrl("xqt-tag")
+                                offered: home.phoneLayout
+                                enabled: app.library.available
+                                onTriggered: home.page = 4
+                            }
                             AdaptiveMenuItem {
                                 text: app.libraryWindows ? qsTr("New library… (new window)") : qsTr("New library…")
                                 onTriggered: newLibraryDialog.open()
@@ -1599,6 +1622,18 @@ Rectangle {
                     }
                 }
             }
+            // The tags of the library's documents (#tags typed in them, keywords of PDFs): a page listing them with
+            // counts; a tap on one filters the library (qt/docs/tags.md)
+            PageTab {
+                id: tagsTab
+                objectName: "tagsPageButton"
+                pageIndex: 4
+                label: qsTr("Tags")
+                iconName: "xqt-tag"
+                enabled: app.library.available
+                // (a phone has no room for it in the switch: the ▾ menu has it)
+                visible: !home.phoneLayout
+            }
             PageTab {
                 id: bookmarksTab
                 objectName: "bookmarksPageButton"
@@ -1630,7 +1665,7 @@ Rectangle {
         /// At the library's top the breadcrumbs would only repeat its name (the switch shows it): no row for them then,
         /// unless it says what the library is doing (importing, indexing)
         readonly property bool atRoot: showCrumbs && app.library.folder === ""
-        readonly property bool needed: !atRoot || app.library.importing
+        readonly property bool needed: !atRoot || app.library.importing || app.library.tagFilter !== ""
                                        || (app.library.indexing && app.library.indexTotal > 0)
                                        || (app.handwriting.enabled && app.handwriting.libraryLeft > 0)
 
@@ -1804,6 +1839,42 @@ Rectangle {
                 }
             }
         }
+        // Only the documents with a tag (the Tags page): the tag, a tap takes the filter away
+        AbstractButton {
+            id: tagFilterChip
+            objectName: "tagFilterChip"
+            visible: app.library.tagFilter !== ""
+            Layout.maximumWidth: 260
+            implicitHeight: home.touch ? 40 : 32
+            implicitWidth: tagChipRow.implicitWidth + 20
+            Accessible.name: qsTr("Only #%1 - tap: all documents").arg(app.library.tagFilter)
+            onClicked: app.library.tagFilter = ""
+            ToolTip.visible: hovered
+            ToolTip.text: qsTr("Only documents tagged #%1 - tap: all documents").arg(app.library.tagFilter)
+            ToolTip.delay: 600
+            background: Rectangle {
+                radius: height / 2
+                color: tagFilterChip.pressed ? "#c2d7f5" : "#d2e3fc"
+            }
+            contentItem: Item {
+                RowLayout {
+                    id: tagChipRow
+                    anchors.centerIn: parent
+                    width: Math.min(implicitWidth, parent.width)
+                    spacing: 4
+                    Label {
+                        objectName: "tagFilterLabel"
+                        text: "#" + app.library.tagFilter
+                        elide: Text.ElideRight
+                        color: "#174ea6"
+                        font.weight: Font.DemiBold
+                        Layout.fillWidth: true
+                    }
+                    Label { text: "✕"; color: "#174ea6" }
+                }
+            }
+        }
+        Item { Layout.fillWidth: true; visible: app.library.tagFilter !== "" && crumbBar.atRoot }
         Label {
             objectName: "listCaption"
             visible: !crumbBar.showCrumbs
@@ -2077,6 +2148,8 @@ Rectangle {
         }
     }
 
+    TagsDialog { id: homeTagsDialog }
+
     AdaptiveMenu {
         id: itemMenu
         objectName: "homeItemMenu"
@@ -2109,6 +2182,14 @@ Rectangle {
                 target: itemMenu
                 function onAboutToShow() { favouriteItemRef.starred = app.isFavouriteFile(home.menuPath) }
             }
+        }
+        // Its tags: a PDF's keywords, written into the file; the #tags typed in it (qt/docs/tags.md)
+        AdaptiveMenuItem {
+            objectName: "documentTagsItem"
+            text: qsTr("Tags…")
+            icon.source: app.iconUrl("xqt-tag")
+            offered: !home.menuMany && !home.menuFolder && ["notes", "pdf", "md"].indexOf(home.menuKind) >= 0
+            onTriggered: homeTagsDialog.openFor(home.menuPath)
         }
         AdaptiveMenuItem {
             objectName: "openAsLibraryItem"

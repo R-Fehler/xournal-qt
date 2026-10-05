@@ -822,6 +822,15 @@
   region renderer) and its recognised words. "Add to calendar": an all-day VEVENT `.ics` handed to the system (Android:
   the calendar's new-event intent); exports of the open ones as `.ics` and Markdown. One way ([todos.md](todos.md)).
 
+- **Tags, `qt/tags` (2026-10-05).** `#tag` (letters, digits, `-`, `_`, `/` for nested tags; not in code, URLs or
+  headings) in typed text, Markdown boxes, sticky notes, PDF text documents and `.md` files (with an Obsidian front
+  matter's `tags:`), and the keywords of PDFs (Info `/Keywords`, XMP `dc:subject`), read into each folder's "notes"
+  pack (old entries read once more, plain PDFs only for their keywords). The library home's Tags tab lists them with
+  counts, nested ones folded (on a phone: in the ▾ menu); a tap filters the library (with Show, the star and the
+  folder; a chip takes it away); cards show a few, then "+N". `tag:name` in the fuzzy syntax and the plain search
+  (`tag:course/`: the nested ones). "Tags…" (card menu, ⋮ → Document) writes a PDF's keywords as an incremental update
+  (archive PDFs stay PDF/A; the app's full saves keep them); a `.xopp` has only typed `#tags` ([tags.md](tags.md)).
+
 - **The toolbox, `qt/toolbox` (2026-10-04).** The tool bar's tools become the user's own tools, as pens taken from a
   sorted box (Drawboard): each entry a pen, highlighter, shape, eraser, text box, sticky note or laser pointer with its
   settings (palette role or color, width, line style, filling, eraser kind, font), in sections, in one rail docked to

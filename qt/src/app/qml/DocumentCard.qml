@@ -58,6 +58,10 @@ Item {
     /// A favourite (starred): a star on the card, tap it to take the star away; the mouse over a card shows an empty
     /// star to add it (qt/docs/bookmarks.md)
     property bool favourite: false
+    /// Its tags (qt/docs/tags.md): a few on the preview, then "+N"
+    property var tags: []
+    /// How many are shown before "+N"
+    readonly property int tagsShown: width < 170 ? 1 : width < 240 ? 2 : 3
     /// Whether the card offers the star (documents: not folders, libraries or other files)
     property bool canStar: !isFolder && !isLibrary && kind !== "other"
     signal favouriteToggled()
@@ -298,6 +302,62 @@ Item {
                             color: "#ffffff"
                         }
                     }
+                }
+                // Its tags: a few, then "+N" (above the "last read" tag)
+                Row {
+                    id: tagRow
+                    objectName: "cardTags"
+                    visible: !card.isFolder && card.tags.length > 0
+                    anchors.left: parent.left
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 6
+                    anchors.bottomMargin: card.lastRead !== "" && card.snippet === "" ? 26 : 6
+                    width: parent.width - 12
+                    spacing: 3
+                    clip: true
+                    z: 2
+                    Repeater {
+                        model: card.tags.slice(0, card.tagsShown)
+                        delegate: Rectangle {
+                            required property string modelData
+                            objectName: "cardTag"
+                            radius: 4
+                            color: "#d2e3fc"
+                            height: 16
+                            width: Math.min(tagText.implicitWidth + 8,
+                                            (tagRow.width - (card.tags.length > card.tagsShown ? 30 : 0)) / Math.min(card.tagsShown, card.tags.length) - 3)
+                            Label {
+                                id: tagText
+                                anchors.centerIn: parent
+                                width: Math.min(implicitWidth, parent.width - 8)
+                                text: "#" + parent.modelData
+                                elide: Text.ElideRight
+                                font.pixelSize: 10
+                                font.weight: Font.Bold
+                                color: "#174ea6"
+                            }
+                        }
+                    }
+                    Rectangle {
+                        objectName: "cardTagsMore"
+                        visible: card.tags.length > card.tagsShown
+                        radius: 4
+                        color: "#e8eaed"
+                        height: 16
+                        width: moreText.implicitWidth + 8
+                        Label {
+                            id: moreText
+                            anchors.centerIn: parent
+                            text: "+" + (card.tags.length - card.tagsShown)
+                            font.pixelSize: 10
+                            font.weight: Font.Bold
+                            color: "#3c4043"
+                        }
+                    }
+                    ToolTip.visible: tagHover.hovered && card.tags.length > 0
+                    ToolTip.text: card.tags.map(function(t) { return "#" + t }).join("  ")
+                    ToolTip.delay: 500
+                    HoverHandler { id: tagHover }
                 }
                 // Sync conflicts: a badge that opens "compare / keep one" (conflictsRequested)
                 Rectangle {

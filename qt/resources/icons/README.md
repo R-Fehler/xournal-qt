@@ -46,3 +46,5 @@ rounded hole: the spotlight) are drawn in the same style.
 
 `xqt-replace` (a dashed box, an arrow down to a solid one: find and replace, qt/docs/md-editor.md) is drawn in the same
 style, after Lucide's `replace`.
+
+`xqt-tag` is Lucide's `tag`: the library's **Tags** tab and a document's "Tags…" (qt/docs/tags.md).

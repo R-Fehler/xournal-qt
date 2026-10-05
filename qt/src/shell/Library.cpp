@@ -46,6 +46,8 @@
 #include "MdImages.h"
 #include "MdPassages.h"
 #include "MdTasks.h"
+#include "PdfKeywords.h"
+#include "Tags.h"
 #include "Previews.h"
 
 namespace xqt {
@@ -458,13 +460,21 @@ bool LibraryIndex::Entry::isPdf() const { return isPdfFile(file); }
 bool LibraryIndex::Entry::pdfKindMissing() const { return pdfKind == PdfKind::Unknown && isPdf(); }
 
 bool LibraryIndex::Entry::onlyMetaMissing(const DocumentItem& item) const {
-    return (!titleRead || pdfKindMissing()) && file == item.main() && xoppStamp == ownStamp(item) &&
-           pdfStamp == fileStamp(pdf) && linksRead && todosRead;
+    // (a plain PDF without tags read: only its keywords are; other documents are read again for theirs)
+    const bool onlyKeywords = !tagsRead && pdfKind == PdfKind::Plain;
+    return (!titleRead || pdfKindMissing() || onlyKeywords) && file == item.main() && xoppStamp == ownStamp(item) &&
+           pdfStamp == fileStamp(pdf) && linksRead && todosRead && (tagsRead || onlyKeywords);
 }
 
 bool LibraryIndex::Entry::upToDate(const DocumentItem& item) const {
     return file == item.main() && xoppStamp == ownStamp(item) && pdfStamp == fileStamp(pdf) && linksRead &&
-           todosRead && titleRead && !pdfKindMissing();
+           todosRead && tagsRead && titleRead && !pdfKindMissing();
+}
+
+QStringList LibraryIndex::Entry::tags() const {
+    QStringList all = textTags;
+    tags::merge(all, pdfTags);
+    return all;
 }
 
 // --- the packs: entries by file name
@@ -525,6 +535,13 @@ QCborMap LibraryIndex::notesOf(const Entry& e) const {
             todos.append(m);
         }
         notes.insert(QStringLiteral("todos"), todos);
+    }
+    if (e.kind != QLatin1String("image") && e.kind != QLatin1String("text")) {
+        // Its tags (also none: they were read); those of its PDF's keywords go with its PDF's stamp
+        notes.insert(QStringLiteral("tags"), QCborArray::fromStringList(e.textTags));
+        if (!e.pdfTags.isEmpty()) {
+            notes.insert(QStringLiteral("pdfTags"), QCborArray::fromStringList(e.pdfTags));
+        }
     }
     if (e.kind == QLatin1String("md")) {
         QCborArray levels;
@@ -641,6 +658,15 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
             e->todos.push_back(std::move(t));
         }
     }
+    // Its tags (added 2026-10 with qt/tags: an entry without them is read again once; a plain PDF: only its keywords)
+    e->tagsRead = notes.contains(QStringLiteral("tags")) || e->kind == QLatin1String("image") ||
+                  e->kind == QLatin1String("text");
+    for (const auto& v: notes.value(QStringLiteral("tags")).toArray()) {
+        e->textTags << v.toString();
+    }
+    for (const auto& v: notes.value(QStringLiteral("pdfTags")).toArray()) {
+        e->pdfTags << v.toString();
+    }
     if (e->showsPdfPages()) {
         // Its PDF's title (added 2026-09: an entry without it is read once more, without its PDF text)
         e->titleRead = notes.contains(QStringLiteral("title"));
@@ -700,6 +726,7 @@ void LibraryIndex::load(const fs::path& folder) {
         ++kindChanges;  // (the kinds stored in its packs are known now)
         ++markChanges;  // (and their bookmarks)
         ++todoChangeCount;  // (and their to-dos)
+        ++tagChangeCount;   // (and their tags)
     }
 }
 
@@ -729,6 +756,9 @@ void LibraryIndex::put(const EntryPtr& e) {
     if ((slot ? slot->todos : std::vector<Todo>()) != e->todos) {
         ++todoChangeCount;
     }
+    if ((slot ? slot->tags() : QStringList()) != e->tags()) {
+        ++tagChangeCount;
+    }
     slot = e;
     scheduler->changed();
 }
@@ -740,6 +770,7 @@ void LibraryIndex::erase(const fs::path& file) {
         ++kindChanges;
         ++markChanges;
         ++todoChangeCount;
+        ++tagChangeCount;
         f->second.notesChanged = f->second.textChanged = true;
         scheduler->changed();
     }
@@ -939,6 +970,8 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
         // Its to-dos (by their lines in the file; their pages are found when one is opened)
         addTodos(*e, source, -1, -1, nullptr, 0);
         numberTodos(*e);
+        // Its tags: `#tag` in its text, its front matter's tags
+        e->textTags = tags::inMarkdown(source);
         return e;
     }
     if (!item.other.empty()) {
@@ -995,6 +1028,7 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
     fillPages(*e, doc, donor, true);
     lock.unlock();
     fillTitle(*e, donor);
+    fillPdfTags(*e, donor);
     return e;
 }
 
@@ -1068,6 +1102,9 @@ bool LibraryIndex::fillPages(Entry& e, Document& doc, const EntryPtr& donor, boo
                 if (el->getType() == ELEMENT_TEXT) {
                     const auto* text = static_cast<const Text*>(el);
                     elements += ' ' + QString::fromStdString(text->getText());
+                    // Its tags (typed text, Markdown boxes, sticky notes, the pages of a text document)
+                    tags::merge(e.textTags, text->isMarkdown() ? tags::inMarkdown(text->getText())
+                                                               : tags::inText(QString::fromStdString(text->getText())));
                     if (text->isMarkdown()) {
                         // Its links (Markdown boxes, link markers), for backlinks (qt/docs/links.md)
                         for (const md::LinkTarget& l: md::linksOf(md::parse(text->getText()))) {
@@ -1093,7 +1130,20 @@ bool LibraryIndex::fillPages(Entry& e, Document& doc, const EntryPtr& donor, boo
     }
     numberTodos(e);
     e.todosRead = true;
+    e.tagsRead = true;  // (the keywords of its PDF: fillPdfTags)
     return true;
+}
+
+void LibraryIndex::fillPdfTags(Entry& e, const EntryPtr& donor) {
+    e.pdfTags.clear();
+    if (e.pdf.empty()) {
+        return;
+    }
+    if (donor && donor->tagsRead && donor->pdf == e.pdf && donor->pdfStamp == e.pdfStamp && !e.pdfStamp.isEmpty()) {
+        e.pdfTags = donor->pdfTags;
+        return;
+    }
+    e.pdfTags = pdfkeywords::tagsOf(e.pdf);
 }
 
 void LibraryIndex::addTodos(Entry& e, const std::string& source, int page, int box, const Text* text,
@@ -1170,6 +1220,8 @@ bool LibraryIndex::documentSaved(const fs::path& file, Document& doc, const std:
     if (!fillPages(*e, doc, known, false)) {
         return false;  // (PDF text that is not known yet: the next update reads it)
     }
+    // The keywords of its PDF: as before when it did not change (else read now: only its trailer and information)
+    fillPdfTags(*e, previous);
     // The title of its PDF as before (else the next update reads it)
     e->titleRead = !e->showsPdfPages();
     if (previous && previous->titleRead && previous->pdf == e->pdf && previous->pdfStamp == e->pdfStamp &&
@@ -1351,6 +1403,11 @@ void LibraryIndex::run(std::vector<DocumentItem> items, quint64 gen) {
                 completed->pdfKind = kindOfPdf(completed->file, nullptr);
                 ++kindReads;
             }
+            if (!completed->tagsRead) {
+                fillPdfTags(*completed, nullptr);  // (a plain PDF: its keywords are its tags)
+                completed->tagsRead = true;
+                ++keywordReads;
+            }
             std::lock_guard lock(mtx);
             put(std::move(completed));
         } else if (auto fresh = read(item, current)) {
@@ -1505,6 +1562,35 @@ std::vector<LibraryIndex::Todo> LibraryIndex::todos() const {
     return out;
 }
 
+std::vector<LibraryIndex::Tagged> LibraryIndex::tagged() const {
+    std::vector<Tagged> out;
+    std::lock_guard lock(mtx);
+    for (const auto& [folder, f]: folders) {
+        for (const auto& [name, e]: f.docs) {
+            if (QStringList t = e->tags(); !t.isEmpty()) {
+                out.push_back({e->file, std::move(t)});
+            }
+        }
+    }
+    return out;
+}
+
+QStringList LibraryIndex::tagsOf(const fs::path& file) const {
+    std::lock_guard lock(mtx);
+    const EntryPtr e = find(file);
+    return e ? e->tags() : QStringList();
+}
+
+QStringList LibraryIndex::textTagsOf(const fs::path& file) const {
+    std::lock_guard lock(mtx);
+    const EntryPtr e = find(file);
+    return e ? e->textTags : QStringList();
+}
+
+bool LibraryIndex::hasTag(const fs::path& file, QStringView query) const {
+    return tags::anyMatches(tagsOf(file), query);
+}
+
 std::shared_ptr<const InkDoc> LibraryIndex::inkOf(const Entry& e) const {
     auto doc = inks->find(e.file);
     const QString stamp = e.xoppStamp.isEmpty() ? e.pdfStamp : e.xoppStamp;
@@ -1560,10 +1646,12 @@ QString inkSnippet(const ink::PageText& text, const ink::Hit& hit) {
 }  // namespace
 
 std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const {
-    const QString q = simplified(query).trimmed();
+    // "tag:name" terms: only documents with these tags (qt/docs/tags.md); the rest is the text searched
+    const tags::Query tagged = tags::splitQuery(simplified(query).trimmed());
+    const QString q = tagged.rest;
     const QString folded = textmatch::prepare(q);
     std::vector<Hit> hits;
-    if (q.isEmpty()) {
+    if (q.isEmpty() && tagged.tags.isEmpty()) {
         return hits;
     }
     std::vector<EntryPtr> snapshot;
@@ -1576,6 +1664,19 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const 
         }
     }
     for (const auto& e: snapshot) {
+        if (!tagged.tags.isEmpty()) {
+            const QStringList docTags = e->tags();
+            if (!std::all_of(tagged.tags.begin(), tagged.tags.end(),
+                             [&](const QString& t) { return tags::anyMatches(docTags, t); })) {
+                continue;
+            }
+            if (q.isEmpty()) {
+                Hit h;
+                h.file = e->file;
+                hits.push_back(std::move(h));  // (all documents with the tags)
+                continue;
+            }
+        }
         Hit h;
         h.file = e->file;
         h.inName = e->name.contains(q, Qt::CaseInsensitive);
@@ -1773,6 +1874,23 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
                 units.push_back(std::move(u));
             }
         }
+        // A tag term holds for the document when it has the tag (in its text or its PDF's keywords), on all its pages
+        std::vector<char> tagged(terms.size(), 0);
+        bool anyTag = false;
+        for (size_t t = 0; t < terms.size(); ++t) {
+            if (terms[t].isTag()) {
+                anyTag = true;
+            }
+        }
+        if (anyTag) {
+            const QStringList docTags = e->tags();
+            for (size_t t = 0; t < terms.size(); ++t) {
+                if (terms[t].isTag()) {
+                    tagged[t] = tags::anyMatches(docTags, terms[t].text) ? 1 : 0;
+                    inText[t] = tagged[t];
+                }
+            }
+        }
         const bool matches = query.evaluate([&](size_t t) { return name.found[t] || inText[t]; });
         if (!matches) {
             continue;
@@ -1786,7 +1904,7 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
         for (const Unit& u: units) {
             h.count += u.count;
             exact = exact || u.exact;
-            if (query.evaluate([&](size_t t) { return name.found[t] || u.on[t]; })) {
+            if (query.evaluate([&](size_t t) { return name.found[t] || tagged[t] || (!terms[t].isTag() && u.on[t]); })) {
                 listed.push_back(&u);
             }
         }

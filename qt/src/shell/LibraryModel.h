@@ -51,6 +51,10 @@ class LibraryModel final: public QAbstractListModel {
     /// Only the favourites (starred documents; DocumentPlaces): all of the library's, without folders, like the flat
     /// list; combined with the "Show" filter and the search (qt/docs/bookmarks.md)
     Q_PROPERTY(bool favouritesOnly READ favouritesOnly WRITE setFavouritesOnly NOTIFY favouritesOnlyChanged)
+    /// Only documents with this tag or one inside it (qt/docs/tags.md; "": all): of the current folder and its
+    /// subfolders (all of the library's with favouritesOnly or flat), without folders; combined with the "Show" filter
+    /// and the search
+    Q_PROPERTY(QString tagFilter READ tagFilter WRITE setTagFilter NOTIFY tagFilterChanged)
     /// "name" or "modified"
     Q_PROPERTY(QString sortBy READ sortBy WRITE setSortBy NOTIFY sortByChanged)
     Q_PROPERTY(QString searchQuery READ searchQuery WRITE setSearchQuery NOTIFY searchChanged)
@@ -130,6 +134,8 @@ public:
         PdfKindRole,
         /// The document is a favourite (starred)
         FavouriteRole,
+        /// Its tags (qt/docs/tags.md), from the index ([] until it is indexed, and for folders)
+        TagsRole,
     };
 
     explicit LibraryModel(QObject* parent = nullptr);
@@ -168,6 +174,8 @@ public:
     Q_INVOKABLE bool isFavourite(const QString& path) const;
     /// A star was set or taken away elsewhere (an open document's menu): shown anew.
     void favouritesChanged();
+    QString tagFilter() const { return onlyTag; }
+    void setTagFilter(const QString& tag);
     QString sortBy() const { return sortKey; }
     void setSortBy(const QString& key);
     QString searchQuery() const { return query; }
@@ -280,6 +288,7 @@ Q_SIGNALS:
     void flatChanged();
     void namesOnlyChanged();
     void favouritesOnlyChanged();
+    void tagFilterChanged();
     /// A document was starred or unstarred here (other views follow).
     void favouriteToggled(const QString& path, bool on);
     void fuzzySearchChanged();
@@ -340,11 +349,13 @@ private:
     QTimer searchTimer;   ///< search again while indexing
     QTimer kindsTimer;    ///< the filter asks what PDFs are: list again when the index found out more
     quint64 kindsSeen = 0;  ///< the index's pdfKindChanges() when the rows were made
+    quint64 tagsSeen = 0;   ///< the index's tagChanges() when the rows were made
     std::vector<Row> rows;
     QString currentFolder;
     bool flatView = false;
     bool onlyNames = false;
     bool onlyFavourites = false;
+    QString onlyTag;
     QString sortKey = "name";
     QString query;
     bool fuzzy = false;

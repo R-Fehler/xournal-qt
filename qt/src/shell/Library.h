@@ -200,6 +200,8 @@ public:
     int titlesRead() const { return titleReads.load(); }
     /// Kinds of PDFs read for entries that had none (only their marker; tests).
     int pdfKindsRead() const { return kindReads.load(); }
+    /// Keywords of plain PDFs read for entries that had no tags (only their keywords; tests).
+    int keywordsRead() const { return keywordReads.load(); }
     /// Called on the worker for each document of an update once it was found on disk, before its entry is looked at
     /// (tests: a move that lands just then). Set it while the index is idle.
     void setCheckHook(std::function<void(const fs::path&)> hook) { checkHook = std::move(hook); }
@@ -290,6 +292,22 @@ public:
     std::vector<Todo> todos() const;
     /// Changes when the to-dos of a document changed, or a document with to-dos came or went.
     quint64 todoChanges() const { return todoChangeCount.load(); }
+    /// The tags of an indexed document (qt/docs/tags.md): the `#tags` of its typed text, Markdown boxes, sticky notes
+    /// (a Markdown file: its text and front matter), and the keywords of the PDF it uses; each once, in that order.
+    struct Tagged {
+        fs::path file;  ///< the document's main file
+        QStringList tags;
+    };
+    /// The documents with tags (by folder, then file): read from the index.
+    std::vector<Tagged> tagged() const;
+    /// The tags of one document ({} when it has none or is not indexed yet).
+    QStringList tagsOf(const fs::path& file) const;
+    /// Only those typed in it (not its PDF's keywords).
+    QStringList textTagsOf(const fs::path& file) const;
+    /// Whether an indexed document has a tag that `query` matches (tags::matches: `course` also finds `course/math`).
+    bool hasTag(const fs::path& file, QStringView query) const;
+    /// Changes when the tags of a document changed, or a document with tags came or went.
+    quint64 tagChanges() const { return tagChangeCount.load(); }
     /// The handwriting recognised in the library's documents (its pack per folder).
     InkTextStore& inkText() { return *inks; }
     const InkTextStore& inkText() const { return *inks; }
@@ -384,6 +402,14 @@ private:
         std::vector<Todo> todos;
         /// They were read (entries of documents indexed before to-dos were: read again once, without their PDF text)
         bool todosRead = true;
+        /// Its tags (qt/docs/tags.md): of its text (`#tag`), and the keywords of its PDF (kept with the PDF's stamp).
+        /// Stored in "notes".
+        QStringList textTags, pdfTags;
+        /// They were read (entries of documents indexed before tags were: read again once, without their PDF text; a
+        /// plain PDF: only its keywords)
+        bool tagsRead = true;
+        /// Both, each once
+        QStringList tags() const;
         /// Its PDF's title (PdfTitle.h): the /Title if it looks like one, and the largest text of the first page it
         /// shows. Kept with its PDF's stamp in "notes".
         QString title;
@@ -453,6 +479,8 @@ private:
     static void addTodos(Entry& e, const std::string& source, int page, int box, const Text* text, double pageWidth);
     /// Their occurrences (to-dos before them with the same text), once all are in
     static void numberTodos(Entry& e);
+    /// The keywords of its PDF as tags into `e` (from `donor` when that read them from the same PDF as it is now)
+    static void fillPdfTags(Entry& e, const EntryPtr& donor);
     std::shared_ptr<Entry> entryOf(const fs::path& folder, const QString& name, const QCborMap& notes,
                                    const QCborValue& text) const;
 
@@ -476,11 +504,12 @@ private:
     std::atomic<quint64> kindChanges{0};
     std::atomic<quint64> markChanges{0};
     std::atomic<quint64> todoChangeCount{0};
+    std::atomic<quint64> tagChangeCount{0};
     std::atomic<bool> running{false};
     std::atomic<bool> discarded{false};
     std::atomic<int> doneCount{0}, totalCount{0};
     std::atomic<int> docsRead{0}, pdfRead{0}, packWrites{0}, conversions{0}, handedOver{0}, titleReads{0},
-            kindReads{0};
+            kindReads{0}, keywordReads{0};
     std::function<void(const fs::path&)> checkHook;
 };
 

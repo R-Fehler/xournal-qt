@@ -1476,6 +1476,13 @@ ApplicationWindow {
                             icon.source: app.iconUrl("xqt-image-off")
                             onTriggered: unusedImagesDialog.show()
                         }
+                        // Its tags: a PDF's keywords, without typing into it (qt/docs/tags.md)
+                        AdaptiveMenuItem {
+                            objectName: "documentTagsMenuItem"
+                            text: qsTr("Tags…")
+                            icon.source: app.iconUrl("xqt-tag")
+                            onTriggered: documentTagsDialog.openFor(app.currentDocumentPath())
+                        }
                         AdaptiveMenuItem { objectName: "linkedFromItem"; text: qsTr("Linked from…"); icon.source: app.iconUrl("xqt-link"); onTriggered: backlinksDialog.show() }
                         AdaptiveMenuItem { objectName: "copyPageLinkItem"; text: qsTr("Copy link to this page"); icon.source: app.iconUrl("xqt-copy"); onTriggered: app.copyPageLink(-1) }
                     }
@@ -4838,6 +4845,7 @@ ApplicationWindow {
     PrintDialog { id: printDialog }
     ChapterDialog { id: chapterDialog }
     RenameDialog { id: renameDocumentDialog }
+    TagsDialog { id: documentTagsDialog }
     ContextPill { id: contextPill; onImageRequested: imageDialog.open() }
     WebConfirm { id: webConfirm }
     WebImageConfirm { id: webImageConfirm }

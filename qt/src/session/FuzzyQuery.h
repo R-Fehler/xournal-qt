@@ -15,6 +15,8 @@
  *   a b       a and b (a space)
  *   a | b     a or b; `|` binds closer than the space: `a b | c` is a and (b or c)
  *   ( … )     a group (an extension of fzf's syntax): `(a b) | c`; `!( … )` negates it
+ *   tag:name  the document has the tag (qt/docs/tags.md; an extension): `tag:course` also finds `#course/math`,
+ *             `tag:course/` only the tags inside it; `!tag:name`: it has not
  *   \  \( \)  a space, a parenthesis in a term
  *
  * Case never matters (as in the plain search). Terms that are empty after their marks (`^`, `!`) are left out, as
@@ -48,15 +50,17 @@ namespace xqt {
 
 class FuzzyQuery {
 public:
-    enum class Type { Fuzzy, Exact, Boundary, Prefix, Suffix, Equal };
+    enum class Type { Fuzzy, Exact, Boundary, Prefix, Suffix, Equal, Tag };
     struct Term {
         QString text;  ///< prepare()d (TextMatch.h)
         Type type = Type::Fuzzy;
         bool negated = false;  ///< !term
         int typos = 0;         ///< a fuzzy term: the typo tolerance when it was parsed (typoTolerance())
         /// How it is looked for in text: a fuzzy term of letters and digits word by word (textmatch::Fuzzy), the
-        /// others as substrings, at word bounds for ^, $, 'term'.
+        /// others as substrings, at word bounds for ^, $, 'term'. A tag: its `#tag` written in the text (where it is
+        /// marked; whether a document has it, the caller asks its tags).
         textmatch::Term textTerm() const;
+        bool isTag() const { return type == Type::Tag; }
     };
 
     FuzzyQuery() = default;

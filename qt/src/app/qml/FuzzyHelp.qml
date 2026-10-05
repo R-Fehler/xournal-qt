@@ -46,6 +46,9 @@ AdaptiveDialog {
           example: qsTr("<tt>sheet$</tt>: \"Exercise sheet\"") },
         { typed: "^a$", finds: qsTr("the name is it; in the text, the whole word"),
           example: qsTr("<tt>^lecture\\ 3$</tt>") },
+        { typed: "tag:a", finds: qsTr("documents with the tag #a (typed in them, or a keyword of the PDF), also the "
+                                      + "tags inside it; <tt>tag:a/</tt> only those inside it. Also in the plain search"),
+          example: qsTr("<tt>tag:course</tt> finds #course and #course/math; <tt>kalman !tag:draft</tt>") },
         { typed: "\\  \\(  \\)", finds: qsTr("a space, a parenthesis within a term"),
           example: qsTr("<tt>kalman\\ filter</tt>: the phrase") }
     ]

@@ -3187,3 +3187,42 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
 - [ ] Phone (Fold 7 folded): the bar's two rows fit, the field gives way, the buttons are big enough for a finger; the
       soft keyboard stays up while replacing one by one.
 - [ ] After closing the bar (Esc), the search is the usual one again (the Fuzzy toggle is back).
+
+## Tags: what is read (qt/tags, qt/docs/tags.md)
+- [ ] A library with a `.xopp` whose typed text says `#exam`, a Markdown box with `#course/math`, a sticky note with
+      `#idea`, a `.md` with an Obsidian front matter (`tags: [project]`) and a PDF from Zotero or arXiv with keywords:
+      after indexing, every one of them has its tags (the Tags tab, the cards); `C#`, `page#3`, `#1984`, `# Heading`
+      and `#tags` in code blocks are none.
+- [ ] A library indexed by an older build: the documents are read once more (the indexing line counts them), plain
+      PDFs only for their keywords (quickly); the next start reads nothing.
+
+## Tags: the search (qt/tags)
+- [ ] The library's search, Fuzzy on: `tag:course` lists the documents with `#course` and `#course/…` (also a PDF
+      whose keywords say so), `tag:course/` only the nested ones, `kalman !tag:draft` leaves the drafts out; the
+      pages button of a hit marks `#course` where it is written. Fuzzy off: `tag:exam lecture` lists the documents
+      with the tag whose text has "lecture"; `tag:exam` alone all of them.
+- [ ] The help of the Fuzzy button (long press) has the `tag:` row.
+
+## Tags: the Tags tab and the cards (qt/tags)
+- [ ] The library's switch has Tags (the tag icon) between Favourites and Bookmarks at 1920 and 1366; on the Fold 7
+      folded (a phone) it is not in the switch but in the library's ▾ menu ("Tags").
+- [ ] The Tags tab lists `#course` with "2 documents" and an arrow: a tap on the arrow unfolds `#math` under it;
+      "Unfold all" / "Fold all"; the text field filters (a nested tag shows with its parent). Show → without PDFs: the
+      counts of PDF keywords go; the Favourites star: only starred documents count; "Only in <folder>" counts the
+      library's current folder.
+- [ ] A tap on a tag: the library lists the documents with it (also from subfolders, no folders), a blue chip "#tag ✕"
+      beside the breadcrumbs; going into a folder narrows the list; Show and the star still filter; a tap on the chip
+      shows the folder as before.
+- [ ] Cards show their tags on the preview, above "last read": 1 on a narrow card, up to 3 on a wide one, then "+N";
+      the mouse over them lists all in a tip.
+
+## Tags: "Tags…" writes a PDF's keywords (qt/tags)
+- [ ] A card's menu of a plain PDF → Tags…: "None yet", the library's tags as suggestions; type `exam`, Enter, tap a
+      suggestion, Save: the card shows both after a moment, the Tags tab counts them; Zotero (or `pdfinfo`) shows the
+      keywords; the PDF opens as before in other apps.
+- [ ] The same for a PDF with notes and an archive PDF (veraPDF still says PDF/A-3b); open, draw, save (incremental),
+      then "Save as" over it / let it compact: the keywords stay.
+- [ ] A PDF open in a tab without changes: ⋮ → Document → Tags…, Save: the tab stays where it was (read again). With
+      unsaved ink: a message says to save first, nothing is written.
+- [ ] A `.xopp`'s Tags… lists the typed `#tags` and explains that only those exist (Close only); a `.md`'s mentions
+      the front matter.
