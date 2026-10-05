@@ -12,6 +12,7 @@
 #include "model/XojPage.h"
 #include "undo/InsertUndoAction.h"
 #include "undo/UndoRedoHandler.h"
+#include "session/ElementTimes.h"
 
 #include "CanvasView.h"
 #include "MdBox.h"
@@ -87,6 +88,7 @@ bool CanvasView::addTodoStamp(size_t pNr, QPointF onPage) {
     const double x = std::clamp(onPage.x() - dx, 0.0, std::max(0.0, page->getWidth() - 2 * size));
     const double y = std::clamp(onPage.y() - dy, 0.0, std::max(0.0, page->getHeight() - 2 * size));
     text->setTransformation(xoj::util::Matrix::TRANSLATION(x, y));
+    timeline::stampNew(*text);
     const Text* raw = text.get();
     {
         std::unique_lock lock(*doc);

@@ -22,6 +22,7 @@
 #include "model/XojPage.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
+#include "session/ElementTimes.h"
 #include "session/PdfPageKeeper.h"
 #include "session/StickerFile.h"
 #include "session/TemplateFile.h"
@@ -215,6 +216,7 @@ std::vector<PageRef> AppController::templatePagesFor(PageClipboard& copy, bool w
                 p->setBackgroundType(type);
                 p->setBackgroundColor(color);
             }
+            timeline::stampPage(*p);  // (a template's content is new on the new page: qt/docs/timeline.md)
             pages.push_back(std::move(p));
         }
     }

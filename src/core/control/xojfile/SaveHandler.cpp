@@ -184,10 +184,13 @@ static inline bool isMatrixPositiveScaling(const RectangularElement& e) {
     return nearEnough(m.yx, 0.) && nearEnough(m.xy, 0.) && m.xx > 0.;
 }
 
-// xournal-qt: the group of an element (qt/groups), only when it is in one
+// xournal-qt: the group of an element (qt/groups), only when it is in one; when it was made (qt/timeline), when known
 static void writeGroup(XmlNode* node, const Element* e) {
     if (e->getGroup() != 0) {
         node->setAttrib(xoj::xml_attrs::GROUP_STR, static_cast<size_t>(e->getGroup()));
+    }
+    if (e->getCreated() > 0) {
+        node->setAttrib(xoj::xml_attrs::CREATED_STR, std::to_string(e->getCreated()));
     }
 }
 

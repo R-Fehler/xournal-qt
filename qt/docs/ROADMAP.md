@@ -945,6 +945,16 @@
   both kept in the library's cache. `xournal-qt-cli hwr-lines` writes a document's lines as a training/evaluation
   dataset (FORMATS.md §1), with "Handwriting sample" pages to write in `qt/research/hwr/sample/`.
 
+- **The document timeline, `qt/timeline` (2026-10-05).** A play bar at the bottom replays how the document was written,
+  with its recordings, read-only (⋮ → View → Replay the writing; the playback pill). Every new element gets its
+  creation time, the element attribute `xqt-created` (ms since 1970 UTC; a seam like `xqt-group`; about 5 bytes per
+  stroke in the compressed `.xopp`); pasted elements and stickers are new, eraser pieces and moved elements keep it.
+  The timeline orders elements by it on one clock with the recordings (placed by their ink, else by their name, so
+  Xournal++ files with audio too), shortens pauses, marks sessions, puts elements without a time first. The pages are
+  drawn with a filter of what is shown (their pictures kept and drawn again only now and then); what came since and
+  the stroke being written (grown along its length) are drawn over them as the pen's stroke is. Audio plays where it
+  overlaps at 1×; a tap on ink goes to its moment; leaving changes nothing ([timeline.md](timeline.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

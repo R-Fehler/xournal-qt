@@ -69,11 +69,14 @@
 #include "Snip.h"
 #include "StickyNotes.h"
 #include "TextEditor.h"
+#include "TimelineReplay.h"
 #include "TextFlow.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentLink.h"
 #include "session/DocumentSession.h"
+#include "session/ElementTimes.h"
+#include "session/Timeline.h"
 #include "session/StickyNote.h"
 #include "audio/DocumentAudio.h"
 
@@ -622,6 +625,7 @@ bool CanvasView::pasteText(const QString& content, std::optional<QPointF> viewPo
     text->setFont(session.getSettings()->getFont());
     text->setColor(session.getToolHandler()->getColor());
     text->move(std::max(0.0, onPage.x()), std::max(0.0, onPage.y()));
+    timeline::stampNew(*text);
     const Text* raw = text.get();
     doc->lock();
     layer->addElement(std::move(text));
@@ -722,6 +726,7 @@ bool CanvasView::addLinkMarker(const QString& markerText, size_t pNr, QPointF on
     const double x = std::clamp(onPage.x(), 0.0, std::max(0.0, pageWidth - width - 2));
     const double y = std::clamp(onPage.y(), 0.0, std::max(0.0, pageHeight - 20));
     text->setTransformation(xoj::util::Matrix::TRANSLATION(x, y));
+    timeline::stampNew(*text);
     const Text* raw = text.get();
     {
         std::unique_lock lock(*doc);
@@ -884,6 +889,7 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
             std::shared_lock lock(*doc);
             groups::renumber(pasted, *doc);
         }
+        timeline::stampNew(pasted);  // (pasted elements are new: qt/docs/timeline.md)
         session.getUndoRedoHandler()->addUndoAction(std::move(undo));
 
         // Paste target: where the user asked for it, else the middle of the visible part of the page (upstream
@@ -961,6 +967,7 @@ bool CanvasView::insertImage(const QByteArray& data, std::optional<QPointF> view
     const double scale = std::min({natural, area.width() * 0.8 / w, area.height() * 0.8 / h});
     const QPointF origin = area.center() - QPointF(w * scale / 2, h * scale / 2);
     img->setTransformation({scale, 0, 0, scale, {std::max(0.0, origin.x()), std::max(0.0, origin.y())}});
+    timeline::stampNew(*img);
 
     PageRef page = pages[pNr]->getPage();
     Layer* layer = note ? note->note : page->getSelectedLayer();
@@ -1300,8 +1307,15 @@ bool CanvasView::toggleMarkdownCheckBox(CanvasPage& page, double x, double y) {
 }
 
 bool CanvasView::tapAt(QPointF viewPos) {
+    // Replaying: a tap on what is shown goes to the moment it was written (nothing else is changed)
+    if (replayState) {
+        if (const auto at = replayTimeAt(viewPos)) {
+            Q_EMIT replayTapped(*at);
+            return true;
+        }
+    }
     // The check-box stamp is armed: it goes where the tap is (TodoStamp.h)
-    if (CanvasPage* page = todostamp::isArmed() && !readingOnly && !session.isReadOnly() ? pageAt(viewPos) : nullptr) {
+    if (CanvasPage* page = todostamp::isArmed() && !isReadingOnly() && !session.isReadOnly() ? pageAt(viewPos) : nullptr) {
         if (const auto idx = indexOf(page)) {
             const QRectF r = pageViewRect(*idx);
             const double zoom = viewController.zoom();
@@ -1322,7 +1336,7 @@ bool CanvasView::tapAt(QPointF viewPos) {
         }
     }
     // A task's check box in a Markdown text: switched (not in a document shown for reading only)
-    if (CanvasPage* page = readingOnly ? nullptr : pageAt(viewPos)) {
+    if (CanvasPage* page = isReadingOnly() ? nullptr : pageAt(viewPos)) {
         if (const auto idx = indexOf(page)) {
             const QRectF r = pageViewRect(*idx);
             const double zoom = viewController.zoom();
@@ -1819,7 +1833,7 @@ bool CanvasView::finishPdfSelection(CanvasPage& page, XojPdfPageSelectionStyle s
     if (QClipboard* cb = QGuiApplication::clipboard(); cb->supportsSelection()) {
         cb->setText(QString::fromStdString(pdfSelection->getSelectedText()), QClipboard::Selection);
     }
-    if (mark && pdfTextMode != PdfTextMode::Select && !readingOnly) {
+    if (mark && pdfTextMode != PdfTextMode::Select && !isReadingOnly()) {
         markPdfText(pdfTextMode);  // the tool marks right away: no extra tap
         return true;
     }
@@ -1836,7 +1850,7 @@ bool CanvasView::finishPdfSelection(CanvasPage& page, XojPdfPageSelectionStyle s
 
 bool CanvasView::markPdfText(PdfTextMode mode) {
     // Port of PdfFloatingToolbox::createStrokes: marker strokes over the selected text lines.
-    if (!hasPdfTextSelection() || mode == PdfTextMode::Select || readingOnly) {
+    if (!hasPdfTextSelection() || mode == PdfTextMode::Select || isReadingOnly()) {
         return false;
     }
     const auto textRects = pdfSelection->getSelectedTextRects();
@@ -1867,6 +1881,7 @@ bool CanvasView::markPdfText(PdfTextMode mode) {
         stroke->addPoint(Point(rect.x1, h, -1));
         stroke->addPoint(Point(rect.x2, h, -1));
         stroke->setStrokeCapStyle(StrokeCapStyle::BUTT);
+        timeline::stampNew(*stroke);
         dirty.addPoint(rect.x1, h - 0.5 * w);
         dirty.addPoint(rect.x2, h + 0.5 * w);
         strokes.push_back(std::move(stroke));
@@ -1910,6 +1925,7 @@ bool CanvasView::drawGeometryMarks(double spacingCm) {
         stroke->setWidth(width);
         stroke->addPoint(Point(from.x(), from.y(), -1));
         stroke->addPoint(Point(to.x(), to.y(), -1));
+        timeline::stampNew(*stroke);
         dirty.addPoint(from.x() - width, from.y() - width);
         dirty.addPoint(from.x() + width, from.y() + width);
         dirty.addPoint(to.x() - width, to.y() - width);
@@ -2178,7 +2194,7 @@ bool CanvasView::writeNoteText() {
     CanvasPage* page = stickyNotes->selectedPage();
     const auto look = stickyNotes->selectedLook();
     const auto idx = page ? indexOf(page) : std::nullopt;
-    if (!note || !look || look->cover || !idx || session.isReadOnly() || readingOnly) {
+    if (!note || !look || look->cover || !idx || session.isReadOnly() || isReadingOnly()) {
         return false;
     }
     stickyNotes->clearSelection();
@@ -2223,7 +2239,7 @@ bool CanvasView::markdownBoxAt(CanvasPage& page, double x, double y) const {
     return box && box == md::boxAt(*layer, x, y);
 }
 
-bool CanvasView::textMode() const { return session.isEditableText() && !readingOnly; }
+bool CanvasView::textMode() const { return session.isEditableText() && !isReadingOnly(); }
 
 void CanvasView::textPress(CanvasPage& page, double x, double y) {
     if (markdownEditor && (markdownEditor->toggleCheckBox(page, x, y) || markdownEditor->tapAnywhere(page, x, y))) {
@@ -2240,7 +2256,7 @@ void CanvasView::textPress(CanvasPage& page, double x, double y) {
 }
 
 bool CanvasView::typesIntoFlow() const {
-    if (session.textFile() || session.isReadOnly() || readingOnly) {
+    if (session.textFile() || session.isReadOnly() || isReadingOnly()) {
         return false;
     }
     Document& doc = *session.getDocument();
@@ -2548,6 +2564,82 @@ void CanvasView::setReadingOnly(bool on) {
     if (on) {
         endTextEditing();  // (a text being typed when the document became the reference: kept, as when it is left)
     }
+}
+
+// --- the replay of the timeline -------------------------------------------------------------------------------------
+
+void CanvasView::rerenderDrawnPages() {
+    for (auto& p: pages) {
+        if (p->bufferInfo().valid) {
+            p->rerenderPage();  // (pages without a picture are drawn so when they come into view)
+        }
+        p->repaintPage();
+    }
+    Q_EMIT updateRequested();
+}
+
+void CanvasView::startReplay(std::shared_ptr<const timeline::Timeline> timeline, int64_t at) {
+    endTextEditing();
+    clearSelection();
+    auto replay = std::make_shared<TimelineReplay>(*this, std::move(timeline), at);
+    {
+        std::lock_guard lock(replayMutex);
+        replayState = std::move(replay);
+    }
+    replaying = true;
+    rerenderDrawnPages();
+}
+
+void CanvasView::seekReplay(int64_t t) {
+    if (replayState) {
+        replayState->seek(t);
+    }
+}
+
+void CanvasView::settleReplay() {
+    if (replayState) {
+        replayState->settle();
+    }
+}
+
+void CanvasView::endReplay() {
+    if (!replayState) {
+        return;
+    }
+    {
+        std::lock_guard lock(replayMutex);
+        replayState.reset();  // (a render still drawing with its filter keeps it until it is done)
+    }
+    replaying = false;
+    rerenderDrawnPages();
+}
+
+std::shared_ptr<const render::ElementFilter> CanvasView::rasterFilter() const {
+    std::shared_ptr<TimelineReplay> replay;
+    {
+        std::lock_guard lock(replayMutex);
+        replay = replayState;
+    }
+    return replay ? replay->rasterFilter() : nullptr;
+}
+
+std::optional<int64_t> CanvasView::replayTimeAt(QPointF viewPos) const {
+    if (!replayState) {
+        return std::nullopt;
+    }
+    const auto index = layout.pageAt(viewController.viewToContent(viewPos), viewController.zoom());
+    if (!index) {
+        return std::nullopt;
+    }
+    const QRectF r = pageViewRect(*index);
+    const double zoom = viewController.zoom();
+    // (a finger's or a pen's width around the point, as upstream's play tool: 15 points, at least 12 pixels)
+    const double radius = std::max(15.0, 12.0 / zoom);
+    const auto hit = replayState->shownAt(*index, (viewPos.x() - r.x()) / zoom, (viewPos.y() - r.y()) / zoom, radius);
+    if (!hit) {
+        return std::nullopt;
+    }
+    return replayState->timeline().events()[*hit].at;
 }
 
 bool CanvasView::rotationAllowed() const {
@@ -3174,7 +3266,7 @@ bool CanvasView::offersSelectMore() const {
     const ToolType tt = session.getToolHandler()->getToolType();
     const bool areaTool = tt == TOOL_SELECT_RECT || tt == TOOL_SELECT_REGION || tt == TOOL_SELECT_MULTILAYER_RECT ||
                           tt == TOOL_SELECT_MULTILAYER_REGION;
-    return areaTool && !readingOnly && !session.isReadOnly() && !textMode();
+    return areaTool && !isReadingOnly() && !session.isReadOnly() && !textMode();
 }
 
 bool CanvasView::canSelectMore() const {
@@ -3339,7 +3431,7 @@ void CanvasView::endSelectionDrag() {
     // page (qt/docs/sticky-notes.md, "Selecting in a note"). Never the page's Markdown texts.
     const bool ofMarkdown = markdownSelection && markdownSelection->selection == sel && !markdownSelection->inNotes;
     auto* page = static_cast<CanvasPage*>(sel->getView());
-    if (type != CURSOR_SELECTION_MOVE || !sel->isMoving() || ofMarkdown || !page || readingOnly ||
+    if (type != CURSOR_SELECTION_MOVE || !sel->isMoving() || ofMarkdown || !page || isReadingOnly() ||
         session.isReadOnly()) {
         sel->mouseUp();
         return;

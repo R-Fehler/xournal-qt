@@ -68,6 +68,10 @@ class QKeyEvent;
 namespace xqt {
 
 class CanvasPage;
+class TimelineReplay;
+namespace timeline {
+class Timeline;
+}
 struct LinkSpot;
 class DocumentSession;
 class TextEditor;
@@ -163,7 +167,23 @@ public:
     bool rotateCanvasBy(double degrees);
     /// Upright again (the double tap, the fits, the chip): about a point of the screen, or the middle
     void resetRotation(std::optional<QPointF> screenAnchor = std::nullopt);
-    bool isReadingOnly() const { return readingOnly; }
+    bool isReadingOnly() const { return readingOnly || replaying; }
+
+    // --- the replay of the timeline (qt/docs/timeline.md, "Replay") --------------------------------------------
+    /// Shows the document as of bar time `at` of `timeline` (built from this view's document), read-only, until
+    /// endReplay. The selection and text editing end first.
+    void startReplay(std::shared_ptr<const timeline::Timeline> timeline, int64_t at);
+    /// Shows the document as of bar time `t`
+    void seekReplay(int64_t t);
+    /// The pages' pictures catch up with the replay (it paused)
+    void settleReplay();
+    /// The whole document again, as it is
+    void endReplay();
+    /// The replay shown (nullptr: none)
+    const TimelineReplay* replay() const { return replayState.get(); }
+    /// The element shown at a point of the view while replaying: the bar time it began (nullopt: none there)
+    std::optional<int64_t> replayTimeAt(QPointF viewPos) const;
+    std::shared_ptr<const render::ElementFilter> rasterFilter() const override;
 
     // --- memory (CanvasMemory) --------------------------------------------------------------------------------
     /// Shown in a window (DocumentCanvasItem): scrolling in it makes it the current view of CanvasMemory.
@@ -570,6 +590,8 @@ Q_SIGNALS:
     void updateRequested();
     /// The play tool found ink tied to the recording `name` at the moment `ts` (ms; playAt)
     void playRequested(const QString& name, qint64 ts);
+    /// While replaying, an element was tapped: the bar time it began (ms)
+    void replayTapped(qint64 at);
     /// The set or geometry of pages changed.
     void pagesChanged();
     /// A selection was made or cleared.
@@ -668,6 +690,11 @@ private:
     std::vector<std::unique_ptr<CanvasPage>> pages;
     bool shown = false;
     bool readingOnly = false;
+    bool replaying = false;
+    std::shared_ptr<TimelineReplay> replayState;  ///< (render threads ask it for the filter, under replayMutex)
+    mutable std::mutex replayMutex;
+    /// Every page with a picture is drawn again (the replay came or went)
+    void rerenderDrawnPages();
     bool rotatable = true;
     bool snapVertically = false;
     std::pair<size_t, size_t> window{1, 0};

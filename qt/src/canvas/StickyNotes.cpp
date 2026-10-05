@@ -26,6 +26,7 @@
 #include "CanvasView.h"
 #include "TextEditor.h"
 #include "session/DocumentSession.h"
+#include "session/ElementTimes.h"
 
 using xoj::util::Rectangle;
 
@@ -239,6 +240,14 @@ bool StickyNotes::insert(std::optional<Color> color) {
 
 void StickyNotes::place(CanvasPage& page, Layer* layer, const char* what) {
     DocumentSession& session = view.getSession();
+    {
+        // A new note, or a pasted one: new (qt/docs/timeline.md)
+        std::vector<Element*> elements;
+        for (auto& e: layer->getElements()) {
+            elements.push_back(e.get());
+        }
+        timeline::stampNew(elements);
+    }
     PageRef ref = page.getPage();
     LayerController* layers = session.getLayerController();
     Layer::Index position = 0;

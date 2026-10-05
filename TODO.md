@@ -657,16 +657,19 @@ Formats shared by training and app: [qt/research/hwr/train/FORMATS.md](qt/resear
 ### A document timeline (the author, 2026-10-05: B9 levels 1 and 2 as one design; `qt/timeline`)
 "A play bar at the bottom, like an audio player, that replays the audio and replays the document editing history in
 read-only mode." Decided: levels 1 and 2 of [ideas B9](qt/docs/ideas-2026-10.md) together, on one clock.
-- [ ] Every new element (stroke, text, image, TeX image, link) gets its creation time, an absolute time saved as the
+- [x] Every new element (stroke, text, image, TeX image, link) gets its creation time, an absolute time saved as the
   element attribute `xqt-created` (a seam like `xqt-group`; upstream ignores and drops it). Eraser pieces and moved,
   recoloured or resized elements keep their time; pasted elements and stickers are new (the time they were pasted).
-- [ ] One timeline per document: elements ordered by creation time; recordings placed on it by their start time, so
+  Built 2026-10-05 ([timeline.md](qt/docs/timeline.md)); left: the device checks (Xournal++ 1.2/1.3 opening such files).
+- [x] One timeline per document: elements ordered by creation time; recordings placed on it by their start time, so
   the audio plays where it overlaps (the strokes' upstream `ts`/`fn` place elements of Xournal++ files with a
   recording); long pauses between sessions compressed (a session mark on the bar). Elements without any time (older
   files, files saved by Xournal++) come first, in the order they sit in their layer.
-- [ ] Replay, read-only: a play bar at the bottom (play/pause, scrub, speed, jump to the session marks), the pages
+  Built 2026-10-05; left: the device checks with real recordings (a Xournal++ lecture with its audio).
+- [x] Replay, read-only: a play bar at the bottom (play/pause, scrub, speed, jump to the session marks), the pages
   drawn as of the bar's time, the stroke being written drawn on progressively (evenly along its length: points have
   no times). Tapping a stroke jumps there. Leaving it brings the document back as it was; nothing is changed.
+  Built 2026-10-05; left: smoothness on the Surface and a phone, speech at other speeds than 1× (silent there).
 - Not in this block: erasing, moving and page changes (level 3, with the version history); per-point times.
 
 ### Version history inside PDFs with notes (the author, 2026-10-05; `qt/pdf-history`)

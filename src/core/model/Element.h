@@ -12,7 +12,7 @@
 #pragma once
 
 #include <cstddef>  // for ptrdiff_t
-#include <cstdint>  // for uint32_t (xournal-qt: group)
+#include <cstdint>  // for uint32_t, int64_t (xournal-qt: group, creation time)
 #include <memory>   // for unique_ptr
 #include <vector>   // for vector
 
@@ -73,6 +73,11 @@ public:
     uint32_t getGroup() const { return group; }
     void setGroup(uint32_t g) { group = g; }
 
+    /// xournal-qt: when the element was made (qt/timeline): milliseconds since 1970-01-01 UTC, 0: not known. Copied
+    /// with the element, saved as the attribute `xqt-created`; not in serialize() (a pasted element is a new one).
+    int64_t getCreated() const { return created; }
+    void setCreated(int64_t ms) { created = ms; }
+
     const xoj::util::Rectangle<double>& getSnappedBounds() const;
 
     const xoj::util::Rectangle<double>& getBoundingBox() const;
@@ -113,7 +118,8 @@ private:
     /// The color in RGB format
     Color color{0U};
 
-    uint32_t group = 0;  ///< xournal-qt: see getGroup()
+    uint32_t group = 0;    ///< xournal-qt: see getGroup()
+    int64_t created = 0;   ///< xournal-qt: see getCreated()
 };
 
 namespace xoj {

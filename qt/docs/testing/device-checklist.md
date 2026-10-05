@@ -3368,3 +3368,49 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
 - [ ] Phone (Fold 7 folded), toolbox: "My tools" → Insert has "Record audio"; the pill is visible above the page.
 - [ ] A build without Qt Multimedia: no record button in the classic bar, the toolbox or the sheets; Ctrl+Shift+R does
       nothing; documents with recordings still open and keep them.
+
+## Creation times of elements (qt/timeline, qt/docs/timeline.md)
+
+- [ ] Write a few strokes, a text, insert an image, paste a sticker; save, close and open again; then ⋮ → View →
+      Replay (below, when built): they come in the order they were made. Autosave / recovery after killing the app:
+      the same.
+- [ ] The `.xopp` (and the `.xopp` exported from a PDF with notes) opened in Xournal++ 1.2 / 1.3: no message, every
+      element there; saved there and opened here again: the elements are there, the replay has them first (no times).
+- [ ] Copy strokes here and paste them in Xournal++ (both running), and the other way: pasted, nothing missing.
+- [ ] Erase across a stroke with the partial stroke eraser, recolour and move strokes: the replay shows them at the
+      time they were first written (where they ended up).
+- [ ] The size of a long handwritten `.xopp` before and after this build (about 5 bytes more per stroke).
+
+## The timeline: order, sessions, recordings (qt/timeline, qt/docs/timeline.md)
+
+Seen through the replay (⋮ → View → Replay the writing).
+- [ ] A document written over two days: one session mark per day on the bar; pauses of a minute while writing take
+      about a second and a half.
+- [ ] A document recorded in xournal-qt with a pause of the recorder in the middle: the ink written after the pause
+      appears when the words that went with it are heard.
+- [ ] Xournal++'s own fixture with a recording (or a lecture recorded in Xournal++ 1.2 with its audio folder set in
+      Settings): the ink comes with the recording, in time.
+- [ ] An old document (no times): its ink comes first, page by page, within a few seconds.
+
+## Replaying the writing (qt/timeline, qt/docs/timeline.md)
+
+- [ ] ⋮ → View → Replay the writing on a page of handwriting: the play bar at the bottom, the tools and pills gone;
+      Play: the strokes are written again one by one, each growing along its length, at the pace they were written;
+      pauses of more than a few seconds take about one and a half.
+- [ ] Playing is smooth (no stutter, the page does not flash) on the Linux machine, the Surface Pro 8 (200 %) and the
+      Fold 7, also zoomed in far (a page drawn in part) and on a page with a PDF; `XQT_PERF=1` shows few renders while
+      it plays (one every few seconds at most).
+- [ ] Scrub the slider back and forth: the page follows at once forwards, and within a moment backwards; let go: sharp.
+- [ ] The speed button: ½× to 8×; with a recording the sound is heard at 1× only.
+- [ ] A lecture recorded here: Play from the start: the voice and the ink go together (also after a pause of the
+      recorder); the red band under the slider is where the recording is.
+- [ ] Play a recording (the play tool on ink), then the playback pill's replay button: the replay starts at that
+      moment and plays with the sound.
+- [ ] Tap a stroke while replaying: the bar goes to the moment it was written (a little before it with a recording)
+      and it is written again.
+- [ ] While replaying, the pen, the eraser and the fingers only scroll; Ctrl+Z, Ctrl+V, Delete do nothing; the
+      sidebar's thumbnails show the whole document.
+- [ ] ✕ or Esc: the whole document again, exactly as before; the tab is not marked as changed; Ctrl+Z undoes the last
+      thing written before the replay.
+- [ ] A document with sticky notes: a note appears when it was put on the page, its ink after it.
+- [ ] Another tab while replaying: the replay ends; closing the tab while replaying: no crash.

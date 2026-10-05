@@ -230,7 +230,7 @@ bool CanvasView::loadSticker(fs::path file,
 
 bool CanvasView::pasteSticker(const std::string& bytes) {
     const size_t pNr = currentPageNo();
-    if (pNr >= pages.size() || bytes.empty() || session.isReadOnly() || readingOnly) {
+    if (pNr >= pages.size() || bytes.empty() || session.isReadOnly() || isReadingOnly()) {
         return false;
     }
     const auto scope = actingScope(pNr);

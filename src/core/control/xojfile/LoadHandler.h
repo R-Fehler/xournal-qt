@@ -105,6 +105,7 @@ private:
                    const LineStyle& lineStyle, fs::path filename, size_t timestamp) override;
     void setStrokeFillColor(Color color) override;  // xournal-qt
     void setElementGroup(uint32_t group) override;  // xournal-qt
+    void setElementCreated(int64_t ms) override;    // xournal-qt
     void setStrokePoints(std::vector<Point> pointVector, bool hasPressure) override;
     void finalizeStroke() override;
     void addText(std::string font, double size, xoj::util::Matrix matrix, Color color, std::optional<double> wrap,

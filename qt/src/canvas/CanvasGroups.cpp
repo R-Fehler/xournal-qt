@@ -35,7 +35,7 @@ std::vector<Element*> selectedElements(const EditSelection* selection, const Mix
 }  // namespace
 
 groups::State CanvasView::groupState() const {
-    if (readingOnly || session.isReadOnly()) {
+    if (isReadingOnly() || session.isReadOnly()) {
         return {};
     }
     bool oneLayer = true;
@@ -52,7 +52,7 @@ groups::State CanvasView::groupState() const {
 }
 
 bool CanvasView::groupSelection() {
-    if (readingOnly || session.isReadOnly()) {
+    if (isReadingOnly() || session.isReadOnly()) {
         return false;
     }
     std::unique_ptr<UndoAction> undo;
@@ -79,7 +79,7 @@ bool CanvasView::groupSelection() {
 }
 
 bool CanvasView::ungroupSelection() {
-    if (readingOnly || session.isReadOnly()) {
+    if (isReadingOnly() || session.isReadOnly()) {
         return false;
     }
     std::unique_ptr<UndoAction> undo;

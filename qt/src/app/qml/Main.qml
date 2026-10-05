@@ -233,7 +233,7 @@ ApplicationWindow {
                                          : (fullScreenMode || chromeSetting === "compact") ? "compact" : "full"
     readonly property bool fullChrome: chromeMode === "full"
     /// Nothing over the page but the page: presenting without controls, or the reader chrome
-    readonly property bool hudHidden: cleanPage || (chromeMode === "reader" && !app.homeVisible)
+    readonly property bool hudHidden: cleanPage || (chromeMode === "reader" && !app.homeVisible) || (replaying && !app.homeVisible)
     onHudHiddenChanged: if (hudHidden) { quickTools.close(); phoneToolSheet.close() }
     /// Reading (qt/docs/toolbox.md, "Reading and presenting"): the reader chrome of this size class (⋮ → View → Read;
     /// automatic in a tiny window) - the page only, and the page cannot be written on: the pen and the fingers scroll,
@@ -241,6 +241,9 @@ ApplicationWindow {
     /// it scrolls. Esc, the pill's ✕ or the corner field leave it. (Presenting is the other mode over the same "tools
     /// hidden" view: writing on the slides stays possible there.)
     readonly property bool reading: chromeMode === "reader" && !app.homeVisible && !app.presenting
+    /// The document's timeline is replayed (qt/docs/timeline.md): the page as of a moment and the play bar at the
+    /// bottom, read-only; no tools (as reading), the play bar's keys
+    readonly property bool replaying: app.timeline.active
     function chooseChrome(mode) { chooseLayout("chrome", mode === chromeAuto ? "" : mode) }
 
     // --- the phone chrome (qt/docs/adaptive-layout.md, "The phone chrome") -------------------------------------------
@@ -392,11 +395,12 @@ ApplicationWindow {
     /// Docked beside the page, taking its strip: the toolbox in the full chrome of a desktop or a tablet (a text
     /// document has no ink tools: its format bar holds undo and redo)
     readonly property bool toolboxDocked: toolboxMode && fullChrome && !phoneLayout && !app.homeVisible && !textDoc
+                                          && !replaying
     /// Floating over the page, a little off its edge: the compact chrome (full screen, presenting with the tools)
     readonly property bool toolboxFloating: toolboxMode && chromeMode === "compact" && !phoneLayout && !app.homeVisible
                                             && !textDoc && !hudHidden
     /// In the phone's dock (at the bottom, or the rail at the right held sideways): its first tools, "My tools"
-    readonly property bool toolboxInDock: toolboxMode && dockShown && !textDoc
+    readonly property bool toolboxInDock: toolboxMode && dockShown && !textDoc && !replaying
     /// The toolbox is shown (docked, or floating in full screen and on phones)
     readonly property bool toolboxShown: toolboxDocked || toolboxFloating || toolboxInDock
     /// The strip it takes at the top or the bottom (0: none, or at a side)
@@ -1588,6 +1592,8 @@ ApplicationWindow {
                         // The reader chrome of this window size: only the page; the mark in the lower left corner
                         // brings the controls back (qt/docs/adaptive-layout.md)
                         AdaptiveMenuItem { objectName: "readItem"; text: qsTr("Read (only the page, no ink)"); icon.source: app.iconUrl("xqt-book-open"); onTriggered: win.chooseChrome("reader") }
+                        // The document's timeline: how it was written, with its recordings (qt/docs/timeline.md)
+                        AdaptiveMenuItem { objectName: "replayItem"; offered: !win.textDoc; text: qsTr("Replay the writing"); icon.source: app.iconUrl("xqt-history"); onTriggered: app.timeline.start() }
                         MenuSeparator {}
                         // Where the tool bar is, in this size class (the automatic place: "Automatic"); the phone
                         // classes have their dock instead
@@ -2372,7 +2378,7 @@ ApplicationWindow {
         height: referenceSplit.mainHeight
         clip: true  // zoomed-in pages must not paint over the sidebar
         view: app.view
-        readingOnly: win.reading
+        readingOnly: win.reading || win.replaying
         snapVertically: win.reading
 
         // Picture files dropped on Markdown being written (a .md, a text document, Markdown on a page): saved with
@@ -4394,7 +4400,7 @@ ApplicationWindow {
     Pane {
         id: readingPill
         objectName: "readingPill"
-        visible: win.reading && !pageGrid.visible && !contentsOverview.visible
+        visible: win.reading && !pageGrid.visible && !contentsOverview.visible && !win.replaying
         z: 90
         x: Math.round(canvas.x + (canvas.width - width) / 2)
         y: win.canvasControlsBottom - height - 24
@@ -4524,7 +4530,7 @@ ApplicationWindow {
     // Esc leaves reading (a selection first loses its selection)
     Shortcut {
         sequence: "Escape"
-        enabled: win.reading && !app.hasSelection && !app.pdfTextIsSelected && !win.sidebarDrawerOpen
+        enabled: win.reading && !win.replaying && !app.hasSelection && !app.pdfTextIsSelected && !win.sidebarDrawerOpen
                  && !app.curtainHandles && app.snip === "" && !win.fullScreenMode
         onActivated: win.chooseChrome("full")
     }
@@ -4718,6 +4724,25 @@ ApplicationWindow {
         target: app.audio
         function onMessage(text) { snackbar.show(text, false) }
     }
+    // The replay of the timeline (qt/docs/timeline.md): its play bar at the bottom of the page
+    TimelineBar {
+        id: timelineBar
+        anchors.bottom: canvas.bottom
+        anchors.horizontalCenter: canvas.horizontalCenter
+        anchors.bottomMargin: 16 + canvas.y + canvas.height - win.canvasControlsBottom
+        width: Math.min(canvas.width - 32, 960)
+        z: 92
+    }
+    Connections {
+        target: app.timeline
+        function onMessage(text) { snackbar.show(text, false) }
+    }
+    Shortcut { sequence: "Escape"; enabled: win.replaying && !app.homeVisible; onActivated: app.timeline.stop() }
+    Shortcut { sequence: "Space"; enabled: win.replaying && !app.homeVisible; onActivated: app.timeline.toggle() }
+    Shortcut { sequence: "Left"; enabled: win.replaying && !app.homeVisible; onActivated: app.timeline.skip(-5000) }
+    Shortcut { sequence: "Right"; enabled: win.replaying && !app.homeVisible; onActivated: app.timeline.skip(5000) }
+    Shortcut { sequence: "Home"; enabled: win.replaying && !app.homeVisible; onActivated: app.timeline.seek(0) }
+    Shortcut { sequence: "End"; enabled: win.replaying && !app.homeVisible; onActivated: app.timeline.seek(app.timeline.duration) }
     Shortcut {
         sequence: "Ctrl+Shift+R"
         enabled: app.audio.available && !app.homeVisible
@@ -4972,7 +4997,7 @@ ApplicationWindow {
     }
 
     // Document shortcuts do nothing while the home screen is shown.
-    readonly property bool docKeys: !app.homeVisible && !app.textFlowActive && !app.markdownActive
+    readonly property bool docKeys: !app.homeVisible && !app.textFlowActive && !app.markdownActive && !replaying
     // The keys come from the shortcut settings (app.shortcuts); reading its revision keeps the bindings fresh.
     function keysOf(id) { return (app.shortcuts.revision, app.shortcuts.keys(id)) }
     Shortcut { sequences: win.keysOf("undo"); enabled: docKeys; onActivated: app.undo() }

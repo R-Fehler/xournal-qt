@@ -46,8 +46,10 @@
 #include "Snip.h"
 #include "StickyNotes.h"
 #include "TextEditor.h"
+#include "TimelineReplay.h"
 #include "render/RenderService.h"
 #include "session/ElementGroups.h"
+#include "session/ElementTimes.h"
 #include "session/DocumentSession.h"
 #include "session/PenFill.h"
 #include "session/StickyNote.h"
@@ -222,6 +224,7 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
         this->inputHandler->onButtonPressEvent(pos, zoom);
         if (Stroke* stroke = this->inputHandler->getStroke()) {
             penfill::apply(*control.getSettings(), *h, *stroke);  // (its fill color, before its view is made)
+            timeline::stampNew(*stroke);  // (when it was made: qt/docs/timeline.md)
             if (h->getToolType() == TOOL_PEN) {
                 control.stampAudio(*stroke);  // (a recording runs: upstream's InputHandler::createStroke, qt/docs/audio.md)
             }
@@ -901,7 +904,10 @@ auto CanvasPage::bufferInfo() -> BufferInfo {
 QImage CanvasPage::composeTile(const QRect& pixelRect) {
     QImage img(pixelRect.size(), QImage::Format_ARGB32_Premultiplied);
     img.fill(Qt::white);
-    raster->withPlacedBuffer([&](xoj::view::Mask& buffer, const PageRaster::Placement& place) {
+    const TimelineReplay* replay = view.replay();
+    const std::optional<size_t> index = replay ? view.indexOf(this) : std::nullopt;
+    raster->withDrawnBuffer([&](xoj::view::Mask& buffer, const PageRaster::Placement& place,
+                                const render::ElementFilter* drawn) {
         if (!buffer.isInitialized()) {
             return;
         }
@@ -917,6 +923,10 @@ QImage CanvasPage::composeTile(const QRect& pixelRect) {
         cairo_translate(cr, -pixelRect.x() / dpiScale - place.x, -pixelRect.y() / dpiScale - place.y);
         cairo_scale(cr, bufferZoom, bufferZoom);  // page coordinates
         buffer.paintTo(cr);
+        // xournal-qt: the replay of the timeline: what the picture lacks at its moment (TimelineReplay.h)
+        if (replay && index) {
+            replay->drawOverlay(cr, *index, drawn);
+        }
         // Upstream XojPageView::paintPage: the overlays draw in page coordinates on top of the buffer.
         for (const auto& v: this->overlayViews) {
             // xournal-qt: a stroke written on a sticky note is clipped to it while it is drawn

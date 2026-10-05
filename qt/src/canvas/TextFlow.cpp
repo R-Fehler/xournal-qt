@@ -20,6 +20,7 @@
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "session/ElementTimes.h"
 #include "session/PageMargins.h"
 #include "undo/UndoAction.h"
 #include "undo/UndoRedoHandler.h"
@@ -392,6 +393,22 @@ double TextFlowSession::update(const std::vector<TextBlock>& blocks) {
         }
         changed = true;
         last = blocks;
+        // The page's text keeps the time it was begun (laid out anew on every change; qt/docs/timeline.md)
+        int64_t begun = 0;
+        const auto earliest = [&](const Element& e) {
+            if (e.getType() == ELEMENT_TEXT && e.getCreated() > 0 && (begun == 0 || e.getCreated() < begun)) {
+                begun = e.getCreated();
+            }
+        };
+        for (const auto& e: original) {
+            earliest(*e);
+        }
+        for (const Element* e: layer->getElementsView()) {  // (this session's texts so far; the UI thread writes)
+            earliest(*e);
+        }
+        for (auto& e: elements) {
+            timeline::stampNew(*e, begun > 0 ? begun : timeline::now());
+        }
         replaceTexts(std::move(elements));
     }
     return overflow;

@@ -231,8 +231,12 @@ public:
     /// written: saving asks for a .xopp (see suggestSavePath), and once saved the document is that .xopp. Empty: none.
     void setShownFile(const fs::path& file, bool readOnly = false);
     const fs::path& shownFile() const { return shownPath; }
-    /// It shows a Markdown or text file read-only (not saved as a .xopp): the canvas does not write on it.
+    /// It shows a Markdown or text file read-only (not saved as a .xopp): the canvas does not write on it. Also while
+    /// it is replayed (setReplaying).
     bool isReadOnly() const;
+    /// Its timeline is replayed (qt/docs/timeline.md): nothing may change it meanwhile (read-only, no undo)
+    void setReplaying(bool on) { replaying = on; }
+    bool isReplaying() const { return replaying; }
 
     // --- a text file edited (TextFile.h, qt/docs/md-editor.md) -------------------------------------------------
     /// This document is the text of a file (a .md, a .txt, another text file): its pages hold the text as the page's
@@ -486,6 +490,7 @@ private:
     void applyBookmark(const PageRef& page, const std::optional<std::string>& label);
     bool textBookmarksQueued = false;
     std::string recording;               ///< setRecording
+    bool replaying = false;              ///< setReplaying
     std::function<size_t()> recordingClock;
     void setLastAutosaveFile(fs::path file);
     static void updatePreview(Document& doc);

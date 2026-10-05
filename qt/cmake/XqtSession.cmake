@@ -97,6 +97,10 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TemplateFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementGroups.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementGroups.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementTimes.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementTimes.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/Timeline.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/Timeline.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageNoteSpace.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageNoteSpace.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/Citation.h
@@ -186,6 +190,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TodoStamp.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TodoStamp.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasGroups.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TimelineReplay.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TimelineReplay.cpp
 )
 target_include_directories(xqt-canvas PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/canvas")
 target_link_libraries(xqt-canvas PUBLIC Qt6::Gui xqt-session xoj-tools)
@@ -208,6 +214,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/StickerFileTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TemplateFileTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/GroupsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/ElementTimesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TimelineTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/NoteSpaceTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/CitationTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BookmarksTest.cpp
@@ -244,6 +252,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/AudioDocumentTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PenGesturesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/GroupsCanvasTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/ElementTimesCanvasTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TimelineReplayTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PresenterMirrorTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PenStylesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/CanvasRotationTest.cpp)

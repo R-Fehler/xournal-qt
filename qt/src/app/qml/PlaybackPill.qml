@@ -8,7 +8,7 @@ import QtQuick.Layouts
 Pane {
     id: pill
     objectName: "playbackPill"
-    visible: app.audio.playing && !app.homeVisible
+    visible: app.audio.playing && !app.homeVisible && !app.timeline.active  // (the replay has its own bar)
     padding: 2
     leftPadding: 6
     Material.foreground: "#303030"
@@ -82,6 +82,17 @@ Pane {
             text: pill.timeText(app.audio.playPositionMs) + " / " + pill.timeText(app.audio.playDurationMs)
             font.features: { "tnum": 1 }
             font.pixelSize: 12
+        }
+        // The writing with it: the document's timeline from this moment (qt/docs/timeline.md)
+        IconButton {
+            objectName: "playbackReplay"
+            iconName: "xqt-history"
+            implicitWidth: 40
+            implicitHeight: 40
+            icon.width: 18
+            icon.height: 18
+            tip: qsTr("Replay the writing with it")
+            onClicked: app.timeline.startAtRecording(app.audio.playName, app.audio.playPositionMs)
         }
         IconButton {
             objectName: "playbackClose"

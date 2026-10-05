@@ -34,6 +34,7 @@
 #include "MdBox.h"
 #include "StickyNotes.h"
 #include "session/ElementGroups.h"
+#include "session/ElementTimes.h"
 #include "session/DocumentSession.h"
 
 using xoj::util::Rectangle;
@@ -614,6 +615,19 @@ bool MixedSelection::pasteGroup(size_t pNr, sticky::Group content, std::optional
     sticky::Group* group = &content;
     if (group->notes.empty() && group->elements.empty()) {
         return false;
+    }
+    {
+        // Pasted elements and stickers are new (qt/docs/timeline.md)
+        std::vector<Element*> pasted;
+        for (auto& e: group->elements) {
+            pasted.push_back(e.get());
+        }
+        for (auto& note: group->notes) {
+            for (auto& e: note->getElements()) {
+                pasted.push_back(e.get());
+            }
+        }
+        timeline::stampNew(pasted);
     }
     view.endTextEditing();
     view.clearSelection();

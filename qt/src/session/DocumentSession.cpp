@@ -1034,7 +1034,7 @@ fs::path DocumentSession::documentFile() const {
 }
 
 bool DocumentSession::isReadOnly() const {
-    return !shownPath.empty() && shownReadOnly && !hasFilePath();
+    return replaying || (!shownPath.empty() && shownReadOnly && !hasFilePath());
 }
 
 void DocumentSession::setShownFile(const fs::path& file, bool readOnly) {
