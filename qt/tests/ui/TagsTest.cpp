@@ -311,6 +311,15 @@ TEST_F(TagsUiTest, theTagsDialogWritesAPdfsKeywords) {
         }
     }
     ASSERT_NE(exam, nullptr);
+    // (the chip just added lays the suggestions out anew: click where "exam" stays, not where it was a moment ago)
+    QPointF last(-1, -1);
+    int still = 0;
+    until([&] {
+        const QPointF at = exam->mapToScene(QPointF(exam->width() / 2, exam->height() / 2));
+        still = at == last ? still + 1 : 0;
+        last = at;
+        return still >= 5;  // (unmoved for 100 ms)
+    });
     click(exam);
     EXPECT_EQ(findAll("tagsDialogChip").size(), 2u);
     QMetaObject::invokeMethod(dialog, "accept");
