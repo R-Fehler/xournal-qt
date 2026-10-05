@@ -7230,7 +7230,8 @@ TEST_F(MainWindowTest, sharingThePdfWithNotes) {
     // A .xopp: asked; a PDF copy leaves the document as it is
     ASSERT_TRUE(controller->saveAs(QUrl::fromLocalFile(dir.filePath("lecture.xopp"))));
     EXPECT_EQ(controller->shareStep(), "ask");
-    QMetaObject::invokeMethod(window, "sharePdfOf", Q_ARG(QVariant, QVariant(QString())), Q_ARG(QVariant, QVariant(false)));
+    QMetaObject::invokeMethod(window, "sharePdfOf", Q_ARG(QVariant, QVariant(QString())), Q_ARG(QVariant, QVariant(false)),
+                              Q_ARG(QVariant, QVariant(false)));
     QObject* ask = find("shareXoppDialog");
     ASSERT_NE(ask, nullptr);
     ASSERT_TRUE(waitOpened(ask, true));
