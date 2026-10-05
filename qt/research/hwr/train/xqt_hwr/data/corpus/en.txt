@@ -1,0 +1,40 @@
+The Kalman gain weighs the measurement against the prediction.
+Today in the lecture: state space models and observers.
+Please hand in the exercise sheets by Friday.
+The gradient points in the direction of steepest ascent.
+For large matrices the decomposition is too expensive.
+She said: "This is a good example."
+We meet at two o'clock in front of the library.
+The transfer function has two poles in the left half plane.
+Still to do: look up the literature on control theory.
+Differentiate with respect to time, then take the limit.
+Shopping: apples, bread rolls, cheese and milk.
+The integral of the density is exactly one.
+Exam in March, registration through the portal.
+Let f be a continuous function on the interval.
+The expectation is linear, the variance is not.
+Dentist tomorrow morning, then back to the office.
+The solution is unique if the determinant is not zero.
+Summary of the chapter on probability theory.
+Questions please by e-mail to the department office.
+The estimate improves with every measurement.
+Proof by induction on the length of the sequence.
+The noise is white and normally distributed.
+Three sources are still missing for the essay.
+We have to check the limits of the model more carefully.
+The eigenvalues determine the behaviour of the system.
+The road was wet, so he drove slowly.
+Convergence follows from the Banach fixed point theorem.
+The measured values are outside the tolerance range.
+A die is thrown twice; what is the probability of a six?
+Notes on the meeting with my supervisor about the thesis.
+The quick brown fox jumps over the lazy dog.
+The results will be discussed in the next session.
+The covariance matrix must be symmetric and positive definite.
+Call the plumber about the kitchen sink before the weekend.
+Remember to back up the notebook before the update.
+The algorithm runs in linear time for sparse graphs.
+Pick up the parcel at the post office on Monday.
+An orthogonal basis makes the projection easy to compute.
+Meeting moved to Thursday afternoon, room 204.
+Write down every assumption before you start the derivation.

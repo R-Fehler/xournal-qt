@@ -1,0 +1,42 @@
+# What `prepare.py all` fetches and converts (into data_root, default $XQT_HWR_DATA or ~/hwr-data).
+# Optional sources may fail (no copy, no network, a changed address) without stopping the rest.
+# Disk: about 2 GB for fhswf, 1 GB per 100k synthetic lines, 0.5 GB for IAM, 1 GB for CVL (estimated).
+data_root: ~/hwr-data
+fonts: true                       # fetch configs/fonts.yaml from Google Fonts first
+
+datasets:
+  # German scans: 15 writers, AFL-3.0
+  - source: fhswf
+    name: fhswf-german
+    pseudo_writers: 15            # used only if the parquet files carry no writer ids (see the README)
+
+  # Synthetic lines, one font per "writer"
+  - source: synthetic
+    name: synthetic-de
+    lang: de
+    lines: 200000
+    corpora:
+      - {source: tatoeba}                    # CC BY 2.0 FR
+      - {source: wikipedia, shards: 1, limit: 300000}   # CC BY-SA 4.0 / GFDL: technical vocabulary
+      - {source: builtin}
+  - source: synthetic
+    name: synthetic-en
+    lang: en
+    lines: 150000
+    corpora:
+      - {source: tatoeba}
+      - {source: wikipedia, shards: 1, limit: 300000}
+      - {source: builtin}
+
+  # English scans, non-commercial research terms. The hub copy (Teklia/IAM-line) keeps the Aachen
+  # writer-independent splits; with your own copy use: {source: iam, path: /data/iam, splits_dir: /data/iam/splits}
+  - source: iam
+    name: iam-lines
+    hub: true
+    optional: true
+
+  # German and English scans, 310 writers (research terms)
+  - source: cvl
+    name: cvl-lines
+    download: true
+    optional: true

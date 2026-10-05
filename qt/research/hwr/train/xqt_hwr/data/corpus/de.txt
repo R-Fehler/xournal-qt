@@ -1,0 +1,40 @@
+Die Kalman-Verstärkung gewichtet die Messung gegen die Vorhersage.
+Heute in der Vorlesung: Zustandsraummodelle und Beobachter.
+Bitte bis Freitag die Übungsblätter abgeben.
+Der Gradient zeigt in Richtung des stärksten Anstiegs.
+Für große Matrizen ist die Zerlegung zu teuer.
+Größe, Maß und Fuß schreibt man mit ß.
+Sie sagte: „Das ist ein gutes Beispiel.“
+Wir treffen uns um 14 Uhr vor der Bibliothek.
+Die Übertragungsfunktion hat zwei Pole in der linken Halbebene.
+Noch offen: Literatur zur Regelungstechnik heraussuchen.
+Ableitung nach der Zeit, dann Grenzwert bilden.
+Einkaufen: Äpfel, Brötchen, Käse und Milch.
+Das Integral über die Dichte ergibt genau eins.
+Prüfungstermin im März, Anmeldung über das Portal.
+Gegeben sei eine stetige Funktion auf dem Intervall.
+Der Erwartungswert ist linear, die Varianz nicht.
+Morgen früh zum Zahnarzt, danach ins Büro.
+Die Lösung ist eindeutig, falls die Determinante ungleich null ist.
+Zusammenfassung des Kapitels über Wahrscheinlichkeitsrechnung.
+Übermorgen kommt die Großmutter zu Besuch.
+Rückfragen bitte per E-Mail an das Sekretariat.
+Die Schätzung wird mit jeder Messung genauer.
+Kühlschrank reparieren lassen und Rechnung aufheben.
+Beweis durch vollständige Induktion über die Länge.
+Das Rauschen ist weiß und normalverteilt.
+Für die Hausarbeit fehlen noch drei Quellen.
+Wir müssen die Grenzen des Modells genauer prüfen.
+Am Wochenende fahren wir nach Köln und Düsseldorf.
+Die Eigenwerte bestimmen das Verhalten des Systems.
+Die Straße war nass, deshalb fuhr er langsam.
+Schöne Grüße aus München und bis bald.
+Konvergenz folgt aus dem Satz von Banach.
+Die Messwerte liegen außerhalb des Toleranzbereichs.
+Bei Fragen zur Klausur bitte in die Sprechstunde kommen.
+Ein Würfel wird zweimal geworfen; wie groß ist die Wahrscheinlichkeit?
+Notizen zum Gespräch mit der Betreuerin über die Masterarbeit.
+Das Flugzeug landete pünktlich trotz des Gewitters.
+Zwölf Boxkämpfer jagen Viktor quer über den großen Sylter Deich.
+Die Ergebnisse werden in der nächsten Sitzung besprochen.
+Die Kovarianzmatrix muss symmetrisch und positiv definit sein.

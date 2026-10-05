@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xqt-hwr"
+version = "0.1.0"
+description = "Training, evaluation and export of xournal-qt's handwriting recognition models"
+license = { text = "GPL-2.0-or-later" }
+requires-python = ">=3.10"
+dependencies = [
+  "torch>=2.4",
+  "torchvision>=0.19",
+  "transformers>=4.46",
+  "tokenizers>=0.20",
+  "huggingface_hub>=0.25",
+  "safetensors",
+  "onnx>=1.16",
+  "onnxruntime>=1.18",
+  "pillow>=10.1",
+  "pyyaml",
+  "numpy",
+  "pyarrow>=14",
+  "fonttools>=4.40",
+  "peft>=0.12",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+xqt-hwr-prepare = "xqt_hwr.prepare:main"
+xqt-hwr-train = "xqt_hwr.train:main"
+xqt-hwr-evaluate = "xqt_hwr.evaluate:main"
+xqt-hwr-export = "xqt_hwr.export:main"
+
+[tool.setuptools.packages.find]
+include = ["xqt_hwr*"]
+
+[tool.setuptools.package-data]
+xqt_hwr = ["data/corpus/*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: end-to-end runs (a few minutes on CPU)"]

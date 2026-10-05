@@ -1,0 +1,55 @@
+# Handwriting fonts fetched from Google Fonts for synthetic lines (prepare.py fonts). The licence is read from each
+# font file (OpenType name records 13/14); anything but OFL or Apache-2.0 is skipped. A font is used for a line only if
+# it has every character of the line (several here lack ß or „ “, so German lines use the others).
+# Each family is one "writer": the synthetic data's val and test splits hold out whole fonts.
+families:
+  - Caveat
+  - Kalam
+  - Patrick Hand
+  - Indie Flower
+  - Shadows Into Light
+  - Shadows Into Light Two
+  - Gloria Hallelujah
+  - Architects Daughter
+  - Handlee
+  - Gochi Hand
+  - Nanum Pen Script
+  - Reenie Beanie
+  - Dancing Script
+  - Edu SA Beginner
+  - Edu NSW ACT Foundation
+  - Edu VIC WA NT Beginner
+  - Edu QLD Beginner
+  - Edu TAS Beginner
+  - Playpen Sans
+  - Sue Ellen Francisco
+  - Nothing You Could Do
+  - Zeyada
+  - Cedarville Cursive
+  - Covered By Your Grace
+  - Annie Use Your Telescope
+  - Waiting for the Sunrise
+  - La Belle Aurore
+  - Dawning of a New Day
+  - Loved by the King
+  - Delius
+  - Mali
+  - Itim
+  - Sriracha
+  - Klee One
+  - Comic Neue
+  - Swanky and Moo Moo
+  - Over the Rainbow
+  - Kristi
+  - Mr Dafoe
+  - Homemade Apple
+  - Just Another Hand
+  - Rock Salt
+  - Schoolbell
+  - Coming Soon
+  - Crafty Girls
+  - Permanent Marker
+  - Neucha
+  - Short Stack
+  - Marck Script
+  - Bad Script

@@ -1,0 +1,22 @@
+# The CPU test environment (no GPU, no hub downloads): runs tests/ in a few minutes.
+#   micromamba create -y -p /opt/xqt-train -f environment-cpu.yml
+#   /opt/xqt-train/bin/python -m pytest
+name: xqt-train
+channels: [conda-forge]
+dependencies:
+  - python=3.12
+  - pytorch=*=cpu*
+  - torchvision
+  - transformers
+  - tokenizers
+  - onnx
+  - onnxruntime
+  - onnxscript
+  - pillow
+  - pyyaml
+  - peft
+  - pytest
+  - fonttools
+  - pyarrow
+  - safetensors
+  - numpy
