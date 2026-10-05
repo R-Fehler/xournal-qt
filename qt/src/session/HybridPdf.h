@@ -30,9 +30,12 @@
 
 #include "util/Util.h"  // npos
 
+#include "PdfEncryption.h"
+
 #include "filesystem.h"
 
 class Document;
+class QPDF;
 class XojPage;
 
 namespace xqt::ink {
@@ -84,6 +87,10 @@ struct WriteOptions {
     const std::vector<std::shared_ptr<const ink::PageText>>* inkText = nullptr;
     /// Version history (a PDF with notes, not an archive PDF); nullptr: none.
     const History* history = nullptr;
+    /// How the file is encrypted when it is written in full (default: as its background PDF is). An incremental
+    /// save keeps the file's encryption; another one (protecting it, changing or removing its password) needs
+    /// `compact`. qt/docs/hybrid-pdf.md, "Encrypted PDFs"
+    PdfEncryption::Encryption encryption;
 };
 
 /// An incremental save writes the whole file anew instead when the file would then have grown by more than this
@@ -172,6 +179,10 @@ int markerReads();
 /// may still be in it, so it is written anew before it is shared (remembered likewise).
 bool hasEarlierRevisions(const fs::path& pdf);
 
+/// Remove the version history and what incremental saves record from the marker of an opened PDF with notes (it is
+/// written anew in one piece: protecting it with a password, PdfEncryption::rewrite).
+void forgetHistory(QPDF& q);
+
 /// Write the file anew in one piece, without its earlier revisions and its version history (the same content; qpdf),
 /// atomically. For a file shared as it is. `to`: a copy written there instead (the file keeps its history).
 bool compact(const fs::path& pdf, std::string& error, const fs::path& to = {});
@@ -225,5 +236,16 @@ void retain(const fs::path& base);
 void release(const fs::path& base);
 /// Mark a clean copy as used now (it is kept at least a day from now).
 void touch(const fs::path& base);
+/// Remove the pictures and recordings a protected PDF's clean copy entry took out while it was open.
+void dropExtracted(const fs::path& base);
+/// A folder holds what was taken out of a protected PDF (its pictures and recordings, a Markdown work folder) by this
+/// process: marked so ("unpacked-<pid>"), so that it does not stay when the process ends without closing it.
+void markUnpacked(const fs::path& folder);
+/// At a start: remove what processes that do not run any more (`alive` says) took out of protected PDFs and left
+/// behind (a crash): the clean copies' pictures and recordings, Markdown work folders. Returns how many folders.
+int removeProtectedLeftovers(const std::function<bool(int64_t)>& alive);
+/// Remove the clean copies (and what was taken out with them) of every version of `pdf` that no open document uses:
+/// after it was protected with a password, no unencrypted copy of it stays in the cache. Returns how many.
+int forgetCopies(const fs::path& pdf);
 
 }  // namespace xqt::HybridPdf

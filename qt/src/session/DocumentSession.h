@@ -13,6 +13,7 @@
  */
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <deque>
 #include <map>
@@ -34,6 +35,7 @@
 
 #include "HeadlessViews.h"
 #include "MdImages.h"
+#include "PdfEncryption.h"
 #include "SessionActions.h"
 #include "filesystem.h"
 
@@ -70,10 +72,24 @@ public:
         /// A hybrid PDF: the root of the pictures its Markdown carries (qt/docs/md-images.md), registered while this
         /// lives (a session registers its own).
         std::shared_ptr<md::images::RootHandle> pictures;
+        // --- encrypted PDFs (PdfEncryption.h; qt/docs/hybrid-pdf.md, "Encrypted PDFs")
+        /// Not opened: the PDF (`passwordFile`: the file itself, or the background PDF of a .xopp) needs a password
+        /// and none was given, or `wrongPassword`.
+        bool needsPassword = false;
+        bool wrongPassword = false;
+        fs::path passwordFile;
+        /// Opened with a password: the document is protected (its caches stay off the disk). The password is known
+        /// in this process while this hold (then the session's) lives.
+        bool encrypted = false;
+        std::shared_ptr<void> passwordHold;
+        /// What the PDF allows when opened without its owner password
+        bool allowPrint = true;
+        bool allowCopy = true;
     };
     /// Load a .xopp, .xoj or .pdf file (a PDF gets one page per PDF page; a hybrid PDF is its embedded document). Does not touch any session, so it may
-    /// run on a worker thread before the tab is created.
-    static LoadResult loadFile(const fs::path& path, bool attachPdf = false);
+    /// run on a worker thread before the tab is created. `password`: for an encrypted PDF (or the encrypted background
+    /// PDF of a .xopp); without it such a file is not opened (needsPassword): the library and previews never pass one.
+    static LoadResult loadFile(const fs::path& path, bool attachPdf = false, const std::string& password = {});
 
     /// A new document with one page from the page template settings.
     explicit DocumentSession(AppContext& app, QObject* parent = nullptr);
@@ -132,6 +148,9 @@ public:
         /// Save of a hybrid PDF that keeps its versions (keepsVersions()): a milestone with this message ("Save with
         /// a message…"); empty: the day's version.
         std::string message;
+        /// A PDF with notes: how it is encrypted (protecting it, changing or removing its password: needs `compact`).
+        /// None given: a protected document's files stay encrypted with its password (encryptionForSave()).
+        std::optional<PdfEncryption::Encryption> encryption;
     };
     /// Save without blocking the window. What the writers need is taken from the document at once on this thread (a
     /// copy of its pages, under its read lock); the heavy file work (the gzip XML, qpdf) runs on a worker, and the
@@ -309,6 +328,27 @@ public:
     static fs::path emergencyPath(qint64 pid, quint64 serial);
     static fs::path unnamedAutosavePath(qint64 pid, quint64 serial);
     static fs::path namedAutosavePath(fs::path document);
+    /// Where autosave() writes a protected document (isProtected(): its file is an encrypted PDF): an encrypted PDF
+    /// with notes "<cache>/autosaves/<pid>-<serial>.autosave.pdf", with the same password.
+    static fs::path protectedAutosavePath(qint64 pid, quint64 serial);
+    /// Remove the original of `pdf` kept in the app cache (PDF files mode): after it was protected with a password,
+    /// no unencrypted copy of it stays there.
+    static void forgetOriginal(const fs::path& pdf);
+
+    // --- encrypted PDFs (PdfEncryption.h; qt/docs/hybrid-pdf.md, "Encrypted PDFs") ----------------------------------
+    /// Its file, or the PDF it annotates, opens only with a password (known in this process while it is open):
+    /// nothing of it is kept on disk unencrypted (previews, the library's index, handwriting, autosaves). Any thread,
+    /// no locking (also the crash handler).
+    bool isProtected() const { return protectedFlag.load(); }
+    /// How a save of it encrypts the file: as its protected file (or PDF) is, else as its background PDF is.
+    PdfEncryption::Encryption encryptionForSave() const;
+    /// What the PDF it was opened from allows (opened without its owner password): printing, copying its text.
+    bool allowsPrinting() const { return allowPrint; }
+    bool allowsCopying() const { return allowCopy; }
+    void setPermissions(bool print, bool copy);
+    /// Its file is a PDF encrypted with an older method than AES-256 (RC4, AES-128): it is always written in full,
+    /// keeping its encryption, so it keeps no versions (version history appends).
+    bool hasOlderEncryption() const { return olderEncryption; }
     /// This document was restored from an autosave/emergency file: it belongs to `original` (empty: unsaved) and
     /// has unsaved changes (upstream's EmergencySaveRestore undo action).
     void markRecovered(const fs::path& original);
@@ -579,6 +619,13 @@ private:
     quint64 serialNo = 0;
     std::unique_ptr<PdfPageKeeper> pdfPages;
     std::vector<fs::path> retainedBases;  ///< clean copies of hybrid PDFs this document uses (HybridPdf::retain)
+    std::vector<std::shared_ptr<void>> passwordHolds;  ///< PdfEncryption::hold of its protected files
+    fs::path knownFile;                                ///< its file as last seen (a protected file renamed: derive)
+    std::atomic<bool> protectedFlag{false};
+    bool olderEncryption = false;
+    bool allowPrint = true;
+    bool allowCopy = true;
+    void updateProtection();
     std::vector<std::string> hybridChanges;
     std::optional<bool> versionsChoice;  ///< keepsVersions() chosen, not saved yet
     std::string restoredMessage;         ///< versionRestored(): for the next save

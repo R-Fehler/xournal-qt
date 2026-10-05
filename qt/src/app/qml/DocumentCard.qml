@@ -40,6 +40,8 @@ Item {
     property string pdfKind
     /// A PDF with notes that keeps its versions (version history): how many (0: none). A clock on the preview.
     property int versions: 0
+    /// A PDF protected with a password: the library does not read it (a lock on the preview).
+    property bool locked: false
     readonly property bool pdfText: pdfKind === "text" || pdfKind === "archive-text"
     readonly property bool pdfArchive: pdfKind === "archive" || pdfKind === "archive-text"
     /// A text or other file: the icon of its type (shown instead of a preview for other files)
@@ -300,6 +302,34 @@ Item {
                     }
                     HoverHandler { id: versionsHover }
                     ToolTip.visible: versionsHover.hovered
+                    ToolTip.delay: 500
+                    ToolTip.text: description
+                }
+                // Protected with a password: a lock under the other marks (the library does not read it)
+                Rectangle {
+                    id: lockMark
+                    objectName: "lockMark"
+                    visible: !card.isFolder && card.locked
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 6
+                    anchors.topMargin: (pdfBadge.visible ? 26 : 6) + (hitBadge.visible ? hitBadge.height + 4 : 0) +
+                                       (versionsMark.visible ? 22 : 0)
+                    width: 18
+                    height: 18
+                    radius: 9
+                    color: "#ffffff"
+                    border.color: "#c4c7c5"
+                    readonly property string description: qsTr("Protected with a password")
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: description
+                    Image {
+                        anchors.centerIn: parent
+                        source: app.iconUrl("xqt-lock")
+                        sourceSize: Qt.size(12, 12)
+                    }
+                    HoverHandler { id: lockHover }
+                    ToolTip.visible: lockHover.hovered
                     ToolTip.delay: 500
                     ToolTip.text: description
                 }

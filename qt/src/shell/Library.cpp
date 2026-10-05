@@ -515,6 +515,9 @@ QCborMap LibraryIndex::notesOf(const Entry& e) const {
     if (e.versions > 0) {
         notes.insert(QStringLiteral("versions"), e.versions);
     }
+    if (e.locked) {
+        notes.insert(QStringLiteral("locked"), true);
+    }
     if (!e.bookmarks.empty()) {
         QCborMap marks;
         for (const auto& [page, label]: e.bookmarks) {
@@ -645,6 +648,7 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
     // What its PDF is (added 2026-09: an entry without it gets only that read, from the PDF's marker)
     e->pdfKind = e->isPdf() ? pdfKindNamed(notes.value(QStringLiteral("pdfKind")).toString()) : PdfKind::Unknown;
     e->versions = e->isPdf() ? static_cast<int>(notes.value(QStringLiteral("versions")).toInteger(0)) : 0;
+    e->locked = e->isPdf() && notes.value(QStringLiteral("locked")).toBool();
     // Its to-dos (added 2026-10 with qt/todos: an entry without them is read again once; a plain PDF has none)
     e->todosRead = notes.contains(QStringLiteral("todos")) || e->kind == QLatin1String("image") ||
                    e->kind == QLatin1String("text") || e->pdfKind == PdfKind::Plain;
@@ -756,7 +760,8 @@ void LibraryIndex::put(const EntryPtr& e) {
         f.textChanged = true;
         f.changedText.insert(qstr(e->file.filename()));
     }
-    if ((slot ? slot->pdfKind : PdfKind::Unknown) != e->pdfKind || (slot ? slot->versions : 0) != e->versions) {
+    if ((slot ? slot->pdfKind : PdfKind::Unknown) != e->pdfKind || (slot ? slot->versions : 0) != e->versions ||
+        (slot ? slot->locked : false) != e->locked) {
         ++kindChanges;  // (the cards show both)
     }
     if ((slot ? slot->bookmarks : std::map<int, QString>()) != e->bookmarks) {
@@ -1026,7 +1031,10 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
         e->versions = versionsOfPdf(e->file);
     }
     if (!loaded.document) {
-        return e;  // unreadable: empty, not read again until it changes
+        // unreadable: empty, not read again until it changes. A PDF protected with a password is never read (not even
+        // while it is open in the app: its text stays out of the index; qt/docs/hybrid-pdf.md, "Encrypted PDFs")
+        e->locked = loaded.needsPassword;
+        return e;
     }
     Document& doc = *loaded.document;
     std::shared_lock lock(doc);
@@ -1193,6 +1201,31 @@ void LibraryIndex::numberTodos(Entry& e) {
     for (Todo& t: e.todos) {
         t.occurrence = seen[t.text]++;
     }
+}
+
+bool LibraryIndex::documentProtected(const fs::path& file) {
+    const DocumentItem item = DocumentFiles::itemOf(file);
+    if (discarded || !item.valid() || !where.contains(item.main())) {
+        return false;
+    }
+    inks->erase(item.main());
+    auto e = std::make_shared<Entry>();
+    e->file = item.main();
+    e->kind = entryKind(item);
+    e->name = QString::fromStdString(item.name());
+    e->xoppStamp = ownStamp(item);
+    e->sample = contentSample(item.main());
+    e->locked = true;
+    if (e->isPdf()) {
+        e->pdfKind = kindOfPdf(e->file, nullptr);  // (what it is: not read again for it)
+    }
+    std::lock_guard lock(mtx);
+    auto f = folders.find(item.main().parent_path());
+    if (f == folders.end() || !f->second.loaded) {
+        return false;
+    }
+    put(e);
+    return true;
 }
 
 bool LibraryIndex::documentSaved(const fs::path& file, Document& doc, const std::map<int, QString>& pdfText) {
@@ -2091,6 +2124,12 @@ int LibraryIndex::pageCount(const fs::path& file) const {
     std::lock_guard lock(mtx);
     const EntryPtr e = find(file);
     return e && !pageless(e->kind) ? e->pageCount() : -1;
+}
+
+bool LibraryIndex::lockedOf(const fs::path& file) const {
+    std::lock_guard lock(mtx);
+    const EntryPtr e = find(file);
+    return e && e->locked;
 }
 
 int LibraryIndex::versionsOf(const fs::path& file) const {

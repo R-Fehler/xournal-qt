@@ -36,7 +36,9 @@ QString keywordsFor(const QString& old, const QStringList& tags);
 bool write(const fs::path& pdf, const QStringList& tags, std::string& error);
 
 /// The keywords of `pdf`.
-Keywords read(const fs::path& pdf);
+/// `session`: the file of an open document (a protected PDF is read with its password, PdfEncryption.h); else a
+/// protected PDF has none (the library never reads one).
+Keywords read(const fs::path& pdf, bool session = false);
 /// Its keywords as tags ({} when it has none or cannot be read).
 QStringList tagsOf(const fs::path& pdf);
 

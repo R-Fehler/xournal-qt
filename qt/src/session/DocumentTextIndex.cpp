@@ -25,6 +25,7 @@
 
 #include "DocumentSession.h"
 #include "MdBox.h"
+#include "PdfEncryption.h"
 #include "TextMatch.h"
 #include "PageNoteSpace.h"
 #include "util/PathUtil.h"
@@ -197,7 +198,11 @@ PopplerDocument* openPdf(const fs::path& file) {
     // (Util::toUri: a path is wchar_t on Windows, and glib wants UTF-8 file names there)
     const std::optional<std::string> uri = Util::toUri(file);
     GError* error = nullptr;
-    PopplerDocument* doc = uri ? poppler_document_new_from_file(uri->c_str(), nullptr, &error) : nullptr;
+    // (a protected PDF of an open document: with its password; its text stays in memory, PdfEncryption.h)
+    const std::string password = PdfEncryption::passwordOf(file);
+    PopplerDocument* doc =
+            uri ? poppler_document_new_from_file(uri->c_str(), password.empty() ? nullptr : password.c_str(), &error)
+                : nullptr;
     if (error) {
         g_error_free(error);
     }

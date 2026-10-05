@@ -793,6 +793,8 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             return r.isFolder || !idx ? QString() : QString::fromLatin1(pdfKindName(idx->pdfKind(r.path)));
         case VersionsRole:
             return r.isFolder || !idx ? 0 : idx->versionsOf(r.path);
+        case LockedRole:
+            return !r.isFolder && idx && idx->lockedOf(r.path);
         case HitPassageListRole: {
             QVariantList passages;
             passages.reserve(static_cast<qsizetype>(r.hit.blockHits.size()));
@@ -863,6 +865,7 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {HybridRole, "hybrid"},
             {PdfKindRole, "pdfKind"},
             {VersionsRole, "versions"},
+            {LockedRole, "locked"},
             {HitPassageListRole, "hitPassageList"},
             {HitPassageBaseRole, "hitPassageBase"},
             {SizeRole, "size"},

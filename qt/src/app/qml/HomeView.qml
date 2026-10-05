@@ -917,6 +917,7 @@ Rectangle {
                         kind: model.kind
                         pdfKind: model.pdfKind
                         versions: model.versions || 0
+                        locked: model.locked || false
                         fileIcon: model.fileIcon
                         hits: model.hits
                         conflicts: model.conflicts ? model.conflicts.length : 0
@@ -1126,6 +1127,7 @@ Rectangle {
                         kind: model.kind
                         pdfKind: model.pdfKind
                         versions: model.versions || 0
+                        locked: model.locked || false
                         width: recentGrid.cellWidth
                         height: recentGrid.cellHeight
                         twoLineName: home.twoLineNames(recentGrid.cellWidth)

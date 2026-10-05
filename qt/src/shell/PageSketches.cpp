@@ -15,6 +15,7 @@
 #include "render/RenderService.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "session/PdfEncryption.h"
 #include "util/PathUtil.h"
 
 #include "CanvasMemory.h"
@@ -38,11 +39,22 @@ QThreadPool& sketchPool(int workers) {
     return *p;
 }
 
+/// The start of the names of the folders of a document's stored previews (every version of it): a hash of its path.
+QString prefixOf(const fs::path& file) {
+    return QString::fromLatin1(
+            QCryptographicHash::hash(QByteArray::fromStdString(file.lexically_normal().string()), QCryptographicHash::Sha1)
+                    .toHex()
+                    .left(12));
+}
+
+/// A folder of the layout before the names began with the document's prefix ("<prefix>-<hash>"): never used again
+bool oldLayout(const fs::path& folder) { return folder.filename().string().find('-') == std::string::npos; }
+
 /// Folder of the stored previews of a document as its files are now (empty: not saved)
 fs::path folderOf(DocumentSession& session) {
     const fs::path file = session.documentFile();
-    if (file.empty()) {
-        return {};
+    if (file.empty() || PdfEncryption::isProtected(file)) {
+        return {};  // (a protected PDF: its pages are never stored unencrypted; qt/docs/hybrid-pdf.md)
     }
     fs::path pdf;
     {
@@ -57,7 +69,8 @@ fs::path folderOf(DocumentSession& session) {
                            QByteArray::fromStdString(pdf.string()) + '|' + fileStamp(pdf).toUtf8();
     const QString name =
             QString::fromLatin1(QCryptographicHash::hash(key, QCryptographicHash::Sha1).toHex().left(24));
-    return Util::getCacheSubfolder("pages") / name.toStdString();
+    // (named after the document first: forgetFile finds every version of it)
+    return Util::getCacheSubfolder("pages") / (prefixOf(file) + "-" + name).toStdString();
 }
 
 QImage readPage(const fs::path& file) {
@@ -300,6 +313,11 @@ void PageSketches::trimDisk(qint64 bytes) {
         if (!it->is_directory(ec)) {
             continue;
         }
+        if (oldLayout(it->path())) {
+            fs::remove_all(it->path(), ec);  // (named the old way: never read again)
+            ec.clear();
+            continue;
+        }
         Folder f{it->path(), fs::last_write_time(it->path(), ec)};
         for (auto p = fs::directory_iterator(it->path(), ec); !ec && p != fs::directory_iterator(); p.increment(ec)) {
             f.size += static_cast<qint64>(p->file_size(ec));
@@ -315,6 +333,33 @@ void PageSketches::trimDisk(qint64 bytes) {
         fs::remove_all(f.path, ec);
         total -= f.size;
     }
+}
+
+int PageSketches::forgetFile(const fs::path& file) {
+    const std::string prefix = (prefixOf(file) + "-").toStdString();
+    const fs::path root = Util::getCacheSubfolder("pages");
+    int removed = 0;
+    std::error_code ec;
+    std::vector<fs::path> gone;
+    for (auto it = fs::directory_iterator(root, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+        if (it->path().filename().string().rfind(prefix, 0) == 0) {
+            gone.push_back(it->path());
+        }
+    }
+    for (const fs::path& dir: gone) {
+        std::error_code rec;
+        fs::remove_all(dir, rec);
+        removed += !rec;
+    }
+    {
+        std::lock_guard lock(mtx);
+        for (auto& [id, disk]: disks) {
+            if (std::find(gone.begin(), gone.end(), disk.folder) != gone.end()) {
+                disk = Disk();  // (nothing stored for it any more)
+            }
+        }
+    }
+    return removed;
 }
 
 void PageSketches::remove(quint64 id) {
@@ -599,7 +644,7 @@ std::unique_ptr<XojPdfDocument> PageSketches::takePdf(quint64 session, const fs:
     }
     auto pdf = std::make_unique<XojPdfDocument>();
     GError* error = nullptr;
-    const bool loaded = pdf->load(path, "", &error);
+    const bool loaded = pdf->load(path, PdfEncryption::passwordOf(path), &error);
     if (error) {
         g_error_free(error);
     }

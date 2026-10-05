@@ -13,6 +13,8 @@
 
 #include "util/PathUtil.h"
 
+#include "PdfEncryption.h"
+
 namespace xqt::MergedPdf {
 
 namespace {
@@ -21,7 +23,7 @@ constexpr const char* PAGES_SUFFIX = ".pages.pdf";
 
 void open(QPDF& pdf, const fs::path& file) {
     pdf.setSuppressWarnings(true);
-    pdf.processFile(file.string().c_str());
+    PdfEncryption::openQpdf(pdf, file);  // (pages of a protected PDF: with its password, and written encrypted)
 }
 
 QPDFObjectHandle info(QPDF& pdf) {
@@ -170,6 +172,9 @@ Result append(const fs::path& base, const std::string& addition, const fs::path&
         mark(pdf, kind);
         r.pages = helper.getAllPages().size();
         writeAtomically(pdf, target);
+        if (!base.empty()) {
+            PdfEncryption::derive(target, base);  // (encrypted as the base is)
+        }
         r.ok = true;
     } catch (const std::exception& e) {
         r.error = e.what();
@@ -197,6 +202,7 @@ Result keepOnly(const fs::path& source, const std::vector<size_t>& pages, const 
         }
         r.pages = helper.getAllPages().size();
         writeAtomically(pdf, target);
+        PdfEncryption::derive(target, source);
         r.ok = true;
     } catch (const std::exception& e) {
         r.error = e.what();

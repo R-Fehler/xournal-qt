@@ -71,9 +71,34 @@ fs::path VersionCache::get(const fs::path& pdf, int id, std::string& error) {
         return {};
     }
     std::lock_guard lock(m);
-    entries.push_front({key, file, fs::file_size(file, ec)});
+    entries.push_front({key, file, fs::file_size(file, ec), pdf});
     trim();
     return file;
+}
+
+void VersionCache::forget(const fs::path& pdf) {
+    std::lock_guard lock(m);
+    for (auto it = entries.begin(); it != entries.end();) {
+        std::error_code ec;
+        if (it->source == pdf || fs::equivalent(it->source, pdf, ec)) {
+            // (also one that is shown: its tab was closed first, AppController::applyProtection)
+            pins.erase(it->file.lexically_normal());
+            fs::remove_all(it->file.parent_path(), ec);
+            it = entries.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+fs::path VersionCache::sourceOf(const fs::path& file) const {
+    std::lock_guard lock(m);
+    for (const auto& e: entries) {
+        if (e.file.lexically_normal() == file.lexically_normal()) {
+            return e.source;
+        }
+    }
+    return {};
 }
 
 auto VersionCache::pin(const fs::path& file) -> Pin {

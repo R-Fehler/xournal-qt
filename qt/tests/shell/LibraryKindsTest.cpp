@@ -22,6 +22,8 @@
 #include <cairo-pdf.h>
 #include <cairo.h>
 #include <gtest/gtest.h>
+#include <qpdf/QPDF.hh>
+#include <qpdf/QPDFWriter.hh>
 
 #include "control/settings/Settings.h"
 #include "model/Document.h"
@@ -452,6 +454,52 @@ TEST_F(LibraryKindsTest, documentsThatKeepVersionsAreMarked) {
         for (int i = 0; i < model.count(); ++i) {
             if (model.data(model.index(i), LibraryModel::NameRole).toString() == "kept") {
                 return model.data(model.index(i), LibraryModel::VersionsRole).toInt() == 2;
+            }
+        }
+        return false;
+    }));
+}
+
+// A PDF protected with a password (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): the index never reads it, also while it
+// is open in the app with its password; its card shows a lock (the "locked" role), kept in notes.pack
+TEST_F(LibraryKindsTest, aProtectedPdfIsLockedAndNotRead) {
+    QTemporaryDir elsewhere;  // (not in the library)
+    const fs::path source = fs::path(elsewhere.path().toStdString()) / "source.pdf";
+    makePlainPdf(source, "confidentialword");
+    {
+        QPDF q;
+        q.processFile(source.string().c_str());
+        QPDFWriter w(q, (root / "locked.pdf").string().c_str());
+        w.setR6EncryptionParameters("pw", "owner", true, true, true, true, true, true, qpdf_r3p_full, true);
+        w.write();
+    }
+    makePlainPdf(root / "plain.pdf", "confidentialword");
+    QTemporaryDir config;
+    AppContext app(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(config.filePath("settings.xml").toStdString()), 1);
+    auto loaded = DocumentSession::loadFile(root / "locked.pdf", false, "pw");
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    DocumentSession open(app, std::move(loaded.document));  // (its password is known in this process meanwhile)
+    {
+        LibraryIndex idx(root);
+        index(idx);
+        EXPECT_TRUE(idx.lockedOf(root / "locked.pdf"));
+        EXPECT_FALSE(idx.lockedOf(root / "plain.pdf"));
+        EXPECT_TRUE(idx.knownPdfText(root / "locked.pdf").empty()) << "its text is not read";
+        const auto hits = idx.search("confidentialword");
+        ASSERT_EQ(hits.size(), 1u);
+        EXPECT_EQ(hits.front().file, root / "plain.pdf");
+        idx.flush();
+    }
+    LibraryIndex again(root);
+    index(again);
+    EXPECT_EQ(again.documentsRead(), 0);
+    EXPECT_TRUE(again.lockedOf(root / "locked.pdf")) << "kept in notes.pack";
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    ASSERT_TRUE(waitFor([&] {
+        for (int i = 0; i < model.count(); ++i) {
+            if (model.data(model.index(i), LibraryModel::NameRole).toString() == "locked") {
+                return model.data(model.index(i), LibraryModel::LockedRole).toBool();
             }
         }
         return false;

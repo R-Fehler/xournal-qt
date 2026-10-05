@@ -25,6 +25,7 @@
 #include "session/DocumentImages.h"
 #include "session/DocumentMode.h"
 #include "session/DocumentSession.h"
+#include "session/PdfEncryption.h"
 #include "session/TextDocument.h"
 #include "session/TextFile.h"
 #include "shell/DocumentFiles.h"
@@ -485,7 +486,8 @@ bool AppController::reloadDocument(DocumentSession* s) {
         return false;
     }
     const fs::path file = s->documentFile();
-    auto result = DocumentSession::loadFile(file);
+    // (a protected PDF: with the password it was opened with, known while it is open)
+    auto result = DocumentSession::loadFile(file, false, PdfEncryption::passwordOf(file));
     if (!result.document) {
         s->stampFiles();  // (not asked again about this version)
         Q_EMIT message(tr("Cannot reload"),
@@ -502,6 +504,7 @@ bool AppController::reloadDocument(DocumentSession* s) {
     tabs->setCurrentIndex(index);
     tabs->addTab(std::make_unique<DocumentSession>(*app, std::move(result.document)));
     DocumentSession* fresh = tabs->currentSession();
+    fresh->setPermissions(result.allowPrint, result.allowCopy);
     closeTab(index);
     if (current != index) {
         tabs->setCurrentIndex(current);

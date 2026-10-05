@@ -518,6 +518,27 @@ void PreviewCache::prune(const std::vector<DocumentItem>& items) {
     }
 }
 
+void PreviewCache::forget(const DocumentItem& item) {
+    std::error_code ec;
+    fs::remove(outsideFile(item), ec);
+    if (!inLibrary(item) || !ensureLoaded(item.folder(), false)) {
+        return;
+    }
+    auto& s = state();
+    std::lock_guard lock(s.mtx);
+    auto f = s.folders.find(item.folder());
+    if (f == s.folders.end()) {
+        return;
+    }
+    auto it = f->second.entries.find(QString::fromStdString(item.main().filename().string()));
+    if (it == f->second.entries.end()) {
+        return;
+    }
+    take(s, f->second, it);
+    f->second.dirty = true;
+    changed(s);
+}
+
 void PreviewCache::moved(const std::vector<std::pair<fs::path, fs::path>>& moves) {
     auto& s = state();
     for (const auto& [from, to]: moves) {

@@ -10,6 +10,7 @@
 
 #include "model/Document.h"
 #include "session/DocumentSession.h"
+#include "session/PdfEncryption.h"
 #include "session/HybridPdf.h"
 #include "session/VersionCache.h"
 
@@ -105,6 +106,10 @@ QString VersionsModel::unavailableReason() const {
         if (fs::exists(session->getFilePath(), ec) && HybridPdf::markerOf(session->getFilePath()).archive) {
             return tr("An archive PDF keeps no versions (it is meant to stay as it was exported).");
         }
+    }
+    if (session->hasOlderEncryption()) {
+        return tr("This PDF is encrypted with an older method than AES-256, which this app writes only in full: it "
+                  "keeps no versions. Protecting it with a password (⋮ → Document) encrypts it with AES-256.");
     }
     return {};
 }
@@ -326,7 +331,7 @@ bool VersionsModel::restore(int id) {
         auto clip = std::make_shared<PageClipboard>();
         const fs::path file = VersionCache::instance().get(pdf, id, error);
         if (!file.empty()) {
-            auto loaded = DocumentSession::loadFile(file);
+            auto loaded = DocumentSession::loadFile(file, false, PdfEncryption::passwordOf(file));
             if (loaded.document) {
                 std::vector<size_t> all(loaded.document->getPageCount());
                 for (size_t i = 0; i < all.size(); ++i) {

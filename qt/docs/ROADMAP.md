@@ -977,6 +977,21 @@
   the page lists, counted in a bar with next and previous change ([reference-view.md](reference-view.md)). Left: the
   added and removed elements of a changed page highlighted; the version scrubber.
 
+- **Encrypted PDFs, `qt/pdf-encryption` (2026-10-05).** A PDF with a password to open asks for it (a dialog; a wrong
+  one is said so; Cancel leaves it closed), also the PDF of a `.xopp` and a protected document's autosave after a crash;
+  one with only an owner password opens without asking, its no-print and no-copy restrictions honoured. The password
+  stays in memory while the document is open (poppler through upstream's `Document` password, qpdf for writing).
+  ⋮ → Document → "Protect with a password…" / "Change or remove the password…": AES-256 (R6) through qpdf, optional
+  restrictions with an owner password (else a random one). Saving keeps the encryption; Ctrl+S still appends (the
+  appender encrypts with the file's AES-256 key), so version history works encrypted. Share can protect the copy it
+  sends; the plain PDF export of a protected document keeps its password. Nothing of a protected document stays
+  unencrypted in the cache (the autosave is an encrypted PDF, no crash save, no stored previews, no library index or
+  handwriting cache, clean copies and versions encrypted; tested by looking for a marker text in every cache file);
+  library cards show a lock; protecting removes every picture, index entry and copy the caches kept of the
+  document before; pictures and voice memos taken out while it is open do not survive a crash (removed at the next
+  start); printing honours "without annotations" and removes the unencrypted print file once `lp` spooled it
+  ([hybrid-pdf.md](hybrid-pdf.md), "Encrypted PDFs"). Left: Acrobat, Preview and pdf.js on the device.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

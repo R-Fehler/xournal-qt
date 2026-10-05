@@ -97,6 +97,8 @@ public:
     /// joined the merged PDF, or a copy of the same file): the outline stays, it is not read again (half a second for
     /// a long PDF with a big outline).
     bool readPdfKeepingOutline(const fs::path& filename);
+    /// xournal-qt: the password readPdf opens the PDF with (an encrypted PDF; kept in memory only)
+    void setPdfPassword(std::string pw) { this->password = std::move(pw); }
 #else
     GtkTreeModel* getContentsModel() const;
 #endif

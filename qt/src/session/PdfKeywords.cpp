@@ -9,6 +9,7 @@
 
 #include "ArchivePdf.h"
 #include "IncrementalPdf.h"
+#include "PdfEncryption.h"
 #include "Tags.h"
 
 namespace xqt::pdfkeywords {
@@ -71,12 +72,16 @@ QStringList Keywords::tags() const {
     return out;
 }
 
-Keywords read(const fs::path& pdf) {
+Keywords read(const fs::path& pdf, bool session) {
     Keywords k;
     try {
         QPDF q;
         q.setSuppressWarnings(true);
-        q.processFile(pdf.string().c_str());
+        if (session) {
+            PdfEncryption::openQpdf(q, pdf);
+        } else {
+            q.processFile(pdf.string().c_str());
+        }
         OH info = q.getTrailer().getKey("/Info");
         if (info.isDictionary()) {
             if (OH v = info.getKey("/Keywords"); v.isString()) {

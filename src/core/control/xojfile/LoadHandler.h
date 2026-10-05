@@ -12,6 +12,7 @@
 #pragma once
 
 #include <cstddef>        // for size_t
+#include <functional>     // for function (xournal-qt)
 #include <memory>         // for unique_ptr
 #include <optional>       // for optional
 #include <string>         // for string
@@ -69,6 +70,13 @@ public:
      */
     std::unique_ptr<Document> loadDocument(fs::path const& filepath);
 
+#ifdef XOJ_NO_GTK
+    /// xournal-qt: load a document whose (uncompressed) XML is `xml`, as if it were the gzipped file `filepath`; its
+    /// attached files come from `attachment` (nullptr: none). The data of a password-protected PDF never goes to disk.
+    std::unique_ptr<Document> loadDocument(std::unique_ptr<xoj::util::InputStream> xml, fs::path const& filepath,
+                                           std::function<std::unique_ptr<std::string>(const fs::path&)> attachment);
+#endif
+
     /**
      * The attached PDF file was not found.
      * Here "attached" refers to either a file in the zip archive, or a file in
@@ -82,6 +90,11 @@ public:
 
     /** @return The version of the loaded file */
     int getFileVersion() const;
+
+#ifdef XOJ_NO_GTK
+    /// xournal-qt: the password a background PDF is opened with (an encrypted PDF; nullptr: none). Any thread.
+    static std::string (*pdfPassword)(const fs::path& pdf);
+#endif
 
 private:
     // interface for XmlParser
@@ -204,6 +217,9 @@ private:
     using zip_wrapper = std::unique_ptr<zip_t, zip_deleter>;
     zip_wrapper zipFp;
     bool isGzFile;
+#ifdef XOJ_NO_GTK
+    std::function<std::unique_ptr<std::string>(const fs::path&)> memoryAttachment;  // xournal-qt
+#endif
 
     std::vector<PageRef> pages;
     std::unordered_map<fs::path, fs::path> audioFiles;

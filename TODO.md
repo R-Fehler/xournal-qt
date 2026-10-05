@@ -709,19 +709,25 @@ general."
 
 ### Encrypted PDFs (the author, 2026-10-05; `qt/pdf-encryption`)
 "Support pdf encryption and opening of encrypted PDFs using qpdf."
-- [ ] **Opening**: a PDF with a user password asks for it (a dialog; wrong password says so; Cancel leaves it
+- [x] **Opening**: a PDF with a user password asks for it (a dialog; wrong password says so; Cancel leaves it
   closed); one with only an owner password (permissions) opens without asking. The password lives in memory for the
   session only, never written anywhere. Works for plain PDFs and PDFs with notes (the embedded notes are encrypted
-  with the file).
-- [ ] **Protecting**: ⋮ → Document → "Protect with a password…" (and in Share and Export as an option): AES-256,
+  with the file). (Built; also a `.xopp` on a protected PDF, and a protected autosave after a crash. Left: Acrobat,
+  Preview, pdf.js on the device.)
+- [x] **Protecting**: ⋮ → Document → "Protect with a password…" (and in Share and Export as an option): AES-256,
   a password to open, optionally restrictions (printing, copying) with an owner password; "Remove the password".
-  Saving keeps the encryption.
-- [ ] **No plaintext leaks** for an encrypted document: autosave and crash saves, thumbnails and previews, the
+  Saving keeps the encryption. (Built; Export: a protected document's export keeps its password, Share has the
+  option; the archive export cannot be encrypted, PDF/A.)
+- [x] **No plaintext leaks** for an encrypted document: autosave and crash saves, thumbnails and previews, the
   library's text index, the handwriting cache, the version cache and the reference/compare copies either stay
   encrypted or are not written; the library shows a lock on its card and does not index what it cannot read.
-- [ ] Saving an encrypted PDF with notes: a full write through qpdf (the incremental appender does not encrypt); if
+  (Built and tested, also for a document protected later; pictures and voice memos taken out while it is open are
+  removed at close or at the next start after a crash.)
+- [x] Saving an encrypted PDF with notes: a full write through qpdf (the incremental appender does not encrypt); if
   encrypted appends with qpdf's primitives are feasible, they keep fast saves and version history, else version
-  history is unavailable for encrypted files (said so in the History panel).
+  history is unavailable for encrypted files (said so in the History panel). (Feasible and built for AES-256: appends
+  are encrypted, version history works; files with older encryption are written in full and keep no versions, which
+  the History panel says.)
 
 ### The adaptive UI reworked (the author, 2026-10-05; `qt/ui-rework`)
 "The classic toolbar can be ignored for now, I believe the new approach is better. The main toolbar is now very

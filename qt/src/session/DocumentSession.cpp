@@ -17,6 +17,7 @@
 
 #include <QCryptographicHash>
 #include <QFile>
+#include <QPointer>
 
 #include "control/layer/LayerController.h"
 #include "control/settings/PageTemplateSettings.h"
@@ -54,6 +55,7 @@
 #include "PageBookmarks.h"
 #include "TextDocument.h"
 #include "PageOrderUndoAction.h"
+#include "PdfEncryption.h"
 #include "PdfPageKeeper.h"
 #include "PictureSaveHandler.h"
 #include "MdBox.h"
@@ -130,9 +132,26 @@ void prepareLoaded(Document& doc) {
 }
 }  // namespace
 
-auto DocumentSession::loadFile(const fs::path& path, bool attachPdf) -> LoadResult {
+auto DocumentSession::loadFile(const fs::path& path, bool attachPdf, const std::string& password) -> LoadResult {
     LoadResult result;
     if (hasExtension(path, ".pdf")) {
+        // xournal-qt: an encrypted PDF (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): a password to open it, or none (only
+        // an owner password: it opens, its restrictions are noted)
+        const PdfEncryption::Status enc = PdfEncryption::probe(path, password);
+        if (!enc.readable && enc.needsPassword) {
+            result.needsPassword = true;
+            result.wrongPassword = enc.wrongPassword;
+            result.passwordFile = path;
+            result.error = enc.wrongPassword ? _("The password is not right.") : _("This PDF is protected with a password.");
+            return result;
+        }
+        result.allowPrint = enc.allowPrint;
+        result.allowCopy = enc.allowCopy;
+        if (enc.isProtected()) {
+            PdfEncryption::remember(path, password);
+            result.passwordHold = PdfEncryption::hold(path);
+            result.encrypted = true;
+        }
         // xournal-qt: a hybrid PDF opens as the document it carries (else, if that fails, as a plain PDF)
         if (HybridPdf::isHybrid(path)) {
             auto opened = HybridPdf::open(path);
@@ -144,6 +163,9 @@ auto DocumentSession::loadFile(const fs::path& path, bool attachPdf) -> LoadResu
                 // The pictures its Markdown carries: into its work folder, found there from now on (while the result
                 // lives, and then by the session's own root; qt/docs/md-images.md)
                 DocumentImages::unpack(path, opened.pictures);
+                if (result.encrypted) {
+                    HybridPdf::markUnpacked(DocumentImages::workFolder(path));  // (removed at a start after a crash)
+                }
                 result.pictures = std::make_shared<md::images::RootHandle>(DocumentImages::embeddedRoot(path));
                 prepareLoaded(*result.document);
                 return result;
@@ -152,21 +174,50 @@ auto DocumentSession::loadFile(const fs::path& path, bool attachPdf) -> LoadResu
         }
         // Port of Control::openPdfFile: annotate a PDF, one page per PDF page.
         auto doc = std::make_unique<Document>(&detachedHandler());
+        doc->setPdfPassword(PdfEncryption::passwordOf(path));
         if (doc->readPdf(path, /*initPages=*/true, attachPdf)) {
             PageBookmarks::adoptOutline(*doc);  // (a PDF with our "Bookmarks" outline item but not our data)
             result.document = std::move(doc);
         } else {
             result.error = FS(_F("Error reading PDF file \"{1}\"\n{2}") % path.u8string() % doc->getLastErrorMsg());
+            result.passwordHold.reset();
         }
         return result;
     }
     // Port of Control::openXoppFile
-    try {
+    LoadHandler::pdfPassword = &PdfEncryption::backgroundPassword;  // (its background PDF may be encrypted)
+    auto load = [&]() {
+        PdfEncryption::askedBackground().clear();
         LoadHandler loadHandler(&result.warnings);
         result.document = loadHandler.loadDocument(path);
         result.missingPdf = loadHandler.getMissingPdfFilename();
         result.attachedPdfMissing = loadHandler.isAttachedPdfMissing();
         result.fileVersion = loadHandler.getFileVersion();
+    };
+    try {
+        load();
+        // Its background PDF is encrypted: with the password given, loaded again (else not opened)
+        if (const fs::path bg = PdfEncryption::askedBackground(); result.document && !bg.empty() &&
+                                                                    result.document->getPdfFilepath().empty()) {
+            if (const auto enc = PdfEncryption::probe(bg, password); enc.needsPassword) {
+                if (!enc.readable) {
+                    result = LoadResult();
+                    result.needsPassword = true;
+                    result.wrongPassword = enc.wrongPassword;
+                    result.passwordFile = bg;
+                    result.error = enc.wrongPassword ? _("The password is not right.")
+                                                     : _("The PDF of these notes is protected with a password.");
+                    return result;
+                }
+                PdfEncryption::remember(bg, password, path);
+                auto hold = PdfEncryption::hold(path);
+                result = LoadResult();
+                load();
+                result.passwordHold = std::move(hold);
+                result.allowPrint = enc.allowPrint;
+                result.allowCopy = enc.allowCopy;
+            }
+        }
         if (result.document) {
             // The pictures its Markdown carries (qt/docs/md-images.md): into its work folder, found there while the
             // result lives (its boxes are sized with them below)
@@ -231,6 +282,20 @@ void DocumentSession::init() {
         }
     }
 
+    // Encrypted PDFs: the passwords of its files stay known while it is open (PdfEncryption.h); a protected file saved
+    // under another name is encrypted the same way (encryptionForSave)
+    knownFile = doc->getFilepath();
+    updateProtection();
+    connect(this, &DocumentSession::filePathChanged, this, [this] {
+        const fs::path now = doc->getFilepath();
+        if (!knownFile.empty() && !now.empty() && now != knownFile && PdfEncryption::isKnown(knownFile) &&
+            hasExtension(now, ".pdf")) {
+            PdfEncryption::derive(now, knownFile);
+        }
+        knownFile = now;
+        updateProtection();
+    });
+
     scrollHandler.indexOf = [this](const PageRef& page) { return doc->indexOf(page); };
     scrollHandler.onScrollToPage = [this](size_t page, XojPdfRectangle) {
         setCurrentPageNo(page);
@@ -290,8 +355,16 @@ DocumentSession::~DocumentSession() {
     blockSignals(true);
     waitForSaves();
     for (const auto& b: retainedBases) {
+        if (isProtected()) {
+            HybridPdf::dropExtracted(b);  // (its pictures and recordings, taken out while it was open)
+        }
         HybridPdf::release(b);
     }
+    if (isProtected() && hasExtension(doc->getFilepath(), ".pdf")) {
+        std::error_code ec;
+        fs::remove_all(DocumentImages::workFolder(doc->getFilepath()), ec);
+    }
+    passwordHolds.clear();  // (the last document of a file: its password is forgotten)
     autosaveTimer.stop();
     layerController->unregisterListener();
     layerController.reset();
@@ -1490,6 +1563,7 @@ bool DocumentSession::detachBackground(const std::vector<fs::path>& files, std::
         error = FS(_F("Could not copy the PDF \"{1}\": {2}") % bg.u8string() % ec.message());
         return false;
     }
+    PdfEncryption::derive(copy, bg);  // (a protected PDF: the same password)
     if (!loadPdfKeepingPictures(copy)) {  // (the same file)
         error = FS(_F("Could not copy the PDF \"{1}\": {2}") % bg.u8string() % doc->getLastErrorMsg());
         return false;
@@ -1563,7 +1637,75 @@ fs::path DocumentSession::exportPdfFor(const fs::path& xopp) {
     return MergedPdf::sidecarOf(xopp);
 }
 
+void DocumentSession::updateProtection() {
+    fs::path file, bg;
+    {
+        std::shared_lock lock(*doc);
+        file = doc->getFilepath();
+        bg = doc->getPdfFilepath();
+    }
+    for (const fs::path& f: {file, bg}) {
+        if (const fs::path owner = PdfEncryption::ownerOf(f); !owner.empty()) {
+            passwordHolds.push_back(PdfEncryption::hold(owner));
+        }
+    }
+    protectedFlag = PdfEncryption::isProtected(file) || PdfEncryption::isProtected(bg);
+    olderEncryption = false;
+    if (std::error_code ec; hasExtension(file, ".pdf") && fs::exists(file, ec)) {
+        const auto st = PdfEncryption::probe(file, PdfEncryption::passwordOf(file));
+        olderEncryption = st.readable && st.encrypted && !st.aes256;
+    }
+}
+
+PdfEncryption::Encryption DocumentSession::encryptionForSave() const {
+    PdfEncryption::Encryption e;  // (as its background PDF is)
+    fs::path file, bg;
+    {
+        std::shared_lock lock(*doc);
+        file = doc->getFilepath();
+        bg = doc->getPdfFilepath();
+    }
+    if (PdfEncryption::isProtected(file) && hasExtension(file, ".pdf")) {
+        e.kind = PdfEncryption::Encryption::Kind::CopyOf;
+        e.from = file;
+    } else if (PdfEncryption::isProtected(bg)) {
+        e.kind = PdfEncryption::Encryption::Kind::CopyOf;
+        e.from = bg;
+    }
+    return e;
+}
+
+void DocumentSession::setPermissions(bool print, bool copy) {
+    allowPrint = print;
+    allowCopy = copy;
+}
+
+fs::path DocumentSession::protectedAutosavePath(qint64 pid, quint64 serial) {
+    fs::path p = Util::getAutosaveFilepath();
+    p.replace_filename(std::to_string(pid) + "-" + std::to_string(serial) + ".autosave.pdf");
+    return p;
+}
+
 auto DocumentSession::autosave() -> SaveResult {
+    if (isProtected() && !hasExtension(doc->getFilepath(), ".xopp") && !hasExtension(doc->getFilepath(), ".xoj")) {
+        // A protected document: an encrypted PDF with notes in the app cache, the same password, written in the
+        // background like a PDF copy (never an unencrypted .xopp; qt/docs/hybrid-pdf.md, "Encrypted PDFs")
+        undoRedo->documentAutosaved();
+        const fs::path target = protectedAutosavePath(Util::getPid(), serialNo);
+        SaveRequest r;
+        r.kind = SaveKind::ExportHybrid;
+        r.target = target;
+        QPointer<DocumentSession> self(this);
+        r.done = [self, target](const SaveResult& result) {
+            if (self && result.ok) {
+                self->setLastAutosaveFile(target);
+            } else if (!result.ok) {
+                g_warning("Could not autosave a protected document: %s", result.error.c_str());
+            }
+        };
+        saveInBackground(std::move(r));
+        return {true, {}};
+    }
     // Port of AutosaveJob::run
     PictureSaveHandler handler;
     undoRedo->documentAutosaved();

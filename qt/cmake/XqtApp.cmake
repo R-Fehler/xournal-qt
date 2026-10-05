@@ -140,6 +140,7 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppStickers.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTodos.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTags.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppEncryption.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppToolbox.cpp
 
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AudioControl.h
@@ -365,6 +366,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/TemplateToolTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AnnotationsPanelTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/VersionHistoryTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/PdfPasswordTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/CitationsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.h
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.cpp
