@@ -692,6 +692,9 @@ bool CanvasInput::actionStart(const Event& event) {
     const bool laser = toolType == TOOL_LASER_POINTER_PEN || toolType == TOOL_LASER_POINTER_HIGHLIGHTER;
     this->readOnlyPress = (view.getSession().isReadOnly() || (view.isReadingOnly() && !readingTool)) &&
                           toolType != TOOL_HAND && !laser && !snipping;  // (a snip only reads)
+    if (view.replay() && !snipping) {
+        this->readOnlyPress = true;  // replaying (qt/docs/timeline.md): every tool scrolls, a tap goes to its moment
+    }
     if (toolType == TOOL_HAND || this->readOnlyPress) {
         return true;  // the hand tool does not change the selection (scrolling keeps it)
     }

@@ -1,5 +1,6 @@
 #include "AppController.h"
 #include "AudioControl.h"
+#include "TimelineControl.h"
 
 #include "hwr/HandwritingSearch.h"
 #include "shell/HandwritingSettings.h"
@@ -422,6 +423,7 @@ AppController::~AppController() {
         disconnect(c);
     }
     flow.reset();  // (before the sessions)
+    timelineControl.reset();  // (a replay ends: its view shows the whole document again)
     audioControl.reset();  // (a recording ends, and its document is told, before the sessions go)
     pages->setSession(nullptr);
     outline->setSession(nullptr);
@@ -952,6 +954,9 @@ void AppController::currentTabChanged() {
     }
     if (audioControl) {
         audioControl->currentChanged();
+    }
+    if (timelineControl) {
+        timelineControl->currentChanged();  // (a replay of another document ends)
     }
     updatePresentedView();  // (another tab: it presents now)
     if (session() && session()->textFile()) {
@@ -1573,12 +1578,12 @@ QString AppController::shownFileNote() const {
 bool AppController::canUndo() const {
     const MarkdownEditor* editor = undoneMarkdown();
     const DocumentSession* s = undoneSession();
-    return (editor && editor->canUndo()) || (s && s->getUndoRedoHandler()->canUndo());
+    return (editor && editor->canUndo()) || (s && !s->isReplaying() && s->getUndoRedoHandler()->canUndo());
 }
 bool AppController::canRedo() const {
     const MarkdownEditor* editor = undoneMarkdown();
     const DocumentSession* s = undoneSession();
-    return (editor && editor->canRedo()) || (s && s->getUndoRedoHandler()->canRedo());
+    return (editor && editor->canRedo()) || (s && !s->isReplaying() && s->getUndoRedoHandler()->canRedo());
 }
 
 QString AppController::tool() const {
@@ -3142,6 +3147,7 @@ QObject* AppController::referenceObject() const { return referenceMode.get(); }
 QObject* AppController::presenterObject() const { return presenter.get(); }
 QObject* AppController::citationsObject() const { return citations.get(); }
 QObject* AppController::audioObject() const { return audioControl.get(); }
+QObject* AppController::timelineObject() const { return timelineControl.get(); }
 
 void AppController::makeAudioControl() {
     audioControl = std::make_unique<AudioControl>(
@@ -3150,6 +3156,8 @@ void AppController::makeAudioControl() {
                 return s && s->hasFilePath() ? QString::fromStdU16String(s->getFilePath().filename().u16string())
                                              : QCoreApplication::translate("AudioControl", "Untitled");
             });
+    timelineControl = std::make_unique<TimelineControl>([this] { return session(); }, [this] { return canvas(); },
+                                                        audioControl.get());
 }
 
 bool AppController::openAsReference(const QString& path) {
@@ -4353,8 +4361,8 @@ void AppController::undo() {
         referenceMode->undo();  // (the canvas last written on has the keys)
         return;
     }
-    if (!session()) {
-        return;
+    if (!session() || session()->isReplaying()) {
+        return;  // (replaying: nothing changes, qt/docs/timeline.md)
     }
     session()->clearSelectionEndText();  // first: finishing a text edit is itself an undo step
     endMarkdown(true);                   // (as is the Markdown being written beside the page)
@@ -4372,7 +4380,7 @@ void AppController::redo() {
         referenceMode->redo();
         return;
     }
-    if (!session()) {
+    if (!session() || session()->isReplaying()) {
         return;
     }
     session()->clearSelectionEndText();

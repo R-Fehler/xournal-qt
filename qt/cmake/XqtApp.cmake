@@ -140,6 +140,8 @@ add_library(xqt-shell STATIC
 
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AudioControl.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AudioControl.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/TimelineControl.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/TimelineControl.cpp
 
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTemplates.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppRename.cpp
@@ -178,6 +180,7 @@ set(XQT_QML_FILES
     src/app/qml/RecordButton.qml
     src/app/qml/RecordingPill.qml
     src/app/qml/PlaybackPill.qml
+    src/app/qml/TimelineBar.qml
     src/app/qml/RecordingsDialog.qml
     src/app/qml/AdaptiveDialog.qml
     src/app/qml/InlineRename.qml
@@ -352,6 +355,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ToolboxTest.cpp
 
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AudioUiTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/TimelineUiTest.cpp
 
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/TemplateToolTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AnnotationsPanelTest.cpp

@@ -17,6 +17,7 @@
 #include "view/background/BackgroundFlags.h"
 #include "view/background/PdfBackgroundView.h"
 
+#include "ElementFilter.h"
 #include "RenderService.h"
 
 using xoj::util::Rectangle;
@@ -185,6 +186,7 @@ void PageRaster::rerenderRange(const Range& range) {
 void PageRaster::releaseBuffer() {
     std::lock_guard lock(drawingMutex);
     buffer.reset();
+    drawnFilter.reset();
 }
 
 void PageRaster::detach() {
@@ -202,7 +204,8 @@ auto PageRaster::createMask(const Range& range, const RasterParams& params) cons
     return mask;
 }
 
-void PageRaster::renderToBuffer(cairo_t* cr, const RasterParams&, bool background, bool whole) const {
+void PageRaster::renderToBuffer(cairo_t* cr, const RasterParams&, bool background, bool whole,
+                                const render::ElementFilter* filter) const {
     Document* doc = host->rasterDocument();
     PdfCache* pdfCache = host->rasterPdfCache(background);
 
@@ -255,6 +258,7 @@ void PageRaster::renderToBuffer(cairo_t* cr, const RasterParams&, bool backgroun
 
     std::shared_lock lock(*doc);
     ScreenDrawing screen;
+    render::FilterScope filtered(filter);  // (the replay: only what is shown at its moment)
     localView.drawPage(this->page, cr, false, flags);
 }
 
@@ -293,7 +297,8 @@ void PageRaster::rerenderRectangle(const Rectangle<double>& rect, const RasterPa
     maskRange.addPadding(RENDER_PADDING);
     xoj::view::Mask newMask = createMask(maskRange, params);
 
-    renderToBuffer(newMask.get(), params, false, wholeBuffer);
+    const auto filter = host->rasterFilter();
+    renderToBuffer(newMask.get(), params, false, wholeBuffer, filter.get());
 
     std::lock_guard lock(this->drawingMutex);
     if (!this->buffer.isInitialized()) {
@@ -334,7 +339,8 @@ void PageRaster::run(bool background) {
                             : createMask(Range((place.x + 0.25) / params.zoom, (place.y + 0.25) / params.zoom,
                                                place.area.x + place.area.width, place.area.y + place.area.height),
                                          params);
-        renderToBuffer(newMask.get(), params, background, place.whole);
+        const auto filter = host->rasterFilter();
+        renderToBuffer(newMask.get(), params, background, place.whole, filter.get());
         if (cairo_surface_t* target = cairo_get_target(newMask.get());
             cairo_surface_get_type(target) == CAIRO_SURFACE_TYPE_IMAGE) {
             statPixels += static_cast<long long>(cairo_image_surface_get_width(target)) *
@@ -347,6 +353,7 @@ void PageRaster::run(bool background) {
             std::lock_guard lock(this->drawingMutex);
             std::swap(this->buffer, newMask);
             this->placement = place;
+            this->drawnFilter = filter;
         }
         {
             std::lock_guard lock(repaintRectMutex);

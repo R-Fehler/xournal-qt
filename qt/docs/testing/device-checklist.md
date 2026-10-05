@@ -3391,3 +3391,26 @@ Seen through the replay (⋮ → View → Replay the writing).
 - [ ] Xournal++'s own fixture with a recording (or a lecture recorded in Xournal++ 1.2 with its audio folder set in
       Settings): the ink comes with the recording, in time.
 - [ ] An old document (no times): its ink comes first, page by page, within a few seconds.
+
+## Replaying the writing (qt/timeline, qt/docs/timeline.md)
+
+- [ ] ⋮ → View → Replay the writing on a page of handwriting: the play bar at the bottom, the tools and pills gone;
+      Play: the strokes are written again one by one, each growing along its length, at the pace they were written;
+      pauses of more than a few seconds take about one and a half.
+- [ ] Playing is smooth (no stutter, the page does not flash) on the Linux machine, the Surface Pro 8 (200 %) and the
+      Fold 7, also zoomed in far (a page drawn in part) and on a page with a PDF; `XQT_PERF=1` shows few renders while
+      it plays (one every few seconds at most).
+- [ ] Scrub the slider back and forth: the page follows at once forwards, and within a moment backwards; let go: sharp.
+- [ ] The speed button: ½× to 8×; with a recording the sound is heard at 1× only.
+- [ ] A lecture recorded here: Play from the start: the voice and the ink go together (also after a pause of the
+      recorder); the red band under the slider is where the recording is.
+- [ ] Play a recording (the play tool on ink), then the playback pill's replay button: the replay starts at that
+      moment and plays with the sound.
+- [ ] Tap a stroke while replaying: the bar goes to the moment it was written (a little before it with a recording)
+      and it is written again.
+- [ ] While replaying, the pen, the eraser and the fingers only scroll; Ctrl+Z, Ctrl+V, Delete do nothing; the
+      sidebar's thumbnails show the whole document.
+- [ ] ✕ or Esc: the whole document again, exactly as before; the tab is not marked as changed; Ctrl+Z undoes the last
+      thing written before the replay.
+- [ ] A document with sticky notes: a note appears when it was put on the page, its ink after it.
+- [ ] Another tab while replaying: the replay ends; closing the tab while replaying: no crash.

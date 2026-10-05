@@ -22,6 +22,7 @@
 #include "model/Point.h"
 #include "model/Stroke.h"
 #include "model/XojPage.h"
+#include "render/ElementFilter.h"
 #include "render/PageRaster.h"
 #include "util/Range.h"
 #include "util/serializing/BinObjectEncoding.h"
@@ -363,9 +364,17 @@ void drawMoreBelow(cairo_t* cr, const Rectangle<double>& rect, Color paper) {
 }
 
 bool draw(const Layer& layer, const xoj::view::Context& ctx) {
+    const render::ElementFilter* filter = render::currentFilter();  // (the replay: what is shown at its moment)
     const Stroke* paper = paperOf(layer);
     if (!paper) {
+        if (filter) {
+            render::drawLayer(layer, ctx, *filter);
+            return true;
+        }
         return false;
+    }
+    if (filter && !filter->shows(paper)) {
+        return true;  // (the note is not there yet)
     }
     cairo_t* cr = ctx.cr;
     double minX = 0;
@@ -412,7 +421,7 @@ bool draw(const Layer& layer, const xoj::view::Context& ctx) {
         const auto elements = layer.getElementsView();
         for (size_t i = 1; i < elements.size(); ++i) {
             const Element* e = elements[i];
-            if (e->intersectsArea(minX, minY, maxX - minX, maxY - minY)) {
+            if ((!filter || filter->shows(e)) && e->intersectsArea(minX, minY, maxX - minX, maxY - minY)) {
                 xoj::view::ElementView::createFromElement(e)->draw(ctx);
             }
         }

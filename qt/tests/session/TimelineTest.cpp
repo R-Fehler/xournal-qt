@@ -22,6 +22,7 @@
 #include "model/Stroke.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
+#include "session/StickyNote.h"
 #include "session/Timeline.h"
 
 using namespace xqt;
@@ -256,4 +257,20 @@ TEST(TimelineTest, aLongPreludeStaysShort) {
     const Timeline t = build(d);
     EXPECT_LE(t.events().back().at, PRELUDE_MAX);
     EXPECT_EQ(t.frameAt(t.duration()).shown, 1000u);
+}
+
+// A sticky note's paper is there at once (it is not written)
+TEST(TimelineTest, aStickyNotesPaperIsThereAtOnce) {
+    Doc d;
+    sticky::Look look;
+    look.rect = {100, 100, 150, 120};
+    Layer* note = sticky::makeNote(look);
+    note->getElements().front()->setCreated(T0);
+    d.doc->getPage(0)->getLayers().push_back(note);
+    addStroke(note, T0 + 4000);
+    const Timeline t = build(d);
+    ASSERT_EQ(t.events().size(), 2u);
+    EXPECT_EQ(t.events()[0].length, 0) << "the paper";
+    EXPECT_EQ(t.events()[0].layer, note);
+    EXPECT_GT(t.events()[1].length, 0) << "its ink is written";
 }

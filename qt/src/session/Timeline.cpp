@@ -20,6 +20,8 @@
 #include "model/Stroke.h"
 #include "model/XojPage.h"
 
+#include "StickyNote.h"
+
 #include "filesystem.h"
 
 namespace xqt::timeline {
@@ -207,8 +209,8 @@ Timeline Timeline::build(const Document& doc, const LengthOf& lengthOf) {
     // How long each stroke is drawn on: at handwriting speed, until the next element at most
     for (size_t i = 0; i < out.list.size(); ++i) {
         Event& e = out.list[i];
-        if (e.element->getType() != ELEMENT_STROKE) {
-            continue;
+        if (e.element->getType() != ELEMENT_STROKE || (e.layer && sticky::paperOf(*e.layer) == e.element)) {
+            continue;  // (a sticky note's paper is there at once)
         }
         int64_t length = e.when == 0 ?
                                  step :

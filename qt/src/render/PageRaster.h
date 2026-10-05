@@ -41,6 +41,9 @@ namespace xqt {
 
 class PageRaster;
 class RenderService;
+namespace render {
+class ElementFilter;
+}
 
 /// Rendering parameters of a view (all pages of a view share them).
 struct RasterParams {
@@ -58,6 +61,8 @@ public:
     virtual PdfCache* rasterPdfCache(bool background = false) const = 0;
     virtual RasterParams rasterParams() const = 0;
     virtual bool rasterMarkAudioStrokes() const { return false; }
+    /// Which elements are drawn (the replay of the timeline, render/ElementFilter.h; nullptr: all). Any thread.
+    virtual std::shared_ptr<const render::ElementFilter> rasterFilter() const { return nullptr; }
     /// A PDF page that is not in the document's PDF yet (pasted pages being merged, see PdfPageKeeper): drawn from
     /// this one meanwhile (any thread; nullptr: none).
     virtual XojPdfPageSPtr rasterPendingPdfPage(size_t) const { return nullptr; }
@@ -150,6 +155,13 @@ public:
         std::lock_guard lock(drawingMutex);
         return f(buffer, placement);
     }
+    /// The same with the filter the buffer was drawn with (as a whole; nullptr: all elements):
+    /// `f(xoj::view::Mask&, const Placement&, const render::ElementFilter*)`.
+    template <typename F>
+    decltype(auto) withDrawnBuffer(F&& f) {
+        std::lock_guard lock(drawingMutex);
+        return f(buffer, placement, drawnFilter.get());
+    }
 
     // --- worker thread -----------------------------------------------------------------------------------------
     /// Port of RenderJob::run(). Called by the RenderService, never concurrently for the same raster.
@@ -158,7 +170,8 @@ public:
 private:
     void schedule();
     /// `whole`: the whole page (else a part of a big page: its PDF is drawn directly, not through the PDF cache)
-    void renderToBuffer(cairo_t* cr, const RasterParams& params, bool background, bool whole) const;
+    void renderToBuffer(cairo_t* cr, const RasterParams& params, bool background, bool whole,
+                        const render::ElementFilter* filter) const;
     xoj::view::Mask createMask(const Range& range, const RasterParams& params) const;
     void rerenderRectangle(const xoj::util::Rectangle<double>& rect, const RasterParams& params);
     void notifyUpdated(std::optional<xoj::util::Rectangle<double>> area);
@@ -170,6 +183,8 @@ private:
 
     xoj::view::Mask buffer;
     Placement placement;  ///< where the buffer is on the page (with the buffer, under drawingMutex)
+    /// the filter the buffer was drawn with as a whole (with the buffer, under drawingMutex)
+    std::shared_ptr<const render::ElementFilter> drawnFilter;
     std::mutex drawingMutex;
 
     std::mutex repaintRectMutex;

@@ -75,3 +75,61 @@ times shown; strokes drawn on over a while and texts at once; a recording placed
 the recorder where it is heard; a Xournal++ recording placed by its name, a memo whose file is nowhere not on the
 bar, a recording placed nowhere; the time in recording names; hidden layers and empty documents; a long prelude stays
 short.
+
+## Replay
+
+`qt/src/canvas/TimelineReplay.*` (the drawing), `CanvasView::startReplay`, `qt/src/render/ElementFilter.*`,
+`qt/src/app/TimelineControl.*` (`app.timeline`), `TimelineBar.qml`.
+
+- **Entered** from ⋮ → View → **Replay the writing** (not in text files), or from the playback pill's replay button
+  (the replay starts where the recording is heard and plays on). The document is replayed from the start, paused.
+- **The play bar** at the bottom of the page (`timelineBar`): ✕ (`timelineClose`, also Esc), the start of this or the
+  previous session and the next one (`timelinePreviousMark`, `timelineNextMark`), play/pause (`timelinePlay`, also
+  Space), a slider (`timelineSlider`) with a mark where each session begins (its date on hover) and a red band where a
+  recording is (grey: its file is not here), the bar's time ("1:23 / 4:56") and the clock time of the moment ("Sun 4
+  Oct 2026, 14:03"; "Written before the times were kept" in the prelude), the speed (`timelineSpeed`: ½×, 1×, 2×, 4×,
+  8×). ← and → go 5 s, Home and End to the ends. The tools, the tool bar and the pills are hidden, as in reading.
+- **Audio** plays where it overlaps, through `app.audio` (the same player as the playback pill, which is hidden
+  meanwhile): at 1× only (at other speeds the replay is silent); the clock follows what is heard when they drift
+  apart by more than 250 ms; a recording that ended or cannot be played is not started again until the next jump.
+- **Read-only**: the view is for reading (`CanvasView::isReadingOnly`): every tool scrolls, as the hand does; the
+  session refuses changes (`DocumentSession::setReplaying`: `isReadOnly`, so no paste, stickers, notes, templates,
+  bookmarks; no undo or redo), and the document's keys are off. **A tap on ink** goes to the moment it was written
+  (less the audio's lead-in where a recording is heard) and the stroke is written again from there. **Leaving** draws
+  the pages whole again; the document was never changed (no undo step, not modified, the same page revisions: the
+  UI test compares the `.xopp` to the byte). Should it change all the same (a page deleted in the sidebar), the replay
+  ends with a message; another tab ends it too.
+- **Drawing** (`TimelineReplay.h`), so that playing stays smooth and the page pictures are kept:
+  - The pages' pictures (`PageRaster`) are drawn with a filter (`RasterHost::rasterFilter`, a thread-local
+    `render::FilterScope` around upstream's `DocumentView::drawPage`): only the first N elements of the timeline.
+    Upstream's `LayerView` asks the fork's layer drawer first (an existing seam); the sticky notes' drawer leaves out
+    what is not there yet, and draws other layers itself while a filter is set. Without a filter nothing changes.
+  - What came since and the stroke being written are drawn over the picture when the canvas composes its tiles
+    (`CanvasPage::composeTile`), as the stroke being written with the pen is: per frame only the tiles under the new
+    part of the stroke are composed again, nothing is rendered. The overlay knows the filter the picture shown was
+    drawn with (`PageRaster::withDrawnBuffer`), so it draws exactly what that picture lacks: nothing twice, nothing
+    missing while a new picture is on its way.
+  - The pictures catch up (the filter "committed", the pages whose content differs drawn again in the background) when
+    the overlay would hold more than 48 elements or is older than 2.5 s, when the replay goes back (a picture cannot
+    be drawn smaller), when a sticky note comes (its paper is drawn by its own drawer), when playing pauses and when
+    the slider is let go. A page keeps its old picture until the new one is there. Pages without a picture are drawn
+    with the filter when they come into view. The PDF background is drawn outside the document's lock as before.
+  - The stroke being written: a copy of the stroke cut at the fraction of its length (the last point between two
+    points, its pressure too), drawn by upstream's `StrokeView`.
+- Thumbnails, previews, the page sidebar and exports show the whole document (they do not use the filter).
+
+Tests: `TimelineReplayTest` (label `canvas`): the pages as of a moment, the stroke being written as far as it got,
+back and forth, the whole document after leaving; playing forward draws over the picture without rendering until the
+overlay is full, then commits; read-only (the pen writes nothing, a tap gives the ink's moment, nothing modified); a
+sticky note's paper and ink come when they were made. `TimelineUiTest` (label `ui`): ⋮ → View → Replay the writing,
+the slider, the speed, play, the pen writes nothing, ✕ and Esc, the document the same to the byte, not modified, the
+same undo step and page revision; a tap on ink; another tab ends it; a recording heard where it is (the fake speaker),
+the playback pill's replay button.
+
+## Not built (later)
+
+- Level 3 (erasing, moving, recolouring, page changes replayed): it waits for the version history (B6).
+- Times per point (a stroke grows evenly along its length).
+- Speech at other speeds than 1× (pitch-kept time stretching).
+- A replay of the audience's screen while presenting (the presenter's view replays, the audience's shows the
+  document).
