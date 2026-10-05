@@ -1031,16 +1031,37 @@ bool CanvasView::snip(CanvasPage& canvasPage, const std::vector<xoj::util::Point
     if (!rectangle && outline.size() >= 3) {
         request.outline = outline;
     }
-    // At least what the screen shows, and 200 dpi (within the size limit)
-    request.scale = region::scaleFor(request.area, viewController.zoom() * dpr);
-    snipJob = std::async(std::launch::async, [this, doc, page, request, pending, index = static_cast<int>(*index)] {
+    // At least what the screen shows, and the resolution chosen (200 dpi; within the size limit)
+    const snip::Resolution sharpness = snip::resolution();
+    const double asked = std::max(viewController.zoom() * dpr, snip::minDpi(sharpness) / 72.0);
+    request.scale = region::scaleFor(request.area, viewController.zoom() * dpr, snip::minDpi(sharpness),
+                                     snip::maxPixels(sharpness));
+    const bool capped = request.scale < asked * 0.999;
+    const int at = static_cast<int>(*index);
+    snipJob = std::async(std::launch::async, [this, doc, page, request, pending, capped, at] {
         QImage image = region::renderImage(*doc, page, request, pending);
         const QRectF area(request.area.x, request.area.y, request.area.width, request.area.height);
         // (the view waits for this when it goes, so it is there to take it)
         QMetaObject::invokeMethod(
-                this, [this, image = std::move(image), index, area] { Q_EMIT snipped(image, index, area); },
+                this, [this, image = std::move(image), at, area, capped] { Q_EMIT snipped(image, at, area, capped); },
                 Qt::QueuedConnection);
     });
+    return true;
+}
+
+bool CanvasView::inkSweep(CanvasPage& canvasPage, const std::vector<xoj::util::Point<double>>& path, bool tapped) {
+    const auto index = indexOf(&canvasPage);
+    if (!index || path.empty()) {
+        return false;
+    }
+    QPolygonF points;
+    for (const auto& p: path) {
+        points << QPointF(p.x, p.y);
+        if (tapped) {
+            break;
+        }
+    }
+    Q_EMIT inkSwept(static_cast<int>(*index), points);
     return true;
 }
 

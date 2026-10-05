@@ -1037,6 +1037,19 @@
   paper takes the Dark palette; the highlighter lightens on dark paper (seam); the print dialog warns about ink
   ([dark-pages.md](dark-pages.md)).
 
+- **Copy tools, `qt/copy-tools` (2026-10-05).** Snip is a fixed tool of the rail after select (rectangle ↔ lasso,
+  Shift+S / Shift+L), no longer in the select list there (the classic bar keeps it in its list). Its resolution is a
+  setting (Settings → Documents → "Pictures copied to the clipboard", the snip's list, a snip entry's editor): the
+  screen's (at least 200 dpi, at most 4 MP, as before), 300 dpi or 600 dpi (at most 36 MP); the note after a snip names
+  the size and says when a picture was made smaller ([snip.md](snip.md)). The mark-PDF-text button cycles with **copy
+  handwriting as text** (Shift+T): one sweep over ink puts the recogniser's best readings of the words in reading order
+  on the clipboard and gives the tool before back at once; "Copy as text" on the selection's pill does the same with
+  the selected ink; a card near the words shows the text (selectable, unsure words grey). Lines not read yet are read
+  on demand as an urgent job of the recognition worker (first, the page being read gives way, only the lines of the
+  sweep); with the search off or no model the note says so with a way to Settings
+  ([handwriting-search.md](handwriting-search.md)). Short rails fold the fixed tools from their end, one more at a
+  time, instead of all at once ([toolbox.md](toolbox.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

@@ -24,6 +24,7 @@
 #include <QImage>
 #include <QObject>
 #include <QPointer>
+#include <QPolygonF>
 #include <QQuickTextDocument>
 #include <QRectF>
 #include <QString>
@@ -52,6 +53,7 @@ class QWindow;
 
 namespace xqt::hwr {
 class HandwritingSearch;
+struct InkStroke;
 }
 
 namespace xqt {
@@ -319,6 +321,14 @@ class AppController: public QObject {
     /// The snip tool (qt/docs/snip.md) is armed: "rect" or "lasso" ("": not). The next rectangle or lasso dragged on a
     /// page copies its picture to the clipboard, then the tool used before comes back.
     Q_PROPERTY(QString snip READ snipShape NOTIFY snipChanged)
+    /// How sharp a snip's picture is: "screen" (the screen's, at least 200 dpi; the default), "high" (300 dpi) or
+    /// "veryHigh" (600 dpi); Settings and the snip's list (Snip.h: the limits)
+    Q_PROPERTY(QString snipResolution READ snipResolution WRITE setSnipResolution NOTIFY snipResolutionChanged)
+    /// "Copy handwriting as text" is armed (qt/docs/handwriting-search.md, AppInkCopy.cpp): the next sweep (the
+    /// lasso's path) over ink copies the words there as text, then the tool used before comes back
+    Q_PROPERTY(bool inkCopy READ inkCopyArmed NOTIFY snipChanged)
+    /// The selection holds handwriting (pen strokes): its pill offers "Copy as text"
+    Q_PROPERTY(bool selectionHasInk READ selectionHasInk NOTIFY selectionChanged)
     Q_PROPERTY(bool selectMoreAvailable READ selectMoreAvailable NOTIFY selectMoreChanged)
     Q_PROPERTY(bool selectingMore READ selectingMore WRITE setSelectingMore NOTIFY selectMoreChanged)
     Q_PROPERTY(int selectedCount READ selectedCount NOTIFY selectMoreChanged)
@@ -1367,8 +1377,18 @@ public:
     Q_INVOKABLE void startSnip(const QString& shape);
     Q_INVOKABLE void cancelSnip();
     QString snipShape() const;
+    QString snipResolution() const;
+    void setSnipResolution(const QString& resolution);
     /// The link offered for a pasted snip (snipLinkOffered): a link to its source page next to the picture
     Q_INVOKABLE bool addSnipLink();
+    /// Copy handwriting as text (AppInkCopy.cpp, hwr/InkCopy.h): arm the tool (one sweep, then the tool in hand now
+    /// comes back, as a snip), or copy the selection's handwriting. The words' readings go to the clipboard in reading
+    /// order; lines not read yet are read first (the user waits: InkRecognitionService's urgent job). inkTextCopy says
+    /// how it went (also when the handwriting search is off or has no model). False: nothing to do.
+    Q_INVOKABLE bool startInkCopy();
+    Q_INVOKABLE bool copySelectionAsText();
+    bool inkCopyArmed() const;
+    bool selectionHasInk() const;
 
     // --- stickers (AppStickers.cpp, qt/docs/stickers.md) ---
     /// The picker's list (StickersModel): the library's Stickers folder or the app-wide set
@@ -1668,6 +1688,13 @@ Q_SIGNALS:
     /// Select more became available or not, was switched on or off, or what is selected changed (its count)
     void selectMoreChanged();
     void snipChanged();
+    void snipResolutionChanged();
+    /// Copying handwriting as text (startInkCopy, copySelectionAsText): `result.state` is "reading" (the words are
+    /// being read), "copied" (`text` is on the clipboard; `html` the same with the unsure words marked, `words`,
+    /// `unsure`, `partial`: lines left out, no model), "nothing" (no handwriting there), "off" (the handwriting search
+    /// is off) or "noModel"; `x`, `y`, `width`, `height`: where on the canvas (its item's coordinates), `reference`:
+    /// on the reference's canvas.
+    void inkTextCopy(const QVariantMap& result);
     /// A sticker was written (`path`) and is on the clipboard; or (`error` not empty) it could not be
     void stickerSaved(const QString& path, const QString& error);
     /// A sticker was pasted (or `error`)
@@ -1846,7 +1873,9 @@ private:
     void applyMarkdownText();
     // --- the snip tool (AppSnip.cpp) ---
     /// A view of `s` drew a snip's picture: onto the clipboard, the tool used before back
-    void snipped(xqt::DocumentSession& s, const QImage& image, int page, const QRectF& area);
+    void snipped(xqt::DocumentSession& s, const QImage& image, int page, const QRectF& area, bool capped);
+    /// The setting "snipResolution" to the snip tool (Snip.h)
+    void applySnipResolution();
     /// The snip ends: disarmed, and (`restore`) the tool used before back
     void endSnip(bool restore);
     /// Follow the snip tool: armed, the tool changing to another one ends it
@@ -1859,6 +1888,18 @@ private:
     void followTodoStampTool();
     ToolType snipTool = TOOL_NONE;      ///< the select tool the snip uses
     QPointer<xqt::CanvasView> snipLinkView;  ///< the view a snip with a link was pasted into
+    /// Arm the snip ("rect", "lasso") for a picture or for the handwriting as text
+    void armSnip(bool lasso, int purpose);
+    // --- copy handwriting as text (AppInkCopy.cpp) ---
+    /// The tool swept over a page of a view
+    void inkSwept(xqt::CanvasView* v, int page, const QPolygonF& path);
+    /// Read the handwriting of these strokes (the page's: only the lines meeting `area`; a selection's: all) and copy
+    /// the words `path` takes (empty: all of them); `box`: where it happens on the canvas (page points of `page`)
+    void copyInkText(xqt::CanvasView* v, int page, std::vector<xqt::hwr::InkStroke> strokes, const QRectF& area,
+                     const QPolygonF& path, const QRectF& box);
+    QVariantMap inkCopyPlace(xqt::CanvasView* v, int page, const QRectF& box) const;
+    /// The owner of the reading in flight (another copy cancels it)
+    std::unique_ptr<QObject> inkCopyOwner;
     // --- stickers (AppStickers.cpp) ---
     mutable std::unique_ptr<xqt::StickersModel> stickers;
     /// The stickers' list follows the library

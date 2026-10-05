@@ -42,13 +42,14 @@ Rectangle {
     /// The group of the tool in use (a cycling button), or ""
     readonly property string currentGroup: {
         const g = win.toolGroups
-        const names = ["pen", "shape", "select", "eraser"]
+        const names = ["pen", "shape", "select", "snip", "eraser"]
         for (let i = 0; i < names.length; ++i) if (g.isActive(names[i])) return names[i]
         return ""
     }
     /// The tool bar's button of a tool without variants
     readonly property var currentSlot: {
         const s = toolArea.slots, t = app.tool
+        if (app.inkCopy) return s.pdfText  // (copying handwriting: the text tools' button)
         if (t === "hand") return s.hand
         if (t === "text") return s.text
         if (t === "selectPdfTextLinear" || t === "selectPdfTextRect") return s.pdfText

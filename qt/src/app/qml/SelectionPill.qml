@@ -64,6 +64,15 @@ Pane {
             HoverHandler { id: countHover }
         }
         IconButton { objectName: pill.named("selectionCopy"); iconName: "xopp-edit-copy"; tip: qsTr("Copy (Ctrl+C)"); onClicked: pill.target.copySelection() }
+        // The handwriting in it as text (qt/copy-tools; the notes only): the readings of its words to the clipboard
+        IconButton {
+            objectName: pill.named("selectionCopyText")
+            visible: pill.target === app && app.selectionHasInk
+            iconName: "xqt-copy-ink-text"
+            label: qsTr("Copy as text")
+            tip: qsTr("Copy as text (the handwriting's words, as the handwriting search read them)")
+            onClicked: app.copySelectionAsText()
+        }
         IconButton { objectName: pill.named("selectionCut"); visible: !pill.readingOnly; iconName: "xopp-edit-cut"; tip: qsTr("Cut (Ctrl+X)"); onClicked: pill.target.cutSelection() }
         IconButton { objectName: pill.named("selectionPaste"); visible: !pill.readingOnly; iconName: "xopp-edit-paste"; tip: qsTr("Paste (Ctrl+V)"); onClicked: pill.target.pasteElements() }
         IconButton {

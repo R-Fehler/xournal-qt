@@ -53,11 +53,14 @@ Popup {
     readonly property var sectionNames: [qsTr("Pen"), qsTr("Touch"), qsTr("Stabilizer"), qsTr("Documents"),
         qsTr("Display"), qsTr("Search"), qsTr("New pages"), qsTr("Storage"), qsTr("Shortcuts"), qsTr("Help")]
     readonly property int shortcutsSection: 8
+    /// Search, with the handwriting search (copying handwriting as text points there when it is off)
+    readonly property int searchSection: 5
     function showSection(index) {
         sections.currentIndex = index
         sectionShown = true
     }
     function showShortcuts() { showSection(shortcutsSection) }
+    function showSearch() { showSection(searchSection) }
     /// Help (qt/docs/onboarding.md): the window shows the introduction, the tutorial, the question whether to start
     /// the tutorial again (the sheet is closed first)
     signal introRequested()
@@ -960,11 +963,25 @@ Popup {
                         }
                     }
                     Hint { text: qsTr("%F is the date (2026-09-19), %H-%M the time.") }
-                    // Pages as pictures (qt/docs/page-files.md): "Copy page as image" and the export use it
-                    SectionTitle { text: qsTr("Pages as pictures") }
+                    // Pictures put on the clipboard (qt/docs/snip.md, qt/docs/page-files.md): chosen here once, not asked
+                    // with every snip or copied page
+                    SectionTitle { text: qsTr("Pictures copied to the clipboard") }
                     RowLayout {
                         Layout.fillWidth: true
-                        Label { text: qsTr("Resolution"); Layout.preferredWidth: sheet.narrow ? -1 : 220 }
+                        Label { text: qsTr("Snip"); Layout.preferredWidth: sheet.narrow ? -1 : 220 }
+                        ComboBox {
+                            objectName: "snipResolutionBox"
+                            Layout.fillWidth: true
+                            readonly property var choices: sheet.inWindow && win.toolGroups ? win.toolGroups.snipResolutions : []
+                            model: choices.map(function(c) { return c.name })
+                            currentIndex: Math.max(0, choices.map(function(c) { return c.key }).indexOf(app.snipResolution))
+                            onActivated: app.snipResolution = choices[currentIndex].key
+                        }
+                    }
+                    Hint { text: qsTr("A snip of a large area gets fewer pixels than asked (at most about 36 megapixels at 300 or 600 dpi, 4 at the screen's); the note after a snip says its size.") }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label { text: qsTr("Pages"); Layout.preferredWidth: sheet.narrow ? -1 : 220 }
                         ComboBox {
                             objectName: "pageImageDpiBox"
                             readonly property var dpis: [150, 200, 300, 400, 600]

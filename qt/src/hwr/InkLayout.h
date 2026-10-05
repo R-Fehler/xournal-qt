@@ -32,6 +32,7 @@
 #include <QPointF>
 #include <QRectF>
 
+class Element;
 class XojPage;
 
 namespace xqt::hwr {
@@ -50,6 +51,8 @@ struct InkStroke {
 /// The pen strokes of the visible layers of a page, in the order they were written (layer by layer). The caller holds
 /// the document's lock (shared).
 std::vector<InkStroke> strokesOf(const XojPage& page);
+/// The pen strokes among these elements (a selection's), in their order.
+std::vector<InkStroke> strokesOf(const std::vector<const Element*>& elements);
 
 struct InkWordBox {
     QRectF box;                     ///< page points

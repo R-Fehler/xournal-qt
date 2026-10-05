@@ -73,6 +73,18 @@ IconButton {
                 onTriggered: button.groups.activate(button.group, modelData.key)
             }
         }
+        // A snip's resolution (a setting for every snip: chosen once, not asked each time)
+        Repeater {
+            model: button.group === "snip" ? button.groups.snipResolutions : []
+            delegate: AdaptiveMenuItem {
+                required property var modelData
+                objectName: "snipResolution_" + modelData.key
+                text: modelData.name
+                checkable: true
+                checked: app.snipResolution === modelData.key
+                onTriggered: app.snipResolution = modelData.key
+            }
+        }
         // The setsquare and the compass leave the page again
         AdaptiveMenuItem {
             objectName: "geometryPutAwayItem"

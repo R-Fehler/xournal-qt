@@ -150,6 +150,7 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppQuickNote.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppSnip.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppInkCopy.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppStickers.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTodos.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTags.cpp
@@ -277,6 +278,7 @@ set(XQT_QML_FILES
     src/app/qml/PdfTextPill.qml
     src/app/qml/NotePill.qml
     src/app/qml/SelectionPill.qml
+    src/app/qml/InkTextToast.qml
     src/app/qml/Popups.js
     src/app/qml/AdaptiveMenu.qml
     src/app/qml/AdaptiveMenuItem.qml
@@ -383,6 +385,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/PresenterViewTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/DocumentLinksTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/SnipTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/CopyToolsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/QuickNoteTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/StickerToolTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/TodosTest.cpp

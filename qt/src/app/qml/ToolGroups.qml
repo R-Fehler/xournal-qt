@@ -3,10 +3,11 @@
 // with the variant last used (remembered per group, in the settings); a long press lists all variants. The tool bar,
 // the tools of the compact chrome and the pen pill use the same groups, so they behave alike.
 //   pen       pen ↔ highlighter (freehand); the laser pointer and laser highlighter in the list only
-//   select    rectangle ↔ lasso (the multi-layer ones and the snips only in the list: a snip copies the picture of a
-//             rectangle or lasso and gives the tool back, qt/docs/snip.md)
-//   snip      rectangle ↔ lasso snip (one picture to the clipboard, then the tool before; the toolbox's snip entry
-//             cycles the same way, qt/docs/toolbox.md)
+//   select    rectangle ↔ lasso (the multi-layer ones only in the list; the snips too in the classic tool bar)
+//   snip      rectangle ↔ lasso snip (one picture to the clipboard, then the tool before, qt/docs/snip.md): with the
+//             toolbox a fixed tool of its own (qt/copy-tools, `snipButton`); the toolbox's snip entry cycles the same way
+//   text      mark PDF text ↔ copy handwriting as text (one sweep over ink, its words to the clipboard, then the tool
+//             before; qt/docs/handwriting-search.md); the PDF text tool's button, whose list also says how it marks
 //   shape     line, rectangle, ellipse, arrow, double arrow, coordinate system, recognized shapes (the pen draws them)
 //   geometry  setsquare ↔ compass (on the page; the geometry pill takes it away); curtain and spotlight only in the list (they are
 //             not tools of their own: they lie over the page whatever tool is in hand, qt/docs/curtain.md)
@@ -35,16 +36,25 @@ QtObject {
                 { key: "selectRegion", icon: "xopp-select-lasso", name: qsTr("Lasso") },
                 { key: "selectMultiLayerRect", icon: "xopp-select-rect", name: qsTr("Rectangle on all layers"), listOnly: true },
                 { key: "selectMultiLayerRegion", icon: "xopp-select-lasso", name: qsTr("Lasso on all layers"), listOnly: true },
-                { key: "snipRect", icon: "xqt-snip-rect", name: qsTr("Snip a rectangle (copy its picture)"), listOnly: true, snip: "rect" },
-                { key: "snipLasso", icon: "xqt-snip-lasso", name: qsTr("Snip with the lasso (copy its picture)"), listOnly: true, snip: "lasso" }
+                // (the classic tool bar: the snips stay in this list, as before; with the toolbox they have a button)
+                { key: "snipRect", icon: "xqt-snip-rect", name: qsTr("Snip a rectangle (copy its picture)"), listOnly: true, snip: "rect", classic: true },
+                { key: "snipLasso", icon: "xqt-snip-lasso", name: qsTr("Snip with the lasso (copy its picture)"), listOnly: true, snip: "lasso", classic: true }
             ]
         },
-        // The snips as a group of their own (the toolbox's snip entry): the icon shows which
+        // The snips as a group of their own (their button, the toolbox's snip entry): the icon shows which
         "snip": {
             name: qsTr("Snip (copy a picture)"),
             variants: [
                 { key: "snipRect", icon: "xqt-snip-rect", name: qsTr("Snip a rectangle (copy its picture)"), snip: "rect" },
                 { key: "snipLasso", icon: "xqt-snip-lasso", name: qsTr("Snip with the lasso (copy its picture)"), snip: "lasso" }
+            ]
+        },
+        // Text on the page: PDF text marked, or handwriting copied as text (one sweep, then the tool before)
+        "text": {
+            name: qsTr("Mark PDF text, copy handwriting"),
+            variants: [
+                { key: "markPdfText", icon: "xqt-mark-text", name: qsTr("Mark PDF text") },
+                { key: "copyInkText", icon: "xqt-copy-ink-text", name: qsTr("Copy handwriting as text") }
             ]
         },
         "shape": {
@@ -78,8 +88,19 @@ QtObject {
         }
     })
 
+    /// How sharp a snip's picture is (app.snipResolution; Settings and the snip's list, qt/docs/snip.md)
+    readonly property var snipResolutions: [
+        { key: "screen", name: qsTr("As sharp as the screen (at least 200 dpi)"), short: qsTr("Screen") },
+        { key: "high", name: qsTr("High resolution (300 dpi)"), short: qsTr("300 dpi") },
+        { key: "veryHigh", name: qsTr("Very high resolution (600 dpi)"), short: qsTr("600 dpi") }
+    ]
     function name(group) { return defs[group].name }
-    function variants(group) { return defs[group].variants }
+    /// The snips have a button of their own (the toolbox's fixed tools, qt/copy-tools): not in the select list then
+    property bool snipButton: false
+    function variants(group) {
+        const vs = defs[group].variants
+        return snipButton ? vs.filter(function(v) { return v.classic !== true }) : vs
+    }
     /// The variants a tap goes through (not the list-only ones)
     function cycle(group) { return defs[group].variants.filter(function(v) { return !v.listOnly }) }
     /// A variant that is the curtain (put out or taken away beside the group's tool, never remembered as its variant)
@@ -107,8 +128,12 @@ QtObject {
         if (group === "shape")
             return (tool === "pen" || tool === "highlighter") && type !== "default" && type !== "dontChange"
                    && type !== "spline" ? type : ""
-        if ((group === "select" || group === "snip") && app.snip !== "") return app.snip === "lasso" ? "snipLasso" : "snipRect"
-        if (group === "snip") return ""
+        if (group === "snip" || (group === "select" && app.snip !== "" && !snipButton))
+            return app.snip === "" ? "" : app.snip === "lasso" ? "snipLasso" : "snipRect"
+        // (the select tool in hand snips, or copies handwriting: the snip button's, the text button's)
+        if (group === "select" && (app.snip !== "" || app.inkCopy)) return ""
+        if (group === "text")
+            return app.inkCopy ? "copyInkText" : tool === "selectPdfTextLinear" || tool === "selectPdfTextRect" ? "markPdfText" : ""
         if (group === "select")
             return ["selectRect", "selectRegion", "selectMultiLayerRect", "selectMultiLayerRegion"].indexOf(tool) >= 0 ? tool : ""
         if (group === "geometry") return app.geometryTool
@@ -173,6 +198,12 @@ QtObject {
             app.drawingType = key  // (the pen, or the highlighter in hand, draws it)
         } else if (group === "select") {
             app.selectTool(key)
+        } else if (group === "text") {
+            if (key === "copyInkText") {
+                if (!app.startInkCopy()) return  // (the handwriting search is off: the window says so)
+            } else {
+                app.selectTool("selectPdfTextLinear")
+            }
         } else if (group === "geometry") {
             if (app.geometryTool !== key) app.toggleGeometryTool(key)
         } else if (group === "eraser") {
@@ -210,7 +241,7 @@ QtObject {
     readonly property Connections followTools: Connections {
         target: app
         function onToolChanged() {
-            ["pen", "shape", "select", "geometry"].forEach(function(g) {
+            ["pen", "shape", "select", "geometry", "text"].forEach(function(g) {
                 const a = groups.activeKey(g)
                 if (a !== "" && groups.snipOf(g, a) === "") groups.remember(g, a)
             })

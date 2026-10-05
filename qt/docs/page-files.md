@@ -67,7 +67,7 @@ The page menu acts on the selection when the page pressed is selected, else on t
   600 dpi gets less). The DPI is written into the files.
 - **One page exported** is also put on the clipboard (several pages: the clipboard is left alone, decided).
 - **Copy page as image** (Ctrl+Shift+C): the page (of a selection, the first) as a PNG on the clipboard at the
-  resolution of Settings → Storage → "Pages as pictures" (300 dpi at first; also changed by the export dialog), on
+  resolution of Settings → Documents → "Pictures copied to the clipboard" → Pages (300 dpi at first; also changed by the export dialog), on
   white paper, with its DPI in the PNG so that apps paste it at the page's size. At most 32 megapixels (an A4 page at
   600 dpi is 35): then less, and the toast says so. Toast: "Page 3 copied as an image (2480×3509)".
 - Always the normal colours: dark pages are a way of showing pages, never of exporting them.

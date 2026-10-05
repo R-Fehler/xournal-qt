@@ -763,9 +763,13 @@ the yellowy browny color used in illustration paper (blank and maybe texturized 
 black (warn the user that printing that pdf will use tons of ink). A6-A8 sound good. [...] B8 sounds very good, I am
 especially interested in importing annotations that come from the GoodNotes PDF exports (no. 1) and Drawboard PDF
 (no. 2); the rest like Mac Preview or iOS Preview and other PDF annotations hopefully work as well."
-- [ ] `qt/copy-tools`: snip one tap away (a fixed tool of its own on the rail, not only in the select list); copy
+- [x] `qt/copy-tools`: snip one tap away (a fixed tool of its own on the rail, not only in the select list); copy
   handwriting as text: a tool of its own (beside / cycling with mark PDF text) that copies the readings of the ink
   it is drawn over, and "Copy as text" on a selection of ink; a small popup shows the text now in the clipboard.
+  Also: the snip's resolution as a setting (screen, 300, 600 dpi). (Left: the device checks; the classic bar keeps
+  the snips in the select list; no live marking of the words during the sweep; "Copy as text" not on the
+  reference's pill; one heading with `qt/page-files`' page resolution: done at the merge.)
+: dark mode for pages (inverted on the GPU, pictures kept) with ink and highlighter colors shown
 - [x] `qt/dark-pages`: dark mode for pages (inverted on the GPU, pictures kept) with ink and highlighter colors shown
   as their dark equivalents (palette roles), readable in both; curated page colors (black, grey, illustration paper,
   textured paper) for `.xopp` and PDFs, with a printing warning for dark pages (2026-10-05, qt/docs/dark-pages.md;

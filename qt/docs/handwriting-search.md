@@ -1,8 +1,9 @@
 # Handwriting search
 
 Handwritten notes become searchable: Ctrl+F in a document, the library's search and other PDF apps find words you
-wrote by hand. The handwriting is **never turned into text** — the ink stays as it is; a recogniser reads it in the
-background and the search looks at what it read.
+wrote by hand. The handwriting is **never turned into text** in the document — the ink stays as it is; a recogniser
+reads it in the background and the search looks at what it read. What it read can be **copied as text** to the
+clipboard (below).
 
 ## Using it
 
@@ -27,6 +28,43 @@ What to expect:
 - Words of 1–2 letters are only found where the recogniser was sure (else "a" or "to" would be everywhere).
 - Drawings, arrows, underlines and filled shapes are left out; highlighter strokes never count.
 - Search terms of several words ("dumb test") find consecutive handwritten words, also across a line end.
+
+## Copy handwriting as text (qt/copy-tools)
+
+The author (2026-10-05): "copy handwritten text but make it its own tool similar to select pdf text (could be a cycle)
+to not interrupt the ink annotation flow. Or maybe when selecting inked words with the select tool offer to copy the
+text in addition to normal copy and give the user a small popup with the text that is now in the clipboard."
+
+- **The tool**: the mark-PDF-text button is a cycle, mark PDF text ↔ **copy handwriting as text** (a tap while one is
+  in use takes the other; held: both, and how PDF text is marked); **Shift+T**; on a phone, "My tools". Then one sweep
+  over the words (drawn like the lasso: along a line, a loop around a paragraph, or a tap on one word) copies them,
+  and the tool in hand before comes back at once: the pen writes on while the words are read. A sweep takes the words
+  whose box it touches (3 pt around them) or whose middle it encloses.
+- **"Copy as text"** beside Copy on the selection's pill, when the selection holds handwriting (pen strokes): every
+  word of it. The selection stays.
+- **The text**: the best reading of each word, in reading order: lines from the words' heights (a line written uphill
+  or with tall letters stays one), top to bottom, words left to right; words by spaces, lines by line breaks, and an
+  empty line where two lines are much further apart than the others (a paragraph). Only the clipboard gets it: nothing
+  is written into the document.
+- **The card**: near the words (above them, or below where there is no room) "Copied as text" with the text, which
+  can be selected (and copied again in part) but not edited: the clipboard has it as it is shown. Words the
+  recogniser was unsure of (below 0.5, as the search's lighter marks) are grey, with a note. Long texts scroll. It
+  hides after 5 s plus 40 ms per letter (at most 15 s), not while the pointer is on it or text in it is selected; ×
+  closes it. While lines not read before are read: "Reading the handwriting…" (after 300 ms; words read before come at
+  once).
+- **Not read yet**: the lines under the sweep (or of the selection) are read on demand, by the search's worker as a
+  job the user waits for: it goes before the pages queued for the search, a page being read gives way after its line
+  (and goes on afterwards), it waits neither for the pages in view nor while the user writes, and it reads only the
+  lines of the sweep's area. What it reads is kept in the line cache for the search as well.
+- **The search off**: the tool is not armed; the note says "Copying handwriting as text needs the handwriting search
+  (Settings → Search)" with **Settings**, which opens Settings at Search. **No model** (and nothing read before): "No
+  handwriting model to read it with (Settings → Search)", the same button. Lines left out for want of a model: the
+  card says so.
+- Code: `hwr/InkCopy.h` (the words a sweep takes, reading order), `InkRecognitionService::Job::area` / `urgent`,
+  `app/AppInkCopy.cpp`, `Snip.h` (`snip::Purpose::InkText`: armed like a snip, the lasso), `CanvasView::inkSwept`,
+  `InkTextToast.qml`, `ToolGroups.qml` (`text`). Tests: `InkCopyTest.*` (`-L hwr`: lines and reading order, the
+  sweep, the urgent jobs), `CopyToolsTest.*` (`-L ui`, with the scripted recogniser: the tool and the pen back, the
+  card and the unsure word, the pill's entry, the search off and no model).
 
 ## Languages and models
 

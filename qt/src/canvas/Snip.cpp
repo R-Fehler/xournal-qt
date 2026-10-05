@@ -7,15 +7,33 @@
 #include <QJsonObject>
 #include <QMimeData>
 
+#include "render/RegionRender.h"
+
 namespace xqt::snip {
 
 namespace {
 std::atomic<Shape> shape{Shape::None};
-}
+std::atomic<Purpose> what{Purpose::Picture};
+std::atomic<Resolution> sharpness{Resolution::Screen};
+}  // namespace
 
-void arm(Shape s) { shape = s; }
-void disarm() { shape = Shape::None; }
+void setResolution(Resolution r) { sharpness = r; }
+Resolution resolution() { return sharpness; }
+double minDpi(Resolution r) {
+    return r == Resolution::VeryHigh ? 600 : r == Resolution::High ? 300 : region::MIN_DPI;
+}
+double maxPixels(Resolution r) { return r == Resolution::Screen ? region::MAX_PIXELS : HIGH_MAX_PIXELS; }
+
+void arm(Shape s, Purpose p) {
+    what = p;
+    shape = s;
+}
+void disarm() {
+    shape = Shape::None;
+    what = Purpose::Picture;
+}
 Shape armed() { return shape; }
+Purpose purpose() { return what; }
 
 QByteArray encode(const Source& source) {
     QJsonObject o;

@@ -231,7 +231,11 @@ void InkRecognitionService::run() {
             }
             continue;
         }
+        // (urgent jobs first: the user waits for them)
         auto best = std::min_element(queue.begin(), queue.end(), [](const Queued& a, const Queued& b) {
+            if (a.job.urgent != b.job.urgent) {
+                return a.job.urgent;
+            }
             return a.job.priority < b.job.priority || (a.job.priority == b.job.priority && a.id < b.id);
         });
         Queued q = std::move(*best);
@@ -240,17 +244,26 @@ void InkRecognitionService::run() {
         runningFor = q.ownerKey;
         cancelRunning = false;
         lock.unlock();
-        const int read = process(q);
+        bool yielded = false;
+        const int read = process(q, yielded);
         lastWork = std::chrono::steady_clock::now();
         loaded = loaded || read > 0;
         lock.lock();
+        if (yielded && !cancelRunning && !stopping) {
+            queue.push_back(std::move(q));  // (after the urgent job; what it read is known by then)
+        }
         running = false;
         runningFor = nullptr;
         idle.notify_all();
     }
 }
 
-int InkRecognitionService::process(Queued& q) {
+bool InkRecognitionService::urgentWaiting() const {
+    std::lock_guard lock(mtx);
+    return std::any_of(queue.begin(), queue.end(), [](const Queued& q) { return q.job.urgent; });
+}
+
+int InkRecognitionService::process(Queued& q, bool& yielded) {
     const Layout layout = hwr::layout(q.job.strokes);
     PageResult result;
     result.id = q.id;
@@ -259,7 +272,11 @@ int InkRecognitionService::process(Queued& q) {
         std::lock_guard lock(mtx);
         return cancelRunning || stopping;
     };
+    const bool urgent = q.job.urgent;
     for (const InkLine& line: layout.lines) {
+        if (!q.job.area.isEmpty() && !line.box.intersects(q.job.area)) {
+            continue;  // (only the lines of the area)
+        }
         LineRef ref{line.hash, line.origin(), known(line.hash)};
         std::shared_ptr<Recognizer> r = recognizer();
         Context context;
@@ -268,8 +285,13 @@ int InkRecognitionService::process(Queued& q) {
         const bool ready = r && r->ready();
         if (!ref.result || (ready && !r->enough(*ref.result, context))) {
             if (ready) {
-                // Not before the pages in view are drawn, nor while the user writes
-                for (;;) {
+                // Not before the pages in view are drawn, nor while the user writes (unless the user waits for this
+                // job); a job the user waits for comes first (this one goes on after it)
+                for (; !urgent;) {
+                    if (urgentWaiting()) {
+                        yielded = true;
+                        return result.recognised;
+                    }
                     RenderService::waitForVisiblePages(std::chrono::milliseconds(500));
                     std::chrono::steady_clock::time_point until;
                     {

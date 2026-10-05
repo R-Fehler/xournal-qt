@@ -328,6 +328,30 @@ Popup {
                 }
             }
 
+            // --- how sharp every snip is (a setting of all snips, also in Settings) ---
+            RowLayout {
+                objectName: "toolEditorSnipResolution"
+                visible: editor.type === "snip"
+                Layout.fillWidth: true
+                Repeater {
+                    model: win.toolGroups.snipResolutions
+                    delegate: Button {
+                        required property var modelData
+                        objectName: "editorSnipResolution_" + modelData.key
+                        Layout.fillWidth: true
+                        flat: true
+                        checkable: true
+                        checked: app.snipResolution === modelData.key
+                        text: modelData.short
+                        font.pixelSize: 12
+                        ToolTip.visible: hovered
+                        ToolTip.text: modelData.name
+                        ToolTip.delay: 600
+                        onClicked: app.snipResolution = modelData.key
+                    }
+                }
+            }
+
             // --- the color: the palette's roles, the colors used lately, another one ---
             ColumnLayout {
                 objectName: "toolEditorColors"

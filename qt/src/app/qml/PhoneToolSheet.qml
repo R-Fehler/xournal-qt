@@ -20,17 +20,19 @@ BottomSheet {
     readonly property var slots: toolArea.slots
     readonly property var groups: win.toolGroups
     /// The group's button in the tool bar
-    readonly property var groupSlot: ({ pen: "pen", eraser: "eraser", select: "select", shape: "shape", geometry: "geometry" })
+    readonly property var groupSlot: ({ pen: "pen", eraser: "eraser", select: "select", snip: "snip", shape: "shape",
+                                        geometry: "geometry", text: "pdfText" })
 
     function variantCells(group) {
         return groups.variants(group).map(function(v) { return { group: group, key: v.key } })
     }
     readonly property var sections: [
         { name: "draw", title: toolbox ? qsTr("Other tools") : qsTr("Write and draw"),
-          cells: toolbox ? [{ slot: "hand" }, { slot: "touchDrawing" }, { slot: "write" }, { slot: "pdfText" }, { slot: "emoji" }]
+          cells: toolbox ? [{ slot: "hand" }, { slot: "touchDrawing" }, { slot: "write" }].concat(variantCells("text"), [{ slot: "emoji" }])
                          : variantCells("pen").concat(variantCells("eraser"), [{ slot: "hand" }, { slot: "touchDrawing" },
-                           { slot: "text" }, { slot: "write" }, { slot: "sticky" }, { slot: "pdfText" }, { slot: "emoji" }]) },
-        { name: "select", title: qsTr("Select"), cells: variantCells("select") },
+                           { slot: "text" }, { slot: "write" }, { slot: "sticky" }], variantCells("text"), [{ slot: "emoji" }]) },
+        // (the snips beside the selection: the same rectangle or lasso, its picture copied)
+        { name: "select", title: qsTr("Select and snip"), cells: variantCells("select").concat(variantCells("snip")) },
         { name: "shape", title: qsTr("Shapes"), cells: toolbox ? [] : variantCells("shape") },
         { name: "geometry", title: qsTr("Setsquare, compass and curtain"), cells: variantCells("geometry") },
         { name: "insert", title: qsTr("Insert"), cells: [{ slot: "image" }, { slot: "sticker" }, { slot: "record" }, { slot: "addPage" }] },
@@ -57,7 +59,8 @@ BottomSheet {
     /// ... held (or right-clicked): the button's own long press, if it has one
     function hold(cell) {
         const b = buttonOf(cell)
-        if (cell.slot === undefined || !b.ownHold) return false
+        // (a variant: only the text tools' own list, which also says how PDF text is marked)
+        if (cell.slot === undefined ? cell.group !== "text" : !b.ownHold) return false
         close()
         Qt.callLater(function() { b.pressAndHold() })
         return true

@@ -243,12 +243,21 @@ TEST_F(ToolboxTest, dockedAtTheRightWithUndoAndRedoAndTheFixedTools) {
         ASSERT_TRUE(shown(b)) << v.toMap().value("type").toString().toStdString();
         EXPECT_TRUE(inside(b, box));
     }
-    for (const char* name: {"handButton", "selectButton", "textModeButton", "geometryButton", "pdfTextButton",
-                            "touchDrawingButton"}) {
-        auto* b = find(name);
-        ASSERT_TRUE(shown(b)) << name;
-        EXPECT_TRUE(inside(b, box)) << name;
+    // (at 1920×1080 the rail is a little short for all of them: the last ones are in one stack after the others)
+    const int fixedShown = box->property("fixedShown").toInt();
+    EXPECT_GE(fixedShown, 5) << "hand, select, snip, write, setsquare on their own";
+    const char* fixedNames[] = {"handButton", "selectButton", "snipButton", "textModeButton", "geometryButton",
+                                "pdfTextButton", "touchDrawingButton"};
+    for (int i = 0; i < 7; ++i) {
+        auto* b = find(fixedNames[i]);
+        if (i < fixedShown) {
+            ASSERT_TRUE(shown(b)) << fixedNames[i];
+            EXPECT_TRUE(inside(b, box)) << fixedNames[i];
+        } else {
+            EXPECT_FALSE(shown(b)) << fixedNames[i] << ": in the stack";
+        }
     }
+    EXPECT_EQ(shown(find("toolboxFixedStack")), fixedShown < 7);
     EXPECT_TRUE(shown(find("toolboxAddButton")));
     // The classic tools are not in the command bar
     for (const char* name: {"penButton", "eraserButton", "shapeButton", "textButton", "stickyNoteButton"}) {
@@ -362,11 +371,14 @@ TEST_F(ToolboxTest, aShortRailFoldsSectionsIntoStacksAndKeepsTheOneInHand) {
     until([&] { return !flyout->property("visible").toBool(); });
     EXPECT_TRUE(shown(find("toolStack_" + pen1))) << "the stack shows the pen in hand now";
 
-    // Taller again: everything unfolds
-    resize(1920, 1080);
+    // Taller again: everything unfolds (the last fixed tools only where the rail is too short for them)
+    resize(1920, 1200);
     EXPECT_TRUE(shown(entry(pen1)));
     EXPECT_TRUE(shown(find("handButton")));
     EXPECT_FALSE(shown(find("toolboxFixedStack")));
+    resize(1920, 1080);
+    EXPECT_TRUE(shown(entry(pen1)));
+    EXPECT_TRUE(shown(find("handButton")));
 }
 
 TEST_F(ToolboxTest, theClassicBarComesBackWithItsSetting) {
@@ -848,7 +860,7 @@ TEST_F(ToolboxTest, theCommandBarShowsEntriesOfTheMoreMenuWhereThereIsRoom) {
     EXPECT_FALSE(shown(find("milestoneButton"))) << "a new document keeps no versions";
     EXPECT_TRUE(item("saveWithMessageItem")->property("offered").toBool());
     // One place each: the rail's fixed tools are not in the bar
-    for (const char* fixed: {"handButton", "selectButton", "textModeButton"}) {
+    for (const char* fixed: {"handButton", "selectButton", "snipButton", "textModeButton"}) {
         EXPECT_FALSE(inside(find(fixed), find("topTools"))) << fixed;
     }
     // The ladder: the tags give way first, sharing last
@@ -1146,6 +1158,7 @@ protected:
 // The record button is a fixed tool of the rail (one place: not in the command bar too), so recording is there docked,
 // floating in full screen and on a phone's sheet; the recording pill stays in sight, clear of the toolbox
 TEST_F(ToolboxAudioTest, recordingIsAFixedToolOfTheRailAndItsPillStaysInSight) {
+    resize(1920, 1200);  // (room for all the fixed tools: at 1080 the last ones are in a stack)
     auto* box = find("toolbox");
     auto* record = find("recordButton");
     ASSERT_NE(record, nullptr);

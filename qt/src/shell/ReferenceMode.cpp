@@ -127,11 +127,14 @@ void ReferenceMode::update() {
         // The text tool on a Markdown text (only while the reference is written in: else the tool scrolls)
         connections.push_back(connect(v, &CanvasView::markdownRequested, this, &ReferenceMode::markdownRequested));
         connections.push_back(connect(v, &CanvasView::markdownBoxRequested, this, &ReferenceMode::markdownBoxRequested));
-        connections.push_back(connect(v, &CanvasView::snipped, this, [this, v](const QImage& image, int page, const QRectF& area) {
-            Q_EMIT snipped(v, image, page, area);
-        }));
+        connections.push_back(connect(v, &CanvasView::snipped, this,
+                                      [this, v](const QImage& image, int page, const QRectF& area, bool capped) {
+                                          Q_EMIT snipped(v, image, page, area, capped);
+                                      }));
         connections.push_back(connect(v, &CanvasView::snipLinkOffered, this,
                                       [this, v](const QString& title) { Q_EMIT snipLinkOffered(v, title); }));
+        connections.push_back(connect(v, &CanvasView::inkSwept, this,
+                                      [this, v](int page, const QPolygonF& path) { Q_EMIT inkSwept(v, page, path); }));
     }
     relock();
     Q_EMIT changed();

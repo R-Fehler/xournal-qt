@@ -3621,7 +3621,7 @@ Seen through the replay (⋮ → View → Replay the writing).
       only the ink is opaque (a checkerboard in GIMP); with dark pages on, the pictures still have the normal colours.
 - [ ] Ctrl+Shift+C on a slide: the toast "Page N copied as an image (2480×3509)"; paste it into LibreOffice, Word,
       GIMP, a chat app (Signal, Slack, Teams): it arrives sharp (zoom in: no screenshot blur) and at the page's size in
-      Office. Settings → Storage → Pages as pictures → 600 dpi: an A4 page says it is smaller than asked (the pixel
+      Office. Settings → Documents → Pictures copied to the clipboard → Pages → 600 dpi: an A4 page says it is smaller than asked (the pixel
       limit); the same from the page menu's copy icon and the grid's ⋯ menu. Windows: paste into Paint and Word.
 - [ ] Export one page as pictures: it is on the clipboard too (paste it).
 - [ ] `xournal-qt-cli --png-dir=out --export-range=1-3 doc.xopp`: `out/doc-p001.png` … `doc-p003.png`.
@@ -3659,3 +3659,29 @@ On the Surface Pro 8 (Windows, Direct3D) and the Linux laptop (OpenGL), and on t
       does not (a plain color), the highlights are invisible there (Xournal++ multiplies).
 - [ ] Insert pages and the Settings → New pages paper: the same swatches; new pages copy the paper of the page before.
 - [ ] Print a document with black pages: the print dialog says it uses a lot of ink; white pages: nothing is said.
+
+## Copy tools (qt/copy-tools)
+
+- [ ] The toolbox (1920×1080 and the Surface): the snip button sits after select among the fixed tools; tap it, drag a
+      rectangle: "Copied picture (… pixels, … dpi)", the pen back. Tap it, tap it again while armed: the lasso. Hold
+      it: the shapes and the three resolutions. The select button's list has no snips. With the rail short (a smaller
+      window) the last fixed tools go into one stack after the others (the stack shows the one in use), not all of
+      them at once.
+- [ ] Settings → Documents → "Pictures copied to the clipboard" → Snip: "Very high resolution (600 dpi)"; snip half a
+      page and paste it into another app (LibreOffice, GIMP): sharp, at the size it had on the page; the note says
+      600 dpi. A whole A3 page at 600 dpi: the note says the area is too large for more; the app stays responsive.
+- [ ] Handwriting search on (Settings → Search), a page of notes read: with the pen, hold the mark-PDF-text button →
+      "Copy handwriting as text"; sweep along a written line with the pen: the pen is back at once (write right
+      away); a card above the line shows the words; paste into a text editor: the same text. A loop around a
+      paragraph: its lines in order, line breaks between them. Shift+T, then a tap on one word: that word.
+- [ ] The text button remembers it: tap it from the pen: the next sweep copies again; tap it while copying is armed:
+      mark PDF text. Write a new line and sweep it at once: "Reading the handwriting…", then the text (the worker
+      reads it first, not after the other pages).
+- [ ] Select some handwriting with the lasso: the pill offers "Copy as text" beside Copy; tap it: the card, the text
+      on the clipboard, the selection stays. A selection of a picture alone: no "Copy as text".
+- [ ] The card: grey words where the recogniser was unsure, the note under the text; select part of the text and copy
+      it with Ctrl+C; a long paragraph scrolls; it stays while the pointer is on it, then goes; × closes it.
+- [ ] Handwriting search off: Shift+T says it needs the handwriting search, "Settings" opens Settings at Search. On,
+      but no model: a sweep says so, with the same button.
+- [ ] Phone (Fold 7): "My tools" → Other tools: "Mark PDF text" and "Copy handwriting as text"; Select and snip: the
+      selections and the two snips.
