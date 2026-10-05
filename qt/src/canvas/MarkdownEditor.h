@@ -104,6 +104,10 @@ public:
         double y = 0;
     };
     Target target() const;
+    /// This box is (a page of) the text being written.
+    bool edits(const Text* box) const {
+        return box && std::any_of(parts.begin(), parts.end(), [box](const Part& p) { return p.box == box; });
+    }
     const std::string& text() const { return md.text(); }
     /// The cursor and the other end of the selection (source offsets).
     size_t cursorPosition() const { return caret; }

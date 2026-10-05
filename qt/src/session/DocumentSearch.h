@@ -95,6 +95,8 @@ public:
     /// for: the search changes when it is there). May be called from the scene graph's thread while the UI thread
     /// waits.
     const std::vector<Place>* placesOn(size_t page, bool ask = true) const;
+    /// Where the hits of a page are drawn, placed now if they are not yet (nullptr: its PDF text is not read yet).
+    const std::vector<Place>* placeNow(size_t page);
     /// The current hit: its number among all (0-based; -1: none), its page, its number on that page.
     int currentHit() const;
     size_t currentPage() const { return curPage; }

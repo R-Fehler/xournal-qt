@@ -251,6 +251,15 @@ const std::vector<DocumentSearch::Place>* DocumentSearch::placesOn(size_t page, 
     return nullptr;
 }
 
+const std::vector<DocumentSearch::Place>* DocumentSearch::placeNow(size_t page) {
+    if (const auto* known = placesOn(page, false)) {
+        return known;
+    }
+    place(page);
+    auto it = places.find(page);
+    return it == places.end() ? nullptr : &it->second;
+}
+
 void DocumentSearch::placeWanted() {
     std::set<size_t> pages;
     {

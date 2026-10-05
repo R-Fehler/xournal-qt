@@ -123,6 +123,21 @@ std::string MarkdownSession::beginBox(size_t pageNo, const md::Style& s, double 
     return start(pageNo, s, false, x, y);
 }
 
+std::string MarkdownSession::beginText(size_t pageNo, const Text* box) {
+    if (!box) {
+        return {};
+    }
+    wanted = box;
+    const auto& at = box->getTransformation().shift;
+    std::string source = start(pageNo, md::Style{}, false, at.x, at.y);
+    wanted = nullptr;
+    if (!chain.empty() && chain.front().box != box) {
+        end();  // (not on that page)
+        return {};
+    }
+    return source;
+}
+
 MarkdownSession::Page MarkdownSession::pageOf(const PageRef& page, double x, double y) {
     Page p;
     p.page = page;
@@ -132,7 +147,18 @@ MarkdownSession::Page MarkdownSession::pageOf(const PageRef& page, double x, dou
         // A sticky note there: its one Markdown text, in the note's layer, the note being its frame (the text at its
         // top left, as wide as the note; qt/docs/sticky-notes.md)
         std::shared_lock lock(*session.getDocument());
-        if (Layer* note = sticky::openNoteAt(*page, x, y)) {
+        Layer* note = nullptr;
+        if (wanted) {  // (beginText: the note that holds it, if it is a note's text)
+            for (Layer* l: page->getLayers()) {
+                if (l->indexOf(wanted) != Element::InvalidIndex) {
+                    note = sticky::isNote(*l) ? l : nullptr;
+                    break;
+                }
+            }
+        } else {
+            note = sticky::openNoteAt(*page, x, y);
+        }
+        if (note) {
             const sticky::Look look = *sticky::lookOf(*note);
             const auto origin = sticky::textOrigin(look);
             p.layer = note;
@@ -153,6 +179,7 @@ MarkdownSession::Page MarkdownSession::pageOf(const PageRef& page, double x, dou
         if (p.layer) {
             // (the page's text: at the margins, or where older text of a small page is, PageMargins::pageBox)
             p.box = pageText ? PageMargins::pageBox(*p.layer, page)
+                    : wanted ? (p.layer->indexOf(wanted) != Element::InvalidIndex ? const_cast<Text*>(wanted) : nullptr)
                              : (p.layer->isVisible() ? md::boxAt(*p.layer, x, y) : nullptr);
         }
         if (p.box) {

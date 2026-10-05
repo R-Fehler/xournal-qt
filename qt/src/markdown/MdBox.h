@@ -70,6 +70,9 @@ std::vector<std::string> shownTexts(const Text& text);
 /// Where bytes [from, to) of its shown text `index` are drawn (page coordinates): a rectangle per line (a part of a
 /// formula's source: the formula).
 std::vector<Rect> shownRects(const Text& text, size_t index, int from, int to);
+/// Where bytes [begin, end) of a box's text (its source) are drawn (page coordinates): a rectangle per line of each
+/// text they are in, as the box is drawn (also while it is written on the page). Marks that are not drawn have none.
+std::vector<Rect> sourceRects(const Text& text, size_t begin, size_t end);
 /// A box written on the page is drawn with the block of the cursor as its source (layout() with `active`): the
 /// cursor's offset in the box's text, NO_SOURCE when it is not written any more. Any thread may read it.
 void setWritingCursor(const Text& text, size_t active);

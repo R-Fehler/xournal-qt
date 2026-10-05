@@ -140,6 +140,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TextFlow.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownSession.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownSession.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/FindReplace.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/FindReplace.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/PageResize.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/PageResize.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/PageRotate.h
@@ -214,6 +216,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PageSizeTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PageRotateTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TextDocumentTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/FindReplaceTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PdfTextDocumentTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/EmojiEditingTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/ScreenCalibrationTest.cpp

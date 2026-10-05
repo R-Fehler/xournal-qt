@@ -218,6 +218,16 @@ std::vector<Rect> shownRects(const Text& text, size_t index, int from, int to) {
     return {};
 }
 
+std::vector<Rect> sourceRects(const Text& text, size_t begin, size_t end) {
+    const auto& shift = text.getTransformation().shift;
+    auto rects = sourceRects(shownLayout(text), begin, end);
+    for (Rect& r: rects) {
+        r.x += shift.x;
+        r.y += shift.y;
+    }
+    return rects;
+}
+
 std::vector<Rect> findText(const Text& text, const std::string& search) {
     const auto& shift = text.getTransformation().shift;
     auto found = findText(shownLayout(text), search);
