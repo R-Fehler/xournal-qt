@@ -693,15 +693,19 @@ section "Confirmed by the author" (it overrides the plan's steps where they diff
 "Implement comparing two versions using the reference view but add a locked scroll toggle so both canvases are
 scrolled at the same time. Make this generic so we can use that toggle in the reference view to compare PDFs in
 general."
-- [ ] A **locked scroll** toggle in the reference view, for any two documents (two PDFs, a document and itself, a
+- [x] A **locked scroll** toggle in the reference view, for any two documents (two PDFs, a document and itself, a
   version and now): while on, scrolling, paging and zooming one side moves the other the same way. The pairing is
   by page, with the offset the two had when it was switched on (page 3 here beside page 1 there stays so), and
   the position within the page relative to its size (pages of other sizes still line up); remembered per pair.
-- [ ] **Compare a version**: in the History panel, "Compare with now" opens the version in the reference view
+  (Built: `ScrollLock`, zoom relative to each half's fitting width; no default key. Left: the device checks.)
+- [x] **Compare a version**: in the History panel, "Compare with now" opens the version in the reference view
   beside the current document, locked; the pages that changed between the two are marked (from the layer sigs),
   with next/previous change. Also "Compare two versions" (pick two in the list).
+  (Built: "Compare with now", "Compare with another version…"; pages compared by what they hold, `VersionDiff`, not
+  by the marker's sigs: they miss unsaved changes and change with the app's version. Left: the device checks.)
 - [ ] If cheap: on a changed page, what was added and what was removed highlighted (elements matched by their
-  serialized form, `xqt-created` helping), as a toggle.
+  serialized form, `xqt-created` helping), as a toggle. (Not built: needs an overlay on the canvas pages; the
+  per-element signatures are there in `VersionDiff`.)
 
 ### Encrypted PDFs (the author, 2026-10-05; `qt/pdf-encryption`)
 "Support pdf encryption and opening of encrypted PDFs using qpdf."
@@ -724,6 +728,24 @@ general."
   history is unavailable for encrypted files (said so in the History panel). (Feasible and built for AES-256: appends
   are encrypted, version history works; files with older encryption are written in full and keep no versions, which
   the History panel says.)
+
+### The adaptive UI reworked (the author, 2026-10-05; `qt/ui-rework`)
+"The classic toolbar can be ignored for now, I believe the new approach is better. The main toolbar is now very
+empty. Populate it with the important new tools. Also think of the cycling groups we currently have and whether we
+can have the snipping screenshots as a cycling tool in the toolbelt for example. Also for the toolbelt, the dashed
+and dotted line buttons just show a regular line. When I select something on the toolbelt popup the popup moves to
+the upper left position of the window instead of staying at the toolbelt. The reader mode sucks. The menu is half
+cut off the lower part of the screen and I feel like we should just reuse the full screen or present mode with a
+read only / readmode toggle that allows skipping to next prev page with big touch areas on the left and right side
+of the screen."
+- [ ] The command bar (the top bar in the toolbox mode) carries the important tools added since it was made, in the
+  ladder's order of priority (the classic tool bar is left as it is).
+- [ ] The cycling groups reviewed; the snips (rectangle ↔ lasso) a cycling tool that can be put in the toolbox.
+- [ ] Bug: the toolbox popup shows dashed and dotted line styles as a plain line.
+- [ ] Bug: choosing something in a toolbox popup moves the popup to the window's top left.
+- [ ] Reading replaced: full screen and presenting get a read-only toggle; while on, big tap areas at the left and
+  right edges go to the previous and next page; ⋮ → View → Read enters it. The reading pill (its menu cut off at the
+  bottom of the screen) goes.
 
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message

@@ -30,6 +30,7 @@ VersionCache& VersionCache::instance() {
 }
 
 VersionCache::VersionCache() {
+    ownFolder = (Util::getCacheSubfolder("versions") / std::to_string(Util::getPid())).lexically_normal();
     // What other processes left behind (a crash): after a day
     std::error_code ec;
     const fs::path root = Util::getCacheSubfolder("versions");
@@ -80,6 +81,8 @@ void VersionCache::forget(const fs::path& pdf) {
     for (auto it = entries.begin(); it != entries.end();) {
         std::error_code ec;
         if (it->source == pdf || fs::equivalent(it->source, pdf, ec)) {
+            // (also one that is shown: its tab was closed first, AppController::applyProtection)
+            pins.erase(it->file.lexically_normal());
             fs::remove_all(it->file.parent_path(), ec);
             it = entries.erase(it);
         } else {
@@ -88,10 +91,47 @@ void VersionCache::forget(const fs::path& pdf) {
     }
 }
 
+fs::path VersionCache::sourceOf(const fs::path& file) const {
+    std::lock_guard lock(m);
+    for (const auto& e: entries) {
+        if (e.file.lexically_normal() == file.lexically_normal()) {
+            return e.source;
+        }
+    }
+    return {};
+}
+
+auto VersionCache::pin(const fs::path& file) -> Pin {
+    if (!contains(file)) {
+        return {};
+    }
+    const fs::path key = file.lexically_normal();
+    {
+        std::lock_guard lock(m);
+        ++pins[key];
+    }
+    return Pin(nullptr, [this, key](void*) {
+        std::lock_guard lock(m);
+        if (auto it = pins.find(key); it != pins.end() && --it->second <= 0) {
+            pins.erase(it);
+            trim();  // (unused again: over the limit, it goes)
+        }
+    });
+}
+
+bool VersionCache::pinned(const fs::path& file) const {
+    std::lock_guard lock(m);
+    return pins.count(file.lexically_normal()) > 0;
+}
+
 void VersionCache::trim() {
     uint64_t total = 0;
     size_t n = 0;
     for (auto it = entries.begin(); it != entries.end();) {
+        if (pins.count(it->file.lexically_normal())) {
+            ++it;  // (shown: never removed, not counted)
+            continue;
+        }
         total += it->bytes;
         ++n;
         if (n > 1 && (n > limitCount || total > limitBytes)) {
@@ -105,8 +145,11 @@ void VersionCache::trim() {
 }
 
 bool VersionCache::contains(const fs::path& file) const {
+    if (file.empty()) {
+        return false;
+    }
     const fs::path f = file.lexically_normal();
-    return f.parent_path().parent_path() == folder().lexically_normal();
+    return f.parent_path().parent_path() == ownFolder;
 }
 
 void VersionCache::clear() {

@@ -90,6 +90,7 @@ class LibraryModel;
 class RecentFiles;
 class ReferenceMode;
 class VersionsModel;
+class VersionCompare;
 class PresenterConsole;
 class StickersModel;
 namespace DocumentFiles {
@@ -322,6 +323,10 @@ class AppController: public QObject {
     Q_PROPERTY(QString pdfTextMode READ pdfTextMode WRITE setPdfTextMode NOTIFY pdfTextModeChanged)
     /// Reference mode: another document beside the current one (xqt::ReferenceMode).
     Q_PROPERTY(QObject* reference READ referenceObject CONSTANT)
+    /// Comparing two versions, or a version and now, in the reference view (xqt::VersionCompare)
+    Q_PROPERTY(QObject* compare READ compareObject CONSTANT)
+    /// The current document is a version of a PDF with notes cut out of its file: shown read-only
+    Q_PROPERTY(bool viewingVersion READ viewingVersion NOTIFY documentChanged)
     /// The presenter view on a second screen while presenting (xqt::PresenterConsole, qt/docs/presenter-view.md)
     Q_PROPERTY(QObject* presenter READ presenterObject CONSTANT)
     /// Looking up selected text, papers of references, arXiv (Citations.h, qt/docs/citations.md)
@@ -965,6 +970,15 @@ public:
     Q_INVOKABLE bool viewVersion(int id);
     /// Open version `id` as a new document that is not saved yet (named after it).
     Q_INVOKABLE bool openVersionAsCopy(int id);
+    /// "Compare with now": version `id` beside the document (as viewVersion), scrolled together, its changed pages
+    /// marked (`compare`).
+    Q_INVOKABLE bool compareWithNow(int id);
+    /// "Compare two versions": the newer one shown read-only in a tab of its own, the older one beside it, as
+    /// compareWithNow.
+    Q_INVOKABLE bool compareVersions(int first, int second);
+    QObject* compareObject() const;
+    xqt::VersionCompare& versionCompare() const { return *compareMode; }
+    bool viewingVersion() const;
 
     /// Show a file beside the current document, as its reference (opened as a tab if it is not open yet; an untouched
     /// new document stays, to write the notes in). Without a document open: opened as the document. The current
@@ -1793,6 +1807,7 @@ private:
     void handOverHandwriting(xqt::DocumentSession& s);
     std::unique_ptr<xqt::TabManager> tabs;
     std::unique_ptr<xqt::ReferenceMode> referenceMode;  ///< (after `tabs`, reset before it)
+    std::unique_ptr<xqt::VersionCompare> compareMode;   ///< (after `referenceMode`, reset before it)
     std::unique_ptr<xqt::PresenterConsole> presenter;   ///< (after `tabs`, reset before it)
     std::unique_ptr<xqt::Citations> citations;
     std::unique_ptr<xqt::AudioControl> audioControl;  ///< (one recording per window; qt/docs/audio.md)

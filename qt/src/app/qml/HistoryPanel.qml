@@ -1,7 +1,8 @@
 // The History panel of the page sidebar (qt/docs/hybrid-pdf.md, "Version history"): the versions a PDF with notes
 // keeps inside itself, newest first. While versions are not kept, what it does and the switch to keep them (off by
-// default, but here to be found). A row's menu: show it beside the document (read-only), restore it (a new version on
-// top, undoable), open it as a copy, give it a message. "Save with a message…" (Ctrl+Alt+S) makes a milestone.
+// default, but here to be found). A row's menu: show it beside the document (read-only), compare it with now or with
+// another version (picked next in the list; app.compare), restore it (a new version on top, undoable), open it as a
+// copy, give it a message. "Save with a message…" (Ctrl+Alt+S) makes a milestone.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -14,6 +15,8 @@ Item {
     signal picked()
     /// Open the dialog that gives version `id` a message (-1: the next save, "Save with a message…")
     signal messageRequested(int id)
+    /// "Compare with another version…": the version to compare (-1: none); the next version tapped is the other one
+    property int compareFrom: -1
 
     Flickable {
         id: intro
@@ -177,6 +180,31 @@ Item {
             font.pixelSize: 11
             color: "#6b6f75"
         }
+        // Picking the second version of a comparison
+        Pane {
+            objectName: "historyPickBanner"
+            Layout.fillWidth: true
+            Layout.leftMargin: 6
+            Layout.rightMargin: 6
+            visible: panel.compareFrom >= 0
+            padding: 8
+            background: Rectangle { color: "#f3e8fd"; radius: 6 }
+            RowLayout {
+                width: parent.width
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    font.pixelSize: 12
+                    text: qsTr("Tap the version to compare with %1.").arg(panel.model.titleOf(panel.compareFrom))
+                }
+                Button {
+                    objectName: "historyPickCancel"
+                    text: qsTr("Cancel")
+                    flat: true
+                    onClicked: panel.compareFrom = -1
+                }
+            }
+        }
         Label {
             objectName: "historyRemoved"
             Layout.fillWidth: true
@@ -218,6 +246,13 @@ Item {
                 enabled: kind === "version"
                 Accessible.name: title + (message !== "" ? ", " + message : "")
                 onClicked: {
+                    if (panel.compareFrom >= 0) {
+                        // (the second version of "Compare with another version…")
+                        const first = panel.compareFrom
+                        panel.compareFrom = -1
+                        if (first !== versionId && app.compareVersions(first, versionId)) panel.picked()
+                        return
+                    }
                     rowMenu.versionId = versionId
                     rowMenu.current = current
                     rowMenu.received = detail === qsTr("The PDF as it was received")
@@ -299,6 +334,19 @@ Item {
             text: qsTr("Show beside the document")
             icon.source: app.iconUrl("xqt-book-open")
             onTriggered: { if (app.viewVersion(rowMenu.versionId)) panel.picked() }
+        }
+        AdaptiveMenuItem {
+            objectName: "historyCompareNow"
+            text: qsTr("Compare with now")
+            icon.source: app.iconUrl("xqt-compare")
+            onTriggered: { if (app.compareWithNow(rowMenu.versionId)) panel.picked() }
+        }
+        AdaptiveMenuItem {
+            objectName: "historyCompareTwo"
+            offered: panel.model.versionCount > 1
+            text: qsTr("Compare with another version…")
+            icon.source: app.iconUrl("xqt-compare")
+            onTriggered: panel.compareFrom = rowMenu.versionId
         }
         AdaptiveMenuItem {
             objectName: "historyRestore"

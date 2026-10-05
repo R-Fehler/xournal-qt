@@ -38,6 +38,7 @@
 #include "util/Util.h"
 #include "util/PlaceholderString.h"
 #include "util/i18n.h"
+#include "VersionCache.h"
 #include "util/raii/CairoWrappers.h"
 #include "util/safe_casts.h"
 #include "view/DocumentView.h"
@@ -1104,7 +1105,10 @@ fs::path DocumentSession::documentFile() const {
 }
 
 bool DocumentSession::isReadOnly() const {
-    return replaying || (!shownPath.empty() && shownReadOnly && !hasFilePath());
+    // Also a version of a PDF with notes cut out of its file (VersionCache): it is shown to read and compare, a
+    // throwaway copy that nothing should be written into (qt/docs/hybrid-pdf.md, "Version history")
+    return replaying || (!shownPath.empty() && shownReadOnly && !hasFilePath()) ||
+           (hasFilePath() && VersionCache::instance().contains(getFilePath()));
 }
 
 void DocumentSession::setShownFile(const fs::path& file, bool readOnly) {

@@ -153,6 +153,21 @@ public:
     void zoomToPageRect(size_t page, QRectF rectPt);
     void panBy(QPointF deltaView);
     void scrollToPage(size_t page);
+
+    // --- a place in the document, for keeping two views together (ScrollLock, qt/docs/reference-view.md) ------------
+    /// A page and a point on it relative to its size (0..1 across the page; outside it in the gap around it)
+    struct Place {
+        size_t page = 0;
+        QPointF relative;
+    };
+    /// The place under a point of the view (none: no pages): on the page nearest to it, or on `page`
+    std::optional<Place> placeAt(QPointF viewPos, std::optional<size_t> page = std::nullopt) const;
+    /// Scroll so that a place (its page clamped to the pages there are) is under a point of the view. Stops momentum
+    /// and an animation; nothing when the view has no size yet.
+    void showPlace(const Place& place, QPointF viewPos);
+    size_t pageCount() const { return layout->pageCount(); }
+    /// The pages go sideways (the layout's horizontal mode)
+    bool horizontal() const { return layout->horizontal(); }
     /// Make a rectangle of a page (in page points) visible, centred if it has to scroll (e.g. a search hit).
     void scrollToPageRect(size_t page, QRectF rectPt);
 

@@ -35,6 +35,7 @@ const char* const CUSTOM = "xournalQt";  // our settings (in upstream's settings
 
 ReferenceMode::ReferenceMode(TabManager& tabs, Settings* settings, QObject* parent):
         QObject(parent), tabs(tabs), settings(settings), pages(std::make_unique<PagesModel>()) {
+    connect(&lock, &ScrollLock::lockedChanged, this, &ReferenceMode::scrollLockChanged);
     connect(&tabs, &TabManager::currentTabChanged, this, &ReferenceMode::update);
     connect(&tabs, &TabManager::referencesChanged, this, &ReferenceMode::update);
     connect(&tabs, &TabManager::countChanged, this, &ReferenceMode::update);
@@ -72,6 +73,7 @@ void ReferenceMode::update() {
     CanvasView* v = tabs.referenceView(tabs.currentIndex());
     DocumentSession* s = index >= 0 ? tabs.session(index) : nullptr;
     if (v == shownView && s == shownSession) {
+        relock();          // (the main view may be another one)
         Q_EMIT changed();  // (the same document; its tab may have another index now)
         return;
     }
@@ -131,6 +133,7 @@ void ReferenceMode::update() {
         connections.push_back(connect(v, &CanvasView::snipLinkOffered, this,
                                       [this, v](const QString& title) { Q_EMIT snipLinkOffered(v, title); }));
     }
+    relock();
     Q_EMIT changed();
     Q_EMIT pageChanged();
     Q_EMIT zoomChanged();
@@ -144,11 +147,63 @@ void ReferenceMode::update() {
     }
 }
 
+// --- locked scrolling ----------------------------------------------------------------------------------------------
+
+bool ReferenceMode::pairLocked(const DocumentSession* x, const DocumentSession* y) const {
+    return std::any_of(lockedPairs.begin(), lockedPairs.end(), [x, y](const auto& p) {
+        return (p.first == x && p.second == y) || (p.first == y && p.second == x);
+    });
+}
+
+void ReferenceMode::relock() {
+    if (placing) {
+        return;
+    }
+    CanvasView* main = tabs.currentView();
+    DocumentSession* mainSession = tabs.currentSession();
+    if (!main || !shownView || !shownSession || !pairLocked(mainSession, shownSession)) {
+        lock.unlock();
+        return;
+    }
+    if (lock.first() != &main->getViewController() || lock.second() != &shownView->getViewController()) {
+        // (the offset: where the two are now; they were kept together while shown)
+        lock.lock(&main->getViewController(), &shownView->getViewController());
+    }
+}
+
+bool ReferenceMode::scrollLocked() const { return lock.locked(); }
+
+void ReferenceMode::setScrollLocked(bool on) {
+    DocumentSession* mainSession = tabs.currentSession();
+    if (!active() || !mainSession || !shownSession || on == scrollLocked()) {
+        return;
+    }
+    // (forget the pairs of documents that were closed)
+    lockedPairs.erase(std::remove_if(lockedPairs.begin(), lockedPairs.end(),
+                                     [](const auto& p) { return !p.first || !p.second; }),
+                      lockedPairs.end());
+    if (on) {
+        lockedPairs.emplace_back(mainSession, shownSession);
+    } else {
+        lockedPairs.erase(std::remove_if(lockedPairs.begin(), lockedPairs.end(),
+                                         [&](const auto& p) {
+                                             return (p.first == mainSession && p.second == shownSession) ||
+                                                    (p.first == shownSession && p.second == mainSession);
+                                         }),
+                          lockedPairs.end());
+    }
+    relock();
+}
+
+bool ReferenceMode::editable() const { return shownSession && !shownSession->isReadOnly(); }
+
 QObject* ReferenceMode::view() const { return shownView.data(); }
 CanvasView* ReferenceMode::canvas() const { return shownView.data(); }
 bool ReferenceMode::active() const { return !shownView.isNull(); }
 bool ReferenceMode::focused() const { return focus && active(); }
-bool ReferenceMode::editing() const { return active() && tabs.referenceEditable(tabs.currentIndex()); }
+bool ReferenceMode::editing() const {
+    return active() && tabs.referenceEditable(tabs.currentIndex()) && editable();
+}
 
 void ReferenceMode::setEditing(bool on) {
     if (active()) {
@@ -308,6 +363,7 @@ void ReferenceMode::showTab(int index) {
         return;
     }
     const bool anew = tabs.referenceOf(current) != index;
+    placing = true;  // (a pair locked before is locked again once it is placed: its fit does not zoom the notes)
     tabs.setReference(current, index);
     // Shown anew in the narrower half: its width fits (the window gave the canvas its size meanwhile). Switching
     // tabs or roles keeps the zoom (and the rendered pages).
@@ -315,6 +371,8 @@ void ReferenceMode::showTab(int index) {
         // (sideways: the height; else the width of its page in view)
         shownView->getViewController().fitDefault(shownView->currentPageNo());
     }
+    placing = false;
+    relock();
 }
 
 void ReferenceMode::close() {
@@ -326,7 +384,11 @@ void ReferenceMode::close() {
 void ReferenceMode::swapRoles() {
     if (active()) {
         setFocused(false);  // (the keys are for the main document, now the other one)
+        // (the views of a document beside itself exchange their places: not followed by each other meanwhile; the
+        // pair is taken again afterwards)
+        lock.unlock();
         tabs.swapReference();
+        relock();
     }
 }
 
@@ -340,6 +402,7 @@ void ReferenceMode::popOut() {
         // The same document: it has one tab. The tab goes to the place of the reference (Back returns), and the
         // split closes.
         setFocused(false);
+        lock.unlock();  // (the place of the reference goes to the tab: not followed by the reference)
         if (CanvasView* main = tabs.view(notes); main && shownView) {
             main->swapPlacesWith(*shownView);
         }

@@ -967,6 +967,16 @@
   written again when unchanged. A lecture of 20 pages: 5–7 KB a day with deltas instead of 25–32 KB
   ([hybrid-pdf.md](hybrid-pdf.md), "Version history"). Left: compare and play (on `qt/timeline`'s play bar), pruning.
 
+- **Locked scrolling and comparing versions, `qt/version-compare` (2026-10-05).** The reference view's pill has "Scroll
+  both sides together" (any two documents, a document beside itself, a version beside now; remembered per pair for
+  the session): scrolling, page jumps and zoom on either side move the other, by page with the offset of when it was
+  switched on and by the place within the page relative to its size, zoom relative to each half's fitting width
+  (`ScrollLock`). The History panel's "Compare with now" and "Compare with another version…" show the two locked
+  side by side (versions read-only); the pages that differ are found from what they hold, without drawing
+  (`VersionDiff`: aligned so inserted and removed pages mark only themselves, moved pages are no change), marked in
+  the page lists, counted in a bar with next and previous change ([reference-view.md](reference-view.md)). Left: the
+  added and removed elements of a changed page highlighted; the version scrubber.
+
 - **Encrypted PDFs, `qt/pdf-encryption` (2026-10-05).** A PDF with a password to open asks for it (a dialog; a wrong
   one is said so; Cancel leaves it closed), also the PDF of a `.xopp` and a protected document's autosave after a crash;
   one with only an owner password opens without asking, its no-print and no-copy restrictions honoured. The password

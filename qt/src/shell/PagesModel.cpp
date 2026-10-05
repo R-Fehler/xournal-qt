@@ -7,6 +7,7 @@
 
 #include <QSizeF>
 
+#include "VersionCompare.h"
 #include "model/Document.h"
 #include "model/DocumentChangeType.h"
 #include "model/XojPage.h"
@@ -56,6 +57,12 @@ void PagesModel::setSession(DocumentSession* s) {
                 Q_EMIT dataChanged(index(0), index(rowCount() - 1), {BookmarkRole});
             }
         }));
+        connections.push_back(connect(&CompareMarks::instance(), &CompareMarks::changed, this,
+                                      [this](const DocumentSession* marked) {
+                                          if (marked == session && rowCount() > 0) {
+                                              Q_EMIT dataChanged(index(0), index(rowCount() - 1), {DiffersRole});
+                                          }
+                                      }));
         connections.push_back(connect(&s->search(), &DocumentSearch::changed, this, [this] {
             if (rowCount() > 0) {
                 Q_EMIT dataChanged(index(0), index(rowCount() - 1),
@@ -127,6 +134,8 @@ QVariant PagesModel::data(const QModelIndex& index, int role) const {
             return session ? PageSketches::instance().url(sessionId, session->pageId(row)) : QString();
         case SelectedRole:
             return row < selected.size() && selected[row];
+        case DiffersRole:
+            return CompareMarks::instance().differs(session, row);
         case SearchHitCountRole:
             return session ? session->search().countOn(row) : 0;
         case SearchHitsRole:
@@ -172,7 +181,7 @@ QHash<int, QByteArray> PagesModel::roleNames() const {
             {SearchHitsRole, "searchHits"},     {CurrentSearchHitRole, "currentSearchHit"},
             {SearchHitCountRole, "searchHitCount"}, {PageIndexRole, "pageIndex"},
             {SelectedRole, "selected"},         {SketchRole, "sketch"},
-            {BookmarkRole, "bookmark"}};
+            {BookmarkRole, "bookmark"},         {DiffersRole, "differs"}};
 }
 
 QString PagesModel::thumbnailUrl(int page) const {

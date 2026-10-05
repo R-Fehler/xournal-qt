@@ -1,8 +1,9 @@
 // Reference mode: the canvas area of the window, split in two when the current tab shows another document beside
 // its own (app.reference). The main canvas (Main.qml's `canvas`) takes mainX / mainY / mainWidth / mainHeight; the
 // reference is a plain canvas for reading on the other side (or for writing too, with the edit switch of its pill),
-// behind a divider that can be dragged, with a small pill of its own: the page (a tap: go to a page), edit, fit width,
-// swap sides, swap roles, close. The main document has a thin frame, so it is always clear which side is the notes.
+// behind a divider that can be dragged, with a small pill of its own: the page (a tap: go to a page), the pages, scroll
+// both sides together (app.reference.scrollLocked), edit, fit width, swap sides, swap roles, close. While two versions
+// are compared (app.compare) a bar at the top of the reference says what changed, with the next and previous change. The main document has a thin frame, so it is always clear which side is the notes.
 // Side by side where the canvas area is landscape, top and bottom where it is portrait (h > w: a tablet or a phone
 // held upright); the divider keeps its ratio when that flips (qt/docs/reference-view.md). In a narrow half (< 480 px)
 // the pill shows only the page and a ⋮ with the rest.
@@ -252,6 +253,7 @@ Item {
                     required property string thumbnail
                     required property string sketch
                     required property bool current
+                    required property bool differs
                     width: referenceGridView.cellWidth
                     height: referenceGridView.cellHeight
                     Rectangle {
@@ -269,6 +271,17 @@ Item {
                             sketch: refCell.sketch
                             thumbnail: refCell.thumbnail
                             sourceWidth: Math.ceil(Math.ceil(refFrame.width * Screen.devicePixelRatio / 128) * 128 / Screen.devicePixelRatio)
+                        }
+                        // Changed in a comparison (app.compare)
+                        Rectangle {
+                            objectName: "referenceGridDiffers"
+                            visible: refCell.differs
+                            anchors.right: parent.left
+                            anchors.rightMargin: 2
+                            width: 5
+                            height: parent.height
+                            radius: 2
+                            color: "#9334e6"
                         }
                     }
                     Label {
@@ -288,6 +301,84 @@ Item {
                     }
                 }
                 TouchpadMomentum { flickable: referenceGridView }
+            }
+        }
+
+        // Comparing two versions, or a version and now (app.compare): what is compared, how many pages changed, and
+        // the next and previous change (on both sides); at the top of the reference
+        Pane {
+            id: compareBar
+            objectName: "compareBar"
+            visible: split.active && app.compare.shown && !referenceGrid.visible
+            anchors.top: parent.top
+            anchors.topMargin: 10
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: Math.min(implicitWidth, referenceScope.width - 16)
+            padding: 2
+            leftPadding: 12
+            rightPadding: 4
+            Material.foreground: "#303030"
+            background: Rectangle {
+                radius: height / 2
+                color: "#f2fafafa"
+                border.width: 1
+                border.color: "#40000000"
+            }
+            RowLayout {
+                width: parent.width
+                spacing: 2
+                Rectangle {  // (the colour of the marks in the page lists)
+                    implicitWidth: 5
+                    implicitHeight: 18
+                    radius: 2
+                    color: "#9334e6"
+                }
+                Label {
+                    objectName: "compareTitle"
+                    visible: referenceScope.width >= 480
+                    Layout.leftMargin: 4
+                    Layout.maximumWidth: 220
+                    text: qsTr("%1 → %2").arg(app.compare.olderTitle).arg(app.compare.newerTitle)
+                    elide: Text.ElideRight
+                    font.weight: Font.DemiBold
+                }
+                Label {
+                    objectName: "compareSummary"
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 6
+                    text: app.compare.summary
+                    elide: Text.ElideRight
+                    color: "#5f6368"
+                }
+                IconButton {
+                    objectName: "comparePreviousButton"
+                    iconName: "xqt-chevron-up"
+                    tip: qsTr("Previous change")
+                    enabled: app.compare.changeCount > 0
+                    implicitWidth: 36; implicitHeight: 36
+                    icon.width: 20; icon.height: 20
+                    focusPolicy: Qt.NoFocus
+                    onClicked: app.compare.previousChange()
+                }
+                IconButton {
+                    objectName: "compareNextButton"
+                    iconName: "xqt-chevron-down"
+                    tip: qsTr("Next change")
+                    enabled: app.compare.changeCount > 0
+                    implicitWidth: 36; implicitHeight: 36
+                    icon.width: 20; icon.height: 20
+                    focusPolicy: Qt.NoFocus
+                    onClicked: app.compare.nextChange()
+                }
+                IconButton {
+                    objectName: "compareCloseButton"
+                    iconName: "xqt-close"
+                    tip: qsTr("End the comparison")
+                    implicitWidth: 36; implicitHeight: 36
+                    icon.width: 18; icon.height: 18
+                    focusPolicy: Qt.NoFocus
+                    onClicked: app.compare.close()
+                }
             }
         }
 
@@ -398,11 +489,24 @@ Item {
                     focusPolicy: Qt.NoFocus
                     onClicked: referencePill.toggleGrid()
                 }
+                // Scroll both sides together (by page, from where they are when it is switched on)
+                IconButton {
+                    objectName: "referenceLockButton"
+                    visible: !referencePill.narrow
+                    iconName: "xqt-scroll-lock"
+                    tip: app.reference.scrollLocked ? qsTr("Scrolling together: tap to scroll each side on its own")
+                                                    : qsTr("Scroll both sides together")
+                    checked: app.reference.scrollLocked
+                    implicitWidth: 40; implicitHeight: 40
+                    icon.width: 22; icon.height: 22
+                    focusPolicy: Qt.NoFocus
+                    onClicked: app.reference.toggleScrollLock()
+                }
                 ToolSeparator { visible: !referencePill.narrow }
                 // Write in the reference too (with the tool in hand; its own undo), or only read it
                 IconButton {
                     objectName: "referenceEditButton"
-                    visible: !referencePill.narrow
+                    visible: !referencePill.narrow && app.reference.editable
                     iconName: "xopp-tool-pencil"
                     tip: app.reference.editing ? qsTr("Writing in the reference: tap for reading only")
                                                : qsTr("Write in the reference")
@@ -480,7 +584,7 @@ Item {
                     visible: referencePill.narrow
                     iconName: "xqt-more"
                     label: qsTr("The reference")
-                    tip: qsTr("The reference: pages, writing, fit, sides, close")
+                    tip: qsTr("The reference: pages, scrolling together, writing, fit, sides, close")
                     implicitWidth: 40; implicitHeight: 40
                     icon.width: 20; icon.height: 20
                     focusPolicy: Qt.NoFocus
@@ -499,7 +603,16 @@ Item {
                             onTriggered: referencePill.toggleGrid()
                         }
                         AdaptiveMenuItem {
+                            objectName: "referenceLockItem"
+                            text: qsTr("Scroll both sides together")
+                            icon.source: app.iconUrl("xqt-scroll-lock")
+                            checkable: true
+                            checked: app.reference.scrollLocked
+                            onTriggered: app.reference.toggleScrollLock()
+                        }
+                        AdaptiveMenuItem {
                             objectName: "referenceEditItem"
+                            offered: app.reference.editable
                             text: qsTr("Write in the reference")
                             icon.source: app.iconUrl("xopp-tool-pencil")
                             checkable: true

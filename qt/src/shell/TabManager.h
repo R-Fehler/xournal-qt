@@ -65,6 +65,9 @@ public:
 
     /// One open document: its session and the view showing it.
     struct Tab {
+        /// A version cut out of its file (VersionCache): its file is kept while the tab shows it (first: released
+        /// last, after the session)
+        std::shared_ptr<void> versionPin;
         std::unique_ptr<DocumentSession> session;
         std::unique_ptr<CanvasView> view;
         /// Reference mode: the document of another tab shown beside this one (for reading), or none; or this tab's

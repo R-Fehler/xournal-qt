@@ -152,6 +152,35 @@ void ViewController::placeAnchor(const Anchor& a, QPointF viewPos) {
     clamp();
 }
 
+auto ViewController::placeAt(QPointF viewPos, std::optional<size_t> on) const -> std::optional<Place> {
+    if (layout->pageCount() == 0) {
+        return std::nullopt;
+    }
+    const QPointF c = viewToContent(viewPos);
+    const size_t page = on ? std::min(*on, layout->pageCount() - 1) : layout->nearestPage(c, z);
+    const QRectF r = layout->pageRect(page, z);
+    if (r.width() <= 0 || r.height() <= 0) {
+        return Place{page, {}};
+    }
+    return Place{page, QPointF((c.x() - r.x()) / r.width(), (c.y() - r.y()) / r.height())};
+}
+
+void ViewController::showPlace(const Place& place, QPointF viewPos) {
+    if (layout->pageCount() == 0 || !initialized || view.isEmpty()) {
+        return;
+    }
+    stopMomentum();
+    const QRectF r = layout->pageRect(std::min(place.page, layout->pageCount() - 1), z);
+    const QPointF content(r.x() + place.relative.x() * r.width(), r.y() + place.relative.y() * r.height());
+    // (where the content is smaller than the view it stays centred: contentOrigin)
+    const QPointF before = scrollPos;
+    scrollPos = content - viewPos;
+    clamp();
+    if (scrollPos != before) {
+        Q_EMIT changed();
+    }
+}
+
 void ViewController::setZoom100(double value) {
     if (!(value > 0) || value == z100) {
         return;

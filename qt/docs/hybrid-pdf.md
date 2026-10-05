@@ -714,15 +714,25 @@ is what is built.
   the switch "Keep versions of this document" (a `.xopp` document: "needs a PDF with notes", with Save as PDF with
   notes…; an archive PDF and a text file keep none). On: the list newest first ("Unsaved changes", versions with their
   date as "Today 14:30", milestones with a flag and their message, other apps' revisions), the Milestones filter, the
-  size line, "Save with a message…". A row's menu: Show beside the document (read-only, as the reference), Restore this
-  version…, Open as a copy (a new document, not saved), Add / Change the message…
+  size line, "Save with a message…". A row's menu: Show beside the document (read-only, as the reference), Compare with
+  now, Compare with another version…, Restore this version…, Open as a copy (a new document, not saved), Add / Change
+  the message…
+- **Comparing** (`qt/version-compare`, [reference-view.md](reference-view.md) "Scrolling both sides together, and
+  comparing"): "Compare with now" shows the version beside the document, both scrolled together, the pages that
+  changed marked in the page lists, with next and previous change; "Compare with another version…" and a tap on
+  another row shows the newer of the two read-only in a tab of its own with the older beside it. The pages are
+  compared by what they hold (`VersionDiff`: each element's XML as the `.xopp` holds it, the background, the size), not by the
+  marker's `/Layers` sigs: those miss the unsaved changes of "now" and change with the app's version. A version cut out
+  of the file is read-only wherever it is shown, and is not added to Recent.
 - ⋮ → Document → "Version history…" and "Save with a message… (Ctrl+Alt+S)". Settings → Documents → "Keep versions
   of new PDFs with notes" (off). The choice per document is the session's (`keepsVersions`) until a save writes it.
 - **Share** sends a PDF with notes that keeps versions without them (a copy written anew in the app cache; the file is
   never compacted in place while it keeps versions), with a check box "With its version history" for the file itself.
 - The library's cards (and Recent) show a small clock on documents that keep versions; the tooltip says how many.
 - **The version cache** (`VersionCache`, the owner of the versions cut out of files to be shown or opened): the last
-  five used, at most 500 MB, removed when the app quits; other processes' after a day.
+  five used, at most 500 MB, removed when the app quits; other processes' after a day. A version a tab shows (beside
+  the document, compared, opened) is pinned by its tab: the limit never removes it and counts only the versions
+  nobody shows; closed, it is an unused one again.
 
 ### Measured (2026-10-05, the container; `XQT_BENCH_HISTORY=1 xqt-session-tests --gtest_filter='*benchTenDays*'`)
 
@@ -742,9 +752,9 @@ is 62 KB gzipped at the end). Eleven versions: 532 KB in all.
 
 ### Not built (follow-ups)
 
-- **Compare and play** (the plan's step 8): the scrubber across versions with ▶ belongs on the replay play bar of
-  the parallel block `qt/timeline`, which the version scrubber should reuse. Compare beside the document works today
-  through "Show beside the document" (the reference view), without changed-page marks.
+- **Play** (the plan's step 8, its other half): the scrubber across versions with ▶ belongs on the replay play bar
+  of `qt/timeline`, which the version scrubber should reuse. Compare is built (`qt/version-compare`, above); left of
+  it: on a changed page, what was added and removed highlighted.
 - Pruning (thinning unnamed versions) and "Remove unnamed versions": only if real files need it.
 - Signed revisions are not looked for (our appender never cuts a revision that is not ours and the last).
 - A cheaper version 0 for long PDFs: the first save appends our page tree with references to the original's streams;
