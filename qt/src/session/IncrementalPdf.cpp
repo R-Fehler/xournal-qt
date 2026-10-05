@@ -524,8 +524,10 @@ std::string Update::serializeWith(const Tail& tail, const Over* over, Stats* sta
     }
     st.added = written.size() - st.changed;
 
-    // The trailer
-    long long size = nextId;
+    // The trailer. /Size is one more than the highest number in the file: the numbers written now (not every number
+    // reserved: one taken and then not needed would make it too large, which checkers warn about) or the previous
+    // revisions' /Size.
+    long long size = xref.empty() ? 0 : static_cast<long long>(xref.rbegin()->first) + 1;
     if (OH old = trailer.getKey("/Size"); old.isInteger()) {
         size = std::max(size, old.getIntValue());
     }
@@ -552,7 +554,7 @@ std::string Update::serializeWith(const Tail& tail, const Over* over, Stats* sta
     }
     const uint64_t xrefAt = base + out.size();
     if (!tail.xrefStream) {
-        dict.replaceKey("/Size", OH::newInteger(std::max<long long>(size, nextId)));
+        dict.replaceKey("/Size", OH::newInteger(size));
         out += "xref\n";
         for (auto it = xref.begin(); it != xref.end();) {
             auto end = it;
@@ -572,7 +574,7 @@ std::string Update::serializeWith(const Tail& tail, const Over* over, Stats* sta
     } else {
         const int id = nextId++;
         xref[id] = {1, xrefAt, 0};
-        size = std::max<long long>(size, nextId);
+        size = std::max<long long>(size, id + 1);
         uint64_t widest = 0;
         for (const auto& [n, e]: xref) {
             widest = std::max(widest, e.offset);

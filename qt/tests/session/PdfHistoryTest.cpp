@@ -27,6 +27,7 @@
 #include <qpdf/QPDFLogger.hh>
 #include <qpdf/QPDFObjectHandle.hh>
 #include <qpdf/QPDFPageDocumentHelper.hh>
+#include <qpdf/QPDFWriter.hh>
 
 #include "model/Document.h"
 #include "model/Layer.h"
@@ -334,6 +335,41 @@ TEST_F(PdfHistoryTest, versionZeroIsThePdfAsReceived) {
     EXPECT_TRUE(next.incremental);
     EXPECT_EQ(next.version, 2);
     expectVersionsOpen(pdf, {0, 1, 2});
+}
+
+// The PDF as received written by other producers (a classic cross-reference table with free entries, or object
+// streams): the first save with history appends to it and the file stays without warnings. The release build on
+// Ubuntu 22.04 (older cairo) had "reported number of objects (40) is not one plus the highest object number (38)":
+// numbers taken for objects that were not written still counted in /Size (2026-10-05)
+TEST_F(PdfHistoryTest, versionZeroOfPdfsFromOtherProducersStaysClean) {
+    for (const bool objectStreams: {false, true}) {
+        SCOPED_TRACE(objectStreams ? "object streams" : "a classic table");
+        const fs::path made = path(objectStreams ? "made-streams.pdf" : "made-classic.pdf");
+        makeTextPdf(made, {"lectureone", "lecturetwo", "lecturethree"});
+        const fs::path pdf = path(objectStreams ? "received-streams.pdf" : "received-classic.pdf");
+        {
+            QPDF q;
+            q.processFile(made.string().c_str());
+            QPDFWriter w(q, pdf.string().c_str());
+            w.setObjectStreamMode(objectStreams ? qpdf_o_generate : qpdf_o_disable);
+            w.write();
+        }
+        auto loaded = DocumentSession::loadFile(pdf);
+        ASSERT_TRUE(loaded.document) << loaded.error;
+        auto s = std::make_unique<DocumentSession>(*app, std::move(loaded.document));
+        drawOn(*s, 0, 300);
+        s->setKeepsVersions(true);
+        const auto r = s->saveAsHybrid(pdf);
+        ASSERT_TRUE(r.ok) << r.error;
+        std::string check;
+        EXPECT_EQ(qpdfCheck(pdf, check), 0) << check;
+        clockNow = at(5, 10);
+        drawOn(*s, 1, 300);
+        ASSERT_TRUE(save(*s).ok);
+        EXPECT_EQ(qpdfCheck(pdf, check), 0) << check;
+        expectVersionsOpen(pdf, {0, 1, 2});
+        clockNow = at(4, 10);
+    }
 }
 
 // Another app saved the file: its revision is listed as such and never cut away; the save that cannot build on the
