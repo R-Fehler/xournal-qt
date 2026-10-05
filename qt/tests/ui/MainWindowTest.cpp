@@ -62,6 +62,7 @@
 #include "model/Stroke.h"
 #include "undo/InsertUndoAction.h"
 #include "undo/UndoRedoHandler.h"
+#include "control/tools/EditSelection.h"
 #include "model/Text.h"
 #include "model/PageType.h"
 #include "model/XojPage.h"
@@ -4778,6 +4779,63 @@ TEST_F(MainWindowTest, thePillsOfASelectionOfferSelectMoreAndCountWhatIsSelected
     until([&] { return !selectionPill->isVisible(); });
     EXPECT_FALSE(selectionPill->isVisible());
     EXPECT_FALSE(notePill->isVisible());
+}
+
+// Groups (qt/docs/groups.md): the selection's pill shows Group for loose elements and Ungroup (in its place) for one
+// group, both for a group with loose elements; Ctrl+G and Ctrl+Shift+G do the same, one undo step each
+TEST_F(MainWindowTest, theSelectionsPillGroupsAndUngroups) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    auto* s = controller->tabManager().currentSession();
+    xqt::CanvasView* view = controller->tabManager().currentView();
+    ASSERT_NE(view, nullptr);
+    std::vector<Element*> strokes;
+    {
+        std::unique_lock lock(*s->getDocument());
+        Layer* layer = s->getDocument()->getPage(0)->getSelectedLayer();
+        for (int i = 0; i < 3; ++i) {
+            auto st = std::make_unique<Stroke>();
+            st->setWidth(2);
+            st->addPoint(Point(100, 100 + 40 * i));
+            st->addPoint(Point(200, 100 + 40 * i));
+            strokes.push_back(st.get());
+            layer->addElement(std::move(st));
+        }
+    }
+    s->getUndoRedoHandler()->clearContents();
+    controller->selectAllOnPage();
+    auto* selectionPill = find<QQuickItem>("selectionBar");
+    ASSERT_NE(selectionPill, nullptr);
+    until([&] { return selectionPill->isVisible(); });
+    auto* group = findItem("selectionGroup");
+    auto* ungroup = findItem("selectionUngroup");
+    ASSERT_NE(group, nullptr);
+    ASSERT_NE(ungroup, nullptr);
+    ASSERT_NE(view->getSelection(), nullptr);
+    ASSERT_GE(view->getSelection()->getElementsView().size(), 3u);
+    EXPECT_TRUE(group->isVisible());
+    EXPECT_FALSE(ungroup->isVisible()) << "nothing grouped yet";
+
+    click(group);
+    until([&] { return ungroup->isVisible(); });
+    EXPECT_FALSE(group->isVisible()) << "one group: Ungroup in its place";
+    EXPECT_TRUE(controller->canUngroup());
+    EXPECT_NE(strokes[0]->getGroup(), 0u);
+    EXPECT_EQ(strokes[0]->getGroup(), strokes[2]->getGroup());
+
+    key(Qt::Key_G, Qt::ControlModifier | Qt::ShiftModifier);
+    until([&] { return group->isVisible(); });
+    EXPECT_FALSE(ungroup->isVisible());
+    EXPECT_EQ(strokes[0]->getGroup(), 0u);
+
+    key(Qt::Key_G, Qt::ControlModifier);
+    until([&] { return ungroup->isVisible(); });
+    EXPECT_NE(strokes[1]->getGroup(), 0u);
+    controller->clearSelection();
+    controller->undo();
+    EXPECT_EQ(strokes[1]->getGroup(), 0u) << "one undo step each";
+    controller->undo();
+    EXPECT_NE(strokes[1]->getGroup(), 0u);
 }
 
 // The setsquare and the compass share a cycling button (qt/docs/adaptive-layout.md, "Cycling buttons"): a tap puts the

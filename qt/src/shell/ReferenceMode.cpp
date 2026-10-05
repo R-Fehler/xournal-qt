@@ -212,6 +212,10 @@ void ReferenceMode::setSelectingMore(bool on) {
     }
 }
 int ReferenceMode::selectedCount() const { return shownView ? shownView->selectedCount() : 0; }
+bool ReferenceMode::canGroup() const { return shownView && editing() && shownView->groupState().canGroup; }
+bool ReferenceMode::canUngroup() const { return shownView && editing() && shownView->groupState().canUngroup; }
+bool ReferenceMode::groupSelection() { return shownView && editing() && shownView->groupSelection(); }
+bool ReferenceMode::ungroupSelection() { return shownView && editing() && shownView->ungroupSelection(); }
 
 bool ReferenceMode::noteSelected() const { return shownView && shownView->notes().hasSelection(); }
 QColor ReferenceMode::noteColor() const {

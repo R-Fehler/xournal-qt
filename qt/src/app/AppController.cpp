@@ -915,6 +915,20 @@ void AppController::setSelectingMore(bool on) {
     }
 }
 int AppController::selectedCount() const { return canvas() ? canvas()->selectedCount() : 0; }
+bool AppController::canGroup() const { return canvas() && canvas()->groupState().canGroup; }
+bool AppController::canUngroup() const { return canvas() && canvas()->groupState().canUngroup; }
+bool AppController::groupSelection() {
+    if (CanvasView* r = editedReference()) {
+        return r->groupSelection();
+    }
+    return canvas() && !referenceMode->focused() && canvas()->groupSelection();
+}
+bool AppController::ungroupSelection() {
+    if (CanvasView* r = editedReference()) {
+        return r->ungroupSelection();
+    }
+    return canvas() && !referenceMode->focused() && canvas()->ungroupSelection();
+}
 bool AppController::copySelection() {
     if (referenceMode->focused() && (referenceMode->hasSelection() ||
                                      (referenceMode->canvas() && referenceMode->canvas()->notes().hasSelection()))) {

@@ -18,6 +18,7 @@
 #include "control/xojfile/LoadHandler.h"
 #include "control/xojfile/XmlParser.h"
 #include "model/Document.h"
+#include "model/ElementInsertionPosition.h"
 #include "model/DocumentHandler.h"
 #include "model/Font.h"
 #include "model/Image.h"
@@ -36,6 +37,7 @@
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "session/ElementGroups.h"
 
 #include "config-test.h"
 
@@ -259,3 +261,89 @@ TEST_F(GroupsTest, copiesAndErasedPiecesStayInTheGroup) {
     g_string_free(db, TRUE);
 }
 
+// --- the model's helpers (session/ElementGroups) -------------------------------------------------------------------
+
+// A new number is larger than any in the document and than any handed out before
+TEST_F(GroupsTest, aNewNumberIsOneNoGroupHas) {
+    auto doc = grouped();
+    const groups::Id a = groups::fresh(*doc);
+    EXPECT_GT(a, 7u);
+    const groups::Id b = groups::fresh(*doc);
+    EXPECT_GT(b, a) << "never the same twice";
+    auto loose = stroke(0, 0, 10, 10, 1000);
+    EXPECT_GT(groups::fresh(*doc, {loose.get()}), 1000u);
+}
+
+// The members of a group in the layer are added to what is found, in the layer's order
+TEST_F(GroupsTest, membersAreAddedInTheLayersOrder) {
+    auto doc = grouped();
+    Layer* layer = doc->getPage(0)->getSelectedLayer();
+    const auto all = layer->getElementsView();
+    std::vector<const Element*> elements(all.begin(), all.end());
+    const InsertionOrderRef found{InsertionPositionRef(elements[2], 2), InsertionPositionRef(elements[6], 6)};
+    const InsertionOrderRef with = groups::withMembers(*layer, found);
+    ASSERT_EQ(with.size(), 6u);
+    for (size_t i = 0; i < with.size(); ++i) {
+        const Element::Index expected[] = {0, 1, 2, 3, 5, 6};
+        EXPECT_EQ(with[i].pos, expected[i]);
+        EXPECT_EQ(with[i].e, elements[static_cast<size_t>(expected[i])]);
+    }
+    // A loose element alone stays alone
+    EXPECT_EQ(groups::withMembers(*layer, InsertionOrderRef{InsertionPositionRef(elements[4], 4)}).size(), 1u);
+}
+
+// Pasted copies get new numbers (each group one); elements coming into a layer only where a group there has theirs
+TEST_F(GroupsTest, renumberAndSeparate) {
+    auto doc = grouped();
+    Layer* layer = doc->getPage(0)->getSelectedLayer();
+    auto a = stroke(0, 0, 10, 10, 3);
+    auto b = stroke(0, 0, 10, 10, 3);
+    auto c = stroke(0, 0, 10, 10, 7);
+    auto d = stroke(0, 0, 10, 10, 0);
+    groups::renumber({a.get(), b.get(), c.get(), d.get()}, *doc);
+    EXPECT_EQ(a->getGroup(), b->getGroup());
+    EXPECT_GT(a->getGroup(), 7u);
+    EXPECT_GT(c->getGroup(), 7u);
+    EXPECT_NE(c->getGroup(), a->getGroup());
+    EXPECT_EQ(d->getGroup(), 0u);
+
+    auto e = stroke(0, 0, 10, 10, 3);   // (3 is taken in the layer)
+    auto f = stroke(0, 0, 10, 10, 12);  // (12 is not)
+    EXPECT_TRUE(groups::separate({e.get(), f.get()}, *layer, *doc));
+    EXPECT_NE(e->getGroup(), 3u);
+    EXPECT_EQ(f->getGroup(), 12u);
+    EXPECT_FALSE(groups::separate({f.get()}, *layer, *doc));
+    // Elements already in the layer are not counted against themselves
+    std::vector<Element*> group3;
+    for (const Element* g: layer->getElementsView()) {
+        if (g->getGroup() == 3) {
+            group3.push_back(const_cast<Element*>(g));
+        }
+    }
+    EXPECT_FALSE(groups::separate(group3, *layer, *doc));
+}
+
+TEST_F(GroupsTest, whatASelectionCanDo) {
+    auto a = stroke(0, 0, 10, 10, 3);
+    auto b = stroke(0, 0, 10, 10, 3);
+    auto c = stroke(0, 0, 10, 10, 0);
+    auto s = groups::stateOf({a.get(), b.get()});
+    EXPECT_TRUE(s.oneGroup);
+    EXPECT_FALSE(s.canGroup);
+    EXPECT_TRUE(s.canUngroup);
+    s = groups::stateOf({a.get(), b.get(), c.get()});
+    EXPECT_FALSE(s.oneGroup);
+    EXPECT_TRUE(s.canGroup);
+    EXPECT_TRUE(s.canUngroup);
+    s = groups::stateOf({c.get()});
+    EXPECT_FALSE(s.canGroup);
+    EXPECT_FALSE(s.canUngroup);
+    s = groups::stateOf({a.get()});  // (a group's last member)
+    EXPECT_FALSE(s.canGroup);
+    EXPECT_TRUE(s.canUngroup);
+    // The clipboard's numbers
+    EXPECT_EQ(groups::clipboardNumbers({a.get(), c.get(), b.get()}), "3 0 3");
+    EXPECT_EQ(groups::fromClipboard("3 0 3", 3), (std::vector<groups::Id>{3, 0, 3}));
+    EXPECT_TRUE(groups::fromClipboard("3 0 3", 2).empty());
+    EXPECT_TRUE(groups::fromClipboard("3 x 3", 3).empty());
+}

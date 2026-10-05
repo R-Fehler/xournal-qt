@@ -73,6 +73,24 @@ Pane {
             tip: qsTr("Save as sticker… (to paste it again from the sticker button)")
             onClicked: pill.stickerRequested()
         }
+        // Groups (qt/docs/groups.md): one button for each that can be done; a selection that is one group shows
+        // only "Ungroup"
+        IconButton {
+            objectName: pill.named("selectionGroup")
+            visible: !pill.readingOnly && pill.target.canGroup
+            iconName: "xqt-group"
+            label: qsTr("Group")
+            tip: qsTr("Group (Ctrl+G): selected together from now on")
+            onClicked: pill.target.groupSelection()
+        }
+        IconButton {
+            objectName: pill.named("selectionUngroup")
+            visible: !pill.readingOnly && pill.target.canUngroup
+            iconName: "xqt-ungroup"
+            label: qsTr("Ungroup")
+            tip: qsTr("Ungroup (Ctrl+Shift+G)")
+            onClicked: pill.target.ungroupSelection()
+        }
         IconButton { objectName: pill.named("selectionDelete"); visible: !pill.readingOnly; iconName: "xqt-delete"; tip: qsTr("Delete (Del)"); onClicked: pill.target.deleteSelection() }
         ToolSeparator {}
         // Select more (qt/touch-multiselect): taps add notes and elements to the selection or take them away

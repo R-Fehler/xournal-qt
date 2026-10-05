@@ -54,6 +54,7 @@
 #include "MixedSelection.h"
 #include "ScreenCalibration.h"
 #include "session/DocumentSession.h"
+#include "session/ElementGroups.h"
 #include "session/StickyNote.h"
 
 class EditSelection;
@@ -265,6 +266,15 @@ public:
     /// in the clipboard's format of notes and elements; a picture: the file's bytes) and whether it is a picture. Not
     /// called when the view goes first (it waits for the work). False: a sticker is still being read or written.
     bool loadSticker(fs::path file, std::function<void(const QString& error, const std::string& bytes, bool picture)> done);
+    // --- groups (qt/docs/groups.md) ---
+    /// What the selected elements can do with groups (nothing in a view for reading or a read-only document). Grouping
+    /// takes elements of one layer.
+    groups::State groupState() const;
+    /// The selected elements become one group (Ctrl+G), or leave their groups (Ctrl+Shift+G): one undo step each.
+    /// False: nothing done.
+    bool groupSelection();
+    bool ungroupSelection();
+
     /// The rectangle or lasso of a select tool let go on a page (CanvasPage): a lasso's shape, else nothing
     void selectedWith(const PageRef& page, std::vector<xoj::util::Point<double>> lasso);
     /// A picture pasted from a snip (snip::Source) with a link to where it came from: the link is offered

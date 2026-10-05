@@ -53,6 +53,10 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"deleteSelection", tr("Delete what is selected"), edit,
              standard(QKeySequence::Delete) + QStringList{"Backspace"}},
             {"selectAll", tr("Select everything on the page"), edit, standard(QKeySequence::SelectAll)},
+            // (before the search: Qt has Ctrl+G and Ctrl+Shift+G for the next and previous hit on some systems, which
+            // keep F3 and Shift+F3)
+            {"group", tr("Group what is selected"), edit, {"Ctrl+G"}},
+            {"ungroup", tr("Ungroup what is selected"), edit, {"Ctrl+Shift+G"}},
             {"markdownMode", tr("Markdown box"), edit, {"Ctrl+Alt+M"}},
 
             {"zoomIn", tr("Zoom in"), view, standard(QKeySequence::ZoomIn)},

@@ -38,3 +38,6 @@ rounded hole: the spotlight) are drawn in the same style.
 `xqt-snip` is Lucide's `scissors`: the snip tool (copy the picture of a part of a page, qt/docs/snip.md).
 
 `xqt-sticker` is Lucide's `sticker` (a sheet with a peeled corner and a smile): the sticker tool (qt/docs/stickers.md).
+
+`xqt-group` and `xqt-ungroup` are Lucide's `group` and `ungroup`: grouping the selected elements and ungrouping them
+(the selection's pill, qt/docs/groups.md).

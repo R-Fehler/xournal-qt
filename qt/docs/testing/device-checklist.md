@@ -2907,3 +2907,12 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
 - [ ] The same `.xopp` (and the `.xopp` exported from a PDF with notes) opened in Xournal++ 1.2 / 1.3: no message,
       every element there and drawn as here; selected one by one (Xournal++ has no groups). Saved there and opened
       here again: the elements are all there, ungrouped.
+- [ ] Select three strokes with the lasso: the pill shows the Group button (two overlapping boxes in a dashed frame),
+      no Ungroup. Group (or Ctrl+G): the button turns into Ungroup (two boxes apart). Undo: no group again (one
+      step); Redo: grouped again.
+- [ ] Select a group and a loose stroke (Select more): both Group and Ungroup are in the pill. Group: one group of
+      all three. Ctrl+Shift+G with the group selected: ungrouped, one undo step.
+- [ ] Hold a finger on Group / Ungroup: their names show above the finger. Ctrl+G and Ctrl+Shift+G are listed in the
+      shortcuts sheet (F1) under Editing and can be changed in Settings; Ctrl+G does not jump to the next search hit
+      any more (F3 does).
+- [ ] The reference beside the notes, written in: its selection pill has the same buttons; for reading only: none.

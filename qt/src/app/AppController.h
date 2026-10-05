@@ -262,6 +262,10 @@ class AppController: public QObject {
     Q_PROPERTY(bool selectMoreAvailable READ selectMoreAvailable NOTIFY selectMoreChanged)
     Q_PROPERTY(bool selectingMore READ selectingMore WRITE setSelectingMore NOTIFY selectMoreChanged)
     Q_PROPERTY(int selectedCount READ selectedCount NOTIFY selectMoreChanged)
+    /// Groups (qt/docs/groups.md): the selected elements can become one group (Ctrl+G) / leave their groups
+    /// (Ctrl+Shift+G); the selection's pill shows a button for each that can be done
+    Q_PROPERTY(bool canGroup READ canGroup NOTIFY selectionChanged)
+    Q_PROPERTY(bool canUngroup READ canUngroup NOTIFY selectionChanged)
     // Page operations (sidebar, page grid) go onto the one undo stack of the document (these are the same as undo)
     Q_PROPERTY(bool canUndoPages READ canUndoPages NOTIFY pageUndoChanged)
     Q_PROPERTY(bool canRedoPages READ canRedoPages NOTIFY pageUndoChanged)
@@ -535,6 +539,11 @@ public:
     bool selectingMore() const;
     void setSelectingMore(bool on);
     int selectedCount() const;
+    bool canGroup() const;
+    bool canUngroup() const;
+    /// Group / ungroup what is selected (the reference while it has the keys and is written in): one undo step
+    Q_INVOKABLE bool groupSelection();
+    Q_INVOKABLE bool ungroupSelection();
     bool canGoBack() const;
     QString pdfTextMode() const { return pdfMode; }
     void setPdfTextMode(const QString& mode);
