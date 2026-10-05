@@ -59,6 +59,17 @@ struct Revision {
     bool valid() const { return !stamp.empty(); }
 };
 
+/// Version history (qt/docs/hybrid-pdf.md, "Version history"; PdfHistory.h).
+struct History {
+    /// Keep the versions of the file: one per day plus milestones; never compacted (a fallback appends the whole
+    /// document instead of writing the file anew). Off: the file's list of versions goes with this save.
+    bool on = false;
+    /// A milestone ("Save with a message…"); empty: the day's version.
+    std::string message;
+    /// A new version, never in place of the day's (the first save after a version was restored).
+    bool newVersion = false;
+};
+
 /// How write() saves an existing hybrid PDF.
 struct WriteOptions {
     /// The file as last written or opened: when it is still that file, only what changed is appended (an
@@ -71,6 +82,8 @@ struct WriteOptions {
     /// The handwriting recognised per page of the document (InkTextLayer.h): written as invisible text, so other PDF
     /// viewers find the words. nullptr: none.
     const std::vector<std::shared_ptr<const ink::PageText>>* inkText = nullptr;
+    /// Version history (a PDF with notes, not an archive PDF); nullptr: none.
+    const History* history = nullptr;
 };
 
 /// An incremental save writes the whole file anew instead when the file would then have grown by more than this
@@ -86,6 +99,9 @@ struct Result {
     bool incremental = false;  ///< only the changes were appended
     uint64_t appended = 0;     ///< bytes appended
     std::string whyFull;       ///< why it was written in full although a revision was given (for measuring)
+    // --- version history
+    int version = -1;          ///< the version written (its id; -1: none)
+    bool replaced = false;     ///< it replaced the day's version
     // --- an archive PDF (writeArchive)
     size_t flattened = 0;             ///< layers merged into the page content
     bool pdfa = false;                ///< it carries the PDF/A-3b identification
@@ -145,6 +161,9 @@ struct Marker {
     bool archive = false;   ///< an archive PDF (writeArchive)
     /// It carries a "name.md" for other apps (listed in the marker's /Files): a PDF text document (TextDocument.h)
     bool markdown = false;
+    /// It keeps its versions (PdfHistory.h), and how many (the marker's /History, not the list)
+    bool history = false;
+    int versions = 0;
 };
 Marker markerOf(const fs::path& pdf);
 /// How often a marker was read from a file (not remembered) so far, in this process (tests: nothing read twice).
@@ -153,9 +172,20 @@ int markerReads();
 /// may still be in it, so it is written anew before it is shared (remembered likewise).
 bool hasEarlierRevisions(const fs::path& pdf);
 
-/// Write the file anew in one piece, without its earlier revisions (the same content; qpdf), atomically. For a file
-/// shared as it is.
-bool compact(const fs::path& pdf, std::string& error);
+/// Write the file anew in one piece, without its earlier revisions and its version history (the same content; qpdf),
+/// atomically. For a file shared as it is. `to`: a copy written there instead (the file keeps its history).
+bool compact(const fs::path& pdf, std::string& error, const fs::path& to = {});
+
+/// Version history (PdfHistory.h): version `id` of `pdf` as a file of its own at `out` (the file cut after that
+/// version; an older version whose .xopp is a delta gets its whole .xopp back), a PDF with notes that opens as the
+/// document saved then (version 0 as received: the plain PDF). False with `error`.
+bool writeVersion(const fs::path& pdf, int id, const fs::path& out, std::string& error);
+/// Give version `id` a message (an empty one: none), or change it. Only the marker is written (appended, part of the
+/// current version: never a version of its own); it needs the file's last revision to be ours.
+bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, std::string& error);
+/// The file changed in a way that keeps its clean copy (only the marker): the cache entry of the version `was` serves
+/// the version it is now.
+void keepCacheEntry(const fs::path& pdf, const std::string& was);
 
 /// The revision of `pdf` that `cleanCopy` (the background of a document opened from it) was made from, if the file is
 /// still that version and was not edited in another app (else an invalid revision: the next save writes it in full).

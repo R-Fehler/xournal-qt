@@ -3,7 +3,8 @@
 // empty or the bar's ✕); press and hold, then move, to drag the selected pages to another place; right click or ⋮
 // for the page menu; Ctrl+C/X/V,
 // Delete and Ctrl+Z (the one undo of the document) with the keyboard. While searching, pages with hits are framed and the list can
-// be limited to them. The last button shows the document's annotations (AnnotationList).
+// be limited to them. The last buttons show the document's annotations (AnnotationList) and its version history
+// (HistoryPanel: the versions a PDF with notes keeps; while it keeps none, what that is and the switch).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -14,13 +15,15 @@ import "DevicePixels.js" as DevicePixels
 Rectangle {
     id: sidebar
     color: "#eceef1"
-    /// "pages", "layers", "contents" or "annotations"
+    /// "pages", "layers", "contents", "annotations" or "history"
     property string mode: "pages"
     readonly property bool showContents: mode === "contents"
     /// A table of contents, or bookmarks (listed at the top of it)
     readonly property bool hasContents: app.outline.available || app.bookmarks.length > 0
     /// A page, an entry of the contents or an annotation was tapped and is shown now (a drawer closes then)
     signal pagePicked()
+    /// The History panel asks for a version's message (-1: "Save with a message…")
+    signal versionMessageRequested(int id)
     /// Room at the bottom for the system's navigation bar (its lists end above it; the sidebar's color goes on below)
     property real bottomInset: 0
     /// Touch: taps select pages instead of going there (a finger held on a page turns it on; it ends when the selection
@@ -32,6 +35,8 @@ Rectangle {
     }
     // The annotations are read only while they are shown
     Binding { target: app.annotations; property: "active"; value: sidebar.visible && sidebar.mode === "annotations" }
+    // The versions too (reading them reads the whole file)
+    Binding { target: app.versions; property: "active"; value: sidebar.visible && sidebar.mode === "history" }
     onModeChanged: if (mode === "contents" && !hasContents) mode = "pages"
 
     // Pages | Layers | Contents (the last one when the document has a table of contents)
@@ -87,6 +92,40 @@ Rectangle {
                 }
             }
         }
+        // History: the versions a PDF with notes keeps (an icon too)
+        AbstractButton {
+            id: historyButton
+            objectName: "sidebarHistoryButton"
+            implicitWidth: win.adaptive.touchProfile ? win.adaptive.minTarget : 36
+            implicitHeight: win.adaptive.touchProfile ? win.adaptive.minTarget : 32
+            readonly property bool active: sidebar.mode === "history"
+            onClicked: sidebar.mode = "history"
+            Accessible.name: qsTr("Version history")
+            ToolTip.visible: hovered
+            ToolTip.text: qsTr("Version history")
+            background: Rectangle { radius: 16; color: historyButton.active ? "#ffffff" : "transparent" }
+            contentItem: Item {
+                Image {
+                    anchors.centerIn: parent
+                    source: app.iconUrl("xqt-history")
+                    sourceSize.width: 18
+                    sourceSize.height: 18
+                    opacity: historyButton.active ? 1 : 0.75
+                }
+            }
+        }
+    }
+    HistoryPanel {
+        objectName: "historyPanel"
+        onPicked: sidebar.pagePicked()
+        onMessageRequested: function(id) { sidebar.versionMessageRequested(id) }
+        visible: sidebar.mode === "history"
+        anchors.top: switchRow.bottom
+        anchors.topMargin: 4
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: sidebar.bottomInset
+        anchors.left: parent.left
+        anchors.right: parent.right
     }
     AnnotationList {
         onPicked: sidebar.pagePicked()

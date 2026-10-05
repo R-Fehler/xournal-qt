@@ -1135,6 +1135,9 @@ counts the pictures of the tool drawn; it should stay 0 while moving and turning
       "edited in another app" question comes, and after "Keep the Xournal data" the next save writes the file anew.
 - [ ] Pull the power (or kill the app with `kill -9`) during a save of a long PDF: the file still opens in every
       viewer as it was before that save; a hidden `.name.pdf.….part` file next to it goes away with a later save.
+- [ ] A PDF with notes with a photo as a page's background (an image opened and written on, saved in PDF files mode):
+      Ctrl+S after a stroke on another page appends a few tens of KB, not the photo's size (`ls -l` before and
+      after); the photo still shows after closing and opening (qt/pdf-history).
 
 ## PDF-only mode (qt/pdf-only)
 
@@ -3414,3 +3417,47 @@ Seen through the replay (⋮ → View → Replay the writing).
       thing written before the replay.
 - [ ] A document with sticky notes: a note appears when it was put on the page, its ink after it.
 - [ ] Another tab while replaying: the replay ends; closing the tab while replaying: no crash.
+
+## Version history inside PDFs with notes (qt/pdf-history, qt/docs/hybrid-pdf.md "Version history")
+
+- [ ] `xournal-qt-cli export-xopp notes.pdf --version 2 -o v2.xopp` on a PDF with notes that kept versions over a
+      few days: the .xopp opens in Xournal++ next to the PDF with the strokes of that day (its PDF background is the PDF
+      by its name, so our annotations show under the strokes: compare the strokes, not the look). Without
+      `--version`: the latest. A version that is not in the file: a message, exit code 253 (-3).
+- [ ] `pdfdetach -list notes.pdf` (or Acrobat's attachments) after several days of saves: `document.xopp` is there
+      and is the latest version; older versions are not listed as attachments.
+- [ ] Open a PDF with notes. The sidebar has a clock button after the highlighter (Version history): it explains what
+      versions are and has the switch "Keep versions of this document" (off). ⋮ → Document → "Version history…" opens
+      the same. Turn it on: "Versions are kept from the next save" with "Save now"; after it the list shows the file as
+      it was and the version saved now.
+- [ ] Write on two days (or change the system date): each day is one version; several Ctrl+S on one day keep one
+      version for that day (the list does not grow, the newest row's time changes). The file does not grow by the
+      whole .xopp for each older day (`ls -l` over a week of saves of a long lecture).
+- [ ] Ctrl+Alt+S: "Save with a message"; type "Before the exam", Save: the row has a flag and the message in bold. A
+      save after it is a new version. "Milestones" shows only flagged rows. A row's menu → "Add a message…" changes a
+      message later (the next Ctrl+S is still fast).
+- [ ] A row's menu → "Show beside the document": that version opens on the side, read-only, with the ink of then.
+      "Open as a copy": a new tab "name (version N)", not saved. "Restore this version…": the pages are those of
+      then, Undo brings today's back; the next Ctrl+S adds a version "Restored the version of …".
+- [ ] Settings → Documents → "Keep versions of new PDFs with notes" (off by default). On: annotate a plain PDF and
+      save it in PDF files mode: the History panel lists "The PDF as it was received" and the first version; the
+      first bytes of the file are the original PDF (`cmp -n <size> original.pdf file.pdf`).
+- [ ] Share… on a PDF with notes that keeps versions: a check box "With its version history" (off). Off: the shared
+      file is a copy (in the app cache) with one revision (`grep -c startxref`), the file itself keeps its versions.
+      On: the file itself.
+- [ ] The phone (Fold 7 folded): the History button fits in the sidebar's row; the row menu is a sheet; Ctrl+Alt+S
+      on a keyboard cover works.
+- [ ] The library (and Recent): the card of a PDF with notes that keeps versions has a small clock under its "PDF ✎"
+      badge; its tooltip says how many ("Keeps its versions (7)"). A PDF with notes without versions has none. The
+      library lists as fast as before (the number comes from the marker the index reads anyway).
+- [ ] Acrobat (desktop): open a PDF with notes that keeps versions, add a comment, File → Save (not Save As): back in
+      xournal-qt the History panel lists the versions and a row "Changed in another app" with Acrobat's date; the next
+      Ctrl+S on the same day is a new version (Acrobat's revision is never cut away), the comment stays.
+- [ ] Acrobat "Save As…" (or "Reduce file size"), and macOS Preview saving the file: the latest state opens in
+      xournal-qt; the History panel says how many versions were removed by another app (they are gone: those apps
+      write the file anew). Preview on iPad/iPhone the same.
+- [ ] An older version cut out of the file (`head -c <end> file.pdf > old.pdf`, the end from "Show beside the
+      document"'s file in the cache) opens in Okular, Firefox and Acrobat with the ink of that day.
+- [ ] Help → Introduction: the first page has "Go back to earlier versions" (the History button, Ctrl+Alt+S); on the
+      phone the page still fits without scrolling past its buttons. Help → Tutorial → section 15 "Versions": the steps
+      work on the tutorial itself (turn on, Ctrl+Alt+S, show, restore, copy). Fill its screenshot placeholder.

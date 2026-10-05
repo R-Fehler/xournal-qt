@@ -186,6 +186,9 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                                                                                    : hover::Pointer::Dot);
         });
 
+    // Version history (qt/docs/hybrid-pdf.md): new PDFs with notes keep their versions from their first save (off)
+    add("keepVersionsOfNewPdfs", [&s] { return QVariant(DocumentMode::keepVersionsOfNewPdfs(s)); },
+        [&s](const QVariant& v) { DocumentMode::setKeepVersionsOfNewPdfs(s, v.toBool()); });
     // Open documents at the page they were left at (off: at their first page)
     add("resumeAtLastPage",
         [&s] {

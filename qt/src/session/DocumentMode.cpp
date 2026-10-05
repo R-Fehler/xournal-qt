@@ -73,6 +73,17 @@ TextKind newTextDocuments(Settings& settings) {
     return pdfOnly(settings) ? TextKind::Pdf : TextKind::Markdown;
 }
 
+bool keepVersionsOfNewPdfs(Settings& settings) {
+    bool on = false;
+    settings.getCustomElement("xournalQt").getBool("keepVersionsOfNewPdfs", on);
+    return on;
+}
+
+void setKeepVersionsOfNewPdfs(Settings& settings, bool on) {
+    settings.getCustomElement("xournalQt").setBool("keepVersionsOfNewPdfs", on);
+    settings.customSettingsChanged();
+}
+
 void setNewTextDocuments(Settings& settings, TextKind kind) {
     settings.getCustomElement("xournalQt").setString("newTextDocuments", kind == TextKind::Pdf ? "pdf" : "md");
     settings.customSettingsChanged();

@@ -134,6 +134,14 @@ AdaptiveDialog {
                                + "document was saved and opened again. With a pen, the pen writes and a finger "
                                + "scrolls and zooms.")
                 }
+                // Version history (qt/docs/hybrid-pdf.md): off by default, so said here once
+                Heading { text: qsTr("Go back to earlier versions") }
+                Para {
+                    objectName: "introVersions"
+                    text: qsTr("A PDF with notes can keep its versions inside itself: one for each day, and "
+                               + "milestones you name (Ctrl+Alt+S). Turn it on with the <b>History</b> button of "
+                               + "the sidebar.")
+                }
             }
 
             // 2. Markdown documents, and a Markdown text inside a PDF

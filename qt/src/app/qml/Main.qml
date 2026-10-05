@@ -149,6 +149,11 @@ ApplicationWindow {
                                         : layoutClass === "phoneShort" ? 260 : Math.min(360, Math.round(width * 0.85))
     /// The Pages button: hides the sidebar (remembered for this size class), or shows it again - beside the page where
     /// there is room, else as a drawer (for the moment, not remembered)
+    /// The sidebar's History panel (version history)
+    function showHistory() {
+        sidebar.mode = "history"
+        showSidebar(true)
+    }
     function showSidebar(shown) {
         if (shown) {
             if (sidebarDocked) return
@@ -516,14 +521,14 @@ ApplicationWindow {
     }
     /// Share → a PDF with notes of the current document (`file`: a PDF of the library instead), shown in the file
     /// manager or onto the clipboard. Saved first if needed; a .xopp is never turned into a PDF unasked.
-    function sharePdfOf(file, toClipboard) {
+    function sharePdfOf(file, toClipboard, withHistory) {
         if (file !== "") {
-            app.shareFile(file, toClipboard)
+            app.shareFile(file, toClipboard, !!withHistory)
             return
         }
         const step = app.shareStep()
         if (step === "share" || step === "save") {
-            app.sharePdf(toClipboard)
+            app.sharePdf(toClipboard, !!withHistory)
         } else if (step === "saveAs") {
             openSaveDialog(function() { app.sharePdf(toClipboard) }, "pdf")
         } else if (toClipboard) {
@@ -1462,6 +1467,17 @@ ApplicationWindow {
                         MenuSeparator {}
                         // Its name (qt/rename): the file, and what belongs to it, as the library renames it
                         AdaptiveMenuItem { objectName: "renameDocumentItem"; text: qsTr("Rename…"); icon.source: app.iconUrl("xqt-pencil"); onTriggered: renameDocumentDialog.openFor(app.currentTab) }
+                        // Version history (qt/docs/hybrid-pdf.md): the sidebar's History panel (off by default; what it
+                        // is and the switch are there)
+                        AdaptiveMenuItem { objectName: "versionHistoryItem"; offered: !win.textDoc; text: qsTr("Version history…"); icon.source: app.iconUrl("xqt-history"); onTriggered: win.showHistory() }
+                        AdaptiveMenuItem {
+                            objectName: "saveWithMessageItem"
+                            offered: !win.textDoc
+                            readonly property var keys: win.keysOf("saveWithMessage")
+                            text: keys.length > 0 ? qsTr("Save with a message… (%1)").arg(keys[0]) : qsTr("Save with a message…")
+                            icon.source: app.iconUrl("xqt-flag")
+                            onTriggered: versionMessageDialog.openFor(-1)
+                        }
                         AdaptiveMenuItem {
                             objectName: "editAnywayItem"
                             offered: app.canEditAnyway
@@ -2280,6 +2296,7 @@ ApplicationWindow {
         // As a drawer (no room beside the page): over the page, below the home screen; it closes once a page is picked
         z: win.sidebarAsDrawer ? 49 : 0
         onPagePicked: if (win.sidebarAsDrawer) win.showSidebar(false)
+        onVersionMessageRequested: function(id) { versionMessageDialog.openFor(id) }
         // The drawer's pin, just outside its edge: keep the sidebar beside the page at this window size
         IconButton {
             objectName: "sidebarPin"
@@ -3310,9 +3327,13 @@ ApplicationWindow {
         property string file: ""  // a PDF of the library; "": the current document
         /// A Markdown or text file (the current document's, or a card's): shared as the file itself, never as a PDF
         property string textFile: ""
+        /// The PDF with notes keeps its versions (version history): they go along only when chosen
+        property bool keepsVersions: false
         function openFor(path) {
             file = path
             textFile = app.sharedTextFile(path)
+            keepsVersions = textFile === "" && app.sharedKeepsVersions(path)
+            withHistoryBox.checked = false
             open()
         }
         preferredWidth: 460
@@ -3337,6 +3358,17 @@ ApplicationWindow {
                 detail: qsTr("Paste it into another app or a chat.")
                 onClicked: { shareDialog.close(); win.shareTextFile(shareDialog.textFile, shareDialog.file === "", true) }
             }
+            // Version history: without the versions unless chosen (older versions may hold ink that was deleted)
+            CheckBox {
+                id: withHistoryBox
+                objectName: "shareWithHistory"
+                Layout.fillWidth: true
+                visible: shareDialog.keepsVersions
+                text: qsTr("With its version history")
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Off (recommended): the PDF goes as it is now. On: with every version it keeps, "
+                                   + "also ink that was deleted since.")
+            }
             ShareChoice {
                 objectName: "sharePdfChoice"
                 visible: shareDialog.textFile === ""
@@ -3344,14 +3376,14 @@ ApplicationWindow {
                 detail: app.canShare ? qsTr("Shown in the file manager, to send it on.")
                                      : qsTr("Not available on this system yet.")
                 enabled: app.canShare
-                onClicked: { shareDialog.close(); win.sharePdfOf(shareDialog.file, false) }
+                onClicked: { shareDialog.close(); win.sharePdfOf(shareDialog.file, false, withHistoryBox.checked) }
             }
             ShareChoice {
                 objectName: "shareCopyChoice"
                 visible: shareDialog.textFile === ""
                 text: qsTr("Copy the PDF with notes")
                 detail: qsTr("Paste it into another app or a chat.")
-                onClicked: { shareDialog.close(); win.sharePdfOf(shareDialog.file, true) }
+                onClicked: { shareDialog.close(); win.sharePdfOf(shareDialog.file, true, withHistoryBox.checked) }
             }
             ShareChoice {
                 objectName: "shareArchiveChoice"
@@ -4560,6 +4592,85 @@ ApplicationWindow {
         anchors.bottomMargin: 96 + canvas.y + canvas.height - win.canvasControlsBottom
     }
     Connections {
+        target: app.versions
+        // A version was restored (the History panel): one undo step
+        function onRestored(ok, text) {
+            if (ok) {
+                snackbar.show(text, true)
+            } else {
+                messageDialog.title = qsTr("The version could not be restored")
+                messageDialog.text = text
+                messageDialog.open()
+            }
+        }
+    }
+    // "Save with a message…" (Ctrl+Alt+S, a milestone of the version history), or a version's message changed later
+    AdaptiveDialog {
+        id: versionMessageDialog
+        objectName: "versionMessageDialog"
+        kind: "question"
+        /// -1: the next save; else the version whose message it is
+        property int versionId: -1
+        function openFor(id) {
+            versionId = id
+            messageField.text = id >= 0 ? app.versions.messageOf(id) : ""
+            keepVersionsBox.checked = true
+            open()
+            messageField.forceActiveFocus()
+        }
+        preferredWidth: 420
+        title: versionId >= 0 ? qsTr("The message of the version of %1").arg(app.versions.titleOf(versionId))
+                              : qsTr("Save with a message")
+        ColumnLayout {
+            width: versionMessageDialog.availableWidth
+            spacing: 8
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                visible: versionMessageDialog.versionId < 0
+                text: qsTr("A version with a message is a milestone: it is kept as it is, whatever is saved later that day.")
+            }
+            TextField {
+                id: messageField
+                objectName: "versionMessageField"
+                Layout.fillWidth: true
+                placeholderText: qsTr("What did you do?")
+                maximumLength: 200
+                onAccepted: versionMessageDialog.accept()
+            }
+            CheckBox {
+                id: keepVersionsBox
+                objectName: "versionMessageKeepVersions"
+                visible: versionMessageDialog.versionId < 0 && !app.versions.on
+                text: qsTr("Keep versions of this document")
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                visible: versionMessageDialog.versionId < 0 && !app.versions.available
+                text: app.versions.unavailableReason
+                color: "#b06000"
+            }
+        }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "versionMessageSave"
+                text: versionMessageDialog.versionId >= 0 ? qsTr("Change") : qsTr("Save")
+                enabled: versionMessageDialog.versionId >= 0 || app.versions.available
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+            Button { text: qsTr("Cancel"); flat: true; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+        }
+        onAccepted: {
+            if (versionId >= 0) {
+                app.setVersionMessage(versionId, messageField.text)
+                return
+            }
+            if (keepVersionsBox.visible && keepVersionsBox.checked) app.versions.on = true
+            if (!app.saveWithMessage(messageField.text, null)) saveOrAsk(null)
+        }
+    }
+    Connections {
         target: app
         function onPageActionDone(text, undoable) { snackbar.show(text, undoable) }
         // A snip pasted from a document with a file (qt/docs/snip.md): a link to its page, if wanted
@@ -5062,6 +5173,7 @@ ApplicationWindow {
     // (the reference, while it has the keys and is written in)
     Shortcut { sequences: win.keysOf("save"); enabled: docKeys; onActivated: if (!app.saveReferenceInHand()) saveOrAsk(null) }
     Shortcut { sequences: win.keysOf("saveAs"); enabled: docKeys; onActivated: openSaveDialog(null) }
+    Shortcut { sequences: win.keysOf("saveWithMessage"); enabled: docKeys && !win.textDoc; onActivated: versionMessageDialog.openFor(-1) }
     Shortcut { sequences: win.keysOf("open"); onActivated: openDialog.open() }
     // Ctrl+N adds a page (what one needs while writing), Ctrl+Shift+N a document
     Shortcut { sequences: win.keysOf("addPage"); enabled: docKeys; onActivated: app.addPageAfterCurrent() }

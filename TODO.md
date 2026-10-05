@@ -676,16 +676,18 @@ read-only mode." Decided: levels 1 and 2 of [ideas B9](qt/docs/ideas-2026-10.md)
 "A fully version controlled PDF document leveraging the append saving … a version sidebar, the save date as the
 commit message and optional milestone messages." Plan: [qt/docs/research/version-history.md](qt/docs/research/version-history.md),
 section "Confirmed by the author" (it overrides the plan's steps where they differ).
-- [ ] Revisions of a PDF with notes read back (`PdfRevisions`: the chain, ends, dates, prefixes).
-- [ ] History on per document (off by default; discoverable: a History sidebar mode, ⋮ → Document → Version
+- [x] Revisions of a PDF with notes read back (`PdfRevisions`: the chain, ends, dates, prefixes). Done.
+- [x] History on per document (off by default; discoverable: a History sidebar mode, ⋮ → Document → Version
   history…, a setting for new PDFs); one version per day plus milestones (Ctrl+Alt+S, a message); no compaction
-  while on; version 0 "as received".
-- [ ] Older versions as deltas of their `.xopp` (keyframes, sha256 checked); the latest always a full `document.xopp`.
-- [ ] Read-only version view, Restore (a new version on top), Open as copy; the History panel (list, milestones,
-  messages, size); Share/Save as without history by default; `xournal-qt-cli export-xopp --version N`.
-- [ ] A mark on library cards of documents with history on.
-- [ ] Background-image attachments not written again when unchanged.
-- [ ] The introduction and the tutorial explain version history.
+  while on; version 0 "as received". Left: Acrobat/Preview round trips on the device.
+- [x] Older versions as deltas of their `.xopp` (keyframes, sha256 checked); the latest always a full `document.xopp`.
+  Left: pruning, only if real files need it.
+- [x] Read-only version view, Restore (a new version on top), Open as copy; the History panel (list, milestones,
+  messages, size); Share/Save as without history by default; `xournal-qt-cli export-xopp --version N`. Left: compare
+  and play (the scrubber on `qt/timeline`'s play bar); "Save a copy with history" (Share can send the file itself).
+- [x] A mark on library cards of documents with history on. Left: nothing (the library has cards only, no rows).
+- [x] Background-image attachments not written again when unchanged. Done.
+- [x] The introduction and the tutorial explain version history. Left: the tutorial's screenshot placeholder.
 
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message

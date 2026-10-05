@@ -136,6 +136,8 @@ public:
         FavouriteRole,
         /// Its tags (qt/docs/tags.md), from the index ([] until it is indexed, and for folders)
         TagsRole,
+        /// A PDF with notes that keeps its versions (version history): how many, from the index (0: none)
+        VersionsRole,
     };
 
     explicit LibraryModel(QObject* parent = nullptr);

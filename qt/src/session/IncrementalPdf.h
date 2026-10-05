@@ -97,6 +97,26 @@ public:
     /// The update's bytes, to append to a file whose end is `tail` (they start at its end). Throws on failure.
     std::string serialize(const Tail& tail, Stats* stats = nullptr);
 
+    /// The revisions of the file after its first `prefix.size` bytes, written again as one (version history: the
+    /// day's version replaced, an older version's data stored as a delta; qt/docs/hybrid-pdf.md, "Version history").
+    struct Over {
+        Tail prefix;  ///< the end of the file as it was before those revisions (they are cut away when appended)
+        /// The objects those revisions define (PdfRevisions::Revision::objects): written again with what they are now.
+        /// Those numbered above `highest` (new in them) only when something written refers to them: what they no
+        /// longer use goes.
+        std::vector<std::pair<int, int>> objects;
+        int highest = 0;  ///< the highest object number of the prefix
+    };
+    /// The update's bytes for `over` (append them with `keep` = over.prefix.size). Throws on failure.
+    std::string serializeOver(const Over& over, Stats* stats = nullptr);
+
+    /// A copy of a whole document of another PDF (its catalog, with its pages and everything they refer to). Streams
+    /// the file has already with the same dictionary and data (when indexReuse() was called) are not copied: the
+    /// update refers to them (a whole document appended on top of the same PDF costs little more than what differs).
+    QPDFObjectHandle copyAll(QPDFObjectHandle foreign);
+    /// Index the streams of the file (reads every object of it) for copyAll().
+    void indexReuse();
+
 private:
     /// The next free number, taken (a null object until it is replaced).
     QPDFObjectHandle reserve();
@@ -105,7 +125,13 @@ private:
         bool data = false;  ///< a stream whose data was replaced
     };
     QPDFObjectHandle copyValue(QPDFObjectHandle o, bool top);
+    std::string serializeWith(const Tail& tail, const Over* over, Stats* stats);
+    /// A stream of the file with this dictionary and data (copyAll); null: none.
+    QPDFObjectHandle reusable(QPDFObjectHandle foreign);
     QPDF& pdf;
+    bool copyPages = false;  ///< copyValue: other pages too (copyAll)
+    bool indexed = false;
+    std::multimap<std::string, QPDFObjGen> reuse;  ///< streams of the file by their key (indexReuse)
     int maxId = 0;
     int nextId = 0;
     std::set<QPDFObjGen> objects;
@@ -121,9 +147,10 @@ struct Result {
 };
 
 /// Append `update` to `file`, whose end must still be `tail` (else nothing is written: another app changed it).
+/// `keep`: only the first `keep` bytes of the file stay, the update follows them (Update::serializeOver).
 /// Atomic: see above. `update` starts right after the old end (Update::serialize puts an end of line first when the
 /// file had none).
-Result append(const fs::path& file, const Tail& tail, const std::string& update);
+Result append(const fs::path& file, const Tail& tail, const std::string& update, uint64_t keep = UINT64_MAX);
 
 /// Tests: called while the update is written with the bytes written so far; returning true fails the write there, as
 /// a full disk or a crash would.

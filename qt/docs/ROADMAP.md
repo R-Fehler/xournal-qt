@@ -955,6 +955,18 @@
   the stroke being written (grown along its length) are drawn over them as the pen's stroke is. Audio plays where it
   overlaps at 1×; a tap on ink goes to its moment; leaving changes nothing ([timeline.md](timeline.md)).
 
+- **Version history inside PDFs with notes, `qt/pdf-history` (2026-10-05).** Off by default, found in the page
+  sidebar's History panel (what it is and the switch), ⋮ → Document → Version history… and Settings → Documents ("Keep
+  versions of new PDFs with notes"); documents that keep versions have a clock on their library card. One version per
+  local day (later saves that day replace it, cut back and appended again), milestones with a message (Ctrl+Alt+S),
+  version 0 the PDF as received; never compacted while on (a fallback appends the whole document). The list lives in
+  the PDF's marker (`/History`, `/Versions`), checked against the revisions (`PdfRevisions`). Older versions keep
+  their `.xopp` as a byte delta with keyframes and SHA-256 checks; the latest always has a whole `document.xopp`
+  (`xournal-qt-cli export-xopp --version N`). Show a version beside the document, restore it (a new version, one undo
+  step), open it as a copy. Share sends it without its versions unless chosen. Attached background images are not
+  written again when unchanged. A lecture of 20 pages: 5–7 KB a day with deltas instead of 25–32 KB
+  ([hybrid-pdf.md](hybrid-pdf.md), "Version history"). Left: compare and play (on `qt/timeline`'s play bar), pruning.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

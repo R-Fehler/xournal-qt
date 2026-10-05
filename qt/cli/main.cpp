@@ -8,9 +8,12 @@
  *   --dump                 print a structural summary of the document (pages, layers, elements)
  *   --bench-render=ZOOM    render every page at ZOOM and print timings
  *   --pdf-dir=DIR          export every FILE as DIR/<name>.pdf (many documents in one go)
- * and a command:
+ * and commands:
  *   hwr-lines DOC --out DIR [--text FILE] [--lang de] [--writer ID] [--licence ID]
  *                          the handwriting of DOC as a line dataset (qt/src/hwr/LineDataset.h; this command links Qt)
+ *   export-xopp PDF [--version N] [-o OUT.xopp]
+ *                          the .xopp of a PDF with notes, of its latest or any version (version history,
+ *                          qt/src/session/PdfHistory.h; links Qt)
  *
  * @license GNU GPLv2 or later
  */
@@ -55,6 +58,9 @@
 #include <QCoreApplication>
 
 #include "hwr/LineDataset.h"
+#endif
+#ifdef XQT_CLI_SESSION
+#include "session/PdfHistory.h"
 #endif
 
 namespace {
@@ -275,6 +281,56 @@ int hwrLines(int argc, char* argv[]) {
 }  // namespace
 #endif
 
+#ifdef XQT_CLI_SESSION
+namespace {
+/// xournal-qt-cli export-xopp PDF [--version N] [-o OUT.xopp]
+int exportVersion(int argc, char* argv[]) {
+    auto usage = [] {
+        std::cerr << "usage: xournal-qt-cli export-xopp <file.pdf> [--version N] [-o out.xopp]\n"
+                     "  The Xournal++ document a PDF with notes carries: of its latest version, or of version N of\n"
+                     "  its version history (an older version's is rebuilt from its delta and checked). Its PDF\n"
+                     "  background is the PDF by its name. Default output: <name>.xopp, or <name>.v<N>.xopp.\n";
+        return 1;
+    };
+    fs::path pdf, out;
+    int version = -1;
+    for (int i = 2; i < argc; ++i) {
+        const std::string a = argv[i];
+        if ((a == "--version" || a == "-v") && i + 1 < argc) {
+            try {
+                version = std::stoi(argv[++i]);
+            } catch (const std::exception&) {
+                return usage();
+            }
+        } else if ((a == "-o" || a == "--out") && i + 1 < argc) {
+            out = fs::path(argv[++i]);
+        } else if (a == "-h" || a == "--help") {
+            return usage();
+        } else if (pdf.empty() && a.rfind("-", 0) != 0) {
+            pdf = fs::path(a);
+        } else {
+            std::cerr << "unknown argument: " << a << "\n";
+            return usage();
+        }
+    }
+    if (pdf.empty()) {
+        return usage();
+    }
+    if (out.empty()) {
+        out = pdf.stem();
+        out += version >= 0 ? ".v" + std::to_string(version) + ".xopp" : std::string(".xopp");
+    }
+    std::string error;
+    if (!xqt::PdfHistory::exportXopp(pdf, version, out, error)) {
+        std::cerr << error << "\n";
+        return -3;
+    }
+    std::cout << out.string() << "\n";
+    return 0;
+}
+}  // namespace
+#endif
+
 int main(int argc, char* argv[]) {
     // Same as upstream initCAndCoutLocales(): numbers in C locale for cairo/PDF output.
     setlocale(LC_ALL, "");
@@ -292,6 +348,11 @@ int main(int argc, char* argv[]) {
 #ifdef XQT_CLI_HWR
     if (argc >= 2 && std::string(argv[1]) == "hwr-lines") {
         return hwrLines(argc, argv);
+    }
+#endif
+#ifdef XQT_CLI_SESSION
+    if (argc >= 2 && std::string(argv[1]) == "export-xopp") {
+        return exportVersion(argc, argv);
     }
 #endif
 

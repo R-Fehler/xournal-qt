@@ -900,6 +900,27 @@ Popup {
                             { text: qsTr("Keep it as it is"), value: "keep" }
                         ]
                     }
+                    // Version history (qt/docs/hybrid-pdf.md): per document in the sidebar's History panel; this is
+                    // for PDFs with notes that are new
+                    SectionTitle { text: qsTr("Version history") }
+                    Hint {
+                        text: qsTr("A PDF with notes can keep its versions inside itself: one for each day you save "
+                                   + "it, plus milestones you name. Turn it on for a document in the sidebar's History "
+                                   + "panel, or here for every new one.")
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: qsTr("Keep versions of new PDFs with notes")
+                        }
+                        Switch {
+                            objectName: "keepVersionsSwitch"
+                            checked: (sheet.s.revision, sheet.s.get("keepVersionsOfNewPdfs"))
+                            onToggled: sheet.s.set("keepVersionsOfNewPdfs", checked)
+                        }
+                    }
                     SectionTitle { text: qsTr("Autosave") }
                     SwitchRow { key: "autosaveEnabled"; text: qsTr("Save a backup of unsaved changes regularly") }
                     SliderRow {

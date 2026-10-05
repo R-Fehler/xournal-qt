@@ -43,6 +43,8 @@ struct DocumentSession::SaveTask {
     std::unordered_map<const XojPage*, size_t> baseOf;  ///< a hybrid PDF: page of the copy -> page of its clean copy
     HybridPdf::Revision revision;  ///< a hybrid PDF saved again: the file as last written or opened (incremental)
     HybridPdf::Revision written;   ///< and what it is after the save
+    HybridPdf::History history;    ///< a hybrid PDF: its version history (keepsVersions(), SaveRequest::message)
+    bool historyChoice = false;    ///< the choice made in the session is written by this save
     /// A hybrid or archive PDF: the handwriting recognised per page (its text layer, InkTextLayer.h)
     std::vector<std::shared_ptr<const ink::PageText>> inkText;
     bool createBackup = false;

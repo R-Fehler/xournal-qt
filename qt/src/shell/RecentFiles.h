@@ -41,6 +41,7 @@ public:
         KindRole,      ///< "notes", "pdf", "md", "image", "text" (DocumentItem::kindName); a library: "library"
         IsLibraryRole, ///< a folder opened as a library
         PdfKindRole,   ///< a document whose file is a PDF: what it is, where the library knows it (pdfKindName; else "")
+        VersionsRole,  ///< a PDF with notes that keeps its versions: how many, where the library knows it (else 0)
     };
     static constexpr int MAX_ENTRIES = 100;
 
@@ -61,6 +62,8 @@ public:
     void remap(const fs::path& from, const fs::path& to);
     /// What a PDF is, where it is known (the library index: set by the controller; not set: not known).
     void setPdfKinds(std::function<PdfKind(const fs::path&)> lookup);
+    /// How many versions a PDF with notes keeps, where it is known (the library index; version history).
+    void setVersionCounts(std::function<int(const fs::path&)> lookup) { versionCounts = std::move(lookup); }
     /// The kinds known may have changed (the index read more): the cards show them anew.
     void pdfKindsChanged();
     /// Files were renamed, moved or trashed (open tabs follow).
@@ -111,6 +114,7 @@ private:
 
     fs::path storeFile;
     std::function<PdfKind(const fs::path&)> pdfKinds;
+    std::function<int(const fs::path&)> versionCounts;
     std::vector<Row> rows;
     GridSelection selection;
 };

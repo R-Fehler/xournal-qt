@@ -107,6 +107,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Annotations.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/AnnotationsModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/AnnotationsModel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/VersionsModel.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/VersionsModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/MdSnippets.h
@@ -222,6 +224,7 @@ set(XQT_QML_FILES
     src/app/qml/ContentsOverview.qml
     src/app/qml/OutlineList.qml
     src/app/qml/AnnotationList.qml
+    src/app/qml/HistoryPanel.qml
     src/app/qml/TextFlowPanel.qml
     src/app/qml/MarkdownPanel.qml
     src/app/qml/EmojiSuggestions.qml
@@ -359,6 +362,7 @@ if(XQT_BUILD_TESTS)
 
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/TemplateToolTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AnnotationsPanelTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/VersionHistoryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/CitationsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.h
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.cpp
@@ -417,7 +421,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CitationLibraryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ArxivTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/StickersTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TemplatesTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TemplatesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/VersionsTest.cpp)
     target_link_libraries(xqt-shell-tests PRIVATE xqt-shell Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-shell-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-shell-tests PRIVATE "${TEST_CONFIG_DIR}")

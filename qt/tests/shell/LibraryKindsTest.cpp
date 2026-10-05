@@ -409,3 +409,51 @@ TEST_F(LibraryKindsTest, benchTheFilterOnManyPdfs) {
                 n, hybrids, sample.isEmpty() ? "" : (" copies of " + sample).toUtf8().constData(), coldBefore,
                 warmBefore, indexing, filterOn, textOnly, relist, kindAlone);
 }
+
+// A PDF with notes that keeps its versions (version history): the index reads how many from the marker it reads anyway
+// (never the list), keeps the number in notes.pack, and the cards show it (the "versions" role)
+TEST_F(LibraryKindsTest, documentsThatKeepVersionsAreMarked) {
+    makePlainPdf(root / "plain.pdf");
+    makeNotesPdf(root / "notes.pdf");
+    {
+        QTemporaryDir config;
+        AppContext app(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(config.filePath("settings.xml").toStdString()), 1);
+        makePlainPdf(root / "src" / "kept.pdf");
+        auto loaded = DocumentSession::loadFile(root / "src" / "kept.pdf");
+        ASSERT_TRUE(loaded.document);
+        DocumentSession s(app, std::move(loaded.document));
+        s.setKeepsVersions(true);
+        drawStroke(s, 0);
+        ASSERT_TRUE(s.saveAsHybrid(root / "kept.pdf").ok);
+        drawStroke(s, 0);
+        DocumentSession::SaveRequest r;
+        r.message = "A milestone";
+        ASSERT_TRUE(s.saveNow(r).ok);
+        fs::remove_all(root / "src");
+    }
+    freshStamps({root / "plain.pdf", root / "notes.pdf", root / "kept.pdf"});
+    {
+        const int markers = HybridPdf::markerReads();
+        LibraryIndex idx(root);
+        index(idx);
+        EXPECT_EQ(idx.versionsOf(root / "kept.pdf"), 2);
+        EXPECT_EQ(idx.versionsOf(root / "notes.pdf"), 0);
+        EXPECT_EQ(idx.versionsOf(root / "plain.pdf"), 0);
+        EXPECT_EQ(HybridPdf::markerReads() - markers, 3) << "the marker once per PDF, read with its kind";
+        idx.flush();
+    }
+    LibraryIndex again(root);
+    index(again);
+    EXPECT_EQ(again.documentsRead(), 0);
+    EXPECT_EQ(again.versionsOf(root / "kept.pdf"), 2) << "kept in notes.pack";
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    ASSERT_TRUE(waitFor([&] {
+        for (int i = 0; i < model.count(); ++i) {
+            if (model.data(model.index(i), LibraryModel::NameRole).toString() == "kept") {
+                return model.data(model.index(i), LibraryModel::VersionsRole).toInt() == 2;
+            }
+        }
+        return false;
+    }));
+}

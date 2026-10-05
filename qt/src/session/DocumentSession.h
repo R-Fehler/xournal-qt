@@ -95,6 +95,9 @@ public:
         // --- a hybrid PDF saved again (qt/docs/hybrid-pdf.md, "Saving: incremental updates")
         bool incremental = false;  ///< only what changed was appended
         uint64_t appended = 0;     ///< bytes appended
+        // --- version history (keepsVersions())
+        int version = -1;              ///< the version written (-1: none)
+        bool replacedVersion = false;  ///< it replaced the day's version
     };
     enum class SaveKind {
         Save,        ///< to the document's file: its .xopp, or its hybrid PDF. Requires hasFilePath().
@@ -126,6 +129,9 @@ public:
         /// Save of a hybrid PDF: written anew in full, never as an incremental update (before it is shared: older
         /// revisions in the file may still hold deleted ink).
         bool compact = false;
+        /// Save of a hybrid PDF that keeps its versions (keepsVersions()): a milestone with this message ("Save with
+        /// a message…"); empty: the day's version.
+        std::string message;
     };
     /// Save without blocking the window. What the writers need is taken from the document at once on this thread (a
     /// copy of its pages, under its read lock); the heavy file work (the gzip XML, qpdf) runs on a worker, and the
@@ -155,6 +161,21 @@ public:
     /// A hybrid PDF whose file holds earlier revisions (incremental updates): written anew (SaveRequest::compact)
     /// before it is shared.
     bool hasEarlierRevisions() const;
+    /// Version history (qt/docs/hybrid-pdf.md, "Version history"): this document keeps its versions when it is saved
+    /// as a PDF with notes. Unless chosen here: what its file says (a PDF with notes), else the setting for new PDFs
+    /// with notes (DocumentMode::keepVersionsOfNewPdfs). The choice is written by the next save.
+    bool keepsVersions() const;
+    void setKeepsVersions(bool on);
+    /// The choice was made here and is not in the file yet.
+    bool versionsChoicePending() const { return versionsChoice.has_value(); }
+    /// Give a version of the file a message, or change it (HybridPdf::setVersionMessage): not while a save runs. The
+    /// next save still builds on the file (only its marker changed).
+    bool setVersionMessage(int id, const std::string& message, std::string& error);
+    /// A version was restored (its pages replaced the document's): the next save is a new version with this message
+    /// (unless it has its own), never in place of the day's version.
+    void versionRestored(const std::string& message);
+    /// Replace every page of the document by `pages` (one undo step, `text`).
+    void replaceAllPages(const std::vector<PageRef>& pages, const std::string& text);
     /// A hybrid PDF: the .xopp for Xournal++ it keeps up to date on every save ("Keep it updated for Xournal++",
     /// SaveRequest::recordExport; read from the file the first time). Empty: none.
     fs::path xoppExport() const;
@@ -458,6 +479,8 @@ Q_SIGNALS:
     void modifiedChanged(bool modified);
     /// isSaving() changed.
     void savingChanged(bool saving);
+    /// keepsVersions() changed (chosen, or the file says otherwise after a save).
+    void versionsChanged();
     /// Pasted PDF pages could not be added to the merged PDF (they show their PDF page as an image instead).
     void pdfPagesFailed(const QString& error);
     void undoRedoStateChanged();
@@ -557,6 +580,8 @@ private:
     std::unique_ptr<PdfPageKeeper> pdfPages;
     std::vector<fs::path> retainedBases;  ///< clean copies of hybrid PDFs this document uses (HybridPdf::retain)
     std::vector<std::string> hybridChanges;
+    std::optional<bool> versionsChoice;  ///< keepsVersions() chosen, not saved yet
+    std::string restoredMessage;         ///< versionRestored(): for the next save
     /// A hybrid PDF as last written or opened: what the next Ctrl+S appends to (valid while the page numbers of the
     /// background PDF stay, `hybridNumbering`, and for `hybridRevisionFile` only).
     std::shared_ptr<HybridPdf::Revision> hybridRevision;

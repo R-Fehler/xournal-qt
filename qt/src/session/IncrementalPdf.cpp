@@ -203,14 +203,84 @@ QPDFObjectHandle Update::copyStream(QPDFObjectHandle stream) {
 
 QPDFObjectHandle Update::copy(QPDFObjectHandle foreign) { return copyValue(foreign, true); }
 
+namespace {
+uint64_t fnv(const std::string& s) {
+    uint64_t h = 1469598103934665603ULL;
+    for (unsigned char c: s) {
+        h ^= c;
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+/// What a stream is, to find the same one in another PDF: its dictionary (without /Length) and its data. Empty: its
+/// dictionary refers to other objects (not compared).
+std::string reuseKey(OH stream) {
+    std::vector<OH> refs;
+    referencesOf(stream, refs);
+    if (!refs.empty()) {
+        return {};
+    }
+    OH dict = stream.getDict().shallowCopy();
+    if (dict.hasKey("/Length")) {
+        dict.removeKey("/Length");
+    }
+    const std::string data = rawData(stream);
+    return dict.unparse() + "|" + std::to_string(data.size()) + "|" + std::to_string(fnv(data));
+}
+}  // namespace
+
+QPDFObjectHandle Update::copyAll(QPDFObjectHandle foreign) {
+    copyPages = true;
+    OH out = copyValue(foreign, true);
+    copyPages = false;
+    return out;
+}
+
+void Update::indexReuse() {
+    indexed = true;
+    for (const auto& og: objects) {
+        try {
+            OH o = pdf.getObjectByObjGen(og);
+            if (o.isStream()) {
+                if (std::string key = reuseKey(o); !key.empty()) {
+                    reuse.emplace(std::move(key), og);
+                }
+            }
+        } catch (const std::exception&) {
+            // (an object that does not read: not reused)
+        }
+    }
+}
+
+QPDFObjectHandle Update::reusable(QPDFObjectHandle foreign) {
+    try {
+        const std::string key = reuseKey(foreign);
+        if (key.empty()) {
+            return OH::newNull();
+        }
+        auto it = reuse.find(key);
+        return it != reuse.end() ? pdf.getObjectByObjGen(it->second) : OH::newNull();
+    } catch (const std::exception&) {
+        return OH::newNull();
+    }
+}
+
 QPDFObjectHandle Update::copyValue(QPDFObjectHandle o, bool top) {
     if (o.isIndirect()) {
         const auto key = std::make_pair(o.getOwningQPDF(), o.getObjGen());
         if (auto it = copied.find(key); it != copied.end()) {
             return it->second;
         }
-        if (!top && o.isDictionary() && o.getKey("/Type").isName() && o.getKey("/Type").getName() == "/Page") {
+        if (!top && !copyPages && o.isDictionary() && o.getKey("/Type").isName() &&
+            o.getKey("/Type").getName() == "/Page") {
             return OH::newNull();  // (another page: not copied along, as qpdf's copyForeignObject does)
+        }
+        if (indexed && o.isStream()) {
+            if (OH same = reusable(o); !same.isNull()) {
+                copied[key] = same;
+                return same;
+            }
         }
         // Numbered first (the object may refer back to itself), its value copied, then put in place
         OH handle = reserve();
@@ -240,7 +310,7 @@ QPDFObjectHandle Update::copyValue(QPDFObjectHandle o, bool top) {
         OH d = OH::newDictionary();
         const bool page = o.getKey("/Type").isName() && o.getKey("/Type").getName() == "/Page";
         for (const auto& k: o.getKeys()) {
-            if (top && page && k == "/Parent") {
+            if (top && page && !copyPages && k == "/Parent") {
                 continue;
             }
             d.replaceKey(k, copyValue(o.getKey(k), false));
@@ -269,14 +339,42 @@ void Update::touchData(QPDFObjectHandle stream) {
     touched[stream.getObjGen()].data = true;
 }
 
-std::string Update::serialize(const Tail& tail, Stats* stats) {
-    // What is written: the changed objects of the file, and the new objects they reach
+std::string Update::serialize(const Tail& tail, Stats* stats) { return serializeWith(tail, nullptr, stats); }
+
+std::string Update::serializeOver(const Over& over, Stats* stats) { return serializeWith(over.prefix, &over, stats); }
+
+std::string Update::serializeWith(const Tail& tail, const Over* over, Stats* stats) {
+    // What is written: the changed objects of the file, and the new objects they reach. Over earlier revisions: also
+    // what they define (objects of the prefix they changed always; their new ones when reached)
     std::map<QPDFObjGen, OH> written;
     std::vector<OH> queue;
     Stats st;
+    std::set<QPDFObjGen> tailNew;  // (new in the revisions written again)
+    if (over) {
+        for (const auto& [num, gen]: over->objects) {
+            const QPDFObjGen og(num, gen);
+            if (num > over->highest) {
+                tailNew.insert(og);
+                continue;
+            }
+            OH o = pdf.getObjectByObjGen(og);
+            if (o.isStream()) {
+                OH type = o.getDict().getKey("/Type");
+                if (type.isNameAndEquals("/XRef") || type.isNameAndEquals("/ObjStm")) {
+                    continue;
+                }
+            }
+            if (!written.count(og) && !o.isNull()) {
+                written[og] = o;
+                queue.push_back(o);
+                ++st.changed;
+            }
+        }
+    }
+    auto fresh = [&](OH r) { return isNew(r) || tailNew.count(r.getObjGen()) > 0; };
     for (const auto& [og, before]: touched) {
         OH o = pdf.getObjectByObjGen(og);
-        if (before.data || textOf(o) != before.text) {
+        if ((before.data || textOf(o) != before.text) && !written.count(og)) {
             written[og] = o;
             queue.push_back(o);
             ++st.changed;
@@ -289,7 +387,7 @@ std::string Update::serialize(const Tail& tail, Stats* stats) {
         throw std::runtime_error("The document catalog is not an indirect object.");
     }
     for (OH o: {root, info}) {
-        if (isNew(o) && !written.count(o.getObjGen())) {
+        if (o.isIndirect() && fresh(o) && !written.count(o.getObjGen())) {
             written[o.getObjGen()] = o;
             queue.push_back(o);
         }
@@ -300,7 +398,7 @@ std::string Update::serialize(const Tail& tail, Stats* stats) {
         std::vector<OH> refs;
         referencesOf(o, refs);
         for (OH r: refs) {
-            if (isNew(r) && !written.count(r.getObjGen())) {
+            if (fresh(r) && !written.count(r.getObjGen())) {
                 if (r.isNull()) {
                     continue;  // (a reference to nothing: written as null by the reader)
                 }
@@ -460,7 +558,7 @@ std::string Update::serialize(const Tail& tail, Stats* stats) {
     return out;
 }
 
-Result append(const fs::path& file, const Tail& tail, const std::string& update) {
+Result append(const fs::path& file, const Tail& tail, const std::string& update, uint64_t keep) {
     Result r;
     std::error_code ec;
     const auto size = fs::file_size(file, ec);
@@ -495,6 +593,13 @@ Result append(const fs::path& file, const Tail& tail, const std::string& update)
     fs::copy_file(file, part, fs::copy_options::overwrite_existing, ec);
     if (ec) {
         return fail(ec.message());
+    }
+    const uint64_t kept = std::min<uint64_t>(keep, tail.size);
+    if (kept < tail.size) {
+        fs::resize_file(part, kept, ec);  // (the revisions after it are written again by the update)
+        if (ec) {
+            return fail(ec.message());
+        }
     }
 #ifdef _WIN32
     std::FILE* f = _wfopen(part.wstring().c_str(), L"ab");
@@ -533,7 +638,7 @@ Result append(const fs::path& file, const Tail& tail, const std::string& update)
         return fail(ec.message());
     }
     r.ok = true;
-    r.size = tail.size + update.size();
+    r.size = kept + update.size();
     return r;
 }
 

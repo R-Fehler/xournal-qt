@@ -260,6 +260,9 @@ void DocumentSession::saveInBackground(SaveRequest request) {
         // Ctrl+S again while a save waits: that one writes the latest state, for both
         SaveRequest& waiting = saveQueue.back();
         waiting.compact = waiting.compact || request.compact;
+        if (!request.message.empty()) {
+            waiting.message = request.message;  // (a milestone: the save that writes the latest state carries it)
+        }
         waiting.done = [first = std::move(waiting.done), second = std::move(request.done)](const SaveResult& r) {
             if (first) {
                 first(r);
@@ -637,6 +640,16 @@ void DocumentSession::takeSnapshot() {
             }
         }
         const fs::path bg = doc->getPdfFilepath();
+        if (t.hybrid && !exporting) {
+            // Version history: Ctrl+S, the first save into the PDF the document annotates (version 0 is that PDF as
+            // received) and a new file; saves before sharing (SaveRequest::compact) and over another file without
+            std::error_code ec;
+            const bool own = t.request.kind == SaveKind::Save || !t.ownCopy.empty() || !fs::exists(t.target, ec);
+            t.history.on = keepsVersions() && !t.request.compact && own;  // (never on top of another file)
+            t.history.message = t.request.message.empty() ? restoredMessage : t.request.message;
+            t.history.newVersion = !restoredMessage.empty();
+            t.historyChoice = versionsChoice.has_value();
+        }
         if (t.hybrid && t.request.kind == SaveKind::Save && !t.request.compact && hybridRevision &&
             hybridNumbering == pdfPages->numbering() && hybridRevisionFile == t.target) {
             t.revision = *hybridRevision;  // (Ctrl+S: an incremental update, if the file is still that version)
@@ -710,6 +723,7 @@ void DocumentSession::takeSnapshot() {
                     options.compact = t.request.compact;
                     options.written = exporting ? nullptr : &t.written;
                     options.inkText = &t.inkText;
+                    options.history = exporting ? nullptr : &t.history;
                     const auto r = HybridPdf::write(*t.snapshot, t.target, baseOf, t.pdfPageCount,
                                                     exporting ? fs::path() : t.request.recordExport, options);
                     if (!r.ok) {
@@ -722,6 +736,8 @@ void DocumentSession::takeSnapshot() {
                     t.result = {true, {}, {}};
                     t.result.incremental = r.incremental;
                     t.result.appended = r.appended;
+                    t.result.version = r.version;
+                    t.result.replacedVersion = r.replaced;
                     if (const fs::path& xopp = t.request.exportXopp; !xopp.empty() && !exporting) {
                         // The .xopp for Xournal++ (a setting), from the same state
                         const auto e = HybridPdf::exportXopp(*t.snapshot, xopp, exportPdfFor(xopp), t.pdfPageCount);
@@ -834,6 +850,13 @@ void DocumentSession::finishWrite() {
             HybridPdf::touch(bg);  // (still used)
         }
         hybridChanges.clear();  // (written anew from the document)
+        if (t.history.on && t.history.newVersion) {
+            restoredMessage.clear();  // (the restored version is in the file now)
+        }
+        if (t.historyChoice && versionsChoice && *versionsChoice == t.history.on) {
+            versionsChoice.reset();  // (the file says it now)
+        }
+        Q_EMIT versionsChanged();
         xoppExportFor = t.target;  // (what the file records now)
         xoppExportPath = t.request.recordExport;
         if (t.written.valid()) {
