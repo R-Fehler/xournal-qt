@@ -202,6 +202,10 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
 }
 
 CanvasView::~CanvasView() {
+    setMirror(nullptr);
+    if (mirrorOf) {
+        mirrorOf->setMirror(nullptr);  // (the audience's view goes first)
+    }
     if (snipJob.valid()) {
         snipJob.wait();  // (it draws a page of this document)
     }
@@ -383,11 +387,52 @@ void CanvasView::setPresenting(bool on) {
     viewController.scrollToPage(page);
 }
 
+// --- the audience's screen of the presenter view ----------------------------------------------------------------
+
+void CanvasView::setMirror(CanvasView* audience) {
+    if (audience == mirrorTo || audience == this || (audience && &audience->session != &session)) {
+        return;
+    }
+    for (const auto& c: std::exchange(mirrorConnections, {})) {
+        disconnect(c);
+    }
+    if (mirrorTo) {
+        mirrorTo->mirrorOf = nullptr;
+        for (const auto& p: mirrorTo->pages) {
+            p->dropMirroredViews();
+        }
+        mirrorTo->curtainLayer.hide();
+    }
+    mirrorTo = audience;
+    if (!audience) {
+        return;
+    }
+    if (audience->mirrorOf) {
+        audience->mirrorOf->setMirror(nullptr);
+    }
+    audience->mirrorOf = this;
+    // (the curtain moves without telling more than a repaint: whatever is drawn again, the audience's follows)
+    mirrorConnections.push_back(connect(this, &CanvasView::updateRequested, this, &CanvasView::curtainToMirror));
+    mirrorConnections.push_back(connect(this, &CanvasView::curtainChanged, this, &CanvasView::curtainToMirror));
+    mirrorConnections.push_back(connect(audience, &CanvasView::currentPageChanged, this, &CanvasView::curtainToMirror));
+    curtainToMirror();
+}
+
+void CanvasView::curtainToMirror() {
+    if (mirrorTo) {
+        mirrorTo->curtainLayer.follow(curtainLayer);
+    }
+}
+
 void CanvasView::relayout() {
     const size_t page = currentPageNo();
     refreshLayout();
     if (presenting) {
         viewController.fitPresentedPage(page);
+        return;
+    }
+    if (viewController.keptFit() == ViewController::Fit::Rect) {
+        viewController.layoutChanged();  // (the audience's screen of the presenter view keeps its slide)
         return;
     }
     viewController.fitDefault(page);

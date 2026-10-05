@@ -104,6 +104,17 @@ public:
     void addOverlayView(std::unique_ptr<xoj::view::OverlayView> v);
     void removeOverlayViewsOf(const OverlayBase* o);
 
+    // --- the audience's screen of the presenter view (CanvasView::setMirror, qt/docs/presenter-view.md) -----------
+    /// The same page in the view that mirrors this page's view (nullptr: none, or not shown there)
+    CanvasPage* mirrorPage() const;
+    /// A view of another page's handler (a stroke being written, the laser pointer) shown here too. `once`: drawn once
+    /// at once (the laser pointer's view makes its picture then).
+    void addMirroredView(const OverlayBase* handler, std::unique_ptr<xoj::view::OverlayView> v, bool once);
+    /// The views shown for another page's handlers go (the view stops mirroring, or the other view goes)
+    void dropMirroredViews();
+    /// Views of another page's handlers are shown (tests)
+    size_t mirroredViewCount() const;
+
     /// The links on this page, found once and kept until the page changes (any change of it forgets them): the mouse
     /// looks them up on every move (CanvasView::hoverLinkAt). Null: not looked for since the last change.
     const std::vector<LinkSpot>* linkSpots() const { return links ? &*links : nullptr; }
@@ -149,6 +160,14 @@ private:
     std::unique_ptr<LaserPointerHandler> laserPointer;  ///< port of XojPageView's (its ink, until it faded)
     /// An overlay view drawn once off screen (its first draw prepares its picture)
     void drawOnce(const xoj::view::OverlayView& v);
+    /// The handlers of another page whose views are shown here (CanvasView::setMirror)
+    std::vector<const OverlayBase*> mirrored;
+    bool isMirroredView(const xoj::view::OverlayView* v) const;
+    /// The views of a handler of this page go, here and on the mirror's page (before the handler goes)
+    void eraseViewsOfHandler(const OverlayBase* handler);
+    /// The newest overlay view (of `handler`) is shown on the mirror's page too
+    template <typename Handler>
+    void mirrorViewOf(const Handler* handler, bool once);
     std::unique_ptr<LegacyRedrawable> eraserRedraw;  ///< the eraser's redraws, told to every view of the page
     std::unique_ptr<EraseHandler> eraser;
     bool inEraser = false;

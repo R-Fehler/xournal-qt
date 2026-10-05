@@ -117,6 +117,7 @@
 #include "shell/SettingsModel.h"
 #include "shell/ToolboxModel.h"
 #include "shell/SystemApps.h"
+#include "shell/PresenterConsole.h"
 #include "shell/ReferenceMode.h"
 #include "shell/Citations.h"
 #include "shell/TabManager.h"
@@ -332,6 +333,7 @@ void AppController::makeTabs() {
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::syncHandwriting);
     connect(tabs.get(), &TabManager::countChanged, this, &AppController::syncHandwriting);
     referenceMode = std::make_unique<ReferenceMode>(*tabs, app->getSettings());
+    presenter = std::make_unique<PresenterConsole>(*app);
     connect(referenceMode.get(), &ReferenceMode::openExternal, this, &AppController::openLink);
     connect(referenceMode.get(), &ReferenceMode::openDocumentLink, this, [this](const QString& uri, const QString& from) {
         // (a place of the document itself, tapped in the second view of it: it goes there, in the reference)
@@ -416,6 +418,7 @@ AppController::~AppController() {
     annotations->setSession(nullptr);
     layers->setSession(nullptr);
     recovery.reset();  // unregisters the sessions from the crash handler before they go away
+    presenter.reset();  // (the audience's view of a session)
     referenceMode.reset();
     if (handwriting) {
         handwriting->setSessions(this, {}, nullptr);
@@ -1333,6 +1336,9 @@ void AppController::updatePresentedView() {
     presentedView = wanted;
     if (presentedView) {
         presentedView->setPresenting(true);
+    }
+    if (presenter) {
+        presenter->setPresented(presentedView);  // (two screens: the audience's screen shows its slide)
     }
 }
 
@@ -3096,6 +3102,7 @@ void AppController::openReceived(const fs::path& folder, const std::vector<fs::p
 }
 
 QObject* AppController::referenceObject() const { return referenceMode.get(); }
+QObject* AppController::presenterObject() const { return presenter.get(); }
 QObject* AppController::citationsObject() const { return citations.get(); }
 QObject* AppController::audioObject() const { return audioControl.get(); }
 

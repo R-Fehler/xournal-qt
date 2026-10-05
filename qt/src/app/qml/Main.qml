@@ -62,7 +62,7 @@ ApplicationWindow {
     /// Where the controls over the pages may go, in the content item's coordinates (the pages under the header and
     /// above the footer): clear of the safe area's insets, and above the soft keyboard
     readonly property real controlsLeft: safeLeft
-    readonly property real controlsRight: contentItem.width - safeRight
+    readonly property real controlsRight: contentItem.width - safeRight - presenterPanelWidth
     readonly property real controlsTop: Math.max(0, safeTop - contentItem.y)
     readonly property real controlsBottom: Math.min(contentItem.height, height - safeBottom - contentItem.y,
                                                     keyboardTop - contentItem.y)
@@ -416,12 +416,40 @@ ApplicationWindow {
         function onPresentingChanged() { if (!app.presenting) win.presentClean = false }
     }
 
-    /// Present from the current page: full screen, a page fills it. `clean`: without controls (below)
+    /// Present from the current page: full screen, a page fills it. `clean`: without controls (below). With two
+    /// screens (qt/docs/presenter-view.md) this window becomes the presenter's console on one of them (off the
+    /// audience's screen first) and the audience's window shows the slide on the other.
     function startPresenting(clean) {
         if (app.homeVisible) return
         presentClean = clean === true
+        if (app.presenter.available) app.presenter.placeConsole(win)
         fullScreenMode = true
         app.presenting = true
+    }
+    // --- the presenter view on a second screen (qt/docs/presenter-view.md) ----------------------------------------
+    /// Presenting with two screens: this window is the console (the page with its space for notes, the panel with
+    /// the clock, the time, the next page), the audience's window shows the slide
+    readonly property bool presenterConsole: app.presenting && app.presenter.active
+    /// The console's panel at the right (the controls over the page stay left of it)
+    readonly property real presenterPanelWidth: presenterConsole ? Math.round(Math.min(480, Math.max(280, width * 0.3))) : 0
+    AudienceWindow {
+        id: audienceWindow
+        onDigitTyped: function(digit) {
+            // (typed on in the console: the audience does not see the number)
+            win.requestActivate()
+            pageJump.forReference = false
+            pageJump.start(digit)
+        }
+    }
+    Connections {
+        target: app.presenter
+        function onActiveChanged() {
+            if (app.presenter.active) app.presenter.placeWindows(audienceWindow, win)
+            else audienceWindow.hide()
+        }
+        function onScreensChanged() {
+            if (app.presenter.active) app.presenter.placeWindows(audienceWindow, win)
+        }
     }
     /// Presenting without controls (Ctrl+F5, or holding the presentation button): only the page shows, no pen pill,
     /// no tool square, no other overlay; the faint mark in the lower left corner (presentCornerMark) or Ctrl+F5
@@ -2368,6 +2396,18 @@ ApplicationWindow {
                         canvas.emojiCompletionRect.width, canvas.emojiCompletionRect.height)
         onChosen: function(index) { canvas.chooseEmojiCompletion(index) }
     }
+    // Presenting with two screens: the console's panel beside the page (qt/docs/presenter-view.md)
+    PresenterPanel {
+        id: presenterPanel
+        visible: win.presenterConsole
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        anchors.rightMargin: win.safeRight
+        width: win.presenterPanelWidth
+        z: 4
+        onStopRequested: app.presenting = false
+    }
     // Reference mode: another document beside this one (the canvas area is split)
     ReferenceSplit {
         id: referenceSplit
@@ -2376,7 +2416,8 @@ ApplicationWindow {
         anchors.topMargin: win.toolboxTop
         anchors.bottom: win.sourcePanel && win.sourceAtBottom ? win.sourcePanel.top : parent.bottom
         anchors.bottomMargin: win.sourcePanel && win.sourceAtBottom ? 0 : win.toolboxBottom
-        anchors.right: win.sourcePanel && !win.sourceAtBottom ? win.sourcePanel.left
+        anchors.right: win.presenterConsole ? presenterPanel.left
+                       : win.sourcePanel && !win.sourceAtBottom ? win.sourcePanel.left
                        : win.dockRail ? phoneDock.left
                        : (win.sideEdge === "right" ? sideTools.left : parent.right)
         anchors.left: sidebar.visible && !win.sidebarAsDrawer ? sidebar.right

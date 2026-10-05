@@ -128,6 +128,15 @@ public:
     /// as the reference): each keeps its zoom. Both can go back to where they were.
     void swapPlacesWith(CanvasView& other);
 
+    // --- the audience's screen of the presenter view (qt/docs/presenter-view.md) -----------------------------------
+    /// Show what this view shows only for a moment on another view of the same document too, the audience's: a
+    /// stroke while it is written, the laser pointer's ink, the curtain and the spotlight (the audience's view never
+    /// shows their handles). nullptr: none. Either view may go first.
+    void setMirror(CanvasView* audience);
+    CanvasView* mirror() const { return mirrorTo; }
+    /// The view whose strokes, laser pointer and curtain this one shows (nullptr: none)
+    CanvasView* mirroredView() const { return mirrorOf; }
+
     // --- reading only (the reference beside the document of a tab) ---------------------------------------------
     /// Shown for reading only: every tool but the select tools (elements, PDF text) scrolls, as the hand does; a
     /// selection can be made and copied but not moved, changed or deleted; PDF text is selected, never marked;
@@ -600,6 +609,12 @@ private:
     /// Snapping to pages (the setting, or presenting)
     void applyScrolling();
     bool presenting = false;
+    /// The audience's view that shows this one's strokes, laser pointer and curtain, and the other way round
+    CanvasView* mirrorTo = nullptr;
+    CanvasView* mirrorOf = nullptr;
+    std::vector<QMetaObject::Connection> mirrorConnections;
+    /// The audience's curtain takes the place of this view's
+    void curtainToMirror();
     /// The zoom before presenting (the fit that was kept, else the zoom itself)
     double zoomBeforePresenting = 0;
     ViewController::Fit fitBeforePresenting = ViewController::Fit::None;

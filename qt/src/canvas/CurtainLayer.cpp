@@ -88,6 +88,37 @@ void CurtainLayer::place(QPointF centre, QSizeF size, double rotation) {
     changed();
 }
 
+void CurtainLayer::follow(const CurtainLayer& other) {
+    CanvasPage* page = other.visible() && other.onPage->getPage() ? view.canvasPageOf(other.onPage->getPage().get())
+                                                                  : nullptr;
+    if (!page) {
+        if (shown) {
+            shown.reset();
+            onPage = nullptr;
+            onDocumentPage.reset();
+            withHandles = false;
+            drag = {};
+            inGesture = false;
+            stateChanged();
+        }
+        return;
+    }
+    const bool state = shown != other.shown || onPage != page || withHandles;
+    if (!state && middle == other.middle && extent == other.extent && turn == other.turn) {
+        return;
+    }
+    shown = other.shown;
+    middle = other.middle;
+    extent = other.extent;
+    turn = other.turn;
+    withHandles = false;
+    drag = {};
+    inGesture = false;
+    onPage = page;
+    onDocumentPage = page->getPage();
+    state ? stateChanged() : changed();
+}
+
 void CurtainLayer::setHandlesShown(bool on) {
     if (on == withHandles || (on && !visible())) {
         return;
