@@ -16,6 +16,9 @@
  * a word (Bounds), and several terms are found at once (the hits of all of them, in order, without overlaps). A fuzzy
  * term (Bounds::Fuzzy) matches whole words, word by word (WordMatch.h): the words of the text are read by words(),
  * and a hit is a word that matches, from its first to its last character.
+ * The find and replace bar's options (qt/docs/md-editor.md, "Find and replace") are bounds too: CaseSensitive compares
+ * the letters as they are (no folding; the rest stays as above), Regex reads the term as a regular expression
+ * (QRegularExpression, Perl syntax) matched in the text as it is kept, simplified.
  *
  * @license GNU GPLv2 or later
  */
@@ -30,6 +33,8 @@ namespace xqt::textmatch {
 
 /// The query as it is compared: whitespace runs to one space, trimmed, case folded, ligatures written out.
 QString prepare(const QString& query);
+/// The same, case folded only when not `caseSensitive`.
+QString prepare(const QString& query, bool caseSensitive);
 /// One character case folded, as prepare() and the matcher fold them.
 inline char16_t fold(char16_t c) {
     if (c < 0x80) {
@@ -57,7 +62,15 @@ enum Bounds : unsigned {
     /// With Fuzzy: only the word containing the term or a typo, not its letters in order (WordMatch.h, rule 2). Used
     /// for recognised handwriting (InkText.h) by the plain search, never for text.
     TypoOnly = 32,
+    /// Letters are compared as they are, not case folded (the query prepare()d with caseSensitive). Not with Fuzzy.
+    CaseSensitive = 64,
+    /// The term is a regular expression (QRegularExpression, Unicode; case-insensitive unless CaseSensitive), not
+    /// prepare()d. Word bounds still apply. An empty match or one across a '\n' is none; an invalid one matches
+    /// nothing (regexError()). Not with Fuzzy.
+    Regex = 128,
 };
+/// Why a regular expression is not valid ("": it is).
+QString regexError(const QString& pattern);
 /// The typo tolerance of a fuzzy term (WordMatch.h: 0 none, 1, 2), and its bits.
 inline int typosOf(unsigned bounds) { return static_cast<int>((bounds & FuzzyTypos) >> 3); }
 inline unsigned typoBits(int typos) { return (static_cast<unsigned>(typos) << 3) & FuzzyTypos; }
@@ -74,6 +87,18 @@ struct Term {
     unsigned bounds = Anywhere;
     bool operator==(const Term&) const = default;
 };
+/// The options of the find and replace bar (qt/docs/md-editor.md, "Find and replace"): letters as typed, whole words,
+/// a regular expression.
+struct Options {
+    bool caseSensitive = false;
+    bool wholeWord = false;
+    bool regex = false;
+    bool any() const { return caseSensitive || wholeWord || regex; }
+    bool operator==(const Options&) const = default;
+};
+/// The term of a text searched with these options: `text` prepare()d (a regular expression as it is), with its
+/// bounds. None if there is nothing to search (or the expression is not valid).
+std::vector<Term> optionTerms(const QString& text, const Options& options);
 /// The matches of all terms, in order; where matches of different terms overlap, the one that starts first (of the
 /// same start: the longer one) is kept - so the count and the marks of several terms agree as they do for one.
 std::vector<Span> find(QStringView text, const std::vector<Term>& terms);

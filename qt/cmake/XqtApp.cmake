@@ -143,6 +143,7 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppBookmarks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppAnnotations.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownFormat.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppReplace.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownImages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppHelp.cpp)
 target_include_directories(xqt-shell PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src ${CMAKE_CURRENT_LIST_DIR}/../src/app)

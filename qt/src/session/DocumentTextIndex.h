@@ -178,6 +178,10 @@ public:
     size_t inkPages() const;
     size_t inkBytes() const;
 
+    /// Edited pages are read again now, not once the edits pause (textChanged; e.g. a replacement, after which the
+    /// next hit is wanted).
+    void readEdits();
+
     /// The page the reader is at: missing text is read from there outwards.
     void setFocusPage(size_t page);
     /// No search needs it for now: the poppler instance of the worker may go (it is opened again when needed).

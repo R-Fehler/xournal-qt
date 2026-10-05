@@ -53,6 +53,9 @@ public:
     /// Start editing the Markdown text box drawn at a point of the page, or a new one there (made at the first
     /// change). Returns its source.
     std::string beginBox(size_t page, const md::Style& style, double x, double y);
+    /// Start editing this Markdown text box (or a sticky note's Markdown text) of the page (find and replace: the box
+    /// itself, not the one drawn on top at its place). Returns its source ("" and not active if it is not there).
+    std::string beginText(size_t page, const Text* box);
     /// The page's text (not a text box) is edited.
     bool isPageText() const { return pageText; }
     /// A sticky note's text is edited: its width is the note's (no width of its own)
@@ -137,6 +140,7 @@ private:
     std::string splitText;            ///< from there, only the pages around the change)
     GroupUndoAction* undo = nullptr;  ///< the edit's undo step (on the undo stack since the first change)
     GroupUndoAction* external = nullptr;  ///< recordInto
+    const Text* wanted = nullptr;         ///< beginText: the box to edit
     bool pageText = true;
 };
 

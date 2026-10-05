@@ -1414,6 +1414,8 @@ ApplicationWindow {
                     AdaptiveMenuItem { objectName: "saveAsItem"; offered: !win.textDoc; text: qsTr("Save as…"); icon.source: app.iconUrl("xopp-document-save"); onTriggered: openSaveDialog(null) }
                     AdaptiveMenuItem { objectName: "shareItem"; offered: !toolArea.inBar("share"); text: qsTr("Share…"); icon.source: app.iconUrl("xqt-share"); onTriggered: shareDialog.openFor("") }
                     AdaptiveMenuItem { objectName: "printItem"; offered: !toolArea.inBar("print"); text: qsTr("Print… (Ctrl+P)"); icon.source: app.iconUrl("xopp-document-print"); onTriggered: printDialog.open() }
+                    // Find and replace: where text can be written (the search itself is a button of the bar)
+                    AdaptiveMenuItem { objectName: "replaceItem"; offered: app.canReplace && !win.reading; text: qsTr("Find and replace (Ctrl+H)"); icon.source: app.iconUrl("xqt-replace"); onTriggered: searchBar.openReplace() }
                     AdaptiveMenuItem {
                         objectName: "bookmarkPageItem"
                         readonly property bool marked: (app.bookmarks, app.isBookmarked(app.pageNumber - 1))
@@ -3155,6 +3157,12 @@ ApplicationWindow {
     SearchBar {
         id: searchBar
         objectName: "searchBar"
+        // Find and replace (qt/docs/md-editor.md): not while reading; on the source beside the page while it is open
+        replaceAllowed: !win.reading
+        sourcePanel: markdownPanel.visible ? markdownPanel : null
+        onNotice: function(text, undo) {
+            snackbar.show(text, false, undo ? qsTr("Undo") : "", undo ? function() { app.undo() } : null)
+        }
         anchors.top: canvas.top
         anchors.topMargin: 12 + win.canvasControlsTop - canvas.y
         anchors.horizontalCenter: canvas.horizontalCenter
@@ -5057,6 +5065,8 @@ ApplicationWindow {
         }
     }
     Shortcut { sequences: win.keysOf("find"); onActivated: app.homeVisible ? homeView.focusSearch() : searchBar.openBar() }
+    // Find and replace: the search bar with its replace row (where text can be written; elsewhere the search alone)
+    Shortcut { sequences: win.keysOf("replace"); onActivated: app.homeVisible ? homeView.focusSearch() : searchBar.openReplace() }
     // Selected elements (the page sidebar and grid handle these keys themselves when they have the focus)
     Shortcut { sequences: win.keysOf("copy"); enabled: docKeys; onActivated: app.copySelection() }
     Shortcut { sequences: win.keysOf("cut"); enabled: docKeys; onActivated: app.cutSelection() }

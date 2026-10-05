@@ -42,6 +42,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentTextIndex.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextMatch.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextMatch.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextReplace.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextReplace.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/WordMatch.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/WordMatch.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/Vocabulary.h
@@ -146,6 +148,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TextFlow.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownSession.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownSession.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/FindReplace.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/FindReplace.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/PageResize.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/PageResize.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/PageRotate.h
@@ -187,6 +191,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentSessionTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentSearchTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TextReplaceTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/FuzzyQueryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/MergedPdfTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/HybridPdfTest.cpp
@@ -222,6 +227,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PageSizeTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PageRotateTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TextDocumentTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/FindReplaceTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PdfTextDocumentTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/EmojiEditingTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/ScreenCalibrationTest.cpp

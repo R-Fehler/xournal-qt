@@ -137,6 +137,41 @@ TEST(TextMatch, matchesAsTheSearchPromises) {
     EXPECT_EQ(s.origin[static_cast<size_t>(s.text.size())], 13) << "the end of the last character";
 }
 
+// The find and replace bar's options (qt/docs/md-editor.md, "Find and replace"): letters as typed, whole words, a
+// regular expression
+TEST(TextMatch, optionsOfTheFindAndReplaceBar) {
+    using textmatch::count;
+    using textmatch::optionTerms;
+    const auto n = [](QStringView text, const QString& query, bool cs, bool word, bool regex) {
+        return count(text, optionTerms(query, {cs, word, regex}));
+    };
+    EXPECT_EQ(n(u"Page page PAGE", "page", false, false, false), 3) << "no option: as the search";
+    EXPECT_EQ(n(u"Page page PAGE", "page", true, false, false), 1) << "case-sensitive";
+    EXPECT_EQ(n(u"Page page PAGE", "Page", true, false, false), 1);
+    EXPECT_EQ(n(u"Größe GRÖSSE größe", "Größe", true, false, false), 1);
+    EXPECT_EQ(n(u"the ﬁrst", "first", true, false, false), 1) << "a ligature still matches its letters";
+    EXPECT_EQ(n(u"a hyphen- ated word", "hyphenated", true, false, false), 1) << "and a word broken at a line end";
+    EXPECT_EQ(n(u"cat cats concat cat.", "cat", false, true, false), 2) << "whole words";
+    EXPECT_EQ(n(u"Cat cat", "cat", true, true, false), 1);
+    EXPECT_EQ(n(u"a1 b22 c333", "[a-z]\\d+", false, false, true), 3) << "a regular expression";
+    EXPECT_EQ(n(u"A1 b22", "[a-z]\\d+", false, false, true), 2) << "case-insensitive";
+    EXPECT_EQ(n(u"A1 b22", "[a-z]\\d+", true, false, true), 1) << "case-sensitive";
+    EXPECT_EQ(n(u"cat cats", "cats?", false, true, true), 2);
+    EXPECT_EQ(n(u"cat concat", "cat", false, true, true), 1) << "whole words";
+    EXPECT_EQ(n(u"ab\ncd", "b.c|b\\sc", false, false, true), 0) << "never across the pieces of a page";
+    EXPECT_EQ(n(u"abc", "x*", false, false, true), 0) << "no empty matches";
+    EXPECT_TRUE(optionTerms("(", {false, false, true}).empty()) << "not valid: nothing searched";
+    EXPECT_FALSE(textmatch::regexError("(").isEmpty());
+    EXPECT_TRUE(textmatch::regexError("a(b)").isEmpty());
+
+    const auto spans = textmatch::find(u"x Foo foo", optionTerms("foo", {true, false, false}));
+    ASSERT_EQ(spans.size(), 1u);
+    EXPECT_EQ(spans[0].start, 6);
+    // The options travel with the terms (the pictures of pages with hits)
+    const auto terms = optionTerms("f.o", {true, true, true});
+    EXPECT_EQ(textmatch::decode(textmatch::encode(terms)), terms);
+}
+
 // --- the search ------------------------------------------------------------------------------------------------
 
 TEST_F(DocumentSearchTest, findsTextElementsOnAllPages) {
@@ -308,6 +343,33 @@ TEST_F(DocumentSearchTest, editsAreSearchedAgain) {
     // Undo takes it away again
     s->getUndoRedoHandler()->undo();
     ASSERT_TRUE(waitFor([&] { return s->search().hitCount() == 3; }));
+}
+
+// The options of the find and replace bar: counted and marked with them, the same text searched again when they change
+TEST_F(DocumentSearchTest, optionsOfTheFindAndReplaceBar) {
+    auto s = open(u8"load/pages.xopp");  // "p1" .. "p11" on pages 0 .. 10
+    search(*s, "p1");
+    ASSERT_EQ(s->search().hitCount(), 3);
+    s->search().setQuery("p1", true, false, {false, true, false});
+    ASSERT_TRUE(waitForCounts(s->search()));
+    EXPECT_EQ(s->search().hitCount(), 1) << "whole words: not p10, p11";
+    EXPECT_EQ(placedHits(s->search()).size(), 1u);
+    s->search().setQuery("P1", true, false, {true, false, false});
+    ASSERT_TRUE(waitForCounts(s->search()));
+    EXPECT_EQ(s->search().hitCount(), 0) << "case-sensitive";
+    s->search().setQuery("p1[01]", true, false, {false, false, true});
+    ASSERT_TRUE(waitForCounts(s->search()));
+    EXPECT_EQ(s->search().hitCount(), 2) << "a regular expression";
+    EXPECT_EQ(placedHits(s->search()).size(), 2u);
+    EXPECT_TRUE(s->search().hint().isEmpty());
+    s->search().setQuery("p1(", true, false, {false, false, true});
+    ASSERT_TRUE(waitForCounts(s->search()));
+    EXPECT_EQ(s->search().hitCount(), 0);
+    EXPECT_FALSE(s->search().hint().isEmpty()) << "why it is not searched";
+    s->search().setQuery("p1 | p2", true, true, {false, true, false});
+    ASSERT_TRUE(waitForCounts(s->search()));
+    EXPECT_FALSE(s->search().fuzzy()) << "options: never the fuzzy syntax";
+    EXPECT_EQ(s->search().hitCount(), 0);
 }
 
 // Pages that come, go or move take their text along: nothing is read again, the counts follow at once.

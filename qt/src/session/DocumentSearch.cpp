@@ -62,17 +62,19 @@ DocumentSearch::DocumentSearch(DocumentSession& session): session(session), inde
 
 DocumentSearch::~DocumentSearch() = default;
 
-void DocumentSearch::setQuery(const QString& query, bool jump, bool fuzzy) {
-    if (query == text && (fuzzy == fuzzyMode || query.isEmpty())) {
+void DocumentSearch::setQuery(const QString& query, bool jump, bool fuzzy, Options options) {
+    fuzzy = fuzzy && !options.any();
+    if (query == text && ((fuzzy == fuzzyMode && options == opts) || query.isEmpty())) {
         if (jump && curIndex < 0) {
             jumpToFirstFromCurrentPage();
         }
         return;
     }
     text = query;
+    opts = options;
     fuzzyMode = fuzzy && !query.isEmpty();
     parsed = fuzzyMode ? FuzzyQuery(query) : FuzzyQuery();
-    terms = FuzzyQuery::textTerms(query, fuzzyMode);
+    terms = options.any() ? textmatch::optionTerms(query, options) : FuzzyQuery::textTerms(query, fuzzyMode);
     prepareTerms();
     found.clear();
     ++generation;
@@ -103,6 +105,13 @@ void DocumentSearch::setQuery(const QString& query, bool jump, bool fuzzy) {
             }
         });
     }
+}
+
+QString DocumentSearch::hint() const {
+    if (opts.regex && !text.isEmpty()) {
+        return textmatch::regexError(text);
+    }
+    return fuzzyMode ? parsed.hint() : QString();
 }
 
 void DocumentSearch::prepareTerms() {
@@ -240,6 +249,15 @@ const std::vector<DocumentSearch::Place>* DocumentSearch::placesOn(size_t page, 
         QMetaObject::invokeMethod(self, [self] { self->placeWanted(); }, Qt::QueuedConnection);
     }
     return nullptr;
+}
+
+const std::vector<DocumentSearch::Place>* DocumentSearch::placeNow(size_t page) {
+    if (const auto* known = placesOn(page, false)) {
+        return known;
+    }
+    place(page);
+    auto it = places.find(page);
+    return it == places.end() ? nullptr : &it->second;
 }
 
 void DocumentSearch::placeWanted() {

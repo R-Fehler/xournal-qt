@@ -93,6 +93,8 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"spotlight", tr("Spotlight (only a part of the page shown)"), tools, {"Shift+B"}},
 
             {"find", tr("Search"), search, standard(QKeySequence::Find)},
+            // (where text can be written: a .md or .txt, Markdown text on pages; qt/docs/md-editor.md)
+            {"replace", tr("Find and replace"), search, {"Ctrl+H"}},
             {"searchAllDocuments", tr("Search all open documents"), search, {"Ctrl+Shift+F"}},
             {"searchLibrary", tr("Search the library"), search, {"Ctrl+Alt+F"}},
             {"findNext", tr("Next hit"), search, standard(QKeySequence::FindNext)},

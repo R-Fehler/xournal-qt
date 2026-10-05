@@ -43,3 +43,6 @@ rounded hole: the spotlight) are drawn in the same style.
 
 `xqt-group` and `xqt-ungroup` are Lucide's `group` and `ungroup`: grouping the selected elements and ungrouping them
 (the selection's pill, qt/docs/groups.md).
+
+`xqt-replace` (a dashed box, an arrow down to a solid one: find and replace, qt/docs/md-editor.md) is drawn in the same
+style, after Lucide's `replace`.

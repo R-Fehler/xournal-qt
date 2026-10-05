@@ -19,6 +19,9 @@
 #include "MarkdownImages.h"
 #include "shell/ContentFiles.h"
 #include "MdFormat.h"
+#include "session/DocumentSearch.h"
+#include "session/DocumentSession.h"
+#include "session/TextReplace.h"
 
 using namespace xqt;
 
@@ -288,4 +291,63 @@ QVariantMap AppController::writeMarkdownTableIn(QQuickTextDocument* document, in
     return applyIn(document, source,
                    md::table::replaceOrInsert(source, utf8Offset(text, anchor), utf8Offset(text, caret),
                                               tableOf(cells, aligns)));
+}
+
+QVariantMap AppController::replaceInSource(QQuickTextDocument* document, int from, int to, const QString& with,
+                                           bool all) {
+    QTextDocument* d = document ? document->textDocument() : nullptr;
+    const DocumentSession* s = session();
+    if (!d || !s || s->search().query().isEmpty()) {
+        return {};
+    }
+    const QString query = s->search().query();
+    const replace::Options options = searchOptions();
+    const QString plain = d->toPlainText();
+    const std::string text = plain.toStdString();
+    const auto matches = replace::find(text, query, with, options);
+    if (matches.empty()) {
+        return {{"count", 0}};
+    }
+    // text[a, b) becomes `middle`, as one undo step of the source
+    const auto change = [&](size_t a, size_t b, const std::string& middle) {
+        QTextCursor c(d);
+        c.setPosition(utf16Offset(text, a));
+        c.setPosition(utf16Offset(text, b), QTextCursor::KeepAnchor);
+        c.beginEditBlock();
+        c.insertText(QString::fromStdString(middle));
+        c.endEditBlock();
+    };
+    if (all) {
+        const size_t a = matches.front().begin;
+        const size_t b = matches.back().end;
+        const std::string after = replace::apply(text, matches);
+        const std::string middle = after.substr(a, after.size() - (text.size() - b) - a);
+        change(a, b, middle);
+        const int at = utf16Offset(after, a + middle.size());
+        return {{"count", static_cast<int>(matches.size())}, {"anchor", at}, {"caret", at}};
+    }
+    // The selection, if it is a match, replaced; then the match after it (or from the top again) selected
+    const size_t selFrom = utf8Offset(plain, std::min(from, to));
+    const size_t selTo = utf8Offset(plain, std::max(from, to));
+    std::string now = text;
+    size_t after = selFrom;
+    bool replaced = false;
+    for (const replace::Match& m: matches) {
+        if (m.begin == selFrom && m.end == selTo) {
+            change(m.begin, m.end, m.with);
+            now = replace::apply(text, {m});
+            after = m.begin + m.with.size();
+            replaced = true;
+            break;
+        }
+    }
+    const auto next = replaced ? replace::find(now, query, with, options) : matches;
+    QVariantMap out{{"replaced", replaced}, {"count", static_cast<int>(next.size())}};
+    if (!next.empty()) {
+        auto it = std::find_if(next.begin(), next.end(), [after](const replace::Match& m) { return m.begin >= after; });
+        const replace::Match& m = it == next.end() ? next.front() : *it;
+        out["anchor"] = utf16Offset(now, m.begin);
+        out["caret"] = utf16Offset(now, m.end);
+    }
+    return out;
 }

@@ -71,7 +71,8 @@ square, the quick tools and the pen pill of full screen are classic only.
 **A text document's format bar** (with the toolbox): undo and redo at its start, then the formatting, then the commands
 that fit, then » and ⋮. One ladder for both: the inserts go into "+ Insert" first, then the commands of low priority
 into », then the headings into one button, then search, full screen and save into » too; only then the row scrolls. At
-1366 px search, full screen and save stay.
+1366 px search, full screen and save stay. Find and replace adds no button to this ladder: it is the search bar's
+second row (Ctrl+H, the bar's replace button, ⋮ → Find and replace; [md-editor.md](md-editor.md)).
 
 ## Reading and presenting
 

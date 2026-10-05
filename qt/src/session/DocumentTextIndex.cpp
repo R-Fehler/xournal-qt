@@ -445,18 +445,21 @@ DocumentTextIndex::DocumentTextIndex(DocumentSession& session): session(session)
     // Edited pages are read again once the edits pause
     dirtyTimer.setSingleShot(true);
     dirtyTimer.setInterval(300);
-    connect(&dirtyTimer, &QTimer::timeout, this, [this] {
-        std::vector<size_t> changed;
-        for (size_t i = 0; i < pages.size(); ++i) {
-            if (pages[i].dirty) {
-                changed.push_back(i);
-            }
+    connect(&dirtyTimer, &QTimer::timeout, this, &DocumentTextIndex::readEdits);
+}
+
+void DocumentTextIndex::readEdits() {
+    dirtyTimer.stop();
+    std::vector<size_t> changed;
+    for (size_t i = 0; i < pages.size(); ++i) {
+        if (pages[i].dirty) {
+            changed.push_back(i);
         }
-        refreshDirty();
-        if (!changed.empty()) {
-            Q_EMIT textChanged(changed);
-        }
-    });
+    }
+    refreshDirty();
+    if (!changed.empty()) {
+        Q_EMIT textChanged(changed);
+    }
 }
 
 DocumentTextIndex::~DocumentTextIndex() {

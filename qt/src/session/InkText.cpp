@@ -82,6 +82,9 @@ using Plan = std::vector<Piece>;
 
 Plan planOf(const textmatch::Term& term, int typos) {
     Plan plan;
+    if (term.bounds & textmatch::Regex) {
+        return plan;  // (a regular expression is matched in text, not in the words read from handwriting)
+    }
     if (term.bounds & textmatch::Fuzzy) {
         plan.push_back({words::Matches::of(term), false});
         return plan;

@@ -886,6 +886,16 @@
   is the one that is not primary (a setting and a button swap them); with one screen nothing changes. Tests with two
   off-screen screens (`PresenterView.ui@2screens`) ([presenter-view.md](presenter-view.md)).
 
+- **Find and replace, `qt/md-find-replace` (2026-10-05).** The search bar gets a replace row (Ctrl+H, its replace
+  button, ⋮) wherever text can be written: `.md` and `.txt` files, PDF text documents, Markdown text boxes and sticky
+  notes' texts of notes. Options match case, whole words and regular expressions (groups in the replacement); the
+  search takes them while the row is shown, so its marks and count show what will be replaced. Replace takes the
+  current hit (the match of the source drawn where it is) and goes to the next; Replace all is one undo step with a
+  snackbar (a step of the text being written when only it has matches). The source is changed, the formatting marks
+  stay; PDF text, handwriting, plain text boxes and the app's own comments never change. The source beside the page
+  has the same. Read-only documents, PDFs without Markdown text and reading show the search alone
+  ([md-editor.md](md-editor.md), "Find and replace").
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

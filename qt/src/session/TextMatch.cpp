@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include <QList>
+#include <QRegularExpression>
 
 #include "WordMatch.h"
 
@@ -43,8 +44,8 @@ inline bool inBounds(QStringView t, qsizetype a, qsizetype b, unsigned bounds) {
     return true;
 }
 
-/// The end of the match of `q` at `j`, or -1
-qsizetype matchAt(QStringView t, qsizetype j, QStringView q) {
+/// The end of the match of `q` at `j`, or -1 (`exact`: letters as they are, not case folded)
+qsizetype matchAt(QStringView t, qsizetype j, QStringView q, bool exact) {
     const qsizetype n = t.size();
     const qsizetype m = q.size();
     qsizetype k = 0;
@@ -54,7 +55,7 @@ qsizetype matchAt(QStringView t, qsizetype j, QStringView q) {
             return -1;
         }
         const char16_t c = t[j].unicode();
-        if (fold(c) == q[k].unicode()) {
+        if ((exact ? c : fold(c)) == q[k].unicode()) {
             afterBreak = c == u'-' && lineBreakHyphen(t, j);
             ++j;
             ++k;
@@ -88,10 +89,62 @@ qsizetype matchAt(QStringView t, qsizetype j, QStringView q) {
 }
 
 
+/// A regular expression of a term (Regex), compiled once per thread for the last few patterns
+const QRegularExpression& regexOf(QStringView pattern, bool caseSensitive) {
+    struct Entry {
+        QString pattern;
+        bool caseSensitive = false;
+        QRegularExpression re;
+    };
+    thread_local std::vector<Entry> cache;  // (most recently used last; a handful: the bar's query, the thumbnails')
+    for (auto it = cache.begin(); it != cache.end(); ++it) {
+        if (it->caseSensitive == caseSensitive && it->pattern == pattern) {
+            if (std::next(it) != cache.end()) {
+                std::rotate(it, std::next(it), cache.end());
+            }
+            return cache.back().re;
+        }
+    }
+    if (cache.size() >= 4) {
+        cache.erase(cache.begin());
+    }
+    QRegularExpression::PatternOptions options = QRegularExpression::UseUnicodePropertiesOption;
+    if (!caseSensitive) {
+        options |= QRegularExpression::CaseInsensitiveOption;
+    }
+    cache.push_back({pattern.toString(), caseSensitive, QRegularExpression(pattern.toString(), options)});
+    cache.back().re.optimize();
+    return cache.back().re;
+}
+
+/// scan() of a regular expression
+template <typename F>
+void scanRegex(QStringView t, QStringView q, unsigned bounds, F&& f) {
+    const QRegularExpression& re = regexOf(q, (bounds & CaseSensitive) != 0);
+    if (!re.isValid()) {
+        return;
+    }
+    QRegularExpressionMatchIterator it = re.globalMatchView(t);
+    while (it.hasNext()) {
+        const QRegularExpressionMatch m = it.next();
+        const qsizetype a = m.capturedStart(), b = m.capturedEnd();
+        if (b <= a || t.sliced(a, b - a).contains(u'\n') || ((bounds & Word) && !inBounds(t, a, b, bounds))) {
+            continue;
+        }
+        if (!f(a, b)) {
+            return;
+        }
+    }
+}
+
 /// Calls f(start, end) for each match; f returns false to stop
 template <typename F>
 void scan(QStringView t, QStringView q, unsigned bounds, F&& f) {
     if (q.isEmpty()) {
+        return;
+    }
+    if (bounds & Regex) {
+        scanRegex(t, q, bounds, f);
         return;
     }
     if (bounds & Fuzzy) {
@@ -106,16 +159,20 @@ void scan(QStringView t, QStringView q, unsigned bounds, F&& f) {
             }
         }
     }
+    const bool exact = (bounds & CaseSensitive) != 0;
+    const unsigned where = bounds & Word;
     const char16_t q0 = q[0].unicode();
-    const char16_t upper = q0 >= u'a' && q0 <= u'z' ? static_cast<char16_t>(q0 - 32) : q0;
+    const char16_t upper = !exact && q0 >= u'a' && q0 <= u'z' ? static_cast<char16_t>(q0 - 32) : q0;
     const bool ligatureStart = q0 == u'f' || q0 == u's';
     const char16_t* data = reinterpret_cast<const char16_t*>(t.data());
     const qsizetype n = t.size();
     qsizetype j = 0;
     while (j < n) {
         const char16_t c = data[j];
-        if (c == q0 || c == upper || (c >= 0x80 && (fold(c) == q0 || (ligatureStart && !ligature(c).isEmpty())))) {
-            if (const qsizetype end = matchAt(t, j, q); end > j && (bounds == Anywhere || inBounds(t, j, end, bounds))) {
+        if (c == q0 || c == upper ||
+            (c >= 0x80 && ((!exact && fold(c) == q0) || (ligatureStart && !ligature(c).isEmpty())))) {
+            if (const qsizetype end = matchAt(t, j, q, exact);
+                end > j && (where == Anywhere || inBounds(t, j, end, where))) {
                 if (!f(j, end)) {
                     return;
                 }
@@ -160,7 +217,9 @@ qsizetype nextWord(QStringView t, qsizetype& j, QString& word) {
 }
 }  // namespace detail
 
-QString prepare(const QString& query) {
+QString prepare(const QString& query) { return prepare(query, false); }
+
+QString prepare(const QString& query, bool caseSensitive) {
     const QString s = query.simplified();
     QString out;
     out.reserve(s.size());
@@ -168,10 +227,31 @@ QString prepare(const QString& query) {
         if (const QStringView letters = ligature(c.unicode()); !letters.isEmpty()) {
             out += letters;
         } else {
-            out += QChar(fold(c.unicode()));
+            out += caseSensitive ? c : QChar(fold(c.unicode()));
         }
     }
     return out;
+}
+
+QString regexError(const QString& pattern) {
+    const QRegularExpression re(pattern, QRegularExpression::UseUnicodePropertiesOption);
+    return re.isValid() ? QString() : re.errorString();
+}
+
+std::vector<Term> optionTerms(const QString& text, const Options& options) {
+    const unsigned bounds = (options.caseSensitive ? CaseSensitive : 0u) | (options.wholeWord ? Word : 0u) |
+                            (options.regex ? Regex : 0u);
+    if (options.regex) {
+        if (text.isEmpty() || !regexError(text).isEmpty()) {
+            return {};
+        }
+        return {{text, bounds}};
+    }
+    QString plain = prepare(text, options.caseSensitive);
+    if (plain.isEmpty()) {
+        return {};
+    }
+    return {{std::move(plain), bounds}};
 }
 
 std::vector<Span> find(QStringView text, QStringView query, unsigned bounds) {
@@ -251,13 +331,18 @@ int count(QStringView text, const std::vector<Term>& terms) {
     return found > 1 ? static_cast<int>(merged(std::move(all)).size()) : static_cast<int>(all.size());
 }
 
+namespace {
+/// The bounds a term keeps in encode()
+constexpr unsigned ENCODED = Word | Fuzzy | FuzzyTypos | CaseSensitive | Regex;
+}  // namespace
+
 QString encode(const std::vector<Term>& terms) {
     QString out;
     for (const Term& t: terms) {
         if (!out.isEmpty()) {
             out += QChar(0x1e);
         }
-        out += QChar(u'0' + static_cast<char16_t>(t.bounds & (Word | Fuzzy | FuzzyTypos)));
+        out += QChar(u'0' + static_cast<char16_t>(t.bounds & ENCODED));
         out += t.text;
     }
     return out;
@@ -266,7 +351,7 @@ QString encode(const std::vector<Term>& terms) {
 std::vector<Term> decode(QStringView encoded) {
     std::vector<Term> out;
     for (const QStringView part: encoded.split(QChar(0x1e))) {
-        if (part.size() >= 2 && part[0] >= u'0' && part[0].unicode() <= u'0' + (Word | Fuzzy | FuzzyTypos)) {
+        if (part.size() >= 2 && part[0] >= u'0' && part[0].unicode() <= u'0' + ENCODED) {
             out.push_back({part.sliced(1).toString(), static_cast<unsigned>(part[0].unicode() - u'0')});
         }
     }

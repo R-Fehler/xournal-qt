@@ -147,6 +147,17 @@ Pane {
     function applyFormat(action, arg) {
         select(app.formatMarkdownIn(area.textDocument, anchorPosition(), area.cursorPosition, action, arg || ""))
     }
+    /// Find and replace on the source (the search bar's replace row, qt/docs/md-editor.md): `all`, or the selection if it
+    /// is a match, then the next one selected (the keys stay in the bar). One undo step of the source each.
+    function replaceInSource(withText, all) {
+        Qt.inputMethod.commit()
+        const r = app.replaceInSource(area.textDocument, area.selectionStart, area.selectionEnd, withText, all)
+        if (r && r.anchor !== undefined) {
+            area.select(r.anchor, r.caret)
+            Qt.callLater(showCursor)
+        }
+        return r
+    }
     function editTable() {
         const anchor = anchorPosition(), caret = area.cursorPosition
         panelTable.openFor(app.markdownTableIn(area.text, caret), function(cells, aligns) {

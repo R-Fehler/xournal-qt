@@ -40,6 +40,8 @@
 #include "filesystem.h"
 #include "model/PageRef.h"
 
+#include "session/TextMatch.h"
+
 class QQuickTextDocument;
 class QWindow;
 
@@ -244,8 +246,18 @@ class AppController: public QObject {
     /// over from the library), else the app-wide setting (app.library.fuzzySearch) new searches take. Set (the toggle
     /// in the search bar): the setting, and the current search runs again in that mode.
     Q_PROPERTY(bool searchFuzzy READ searchFuzzy WRITE setSearchFuzzy NOTIFY searchFuzzyChanged)
-    /// Why the current (fuzzy) search is read as plain text ("": it is not).
+    /// Why the current (fuzzy) search is read as plain text, or a regular expression is not searched ("": neither).
     Q_PROPERTY(QString searchHint READ searchHint NOTIFY searchChanged)
+    /// Find and replace (qt/docs/md-editor.md, "Find and replace"): the replace row of the search bar is shown, and
+    /// its options, in effect while it is (the search runs again with them, never fuzzy then). For this window.
+    Q_PROPERTY(bool replacing READ replacing WRITE setReplacing NOTIFY searchOptionsChanged)
+    Q_PROPERTY(bool searchCaseSensitive READ searchCaseSensitive WRITE setSearchCaseSensitive NOTIFY
+                       searchOptionsChanged)
+    Q_PROPERTY(bool searchWholeWord READ searchWholeWord WRITE setSearchWholeWord NOTIFY searchOptionsChanged)
+    Q_PROPERTY(bool searchRegex READ searchRegex WRITE setSearchRegex NOTIFY searchOptionsChanged)
+    /// The current document has text that find and replace can change: an edited text file, or notes with Markdown
+    /// text shown (a PDF text document, Markdown text boxes, sticky notes' texts). Not read-only files, not PDF text.
+    Q_PROPERTY(bool canReplace READ canReplace NOTIFY markdownOnPageChanged)
     // Page layout of the canvas (upstream settings viewColumns, showPairedPages, numPairsOffset), for all tabs
     Q_PROPERTY(int viewColumns READ viewColumns WRITE setViewColumns NOTIFY viewLayoutChanged)
     Q_PROPERTY(bool pairedPages READ pairedPages WRITE setPairedPages NOTIFY viewLayoutChanged)
@@ -565,6 +577,15 @@ public:
     bool searchFuzzy() const;
     void setSearchFuzzy(bool fuzzy);
     QString searchHint() const;
+    bool replacing() const { return replaceRow; }
+    void setReplacing(bool on);
+    bool searchCaseSensitive() const { return replaceOptions.caseSensitive; }
+    void setSearchCaseSensitive(bool on);
+    bool searchWholeWord() const { return replaceOptions.wholeWord; }
+    void setSearchWholeWord(bool on);
+    bool searchRegex() const { return replaceOptions.regex; }
+    void setSearchRegex(bool on);
+    bool canReplace() const;
     bool hasSelection() const;
     bool selectMoreOffered() const;
     bool selectMoreAvailable() const;
@@ -753,6 +774,17 @@ public:
     Q_INVOKABLE void clearSelection();
 
     // --- search ---
+    /// Find and replace (qt/src/canvas/FindReplace.h): the current hit of the search replaced with `with` (one undo
+    /// step), and the next one current. "replaced"; "skipped": it cannot be replaced (PDF text, a plain text,
+    /// handwriting), the next is current; "shown": there was no current hit, the first is current now; "": no hits.
+    Q_INVOKABLE QString replaceCurrent(const QString& with);
+    /// Every match replaced with `with`, as one undo step. Returns how many.
+    Q_INVOKABLE int replaceAll(const QString& with);
+    /// The same in the source beside the page (its TextArea's document, MarkdownPanel), as one undo step of it.
+    /// `all`: every match ({count}); else the selection [from, to) replaced if it is a match ({replaced: true}),
+    /// and the next match selected ({anchor, caret}; none: no "anchor").
+    Q_INVOKABLE QVariantMap replaceInSource(QQuickTextDocument* document, int from, int to, const QString& with,
+                                            bool all);
     Q_INVOKABLE void searchNext();
     Q_INVOKABLE void searchPrevious();
     Q_INVOKABLE void clearSearch();
@@ -1438,6 +1470,7 @@ Q_SIGNALS:
     void annotationsExported(const QString& file, const QString& error);
     void searchChanged();
     void searchFuzzyChanged();
+    void searchOptionsChanged();
     void viewLayoutChanged();
     void presentingChanged();
     void pageUndoChanged();
@@ -1522,6 +1555,12 @@ Q_SIGNALS:
     void editAnywayWarning(const QString& name);
 
 private:
+    /// The search's options in effect (the replace row's while it is shown, else none)
+    xqt::textmatch::Options searchOptions() const;
+    /// The current search again with the options in effect
+    void applySearchOptions();
+    bool replaceRow = false;
+    xqt::textmatch::Options replaceOptions;
     /// The last query fuzzyName() parsed
     mutable QString fuzzyText;
     mutable std::shared_ptr<const xqt::FuzzyQuery> fuzzyParsed;
