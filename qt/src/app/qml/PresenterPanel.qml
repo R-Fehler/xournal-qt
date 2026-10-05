@@ -9,7 +9,7 @@ import QtQuick.Layouts
 Rectangle {
     id: panel
     objectName: "presenterPanel"
-    property QtObject console: app.presenter
+    property QtObject presenter: app.presenter
     signal stopRequested()
     color: "#202124"
     Material.theme: Material.Dark
@@ -47,25 +47,25 @@ Rectangle {
             spacing: 4
             Label {
                 objectName: "presenterElapsed"
-                text: panel.duration(panel.console.elapsedSeconds)
+                text: panel.duration(panel.presenter.elapsedSeconds)
                 font.pixelSize: 26
-                color: panel.console.timerRunning ? "#e8eaed" : "#9aa0a6"
+                color: panel.presenter.timerRunning ? "#e8eaed" : "#9aa0a6"
                 Layout.fillWidth: true
             }
             ToolButton {
                 objectName: "presenterTimerToggle"
-                icon.source: app.iconUrl(panel.console.timerRunning ? "xopp-audio-playback-pause" : "xopp-object-play")
+                icon.source: app.iconUrl(panel.presenter.timerRunning ? "xopp-audio-playback-pause" : "xopp-object-play")
                 focusPolicy: Qt.NoFocus
-                onClicked: panel.console.toggleTimer()
+                onClicked: panel.presenter.toggleTimer()
                 ToolTip.visible: hovered
-                ToolTip.text: panel.console.timerRunning ? qsTr("Pause the time") : qsTr("Go on with the time")
+                ToolTip.text: panel.presenter.timerRunning ? qsTr("Pause the time") : qsTr("Go on with the time")
                 Accessible.name: ToolTip.text
             }
             ToolButton {
                 objectName: "presenterTimerReset"
                 icon.source: app.iconUrl("xqt-rotate-left")
                 focusPolicy: Qt.NoFocus
-                onClicked: panel.console.resetTimer()
+                onClicked: panel.presenter.resetTimer()
                 ToolTip.visible: hovered
                 ToolTip.text: qsTr("Back to 0:00")
                 Accessible.name: ToolTip.text
@@ -73,23 +73,23 @@ Rectangle {
         }
         Label {
             objectName: "presenterPageLabel"
-            text: qsTr("Page %1 of %2").arg(panel.console.page + 1).arg(panel.console.pageCount)
+            text: qsTr("Page %1 of %2").arg(panel.presenter.page + 1).arg(panel.presenter.pageCount)
             font.pixelSize: 18
             color: "#e8eaed"
         }
         Label {
             objectName: "presenterNextLabel"
-            text: panel.console.nextPicture !== "" ? qsTr("Next") : qsTr("The last page")
+            text: panel.presenter.nextPicture !== "" ? qsTr("Next") : qsTr("The last page")
             color: "#9aa0a6"
         }
         Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(width * panel.console.nextAspect, panel.height * 0.45)
-            visible: panel.console.nextPicture !== ""
+            Layout.preferredHeight: Math.min(width * panel.presenter.nextAspect, panel.height * 0.45)
+            visible: panel.presenter.nextPicture !== ""
             Image {
                 objectName: "presenterNext"
                 anchors.fill: parent
-                source: panel.console.nextPicture
+                source: panel.presenter.nextPicture
                 asynchronous: true
                 cache: false
                 sourceSize.width: Math.round(width)
@@ -102,8 +102,8 @@ Rectangle {
         Item { Layout.fillHeight: true }
         Label {
             objectName: "presenterNotesHint"
-            visible: panel.console.pageHasNotes
-            text: panel.console.showNotes ? qsTr("The audience sees the space for notes too.")
+            visible: panel.presenter.pageHasNotes
+            text: panel.presenter.showNotes ? qsTr("The audience sees the space for notes too.")
                                           : qsTr("The space for notes shows only here, not to the audience.")
             wrapMode: Text.WordWrap
             color: "#9aa0a6"
@@ -114,7 +114,7 @@ Rectangle {
         Switch {
             objectName: "presenterShowNotes"
             text: qsTr("Notes for the audience too")
-            checked: panel.console.showNotes
+            checked: panel.presenter.showNotes
             focusPolicy: Qt.NoFocus
             padding: 0
             onToggled: app.settings.set("presenterShowNotes", checked)
@@ -127,7 +127,7 @@ Rectangle {
             Switch {
                 objectName: "presenterFollowView"
                 text: qsTr("The audience follows my zoom")
-                checked: panel.console.followView
+                checked: panel.presenter.followView
                 focusPolicy: Qt.NoFocus
                 padding: 0
                 onToggled: app.settings.set("presenterFollowView", checked)
@@ -138,16 +138,16 @@ Rectangle {
                 text: qsTr("Fit")
                 focusPolicy: Qt.NoFocus
                 flat: true
-                onClicked: panel.console.fitPage()
+                onClicked: panel.presenter.fitPage()
                 ToolTip.visible: hovered
-                ToolTip.text: panel.console.showNotes ? qsTr("The whole page on both screens")
+                ToolTip.text: panel.presenter.showNotes ? qsTr("The whole page on both screens")
                                                       : qsTr("The whole slide on both screens")
                 Accessible.name: ToolTip.text
             }
         }
         Label {
-            text: qsTr("Audience: %1").arg(panel.console.audienceScreenName)
-            visible: panel.console.audienceScreenName !== ""
+            text: qsTr("Audience: %1").arg(panel.presenter.audienceScreenName)
+            visible: panel.presenter.audienceScreenName !== ""
             elide: Text.ElideRight
             color: "#9aa0a6"
             Layout.fillWidth: true
@@ -160,7 +160,7 @@ Rectangle {
                 icon.source: app.iconUrl("xqt-swap-sides")
                 focusPolicy: Qt.NoFocus
                 flat: true
-                onClicked: app.settings.set("presenterSwapScreens", !panel.console.swapScreens)
+                onClicked: app.settings.set("presenterSwapScreens", !panel.presenter.swapScreens)
             }
             Item { Layout.fillWidth: true }
             Button {

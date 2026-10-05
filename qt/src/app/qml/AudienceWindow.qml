@@ -9,7 +9,7 @@ import XournalQt.Canvas
 Window {
     id: audience
     objectName: "audienceWindow"
-    property QtObject console: app.presenter
+    property QtObject presenter: app.presenter
     /// A digit typed here: the page number is typed on in the console's window (the audience does not see it)
     signal digitTyped(string digit)
     title: qsTr("Presentation") + " — " + app.title
@@ -25,7 +25,7 @@ Window {
     DocumentCanvas {
         id: audienceCanvas
         objectName: "audienceCanvas"
-        readonly property size slide: audience.console.shownSize
+        readonly property size slide: audience.presenter.shownSize
         readonly property real scale: slide.width > 0 && slide.height > 0
                                       ? Math.min(audience.width / slide.width, audience.height / slide.height) : 1
         width: slide.width * scale
@@ -34,12 +34,12 @@ Window {
         clip: true
         enabled: false  // (nothing is written here: the presenter writes on the console)
         readingOnly: true
-        view: audience.console.active ? audience.console.audienceView : null
+        view: audience.presenter.active ? audience.presenter.audienceView : null
     }
 
     // (the shape the part the audience sees is widened to, when it follows the presenter's zoom)
     Binding {
-        target: audience.console
+        target: audience.presenter
         property: "audienceSize"
         value: Qt.size(audience.width, audience.height)
         when: audience.visible && audience.width > 0 && audience.height > 0
