@@ -209,6 +209,123 @@ protected:
         }
         return runs;
     }
+    /// What the rail shows in its middle (qt/docs/toolbox.md, "Short rails"): the cells (the user's tools, stacks, the
+    /// fixed tools and their stack) shown, how many of them lie in sight, the room of the middle along the rail and
+    /// the length its contents take
+    struct RailState {
+        int cells = 0;
+        int inSight = 0;
+        double room = 0;
+        double content = 0;
+        bool scrolls = false;
+        bool anyFolded = false;
+        bool allFolded = false;
+        double nextUnfold = 1e9;
+        QString text;
+    };
+    RailState rail() const {
+        RailState s;
+        auto* box = find("toolbox");
+        auto* middle = find("toolboxMiddle");
+        auto* grid = find("toolboxTools");
+        if (!box || !middle || !grid) {
+            return s;
+        }
+        const bool vertical = box->property("vertical").toBool();
+        const QRectF sight = rectOf(middle);
+        std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+            for (QQuickItem* c: i->childItems()) {
+                const QString n = c->objectName();
+                const bool fixed = c->parentItem() && c->parentItem()->objectName() == "toolboxFixed";
+                if ((n.startsWith("toolEntry_") || n.startsWith("toolStack_") || n == "toolboxFixedStack" || fixed) &&
+                    shown(c)) {
+                    ++s.cells;
+                    const QRectF r = rectOf(c).adjusted(1, 1, -1, -1);
+                    s.inSight += sight.contains(r) ? 1 : 0;
+                }
+                walk(c);
+            }
+        };
+        walk(grid);
+        s.room = vertical ? middle->height() : middle->width();
+        s.content = vertical ? middle->property("contentHeight").toDouble() : middle->property("contentWidth").toDouble();
+        s.scrolls = middle->property("interactive").toBool();
+        const QVariantMap plan = box->property("plan").toMap();
+        const int fixed = box->property("fixedButtons").toList().size();
+        const int fixedShown = box->property("fixedShown").toInt();
+        bool all = fixedShown == 0 || fixed <= 1;
+        bool any = fixedShown < fixed;
+        // (the room the next unfolding needs: a fixed tool more on its own takes a cell; a section, all but one)
+        s.nextUnfold = fixedShown < fixed ? box->property("cell").toDouble() : 1e9;
+        const QVariantList folded = plan.value("folded").toList();
+        const QVariantList sections = box->property("sections").toList();
+        for (int i = 0; i < folded.size() && i < sections.size(); ++i) {
+            const bool f = folded[i].toBool();
+            any = any || f;
+            all = all && (f || sections[i].toList().size() <= 1);
+            if (f) {
+                s.nextUnfold = std::min(s.nextUnfold, (sections[i].toList().size() - 1) * box->property("cell").toDouble());
+            }
+        }
+        s.anyFolded = any;
+        s.allFolded = all;
+        s.text = QString("%1×%2 %3%4: %5 cells, %6 in sight, room %7, content %8%9%10")
+                         .arg(window->width())
+                         .arg(window->height())
+                         .arg(win("layoutClass").toString(), box->property("compact").toBool() ? " (dock)" : "")
+                         .arg(s.cells)
+                         .arg(s.inSight)
+                         .arg(s.room)
+                         .arg(s.content)
+                         .arg(s.anyFolded ? ", folded" : "", s.scrolls ? ", scrolls" : "");
+        return s;
+    }
+    /// The rail uses the room it has: every cell it shows is in sight unless everything is folded and it scrolls;
+    /// while something is folded, the room left over is less than the smallest unfolding needs (plus the 16 px a
+    /// growing rail keeps against flicker: `grew`)
+    void expectRailFills(const char* where, bool grew = false) {
+        auto* box = find("toolbox");
+        ASSERT_TRUE(shown(box)) << where;
+        until([&] { return rail().cells > 0; });
+        const RailState s = rail();
+        const double cell = box->property("cell").toDouble();
+        SCOPED_TRACE(std::string(where) + ": " + s.text.toStdString());
+        EXPECT_GE(s.room, cell) << "a middle at least a cell long";
+        if (box->property("compact").toBool()) {
+            // The dock: as many of the user's tools as fit, then "My tools"
+            const int all = tools()->tools().size();
+            EXPECT_GE(s.cells, std::min(all, 1));
+            EXPECT_EQ(s.inSight, s.cells) << "no tool cut off";
+            if (s.cells < all) {
+                EXPECT_LT(s.room - s.cells * cell, cell + 8.5) << "room for one more tool left empty";
+            }
+            EXPECT_TRUE(shown(find("toolboxAllButton")));
+            return;
+        }
+        if (s.scrolls) {
+            EXPECT_TRUE(s.allFolded) << "scrolls only when everything is folded";
+            EXPECT_GE(s.inSight, int(s.room / cell) - 1) << "the cells in sight fill the middle";
+        } else {
+            EXPECT_EQ(s.inSight, s.cells) << "every cell in sight";
+            EXPECT_LE(s.content, s.room + 0.5);
+            if (s.anyFolded) {
+                EXPECT_LT(s.room - s.content, s.nextUnfold + (grew ? 16 : 0)) << "folded with room to spare";
+            }
+        }
+    }
+    void touchProfile(const char* mode) {
+        QMetaObject::invokeMethod(controller->settingsModel(), "set", Q_ARG(QString, "touchProfile"),
+                                  Q_ARG(QVariant, mode));
+        wait(100);
+    }
+    /// A phone's safe area (Android edge to edge: the status bar, the navigation bar, a cut-out held sideways)
+    void safeArea(double top, double right, double bottom, double left) {
+        window->setProperty("safeTop", top);
+        window->setProperty("safeRight", right);
+        window->setProperty("safeBottom", bottom);
+        window->setProperty("safeLeft", left);
+        wait(300);
+    }
     QObject* editor() const { return find<QObject>("toolEntryEditor"); }
     bool editorOpen() const { return editor() && editor()->property("visible").toBool(); }
 
@@ -379,6 +496,67 @@ TEST_F(ToolboxTest, aShortRailFoldsSectionsIntoStacksAndKeepsTheOneInHand) {
     resize(1920, 1080);
     EXPECT_TRUE(shown(entry(pen1)));
     EXPECT_TRUE(shown(find("handButton")));
+}
+
+// The author on 0.6.0, a Galaxy Fold 7 unfolded: "the rail is just showing one item although there is plenty space on
+// the rail" (qt/rail-fill). Its sizes with the touch profile and an Android phone's safe area: unfolded (900 × 1000,
+// tablet portrait), turned (1000 × 900), folded (412 × 915, the dock) and folded held sideways (915 × 412)
+TEST_F(ToolboxTest, theRailFillsItsRoomAtTheFoldsSizes) {
+    touchProfile("on");
+    for (const bool insets: {false, true}) {
+        safeArea(insets ? 40 : 0, 0, insets ? 24 : 0, 0);
+        // (the rail grows at 1920 × 1080: it may keep 16 px against flicker)
+        for (const auto& [w, h]: std::vector<std::pair<int, int>>{{900, 1000}, {1000, 900}, {412, 915}, {915, 412},
+                                                                  {1920, 1080}, {1300, 600}}) {
+            resize(w, h);
+            const std::string at = std::to_string(w) + "x" + std::to_string(h) + (insets ? " with insets" : "");
+            expectRailFills(at.c_str(), w == 1920);
+        }
+    }
+    // Unfolded with room for every tool of the first start but the last fixed ones: no stack of one's own tools
+    resize(900, 1000);
+    EXPECT_FALSE(rail().allFolded) << rail().text.toStdString();
+    EXPECT_GE(rail().cells, 12) << rail().text.toStdString();
+    touchProfile("auto");
+}
+
+// What the device goes through: started folded (the dock), unfolded, turned, folded again; and the safe area changing
+// at one size (the navigation bar, a cut-out): the rail plans anew for every length
+TEST_F(ToolboxTest, theRailPlansAnewWhenThePhoneIsFoldedUnfoldedAndTurned) {
+    touchProfile("on");
+    safeArea(40, 0, 24, 0);
+    resize(412, 915);
+    expectRailFills("folded");
+    resize(900, 1000);
+    expectRailFills("unfolded");
+    const RailState unfolded = rail();
+    resize(1000, 900);
+    expectRailFills("turned");
+    resize(900, 1000);
+    expectRailFills("unfolded again", true);
+    EXPECT_EQ(rail().cells, unfolded.cells) << "the same as before";
+    resize(412, 915);
+    expectRailFills("folded again");
+    resize(915, 412);
+    expectRailFills("folded, sideways");
+    resize(900, 1000);
+    expectRailFills("unfolded from sideways");
+    EXPECT_EQ(rail().cells, unfolded.cells);
+    // The navigation bar grows under the rail's end, and goes again: the same size, another length
+    safeArea(40, 0, 200, 0);
+    expectRailFills("a taller navigation bar");
+    safeArea(40, 0, 24, 0);
+    expectRailFills("the navigation bar as before", true);
+    EXPECT_EQ(rail().cells, unfolded.cells);
+    // Android reports the new size and the new insets one after the other (unfolding: the window grows while the
+    // insets of the moment before still hold): the rail must not stay folded for the insets of before
+    resize(412, 915);
+    safeArea(40, 0, 420, 0);
+    resize(900, 1000);
+    safeArea(40, 0, 24, 0);
+    expectRailFills("unfolded, the insets after the size", true);
+    EXPECT_EQ(rail().cells, unfolded.cells) << "as many as unfolded with the insets at once";
+    touchProfile("auto");
 }
 
 TEST_F(ToolboxTest, theClassicBarComesBackWithItsSetting) {
