@@ -74,6 +74,11 @@ inline bool available() { return backend() != Backend::None; }
 /// Whether this build has the Qt Multimedia backend.
 bool builtWithQtMultimedia();
 
+/// What recording runs on, for `xournal-qt --audio-info` and the CI's smoke tests (qt/docs/audio.md, "Platforms"):
+/// the first line is "recording: available (…)" or "recording: not offered (…)", then with Qt Multimedia the
+/// microphones and speakers the system has (listing them asks for no permission).
+std::string describe();
+
 /// A new microphone or speaker of the current backend (nullptr: none).
 std::unique_ptr<AudioInput> makeInput();
 std::unique_ptr<AudioOutput> makeOutput();

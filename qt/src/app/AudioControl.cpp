@@ -2,7 +2,10 @@
 
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QDesktopServices>
 #include <QSettings>
+#include <QTimer>
+#include <QUrl>
 #include <QtCore/qtcore-config.h>
 #if QT_CONFIG(permissions)
 #include <QPermissions>
@@ -24,14 +27,75 @@ constexpr const char* LEAD_IN_KEY = "audio/leadInMs";
 
 QString qstr(const std::string& s) { return QString::fromStdString(s); }
 
-std::function<void(bool)>& platformHook() {
-    static std::function<void(bool)> hook;
+std::function<void(const AudioControl::PlatformState&)>& platformHook() {
+    static std::function<void(const AudioControl::PlatformState&)> hook;
     return hook;
 }
-void tellPlatform(bool recording) {
-    if (platformHook()) {
-        platformHook()(recording);
+AudioControl::PermissionAccess& permissionAccess() {
+    static AudioControl::PermissionAccess access;
+    return access;
+}
+std::function<bool()>& settingsOpener() {
+    static std::function<bool()> open;
+    return open;
+}
+
+/// The system's page for the microphone permission, where a URL opens it
+bool openSettingsByUrl() {
+#if defined(Q_OS_MACOS)
+    return QDesktopServices::openUrl(
+            QUrl(QStringLiteral("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")));
+#elif defined(Q_OS_WIN)
+    return QDesktopServices::openUrl(QUrl(QStringLiteral("ms-settings:privacy-microphone")));
+#else
+    return false;
+#endif
+}
+
+/// XQT_FAKE_MIC_PERMISSION: "denied", "ask-deny" or "ask-grant" (empty: none)
+QString fakePermission() { return qEnvironmentVariable("XQT_FAKE_MIC_PERMISSION"); }
+
+AudioControl::Permission checkMicrophone() {
+    if (permissionAccess().check) {
+        return permissionAccess().check();
     }
+    if (const QString fake = fakePermission(); !fake.isEmpty()) {
+        return fake == QLatin1String("denied")       ? AudioControl::Permission::Denied
+               : fake.startsWith(QLatin1String("ask")) ? AudioControl::Permission::Undetermined
+                                                       : AudioControl::Permission::Granted;
+    }
+#if QT_CONFIG(permissions)
+    // Android and macOS ask the user once; Linux and Windows report it granted
+    if (audio::backend() == audio::Backend::Qt) {
+        switch (QCoreApplication::instance()->checkPermission(QMicrophonePermission())) {
+            case Qt::PermissionStatus::Undetermined:
+                return AudioControl::Permission::Undetermined;
+            case Qt::PermissionStatus::Denied:
+                return AudioControl::Permission::Denied;
+            case Qt::PermissionStatus::Granted:
+                break;
+        }
+    }
+#endif
+    return AudioControl::Permission::Granted;
+}
+
+void requestMicrophone(QObject* context, std::function<void(bool)> answer) {
+    if (permissionAccess().request) {
+        permissionAccess().request(context, std::move(answer));
+        return;
+    }
+    if (const QString fake = fakePermission(); !fake.isEmpty()) {
+        QTimer::singleShot(0, context, [answer, granted = fake == QLatin1String("ask-grant")] { answer(granted); });
+        return;
+    }
+#if QT_CONFIG(permissions)
+    QCoreApplication::instance()->requestPermission(QMicrophonePermission(), context, [answer](const QPermission& p) {
+        answer(p.status() == Qt::PermissionStatus::Granted);
+    });
+#else
+    QTimer::singleShot(0, context, [answer] { answer(true); });
+#endif
 }
 std::string utf8(const QString& s) { return s.toStdString(); }
 
@@ -69,11 +133,14 @@ AudioControl::AudioControl(std::function<DocumentSession*()> c, std::function<QS
     connect(player.get(), &audio::Player::positionChanged, this, &AudioControl::playPositionChanged);
     connect(player.get(), &audio::Player::failed, this,
             [this](const QString& error) { Q_EMIT message(tr("Playing stopped: %1").arg(error)); });
+    // The platform hears of every start, pause, resume and end (after the slots above have run)
+    connect(this, &AudioControl::recordingChanged, this, &AudioControl::syncPlatform, Qt::QueuedConnection);
 }
 
 AudioControl::~AudioControl() {
     if (recorder->isRecording()) {
         stopRecording();
+        syncPlatform();  // (now: the queued call would not come any more)
     }
 }
 
@@ -100,35 +167,109 @@ void AudioControl::setLeadInMs(int ms) {
     Q_EMIT leadInChanged();
 }
 
-void AudioControl::setPlatformHook(std::function<void(bool)> hook) { platformHook() = std::move(hook); }
+void AudioControl::setPlatformHook(std::function<void(const PlatformState&)> hook) { platformHook() = std::move(hook); }
+void AudioControl::setPermissionAccess(PermissionAccess access) { permissionAccess() = std::move(access); }
+void AudioControl::setSettingsOpener(std::function<bool()> open) { settingsOpener() = std::move(open); }
+
+QString AudioControl::microphoneSettingsPath() const {
+#if defined(Q_OS_MACOS)
+    return tr("System Settings → Privacy & Security → Microphone");
+#elif defined(Q_OS_WIN)
+    return tr("Settings → Privacy & security → Microphone");
+#elif defined(Q_OS_ANDROID)
+    return tr("Settings → Apps → Xournal Qt → Permissions → Microphone");
+#else
+    return tr("the system's privacy settings");
+#endif
+}
+
+bool AudioControl::canOpenMicrophoneSettings() const {
+#if defined(Q_OS_MACOS) || defined(Q_OS_WIN)
+    return true;
+#else
+    return bool(settingsOpener());
+#endif
+}
+
+bool AudioControl::openMicrophoneSettings() {
+    setDenied(false);
+    return settingsOpener() ? settingsOpener()() : openSettingsByUrl();
+}
+
+void AudioControl::dismissMicrophoneNotice() { setDenied(false); }
+
+void AudioControl::setDenied(bool on) {
+    if (denied != on) {
+        denied = on;
+        Q_EMIT microphoneDeniedChanged();
+    }
+}
+
+bool AudioControl::microphoneAllowed() {
+    switch (checkMicrophone()) {
+        case Permission::Granted:
+            return true;
+        case Permission::Denied:
+            setDenied(true);
+            return false;
+        case Permission::Undetermined:
+            break;
+    }
+    // The system asks the user (once); recording starts when the answer is yes
+    if (!asking) {
+        asking = true;
+        requestMicrophone(this, [this](bool granted) {
+            asking = false;
+            if (granted) {
+                startRecording();
+            } else {
+                setDenied(true);
+            }
+        });
+    }
+    return false;
+}
+
+void AudioControl::syncPlatform() {
+    PlatformState now;
+    now.recording = recording();
+    now.paused = recordingPaused();
+    if (now.recording) {
+        now.recordedMs = recordedMs();
+        now.title = recordingTitle();
+    }
+    // (the time alone is no news: the notification's clock runs by itself)
+    const bool changed = now.recording != told.recording || now.paused != told.paused ||
+                         (now.recording && now.title != told.title);
+    told = now;
+    if (changed && platformHook()) {
+        platformHook()(now);
+    }
+}
+
+void AudioControl::platformCommand(PlatformCommand command) {
+    switch (command) {
+        case PlatformCommand::Pause:
+            pauseRecording();
+            break;
+        case PlatformCommand::Resume:
+            resumeRecording();
+            break;
+        case PlatformCommand::Stop:
+            stopRecording();
+            break;
+    }
+}
 
 bool AudioControl::startRecording() {
     DocumentSession* s = current();
     if (!s || recorder->isRecording()) {
         return false;
     }
-#if QT_CONFIG(permissions)
-    // The microphone: Android, macOS, iOS and Windows ask the user once (on Linux it is always allowed)
-    if (audio::backend() == audio::Backend::Qt) {
-        const QMicrophonePermission mic;
-        switch (QCoreApplication::instance()->checkPermission(mic)) {
-            case Qt::PermissionStatus::Undetermined:
-                QCoreApplication::instance()->requestPermission(mic, this, [this](const QPermission& p) {
-                    if (p.status() == Qt::PermissionStatus::Granted) {
-                        startRecording();
-                    } else {
-                        Q_EMIT message(tr("Recording needs the microphone: allow it in the system's settings."));
-                    }
-                });
-                return false;
-            case Qt::PermissionStatus::Denied:
-                Q_EMIT message(tr("Recording needs the microphone: allow it in the system's settings."));
-                return false;
-            case Qt::PermissionStatus::Granted:
-                break;
-        }
+    if (!microphoneAllowed()) {
+        return false;
     }
-#endif
+    setDenied(false);
     stopPlayback();  // (the speaker would be recorded)
     const fs::path folder = audio::appFolder();
     const std::string name = audio::newRecordingName(QDateTime::currentDateTime(), [&](const std::string& n) {
@@ -143,13 +284,11 @@ bool AudioControl::startRecording() {
     audio::Recorder* r = recorder.get();
     s->setRecording(name, [r] { return static_cast<size_t>(r->positionMs()); });
     s->addVoiceMemo(s->getCurrentPageNo(), name);
-    tellPlatform(true);
     connect(s, &QObject::destroyed, this, [this] {
         // Its tab closed: the recording ends with it (the session is gone: nothing more to tell it)
         recordingFor = nullptr;
         if (recorder->isRecording()) {
             recorder->stop();
-            tellPlatform(false);
             Q_EMIT message(tr("The recording ended with its document."));
         }
         Q_EMIT recordingChanged();
@@ -159,7 +298,6 @@ bool AudioControl::startRecording() {
 }
 
 void AudioControl::endRecording() {
-    tellPlatform(false);
     if (recordingFor) {
         recordingFor->setRecording({}, {});
         disconnect(recordingFor, &QObject::destroyed, this, nullptr);

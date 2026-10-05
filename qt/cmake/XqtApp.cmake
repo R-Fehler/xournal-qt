@@ -211,6 +211,7 @@ set(XQT_QML_FILES
     src/app/qml/PlaybackPill.qml
     src/app/qml/TimelineBar.qml
     src/app/qml/RecordingsDialog.qml
+    src/app/qml/MicrophoneDialog.qml
     src/app/qml/AdaptiveDialog.qml
     src/app/qml/InlineRename.qml
     src/app/qml/RenameDialog.qml

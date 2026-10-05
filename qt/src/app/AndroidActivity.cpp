@@ -42,6 +42,20 @@ void deliver() {
     }
 }
 
+std::function<void(int)>& recordingCommand() {
+    static std::function<void(int)> c;
+    return c;
+}
+
+/// Java (the notification's buttons, through RecordingService on the Android UI thread)
+void JNICALL recordingCommandArrived(JNIEnv*, jclass, jint command) {
+    QMetaObject::invokeMethod(QCoreApplication::instance(), [command] {
+        if (recordingCommand()) {
+            recordingCommand()(static_cast<int>(command));
+        }
+    }, Qt::QueuedConnection);
+}
+
 /// Java (the Android UI thread): new files are waiting.
 void JNICALL incomingFilesArrived(JNIEnv*, jclass) {
     QMetaObject::invokeMethod(QCoreApplication::instance(), &deliver, Qt::QueuedConnection);
@@ -62,6 +76,28 @@ void watchIncomingFiles(std::function<void(const QStringList&)> receive) {
 
 bool hasStylus() { return QJniObject::callStaticMethod<jboolean>(ACTIVITY, "hasStylus", "()Z"); }
 
-void setRecording(bool on) { QJniObject::callStaticMethod<void>(ACTIVITY, "setRecording", "(Z)V", jboolean(on)); }
+void setRecording(bool on, bool paused, qint64 recordedMs, const QString& title, const QStringList& labels) {
+    QJniEnvironment env;
+    jobjectArray texts =
+            env->NewObjectArray(static_cast<jsize>(labels.size()), env.findClass("java/lang/String"), nullptr);
+    for (qsizetype i = 0; i < labels.size(); ++i) {
+        env->SetObjectArrayElement(texts, static_cast<jsize>(i), QJniObject::fromString(labels[i]).object<jstring>());
+    }
+    QJniObject::callStaticMethod<void>(ACTIVITY, "setRecording", "(ZZJLjava/lang/String;[Ljava/lang/String;)V",
+                                       jboolean(on), jboolean(paused), jlong(recordedMs),
+                                       QJniObject::fromString(title).object<jstring>(), texts);
+    env->DeleteLocalRef(texts);
+}
+
+void watchRecordingCommands(std::function<void(int)> command) {
+    recordingCommand() = std::move(command);
+    QJniEnvironment env;
+    const JNINativeMethod methods[] = {{"recordingCommand", "(I)V", reinterpret_cast<void*>(&recordingCommandArrived)}};
+    if (!env.registerNativeMethods(ACTIVITY, methods, 1)) {
+        qWarning("xournal-qt: the recording's notification cannot pause or stop it (no %s)", ACTIVITY);
+    }
+}
+
+bool openAppSettings() { return QJniObject::callStaticMethod<jboolean>(ACTIVITY, "openAppSettings", "()Z"); }
 
 }  // namespace xqt::android

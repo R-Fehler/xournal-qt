@@ -12,6 +12,7 @@ namespace xqt::audio {
 // QtAudioDevice.cpp
 std::unique_ptr<AudioInput> makeQtInput();
 std::unique_ptr<AudioOutput> makeQtOutput();
+std::string describeQtDevices();
 #endif
 
 namespace {
@@ -39,6 +40,21 @@ Backend backend() {
 void useFakeDevices(bool on) { forced = on ? static_cast<int>(Backend::Fake) : -1; }
 
 void useNoDevices(bool on) { forced = on ? static_cast<int>(Backend::None) : -1; }
+
+std::string describe() {
+    switch (backend()) {
+        case Backend::Fake:
+            return "recording: available (fake devices, XQT_FAKE_AUDIO=1)\n";
+        case Backend::Qt:
+#ifdef XQT_HAVE_QT_MULTIMEDIA
+            return "recording: available (Qt Multimedia, Qt " + std::string(qVersion()) + ")\n" + describeQtDevices();
+#endif
+        case Backend::None:
+            break;
+    }
+    return builtWithQtMultimedia() ? "recording: not offered\n"
+                                   : "recording: not offered (this build has no Qt Multimedia)\n";
+}
 
 std::unique_ptr<AudioInput> makeInput() {
     switch (backend()) {

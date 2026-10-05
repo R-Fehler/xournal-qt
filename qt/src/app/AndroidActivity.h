@@ -23,7 +23,17 @@ void watchIncomingFiles(std::function<void(const QStringList&)> receive);
 /// A stylus is attached (Android's input devices report a stylus source).
 bool hasStylus();
 
-/// A recording runs or ended: the foreground service that keeps the microphone in the background (qt/docs/audio.md).
-void setRecording(bool on);
+/// A recording runs, paused or ended: the foreground service that keeps the microphone in the background, with its
+/// notification (qt/docs/audio.md, "Android"): the time (`recordedMs` now; its clock runs on while not paused), the
+/// document's `title`, and Pause/Resume and Stop. `labels`: the notification's texts, translated (recording, paused,
+/// pause, resume, stop).
+void setRecording(bool on, bool paused, qint64 recordedMs, const QString& title, const QStringList& labels);
+
+/// The notification's buttons: `command` gets 1 (pause), 2 (resume) or 3 (stop), on the UI thread
+/// (AudioControl::PlatformCommand).
+void watchRecordingCommands(std::function<void(int command)> command);
+
+/// The app's page in the system's settings (where the microphone is allowed after a refusal).
+bool openAppSettings();
 
 }  // namespace xqt::android

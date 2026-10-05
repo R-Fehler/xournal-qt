@@ -3086,13 +3086,7 @@ offered).
 - [ ] "Recordings of this document…": pages, length, ink count; play; remove (the ink stays; Ctrl+Z brings it back).
 - [ ] With a pen on the Surface and the iPad: the record button and the pills are easy to hit; writing while
       recording feels the same as without (no lag from the encoder).
-- [ ] Android: the first recording asks for the microphone; refused: the message, nothing recorded. Allowed: record,
-      switch to another app for a minute, come back: the notification was there, the recording has that minute.
-      Swipe the app away while recording: the notification goes; the file plays up to then.
-- [ ] macOS: the first recording asks for the microphone with the app's text (Info.plist).
-- [ ] Windows, macOS, Android: a package without Qt Multimedia's FFmpeg plugin (`windeployqt --skip-plugin-types
-      multimedia`, the macOS bundle without `PlugIns/multimedia`) still records and plays; if not, the plugin must
-      ship.
+- [ ] Windows, macOS, Android: see "Recording on Windows, macOS and Android (qt/audio-platforms)" below.
 
 ## Quick note (qt/quick-note, qt/docs/quick-note.md)
 - [ ] Home screen at 1920×1080: the lightning beside New makes `Inbox/<date> <hh-mm>.xopp` in the library (the folder
@@ -3736,3 +3730,41 @@ On the Surface Pro 8 (Windows, Direct3D) and the Linux laptop (OpenGL), and on t
       outside the folder (in `_attached/`); recordings play after setting Xournal++'s audio folder to `name.audio`.
 - [ ] Plain PDFs: Acrobat, Preview and a phone viewer show the ink; a protected PDF still asks for its password.
 - [ ] A library copied by hand to another disk (times not kept): opening it reads nothing again.
+
+## Recording on Windows, macOS and Android (qt/audio-platforms, qt/docs/audio.md "Platforms")
+
+The packages carry Qt Multimedia without its media plugins (no FFmpeg): audio in and out should not need them. If a
+package cannot open the microphone or the speaker, that is the first thing to suspect (the release run's smoke test
+checks only that the library is there and the devices can be listed).
+
+- [ ] The release run: the Windows and macOS smoke tests pass their recording step (`audio-info.log`: "recording:
+      available (Qt Multimedia …)"); the configure logs say "recording is built"; the zip has `Qt6Multimedia.dll`
+      and no `multimedia\` folder or `avcodec-*.dll`; the `.dmg` has `QtMultimedia.framework` and no
+      `PlugIns/multimedia`; `unzip -l` of the APK shows `libQt6Multimedia_arm64-v8a.so` and no
+      `libplugins_multimedia_*`/`libavcodec*` (if androiddeployqt packed the plugins anyway, it costs size, not
+      function). Sizes against the release before.
+- [ ] Windows (Surface): `bin\xournal-qt.exe --audio-info` in a terminal lists the microphones. Record 30 s with the
+      built-in microphone and with a headset, write meanwhile, stop, play from a stroke: the voice at the right speed,
+      no crackle. Settings → Privacy & security → Microphone → "Let desktop apps access your microphone" off: a tap
+      on the record button says the microphone cannot be opened; on again: it records.
+- [ ] macOS: the first tap on the record button shows macOS's question with the app's text (Info.plist); "Allow":
+      the recording starts by itself. Record, play from a stroke. Then System Settings → Privacy & Security →
+      Microphone → Xournal Qt off; tap record: the dialog "The microphone is off for Xournal Qt" with the path; "Open
+      settings" opens that page; on again: the next tap records.
+- [ ] Android (Fold 7): the first tap on the record button asks for the microphone, then for notifications (Android
+      13+, once). "Allow" for the microphone: the recording starts by itself. "Don't allow": the dialog with "Settings
+      → Apps → Xournal Qt → Permissions → Microphone"; "Open settings" opens the app's page; allowed there, back in
+      the app the next tap records.
+- [ ] Android, while recording: the notification "Recording", the document's name and a running clock that matches
+      the pill; Pause in the notification: the pill pauses, the notification says "Recording paused · m:ss" with
+      Resume; Resume: the clock goes on from there (paused time not counted); Stop: the recording ends in the app,
+      the notification goes. Pause and resume in the app's pill: the notification follows.
+- [ ] Android, screen off: record, turn the screen off for two minutes (speak meanwhile), turn it on: the recording
+      has those two minutes without gaps (play them back). The same with the app in the background (another app in
+      front, then home screen) and with the phone folded. A tap on the notification brings the app back with the
+      pill.
+- [ ] Android: swipe the app away while recording: the notification goes; the file plays up to then. Without a
+      recording, the app in the background for an hour: no battery use shown for it (the event loop runs in the
+      background now, `android.app.background_running`).
+- [ ] Android: notifications refused (Android 13+): recording still works with the screen off; the recording shows in
+      the task manager's "active apps" instead of the drawer.

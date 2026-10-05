@@ -9,6 +9,9 @@
 #   2. exports that tell apart what fails: strokes to PNG (raster, no text), text to PDF (text, no raster), text to
 #      PNG (both), images to PDF (gdk-pixbuf), a PDF background to PDF (poppler, qpdf)
 #   3. the app off-screen: opens a library and a document, saves a screenshot of its window after 5 s, quits
+#   4. recording (qt/docs/audio.md, "Platforms"): QtMultimedia.framework is in the bundle and Qt's media plugins and
+#      FFmpeg's libraries are not; `xournal-qt --audio-info` says "recording: available" (it lists the devices
+#      without opening the microphone, so macOS asks for no permission)
 #
 # The CI hides Homebrew (/opt/homebrew) while this runs, so that a library missing from the bundle fails here and not
 # on a Mac without Homebrew.
@@ -159,6 +162,28 @@ if ! attempt app 300 "${app_env[@]}" "XQT_SCREENSHOT=$out/app.png" "$macos/xourn
     tail -n 300 "$out/app-plugins.log"
 fi
 expect_file app "$out/app.png"
+
+# --- Recording -------------------------------------------------------------------------------------------------------
+printf '\n=== recording: what the bundle has\n'
+if [[ -d "$app/Contents/Frameworks/QtMultimedia.framework" ]]; then
+    echo "QtMultimedia.framework is in the bundle"
+else
+    echo "::error::recording: no QtMultimedia.framework in the bundle"
+    failures=$((failures + 1))
+fi
+ffmpeg=$(find "$app/Contents" \( -path '*/PlugIns/multimedia/*' -o -name 'libavcodec*.dylib' \
+    -o -name 'libavformat*.dylib' -o -name 'libavutil*.dylib' \) | sort)
+if [[ -n "$ffmpeg" ]]; then
+    echo "::error::recording: media plugins or FFmpeg libraries in the bundle, which audio does not need:"
+    echo "$ffmpeg"
+    failures=$((failures + 1))
+fi
+if attempt audio-info 60 QT_QPA_PLATFORM=offscreen "$macos/xournal-qt" --audio-info; then
+    grep -q '^recording: available (Qt Multimedia' "$out/audio-info.log" ||
+        { echo "::error::audio-info: recording is not available through Qt Multimedia"; failures=$((failures + 1)); }
+else
+    failures=$((failures + 1))
+fi
 
 printf '\n=== %d failure(s)\n' "$failures"
 ((failures == 0))

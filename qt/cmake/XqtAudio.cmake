@@ -79,9 +79,13 @@ target_link_libraries(xqt-audio PUBLIC Qt6::Core xoj-core PRIVATE xqt-vorbis)
 set_target_properties(xqt-audio PROPERTIES AUTOMOC ON)
 
 # The microphone and the speaker through Qt Multimedia (QAudioSource / QAudioSink; no FFmpeg plugin needed: the files
-# are Ogg Vorbis by the codec above). Without it the app builds and runs, and does not offer recording;
-# XQT_FAKE_AUDIO=1 then gives fake devices (qt/src/audio/FakeAudio.h) to try the UI.
+# are Ogg Vorbis by the codec above, and since Qt 6.5 the audio devices are in the Qt Multimedia library itself, on
+# every platform: PulseAudio/PipeWire, WASAPI, Core Audio, AAudio/OpenSL ES). Without it the app builds and runs, and
+# does not offer recording; XQT_FAKE_AUDIO=1 then gives fake devices (qt/src/audio/FakeAudio.h) to try the UI.
+# The release packages for Windows, macOS and Android configure with XQT_REQUIRE_AUDIO=ON, so that a missing Qt
+# Multimedia fails their build instead of shipping without recording (qt/docs/releasing.md).
 option(XQT_AUDIO "Audio recordings: record and play through Qt Multimedia when it is found" ON)
+option(XQT_REQUIRE_AUDIO "Fail when Qt Multimedia is not found (release packages: they offer recording)" OFF)
 set(XQT_HAVE_QT_MULTIMEDIA OFF)
 if(XQT_AUDIO)
     find_package(Qt6 ${Qt6_VERSION} QUIET COMPONENTS Multimedia)
@@ -90,13 +94,17 @@ if(XQT_AUDIO)
     endif()
 endif()
 if(XQT_HAVE_QT_MULTIMEDIA)
-    message(STATUS "Audio recordings: Qt Multimedia ${Qt6Multimedia_VERSION}")
+    message(STATUS "Audio recordings: recording is built (Qt Multimedia ${Qt6Multimedia_VERSION})")
     target_sources(xqt-audio PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../src/audio/QtAudioDevice.cpp)
     target_link_libraries(xqt-audio PUBLIC Qt6::Multimedia)
     target_compile_definitions(xqt-audio PRIVATE XQT_HAVE_QT_MULTIMEDIA)
+elseif(XQT_REQUIRE_AUDIO)
+    message(FATAL_ERROR "Audio recordings: XQT_REQUIRE_AUDIO is on, but Qt6::Multimedia was not found (XQT_AUDIO="
+        "${XQT_AUDIO}). Install Qt Multimedia: qt6-multimedia-dev (Debian, Ubuntu), "
+        "mingw-w64-ucrt-x86_64-qt6-multimedia (MSYS2), qtmultimedia (Homebrew), aqt's -m qtmultimedia (Android).")
 else()
-    message(STATUS "Audio recordings: no Qt Multimedia (Qt6::Multimedia not found or XQT_AUDIO off): recording is not "
-        "offered; XQT_FAKE_AUDIO=1 uses fake devices")
+    message(STATUS "Audio recordings: recording is NOT built (Qt6::Multimedia not found or XQT_AUDIO off): the record "
+        "button is hidden; XQT_FAKE_AUDIO=1 uses fake devices")
 endif()
 
 if(XQT_BUILD_TESTS)

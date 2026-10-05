@@ -19,13 +19,15 @@
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
-    <!-- Audio recordings (qt/docs/audio.md): the microphone, asked for when the first recording starts, and the
-         foreground service that keeps it while the app is in the background, with its notification (Android 13 asks
-         for that; without it the service still runs, the notification is only in the drawer). -->
+    <!-- Audio recordings (qt/docs/audio.md, "Android"): the microphone, asked for when the first recording starts
+         (Qt's QMicrophonePermission), and the foreground service that keeps it while the app is in the background or
+         the screen is off, with its notification (Android 13+ asks for that once, at the first recording; without it
+         the service still runs and shows only in the task manager) and a partial wake lock while it runs. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- %%INSERT_FEATURES -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen.multitouch" android:required="false" />
@@ -126,9 +128,16 @@
             <meta-data
                 android:name="android.app.arguments"
                 android:value="-- %%INSERT_APP_ARGUMENTS%% --" />
+            <!-- Qt's event loop keeps running when the app goes to the background (Qt blocks it otherwise): a
+                 recording takes the microphone's samples on it, and would stop with the screen off (qt/docs/audio.md,
+                 "Android"). The window draws nothing meanwhile (it is not exposed); without a foreground service
+                 Android freezes an app in the background anyway. -->
+            <meta-data
+                android:name="android.app.background_running"
+                android:value="true" />
         </activity>
 
-        <!-- A recording going on in the background (RecordingService.java) -->
+        <!-- A recording going on in the background, with its notification (RecordingService.java) -->
         <service
             android:name="org.xournalqt.app.RecordingService"
             android:exported="false"

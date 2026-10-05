@@ -49,10 +49,11 @@ jobs:
           set -euo pipefail
           brew update --quiet || true
           # qtbase has macdeployqt; qtdeclarative the QML modules (Controls, Dialogs, Layouts, ...); qtsvg the SVG
-          # icons. librsvg only draws the program icon for the .icns. No KSyntaxHighlighting in Homebrew: code blocks
-          # in Markdown are not highlighted (it is optional).
+          # icons; qtmultimedia the microphone and the speaker of the recordings (its media plugins and FFmpeg stay out
+          # of the bundle, qt/scripts/macos-deploy.sh). librsvg only draws the program icon for the .icns. No
+          # KSyntaxHighlighting in Homebrew: code blocks in Markdown are not highlighted (it is optional).
           brew install cmake ninja ccache pkgconf gettext glib cairo pango fontconfig poppler libzip qpdf gdk-pixbuf \
-            qtbase qtdeclarative qtsvg qtshadertools librsvg
+            qtbase qtdeclarative qtsvg qtshadertools qtmultimedia librsvg
 
       - name: What was installed
         run: |
@@ -63,7 +64,7 @@ jobs:
           clang --version | head -1
           cmake --version | head -1
           ccache --version | head -1
-          brew list --versions qtbase qtdeclarative qtsvg glib cairo pango poppler qpdf libzip gdk-pixbuf gettext \
+          brew list --versions qtbase qtdeclarative qtsvg qtmultimedia glib cairo pango poppler qpdf libzip gdk-pixbuf gettext \
             fontconfig librsvg || true
           echo "Qt tools:"
           command -v qtpaths6 qtpaths macdeployqt macdeployqt6 || true
@@ -91,7 +92,7 @@ jobs:
           cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
             "-DCMAKE_C_FLAGS_RELEASE=-O2 -g1 -DNDEBUG" "-DCMAKE_CXX_FLAGS_RELEASE=-O2 -g1 -DNDEBUG" \
             "-DCMAKE_PREFIX_PATH=$(brew --prefix)" "-DCMAKE_OSX_DEPLOYMENT_TARGET=$target" \
-            -DXQT_BUILD_TESTS=OFF -DXQT_BUILD_SPIKES=OFF -DXQT_BUILD_CLI=ON \
+            -DXQT_BUILD_TESTS=OFF -DXQT_BUILD_SPIKES=OFF -DXQT_BUILD_CLI=ON -DXQT_REQUIRE_AUDIO=ON \
             2>&1 | tee build-logs/configure.log
 
       - name: Build

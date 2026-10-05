@@ -59,8 +59,9 @@ and the app need is a Homebrew bottle, so nothing is compiled but the app:
 - `qpdf` 12.4 (12 or newer is what [XqtQpdf.cmake](../cmake/XqtQpdf.cmake) asks for). The Linux packages compile a
   pinned qpdf into the program because the distributions have old ones; Homebrew's is current, so on macOS, as on
   Windows and Android, the package manager's qpdf is used (`XQT_SYSTEM_QPDF` is on by default for Apple);
-- Qt 6.11 as Homebrew's split formulas `qtbase` (it has `macdeployqt`), `qtdeclarative` (the QML modules) and
-  `qtsvg` (the SVG icons), not the `qt` formula that pulls in every Qt module;
+- Qt 6.11 as Homebrew's split formulas `qtbase` (it has `macdeployqt`), `qtdeclarative` (the QML modules),
+  `qtsvg` (the SVG icons) and `qtmultimedia` (the microphone and the speaker of the audio recordings,
+  [audio.md](audio.md)), not the `qt` formula that pulls in every Qt module;
 - `librsvg` only to draw the program icon ([qt/packaging/xournal-qt.svg](../packaging/xournal-qt.svg)) into the
   `.icns`;
 - libxml2 and zlib come with macOS.
@@ -73,8 +74,9 @@ The workflow's steps:
 1. **Homebrew** installs the packages above; the step after it prints the versions, where Qt's tools are and whether
    gdk-pixbuf has loader modules.
 2. **Configure**: `cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$(brew --prefix)
-   -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 -DXQT_BUILD_TESTS=OFF -DXQT_BUILD_SPIKES=OFF -DXQT_BUILD_CLI=ON` (the
-   deployment target is the runner's macOS, the one Homebrew's bottles are built for).
+   -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 -DXQT_BUILD_TESTS=OFF -DXQT_BUILD_SPIKES=OFF -DXQT_BUILD_CLI=ON
+   -DXQT_REQUIRE_AUDIO=ON` (the deployment target is the runner's macOS, the one Homebrew's bottles are built for;
+   without Qt Multimedia the configure step fails rather than build a `.dmg` without recording).
 3. **Build** with ccache (its folder is cached between runs), `ninja -k 0`: one run lists every file that does not
    compile, repeated in the run's summary.
 4. **Bundle and disk image** ([qt/scripts/macos-deploy.sh](../scripts/macos-deploy.sh)):
@@ -87,6 +89,9 @@ The workflow's steps:
      `Contents/Frameworks`, with their references rewritten. Three plugins are added by hand (and handed to
      macdeployqt with `-executable`): the off-screen platform for scripted runs, and the SVG image and icon plugins
      (the program does not link Qt Svg itself);
+   - Qt Multimedia's media plugins (`PlugIns/multimedia`: FFmpeg's and AVFoundation's players, which macdeployqt
+     adds because the program links Qt Multimedia) are removed again, with every library only they used (FFmpeg and
+     its codecs): the recordings need only `QtMultimedia.framework`, whose audio devices use Core Audio;
    - what macdeployqt leaves out: Homebrew's libraries name some of their own through `@rpath` with an rpath like
      `@loader_path/../lib` (`libpoppler-glib` → `libpoppler`, `libbrotlidec` → `libbrotlicommon`, `libwebp` →
      `libsharpyuv`), which macdeployqt neither copies nor rewrites (CI run 1: the app did not start). The script points
@@ -106,7 +111,9 @@ The workflow's steps:
    from the bundle fails here and not on a Mac without Homebrew: the CLI's `--version`; exports that tell apart what
    fails (strokes to PNG, text to PDF, text to PNG, images to PDF, a PDF background to PDF); then the app, off-screen
    with Qt Quick's software renderer, opening a library and a document and saving a screenshot of its window after
-   5 s (`app.png` in the artifact `smoke-test-macos-arm64`). A step that fails runs again under **lldb**
+   5 s (`app.png` in the artifact `smoke-test-macos-arm64`); last, recording: `QtMultimedia.framework` is in the
+   bundle, no media plugin and no FFmpeg library is, and `xournal-qt --audio-info` says "recording: available (Qt
+   Multimedia …)" (it lists the devices without opening the microphone, so macOS asks nothing). A step that fails runs again under **lldb**
    (`<step>.lldb.log`: the backtraces of every thread; the build has `-g1`).
 
 ### Why macOS 15, and not older Macs
@@ -143,6 +150,10 @@ An Intel build would need the libraries from elsewhere, as for older macOS versi
   (untested).
 - **Session recovery** asks the kernel for the name of a process (`proc_name`) instead of `/proc`.
 - **Show in Finder**: `open -R` (SystemApps.cpp). No D-Bus.
+- **The microphone** ([audio.md](audio.md), "macOS"): macOS asks the first time a recording starts, with the text of
+  `NSMicrophoneUsageDescription` in `Info.plist`; refused, a dialog says where to allow it and opens System Settings →
+  Privacy & Security → Microphone. With the hardened runtime (signing, below) the entitlement
+  `com.apple.security.device.audio-input` is needed as well.
 
 ## What is missing
 
@@ -162,7 +173,7 @@ Needed for a first start without "Open Anyway", and for Gatekeeper to trust upda
    bundle), instead of the ad-hoc signature:
    `codesign --force --options runtime --timestamp --entitlements xournal-qt.entitlements --sign "Developer ID
    Application: <name> (<team id>)" …`. The entitlements must include `com.apple.security.cs.allow-jit` (the QML
-   engine's JIT) and probably `com.apple.security.cs.disable-library-validation` only if a plugin from outside the
+   engine's JIT), `com.apple.security.device.audio-input` (the recordings' microphone) and probably `com.apple.security.cs.disable-library-validation` only if a plugin from outside the
    bundle is ever loaded (not now). `macdeployqt -codesign=<identity> -hardened-runtime -timestamp` can do the signing
    part.
 5. **Notarize** the signed `.dmg`: `xcrun notarytool submit xournal-qt.dmg --key <p8> --key-id <id> --issuer <issuer>

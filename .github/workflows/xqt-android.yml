@@ -32,6 +32,7 @@ jobs:
       VCPKG_BINARY_CACHE: ${{ github.workspace }}/.ci/vcpkg-archives
       XQT_ANDROID_BUILD: ${{ github.workspace }}/.ci/build-android
       XQT_JOBS: 4
+      XQT_REQUIRE_AUDIO: 'ON'  # (recording: a Qt without Qt Multimedia fails the build, qt/docs/audio.md)
     steps:
       - uses: actions/checkout@v4
 
@@ -64,7 +65,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.ci/Qt
-          key: xqt-android-qt-${{ env.QT_VERSION }}
+          # (-multimedia: the Qt for Android of the cache before had no Qt Multimedia)
+          key: xqt-android-qt-${{ env.QT_VERSION }}-multimedia
 
       - name: Qt for the desktop (host tools) and for Android
         if: steps.qt-cache.outputs.cache-hit != 'true'
@@ -72,7 +74,9 @@ jobs:
           set -euo pipefail
           pipx install aqtinstall
           aqt install-qt linux desktop "$QT_VERSION" linux_gcc_64 -O "$GITHUB_WORKSPACE/.ci/Qt"
-          aqt install-qt linux android "$QT_VERSION" android_arm64_v8a -O "$GITHUB_WORKSPACE/.ci/Qt"
+          # Qt Multimedia for the recordings (qt/docs/audio.md): the audio devices only; its media plugins are left
+          # out of the APK (qt/cmake/XqtAndroid.cmake)
+          aqt install-qt linux android "$QT_VERSION" android_arm64_v8a -m qtmultimedia -O "$GITHUB_WORKSPACE/.ci/Qt"
 
       - name: vcpkg at the manifest's baseline
         run: |

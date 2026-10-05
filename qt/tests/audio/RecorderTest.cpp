@@ -149,6 +149,24 @@ TEST_F(RecorderTest, theTimerDrivesTheFakeMicrophone) {
     EXPECT_GE(durationMsOf(file("timed.ogg")), 300);
 }
 
+/// `xournal-qt --audio-info` (the CI's smoke tests of the Windows and macOS packages look for "recording: available"):
+/// the backend in its first line, and with Qt Multimedia the devices the system has (none in a container is fine).
+TEST_F(RecorderTest, theDescriptionSaysWhatRecordingRunsOn) {
+    EXPECT_EQ(describe(), "recording: available (fake devices, XQT_FAKE_AUDIO=1)\n");
+    useNoDevices(true);
+    EXPECT_EQ(describe().rfind("recording: not offered", 0), 0u) << describe();
+    useNoDevices(false);
+    useFakeDevices(false);
+    const std::string d = describe();
+    if (builtWithQtMultimedia()) {
+        EXPECT_EQ(d.rfind("recording: available (Qt Multimedia, Qt ", 0), 0u) << d;
+        EXPECT_NE(d.find("\nmicrophones: "), std::string::npos) << d;
+        EXPECT_NE(d.find("\nspeakers: "), std::string::npos) << d;
+    } else {
+        EXPECT_EQ(d, "recording: not offered (this build has no Qt Multimedia)\n");
+    }
+}
+
 /// The real microphone (a machine with one; XQT_AUDIO_DEVICE=1): one second of sound.
 TEST_F(RecorderTest, theRealMicrophone) {
     useFakeDevices(false);
