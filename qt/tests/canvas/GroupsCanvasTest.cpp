@@ -366,3 +366,46 @@ TEST_F(GroupsCanvasTest, groupsInACopiedSelectionOfNotesAndElements) {
     EXPECT_NE(groups[2], 4u);
 }
 
+// --- stickers ----------------------------------------------------------------------------------------------------
+
+// A sticker is pasted as a group: a tap on any of its strokes selects all of it; it can be ungrouped
+TEST_F(GroupsCanvasTest, aPastedStickerIsAGroup) {
+    sticky::Group content;
+    auto s1 = std::make_unique<Stroke>();
+    s1->setToolType(StrokeTool::PEN);
+    s1->setWidth(2);
+    s1->addPoint(Point(10, 10));
+    s1->addPoint(Point(60, 10));
+    auto s2 = s1->cloneStroke();
+    s2->move(0, 40);
+    auto s3 = s1->cloneStroke();
+    s3->move(0, 80);
+    s3->setGroup(9);  // (a group inside the sticker gives way: groups are flat)
+    content.elements.push_back(std::move(s1));
+    content.elements.push_back(std::move(s2));
+    content.elements.push_back(std::move(s3));
+    content.markdown = {false, false, false};
+    content.bounds = xoj::util::Rectangle<double>(10, 10, 50, 80);
+    auto doc = stickers::makeDocument(std::move(content), Color(0xffffffU));
+    const fs::path file = fs::path(tmp.filePath("Lines.xopp").toStdString());
+    ASSERT_TRUE(stickers::write(*doc, file));
+    auto read = stickers::read(file);
+    ASSERT_TRUE(read);
+    ASSERT_TRUE(view->pasteSticker(stickers::clipboardBytes(*read)));
+    EXPECT_EQ(selected().size(), 3u) << "pasted selected";
+    EXPECT_TRUE(view->groupState().oneGroup) << "one group: its pill offers Ungroup";
+    view->clearSelection();
+    const auto groups = groupsOnPage();
+    ASSERT_EQ(groups.size(), 3u);
+    EXPECT_NE(groups[0], 0u);
+    EXPECT_EQ(groups, (std::vector<uint32_t>{groups[0], groups[0], groups[0]}));
+    // A tap on one of its strokes selects it all
+    app->getToolHandler()->selectTool(TOOL_SELECT_RECT);
+    const Element* first = layer()->getElementsView().front();
+    const auto box = first->getBoundingBox();
+    tap(0, QPointF(box.x + box.width / 2, box.y + box.height / 2));
+    EXPECT_EQ(selected().size(), 3u);
+    ASSERT_TRUE(view->ungroupSelection());
+    view->clearSelection();
+    EXPECT_EQ(groupsOnPage(), (std::vector<uint32_t>{0, 0, 0}));
+}

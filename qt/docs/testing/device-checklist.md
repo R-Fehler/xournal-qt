@@ -2929,3 +2929,7 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
 - [ ] Copy a group here and paste it into Xournal++ (running at the same time): pasted, ungrouped, nothing missing.
       Copy in Xournal++ and paste here: pasted, ungrouped.
 - [ ] Several sticky notes with a grouped figure (Select more), copied and pasted: the figure is still a group.
+- [ ] Paste a sticker from the picker: a tap on any of its strokes selects the whole sticker; the pill shows Ungroup.
+      Ungroup: its strokes are selected one by one again. Ctrl+V right after saving a sticker: pasted as a group too.
+- [ ] A sticker with ink and a Markdown box: the ink is one group, the Markdown box(es) another (they are in two
+      layers).

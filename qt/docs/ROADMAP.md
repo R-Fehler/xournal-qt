@@ -811,6 +811,13 @@
   folder. Card menu: rename, reorder, move, open, copy to all libraries / another library, delete
   ([stickers.md](stickers.md)).
 
+- **Groups, `qt/groups` (2026-10-05).** Ctrl+G groups the selected elements, Ctrl+Shift+G ungroups them (the
+  selection pill's Group / Ungroup buttons; a selection that is one group shows Ungroup in Group's place), one undo
+  step each. A tap, rectangle or lasso that reaches any member, and Select more, take the whole group. Pasted stickers
+  are groups. Stored as the element attribute `xqt-group` (a small upstream seam; Xournal++ ignores it and drops it
+  when it saves); upstream's clipboard data unchanged, the groups beside it in `application/x-xournal-qt-groups`;
+  pasted and moved groups get new numbers so groups never merge ([groups.md](groups.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
