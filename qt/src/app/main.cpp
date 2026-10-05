@@ -37,6 +37,7 @@
 #include "hwr/HandwritingSearch.h"
 #include "hwr/ModelInfo.h"
 #ifdef XQT_HWR_ONNX
+#include "hwr/CtcRecognizer.h"
 #include "hwr/TrocrRecognizer.h"
 #endif
 #include "EmojiFont.h"
@@ -214,11 +215,11 @@ int main(int argc, char* argv[]) {
     QQuickStyle::setStyle("Material");
     xqt::registerQuickTypes();
 #ifdef XQT_HWR_ONNX
-    // The handwriting search's recognisers, by their manifests' kind: TrOCR in ONNX Runtime (loaded only when the
-    // search is switched on); a folder without a model gets TrOCR's, which says what is missing
+    // The handwriting search's recognisers, by their manifests' kind: TrOCR or a CTC model in ONNX Runtime (loaded
+    // only when the search is switched on); a folder without a model gets TrOCR's, which says what is missing
     xqt::hwr::HandwritingSearch::setFactory([](const QString& dir) -> std::shared_ptr<xqt::hwr::Recognizer> {
         if (xqt::hwr::ModelInfo::read(dir).kind == QLatin1String("ctc")) {
-            return nullptr;
+            return std::make_shared<xqt::hwr::CtcRecognizer>(dir);
         }
         return std::make_shared<xqt::hwr::TrocrRecognizer>(dir);
     });

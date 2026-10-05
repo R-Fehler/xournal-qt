@@ -2816,6 +2816,10 @@ scripted models (`xqt-hwr-tests`); the steps below need the real models.
 - [ ] "English" only, then "German" only: the other model's row says its language is not read; nothing is
       downloaded or removed by switching. A model that reads both languages (`languages` ["de", "en"]) in
       `~/.local/share/xournal-qt/models/<name>/` serves both rows ("Read by <name>").
+- [ ] A CTC model of the training block (`qt/research/hwr/train`, `kind` "ctc") chosen as the German model: German
+      handwriting (umlauts, ß) is found by Ctrl+F; `XQT_HWR_MODEL_DE=<folder> XQT_ONNXRUNTIME=<the .so>
+      build-qt/xqt-hwr-tests --gtest_filter='Ctc*'` passes. A line wider than the model's `max_width` (a long
+      line on a landscape page) is still found word by word.
 - [ ] With `XQT_HWR_MODEL_DE=<folder>` the German row says the model is that folder and offers neither download nor
       removal.
 
