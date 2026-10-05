@@ -69,7 +69,9 @@ def evaluate(model_path: str | Path, lines, device: str = "cpu", topk: int | Non
             shown.append({"id": l.id, "truth": l.text, "readings": [[t, round(p, 3)] for t, p in readings]})
         if progress and (n + 1) % 100 == 0:
             print(f"  {n + 1}/{len(lines)}", flush=True)
-    return {"model": getattr(rec, "name", str(model_path)), "path": str(model_path), "kind": rec.kind,
+    runtime = "onnx" if (Path(os.path.expanduser(str(model_path))) / "model.json").exists() else "pytorch"
+    return {"model": f"{getattr(rec, 'name', Path(str(model_path)).name)} ({runtime})", "path": str(model_path),
+            "kind": rec.kind, "runtime": runtime,
             "languages": getattr(rec, "languages", []), "lines": len(lines),
             "seconds_per_line": round(spent / max(1, len(lines)), 4), "groups": g.table(), "samples": shown}
 

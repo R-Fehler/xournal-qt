@@ -83,3 +83,4 @@ def test_exported_folders_evaluate_through_onnxruntime(exported, data_root, tmp_
                    "--data-root", str(data_root), "--max-lines", "3", "--out", str(tmp_path / "rep")])
     d = json.loads((tmp_path / "rep.json").read_text())
     assert [m["kind"] for m in d["models"]] == ["ctc", "trocr"]
+    assert all(m["runtime"] == "onnx" and m["model"].endswith(" (onnx)") for m in d["models"])

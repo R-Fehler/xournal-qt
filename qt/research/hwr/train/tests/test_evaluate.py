@@ -35,7 +35,7 @@ def test_evaluate_checkpoints_and_compare(trained, data_root, tmp_path, capsys):
         assert any(k.startswith("writer:synthetic-de/font:") for k in g)
         assert g["all"]["lines"] == 8 and r["seconds_per_line"] > 0
     md = out.with_suffix(".md").read_text()
-    assert "| all | tiny-trocr |" in md and "words_found" in md
+    assert "| all | tiny-trocr (pytorch) |" in md and "words_found" in md
     # from saved reports
     evaluate.main(["compare", "--reports", str(out.with_suffix(".json")), "--out", str(tmp_path / "again")])
     assert (tmp_path / "again.md").read_text() == md
