@@ -132,6 +132,46 @@ editing from then on without asking; the accepted files are listed in the config
 (`~/.config/xournal-qt/edit-as-text.json`, the last 500). A file that is not UTF-8, is over 2 MB or cannot be
 written says why and stays read-only.
 
+## Find and replace
+The search bar (Ctrl+F) has a second row for replacing wherever text can be written: a `.md` or `.txt` that is
+edited, a PDF text document, and notes with Markdown text on their pages (the page's text, Markdown text boxes,
+sticky notes' texts). **Ctrl+H**, the bar's replace button (beside ✕) or ⋮ → **Find and replace** open it, with the
+cursor in the search field (in the replace field when there is a text to find). Documents shown read-only (a file that
+cannot be written, a code file before "Edit anyway"), PDFs and notes without Markdown text, and reading mode have no
+replace row: there Ctrl+H opens the search alone. With the toolbox the search is a command of a text document's format
+bar (qt/docs/toolbox.md); find and replace adds no button to that bar's ladder, only the row, the bar's button and the
+⋮ entry.
+- **Options**, in the row; the search takes them while the row is shown (its marks and count follow at once; never the
+  fuzzy syntax then, the Fuzzy toggle is hidden): **Aa** match case, **ab** whole words (not next to a letter or
+  digit), **.\*** a regular expression (Perl syntax; in the replacement `$1`…`$99`, `${name}` and `\1`…`\9` are its
+  groups, `\n` a line break, `\t` a tab, `$$` and `\\` a dollar sign and a backslash). An expression that is not valid
+  is not searched; the bar says why (in red, the tool tip has the whole reason). Closing the bar ends them.
+- **Replace** (Enter in the replace field) replaces the current hit and makes the next one current, scrolled to;
+  without a current hit the first from the page in view is shown first. **All** (Ctrl+Enter) replaces every match in
+  the document as one undo step; a snackbar says how many, with Undo.
+- What is replaced is the **source**, the Markdown as written; the search finds the text as it is shown. Replace takes
+  the match of the source that is drawn where the current hit is: a bold `**cat**`, a heading, a link's text, inline
+  code are replaced inside their marks. A hit without such a match is passed over and the next one becomes current
+  (the snackbar says so): PDF text, handwriting, a plain text box of Xournal++, or a phrase across formatting (`a **b**`
+  searched as "a b"). The source is matched as close to the search as a source allows: case-insensitive unless asked,
+  the query trimmed, a space in it matching the line break between the lines of a paragraph (not a blank line). The
+  app's own comments (`<!-- xqt:… -->`: bookmarks, continued pages) are never changed; text on hidden layers neither.
+- While text is written on the page and only that text has matches, Replace and All are steps of the text being
+  written (Ctrl+Z in it; the cursor stays in it). Otherwise the writing ends first and the replacement is an undo step
+  of the document: All over several texts (a text over many pages, boxes, notes) is one step, and a text that grows
+  gets pages as when typing (undo takes them away again).
+- **The source beside the page** (the Markdown panel): while it is open, Replace and All work on its text: Replace
+  replaces the selection when it is a match and selects the next one (from the top again after the last), All
+  replaces every match in it; each is one undo step of the source, the keys stay in the bar, and the page follows as
+  when typing (Cancel in the panel drops them with the rest).
+
+Code: `qt/src/session/TextReplace.*` (the matches in a source, the replacement's groups), `TextMatch.*` (the search's
+options, `CaseSensitive` and `Regex`), `qt/src/canvas/FindReplace.*` (the texts of a document, Replace all as one undo
+step, the current hit to its match by where both are drawn: `md::sourceRects`), `MarkdownSession::beginText`,
+`qt/src/app/AppReplace.cpp`, `AppController::replaceInSource` (`AppMarkdownFormat.cpp`), `qml/SearchBar.qml`. Tests:
+`TextReplace.*`, `TextMatch.optionsOfTheFindAndReplaceBar`, `DocumentSearchTest.optionsOfTheFindAndReplaceBar`
+(`-L session`), `FindReplaceTest.*` (`-L canvas`), `MainWindowTest.findAndReplaceInAMarkdownFile` (`-L ui`).
+
 ## Saving
 - Save (Ctrl+S, the save button, the question when closing) writes the text back to the file, in the background
   like every save. Unchanged text is written byte for byte as it was:

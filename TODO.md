@@ -586,8 +586,10 @@ The other ideas (A3–A9, A15, B1–B8) stay in that file to decide later.
   becomes a line, circle, ellipse, rectangle or triangle through upstream's shape recogniser, undoable in one step
   back to the freehand stroke; a setting) and **scratch out to erase** (a quick zigzag over ink deletes what it
   crosses, opt-in, one undo step; a zigzag over nothing stays a stroke).
-- [ ] `qt/md-find-replace` (A10): find and replace in `.md` files, text documents and Markdown boxes (case, whole
-  word, replace one / all, one undo step for "all"). After `qt/toolbox` (the Markdown bar).
+- [x] `qt/md-find-replace` (A10): find and replace in `.md` files, text documents and Markdown boxes (case, whole
+  word, replace one / all, one undo step for "all"). After `qt/toolbox` (the Markdown bar). Done 2026-10-05
+  (qt/docs/md-editor.md, "Find and replace"); left: replacing in plain (non-Markdown) text boxes of Xournal++, and a
+  phrase across formatting marks ("a **b**") is passed over.
 - [ ] `qt/quick-note` (A11): one tap (home screen, toolbox, tray/launcher shortcut on Android), a shortcut and
   `xournal-qt --quick-note` make a new note in the library's `Inbox/` named by date and time, in the document mode
   chosen (or append to today's `Inbox/<date>.md`, a setting).
