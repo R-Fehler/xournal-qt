@@ -55,7 +55,6 @@ Pane {
         ToolTip.delay: 600
     }
     onReplaceShownChanged: app.replacing = replaceShown
-    Component.onDestruction: app.replacing = false
 
     function openBar() {
         open = true
