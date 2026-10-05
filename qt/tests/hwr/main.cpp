@@ -16,6 +16,7 @@ int main(int argc, char* argv[]) {
     qputenv("XDG_CACHE_HOME", (home.path() + "/cache").toUtf8());
     qputenv("XDG_CONFIG_HOME", (home.path() + "/config").toUtf8());
     qputenv("XDG_DATA_HOME", (home.path() + "/data").toUtf8());
+    qputenv("QT_QPA_PLATFORM", "offscreen");  // (also when the build lists the tests: CI machines have no display)
     QGuiApplication app(argc, argv);
     setlocale(LC_NUMERIC, "C");
     xqt::AppContext::installQtUiThreadDispatcher();
