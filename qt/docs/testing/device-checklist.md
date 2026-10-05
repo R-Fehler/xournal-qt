@@ -2985,3 +2985,27 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
 - [ ] First start after the update: the toolbox's first pen has the pen's color and width of before; the eraser
       erases as it did (standard, whiteout or whole strokes); the text box has the font of before.
 - [ ] Restart: the tool in hand is the entry taken last, with its color and width.
+
+## Find and replace (qt/md-find-replace)
+
+- [ ] A `.md` (and a `.txt`): Ctrl+H opens the search bar with a second row (replace with, Aa, ab, .*, Replace, All);
+      ⋮ → "Find and replace" and the bar's replace button do the same; the button again hides the row.
+- [ ] Type a word, Enter: the hits are marked as in the search. Ctrl+H again (or a tap) to the replace field, type,
+      Enter: the marked hit is replaced, the view goes to the next one; again and again to the last; Ctrl+Z undoes
+      them one by one.
+- [ ] "All" (or Ctrl+Enter): every match over all pages at once, the pages follow (a text that grows gets pages); the
+      snackbar says how many; its Undo (or Ctrl+Z once) brings all of them back.
+- [ ] Aa: "Cat" is no longer found for "cat". ab: "concatenation" is no longer found for "cat". .*: `(\d+)-(\d+)` with
+      `$2/$1` swaps the numbers; `(` shows a red hint (its tool tip says why) and finds nothing.
+- [ ] A word in bold, in a heading, in a link text, in inline code: replaced in place, the formatting stays.
+- [ ] While writing on the page (the cursor in the text): Replace and All work, the cursor stays in the text, Ctrl+Z in
+      the text undoes them.
+- [ ] A PDF text document and notes with Markdown text boxes and a sticky note with text: All changes them all (one
+      Ctrl+Z); a hit in the PDF's own text is passed over ("Skipped …"), never changed; ink and plain text boxes stay.
+- [ ] The source beside the page (Markdown panel) open: Replace selects the next match in the source (the bar keeps the
+      keys), Replace again replaces it; All replaces in the source; the page follows; Cancel in the panel drops them.
+- [ ] A PDF without Markdown text, a read-only text file (a code file before "Edit anyway"), reading mode (⋮ → View →
+      Read): Ctrl+H opens only the search; no replace button, no ⋮ entry.
+- [ ] Phone (Fold 7 folded): the bar's two rows fit, the field gives way, the buttons are big enough for a finger; the
+      soft keyboard stays up while replacing one by one.
+- [ ] After closing the bar (Esc), the search is the usual one again (the Fuzzy toggle is back).

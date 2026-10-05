@@ -703,6 +703,71 @@ TEST_F(MainWindowTest, searchBarFindsAndSteps) {
     EXPECT_EQ(controller->searchQuery(), "");
 }
 
+// Find and replace (qt/docs/md-editor.md, "Find and replace"): Ctrl+H opens the search bar with its replace row in a
+// .md; Enter replaces the current hit and goes to the next, Ctrl+Enter replaces all (one undo step, a snackbar with
+// how many and Undo); the options are the search's while the row is shown. A document without text that can be written
+// has no replace row and no ⋮ entry.
+TEST_F(MainWindowTest, findAndReplaceInAMarkdownFile) {
+    QTemporaryDir dir;
+    const fs::path file = fs::path(dir.path().toStdString()) / "cats.md";
+    std::ofstream(file, std::ios::binary) << "# Cats\n\nOne cat, two Cats, a concatenation and a cat.\n";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(file.string())));
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    ASSERT_NE(s, nullptr);
+    EXPECT_TRUE(controller->canReplace());
+    auto* bar = find<QQuickItem>("searchBar");
+    auto* row = findItem("replaceRow");
+    ASSERT_NE(bar, nullptr);
+    ASSERT_NE(row, nullptr);
+
+    key(Qt::Key_H, Qt::ControlModifier);
+    ASSERT_TRUE(bar->isVisible());
+    EXPECT_TRUE(row->isVisible());
+    EXPECT_TRUE(controller->replacing());
+    EXPECT_TRUE(find<QQuickItem>("searchField")->hasActiveFocus()) << "nothing to find yet: the search field";
+    type("cat");
+    key(Qt::Key_Return);
+    ASSERT_TRUE(waitFor([&] { return controller->searchHitCount() == 5 && !controller->searchRunning(); }));
+    click(findItem("replaceWholeWord"));
+    EXPECT_TRUE(controller->searchWholeWord());
+    ASSERT_TRUE(waitFor([&] { return controller->searchHitCount() == 2; })) << "whole words: cat, cat";
+    click(findItem("replaceCaseSensitive"));
+    click(findItem("replaceWholeWord"));
+    ASSERT_TRUE(waitFor([&] { return controller->searchHitCount() == 3; })) << "case: not Cats";
+
+    key(Qt::Key_H, Qt::ControlModifier);  // (again: the field to replace with)
+    auto* replaceField = find<QQuickItem>("replaceField");
+    ASSERT_NE(replaceField, nullptr);
+    EXPECT_TRUE(replaceField->hasActiveFocus());
+    type("dog");
+    key(Qt::Key_Return);  // the current hit, then the next
+    EXPECT_EQ(s->currentText(), "# Cats\n\nOne dog, two Cats, a concatenation and a cat.\n");
+    ASSERT_TRUE(waitFor([&] { return controller->searchHitCount() == 2; }));
+    key(Qt::Key_Return, Qt::ControlModifier);  // all of them, one undo step
+    EXPECT_EQ(s->currentText(), "# Cats\n\nOne dog, two Cats, a condogenation and a dog.\n");
+    auto* snackbarText = findItem("snackbarText");
+    ASSERT_NE(snackbarText, nullptr);
+    until([&] { return find<QQuickItem>("snackbar")->isVisible(); });
+    EXPECT_TRUE(snackbarText->property("text").toString().contains("2")) << snackbarText->property("text").toString().toStdString();
+    controller->undo();
+    EXPECT_EQ(s->currentText(), "# Cats\n\nOne dog, two Cats, a concatenation and a cat.\n");
+
+    // Closed: the search is plain again
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(bar->isVisible());
+    EXPECT_FALSE(controller->replacing());
+
+    // A document without Markdown text: the search alone
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    EXPECT_FALSE(controller->canReplace());
+    key(Qt::Key_H, Qt::ControlModifier);
+    EXPECT_TRUE(bar->isVisible());
+    EXPECT_FALSE(row->isVisible());
+    EXPECT_FALSE(controller->replacing());
+    EXPECT_FALSE(findItem("replaceToggle")->isVisible());
+    key(Qt::Key_Escape);
+}
+
 TEST_F(MainWindowTest, tabOverviewSearchesAllDocuments) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     ASSERT_TRUE(controller->openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));

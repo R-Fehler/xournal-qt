@@ -38,3 +38,6 @@ rounded hole: the spotlight) are drawn in the same style.
 `xqt-snip` is Lucide's `scissors`: the snip tool (copy the picture of a part of a page, qt/docs/snip.md).
 
 `xqt-sticker` is Lucide's `sticker` (a sheet with a peeled corner and a smile): the sticker tool (qt/docs/stickers.md).
+
+`xqt-replace` (a dashed box, an arrow down to a solid one: find and replace, qt/docs/md-editor.md) is drawn in the same
+style, after Lucide's `replace`.

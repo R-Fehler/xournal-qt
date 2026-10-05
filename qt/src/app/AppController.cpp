@@ -1038,7 +1038,8 @@ void AppController::setSearchQuery(const QString& query) {
     if (session()) {
         // In the mode the search bar shows: a search refined here keeps its mode (also one handed over from the
         // library), a new one takes the setting
-        session()->search().setQuery(query, true, searchFuzzy() && !query.isEmpty());
+        // (with the replace row: plain, with its options)
+        session()->search().setQuery(query, true, !replaceRow && searchFuzzy() && !query.isEmpty(), searchOptions());
     }
 }
 bool AppController::searchFuzzy() const {
