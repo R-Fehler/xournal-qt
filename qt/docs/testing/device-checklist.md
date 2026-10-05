@@ -2855,3 +2855,10 @@ offered).
 - [ ] "Recordings of this document…": pages, length, ink count; play; remove (the ink stays; Ctrl+Z brings it back).
 - [ ] With a pen on the Surface and the iPad: the record button and the pills are easy to hit; writing while
       recording feels the same as without (no lag from the encoder).
+- [ ] Android: the first recording asks for the microphone; refused: the message, nothing recorded. Allowed: record,
+      switch to another app for a minute, come back: the notification was there, the recording has that minute.
+      Swipe the app away while recording: the notification goes; the file plays up to then.
+- [ ] macOS: the first recording asks for the microphone with the app's text (Info.plist).
+- [ ] Windows, macOS, Android: a package without Qt Multimedia's FFmpeg plugin (`windeployqt --skip-plugin-types
+      multimedia`, the macOS bundle without `PlugIns/multimedia`) still records and plays; if not, the plugin must
+      ship.

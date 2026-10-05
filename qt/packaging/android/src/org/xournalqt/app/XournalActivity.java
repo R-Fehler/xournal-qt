@@ -161,6 +161,23 @@ public class XournalActivity extends QtActivity {
         return true;
     }
 
+    /// A recording runs (true) or ended (false): the foreground service that keeps the microphone in the background
+    /// (RecordingService, qt/docs/audio.md) is started or stopped.
+    public static void setRecording(boolean on) {
+        final XournalActivity a = current.get();
+        if (a == null) {
+            return;
+        }
+        Intent service = new Intent(a, RecordingService.class);
+        if (!on) {
+            a.stopService(service);
+        } else if (Build.VERSION.SDK_INT >= 26) {
+            a.startForegroundService(service);
+        } else {
+            a.startService(service);
+        }
+    }
+
     /// A pen digitizer is attached (a built-in S Pen layer or a Bluetooth stylus). Touch screens of phones without a
     /// pen report only TOUCHSCREEN.
     public static boolean hasStylus() {

@@ -19,4 +19,7 @@ void watchIncomingFiles(std::function<void(const QStringList&)> receive);
 /// A stylus is attached (Android's input devices report a stylus source).
 bool hasStylus();
 
+/// A recording runs or ended: the foreground service that keeps the microphone in the background (qt/docs/audio.md).
+void setRecording(bool on);
+
 }  // namespace xqt::android

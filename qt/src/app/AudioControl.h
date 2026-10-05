@@ -106,6 +106,10 @@ public:
     /// The current tab changed (recordingHere).
     void currentChanged();
 
+    /// The platform's part of a running recording (Android: the foreground service that keeps the microphone in the
+    /// background; main.cpp sets it). Called with true when one starts, false when it ends.
+    static void setPlatformHook(std::function<void(bool recording)> hook);
+
 Q_SIGNALS:
     void recordingChanged();
     void recordedMsChanged();

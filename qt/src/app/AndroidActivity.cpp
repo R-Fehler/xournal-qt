@@ -62,4 +62,6 @@ void watchIncomingFiles(std::function<void(const QStringList&)> receive) {
 
 bool hasStylus() { return QJniObject::callStaticMethod<jboolean>(ACTIVITY, "hasStylus", "()Z"); }
 
+void setRecording(bool on) { QJniObject::callStaticMethod<void>(ACTIVITY, "setRecording", "(Z)V", jboolean(on)); }
+
 }  // namespace xqt::android

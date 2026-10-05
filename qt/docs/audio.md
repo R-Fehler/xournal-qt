@@ -163,3 +163,22 @@ Tests: `AudioUiTest` (label `ui`, fake devices with their timers): record from t
 stroke tied to the recording and the page's memo, stop, the play tool on the stroke, the playback pill's pause and ×;
 the list of recordings from the button's menu, removing one and undo; a recording belongs to its tab (another tab's
 ink is not tied, closing the tab ends it).
+
+## Platforms
+
+- **Microphone permission**: asked the first time a recording starts (Qt's `QMicrophonePermission`; with the Qt
+  Multimedia backend only). Refused: a message says to allow it in the system's settings.
+- **Android**: `RECORD_AUDIO`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MICROPHONE`, `POST_NOTIFICATIONS` in the
+  manifest; while a recording runs a **foreground service** of type microphone (`RecordingService.java`, started and
+  stopped through `XournalActivity.setRecording`, `AudioControl::setPlatformHook` in `main.cpp`) shows a notification
+  and keeps the microphone when the app is in the background (Android stops it otherwise). Swiping the app away ends
+  the service; the recording file plays up to that moment (see "Format").
+- **macOS**: `NSMicrophoneUsageDescription` in `Info.plist.in` (without it macOS ends the app when the microphone is
+  opened).
+- **Builds**: Qt Multimedia is needed for recording (`qt6-multimedia-dev` in `qt/scripts/linux-deps.sh`; MSYS2
+  `mingw-w64-ucrt-x86_64-qt6-multimedia`; Homebrew's `qt` has it; conda-forge `qt6-multimedia`). Without it the app
+  builds and runs and does not offer recording. Only `QAudioSource`/`QAudioSink` are used: whether a deployment
+  without Qt Multimedia's FFmpeg plugin still opens the devices is to be checked per platform (device checklist);
+  if one needs the plugin, ship it there.
+- Not built or compiled here: the Android and macOS parts (no SDK in the build container), the Qt Multimedia backend
+  (`QtAudioDevice.cpp`: the build container's Qt has no Qt Multimedia; checked against stub headers only).

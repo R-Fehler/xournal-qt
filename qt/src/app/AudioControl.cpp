@@ -1,7 +1,12 @@
 #include "AudioControl.h"
 
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QSettings>
+#include <QtCore/qtcore-config.h>
+#if QT_CONFIG(permissions)
+#include <QPermissions>
+#endif
 
 #include "audio/AudioDevice.h"
 #include "audio/AudioFiles.h"
@@ -18,6 +23,16 @@ namespace {
 constexpr const char* LEAD_IN_KEY = "audio/leadInMs";
 
 QString qstr(const std::string& s) { return QString::fromStdString(s); }
+
+std::function<void(bool)>& platformHook() {
+    static std::function<void(bool)> hook;
+    return hook;
+}
+void tellPlatform(bool recording) {
+    if (platformHook()) {
+        platformHook()(recording);
+    }
+}
 std::string utf8(const QString& s) { return s.toStdString(); }
 
 QString pagesText(const std::vector<size_t>& pages) {
@@ -85,11 +100,35 @@ void AudioControl::setLeadInMs(int ms) {
     Q_EMIT leadInChanged();
 }
 
+void AudioControl::setPlatformHook(std::function<void(bool)> hook) { platformHook() = std::move(hook); }
+
 bool AudioControl::startRecording() {
     DocumentSession* s = current();
     if (!s || recorder->isRecording()) {
         return false;
     }
+#if QT_CONFIG(permissions)
+    // The microphone: Android, macOS, iOS and Windows ask the user once (on Linux it is always allowed)
+    if (audio::backend() == audio::Backend::Qt) {
+        const QMicrophonePermission mic;
+        switch (QCoreApplication::instance()->checkPermission(mic)) {
+            case Qt::PermissionStatus::Undetermined:
+                QCoreApplication::instance()->requestPermission(mic, this, [this](const QPermission& p) {
+                    if (p.status() == Qt::PermissionStatus::Granted) {
+                        startRecording();
+                    } else {
+                        Q_EMIT message(tr("Recording needs the microphone: allow it in the system's settings."));
+                    }
+                });
+                return false;
+            case Qt::PermissionStatus::Denied:
+                Q_EMIT message(tr("Recording needs the microphone: allow it in the system's settings."));
+                return false;
+            case Qt::PermissionStatus::Granted:
+                break;
+        }
+    }
+#endif
     stopPlayback();  // (the speaker would be recorded)
     const fs::path folder = audio::appFolder();
     const std::string name = audio::newRecordingName(QDateTime::currentDateTime(), [&](const std::string& n) {
@@ -104,11 +143,13 @@ bool AudioControl::startRecording() {
     audio::Recorder* r = recorder.get();
     s->setRecording(name, [r] { return static_cast<size_t>(r->positionMs()); });
     s->addVoiceMemo(s->getCurrentPageNo(), name);
+    tellPlatform(true);
     connect(s, &QObject::destroyed, this, [this] {
         // Its tab closed: the recording ends with it (the session is gone: nothing more to tell it)
         recordingFor = nullptr;
         if (recorder->isRecording()) {
             recorder->stop();
+            tellPlatform(false);
             Q_EMIT message(tr("The recording ended with its document."));
         }
         Q_EMIT recordingChanged();
@@ -118,6 +159,7 @@ bool AudioControl::startRecording() {
 }
 
 void AudioControl::endRecording() {
+    tellPlatform(false);
     if (recordingFor) {
         recordingFor->setRecording({}, {});
         disconnect(recordingFor, &QObject::destroyed, this, nullptr);
