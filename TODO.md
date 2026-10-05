@@ -689,6 +689,36 @@ section "Confirmed by the author" (it overrides the plan's steps where they diff
 - [x] Background-image attachments not written again when unchanged. Done.
 - [x] The introduction and the tutorial explain version history. Left: the tutorial's screenshot placeholder.
 
+### Comparing versions and documents side by side (the author, 2026-10-05; `qt/version-compare`)
+"Implement comparing two versions using the reference view but add a locked scroll toggle so both canvases are
+scrolled at the same time. Make this generic so we can use that toggle in the reference view to compare PDFs in
+general."
+- [ ] A **locked scroll** toggle in the reference view, for any two documents (two PDFs, a document and itself, a
+  version and now): while on, scrolling, paging and zooming one side moves the other the same way. The pairing is
+  by page, with the offset the two had when it was switched on (page 3 here beside page 1 there stays so), and
+  the position within the page relative to its size (pages of other sizes still line up); remembered per pair.
+- [ ] **Compare a version**: in the History panel, "Compare with now" opens the version in the reference view
+  beside the current document, locked; the pages that changed between the two are marked (from the layer sigs),
+  with next/previous change. Also "Compare two versions" (pick two in the list).
+- [ ] If cheap: on a changed page, what was added and what was removed highlighted (elements matched by their
+  serialized form, `xqt-created` helping), as a toggle.
+
+### Encrypted PDFs (the author, 2026-10-05; `qt/pdf-encryption`)
+"Support pdf encryption and opening of encrypted PDFs using qpdf."
+- [ ] **Opening**: a PDF with a user password asks for it (a dialog; wrong password says so; Cancel leaves it
+  closed); one with only an owner password (permissions) opens without asking. The password lives in memory for the
+  session only, never written anywhere. Works for plain PDFs and PDFs with notes (the embedded notes are encrypted
+  with the file).
+- [ ] **Protecting**: ⋮ → Document → "Protect with a password…" (and in Share and Export as an option): AES-256,
+  a password to open, optionally restrictions (printing, copying) with an owner password; "Remove the password".
+  Saving keeps the encryption.
+- [ ] **No plaintext leaks** for an encrypted document: autosave and crash saves, thumbnails and previews, the
+  library's text index, the handwriting cache, the version cache and the reference/compare copies either stay
+  encrypted or are not written; the library shows a lock on its card and does not index what it cannot read.
+- [ ] Saving an encrypted PDF with notes: a full write through qpdf (the incremental appender does not encrypt); if
+  encrypted appends with qpdf's primitives are feasible, they keep fast saves and version history, else version
+  history is unavailable for encrypted files (said so in the History panel).
+
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
    when a save falls back to a full write, and a check in MuPDF and pdf.js).
