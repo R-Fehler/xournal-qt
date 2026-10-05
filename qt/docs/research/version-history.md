@@ -228,3 +228,12 @@ week for light documents.
 11. **No `xmpMM:History` mirror** for now (messages stay in our marker); maybe for archive PDFs later.
     *Recommended.*
 12. **Restore as a new version on top**, never by truncating the file. *Recommended* (as the author said).
+13. **Getting the notes out of a file with split data** (added 2026-10-05 on the author's question). Every export
+    (Share → For Xournal++, "Keep it updated for Xournal++", Save as, archive) writes one ordinary `document.xopp`
+    from the open document, as today, so nothing changes there. What changes is the user's own working file with
+    history on: its layer pieces are private streams the marker points to, so a generic tool (Acrobat's attachment
+    panel, `pdfdetach`) no longer finds a complete `document.xopp` in it. *Recommended:* drop the stale
+    `document.xopp` attachment on the first split save (a stale one would mislead), and add
+    `xournal-qt-cli export-xopp <file.pdf> [--version N] [-o out.xopp]`, which rebuilds the plain `.xopp` of the
+    latest or any version. (Alternative: also append a complete `document.xopp` every N saves or at each milestone,
+    for generic tools, at its size cost.)
