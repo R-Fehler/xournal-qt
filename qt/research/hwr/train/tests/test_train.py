@@ -6,32 +6,16 @@ from pathlib import Path
 
 import pytest
 
-from xqt_hwr import train
 
 ROOT = Path(__file__).resolve().parent.parent
 TINY = ROOT / "configs" / "tiny"
 
 
-def run(cfg, data_root, out, *sets, resume=False):
-    args = ["--config", str(TINY / cfg), "--set", f"data_root={data_root}", "--set", f"out_dir={out}"]
-    for s in sets:
-        args += ["--set", s]
-    if resume:
-        args.append("--resume")
-    train.main(args)
+from conftest import run_train as run
 
 
 def meta(ck):
     return json.loads((ck / "xqt.json").read_text())
-
-
-@pytest.fixture(scope="session")
-def trained(data_root, tmp_path_factory):
-    """Tiny TrOCR and CTC trained for three steps (shared by the evaluation and export tests)."""
-    out = tmp_path_factory.mktemp("runs")
-    run("tiny-trocr.yaml", data_root, out / "trocr")
-    run("tiny-ctc.yaml", data_root, out / "ctc")
-    return out
 
 
 def test_one_step_each_kind(trained):

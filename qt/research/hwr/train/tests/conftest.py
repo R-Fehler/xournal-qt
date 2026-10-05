@@ -49,3 +49,28 @@ def data_root(tmp_path_factory):
                            cfg, seed=1, workers=1, cache=root / ".cache", allow_system_fonts=True)
     make_ink_dataset(root)
     return root
+
+
+TINY = ROOT / "configs" / "tiny"
+
+
+def run_train(cfg, data_root, out, *sets, resume=False):
+    from xqt_hwr import train
+
+    args = ["--config", str(TINY / cfg), "--set", f"data_root={data_root}", "--set", f"out_dir={out}"]
+    for s in sets:
+        args += ["--set", s]
+    if resume:
+        args.append("--resume")
+    train.main(args)
+
+
+@pytest.fixture(scope="session")
+def trained(data_root, tmp_path_factory):
+    """Tiny TrOCR and CTC trained for three steps (shared by the evaluation and export tests)."""
+    out = tmp_path_factory.mktemp("runs")
+    run_train("tiny-trocr.yaml", data_root, out / "trocr")
+    run_train("tiny-ctc.yaml", data_root, out / "ctc")
+    return out
+
+
