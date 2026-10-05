@@ -74,6 +74,7 @@
 #include "session/DocumentSearch.h"
 #include "session/DocumentLink.h"
 #include "session/DocumentSession.h"
+#include "session/ElementTimes.h"
 #include "session/StickyNote.h"
 #include "audio/DocumentAudio.h"
 
@@ -622,6 +623,7 @@ bool CanvasView::pasteText(const QString& content, std::optional<QPointF> viewPo
     text->setFont(session.getSettings()->getFont());
     text->setColor(session.getToolHandler()->getColor());
     text->move(std::max(0.0, onPage.x()), std::max(0.0, onPage.y()));
+    timeline::stampNew(*text);
     const Text* raw = text.get();
     doc->lock();
     layer->addElement(std::move(text));
@@ -722,6 +724,7 @@ bool CanvasView::addLinkMarker(const QString& markerText, size_t pNr, QPointF on
     const double x = std::clamp(onPage.x(), 0.0, std::max(0.0, pageWidth - width - 2));
     const double y = std::clamp(onPage.y(), 0.0, std::max(0.0, pageHeight - 20));
     text->setTransformation(xoj::util::Matrix::TRANSLATION(x, y));
+    timeline::stampNew(*text);
     const Text* raw = text.get();
     {
         std::unique_lock lock(*doc);
@@ -884,6 +887,7 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
             std::shared_lock lock(*doc);
             groups::renumber(pasted, *doc);
         }
+        timeline::stampNew(pasted);  // (pasted elements are new: qt/docs/timeline.md)
         session.getUndoRedoHandler()->addUndoAction(std::move(undo));
 
         // Paste target: where the user asked for it, else the middle of the visible part of the page (upstream
@@ -961,6 +965,7 @@ bool CanvasView::insertImage(const QByteArray& data, std::optional<QPointF> view
     const double scale = std::min({natural, area.width() * 0.8 / w, area.height() * 0.8 / h});
     const QPointF origin = area.center() - QPointF(w * scale / 2, h * scale / 2);
     img->setTransformation({scale, 0, 0, scale, {std::max(0.0, origin.x()), std::max(0.0, origin.y())}});
+    timeline::stampNew(*img);
 
     PageRef page = pages[pNr]->getPage();
     Layer* layer = note ? note->note : page->getSelectedLayer();
@@ -1867,6 +1872,7 @@ bool CanvasView::markPdfText(PdfTextMode mode) {
         stroke->addPoint(Point(rect.x1, h, -1));
         stroke->addPoint(Point(rect.x2, h, -1));
         stroke->setStrokeCapStyle(StrokeCapStyle::BUTT);
+        timeline::stampNew(*stroke);
         dirty.addPoint(rect.x1, h - 0.5 * w);
         dirty.addPoint(rect.x2, h + 0.5 * w);
         strokes.push_back(std::move(stroke));
@@ -1910,6 +1916,7 @@ bool CanvasView::drawGeometryMarks(double spacingCm) {
         stroke->setWidth(width);
         stroke->addPoint(Point(from.x(), from.y(), -1));
         stroke->addPoint(Point(to.x(), to.y(), -1));
+        timeline::stampNew(*stroke);
         dirty.addPoint(from.x() - width, from.y() - width);
         dirty.addPoint(from.x() + width, from.y() + width);
         dirty.addPoint(to.x() - width, to.y() - width);

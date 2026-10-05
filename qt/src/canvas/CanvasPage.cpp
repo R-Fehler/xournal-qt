@@ -48,6 +48,7 @@
 #include "TextEditor.h"
 #include "render/RenderService.h"
 #include "session/ElementGroups.h"
+#include "session/ElementTimes.h"
 #include "session/DocumentSession.h"
 #include "session/PenFill.h"
 #include "session/StickyNote.h"
@@ -222,6 +223,7 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
         this->inputHandler->onButtonPressEvent(pos, zoom);
         if (Stroke* stroke = this->inputHandler->getStroke()) {
             penfill::apply(*control.getSettings(), *h, *stroke);  // (its fill color, before its view is made)
+            timeline::stampNew(*stroke);  // (when it was made: qt/docs/timeline.md)
             if (h->getToolType() == TOOL_PEN) {
                 control.stampAudio(*stroke);  // (a recording runs: upstream's InputHandler::createStroke, qt/docs/audio.md)
             }

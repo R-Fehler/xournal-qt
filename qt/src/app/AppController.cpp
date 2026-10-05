@@ -71,6 +71,7 @@
 #include "session/DocumentMode.h"
 #include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
+#include "session/ElementTimes.h"
 #include "shell/ColorPalettes.h"
 #include "shell/ContentFiles.h"
 #include "shell/DocumentFiles.h"
@@ -5278,6 +5279,7 @@ bool AppController::addChapter(int page, const QString& title, int level) {
     text->setText(DocumentChapters::headingText(title.trimmed().toStdString(), level));
     text->setFont(XojFont("Sans Bold", DocumentChapters::headingSize(level)));
     text->setColor(Color(0, 0, 0));
+    timeline::stampNew(*text);
     const Text* raw = text.get();
     Layer* layer = nullptr;
     PageRef pageRef;

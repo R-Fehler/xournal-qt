@@ -15,6 +15,7 @@
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "session/ElementTimes.h"
 #include "session/PageMargins.h"
 #include "session/StickyNote.h"
 #include "undo/GroupUndoAction.h"
@@ -287,6 +288,7 @@ void MarkdownSession::setBox(Page& p, const std::string& text) {
             t->setFont(XojFont(style.family, style.size));
             t->setColor(style.color);
             t->setWrap(style.width);
+            timeline::stampNew(*t);  // (when the box was begun: qt/docs/timeline.md)
             p.box = t.get();
             p.layer->addElement(std::move(t));
         }

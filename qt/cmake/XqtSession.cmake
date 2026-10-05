@@ -97,6 +97,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TemplateFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementGroups.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementGroups.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementTimes.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementTimes.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageNoteSpace.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageNoteSpace.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/Citation.h
@@ -208,6 +210,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/StickerFileTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TemplateFileTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/GroupsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/ElementTimesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/NoteSpaceTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/CitationTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BookmarksTest.cpp
@@ -244,6 +247,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/AudioDocumentTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PenGesturesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/GroupsCanvasTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/ElementTimesCanvasTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PresenterMirrorTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PenStylesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/CanvasRotationTest.cpp)

@@ -3368,3 +3368,15 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
 - [ ] Phone (Fold 7 folded), toolbox: "My tools" → Insert has "Record audio"; the pill is visible above the page.
 - [ ] A build without Qt Multimedia: no record button in the classic bar, the toolbox or the sheets; Ctrl+Shift+R does
       nothing; documents with recordings still open and keep them.
+
+## Creation times of elements (qt/timeline, qt/docs/timeline.md)
+
+- [ ] Write a few strokes, a text, insert an image, paste a sticker; save, close and open again; then ⋮ → View →
+      Replay (below, when built): they come in the order they were made. Autosave / recovery after killing the app:
+      the same.
+- [ ] The `.xopp` (and the `.xopp` exported from a PDF with notes) opened in Xournal++ 1.2 / 1.3: no message, every
+      element there; saved there and opened here again: the elements are there, the replay has them first (no times).
+- [ ] Copy strokes here and paste them in Xournal++ (both running), and the other way: pasted, nothing missing.
+- [ ] Erase across a stroke with the partial stroke eraser, recolour and move strokes: the replay shows them at the
+      time they were first written (where they ended up).
+- [ ] The size of a long handwritten `.xopp` before and after this build (about 5 bytes more per stroke).
