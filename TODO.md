@@ -630,6 +630,17 @@ The other ideas (A3–A9, A15, B1–B8) stay in that file to decide later.
   and a page change bring both back to the whole slide. Built 2026-10-05 ([presenter-view.md](qt/docs/presenter-view.md));
   left: the device checks (smoothness on a real projector, a 4K projector zoomed in far).
 
+### Handwriting in German and English (the author, 2026-10-05)
+Formats shared by training and app: [qt/research/hwr/train/FORMATS.md](qt/research/hwr/train/FORMATS.md).
+- [~] `qt/hwr-training` (Python, PyTorch): datasets (fhswf German, synthetic German/English, IAM only from the
+  author's own copy, xournal-qt ink datasets), TrOCR-small (from the pre-IAM stage) and a small CTC model, DDP with
+  torchrun on GPUs with at least 11 GB, configs for a German model, one combined English+German model and fine-tuning
+  on user data, evaluation (words found, CER, WER per dataset, language and writer), export to the app's model folder.
+- [~] `qt/hwr-multilang` (app): English / German / both; several models with merged readings; a CTC recogniser;
+  per-document language detection and override; `xournal-qt-cli hwr-lines` exports ink lines as a dataset.
+- [ ] `qt/hwr-userdata` (later, lower priority): a dataset of the user's own hand made in xournal-qt (prompted
+  sentences to write, corrections of readings), exported for fine-tuning.
+
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
    when a save falls back to a full write, and a check in MuPDF and pdf.js).
