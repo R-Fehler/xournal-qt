@@ -595,9 +595,11 @@ The other ideas (A3–A9, A15, B1–B8) stay in that file to decide later.
   included, so using it is the same as copying that page) into a `Templates/` folder of the library (and an app-wide
   set), chosen when adding pages (the add-page button's list, Insert pages dialog, new document). After `qt/stickers`
   (same folder model and picker).
-- [ ] `qt/tags` (A13): `#tag` in typed text, Markdown and sticky notes, XMP/Info keywords in PDFs; indexed per folder;
+- [x] `qt/tags` (A13): `#tag` in typed text, Markdown and sticky notes, XMP/Info keywords in PDFs; indexed per folder;
   a Tags chip in the library like Favourites (list of tags with counts, filter), `tag:name` in the fuzzy syntax,
-  shown on cards. After `qt/todos` (both extend the index's notes pack).
+  shown on cards. After `qt/todos` (both extend the index's notes pack). (Done 2026-10-05, [tags.md](qt/docs/tags.md);
+  left: renaming a tag across the library, tags of handwriting, editing a `.md`'s front matter from "Tags…", a check
+  in Zotero/Acrobat on a device.)
 - [ ] `qt/presenter-view` (A14): while presenting on a second screen, the laptop shows the current slide with its
   note space, the next slide, a timer and the page number; the audience screen shows only the slide. After
   `qt/toolbox` (presenting chrome).
