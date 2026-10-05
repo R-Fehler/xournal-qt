@@ -21,7 +21,8 @@ from .decode import beam_search, ctc_beams
 
 TROCR_BEAMS = 4         # TrocrRecognizer::BEAMS
 TROCR_MAX_TOKENS = 48   # TrocrRecognizer::MAX_TOKENS
-CTC_TOPK = 5
+CTC_TOPK = 5          # CtcRecognizer::TOP_K (block qt/hwr-multilang)
+CTC_BEAMS = 8         # CtcRecognizer::BEAMS
 
 
 class Recognizer:
@@ -94,7 +95,7 @@ class TorchCtc(Recognizer):
         return self.model(x)[:, 0].float().cpu().numpy()
 
     def read(self, img):
-        return [(self.codec.decode(p), lp) for p, lp in ctc_beams(self.logits(img), topk=self.k)]
+        return [(self.codec.decode(p), lp) for p, lp in ctc_beams(self.logits(img), beam=CTC_BEAMS, topk=self.k)]
 
 
 # --- ONNX Runtime (what ships) ---------------------------------------------------------------------------------------
@@ -195,7 +196,8 @@ class OnnxCtc(Recognizer):
         return self.sess.run(["logits"], {"image": x})[0][:, 0]
 
     def read(self, img):
-        return [(self.codec.decode(p), lp) for p, lp in ctc_beams(self.logits(img), topk=self.k, blank=self.blank)]
+        return [(self.codec.decode(p), lp) for p, lp in ctc_beams(self.logits(img), beam=CTC_BEAMS, topk=self.k,
+                                                                    blank=self.blank)]
 
 
 def read_alphabet(path: Path) -> list[str]:
@@ -215,8 +217,18 @@ def write_alphabet(path: Path, alphabet: list[str]):
 # --- by path ---------------------------------------------------------------------------------------------------------
 
 
+def quiet_transformers():
+    try:
+        from transformers.utils import logging as tl
+        tl.set_verbosity_error()
+        tl.disable_progress_bar()
+    except Exception:
+        pass
+
+
 def open_model(path: str | Path, device: str = "cpu", k: int | None = None, threads: int = 2) -> Recognizer:
     path = Path(os.path.expanduser(str(path)))
+    quiet_transformers()
     if (path / "model.json").exists():
         kind = json.loads((path / "model.json").read_text(encoding="utf-8")).get("kind", "trocr")
         if kind == "ctc":
@@ -228,7 +240,8 @@ def open_model(path: str | Path, device: str = "cpu", k: int | None = None, thre
             from .models import ctc
 
             model, alphabet, d = ctc.load(path / "model.pt")
-            r = TorchCtc(model, alphabet, k or CTC_TOPK, device, name=meta.get("name", path.name))
+            r = TorchCtc(model, alphabet, k or CTC_TOPK, device, height=int(meta.get("input_height", 64)),
+                         max_width=int(meta.get("max_width", 2048)), name=meta.get("name", path.name))
         else:
             from transformers import AutoTokenizer, VisionEncoderDecoderModel
 
