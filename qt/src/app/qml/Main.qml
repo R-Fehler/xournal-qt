@@ -1673,6 +1673,22 @@ ApplicationWindow {
                             icon.source: app.iconUrl("xqt-book-open")
                             onTriggered: win.startReading()
                         }
+                        // Pages shown dark, the document unchanged (qt/docs/dark-pages.md)
+                        AdaptiveMenu {
+                            objectName: "darkPagesMenu"
+                            offered: !win.textDoc
+                            title: qsTr("Dark pages")
+                            iconName: "xqt-moon"
+                            component DarkItem: AdaptiveMenuItem {
+                                property string mode
+                                checkable: true
+                                checked: app.darkPagesMode === mode
+                                onTriggered: app.darkPagesMode = mode
+                            }
+                            DarkItem { objectName: "darkPagesOffItem"; text: qsTr("Off"); mode: "off" }
+                            DarkItem { objectName: "darkPagesOnItem"; text: qsTr("On"); mode: "on" }
+                            DarkItem { objectName: "darkPagesSystemItem"; text: qsTr("With the system's dark mode"); mode: "system" }
+                        }
                         // The document's timeline: how it was written, with its recordings (qt/docs/timeline.md)
                         AdaptiveMenuItem { objectName: "replayItem"; offered: !win.textDoc && !toolArea.inBar("replay"); text: qsTr("Replay the writing"); icon.source: app.iconUrl("xqt-replay"); onTriggered: app.timeline.start() }
                         MenuSeparator {}
@@ -2513,6 +2529,7 @@ ApplicationWindow {
         height: referenceSplit.mainHeight
         clip: true  // zoomed-in pages must not paint over the sidebar
         view: app.view
+        darkPages: app.darkPagesShown  // (qt/docs/dark-pages.md)
         // (a version cut out of its file, compared or shown: read-only)
         readingOnly: win.reading || win.replaying || app.viewingVersion
         snapVertically: win.reading && !app.presenting

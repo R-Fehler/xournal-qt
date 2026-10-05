@@ -45,6 +45,7 @@ optional=(
     qml6-module-qtquick-templates qml6-module-qtquick-window qml6-module-qtqml-workerscript
     libkf6syntaxhighlighting-dev
     qt6-multimedia-dev  # (audio recordings: the microphone and the speaker; without it recording is not offered)
+    qt6-shadertools-dev qt6-shader-baker  # (dark pages drawn by a shader; without them on the CPU: qt/docs/dark-pages.md)
     fonts-dejavu-core fonts-noto-core
 )
 for package in "${optional[@]}"; do

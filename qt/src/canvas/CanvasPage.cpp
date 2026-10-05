@@ -38,8 +38,11 @@
 #include "util/Rectangle.h"
 #include "view/Mask.h"
 #include "view/overlays/OverlayView.h"
+#include "view/PaperTone.h"
 
 #include "CanvasView.h"
+#include "DarkPages.h"
+#include "PagePictures.h"
 #include "MdBox.h"
 #include "MixedSelection.h"
 #include "PenGestures.h"
@@ -57,6 +60,14 @@
 using xoj::util::Rectangle;
 
 namespace xqt {
+
+namespace {
+/// The page's paper is dark: its highlighters lighten (view/PaperTone.h). UI thread (the page's background changes
+/// there).
+bool darkPaper(const PageRef& page) {
+    return !page->getBackgroundType().isSpecial() && xoj::view::isDarkPaper(page->getBackgroundColor());
+}
+}  // namespace
 
 namespace {
 template <typename Views, typename Handler>
@@ -119,6 +130,7 @@ QRectF CanvasPage::viewRect() const {
 // --- input (port of XojPageView) ---------------------------------------------------------------------------------
 
 bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
+    const xoj::view::PaperToneScope tone(darkPaper(page));  // (the stroke's view is made now)
     if (currentSequenceDeviceId) {
         // An input sequence is already under way from another device
         return false;
@@ -420,6 +432,7 @@ void CanvasPage::mirrorViewOf(const Handler* handler, bool once) {
     // Upstream's handlers tell all their views (a DispatchPool): a second view of the stroke on the audience's page
     // follows it as the first one does, and goes when the handler finishes it (or with eraseViewsOfHandler)
     if (CanvasPage* m = mirrorPage(); m && handler) {
+        const xoj::view::PaperToneScope tone(darkPaper(m->page));  // (its view is made for that page's paper)
         m->addMirroredView(handler, handler->createView(m), once);
     }
 }
@@ -901,7 +914,59 @@ auto CanvasPage::bufferInfo() -> BufferInfo {
     });
 }
 
+auto CanvasPage::darkTone() -> DarkTone {
+    const std::optional<size_t> index = view.indexOf(this);
+    DocumentSession& session = view.getSession();
+    const quint64 revision = index ? session.pageRevision(*index) : 0;
+    Document* doc = session.getDocument();
+    fs::path pdfFile;
+    if (revision != darkModel.revision || !index) {
+        DarkModel m;
+        m.revision = revision;
+        std::shared_lock lock(*doc);
+        const auto type = page->getBackgroundType();
+        m.pdf = type.isPdfPage() && page->isLayerVisible(0);
+        m.pdfPage = static_cast<int>(page->getPdfPageNr());
+        m.pdfAt = QPointF(page->getNoteSpace().left, page->getNoteSpace().top);
+        m.paper = type.isSpecial() ? 0xffffffff : static_cast<QRgb>(uint32_t(page->getBackgroundColor())) | 0xff000000;
+        m.images = imageRects(*page);
+        darkModel = std::move(m);
+    }
+    DarkTone tone;
+    tone.paper = darkModel.paper;
+    std::vector<QRectF> pictures = darkModel.images;
+    if (darkModel.pdf) {
+        // A PDF page's paper: what its picture shows in its corners (dark slides stay as they are)
+        tone.paper = raster->withPlacedBuffer([](xoj::view::Mask& buffer, const PageRaster::Placement& place) -> QRgb {
+            if (!buffer.isInitialized() || !place.whole) {
+                return 0xffffffff;
+            }
+            cairo_surface_t* s = cairo_get_target(buffer.get());
+            cairo_surface_flush(s);
+            const QImage img(cairo_image_surface_get_data(s), cairo_image_surface_get_width(s),
+                             cairo_image_surface_get_height(s), cairo_image_surface_get_stride(s),
+                             QImage::Format_ARGB32_Premultiplied);
+            return dark::paperOfImage(img);
+        });
+        {
+            std::shared_lock lock(*doc);
+            pdfFile = doc->getPdfFilepath();
+        }
+        if (auto p = view.pdfPictures().pictures(pdfFile, darkModel.pdfPage)) {
+            for (const QRectF& r: *p) {
+                pictures.push_back(r.translated(darkModel.pdfAt));
+            }
+        }
+    }
+    tone.dark = dark::turnsDark(tone.paper);
+    if (tone.dark) {
+        tone.keep = dark::keptPictures(std::move(pictures), page->getWidth(), page->getHeight());
+    }
+    return tone;
+}
+
 QImage CanvasPage::composeTile(const QRect& pixelRect) {
+    const xoj::view::PaperToneScope tone(darkPaper(page));
     QImage img(pixelRect.size(), QImage::Format_ARGB32_Premultiplied);
     img.fill(Qt::white);
     const TimelineReplay* replay = view.replay();
@@ -1027,6 +1092,7 @@ void CanvasPage::flagDirtyRegion(const Range& rg) const {
 }
 
 void CanvasPage::drawAndDeleteToolView(xoj::view::ToolView* v, const Range& rg) {
+    const xoj::view::PaperToneScope tone(darkPaper(page));
     // (a stroke finished on the presenter's page: drawn onto the audience's page as well, until it is rendered)
     if (v->isViewOf(this->inputHandler.get()) || isMirroredView(v)) {
         // Draw the inputHandler's view onto the page buffer (upstream: no re-render, no flicker).

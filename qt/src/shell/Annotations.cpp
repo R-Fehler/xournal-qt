@@ -22,6 +22,7 @@
 #include "model/XojPage.h"
 #include "pdf/base/XojPdfPage.h"
 #include "view/LayerView.h"
+#include "view/PaperTone.h"
 #include "view/View.h"
 #include "view/background/BackgroundFlags.h"
 #include "view/background/BackgroundView.h"
@@ -704,6 +705,8 @@ QImage drawArea(Document& doc, const PageRef& page, const QRectF& rect, double s
     }
     {
         std::shared_lock lock(doc);
+        const xoj::view::PaperToneScope tone(!page->getBackgroundType().isSpecial() &&
+                                             xoj::view::isDarkPaper(page->getBackgroundColor()));
         for (const Layer* layer: page->getLayersView()) {
             if (layer->isVisible()) {
                 xoj::view::LayerView(layer).draw(xoj::view::Context::createDefault(cr));

@@ -189,4 +189,31 @@ double ColorPalettes::highlighterOpacity(const QColor& paper) {
     return isDarkPaper(paper) ? DARK_PAPER_OPACITY : LIGHT_PAPER_OPACITY;
 }
 
+std::vector<ColorPalettes::DarkPair> ColorPalettes::darkPairs(const QString& darkId) const {
+    std::vector<DarkPair> out;
+    const ColorPalette* dark = palette(darkId);
+    if (!dark) {
+        return out;
+    }
+    const auto add = [&](const QColor& light, const QColor& to, double opacity) {
+        if (!light.isValid() || !to.isValid() ||
+            std::any_of(out.begin(), out.end(), [&](const DarkPair& p) { return p.light.rgb() == light.rgb(); })) {
+            return;
+        }
+        out.push_back({light, to, opacity});
+    };
+    for (const ColorPalette& p: list) {
+        if (p.dark) {
+            continue;
+        }
+        for (const PaletteRole& r: p.roles) {
+            if (const PaletteRole* d = dark->role(r.key)) {
+                add(r.ink, d->ink, 1.0);
+                add(r.highlight, d->highlight, DARK_PAPER_OPACITY / UPSTREAM_HIGHLIGHTER_OPACITY);
+            }
+        }
+    }
+    return out;
+}
+
 }  // namespace xqt

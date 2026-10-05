@@ -74,6 +74,7 @@ class Timeline;
 }
 struct LinkSpot;
 class DocumentSession;
+class PdfPictures;
 class TextEditor;
 class MarkdownEditor;
 class CanvasTextInput;
@@ -218,6 +219,8 @@ public:
     /// Nothing is rendered for it: a page is rendered sharp straight away.
     void setPreviewSource(std::function<QImage(size_t page)> source) { previewSource = std::move(source); }
     QImage preview(size_t page) const { return previewSource ? previewSource(page) : QImage(); }
+    /// The pictures of the PDF's pages (dark pages keep them: PagePictures.h); made when first asked for
+    PdfPictures& pdfPictures();
     /// Previews came: pages without a buffer show them
     void previewsChanged() { Q_EMIT updateRequested(); }
 
@@ -766,6 +769,7 @@ private:
     GeometryToolLayer geometry{*this};
     CurtainLayer curtainLayer{*this};
     std::unique_ptr<StickyNotes> stickyNotes;
+    std::unique_ptr<PdfPictures> pictures;  ///< pdfPictures()
     std::unique_ptr<MixedSelection> mixedSelection;
     std::unique_ptr<MarkdownBoxResize> boxResizer;
     std::unique_ptr<PdfElemSelection> pdfSelection;

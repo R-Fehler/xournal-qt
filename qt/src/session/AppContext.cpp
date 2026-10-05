@@ -15,6 +15,7 @@
 #include "EmojiFont.h"
 #include "MdBox.h"
 #include "PageMargins.h"
+#include "render/PaperTexture.h"
 #include "StickyNote.h"
 #include "config-dev.h"  // for SETTINGS_XML_FILE
 
@@ -25,6 +26,7 @@ AppContext::AppContext(fs::path resourceDir, fs::path settingsFile, int renderTh
     md::installRenderer();  // Markdown boxes are drawn formatted (on the canvas, in thumbnails, exports, ...)
     sticky::installDrawer();  // sticky notes: their content clipped to them, everywhere a page is drawn
     PageMargins::installRuling();  // the ruling of pages smaller than A5 to scale (its margin line), everywhere too
+    paper::install();  // textured paper (qt/docs/dark-pages.md), everywhere a page is drawn
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_WIN) && !defined(Q_OS_MACOS)
     // The colour emoji font that comes with the app, for Pango (Windows and Android have it in the fonts.conf they
     // write at start: WindowsSetup.cpp, AndroidSetup.cpp). Not on macOS: Pango draws with Core Text there, not

@@ -19,6 +19,7 @@
 #include "control/settings/Settings.h"
 #include "control/settings/SettingsEnums.h"
 #include "control/tools/StrokeStabilizerEnum.h"
+#include "render/PaperTexture.h"
 #include "session/AppContext.h"
 #include "session/DocumentMode.h"
 #include "session/FuzzyQuery.h"
@@ -103,6 +104,14 @@ int SettingsModel::systemMemory() const { return static_cast<int>(CanvasMemory::
 
 void SettingsModel::applyPreviewMemory(Settings& s) {
     ThumbnailProvider::setCacheLimit(static_cast<qint64>(previewMemory(s)) * 1024 * 1024);
+}
+
+PageType SettingsModel::paperType(PageType base, Color color, bool textured) {
+    if (base.isSpecial()) {
+        return base;
+    }
+    base.config = paper::withLineColors(paper::withTexture(base.config, textured), color);
+    return base;
 }
 
 QSizeF SettingsModel::paperSize(int index) {
@@ -547,7 +556,9 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             const PageType current = settings.getPageTemplateSettings().getBackgroundType();
             const auto& types = this->app.getPageTypes()->getPageTypes();
             for (size_t i = 0; i < types.size(); ++i) {
-                if (types[i]->page == current) {
+                // (the paper's texture and ruling colors aside: qt/docs/dark-pages.md)
+                if (types[i]->page.format == current.format &&
+                    paper::baseConfig(types[i]->page.config) == paper::baseConfig(current.config)) {
                     return QVariant(static_cast<int>(i));
                 }
             }
@@ -557,7 +568,10 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             const auto& types = this->app.getPageTypes()->getPageTypes();
             const int i = v.toInt();
             if (i >= 0 && i < static_cast<int>(types.size())) {
-                withTemplate([&](PageTemplateSettings& tpl) { tpl.setBackgroundType(types[static_cast<size_t>(i)]->page); });
+                withTemplate([&](PageTemplateSettings& tpl) {
+                    tpl.setBackgroundType(paperType(types[static_cast<size_t>(i)]->page, tpl.getBackgroundColor(),
+                                                    paper::textured(tpl.getBackgroundType().config)));
+                });
             }
         });
     add("paperFormat",
@@ -600,8 +614,20 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
         [withTemplate](const QVariant& v) {
             const QColor c = v.value<QColor>();
             if (c.isValid()) {
-                withTemplate([&](PageTemplateSettings& tpl) { tpl.setBackgroundColor(Color(c.rgb() | 0xff000000u)); });
+                withTemplate([&](PageTemplateSettings& tpl) {
+                    tpl.setBackgroundColor(Color(c.rgb() | 0xff000000u));
+                    // (the ruling's colors follow the paper)
+                    tpl.setBackgroundType(paperType(tpl.getBackgroundType(), tpl.getBackgroundColor(),
+                                                    paper::textured(tpl.getBackgroundType().config)));
+                });
             }
+        });
+    // Textured paper (qt/docs/dark-pages.md: the page type's xqt-texture)
+    add("pageTexture", [&s] { return QVariant(paper::textured(s.getPageTemplateSettings().getBackgroundType().config)); },
+        [withTemplate](const QVariant& v) {
+            withTemplate([&](PageTemplateSettings& tpl) {
+                tpl.setBackgroundType(paperType(tpl.getBackgroundType(), tpl.getBackgroundColor(), v.toBool()));
+            });
         });
     add("copyLastPageSettings", [&s] { return QVariant(s.getPageTemplateSettings().isCopyLastPageSettings()); },
         [withTemplate](const QVariant& v) {

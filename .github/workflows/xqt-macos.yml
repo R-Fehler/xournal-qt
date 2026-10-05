@@ -52,7 +52,7 @@ jobs:
           # icons. librsvg only draws the program icon for the .icns. No KSyntaxHighlighting in Homebrew: code blocks
           # in Markdown are not highlighted (it is optional).
           brew install cmake ninja ccache pkgconf gettext glib cairo pango fontconfig poppler libzip qpdf gdk-pixbuf \
-            qtbase qtdeclarative qtsvg librsvg
+            qtbase qtdeclarative qtsvg qtshadertools librsvg
 
       - name: What was installed
         run: |

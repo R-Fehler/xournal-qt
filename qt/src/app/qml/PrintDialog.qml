@@ -16,6 +16,8 @@ AdaptiveDialog {
     property string pages: "all"   ///< "all", "current" or "range"
     readonly property string range: pages === "current" ? String(app.pageNumber)
                                     : pages === "range" ? rangeField.text.trim() : ""
+    /// The pages printed have dark paper (qt/docs/dark-pages.md): the dialog says it takes a lot of ink
+    readonly property bool darkPaper: visible && withAnnotations && app.printUsesDarkPaper(range)
 
     /// Opens it for these pages (0-based, e.g. what is selected in the page overview).
     function openFor(list) {
@@ -51,6 +53,26 @@ AdaptiveDialog {
     ColumnLayout {
         width: dlg.availableWidth
         spacing: 4
+
+        Rectangle {
+            objectName: "darkPaperWarning"
+            visible: dlg.darkPaper
+            Layout.fillWidth: true
+            Layout.bottomMargin: 8
+            color: "#fff4e5"
+            border.width: 1
+            border.color: "#f0b86e"
+            radius: 8
+            implicitHeight: inkWarning.implicitHeight + 16
+            Label {
+                id: inkWarning
+                anchors.fill: parent
+                anchors.margins: 8
+                wrapMode: Text.Wrap
+                text: qsTr("Some of these pages have dark paper: printing them uses a lot of ink. With a light paper "
+                           + "(“Background of this page…”) they print with little.")
+            }
+        }
 
         Label { text: qsTr("What"); font.weight: Font.DemiBold; visible: app.hasPdfBackground() }
         RadioButton {

@@ -25,6 +25,7 @@
 #include "view/DocumentView.h"
 #include "view/background/BackgroundFlags.h"
 #include "PageNoteSpace.h"
+#include "DarkPages.h"
 
 namespace xqt {
 
@@ -44,8 +45,14 @@ Registry& registry() {
 class ThumbnailResponse final: public QQuickImageResponse {
 public:
     QQuickTextureFactory* textureFactory() const override {
+        if (dark && !image.isNull()) {  // (dark pages: the thumbnail as the canvas shows the page)
+            QImage shown = image;
+            dark::apply(shown, dark::paperOfImage(shown));
+            return QQuickTextureFactory::textureFactoryForImage(shown);
+        }
         return QQuickTextureFactory::textureFactoryForImage(image);
     }
+    bool dark = false;
     /// QML does not want it any more (its item went away): it is not drawn
     void cancel() override { cancelled = true; }
     QImage image;
@@ -291,8 +298,10 @@ QImage ThumbnailProvider::renderPage(Document& doc, const PageRef& page, int wid
 
 QQuickImageResponse* ThumbnailProvider::requestImageResponse(const QString& id, const QSize& requestedSize) {
     auto* response = new ThumbnailResponse;
-    // id: <session>/<page>/<revision>[/<only for QML: ask again>]
-    const QStringList parts = id.split('/');
+    // id: <session>/<page>/<revision>[/<only for QML: ask again>][~dark]
+    QString plain = id;
+    response->dark = dark::takeSuffix(plain);
+    const QStringList parts = plain.split('/');
     const quint64 sessionId = parts.value(0).toULongLong();
     const size_t page = parts.value(1).toULongLong();
     const quint64 revision = parts.value(2).toULongLong();

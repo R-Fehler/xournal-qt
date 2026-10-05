@@ -10,6 +10,7 @@
 #include "util/Assert.h"
 #include "util/Color.h"
 #include "util/PairView.h"
+#include "view/PaperTone.h"  // xournal-qt: the highlighter on dark paper
 #include "util/Range.h"
 #include "util/raii/CairoWrappers.h"  // for CairoSaveGuard
 #include "view/Repaintable.h"
@@ -113,7 +114,8 @@ void StrokeToolView::on(StrokeToolView::StrokeReplacementRequest, const Stroke& 
     xoj_assert(this->strokeColor == strokeColorWithAlpha(newStroke));
     xoj_assert(this->lineStyle == newStroke.getLineStyle());
     xoj_assert(this->cairoOp ==
-               (newStroke.getToolType() == StrokeTool::HIGHLIGHTER ? CAIRO_OPERATOR_MULTIPLY : CAIRO_OPERATOR_OVER));
+               (newStroke.getToolType() == StrokeTool::HIGHLIGHTER ? xoj::view::highlighterOperator() :  // xournal-qt
+                                                                    CAIRO_OPERATOR_OVER));
 }
 
 void StrokeToolView::deleteOn(StrokeToolView::FinalizationRequest, const Range& rg) {

@@ -20,6 +20,14 @@
 
 using namespace xoj::view;
 
+namespace {
+/// xournal-qt: the frontend's pattern over the background (backgroundDecorator), if it has one
+std::unique_ptr<BackgroundView> decorated(std::unique_ptr<BackgroundView> view, const XojPage& page) {
+    const BackgroundDecorator decorate = backgroundDecorator.load(std::memory_order_acquire);
+    return decorate ? decorate(std::move(view), page) : std::move(view);
+}
+}  // namespace
+
 auto BackgroundView::createRuled(double width, double height, Color backgroundColor, const PageType& pt,
                                  double lineWidthFactor) -> std::unique_ptr<BackgroundView> {
     std::unique_ptr<OneColorBackgroundView> res;
@@ -86,12 +94,13 @@ auto BackgroundView::createForPage(ConstPageRef page, BackgroundFlags bgFlags, P
         }
     } else {
         if (bgFlags.showRuling) {
-            return createRuled(width, height, page->getBackgroundColor(), pt);
+            return decorated(createRuled(width, height, page->getBackgroundColor(), pt), *page);  // xournal-qt
         }
     }
 
     if (bgFlags.forceBackgroundColor) {
-        return std::make_unique<PlainBackgroundView>(width, height, page->getBackgroundColor());
+        return decorated(std::make_unique<PlainBackgroundView>(width, height, page->getBackgroundColor()),  // xournal-qt
+                         *page);
     } else {
         return std::make_unique<BackgroundView>(width, height);  // Dummy no-op view
     }

@@ -19,6 +19,9 @@ AdaptiveDialog {
     /// That size as text ("" when it is one of the formats)
     property string otherPaper: ""
     property bool landscape: false
+    /// The paper (qt/docs/dark-pages.md)
+    property color paperColor: "#ffffff"
+    property bool textured: false
     /// "From a template": the template's file ("": a blank page)
     property bool fromTemplate: false
     property string templatePath: ""
@@ -32,6 +35,8 @@ AdaptiveDialog {
         // (after the model: a choice made before took the box's binding away)
         paperBox.currentIndex = paper < 0 ? s.paperFormats.length : paper
         landscape = s.get("landscape")
+        paperColor = s.get("pageColor")
+        textured = s.get("pageTexture") === true
         libraryBox.checked = canSaveInLibrary
         fromTemplate = false
         // The name field gets the keys at once, but not on a phone or tablet: there that opens the soft keyboard over
@@ -54,6 +59,8 @@ AdaptiveDialog {
         if (paper >= 0)
             s.set("paperFormat", paper)
         s.set("landscape", landscape)
+        s.set("pageColor", paperColor)
+        s.set("pageTexture", textured)
         app.createDocument(nameField.text, libraryBox.checked)
         dlg.close()
     }
@@ -135,7 +142,16 @@ AdaptiveDialog {
             Layout.fillWidth: true
             selected: dlg.bgIndex
             landscape: dlg.landscape
+            paper: dlg.paperColor
             onChosen: function(index) { dlg.bgIndex = index }
+        }
+        PaperSwatches {
+            visible: !dlg.fromTemplate
+            Layout.fillWidth: true
+            paper: dlg.paperColor
+            textured: dlg.textured
+            onChosen: function(c) { dlg.paperColor = c }
+            onTexturedToggled: function(on) { dlg.textured = on }
         }
 
         // Paper and orientation: one row, or two in a narrow window (a phone)

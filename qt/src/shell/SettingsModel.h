@@ -17,6 +17,9 @@
 #include <QStringList>
 #include <QVariant>
 
+#include "model/PageType.h"
+#include "util/Color.h"
+
 class QWindow;
 class Settings;
 
@@ -39,6 +42,9 @@ public:
     static QSizeF paperSize(int index);
     /// The paper format of a page of this size (points), either way round; -1: none.
     static int paperFormatOf(double width, double height);
+    /// A page background (`base`, a pattern) on paper of this color, textured or not: its config with the texture and
+    /// ruling colors that show on the paper (render/PaperTexture.h)
+    static PageType paperType(PageType base, Color color, bool textured);
     /// Memory for kept page thumbnails (MB, setting "previewMemory"); applyPreviewMemory hands it to them.
     static int previewMemory(Settings& settings);
     static void applyPreviewMemory(Settings& settings);

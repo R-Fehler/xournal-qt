@@ -61,6 +61,8 @@ public:
     /// Highlighter opacity on light and on dark paper (the spec's rule)
     static constexpr double LIGHT_PAPER_OPACITY = 0.5;
     static constexpr double DARK_PAPER_OPACITY = 0.8;
+    /// What upstream draws the highlighter with on light paper (StrokeView::OPACITY_HIGHLIGHTER)
+    static constexpr double UPSTREAM_HIGHLIGHTER_OPACITY = 0.47;
 
     /// The app's palettes (palettes.json, compiled in as :/xqt-palettes/palettes.json)
     static const ColorPalettes& builtIn();
@@ -87,6 +89,16 @@ public:
     std::optional<QColor> follow(const ColorRef& ref, const QString& paletteId, Kind kind) const {
         return color(paletteId, ref.role, kind);
     }
+
+    /// Dark pages (canvas/DarkPages.h): each role's colors of the light palettes and the same role's colors in the
+    /// dark palette ("dark"): {light, dark, opacity} (the highlight colors 0.8 / 0.47: upstream draws the highlighter at
+    /// 0.47, dark paper wants 0.8). A color two palettes share is paired once (the first).
+    struct DarkPair {
+        QColor light;
+        QColor dark;
+        double opacity = 1.0;
+    };
+    std::vector<DarkPair> darkPairs(const QString& darkId = QStringLiteral("dark")) const;
 
     /// The palettes for QML: [{ id, name, source, background, dark, roles: [{ key, name, ink, highlight }] }]
     QVariantList toVariant() const;

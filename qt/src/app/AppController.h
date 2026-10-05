@@ -40,6 +40,8 @@
 #include "control/ToolEnums.h"
 #include "filesystem.h"
 #include "model/PageRef.h"
+#include "model/PageType.h"
+#include "util/Color.h"
 
 #include "session/DocumentSession.h"  // (LoadResult: openLoaded)
 #include "session/PdfEncryption.h"
@@ -193,6 +195,11 @@ class AppController: public QObject {
     Q_PROPERTY(double fontSize READ fontSize WRITE setFontSize NOTIFY fontChanged)
     /// The text tool makes Markdown text boxes (drawn formatted) instead of ordinary texts
     Q_PROPERTY(bool textMarkdown READ textMarkdown WRITE setTextMarkdown NOTIFY fontChanged)
+    /// Dark pages (qt/docs/dark-pages.md): "off", "on", or "system" (dark while the system's colors are dark); the
+    /// setting darkPages, for every window. Only what is shown: the documents do not change.
+    Q_PROPERTY(QString darkPagesMode READ darkPagesMode WRITE setDarkPagesMode NOTIFY darkPagesChanged)
+    /// ... whether the pages are shown dark now (the canvases, the page lists)
+    Q_PROPERTY(bool darkPagesShown READ darkPagesShown NOTIFY darkPagesChanged)
     /// Font size of new Markdown text (default: 60 % of the text font's size)
     Q_PROPERTY(double markdownFontSize READ markdownFontSize WRITE setMarkdownFontSize NOTIFY fontChanged)
     /// Font size of the Markdown text edited beside the page
@@ -539,6 +546,14 @@ public:
     Q_INVOKABLE QString textFlowFamily() const;
     bool markdownActive() const;
     bool textMarkdown() const;
+    QString darkPagesMode() const;
+    void setDarkPagesMode(const QString& mode);
+    bool darkPagesShown() const;
+    /// The curated page colors (qt/docs/dark-pages.md, "Page colors"): [{ id, name, color, dark }]
+    Q_INVOKABLE QVariantList paperSwatches() const;
+    /// The pages printed (`range` as printDocument takes it) have dark paper (a page color, not a PDF page): printing
+    /// them takes a lot of ink, the print dialog says so
+    Q_INVOKABLE bool printUsesDarkPaper(const QString& range) const;
     void setTextMarkdown(bool markdown);
     double markdownFontSize() const;
     void setMarkdownFontSize(double size);
@@ -1259,12 +1274,17 @@ public:
     /// Insert `count` new pages before `position` (0-based; page count: at the end): background `background` (index
     /// in the settings' pageBackgrounds), paper `paper` (index in paperFormats; -1: the size of the current page),
     /// portrait or landscape. One step to undo.
-    Q_INVOKABLE bool insertPages(int position, int background, int paper, bool landscape, int count = 1);
-    /// Give these pages another background (index in the settings' pageBackgrounds); one undo step.
-    Q_INVOKABLE bool changePageBackground(const QList<int>& pages, int background);
+    /// `paperColor`, `textured` (-1: the settings' for new pages): the paper's color and texture (qt/docs/dark-pages.md)
+    Q_INVOKABLE bool insertPages(int position, int background, int paper, bool landscape, int count = 1,
+                                 const QColor& paperColor = QColor(), int textured = -1);
+    /// Give these pages another background (index in the settings' pageBackgrounds), on paper of this color and
+    /// texture (invalid, -1: the settings' for new pages); one undo step.
+    Q_INVOKABLE bool changePageBackground(const QList<int>& pages, int background, const QColor& paperColor = QColor(),
+                                          int textured = -1);
     /// One of the pages shows a page of the PDF (changing the background takes that away).
     Q_INVOKABLE bool pagesHavePdfBackground(const QList<int>& pages) const;
-    /// The current page: { background (index in pageBackgrounds, -1: other), landscape }
+    /// The current page: { background (index in pageBackgrounds, -1: other), landscape, paper (its color; white for a
+    /// page of a PDF), textured, pdf (a page of the PDF: no paper of its own) }
     Q_INVOKABLE QVariantMap currentPageFormat() const;
     /// Ask the window for the "insert pages" dialog (page menu); position as for insertPages.
     Q_INVOKABLE void requestInsertPages(int position) { Q_EMIT insertPagesRequested(position); }
@@ -1675,6 +1695,7 @@ Q_SIGNALS:
     /// A snip from a document with a file was pasted: the window offers to add a link to its page (addSnipLink)
     void snipLinkOffered(const QString& title);
     void fontChanged();
+    void darkPagesChanged();
     void navigationChanged();
     void pdfTextModeChanged();
     /// PDF text was selected (select mode); rect in canvas coordinates.
@@ -1743,6 +1764,13 @@ Q_SIGNALS:
     void editAnywayWarning(const QString& name);
 
 private:
+    /// Dark pages: the roles' dark colors for the canvas, and darkPagesChanged when the setting (any window's) or the
+    /// system's colors change (AppPaper.cpp)
+    void setUpDarkPages();
+    /// A new document's paper: the ink in hand readable on it (qt/docs/dark-pages.md, "Ink on dark paper")
+    void inkForPaper(const QColor& paper);
+    /// The pattern `background` (index in the page types) on this paper (invalid, -1: the settings' for new pages)
+    PageType paperTypeOf(int background, const QColor& paperColor, int textured, Color& color) const;
     /// The search's options in effect (the replace row's while it is shown, else none)
     xqt::textmatch::Options searchOptions() const;
     /// The current search again with the options in effect
