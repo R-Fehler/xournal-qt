@@ -2658,6 +2658,21 @@ private:
             if (!ef.isDictionary()) {
                 return false;
             }
+            const QByteArray md5 = QCryptographicHash::hash(
+                    QByteArray::fromRawData(data.data(), static_cast<int>(data.size())), QCryptographicHash::Md5);
+            if (!xopp) {
+                // An attachment whose data did not change (an attached background image, a picture): the file has it
+                // already, by its size and checksum (written by us)
+                QPDFObjectHandle had = ef.getKey("/F");
+                QPDFObjectHandle params = had.isStream() ? had.getDict().getKey("/Params") : QPDFObjectHandle::newNull();
+                QPDFObjectHandle size = params.isDictionary() ? params.getKey("/Size") : QPDFObjectHandle::newNull();
+                QPDFObjectHandle sum = params.isDictionary() ? params.getKey("/CheckSum") : QPDFObjectHandle::newNull();
+                if (size.isInteger() && size.getIntValue() == static_cast<long long>(data.size()) && sum.isString() &&
+                    sum.getStringValue() == md5.toStdString() &&
+                    (mime.empty() || had.getDict().getKey("/Subtype").isNameAndEquals("/" + mime))) {
+                    return true;
+                }
+            }
             u.touch(s);
             u.touch(ef);
             // (as QPDFEFStreamObjectHelper makes it: its type, size and MD5 checksum)
@@ -2668,8 +2683,6 @@ private:
                                                              : std::string(xopp ? ArchivePdf::XOPP_MIME : "image/png"))));
             QPDFObjectHandle params = QPDFObjectHandle::newDictionary();
             params.replaceKey("/Size", QPDFObjectHandle::newInteger(static_cast<long long>(data.size())));
-            const QByteArray md5 = QCryptographicHash::hash(
-                    QByteArray::fromRawData(data.data(), static_cast<int>(data.size())), QCryptographicHash::Md5);
             params.replaceKey("/CheckSum", QPDFObjectHandle::newString(md5.toStdString()));
             if (archive) {
                 params.replaceKey("/ModDate", QPDFObjectHandle::newString(pdfDateNow()));

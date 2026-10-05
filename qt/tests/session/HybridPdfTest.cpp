@@ -35,6 +35,9 @@
 
 #include "control/ExportHelper.h"
 #include "control/xojfile/SaveHandler.h"
+#include <gdk-pixbuf/gdk-pixbuf.h>
+
+#include "model/BackgroundImage.h"
 #include "model/Document.h"
 #include "model/Font.h"
 #include "model/Layer.h"
@@ -1571,6 +1574,75 @@ TEST_F(IncrementalSaveTest, ctrlSAppendsOnlyWhatChanged) {
     ASSERT_TRUE(again.ok);
     EXPECT_TRUE(again.incremental);
     EXPECT_LT(again.appended, 8000u);
+}
+
+// An image attached as a page's background (document.xopp.bg_1.png) is not written again by a save that did not change
+// it; a new image is
+TEST_F(IncrementalSaveTest, attachedBackgroundImagesAreNotWrittenAgainWhenUnchanged) {
+    auto makePng = [](const fs::path& png, unsigned seed) {
+        GdkPixbuf* pixbuf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, false, 8, 160, 160);
+        guchar* pixels = gdk_pixbuf_get_pixels(pixbuf);
+        const int stride = gdk_pixbuf_get_rowstride(pixbuf);
+        for (int y = 0; y < 160; ++y) {
+            for (int x = 0; x < 160 * 3; ++x) {
+                seed = seed * 1103515245u + 12345u;  // (noise: it does not compress)
+                pixels[y * stride + x] = static_cast<guchar>(seed >> 16);
+            }
+        }
+        ASSERT_TRUE(gdk_pixbuf_save(pixbuf, png.string().c_str(), "png", nullptr, nullptr));
+        g_object_unref(pixbuf);
+    };
+    auto imagePage = [](const fs::path& png) {
+        auto page = std::make_shared<XojPage>(595, 842);
+        BackgroundImage img;
+        GError* error = nullptr;
+        img.loadFile(png, &error);
+        EXPECT_EQ(error, nullptr);
+        img.setAttach(true);
+        page->setBackgroundImage(img);
+        page->setBackgroundType(PageType(PageTypeFormat::Image));
+        return page;
+    };
+    makePng(path("photo.png"), 1);
+    const auto pngSize = fs::file_size(path("photo.png"));
+    ASSERT_GT(pngSize, 50000u);
+    auto doc = annotated(path("lecture.pdf"));
+    doc->addPage(imagePage(path("photo.png")));
+    const fs::path out = path("notes.pdf");
+    auto s = std::make_unique<DocumentSession>(*app, std::move(doc));
+    ASSERT_TRUE(s->saveAsHybrid(out).ok);
+    drawOn(*s, 0, 500);
+    auto r = s->save();
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(r.incremental);
+    EXPECT_LT(r.appended, pngSize / 2) << "the unchanged image is not written again";
+    int code = -1;
+    EXPECT_EQ((qpdfCheck(out, code), code), 0);
+    {
+        auto loaded = DocumentSession::loadFile(out);
+        ASSERT_TRUE(loaded.document) << loaded.error;
+        const PageRef last = loaded.document->getPage(loaded.document->getPageCount() - 1);
+        ASSERT_TRUE(last->getBackgroundType().isImagePage());
+        ASSERT_NE(last->getBackgroundImage().getPixbuf(), nullptr) << "the image is still there";
+        EXPECT_EQ(gdk_pixbuf_get_width(last->getBackgroundImage().getPixbuf()), 160);
+    }
+    // Another image on that page: written
+    makePng(path("other.png"), 2);
+    {
+        auto* d = s->getDocument();
+        d->lock();
+        const PageRef last = d->getPage(d->getPageCount() - 1);
+        BackgroundImage img;
+        GError* error = nullptr;
+        img.loadFile(path("other.png"), &error);
+        img.setAttach(true);
+        last->setBackgroundImage(img);
+        d->unlock();
+    }
+    drawOn(*s, 0, 520);
+    r = s->save();
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_GT(r.appended, pngSize / 2) << "a new image is written";
 }
 
 // Many saves in a row, with every kind of change: each file is valid, looks like a full write, and opens as the

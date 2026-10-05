@@ -1135,6 +1135,9 @@ counts the pictures of the tool drawn; it should stay 0 while moving and turning
       "edited in another app" question comes, and after "Keep the Xournal data" the next save writes the file anew.
 - [ ] Pull the power (or kill the app with `kill -9`) during a save of a long PDF: the file still opens in every
       viewer as it was before that save; a hidden `.name.pdf.….part` file next to it goes away with a later save.
+- [ ] A PDF with notes with a photo as a page's background (an image opened and written on, saved in PDF files mode):
+      Ctrl+S after a stroke on another page appends a few tens of KB, not the photo's size (`ls -l` before and
+      after); the photo still shows after closing and opening (qt/pdf-history).
 
 ## PDF-only mode (qt/pdf-only)
 

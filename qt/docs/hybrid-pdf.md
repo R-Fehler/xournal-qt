@@ -479,7 +479,8 @@ means reading most of the file (seconds). An incremental save reads only what it
   `/Resources`), the new or rewritten annotations and drawings, the page tree's root when pages were added,
   removed or moved, new base pages, the embedded `document.xopp` (a new stream in its file specification; for
   archive files with `/Params /ModDate`), the marker (hashes, record, `/Base` and `/Updates`), and `/Info` (and the XMP
-  metadata of an archive PDF). A removed page is only taken out of the page tree (its objects stay, so undo can
+  metadata of an archive PDF). Attached background images (`document.xopp.bg_N.png`) and other attachments whose
+  size and MD5 checksum are what the file has are not written again (`qt/pdf-history`). A removed page is only taken out of the page tree (its objects stay, so undo can
   bring it back cheaply; the next full write drops it).
 - Files of earlier versions (no record, no sigs) are appended to as well: the first save reads the pages with our
   notes and redraws all layers; it writes the record, so the next saves are fast.
