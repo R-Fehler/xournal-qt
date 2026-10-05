@@ -82,7 +82,7 @@ CanvasInput::CanvasInput(CanvasView& view, QObject* parent): QObject(parent), vi
     connect(&longPressTimer, &QTimer::timeout, this, [this] {
         cancelFingerStroke();  // (held still while drawing with the finger: the dot it began is taken back)
         longPressFired = true;
-        Q_EMIT this->view.contextRequested(touchSessionStartPos);
+        Q_EMIT this->view.contextRequested(this->view.getViewController().viewToScreen(touchSessionStartPos));
     });
     // The pen held still with the pen or highlighter: the same
     penHoldTimer.setSingleShot(true);
@@ -188,7 +188,7 @@ void CanvasInput::penHeld() {
     sequenceStartPage = nullptr;
     inputRunning = false;
     penHoldFired = true;
-    Q_EMIT view.contextRequested(penHoldPos);
+    Q_EMIT view.contextRequested(view.getViewController().viewToScreen(penHoldPos));
 }
 
 // --- tablet --------------------------------------------------------------------------------------------------------
@@ -363,7 +363,7 @@ bool CanvasInput::mouseEvent(QMouseEvent* e, QPointF viewPos) {
                     lastGeometryPos = onGeometryPage(viewPos);
                     return true;
                 }
-                Q_EMIT view.contextRequested(viewPos);
+                Q_EMIT view.contextRequested(view.getViewController().viewToScreen(viewPos));
                 return true;
             }
             modifier2 = e->button() == Qt::MiddleButton;

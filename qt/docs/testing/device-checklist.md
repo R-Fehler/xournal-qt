@@ -3116,3 +3116,13 @@ offered).
       drawn hover dot (Android, iOS) sits under the pen tip.
 - [ ] The pages are sharp when the zoom settles (90°: as sharp as upright; free angles: smoothed by the GPU, no gaps
       between the tiles of a page).
+- [ ] Turned by 90° and about 30°: a long press (or right click) on PDF text selects the word and its pill and knobs
+      sit at the turned text; dragging a knob widens the selection where the finger is. The context pill (paste…)
+      opens where the finger was; "Paste" there lands under that spot.
+- [ ] A tapped link's popup, a sticky note's pill, the "text goes on below the note" hint and a formula error's tool
+      tip sit beside the turned thing on the screen.
+- [ ] Writing text on a turned canvas (a text box, a Markdown box): the on-screen keyboard (Android) does not cover
+      the cursor; the emoji suggestions (":smi") open at the cursor; an input method's candidate window (Linux, IME)
+      opens at the cursor.
+- [ ] Scroll bars: at 90° and 270° the bar at the right scrolls along the turned pages (dragging it down moves the
+      pages up on the screen), at 180° both bars run the other way round; at a free angle there are none.

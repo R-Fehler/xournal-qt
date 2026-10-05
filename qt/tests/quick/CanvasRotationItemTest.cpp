@@ -14,6 +14,8 @@
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QInputMethodQueryEvent>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QWheelEvent>
@@ -23,6 +25,8 @@
 #include "control/ToolEnums.h"
 #include "control/ToolHandler.h"
 #include "model/Document.h"
+#include "model/Font.h"
+#include "model/Text.h"
 #include "model/Layer.h"
 #include "model/Stroke.h"
 #include "model/XojPage.h"
@@ -288,4 +292,93 @@ TEST_F(CanvasRotationItemTest, aPinchOnATurnedCanvasStaysUnderTheFingers) {
         EXPECT_NEAR(turned.x(), upright.x(), 0.5) << "as upright, at " << angle << "°";
         EXPECT_NEAR(turned.y(), upright.y(), 0.5) << "as upright, at " << angle << "°";
     }
+}
+
+// The scroll bars are the screen's: turned by 90° the one at the right scrolls the view sideways; at a free angle there
+// are none
+TEST_F(CanvasRotationItemTest, theScrollBarsFollowTheScreen) {
+    zoomIn();
+    const QSizeF content = view->documentLayout().contentSize(vc().zoom());
+    EXPECT_DOUBLE_EQ(canvas->contentWidth(), content.width());
+    EXPECT_DOUBLE_EQ(canvas->contentY(), vc().scrollPosition().y());
+    vc().setRotation(90);
+    EXPECT_DOUBLE_EQ(canvas->contentWidth(), content.height()) << "across the screen: the view's up and down";
+    EXPECT_DOUBLE_EQ(canvas->contentHeight(), content.width());
+    EXPECT_DOUBLE_EQ(canvas->contentY(), vc().scrollPosition().x()) << "down the screen: the view's x, the same way";
+    EXPECT_NEAR(canvas->contentX(), content.height() - vc().scrollPosition().y() - vc().viewSize().height(), 1e-9)
+            << "across the screen: the view's y, the other way";
+    // Dragging the bar at the right down moves the pages up on the screen, by as much
+    const QPointF middle(400, 350);
+    const auto [page, pt] = under(middle);
+    canvas->scrollTo(canvas->contentX(), canvas->contentY() + 60);
+    const QPointF now = onScreen(page, pt);
+    EXPECT_NEAR(now.x(), middle.x(), 1e-6);
+    EXPECT_NEAR(now.y(), middle.y() - 60, 1e-6);
+    // ... and the bar at the bottom moved right: the pages go left
+    const auto [page2, pt2] = under(middle);
+    canvas->scrollTo(canvas->contentX() + 40, canvas->contentY());
+    const QPointF now2 = onScreen(page2, pt2);
+    EXPECT_NEAR(now2.x(), middle.x() - 40, 1e-6);
+    EXPECT_NEAR(now2.y(), middle.y(), 1e-6);
+    vc().setRotation(37);
+    EXPECT_EQ(canvas->contentWidth(), 0) << "no scroll bars at a free angle";
+    EXPECT_EQ(canvas->contentHeight(), 0);
+}
+
+// A link on a turned canvas: the mouse over it shows where it leads, a click follows it, and the rectangle the window
+// gets for it is where it is on the screen
+TEST_F(CanvasRotationItemTest, linksAreFoundAndShownWhereTheyAreOnTheScreen) {
+    auto text = std::make_unique<Text>();
+    text->setText("see https://example.org/turned for more");
+    text->setFont(XojFont("Sans", 14));
+    text->move(80, 120);
+    const Text* raw = text.get();
+    {
+        auto p = session->getDocument()->getPage(0);
+        std::unique_lock lock(*session->getDocument());
+        p->getSelectedLayer()->addElement(std::move(text));
+    }
+    session->getDocument()->getPage(0)->firePageChanged();
+    vc().setRotation(90);
+    const auto& box = raw->getBoundingBox();
+    const QPointF onPage(box.x + box.width / 2, box.y + box.height / 2);
+    // (the link in the middle of the view)
+    const QPointF content = view->pageViewRect(0).topLeft() - vc().contentOrigin() + onPage * vc().zoom();
+    vc().setScrollPosition(content - QPointF(vc().viewSize().width() / 2, vc().viewSize().height() / 2));
+    wait(100);
+    const QPointF link = onScreen(0, onPage);
+    ASSERT_TRUE(QRectF(0, 0, canvas->width(), canvas->height()).contains(link));
+    for (int i = 0; i <= 6; ++i) {
+        QTest::mouseMove(window, (link + QPointF(0, -12 + 2 * i)).toPoint());  // (along the link: down the screen)
+    }
+    wait(DocumentCanvasItem::LINK_HOVER_MS + 150);
+    EXPECT_EQ(canvas->hoveredLink().value("uri").toString(), "https://example.org/turned");
+    EXPECT_EQ(canvas->cursor().shape(), Qt::PointingHandCursor);
+    QSignalSpy followed(view.get(), &CanvasView::linkTapped);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, link.toPoint());
+    wait(50);
+    ASSERT_EQ(followed.count(), 1);
+    const QRectF rect = followed.at(0).at(2).toRectF();
+    EXPECT_TRUE(rect.adjusted(-1, -1, 1, 1).contains(link)) << "the link's rectangle on the screen";
+    EXPECT_GT(rect.height(), rect.width()) << "turned by 90°, the line of text runs down the screen";
+}
+
+// Writing text on a turned canvas: the on-screen keyboard and the input method are told where the cursor is on the
+// screen
+TEST_F(CanvasRotationItemTest, theTextCursorIsReportedWhereItIsOnTheScreen) {
+    zoomIn();
+    vc().setRotation(90);
+    wait(50);
+    app->getToolHandler()->selectTool(TOOL_TEXT);
+    const QPoint at(300, 260);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, at);
+    wait(50);
+    ASSERT_TRUE(canvas->textEditing());
+    QInputMethodQueryEvent query(Qt::ImCursorRectangle);
+    QCoreApplication::sendEvent(canvas, &query);
+    const QRectF cursor = query.value(Qt::ImCursorRectangle).toRectF();
+    ASSERT_FALSE(cursor.isEmpty());
+    EXPECT_LT(std::hypot(cursor.center().x() - at.x(), cursor.center().y() - at.y()), 40)
+            << "near where the text tool was pressed";
+    EXPECT_GT(cursor.width(), cursor.height()) << "turned by 90°, the text cursor lies across the screen";
 }

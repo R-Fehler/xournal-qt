@@ -51,7 +51,8 @@ class DocumentCanvasItem: public QQuickItem {
     Q_OBJECT
     /// The xqt::CanvasView to show (set from C++ through the application controller).
     Q_PROPERTY(QObject* view READ view WRITE setView NOTIFY viewChanged)
-    /// Size of the scrollable content and the scroll position (for scroll bars), in logical pixels.
+    /// Size of the scrollable content and the scroll position (for scroll bars), in logical pixels, along the screen's
+    /// axes (the canvas turned by 90°: the view's sideways; at a free angle: none, 0).
     Q_PROPERTY(qreal contentWidth READ contentWidth NOTIFY viewportChanged)
     Q_PROPERTY(qreal contentHeight READ contentHeight NOTIFY viewportChanged)
     Q_PROPERTY(qreal contentX READ contentX NOTIFY viewportChanged)
@@ -228,6 +229,8 @@ private:
     /// Another canvas of the process shows this view (while two canvases swap their views).
     bool shownByAnother(const xqt::CanvasView* v) const;
     void updateViewGeometry();
+    /// The content's size and the scroll position along a screen axis (0: across, 1: down), for the scroll bars
+    std::pair<qreal, qreal> screenContent(int screenAxis) const;
     /// Item (screen) coordinates to the view's and back (the canvas turned: qt/docs/canvas-rotation.md; the same while
     /// it is upright)
     QPointF toView(QPointF itemPos) const;

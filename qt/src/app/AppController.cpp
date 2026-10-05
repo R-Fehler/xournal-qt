@@ -998,7 +998,9 @@ bool AppController::pasteAt(qreal x, qreal y) {
     if (textPagesFixed()) {
         return false;  // (a text file: its pages are its text)
     }
-    return canvas() && !session()->isReadOnly() && canvas()->pasteElements(QPointF(x, y));
+    // (x, y: the canvas item's; the canvas may be turned)
+    return canvas() && !session()->isReadOnly() &&
+           canvas()->pasteElements(canvas()->getViewController().screenToView(QPointF(x, y)));
 }
 bool AppController::canPaste() const {
     const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
@@ -4387,7 +4389,9 @@ void AppController::setNoteCovers(bool covers) {
         canvas()->notes().setCover(covers);
     }
 }
-QRectF AppController::noteBox() const { return canvas() ? canvas()->notes().selectedViewBox() : QRectF(); }
+QRectF AppController::noteBox() const {
+    return canvas() ? canvas()->getViewController().viewToScreen(canvas()->notes().selectedViewBox()) : QRectF();
+}
 void AppController::deleteStickyNote() {
     if (canvas()) {
         canvas()->notes().deleteSelected();
@@ -5231,7 +5235,7 @@ bool AppController::selectPdfTextAt(qreal x, qreal y) {
         return false;
     }
     // The same word again: its whole line (like a phone widens the selection)
-    const QPointF where(x, y);
+    const QPointF where = canvas()->getViewController().screenToView(QPointF(x, y));
     const bool again = canvas()->hasPdfTextSelection() && canvas()->pdfSelectionEnds().adjusted(-8, -8, 8, 8).contains(where);
     const bool selected = canvas()->selectPdfTextAt(where, again);
     Q_EMIT pdfTextSelectionChanged();
@@ -5239,16 +5243,22 @@ bool AppController::selectPdfTextAt(qreal x, qreal y) {
 }
 
 bool AppController::dragPdfSelection(qreal x, qreal y, bool startEnd) {
-    const bool changed = canvas() && canvas()->dragPdfSelection(QPointF(x, y), startEnd);
+    const bool changed =
+            canvas() && canvas()->dragPdfSelection(canvas()->getViewController().screenToView(QPointF(x, y)), startEnd);
     if (changed) {
         Q_EMIT pdfTextSelectionChanged();
     }
     return changed;
 }
 
-QRectF AppController::pdfSelectionEnds() const { return canvas() ? canvas()->pdfSelectionEnds() : QRectF(); }
+// (on the screen: the canvas item's coordinates, the canvas may be turned)
+QRectF AppController::pdfSelectionEnds() const {
+    return canvas() ? canvas()->getViewController().viewToScreenEnds(canvas()->pdfSelectionEnds()) : QRectF();
+}
 
-QRectF AppController::pdfSelectionBox() const { return canvas() ? canvas()->pdfSelectionBox() : QRectF(); }
+QRectF AppController::pdfSelectionBox() const {
+    return canvas() ? canvas()->getViewController().viewToScreen(canvas()->pdfSelectionBox()) : QRectF();
+}
 
 void AppController::showPdfSelection() {
     if (canvas()) {

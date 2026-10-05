@@ -975,26 +975,63 @@ bool DocumentCanvasItem::heldByAnother(bool DocumentCanvasItem::*grab) const {
     });
 }
 
-qreal DocumentCanvasItem::contentWidth() const {
-    return canvasView ? canvasView->documentLayout().contentSize(canvasView->getViewController().zoom()).width() : 0;
+namespace {
+/// The axis of the upright view (0: x, 1: y) a screen axis (0: across, 1: down) runs along when the canvas is turned
+/// by a multiple of 90°, and whether the same way (none: a free angle, there are no scroll bars then)
+std::optional<std::pair<int, bool>> viewAxis(const xqt::ViewController& vc, int screenAxis) {
+    if (!vc.rightAngled()) {
+        return std::nullopt;
+    }
+    const QPointF along = vc.screenDeltaToView(screenAxis == 0 ? QPointF(1, 0) : QPointF(0, 1));
+    return std::abs(along.x()) > 0.5 ? std::pair{0, along.x() > 0} : std::pair{1, along.y() > 0};
 }
+double component(QPointF p, int axis) { return axis == 0 ? p.x() : p.y(); }
+double component(QSizeF s, int axis) { return axis == 0 ? s.width() : s.height(); }
+}  // namespace
 
-qreal DocumentCanvasItem::contentHeight() const {
-    return canvasView ? canvasView->documentLayout().contentSize(canvasView->getViewController().zoom()).height() : 0;
-}
+// The scroll bars are the screen's: turned by 90° or 270° the one at the right scrolls the view sideways (and the way
+// the pages move on the screen); at a free angle there are none (no content size).
+qreal DocumentCanvasItem::contentWidth() const { return screenContent(0).first; }
 
-qreal DocumentCanvasItem::contentX() const {
-    return canvasView ? canvasView->getViewController().scrollPosition().x() : 0;
-}
+qreal DocumentCanvasItem::contentHeight() const { return screenContent(1).first; }
 
-qreal DocumentCanvasItem::contentY() const {
-    return canvasView ? canvasView->getViewController().scrollPosition().y() : 0;
+qreal DocumentCanvasItem::contentX() const { return screenContent(0).second; }
+
+qreal DocumentCanvasItem::contentY() const { return screenContent(1).second; }
+
+std::pair<qreal, qreal> DocumentCanvasItem::screenContent(int screenAxis) const {
+    if (!canvasView) {
+        return {0, 0};
+    }
+    const xqt::ViewController& vc = canvasView->getViewController();
+    const auto axis = viewAxis(vc, screenAxis);
+    if (!axis) {
+        return {0, 0};
+    }
+    const auto [a, sameWay] = *axis;
+    const double content = component(canvasView->documentLayout().contentSize(vc.zoom()), a);
+    const double pos = component(vc.scrollPosition(), a);
+    return {content, sameWay ? pos : std::max(0.0, content - pos - component(vc.viewSize(), a))};
 }
 
 void DocumentCanvasItem::scrollTo(qreal x, qreal y) {
-    if (canvasView) {
-        canvasView->getViewController().setScrollPosition(QPointF(x, y));
+    if (!canvasView) {
+        return;
     }
+    xqt::ViewController& vc = canvasView->getViewController();
+    QPointF target = vc.scrollPosition();
+    for (int screenAxis: {0, 1}) {
+        const auto axis = viewAxis(vc, screenAxis);
+        if (!axis) {
+            return;
+        }
+        const auto [a, sameWay] = *axis;
+        const double value = screenAxis == 0 ? x : y;
+        const double content = component(canvasView->documentLayout().contentSize(vc.zoom()), a);
+        const double pos = sameWay ? value : content - value - component(vc.viewSize(), a);
+        (a == 0 ? target.rx() : target.ry()) = pos;
+    }
+    vc.setScrollPosition(target);
 }
 
 void DocumentCanvasItem::updateViewGeometry() {
@@ -1407,7 +1444,7 @@ QRectF DocumentCanvasItem::emojiCompletionRect() const {
                    : QRectF();
 }
 
-QRectF DocumentCanvasItem::noteTextHint() const { return canvasView ? canvasView->noteTextHintBox() : QRectF(); }
+QRectF DocumentCanvasItem::noteTextHint() const { return canvasView ? toItem(canvasView->noteTextHintBox()) : QRectF(); }
 
 void DocumentCanvasItem::chooseEmojiCompletion(int index) {
     if (canvasView) {
@@ -1444,7 +1481,7 @@ QVariant DocumentCanvasItem::inputMethodQuery(Qt::InputMethodQuery query) const 
         const double zoom = canvasView->getViewController().zoom();
         const QRectF r = editor->cursorRectOnPage();
         const QPointF origin = canvasView->pageViewRect(*idx).topLeft();
-        return QRectF(origin + r.topLeft() * zoom, r.size() * zoom);
+        return toItem(QRectF(origin + r.topLeft() * zoom, r.size() * zoom));  // (on the screen: the canvas may be turned)
     }
     return editor->inputMethodQuery(query);
 }

@@ -85,6 +85,7 @@ public:
     DocumentSession& getSession() const { return session; }
     RenderService& getRenderService() const { return renderService; }
     ViewController& getViewController() { return viewController; }
+    const ViewController& getViewController() const { return viewController; }
     const DocumentLayout& documentLayout() const { return layout; }
     /// Scrolling sideways comes to rest on whole pages (setting "snapPages" of ours, default on)
     static bool snapSetting(Settings& settings);
@@ -548,7 +549,8 @@ Q_SIGNALS:
     /// The undo or redo steps of the Markdown being written changed (MarkdownEditor::canUndo / canRedo): the undo
     /// and redo buttons follow them.
     void markdownUndoChanged();
-    /// A long press with a finger, or a right click: the UI shows what can be done here (paste, ...).
+    /// A long press with a finger, or a right click: the UI shows what can be done here (paste, ...). Screen
+    /// coordinates (the canvas item's: the canvas may be turned, qt/docs/canvas-rotation.md), as for the signals below.
     void contextRequested(QPointF viewPos);
     /// The emoji suggestions for a shortcode being typed were shown, changed or closed (emojiCompletion()).
     void emojiCompletionChanged();
@@ -562,7 +564,7 @@ Q_SIGNALS:
     void navigationChanged();
     /// currentPageNo() changed (the primary view: the session's current page).
     void currentPageChanged(qulonglong page);
-    /// PDF text was selected (Select mode): the UI offers marking / copying it; rect in view coordinates.
+    /// PDF text was selected (Select mode): the UI offers marking / copying it; rect in screen coordinates.
     void pdfTextSelected(QRectF viewRect);
     void pdfTextSelectionCleared();
     /// The setsquare / compass changed on its own (e.g. put aside because its page went).

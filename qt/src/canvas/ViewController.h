@@ -88,6 +88,11 @@ public:
     QPointF viewDeltaToScreen(QPointF d) const { return QPointF(d.x() * cosA - d.y() * sinA, d.x() * sinA + d.y() * cosA); }
     /// The bounding box on the screen of a rectangle of the view (itself when the canvas is upright)
     QRectF viewToScreen(const QRectF& r) const;
+    /// A rectangle that stands for two points (its top left and bottom right: the ends of a PDF text selection) on the
+    /// screen: the two points mapped (its width or height may become negative)
+    QRectF viewToScreenEnds(const QRectF& r) const {
+        return angle == 0 || r.isNull() ? r : QRectF(viewToScreen(r.topLeft()), viewToScreen(r.bottomRight()));
+    }
     /// The corners of the screen in the view (top left, top right, bottom right, bottom left): what of the view's
     /// bounding box is shown
     std::array<QPointF, 4> screenInView() const;
