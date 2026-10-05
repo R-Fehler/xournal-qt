@@ -107,6 +107,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Annotations.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/AnnotationsModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/AnnotationsModel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/VersionsModel.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/VersionsModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/MdSnippets.h
@@ -413,7 +415,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CitationLibraryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ArxivTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/StickersTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TemplatesTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TemplatesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/VersionsTest.cpp)
     target_link_libraries(xqt-shell-tests PRIVATE xqt-shell Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-shell-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-shell-tests PRIVATE "${TEST_CONFIG_DIR}")

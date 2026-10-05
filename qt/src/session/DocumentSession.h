@@ -168,6 +168,14 @@ public:
     void setKeepsVersions(bool on);
     /// The choice was made here and is not in the file yet.
     bool versionsChoicePending() const { return versionsChoice.has_value(); }
+    /// Give a version of the file a message, or change it (HybridPdf::setVersionMessage): not while a save runs. The
+    /// next save still builds on the file (only its marker changed).
+    bool setVersionMessage(int id, const std::string& message, std::string& error);
+    /// A version was restored (its pages replaced the document's): the next save is a new version with this message
+    /// (unless it has its own), never in place of the day's version.
+    void versionRestored(const std::string& message);
+    /// Replace every page of the document by `pages` (one undo step, `text`).
+    void replaceAllPages(const std::vector<PageRef>& pages, const std::string& text);
     /// A hybrid PDF: the .xopp for Xournal++ it keeps up to date on every save ("Keep it updated for Xournal++",
     /// SaveRequest::recordExport; read from the file the first time). Empty: none.
     fs::path xoppExport() const;
@@ -568,6 +576,7 @@ private:
     std::vector<fs::path> retainedBases;  ///< clean copies of hybrid PDFs this document uses (HybridPdf::retain)
     std::vector<std::string> hybridChanges;
     std::optional<bool> versionsChoice;  ///< keepsVersions() chosen, not saved yet
+    std::string restoredMessage;         ///< versionRestored(): for the next save
     /// A hybrid PDF as last written or opened: what the next Ctrl+S appends to (valid while the page numbers of the
     /// background PDF stay, `hybridNumbering`, and for `hybridRevisionFile` only).
     std::shared_ptr<HybridPdf::Revision> hybridRevision;

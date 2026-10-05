@@ -1404,6 +1404,43 @@ void DocumentSession::setKeepsVersions(bool on) {
     Q_EMIT versionsChanged();
 }
 
+bool DocumentSession::setVersionMessage(int id, const std::string& message, std::string& error) {
+    if (isSaving() || !isHybrid()) {
+        error = isSaving() ? "A save is running." : "The document is not a PDF with notes.";
+        return false;
+    }
+    const fs::path file = getFilePath();
+    // (as HybridPdf keeps a file's version: its size and time)
+    auto stamp = [&file] {
+        std::error_code ec;
+        const auto size = fs::file_size(file, ec);
+        const auto time = fs::last_write_time(file, ec);
+        return std::to_string(size) + "-" + std::to_string(static_cast<long long>(time.time_since_epoch().count()));
+    };
+    const std::string was = stamp();
+    if (!HybridPdf::setVersionMessage(file, id, message, error)) {
+        return false;
+    }
+    if (hybridRevision && hybridRevisionFile == file && hybridRevision->stamp == was) {
+        // (the pages are the same objects: the next save appends as before)
+        hybridRevision->stamp = stamp();
+    }
+    stampFiles();  // (the app's own change, never one "by another program")
+    Q_EMIT versionsChanged();
+    return true;
+}
+
+void DocumentSession::versionRestored(const std::string& message) { restoredMessage = message; }
+
+void DocumentSession::replaceAllPages(const std::vector<PageRef>& pages, const std::string& text) {
+    if (pages.empty()) {
+        return;
+    }
+    const auto before = pageOrder();
+    applyPageOrder(pages, {});
+    addPageUndoAction(std::make_unique<PageOrderUndoAction>(before, pages, std::vector<PageRef>{}, text));
+}
+
 bool DocumentSession::hasEarlierRevisions() const {
     std::error_code ec;
     return isHybrid() && fs::exists(getFilePath(), ec) && HybridPdf::hasEarlierRevisions(getFilePath());

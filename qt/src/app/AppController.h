@@ -85,6 +85,7 @@ class Library;
 class LibraryModel;
 class RecentFiles;
 class ReferenceMode;
+class VersionsModel;
 class PresenterConsole;
 class StickersModel;
 namespace DocumentFiles {
@@ -111,6 +112,8 @@ class AppController: public QObject {
     Q_PROPERTY(QObject* outline READ outlineModel CONSTANT)
     /// Highlights and notes of the current tab (the sidebar's Annotations panel, qt/docs/annotations-md.md)
     Q_PROPERTY(QObject* annotations READ annotationsModel CONSTANT)
+    /// The version history of the current tab (the sidebar's History panel; xqt::VersionsModel, PdfHistory.h)
+    Q_PROPERTY(QObject* versions READ versionsModel CONSTANT)
     /// The layers of the current page
     Q_PROPERTY(QObject* layers READ layersModel CONSTANT)
     /// The keyboard shortcuts (the same ones in every window)
@@ -343,6 +346,7 @@ public:
     QObject* filteredPagesModel() const;
     QObject* outlineModel() const;
     QObject* annotationsModel() const;
+    QObject* versionsModel() const;
     QObject* layersModel() const;
     QObject* shortcutsModel() const;
     QObject* settingsModel() const;
@@ -937,6 +941,17 @@ private:
     void openReceived(const fs::path& folder, const std::vector<fs::path>& files, const QStringList& errors);
 
 public:
+    // --- version history (qt/docs/hybrid-pdf.md "Version history"; the model: `versions`) ------------------------
+    /// "Save with a message…" (Ctrl+Alt+S): a save that makes a milestone (a version with this message, never
+    /// replaced). Like saveInBackground otherwise.
+    Q_INVOKABLE bool saveWithMessage(const QString& message, const QJSValue& then = QJSValue());
+    /// Give a version a message (an empty one: none) or change it; false and a message when it cannot.
+    Q_INVOKABLE bool setVersionMessage(int id, const QString& message);
+    /// Show version `id` beside the document, read-only (as its reference; the file of the version in VersionCache).
+    Q_INVOKABLE bool viewVersion(int id);
+    /// Open version `id` as a new document that is not saved yet (named after it).
+    Q_INVOKABLE bool openVersionAsCopy(int id);
+
     /// Show a file beside the current document, as its reference (opened as a tab if it is not open yet; an untouched
     /// new document stays, to write the notes in). Without a document open: opened as the document. The current
     /// document itself: a second view of it beside it.
@@ -1740,6 +1755,8 @@ private:
     std::unique_ptr<xqt::PageFilterModel> filteredPages;
     std::unique_ptr<xqt::OutlineModel> outline;
     std::unique_ptr<xqt::AnnotationsModel> annotations;
+    std::unique_ptr<xqt::VersionsModel> versions;
+    std::string nextSaveMessage;  ///< saveWithMessage(): for the save it starts
     std::unique_ptr<xqt::LayersModel> layers;
     std::unique_ptr<xqt::ShortcutsModel> ownShortcuts;
     xqt::ShortcutsModel* shortcuts = nullptr;  ///< the main window's

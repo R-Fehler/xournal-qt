@@ -162,6 +162,8 @@ State stateOf(QPDF& q) {
         s.on = on.isBool() && on.getBoolValue();
         QPDFObjectHandle count = h.getKey("/Count");
         s.count = count.isInteger() ? static_cast<int>(count.getIntValue()) : 0;
+        QPDFObjectHandle start = h.getKey("/Start");
+        s.start = start.isInteger() ? start.getIntValue() : -1;
     }
     QPDFObjectHandle list = marker.getKey("/Versions");
     if (list.isStream()) {
@@ -194,17 +196,26 @@ Listed list(const fs::path& pdf) {
     }
     l.on = s.on;
     std::set<uint64_t> ends;
+    const PdfRevisions::Revision* marked = nullptr;  // the revision with the latest marker
     for (const auto& r: l.chain.revisions) {
         ends.insert(r.end);
+        if (s.start >= 0 && r.start == static_cast<uint64_t>(s.start)) {
+            marked = &r;
+        }
     }
+    l.lastIsOurs = marked && marked == &l.chain.revisions.back();
     for (size_t k = 0; k < s.versions.size(); ++k) {
         Version v = s.versions[k];
         const bool current = k + 1 == s.versions.size();
         if (current || v.end == 0) {
-            // (its end was not known when its own list was written: the first revision end after its start)
+            // (its end was not known when its own list was written: the revision with the marker, which may be an
+            // update of the marker alone after it (a message changed), else the revision that begins where it does)
             v.end = 0;
+            if (current && marked && marked->start >= v.start) {
+                v.end = marked->end;
+            }
             for (const auto& r: l.chain.revisions) {
-                if (r.end > v.start && (r.start == v.start || v.id == 0)) {
+                if (v.end == 0 && r.end > v.start && (r.start == v.start || v.id == 0)) {
                     v.end = r.end;
                     break;
                 }
@@ -217,12 +228,11 @@ Listed list(const fs::path& pdf) {
         l.versions.push_back(std::move(v));
     }
     if (!l.versions.empty()) {
-        std::set<uint64_t> ours;
-        for (const auto& v: l.versions) {
-            ours.insert(v.end);
-        }
         for (const auto& r: l.chain.revisions) {
-            if (r.end > l.versions.front().end && !ours.count(r.end)) {
+            const bool inVersion = std::any_of(l.versions.begin(), l.versions.end(), [&](const Version& v) {
+                return v.id > 0 && r.start >= v.start && r.end <= v.end;
+            });
+            if (r.end > l.versions.front().end && !inVersion) {
                 l.others.push_back({r.start, r.end, PdfRevisions::dateOf(pdf, r.end)});
             }
         }
@@ -238,7 +248,7 @@ bool replacesLast(const Listed& listed, const std::string& today) {
     const auto& last = listed.chain.revisions.back();
     // (a version written in full, at the start of the file, is not cut away: that would be writing the file anew)
     return cur.id > 0 && cur.start > 0 && cur.kind != Kind::RECEIVED && !cur.milestone() && cur.day == today &&
-           last.start == cur.start && last.end == cur.end;
+           listed.lastIsOurs && last.end == cur.end;
 }
 
 }  // namespace xqt::PdfHistory

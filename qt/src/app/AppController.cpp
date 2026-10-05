@@ -91,6 +91,8 @@
 #include "shell/ShortcutsModel.h"
 #include "shell/OutlineModel.h"
 #include "shell/AnnotationsModel.h"
+#include "shell/VersionsModel.h"
+#include "session/VersionCache.h"
 #include "shell/LocalUrl.h"
 #include "shell/PdfPrinting.h"
 #include "ImageFile.h"
@@ -167,6 +169,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     filteredPages = std::make_unique<PageFilterModel>(*pages);
     outline = std::make_unique<OutlineModel>();
     annotations = std::make_unique<AnnotationsModel>();
+    versions = std::make_unique<VersionsModel>();
     layers = std::make_unique<LayersModel>();
     ownPageClipboard = std::make_unique<PageClipboard>();
     pageClipboard = ownPageClipboard.get();
@@ -324,6 +327,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     filteredPages = std::make_unique<PageFilterModel>(*pages);
     outline = std::make_unique<OutlineModel>();
     annotations = std::make_unique<AnnotationsModel>();
+    versions = std::make_unique<VersionsModel>();
     layers = std::make_unique<LayersModel>();
     connect(this, &AppController::searchChanged, this, [this] {
         if (searchQuery().isEmpty()) {
@@ -425,6 +429,10 @@ AppController::~AppController() {
     pages->setSession(nullptr);
     outline->setSession(nullptr);
     annotations->setSession(nullptr);
+    versions->setSession(nullptr);
+    if (!isSecondary()) {
+        VersionCache::instance().clear();  // (the versions shown or opened: this process's, in the app cache)
+    }
     layers->setSession(nullptr);
     recovery.reset();  // unregisters the sessions from the crash handler before they go away
     presenter.reset();  // (the audience's view of a session)
@@ -873,6 +881,7 @@ void AppController::currentTabChanged() {
     pages->setSession(session());
     outline->setSession(session());
     annotations->setSession(session());
+    versions->setSession(session());
     layers->setSession(session());
     if (CanvasView* v = canvas()) {
         currentConnections.push_back(connect(v, &CanvasView::pagesChanged, this, &AppController::pageChanged));
@@ -1515,6 +1524,8 @@ void AppController::setHomeVisible(bool visible) {
 QObject* AppController::filteredPagesModel() const { return filteredPages.get(); }
 QObject* AppController::outlineModel() const { return outline.get(); }
 QObject* AppController::annotationsModel() const { return annotations.get(); }
+
+QObject* AppController::versionsModel() const { return versions.get(); }
 QObject* AppController::layersModel() const { return layers.get(); }
 QObject* AppController::shortcutsModel() const { return shortcuts; }
 int AppController::currentTab() const { return tabs->currentIndex(); }
@@ -3428,6 +3439,7 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
     }
     request.target = target;
     request.compact = compact;
+    request.message = std::exchange(nextSaveMessage, std::string());
     const bool hybrid = way == SaveWay::Hybrid || (way == SaveWay::Save && s->isHybrid());
     // A document saved as "name.xopp" becomes a PDF with notes: what happens to the .xopp (asked by the window, or
     // the setting; not asked: it stays)
@@ -3596,6 +3608,66 @@ std::function<void(bool)> AppController::callWhenSaved(const QJSValue& then) {
 }
 
 bool AppController::saveInBackground(const QJSValue& then) { return startSave(SaveWay::Save, {}, callWhenSaved(then)); }
+
+bool AppController::saveWithMessage(const QString& message, const QJSValue& then) {
+    if (!session()) {
+        return false;
+    }
+    nextSaveMessage = message.simplified().left(200).toStdString();  // (one line, as the plan says)
+    const bool started = startSave(SaveWay::Save, {}, callWhenSaved(then));
+    nextSaveMessage.clear();
+    return started;
+}
+
+bool AppController::setVersionMessage(int id, const QString& message) {
+    DocumentSession* s = session();
+    std::string error;
+    if (!s || !s->setVersionMessage(id, message.simplified().left(200).toStdString(), error)) {
+        Q_EMIT this->message(tr("The message could not be changed"), QString::fromStdString(error), true);
+        return false;
+    }
+    return true;
+}
+
+bool AppController::viewVersion(int id) {
+    DocumentSession* s = session();
+    if (!s || !s->isHybrid()) {
+        return false;
+    }
+    std::string error;
+    const fs::path file = VersionCache::instance().get(s->getFilePath(), id, error);
+    if (file.empty()) {
+        Q_EMIT message(tr("The version cannot be shown"), QString::fromStdString(error), true);
+        return false;
+    }
+    return openAsReference(QString::fromStdString(file.string()));
+}
+
+bool AppController::openVersionAsCopy(int id) {
+    DocumentSession* s = session();
+    if (!s || !s->isHybrid()) {
+        return false;
+    }
+    std::string error;
+    const fs::path file = VersionCache::instance().get(s->getFilePath(), id, error);
+    auto loaded = file.empty() ? DocumentSession::LoadResult{} : DocumentSession::loadFile(file);
+    if (!loaded.document) {
+        Q_EMIT message(tr("The version cannot be opened"),
+                       QString::fromStdString(error.empty() ? loaded.error : error), true);
+        return false;
+    }
+    // A new document, not saved yet, named after the version (next to the document)
+    fs::path suggestion = s->getFilePath().parent_path() / file.filename();
+    loaded.document->lock();
+    loaded.document->setFilepath({});
+    loaded.document->unlock();
+    auto copy = std::make_unique<DocumentSession>(*app, std::move(loaded.document));
+    copy->setMadeFrom(suggestion);
+    tabs->addTab(std::move(copy));
+    setHomeVisible(false);
+    Q_EMIT titleChanged();
+    return true;
+}
 
 bool AppController::saveAsInBackground(const QUrl& url, const QJSValue& then) {
     return startSave(SaveWay::SaveAs, fs::path(url.toLocalFile().toStdString()), callWhenSaved(then));

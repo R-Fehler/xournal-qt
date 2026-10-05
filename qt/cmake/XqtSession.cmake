@@ -71,6 +71,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfHistory.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ByteDelta.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ByteDelta.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/VersionCache.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/VersionCache.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPdf.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPdf.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ArchivePdf.h

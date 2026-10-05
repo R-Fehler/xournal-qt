@@ -646,7 +646,8 @@ void DocumentSession::takeSnapshot() {
             std::error_code ec;
             const bool own = t.request.kind == SaveKind::Save || !t.ownCopy.empty() || !fs::exists(t.target, ec);
             t.history.on = keepsVersions() && !t.request.compact && own;  // (never on top of another file)
-            t.history.message = t.request.message;
+            t.history.message = t.request.message.empty() ? restoredMessage : t.request.message;
+            t.history.newVersion = !restoredMessage.empty();
             t.historyChoice = versionsChoice.has_value();
         }
         if (t.hybrid && t.request.kind == SaveKind::Save && !t.request.compact && hybridRevision &&
@@ -849,6 +850,9 @@ void DocumentSession::finishWrite() {
             HybridPdf::touch(bg);  // (still used)
         }
         hybridChanges.clear();  // (written anew from the document)
+        if (t.history.on && t.history.newVersion) {
+            restoredMessage.clear();  // (the restored version is in the file now)
+        }
         if (t.historyChoice && versionsChoice && *versionsChoice == t.history.on) {
             versionsChoice.reset();  // (the file says it now)
         }

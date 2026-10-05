@@ -62,6 +62,7 @@ std::vector<Version> fromJsonLines(const std::string& text);
 struct State {
     bool on = false;
     int count = 0;  ///< /History /Count (what the library shows, without reading the list)
+    long long start = -1;  ///< /History /Start: where the revision with this marker begins (-1: not said)
     std::vector<Version> versions;
 };
 State stateOf(QPDF& q);
@@ -79,6 +80,7 @@ struct Listed {
     std::vector<Version> versions;  ///< oldest first, each with its end; versions no longer in the file left out
     std::vector<Other> others;      ///< revisions of other apps after the first version
     int removed = 0;                ///< listed versions that are not in the file any more
+    bool lastIsOurs = false;        ///< the file's last revision has the marker the list was read from
     uint64_t size = 0;              ///< the file's length
     PdfRevisions::Chain chain;
     std::string error;

@@ -1578,6 +1578,7 @@ std::vector<PdfBookmarks::Entry> bookmarksOf(const Prepared& prep, const std::ve
 /// Version history (PdfHistory.h): what our marker says about it after this save.
 struct HistoryMark {
     std::vector<PdfHistory::Version> versions;  ///< oldest first; the last one is the version written
+    uint64_t start = 0;                         ///< where the revision with this marker begins in the file
 };
 
 /// Put the history into our marker (`mark` null: none, the keys go); `stream` makes the /Versions stream.
@@ -1595,6 +1596,7 @@ void putHistory(QPDFObjectHandle marker, const HistoryMark* mark,
     h.replaceKey("/On", QPDFObjectHandle::newBool(true));
     h.replaceKey("/Count", QPDFObjectHandle::newInteger(static_cast<long long>(mark->versions.size())));
     h.replaceKey("/Latest", QPDFObjectHandle::newString(mark->versions.back().date));
+    h.replaceKey("/Start", QPDFObjectHandle::newInteger(static_cast<long long>(mark->start)));
     marker.replaceKey("/History", h);
     marker.replaceKey("/Versions", stream(PdfHistory::toJsonLines(mark->versions)));
 }
@@ -2068,6 +2070,33 @@ void touchNames(IncrementalPdf::Update& u, QPDFObjectHandle root) {
         }
     };
     walk(names.getKey("/EmbeddedFiles"), 0);
+}
+
+/// The embedded document as a new file specification in the name tree (whose nodes are touched here): after an older
+/// version's .xopp became a delta (version history), and in a version cut out of the file.
+void addDataSpec(QPDF& q, IncrementalPdf::Update& u, const std::string& name, const std::string& xopp) {
+    touchNames(u, q.getRoot());
+    QPDFObjectHandle dict = QPDFObjectHandle::newDictionary();
+    dict.replaceKey("/Type", QPDFObjectHandle::newName("/EmbeddedFile"));
+    dict.replaceKey("/Subtype", QPDFObjectHandle::newName("/" + std::string(ArchivePdf::XOPP_MIME)));
+    QPDFObjectHandle params = QPDFObjectHandle::newDictionary();
+    params.replaceKey("/Size", QPDFObjectHandle::newInteger(static_cast<long long>(xopp.size())));
+    const QByteArray md5 = QCryptographicHash::hash(QByteArray::fromRawData(xopp.data(), static_cast<int>(xopp.size())),
+                                                    QCryptographicHash::Md5);
+    params.replaceKey("/CheckSum", QPDFObjectHandle::newString(md5.toStdString()));
+    dict.replaceKey("/Params", params);
+    QPDFObjectHandle stream = u.addStream(dict, xopp);
+    QPDFObjectHandle ef = QPDFObjectHandle::newDictionary();
+    ef.replaceKey("/F", stream);
+    ef.replaceKey("/UF", stream);
+    QPDFObjectHandle spec = QPDFObjectHandle::newDictionary();
+    spec.replaceKey("/Type", QPDFObjectHandle::newName("/Filespec"));
+    spec.replaceKey("/F", QPDFObjectHandle::newUnicodeString(name));
+    spec.replaceKey("/UF", QPDFObjectHandle::newUnicodeString(name));
+    spec.replaceKey("/EF", ef);
+    spec.replaceKey("/Desc",
+                    QPDFObjectHandle::newUnicodeString("The Xournal++ document of this PDF (xournal-qt hybrid PDF)"));
+    QPDFEmbeddedFileDocumentHelper(q).replaceEmbeddedFile(name, QPDFFileSpecObjectHelper(u.add(spec)));
 }
 
 /// One incremental save: what changed of the document `prep` is put into the existing file `e`, then appended.
@@ -2732,26 +2761,7 @@ private:
                 throw std::runtime_error("the embedded document is missing");
             }
             // The last version's .xopp became a delta (version history): the embedded document is added again
-            QPDFObjectHandle dict = QPDFObjectHandle::newDictionary();
-            dict.replaceKey("/Type", QPDFObjectHandle::newName("/EmbeddedFile"));
-            dict.replaceKey("/Subtype", QPDFObjectHandle::newName("/" + std::string(ArchivePdf::XOPP_MIME)));
-            QPDFObjectHandle params = QPDFObjectHandle::newDictionary();
-            params.replaceKey("/Size", QPDFObjectHandle::newInteger(static_cast<long long>(prep.xopp.size())));
-            const QByteArray md5 = QCryptographicHash::hash(
-                    QByteArray::fromRawData(prep.xopp.data(), static_cast<int>(prep.xopp.size())), QCryptographicHash::Md5);
-            params.replaceKey("/CheckSum", QPDFObjectHandle::newString(md5.toStdString()));
-            dict.replaceKey("/Params", params);
-            QPDFObjectHandle stream = u.addStream(dict, prep.xopp);
-            QPDFObjectHandle ef = QPDFObjectHandle::newDictionary();
-            ef.replaceKey("/F", stream);
-            ef.replaceKey("/UF", stream);
-            QPDFObjectHandle spec = QPDFObjectHandle::newDictionary();
-            spec.replaceKey("/Type", QPDFObjectHandle::newName("/Filespec"));
-            spec.replaceKey("/F", QPDFObjectHandle::newUnicodeString(data));
-            spec.replaceKey("/UF", QPDFObjectHandle::newUnicodeString(data));
-            spec.replaceKey("/EF", ef);
-            spec.replaceKey("/Desc", QPDFObjectHandle::newUnicodeString("The Xournal++ document of this PDF (xournal-qt hybrid PDF)"));
-            efdh.replaceEmbeddedFile(data, QPDFFileSpecObjectHelper(u.add(spec)));
+            addDataSpec(q, u, data, prep.xopp);
         }
         std::set<std::string> before;
         {
@@ -3274,6 +3284,15 @@ bool rewriteFrom(const fs::path& target, uint64_t from, std::string& error,
         if (change) {
             change(q, u);
         }
+        // (the marker says where its revision begins: version history tells our revisions from other apps' by it)
+        QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
+        if (QPDFObjectHandle h = marker.isDictionary() ? marker.getKey("/History") : QPDFObjectHandle::newNull();
+            h.isDictionary()) {
+            u.touch(marker.isIndirect() ? marker : q.getRoot());
+            QPDFObjectHandle copy = h.shallowCopy();
+            copy.replaceKey("/Start", QPDFObjectHandle::newInteger(static_cast<long long>(from)));
+            marker.replaceKey("/History", copy);
+        }
         bytes = u.serializeOver(over);
     }
     const auto r = IncrementalPdf::append(target, whole, bytes, from);
@@ -3358,7 +3377,7 @@ bool storeAsDelta(const fs::path& target, const PdfHistory::Listed& listed, std:
     const auto& last = listed.chain.revisions.back();
     if (cur.kind != PdfHistory::Kind::FULL || cur.id <= 0 || cur.start == 0 || cur.milestone() ||
         cur.id % PdfHistory::KEYFRAME_EVERY == 0 || prev.kind == PdfHistory::Kind::RECEIVED || cur.sha.empty() ||
-        last.start != cur.start || last.end != cur.end) {
+        !listed.lastIsOurs || last.end != cur.end) {
         return false;
     }
     Steps step;
@@ -3447,7 +3466,7 @@ Result writeKeeping(Document& doc, const fs::path& target, const BasePageOf& bas
         // Nothing to build on (a new file, or one that does not read): the first version, written in full
         Prepared prep = prepared(nullptr);
         v.id = 1;
-        HistoryMark mark{{v}};
+        HistoryMark mark{{v}, 0};
         Result r = assemble(prep, target, Mode::Hybrid, exportName, titleOf(target), &mark);
         r.version = v.id;
         if (r.ok && options.written) {
@@ -3468,7 +3487,7 @@ Result writeKeeping(Document& doc, const fs::path& target, const BasePageOf& bas
         Prepared prep = prepared(nullptr);
         v.id = 1;
         v.start = chain.size;
-        HistoryMark mark{{v0, v}};
+        HistoryMark mark{{v0, v}, chain.size};
         Result r = appendWhole(prep, target, exportName, mark, options.written, work);
         r.version = v.id;
         return r;
@@ -3499,7 +3518,7 @@ Result writeKeeping(Document& doc, const fs::path& target, const BasePageOf& bas
         versions.push_back(v0);
         last = 0;
     }
-    const bool replace = PdfHistory::replacesLast(listed, v.day);
+    const bool replace = !options.history->newVersion && PdfHistory::replacesLast(listed, v.day);
     uint64_t cut = 0;
     if (replace) {
         v.id = versions.back().id;
@@ -3541,7 +3560,7 @@ Result writeKeeping(Document& doc, const fs::path& target, const BasePageOf& bas
             if (existing) {
                 Prepared prep = prepared(&existing->reuse);
                 versions.push_back(v);
-                HistoryMark mark{versions};
+                HistoryMark mark{versions, existing->tail.size};
                 const std::string was = options.revision->stamp;
                 Result r = Appending(*existing, prep, false, rev, &mark).run(exportName, target, options.written, whyFull);
                 if (r.ok) {
@@ -3569,11 +3588,137 @@ Result writeKeeping(Document& doc, const fs::path& target, const BasePageOf& bas
     // The fallback that keeps the versions: the whole document appended
     Prepared prep = prepared(nullptr);
     versions.push_back(v);
-    Result r = appendWhole(prep, target, exportName, HistoryMark{versions}, options.written, work);
+    std::error_code sec;
+    Result r = appendWhole(prep, target, exportName, HistoryMark{versions, fs::file_size(target, sec)}, options.written,
+                           work);
     r.whyFull = whyFull;
     return finish(r);
 }
 }  // namespace
+
+bool writeVersion(const fs::path& pdf, int id, const fs::path& out, std::string& error) {
+    try {
+        const PdfHistory::Listed listed = PdfHistory::list(pdf);
+        auto it = std::find_if(listed.versions.begin(), listed.versions.end(),
+                               [&](const PdfHistory::Version& v) { return v.id == id; });
+        if (it == listed.versions.end()) {
+            error = listed.error.empty() ? "There is no such version in the file." : listed.error;
+            return false;
+        }
+        std::string xopp;
+        if (it->kind == PdfHistory::Kind::DELTA) {
+            xopp = PdfHistory::xoppOf(pdf, listed, id, error);  // (rebuilt and checked first)
+            if (xopp.empty()) {
+                return false;
+            }
+        }
+        if (!PdfRevisions::extract(pdf, it->end, out, error)) {
+            return false;
+        }
+        if (xopp.empty()) {
+            return true;  // (the file as it was saved then: its own document.xopp, or the PDF as received)
+        }
+        // Its .xopp was a delta: the whole one added again, so that it opens as a PDF with notes of its own
+        IncrementalPdf::Tail tail;
+        if (!IncrementalPdf::readTail(out, tail, error)) {
+            return false;
+        }
+        std::string bytes;
+        {
+            QPDF q;
+            q.setSuppressWarnings(true);
+            q.processFile(out.string().c_str());
+            IncrementalPdf::Update u(q);
+            QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
+            QPDFObjectHandle name = marker.getKey("/Data");
+            addDataSpec(q, u, name.isString() ? name.getUTF8Value() : std::string(DATA_NAME), xopp);
+            u.touch(marker.isIndirect() ? marker : q.getRoot());
+            marker.removeKey(PdfHistory::DELTA_KEY);
+            bytes = u.serialize(tail);
+        }
+        const auto r = IncrementalPdf::append(out, tail, bytes);
+        if (!r.ok) {
+            error = r.error;
+        }
+        return r.ok;
+    } catch (const std::exception& e) {
+        error = e.what();
+    }
+    return false;
+}
+
+bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, std::string& error) {
+    try {
+        PdfHistory::Listed listed = PdfHistory::list(pdf);
+        if (!listed.on || !listed.lastIsOurs || listed.versions.empty()) {
+            error = "The file was changed by another app since it was saved here: save it first.";
+            return false;
+        }
+        bool found = false;
+        for (auto& v: listed.versions) {
+            if (v.id == id) {
+                v.message = message;
+                found = true;
+            }
+        }
+        if (!found) {
+            error = "There is no such version in the file.";
+            return false;
+        }
+        listed.versions.back().end = 0;  // (the current version: as its own list says it)
+        IncrementalPdf::Tail tail;
+        if (!IncrementalPdf::readTail(pdf, tail, error)) {
+            return false;
+        }
+        std::string bytes;
+        {
+            QPDF q;
+            q.setSuppressWarnings(true);
+            q.processFile(pdf.string().c_str());
+            IncrementalPdf::Update u(q);
+            QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
+            u.touch(marker.isIndirect() ? marker : q.getRoot());
+            HistoryMark mark{listed.versions, tail.size};
+            putHistory(marker, &mark, [&](const std::string& data) {
+                return u.addStream(QPDFObjectHandle::newDictionary(), data);
+            });
+            bytes = u.serialize(tail);
+        }
+        const std::string was = stampOf(pdf);
+        const auto r = IncrementalPdf::append(pdf, tail, bytes);
+        if (!r.ok) {
+            error = r.error;
+            return false;
+        }
+        // (only the marker changed: the clean copy is still the clean copy of this version)
+        keepCacheEntry(pdf, was);
+        return true;
+    } catch (const std::exception& e) {
+        error = e.what();
+    }
+    return false;
+}
+
+void keepCacheEntry(const fs::path& pdf, const std::string& was) {
+    std::error_code ec;
+    const fs::path from = entryOf(pdf, was);
+    const fs::path to = entryOf(pdf, stampOf(pdf));
+    if (from == to || !fs::exists(from / CHECK_NAME, ec) || fs::exists(to / CHECK_NAME, ec)) {
+        return;
+    }
+    fs::create_directories(to, ec);
+    for (auto it = fs::directory_iterator(from, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+        if (it->path().filename() == CHECK_NAME || !it->is_regular_file()) {
+            continue;
+        }
+        std::error_code lec;
+        fs::create_hard_link(it->path(), to / it->path().filename(), lec);
+        if (lec) {
+            fs::copy_file(it->path(), to / it->path().filename(), fs::copy_options::overwrite_existing, lec);
+        }
+    }
+    fs::copy_file(from / CHECK_NAME, to / CHECK_NAME, fs::copy_options::overwrite_existing, ec);  // (last: complete)
+}
 
 Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, size_t pdfPageCount,
              const fs::path& xoppExport, const WriteOptions& options) {
