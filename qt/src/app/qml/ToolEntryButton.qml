@@ -7,6 +7,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
+import "LineStyles.js" as LineStyles
 
 AbstractButton {
     id: button
@@ -41,7 +42,6 @@ AbstractButton {
 
     readonly property string type: entry && entry.type ? entry.type : ""
     readonly property real width_: entry && entry.width ? entry.width : 1
-    readonly property var dashes: ({ "plain": [], "dash": [6, 3], "dashdot": [6, 3, 0.5, 3], "dot": [0.5, 3] })
 
     implicitWidth: cell
     implicitHeight: cell
@@ -68,6 +68,7 @@ AbstractButton {
         case "text": return "xqt-text-box"
         case "sticky": return "xqt-sticky-note"
         case "laser": return "xopp-laser-pointer"
+        case "snip": return e.variant === "lasso" ? "xqt-snip-lasso" : "xqt-snip-rect"
         }
         return "xopp-tool-pencil"
     }
@@ -134,7 +135,8 @@ AbstractButton {
         // translucent; an eraser's a gray dot of its size; a text box's "Aa" in its font and color
         Canvas {
             id: sample
-            visible: button.type !== "sticky" && button.type !== "text"
+            objectName: "toolSample"
+            visible: button.type !== "sticky" && button.type !== "text" && button.type !== "snip"
             anchors.horizontalCenter: parent.horizontalCenter
             y: Math.round(parent.height / 2 + 6)
             width: 28
@@ -169,9 +171,9 @@ AbstractButton {
                 }
                 ctx.strokeStyle = button.inkColor
                 ctx.lineWidth = highlighter ? Math.max(w, 6) : w
-                ctx.lineCap = highlighter ? "butt" : "round"
-                const d = button.dashes[button.entry.lineStyle || "plain"] || []
-                ctx.setLineDash(d.map(function(x) { return x * Math.max(1, 3 / ctx.lineWidth) }))
+                const style = button.entry.lineStyle || "plain"
+                ctx.lineCap = highlighter ? "butt" : LineStyles.sampleCap(style, "round")
+                ctx.setLineDash(LineStyles.sampleDashes(style, ctx.lineWidth))
                 ctx.beginPath()
                 ctx.moveTo(4 + ctx.lineWidth / 2, height / 2)
                 ctx.lineTo(width - 4 - ctx.lineWidth / 2, height / 2)
@@ -194,6 +196,23 @@ AbstractButton {
             font.family: button.entry && button.entry.font ? button.entry.font.family : ""
             font.pixelSize: 12
             font.weight: Font.DemiBold
+        }
+        // A snip (a cycling tool): two dots, the one of its shape in color (ToolCycleButton's dots)
+        Row {
+            objectName: "snipDots"
+            visible: button.type === "snip"
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: Math.round(parent.height / 2 + 9)
+            spacing: 3
+            Repeater {
+                model: ["rect", "lasso"]
+                delegate: Rectangle {
+                    required property string modelData
+                    width: 4; height: 4; radius: 2
+                    color: (button.entry.variant || "rect") === modelData
+                           ? (button.inHand ? Material.accentColor : "#505050") : "#b4b8bd"
+                }
+            }
         }
         // A stack: dots for the entries it holds
         Row {

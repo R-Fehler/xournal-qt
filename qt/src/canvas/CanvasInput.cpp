@@ -1006,9 +1006,9 @@ bool CanvasInput::actionEnd(const Event& event) {
         return false;
     }
     if (std::exchange(this->readOnlyPress, false)) {
-        // A read-only document: nothing was written; a tap may be a link
-        if (isClick(event)) {
-            view.tapAt(event.viewPos);
+        // A read-only document: nothing was written; a tap may be a link, else at an edge it turns the page
+        if (isClick(event) && !view.tapAt(event.viewPos)) {
+            view.edgeTap(event.viewPos);
         } else if (view.getViewController().snapping()) {
             view.getViewController().endScroll({});  // (dragged: to rest on a page)
         }
@@ -1068,8 +1068,8 @@ bool CanvasInput::actionEnd(const Event& event) {
                          tt == TOOL_SELECT_MULTILAYER_RECT || tt == TOOL_SELECT_MULTILAYER_REGION ||
                          tt == TOOL_SELECT_OBJECT || tt == TOOL_SELECT_PDF_TEXT_LINEAR ||
                          tt == TOOL_SELECT_PDF_TEXT_RECT;
-    if (tapTool && !toggle && !view.hasAnySelection() && isClick(event)) {
-        view.tapAt(event.viewPos);
+    if (tapTool && !toggle && !view.hasAnySelection() && isClick(event) && !view.tapAt(event.viewPos)) {
+        view.edgeTap(event.viewPos);  // (reading: the edges turn the pages)
     }
 
     if (tt == TOOL_HAND && view.getViewController().snapping()) {
@@ -1677,6 +1677,8 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
                     lastTapMs = 0;  // select more (the finger scrolls): what was tapped joined the selection or left it
                 } else if (view.tapAt(touchSessionStartPos)) {
                     lastTapMs = 0;  // it was a PDF link: never the first tap of a double tap
+                } else if (view.edgeTap(touchSessionStartPos)) {
+                    lastTapMs = 0;  // reading: an edge turned the page (taps in a row turn more, no double tap)
                 } else if (now - lastTapMs <= DOUBLE_TAP_MS &&
                            std::hypot(touchSessionStartPos.x() - lastTapPos.x(),
                                       touchSessionStartPos.y() - lastTapPos.y()) <= DOUBLE_TAP_PX) {

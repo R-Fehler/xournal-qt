@@ -11,6 +11,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Dialogs
 import QtQuick.Layouts
+import "LineStyles.js" as LineStyles
 
 Popup {
     id: editor
@@ -23,6 +24,8 @@ Popup {
     property int addAt: -1
     /// The button it opened from (it opens beside it, towards the page)
     property Item owner: null
+    /// The button that shows an entry now (Toolbox.buttonFor): the owner again when the rail made its buttons anew
+    property var ownerOf: null
     /// The toolbox's edge (where the page is from the owner)
     property string edge: "right"
     readonly property bool adding: entryId === ""
@@ -82,7 +85,7 @@ Popup {
                                  : type === "eraser" ? [1, 2.83, 8.5, 19.84, 30]
                                  : type === "laser" ? [0.7, 1.41, 2.4, 4, 7] : [0.42, 0.85, 1.41, 2.26, 5.67]
     readonly property bool hasWidth: ["pen", "highlighter", "shape", "eraser", "laser"].indexOf(type) >= 0
-    readonly property bool hasColor: type !== "eraser"
+    readonly property bool hasColor: type !== "eraser" && type !== "snip"
     readonly property bool hasLineStyle: type === "pen" || (type === "shape" && entry.base !== "highlighter")
     readonly property bool hasFill: type === "pen" || type === "highlighter" || type === "shape"
     /// 0.1 to 150 pt on a log scale (slider 0 … 1)
@@ -110,19 +113,37 @@ Popup {
     topPadding: 10
     width: asSheet ? win.sheetWidth : 340
     height: Math.min(implicitHeight, (parent ? parent.height : 600) - 16)
-    readonly property rect ownerRect: {
-        if (!owner || !parent || !visible) return Qt.rect(0, 0, 0, 0)
+    // Beside its button, towards the page. Placed (not bound to the button): a button can go away while the editor is
+    // open (the rail made anew, the tool replaced), and a binding then put the editor in the window's top left corner
+    // (2026-10-05). Without a button it stays where it is, and takes the entry's button again once there is one.
+    property real placedX: 8
+    property real placedY: 8
+    function place() {
+        if (!owner || !parent) return
         const p = owner.mapToItem(parent, 0, 0)
-        return Qt.rect(p.x, p.y, owner.width, owner.height)
+        const r = Qt.rect(p.x, p.y, owner.width, owner.height)
+        placedX = Math.max(8, Math.min(parent.width - width - 8,
+                                       edge === "right" ? r.x - width - 12 : edge === "left" ? r.x + r.width + 12
+                                                        : r.x + r.width / 2 - width / 2))
+        placedY = Math.max(8, Math.min(parent.height - height - 8,
+                                       edge === "bottom" ? r.y - height - 12 : edge === "top" ? r.y + r.height + 12
+                                                         : r.y + r.height / 2 - height / 2))
     }
-    x: asSheet ? win.sheetX
-       : Math.max(8, Math.min((parent ? parent.width : 800) - width - 8,
-                              edge === "right" ? ownerRect.x - width - 12 : edge === "left" ? ownerRect.x + ownerRect.width + 12
-                                               : ownerRect.x + ownerRect.width / 2 - width / 2))
-    y: asSheet ? win.sheetBottom - height
-       : Math.max(8, Math.min((parent ? parent.height : 600) - height - 8,
-                              edge === "bottom" ? ownerRect.y - height - 12 : edge === "top" ? ownerRect.y + ownerRect.height + 12
-                                                : ownerRect.y + ownerRect.height / 2 - height / 2))
+    function findOwner() {
+        if (owner || !visible || entryId === "" || typeof ownerOf !== "function") return
+        owner = ownerOf(entryId)
+    }
+    onOwnerChanged: owner ? place() : Qt.callLater(findOwner)
+    onAboutToShow: place()
+    onWidthChanged: place()
+    onHeightChanged: place()
+    Connections {
+        target: editor.parent
+        function onWidthChanged() { editor.place() }
+        function onHeightChanged() { editor.place() }
+    }
+    x: asSheet ? win.sheetX : placedX
+    y: asSheet ? win.sheetBottom - height : placedY
     bottomPadding: asSheet ? 12 + win.sheetBottomPadding : 12
     background: Rectangle {
         radius: editor.asSheet ? 16 : 12
@@ -165,7 +186,7 @@ Popup {
             Canvas {
                 id: preview
                 objectName: "toolEditorPreview"
-                visible: editor.type !== "text" && editor.type !== "sticky"
+                visible: editor.type !== "text" && editor.type !== "sticky" && editor.type !== "snip"
                 Layout.fillWidth: true
                 Layout.preferredHeight: 44
                 readonly property var key: [editor.shownColor, editor.entry.width, editor.entry.lineStyle, editor.type,
@@ -204,8 +225,7 @@ Popup {
                     ctx.strokeStyle = editor.shownColor
                     ctx.lineWidth = w
                     ctx.lineCap = editor.highlights ? "butt" : "round"
-                    const d = { "dash": [6, 3], "dashdot": [6, 3, 0.5, 3], "dot": [0.5, 3] }[e.lineStyle] || []
-                    ctx.setLineDash(d)
+                    ctx.setLineDash(LineStyles.dashes(e.lineStyle))  // (as it draws: in widths of the line)
                     ctx.beginPath()
                     if (fill) {
                         ctx.ellipse(width / 2 - 50, 6, 100, height - 12)
@@ -280,6 +300,30 @@ Popup {
                         font.pixelSize: 12
                         display: AbstractButton.TextUnderIcon
                         onClicked: editor.set({ variant: modelData.key })
+                    }
+                }
+            }
+
+            // --- a snip's shape (a tap on it while it is armed takes the other one too) ---
+            RowLayout {
+                objectName: "toolEditorSnipShapes"
+                visible: editor.type === "snip"
+                Layout.fillWidth: true
+                Repeater {
+                    model: win.toolGroups.variants("snip")
+                    delegate: Button {
+                        required property var modelData
+                        readonly property string shape: modelData.snip
+                        objectName: "editorSnip_" + shape
+                        Layout.fillWidth: true
+                        flat: true
+                        checkable: true
+                        checked: (editor.entry.variant || "rect") === shape
+                        icon.source: app.iconUrl(modelData.icon)
+                        text: shape === "lasso" ? qsTr("Lasso") : qsTr("Rectangle")
+                        font.pixelSize: 12
+                        display: AbstractButton.TextUnderIcon
+                        onClicked: editor.set({ variant: shape })
                     }
                 }
             }
@@ -485,8 +529,8 @@ Popup {
                 spacing: 2
                 Label { text: qsTr("Line"); Layout.fillWidth: true; color: "#5f6368" }
                 Repeater {
-                    model: [{ key: "plain", dashes: [], name: qsTr("Solid") }, { key: "dash", dashes: [6, 3], name: qsTr("Dashed") },
-                            { key: "dashdot", dashes: [6, 3, 0.5, 3], name: qsTr("Dash-dot") }, { key: "dot", dashes: [0.5, 3], name: qsTr("Dotted") }]
+                    model: [{ key: "plain", name: qsTr("Solid") }, { key: "dash", name: qsTr("Dashed") },
+                            { key: "dashdot", name: qsTr("Dash-dot") }, { key: "dot", name: qsTr("Dotted") }]
                     delegate: AbstractButton {
                         id: styleButton
                         required property var modelData
@@ -508,15 +552,17 @@ Popup {
                                 border.color: Material.accentColor
                             }
                             Canvas {
+                                objectName: "lineStyleSample"
                                 anchors.centerIn: parent
                                 width: 32; height: 12
                                 onPaint: {
                                     const ctx = getContext("2d")
                                     ctx.reset()
+                                    const key = styleButton.modelData.key
                                     ctx.lineWidth = 2.5
-                                    ctx.lineCap = "round"
+                                    ctx.lineCap = LineStyles.sampleCap(key, "round")
                                     ctx.strokeStyle = "#303030"
-                                    ctx.setLineDash(styleButton.modelData.dashes)
+                                    ctx.setLineDash(LineStyles.sampleDashes(key, ctx.lineWidth))
                                     ctx.beginPath()
                                     ctx.moveTo(2.5, height / 2)
                                     ctx.lineTo(width - 2.5, height / 2)

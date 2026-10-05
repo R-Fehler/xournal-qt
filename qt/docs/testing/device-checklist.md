@@ -2184,7 +2184,9 @@ screen, Present, Present without controls, Hide the tool bar and Tool bar positi
       never covers the tab strip or the ⋮ button.
 - [ ] The library's ▾ menu (the libraries), a card's ⋮, a tab's menu (right click), the layout menu (right click the
       columns button of the view pill): as wide as their entries, inside the window, not over their button.
-- [ ] View → Read (only the page): the tool bar and pills go; the faint dot in the lower left corner brings them back.
+- [ ] View → Read: since qt/ui-rework full screen read only (the lock in the corner, the edges turn the pages); the
+      reader chrome (Settings → Display → Controls at this size → Reader): the tool bar and pills go; the faint dot in
+      the lower left corner brings them back.
 - [ ] Android, Fold 7 folded (412 wide): ⋮ opens as a sheet from the bottom with a handle, the page dimmed, rows as
       tall as a finger. Tap Document: the sheet shows its entries with a back arrow and "Document"; the arrow goes
       back. View → Tool bar position: a second level. The back key: a level up, then closes the sheet.
@@ -2394,8 +2396,9 @@ Fold 7 folded (412 × 915):
 - [ ] The library (tap the library button): the same top bar, the library button marked, the title of the document
       behind it in grey (tap it: back to that document), no ⋮. At the library's top no breadcrumb row with only the
       library's name; in a folder the breadcrumbs are there.
-- [ ] ⋮ → View → Read: only the page. A dot in the lower left corner, faint; hold it: "Show the tools"; tap it: the bars
-      are back.
+- [ ] ⋮ → View → Read: full screen read only (qt/ui-rework): the lock in the upper right corner, clear of the cut-out;
+      tap the left and right edges for the pages; Esc (a keyboard cover) leaves. (The reader chrome, chosen in
+      Settings → Display: a faint dot in the lower left corner; hold it: "Show the tools"; tap it: the bars are back.)
 
 Fold 7 folded, held sideways (915 × 412):
 - [ ] The top bar across; the dock is a column at the right edge (pen, All tools, color, width, undo, redo, page
@@ -2437,7 +2440,8 @@ Safe areas, held sideways (915 × 412), both ways round (the cut-out at the left
 - [ ] The page's arrow at the left edge (open the pages) beside the cut-out; the pages drawer opens beside it (the
       drawer's color under the cut-out), its thumbnails above the gesture bar.
 - [ ] The scroll bars of the page (zoom in) clear of the cut-out and the gesture bar.
-- [ ] ⋮ → View → Read, then the compact chrome (Settings → Display → Controls at this size → Compact): the tool
+- [ ] ⋮ → View → Read (full screen read only; the lock clear of the cut-out), then the compact chrome (Settings →
+      Display → Controls at this size → Compact): the tool
       square, the tab dots, the pen pill and the view pill all clear of the cut-out and the bars.
 
 Unfolded (900 × 1000), and unfolded held sideways:
@@ -3039,9 +3043,7 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
       are back in ⋮.
 - [ ] A `.md` document at 1366: undo and redo at the start of the format bar, search, full screen, save before »;
       narrower: the inserts fold first, then the other commands go into », then the headings, then search and save.
-- [ ] ⋮ → View → Read: no tools, the pen scrolls (no ink), PDF text can be selected and copied; the reading pill at the
-      bottom fades after 2 s and comes back when scrolling; sideways and "Pages / Free" work (up and down: a fling
-      comes to rest on a page top with "Pages"); Esc and ✕ leave reading.
+- [ ] ⋮ → View → Read: full screen read only (since qt/ui-rework; see "The adaptive UI reworked" below).
 - [ ] Settings → Pen → Tools: "Classic tool bar" brings back the old bar, pen pill and tool square; "My toolbox" brings
       the toolbox back; "Back to the first tools…" resets it.
 - [ ] First start after the update: the toolbox's first pen has the pen's color and width of before; the eraser
@@ -3539,3 +3541,38 @@ Seen through the replay (⋮ → View → Replay the writing).
       pages, and the library search does not find its words; the password dialog shows the keyboard and does not
       offer to store the password in a password manager unasked.
 
+## The adaptive UI reworked (qt/ui-rework)
+
+- [ ] The toolbox: tap the pen in hand; in its editor the four line buttons show a solid, a dashed, a dash-dot and a
+      dotted line. Choose "Dashed": the pen on the rail shows a dashed ink sample; "Dotted": dots. The same in the
+      classic tool bar's pen menu (hold the pen button).
+- [ ] The toolbox: tap the pen in hand; in its editor choose a color, a width (slider and dots), a line style, the
+      filling: the editor stays beside the pen each time (not in the window's top left corner). The same for a
+      highlighter further down, with the rail docked left, top and bottom, and floating in full screen.
+- [ ] The toolbox's "+" → Snip: the editor offers Rectangle and Lasso (no color, no width); Add: the snip is armed at
+      once; drag a lasso over a page: "Copied picture", the pen in hand before comes back. The new entry shows the
+      lasso icon with two dots. Tap it, then tap it again while armed: the rectangle (icon and dot change), drag a
+      rectangle: copied. Shift+L / Shift+S lift the entry when its shape matches. Long press → Edit… changes the shape.
+      Folded into a stack on a short rail it still snips.
+- [ ] ⋮ → View → Read (Surface, 1920×1080 and a phone): full screen, no toolbox, a lock in the upper right corner; the
+      pen and a finger scroll and write nothing; PDF text can be selected with the pen and copied. Tap the right fifth
+      of the page with the pen, a finger and the mouse: the next page's top, a short arrow at the right edge; the left
+      fifth: the previous page. Tap several times quickly: page after page (no zoom from a double tap). A swipe that
+      starts at an edge scrolls. A link at the edge is followed instead.
+- [ ] Read only, then the lock: the toolbox floats again, still full screen. Ctrl+Alt+R on and off; in a window it
+      enters full screen read only. Esc leaves full screen and read only; the docked toolbox comes back.
+- [ ] Full screen → the toolbox's ⋯ → Read only; F5 while it is on: the edges go to the previous and next slide.
+      Presenting with the tools → Ctrl+Alt+R: the toolbox goes, the edges turn the slides; again: it comes back.
+- [ ] The classic tool bar (Settings → Pen → Tools): F11 → the tool square → "Read only": the square and the pen pill
+      go, the lock and the edges work the same.
+- [ ] Page layout menu (the view pill) while reading: "Stop on whole pages" is offered up and down too; with it a
+      fling comes to rest on a page top. "Scroll sideways": the edges still turn the pages.
+- [ ] A tiny window (split screen, under 360 px): the reader chrome is read only with the tap fields; the corner field
+      brings the tools back.
+- [ ] The command bar (the toolbox, 1920×1080): after settings and the file buttons come Read, Replay, Share, Print,
+      Bookmark, Favourite (a library document) and Tags; ⋮ → View has no Read or Replay, ⋮ → Document no Tags…. A PDF
+      with notes that keeps versions: a flag (Milestone) after Save, and ⋮ → Document has no "Save with a message…".
+      Make the window narrower: the tags go back into ⋮ first, then favourite, bookmark, print, milestone, replay; Read
+      and Share last (each is in the bar or in ⋮, never both). The classic tool bar has none of these buttons.
+- [ ] Read in the command bar: full screen read only. Replay: the timeline bar. Milestone: the message dialog. Tags:
+      the document's tags.

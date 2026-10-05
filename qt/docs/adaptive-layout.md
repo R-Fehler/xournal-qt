@@ -205,7 +205,7 @@ button of its own ("One place for each action", below):
 | **Document ▸** | Rename…, Edit anyway (as plain text)…, Open as PDF document, Remove unused images…, Linked from…, Copy link to this page |
 | **Export ▸** | Export as plain PDF…, Export for the archive…, Export as Markdown |
 | **Page ▸** (not for text files) | Insert pages…, Background of this page…, Page size…, Space for notes…, Start a chapter here… |
-| **View ▸** | All open documents (not in the phone chrome: its tab count), Page layout… (where the view pill has no button for it: phone portrait, the compact pill, the phone chrome), Present without controls (Ctrl+F5), Read (only the page: the reader chrome of this size class), Tool bar position ▸ (Top, Two rows at the top, Two rows at the bottom, Left, Right, Automatic for this window size; not in the phone classes: their dock) |
+| **View ▸** | All open documents (not in the phone chrome: its tab count), Page layout… (where the view pill has no button for it: phone portrait, the compact pill, the phone chrome), Present without controls (Ctrl+F5), Read (full screen, read only: the edges turn the pages; Ctrl+Alt+R), Tool bar position ▸ (Top, Two rows at the top, Two rows at the bottom, Left, Right, Automatic for this window size; not in the phone classes: their dock) |
 
 Entries that depend on the document (a `.md`: Open as PDF document, Remove unused images; a text file: no Save as, no
 Page) are left out as before. "Markdown source beside the page" is in the menu of the writing button (its long
@@ -258,7 +258,9 @@ order of compression as the room runs short:
 2. the widths become **one cycling width button** (a tap: the next width, as the pen pill's; a long press: the five);
 3. the colors become **the current color, the recent ones and a palette button** (the color chooser): at least 4 recent colors (used
    last, then the palette's), as many as fit (they are the filler: more room, more colors);
-4. low-priority buttons go into **"more tools"**, one by one: New, Open, Save, Settings, Present, Full screen, Edit as
+4. with the toolbox, the entries of ⋮ shown as buttons go back into ⋮ first, one by one: tags, favourite, bookmark,
+   print, milestone, replay, read, share ([toolbox.md](toolbox.md), "The command bar"); then
+   low-priority buttons go into **"more tools"**, one by one: New, Open, Save, Settings, Present, Full screen, Edit as
    notes, Search, Open externally (after Search: for a file shown here it is how the file is edited; at 1280 px it
    stays in the bar next to undo and redo), Add a page, Image, Emoji, Mark PDF text, Setsquare/compass, Shapes;
 5. the colors become **one cycling color button** (a tap: the next of the first five palette colors; a long press:
@@ -303,17 +305,37 @@ Tools that do almost the same share one button (`ToolCycleButton.qml`, the logic
 
 | Group | Variants (a tap goes through them) | Only in its list |
 | --- | --- | --- |
-| `pen` | pen ↔ highlighter (freehand) | |
+| `pen` | pen ↔ highlighter (freehand) | the laser pointer and the laser highlighter |
 | `eraser` | standard ↔ whiteout ↔ whole strokes (`eraserMode`) | |
-| `select` | rectangle ↔ lasso | rectangle and lasso on all layers |
+| `select` | rectangle ↔ lasso | rectangle and lasso on all layers; the two snips (never remembered as its variant) |
 | `shape` | line, rectangle, ellipse, arrow, double arrow, coordinate system, recognize shapes (the pen, or the highlighter in hand, draws them) | |
-| `geometry` | setsquare ↔ compass | "Take it off the page" (also the × of the geometry pill) |
+| `geometry` | setsquare ↔ compass | the curtain and the spotlight (put out or taken away, beside the tool in hand); "Take it off the page" (also the × of the geometry pill) |
+| `snip` (qt/ui-rework) | snip a rectangle ↔ snip with the lasso (one picture to the clipboard, then the tool before; [snip.md](snip.md)) | |
+
+**The groups reviewed** (qt/ui-rework, the author: "think of the cycling groups we currently have and whether we can
+have the snipping screenshots as a cycling tool in the toolbelt"):
+
+- **The snips** are a group of their own: in the toolbox an entry of the kind "Snip" ("+" or "Add a tool here…"; not
+  among the first tools), whose icon is its shape (`xqt-snip-rect`, `xqt-snip-lasso`) with two dots for the two. A tap
+  snips with its shape; a tap while it is armed takes the other shape, which the entry keeps; its editor (Edit… in its
+  menu) chooses the shape too. A snip is never the toolbox's active entry: the tool before stays the one that comes
+  back. Among the fixed tools the snips keep their one place, the select button's list (with Shift+S, Shift+L); the
+  image button's list keeps them as well, as an insert (a picture to paste). The classic bar is unchanged.
+- **Curtain ↔ spotlight** stay in the setsquare's list (and ⋮ → View), not a group with a button: they are not tools
+  but sheets over the page whatever tool is in hand, and are put out and taken away; a cycle (curtain → spotlight →
+  none) on a button would hide which one is out. Their keys are B and Shift+B.
+- **The laser pointer** stays in the pen's list in the classic bar; in the toolbox it is an entry of its own (drawn
+  with the pen or the highlighter), as before.
+- **Pen ↔ highlighter, the eraser's kinds, select, the shapes, setsquare ↔ compass** stay as they are; with the
+  toolbox, the pens, highlighters, erasers and shapes are entries (each with its settings), and select and setsquare
+  are fixed tools that cycle as in the classic bar.
 
 - A tap on the button while its tool is in use: the next variant. A tap while another tool is in use: its tool with
   the variant used last (remembered per group in the setting `toolVariants`; the eraser's is `eraserMode`).
 - The icon is the variant in use (or the one last used); small dots under it say how many there are and which one.
 - A long press (or a right click) lists all variants with icon and name, with the group's name on top: to pick one.
-- The keys (P, H, E, S, L) take a variant directly; the button follows and remembers it.
+- The keys (P, H, E, S, L; Shift+S and Shift+L for the snips) take a variant directly; the button follows and
+  remembers it.
 - The pen pill of the compact chrome uses the same `pen` button (smaller); the tool square's popup holds the tool
   bar's buttons themselves.
 - The shapes menu and the eraser menu are gone. What they held besides variants: the sticky note (a button of its
@@ -655,8 +677,10 @@ page: Insert pages…; Present: without controls; Write on the page: its source)
 close it. The palette (`colorPalette`) and the widths (`widthChoices`) of the cycling buttons are sheets of the same
 form in the phone classes (their `asSheet`); the menus were already (`MenuSheet`).
 
-**The reader**: automatic only in a tiny window (`chromeAuto`); elsewhere by hand (⋮ → View → Read). No HUD; the
-corner field brings the chrome back (and in a tiny window stores "full" for that class).
+**The reader**: automatic only in a tiny window (`chromeAuto`); elsewhere chosen in Settings → Display. No HUD, read
+only, and the edges turn the pages (as read only in full screen, [toolbox.md](toolbox.md), "Reading and presenting");
+the corner field brings the chrome back (and in a tiny window stores "full" for that class). ⋮ → View → Read is no
+longer the reader chrome but full screen with read only on (qt/ui-rework).
 
 **The corner field** (`presentCornerMark`) of presenting and of the reader: a 48 px target in the lower left corner of
 the page. While the tools show (presenting with controls: `highlighted`) it is clearly there: an accent-colored dot in

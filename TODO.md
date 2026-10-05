@@ -738,14 +738,18 @@ the upper left position of the window instead of staying at the toolbelt. The re
 cut off the lower part of the screen and I feel like we should just reuse the full screen or present mode with a
 read only / readmode toggle that allows skipping to next prev page with big touch areas on the left and right side
 of the screen."
-- [ ] The command bar (the top bar in the toolbox mode) carries the important tools added since it was made, in the
-  ladder's order of priority (the classic tool bar is left as it is).
-- [ ] The cycling groups reviewed; the snips (rectangle ↔ lasso) a cycling tool that can be put in the toolbox.
-- [ ] Bug: the toolbox popup shows dashed and dotted line styles as a plain line.
-- [ ] Bug: choosing something in a toolbox popup moves the popup to the window's top left.
-- [ ] Reading replaced: full screen and presenting get a read-only toggle; while on, big tap areas at the left and
+- [x] The command bar (the top bar in the toolbox mode) carries the important tools added since it was made, in the
+  ladder's order of priority (the classic tool bar is left as it is). (`qt/ui-rework`: Read, Replay, Milestone, Tags;
+  left: a button for the reference view once `qt/version-compare` has reworked it.)
+- [x] The cycling groups reviewed; the snips (rectangle ↔ lasso) a cycling tool that can be put in the toolbox.
+  (`qt/ui-rework`: "+" → Snip; not among the first tools; curtain and spotlight stay in the setsquare's list.)
+- [x] Bug: the toolbox popup shows dashed and dotted line styles as a plain line. (`qt/ui-rework`; nothing left.)
+- [x] Bug: choosing something in a toolbox popup moves the popup to the window's top left. (`qt/ui-rework`; nothing
+  left.)
+- [x] Reading replaced: full screen and presenting get a read-only toggle; while on, big tap areas at the left and
   right edges go to the previous and next page; ⋮ → View → Read enters it. The reading pill (its menu cut off at the
-  bottom of the screen) goes.
+  bottom of the screen) goes. (`qt/ui-rework`; left: the edges with the canvas turned are those of the turned view;
+  on device: the feel of the fields' width and of the hint.)
 
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message

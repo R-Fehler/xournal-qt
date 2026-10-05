@@ -17,7 +17,8 @@ per device. Reading and presenting are two modes over one "tools hidden" view (b
 **My tools.** Each entry is a tool with its settings: a pen (color or palette role, width, line style, filling), a
 highlighter, a shape (line, rectangle, ellipse, arrow, double arrow, coordinate system, recognized shapes; drawn with
 the pen or the highlighter), an eraser (standard, whiteout, whole strokes; its size), a text box (its font and color),
-a sticky note (its pastel), the laser pointer (pen or highlighter). Dividers group them into sections.
+a sticky note (its pastel), the laser pointer (pen or highlighter), a **snip** (a rectangle or a lasso whose picture goes to the clipboard; a
+cycling tool: a tap while it is armed takes the other shape, qt/ui-rework). Dividers group them into sections.
 
 The first start: three pens (body, key terms, warnings) | two highlighters (key terms, definitions) | the eraser | a
 line, a text box, a sticky note | the laser pointer. The pens and highlighters take their colors from the **palette
@@ -69,9 +70,42 @@ with 16 px to spare (no flicker at an edge).
 
 In the toolbox mode the tool bar at the top is a **command bar**: open, save, image, stickers, add a page, search, full
 screen, present, settings (New is the tab strip's "+"; recording is a fixed tool of the rail), and entries of ⋮ as
-buttons where there is room (share, print, bookmark, favourite; one
-place each: ⋮ leaves out what the bar shows, and shows it again when the bar has no room for it). The classic tool
-square, the quick tools and the pen pill of full screen are classic only.
+buttons where there is room (one place each: ⋮ leaves out what the bar shows, and shows it again when the bar has no
+room for it). The classic tool square, the quick tools and the pen pill of full screen are classic only.
+
+### The command bar (qt/ui-rework)
+
+The author (2026-10-05): "The main toolbar is now very empty. Populate it with the important new tools." Since
+qt/ui-rework the entries of ⋮ shown as buttons where there is room (`ToolBarPlan.PROMOTED`, `promoted: true` in
+`Main.qml`) are, in the order they give way back into ⋮ as the bar gets narrower:
+
+| Gives way | Button | Its entry in ⋮ | Offered |
+| --- | --- | --- | --- |
+| first | **Tags** (`tagsButton`) | Document → Tags… | always |
+| | Favourite | Add to favourites | a document with a file in a library |
+| | Bookmark | Bookmark this page | where pages can be bookmarked |
+| | Print | Print… | always |
+| | **Milestone** (`milestoneButton`, the flag) | Document → Save with a message… (Ctrl+Alt+S) | only where the document keeps versions |
+| | **Replay** (`replayButton`) | View → Replay the writing | not for a text document |
+| | **Read** (`readButton`) | View → Read (full screen, read only; Ctrl+Alt+R) | not for a text document |
+| last | Share | Share… | always |
+
+They sit with their kind: Read and Replay after Present (view), Milestone after Save (file), Tags after Favourite
+(document). Measured off-screen with a new document (no favourite): everything up to 1920 and down to 860 px; the tags
+go into ⋮ at 800, the bookmark at 760, print at 720, the replay at 680; Read and Share stay longest. Below that the
+ladder of before goes on (the commands into "more tools").
+
+Weighed and left where they are (one place each):
+
+- **The page number, go to page, the zoom and the fits**: the view pill at the page's corner (also in full screen
+  and while reading); a second copy at the top would be the same buttons twice.
+- **The reference view / compare beside**: the tab's menu ("Show this document beside", "Open as reference") and the
+  page menu; `qt/version-compare` is reworking it (the reference view, the History panel), so the bar waits for it.
+- **The version history**: the History panel of the sidebar (its button); the bar has only the milestone, and only
+  where versions are kept.
+- **Snip**: a tool, so the rail's (a toolbox entry, the select button's list) and the image button's list.
+- **Templates**: the add-a-page button's hold (the templates used last, all templates, save as template).
+- **Present, full screen, search, share**: already buttons of the bar.
 
 **A text document's format bar** (with the toolbox): undo and redo at its start, then the formatting, then the commands
 that fit, then » and ⋮. One ladder for both: the inserts go into "+ Insert" first, then the commands of low priority
@@ -81,22 +115,65 @@ second row (Ctrl+H, the bar's replace button, ⋮ → Find and replace; [md-edit
 
 ## Reading and presenting
 
-Two modes over one "tools hidden" view:
+The author (2026-10-05): "The reader mode sucks. The menu is half cut off the lower part of the screen and I feel like
+we should just reuse the full screen or present mode with a read only / readmode toggle that allows skipping to next
+prev page with big touch areas on the left and right side of the screen." So reading is no mode of its own any more
+(qt/ui-rework): it is **read only**, a toggle of full screen and of presenting. The reading pill is gone.
 
-- **Reading** (⋮ → View → Read; automatically in a tiny window): the page only, and it cannot be written on
-  (`DocumentCanvas.readingOnly`): the pen and the fingers scroll, PDF text can still be selected, copied and looked
-  up; no ink by accident. The toolbox, the command bar and the tab strip are hidden. The **reading pill** at the
-  bottom: the page number (all pages), ‹ ›, up and down or sideways, whole pages or free (momentum), the width or the
-  whole page, ✕. It fades 2 s after the last scroll or touch and comes back when the view moves, the page changes or
-  the pointer comes near; a touch on the faded pill only shows it. **Esc**, the pill's ✕ or the corner field leave
-  reading.
+- **Read only** (`win.readOnly`; on where `win.readOnlyOffered`: full screen, the compact chrome, presenting): the
+  floating toolbox's ⋯ → "Read only", the compact chrome's tools (the classic tool square's popup, phones' full
+  screen), **Ctrl+Alt+R** (a shortcut of its own, changeable), and **⋮ → View → Read**, which enters full screen with
+  it on (so does Ctrl+Alt+R in a window). While it is on:
+  - the page cannot be written on (`DocumentCanvas.readingOnly`): the pen and the fingers scroll, PDF text can still be
+    selected, copied and looked up (decided: selecting text writes nothing, and reading is where one copies a quote);
+    no ink by accident;
+  - the tools are hidden (`win.toolsHidden`: the floating toolbox, the classic tool square and pen pill); the view
+    pill (the page number, the zoom and its fits, the page layout) stays, as in full screen;
+  - **big tap fields at the left and right edges**: a fifth of the page's width each (at least 48 px), its whole height,
+    invisible. A tap there goes to the previous or the next page (in full screen to its top, presenting: the slide); a
+    short arrow appears at that edge. The page finds the taps itself (`DocumentCanvas.edgeTapWidth`, `edgeTapped`;
+    `CanvasView::edgeTap`): a tap that is a link or opens a covering note does that instead, a swipe or a drag
+    scrolls, and taps in a row turn page after page (no double tap there). The fields in `Main.qml`
+    (`readingTapFields`) only show the hint and let the presses through (`inputTransparent`);
+  - a **lock** in the upper right corner (`readOnlyMark`, where the toolbox floats) says so; a tap on it writes again.
+  - It ends with Esc (full screen ends, and read only with it), the lock, Ctrl+Alt+R again, the ⋯ entry, and when full
+    screen ends or the home screen is shown (`onReadOnlyOfferedChanged`).
+- **The reader chrome** (no HUD: automatic in a tiny window, or chosen in Settings → Display → Controls at this size)
+  is reading too: read only with the tap fields; the corner field brings the chrome back, as before.
 - **Presenting** (F5): full screen, black around the pages, page by page; writing on the slides stays possible: the
-  toolbox floats. The corner field hides and shows it ("present without controls" is presenting with it hidden).
+  toolbox floats. The corner field hides and shows it ("present without controls" is presenting with it hidden). Read
+  only while presenting: the edges go to the previous and next slide, the pen does not write.
+
+Kept from the reading of before, as settings rather than a pill: **up and down or sideways** and **whole pages**
+(⋮ → the view pill's page layout menu: "Scroll sideways", "Stop on whole pages"; the latter is offered while reading
+too). The width or the whole page: the view pill's zoom menu. Dropped: the pill itself, its ‹ › (the edges do that)
+and its fading.
 
 Up and down, "whole pages" (the setting `snapPages`, as sideways) makes a drag or a fling come to rest on a row of
-pages while reading (`ViewController::setSnappingVertically`): a row taller than the view rests anywhere within it (its
-top at the view's top at the latest), a fling at its end goes on to the next row's top, a row that fits rests in the
-middle. Outside reading, up and down scrolls freely as before.
+pages while reading (`ViewController::setSnappingVertically`; not while presenting, which is page by page anyway): a
+row taller than the view rests anywhere within it (its top at the view's top at the latest), a fling at its end goes
+on to the next row's top, a row that fits rests in the middle. Outside reading, up and down scrolls freely as before.
+
+## Popups beside the rail
+
+The editor opens beside its tool and stays there while something is chosen in it. Two things keep it there (the
+author, 2026-10-05: "when I select something on the toolbelt popup the popup moves to the upper left position of the
+window"): the rail's buttons are made anew only when what is where changes (an entry, a stack and the entry it shows,
+a divider), not when a tool's color, width or line style does (`Toolbox.items`, `syncItems`; the buttons read their
+entry from the store); and the editor is placed when it opens (and when it or the window changes size), not bound to
+its button: a button that goes away (a tool replaced) leaves it where it is, and it takes the entry's button again
+(`Toolbox.buttonFor`, the stack that holds it when its section is folded). A stack's list and the folded fixed tools
+close when a tool is taken in them; their buttons stay while they are open.
+
+## Line styles
+
+The samples of a line style (the editor's four buttons, its preview, the ink of a tool on the rail, the classic pen's
+options) are drawn by `LineStyles.js`. Two things of Qt's Canvas made them all solid once (the author, 2026-10-05:
+"the dashed and dotted line buttons just show a regular line"): `setLineDash()` takes only a JavaScript array, and a
+list that came through a model (a Repeater's `modelData.dashes`) is silently ignored; and, like `QPen`, it measures
+the dashes in widths of the line, not in pixels, so upstream's `[6, 3]` on a 2.6 px sample of 17 px is one dash. The
+short samples use dashes in pixels (at least two dashes or three dots fit) with butt caps; the editor's preview draws
+upstream's dashes as the pen does.
 
 ## Storage
 
@@ -113,7 +190,8 @@ written after a pause of 400 ms (a dragged slider writes once), and when the app
  {"id":"e5","type":"eraser","variant":"whiteout","width":8.5},
  {"id":"e7","type":"text","font":{"family":"Sans","size":12},"color":"#2b2b2b","role":"body"},
  {"id":"e8","type":"sticky","color":"#fff59d"},
- {"id":"e9","type":"laser","base":"pen","color":"#ff0000","width":2.4}]}
+ {"id":"e9","type":"laser","base":"pen","color":"#ff0000","width":2.4},
+ {"id":"e10","type":"snip","variant":"lasso"}]}
 ```
 
 `role` is a palette role: the entry draws with that role's color in the chosen palette (ink; the highlight color for
@@ -134,9 +212,10 @@ tools. The last eraser cannot be removed.
 | `qt/src/app/qml/Toolbox.qml`, `ToolboxPlan.js` | the rail: head, tools, stacks, fixed tools, tail; the plan; carrying a tool; the grip |
 | `qt/src/app/qml/ToolEntryButton.qml` | one tool: its icon and a sample of its ink; lifted in hand; the hold, the carrying, the wheel |
 | `qt/src/app/qml/ToolEntryEditor.qml` | the editor (and the draft of a new tool) |
-| `Main.qml` | where the rail is (`toolboxDocked`, `toolboxFloating`, `toolboxInDock`, `toolboxEdge`), the menus (`toolEntryMenu`, `toolTypeMenu`, `toolboxMoreMenu`), the command bar's promoted entries, the format bar's undo / redo and commands, reading (`win.reading`, `readingPill`) |
+| `Main.qml` | where the rail is (`toolboxDocked`, `toolboxFloating`, `toolboxInDock`, `toolboxEdge`), the menus (`toolEntryMenu`, `toolTypeMenu`, `toolboxMoreMenu`), the command bar's promoted entries, the format bar's undo / redo and commands, reading (`win.readOnly`, `win.reading`, `readingTapFields`, `readOnlyMark`) |
 | `PhoneDock.qml`, `PhoneToolSheet.qml` | the dock hosts the rail; the sheet "My tools" |
 | `qt/src/canvas/ViewController.*`, `CanvasView`, `DocumentCanvasItem.snapVertically` | snapping up and down while reading |
+| `CanvasView::edgeTap`, `CanvasInput` (the taps of the mouse, the pen, a finger), `DocumentCanvasItem.edgeTapWidth` / `edgeTapped` | the tap fields of reading |
 
 ## Tests
 

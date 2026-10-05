@@ -864,6 +864,7 @@ void DocumentCanvasItem::setView(QObject* object) {
         if (!shownByAnother(canvasView)) {
             canvasView->setShown(false);
             canvasView->setReadingOnly(false);
+            canvasView->setEdgeTapWidth(0);
             canvasView->setSnapVertically(false);
             canvasView->setRotatable(true);
         }
@@ -879,6 +880,7 @@ void DocumentCanvasItem::setView(QObject* object) {
     if (canvasView) {
         canvasView->setShown(true);
         canvasView->setReadingOnly(reading);
+        canvasView->setEdgeTapWidth(edgeWidth);
         canvasView->setSnapVertically(verticalSnap);
         canvasView->setRotatable(turnable);
         // (a paste with the keys asks where the mouse rests: over a sticky note it goes into the note)
@@ -890,6 +892,7 @@ void DocumentCanvasItem::setView(QObject* object) {
         });
         input = std::make_unique<xqt::CanvasInput>(*canvasView);
         connect(canvasView, &xqt::CanvasView::updateRequested, this, &QQuickItem::update);
+        connect(canvasView, &xqt::CanvasView::edgeTapped, this, &DocumentCanvasItem::edgeTapped);
         connect(canvasView, &xqt::CanvasView::pagesChanged, this, &QQuickItem::update);
         connect(canvasView, &xqt::CanvasView::pagesChanged, this, &DocumentCanvasItem::viewportChanged);
         connect(&canvasView->getViewController(), &xqt::ViewController::changed, this,
@@ -953,6 +956,17 @@ void DocumentCanvasItem::setReadingOnly(bool on) {
     }
     refreshPointer();  // (no eraser where nothing is erased)
     Q_EMIT readingOnlyChanged();
+}
+
+void DocumentCanvasItem::setEdgeTapWidth(qreal px) {
+    if (qFuzzyCompare(px + 1, edgeWidth + 1)) {
+        return;
+    }
+    edgeWidth = px;
+    if (canvasView) {
+        canvasView->setEdgeTapWidth(px);
+    }
+    Q_EMIT edgeTapWidthChanged();
 }
 
 void DocumentCanvasItem::setRotatable(bool on) {

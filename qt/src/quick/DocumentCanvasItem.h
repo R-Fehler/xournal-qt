@@ -62,6 +62,9 @@ class DocumentCanvasItem: public QQuickItem {
     /// Reading (qt/docs/toolbox.md): a drag or a fling up and down comes to rest on a row of pages, when the setting
     /// snapPages is on (CanvasView::setSnapVertically)
     Q_PROPERTY(bool snapVertically READ snapVertically WRITE setSnapVertically NOTIFY snapVerticallyChanged)
+    /// Reading (qt/docs/toolbox.md, "Reading"): taps within this many pixels of the left or right edge that nothing
+    /// else takes are edgeTapped (the window turns the page); 0: off (CanvasView::setEdgeTapWidth)
+    Q_PROPERTY(qreal edgeTapWidth READ edgeTapWidth WRITE setEdgeTapWidth NOTIFY edgeTapWidthChanged)
     /// The canvas may be turned here (qt/docs/canvas-rotation.md; the reference beside the notes may not:
     /// CanvasView::setRotatable)
     Q_PROPERTY(bool rotatable READ rotatable WRITE setRotatable NOTIFY rotatableChanged)
@@ -97,6 +100,8 @@ public:
     void setView(QObject* view);
 
     bool readingOnly() const { return reading; }
+    qreal edgeTapWidth() const { return edgeWidth; }
+    void setEdgeTapWidth(qreal px);
     bool snapVertically() const { return verticalSnap; }
     void setSnapVertically(bool on);
     void setReadingOnly(bool on);
@@ -201,6 +206,9 @@ Q_SIGNALS:
     void viewChanged();
     void viewportChanged();
     void readingOnlyChanged();
+    void edgeTapWidthChanged();
+    /// Reading: a tap at the left (-1) or the right (+1) edge
+    void edgeTapped(int side);
     void snapVerticallyChanged();
     void rotatableChanged();
     void mathErrorChanged();
@@ -280,6 +288,7 @@ private:
     bool touchSessionOwned = false;
     bool viewReplaced = false;
     bool reading = false;
+    qreal edgeWidth = 0;
     bool verticalSnap = false;
     bool turnable = true;
     bool mouseElsewhere = false;  ///< a mouse drag that began outside the canvas (e.g. on a scroll bar)

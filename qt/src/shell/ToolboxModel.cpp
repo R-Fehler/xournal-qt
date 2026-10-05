@@ -60,6 +60,7 @@ const QStringList SHAPES{"line", "rectangle", "ellipse", "arrow", "doubleArrow",
                          "strokeRecognizer"};
 const QStringList ERASERS{"default", "whiteout", "deleteStroke"};
 const QStringList BASES{"pen", "highlighter"};
+const QStringList SNIPS{"rect", "lasso"};
 
 QVariantMap divider(const QString& id) { return QVariantMap{{"id", id}, {"divider", true}}; }
 bool isDivider(const QVariant& v) { return v.toMap().value("divider").toBool(); }
@@ -79,7 +80,7 @@ ToolboxModel::ToolboxModel(Load l, Store s, QObject* parent): QObject(parent), l
 ToolboxModel::~ToolboxModel() { flush(); }
 
 QStringList ToolboxModel::types() {
-    return {"pen", "highlighter", "shape", "eraser", "text", "sticky", "laser"};
+    return {"pen", "highlighter", "shape", "eraser", "text", "sticky", "laser", "snip"};
 }
 
 QStringList ToolboxModel::variantsOf(const QString& type) {
@@ -88,6 +89,9 @@ QStringList ToolboxModel::variantsOf(const QString& type) {
     }
     if (type == "eraser") {
         return ERASERS;
+    }
+    if (type == "snip") {
+        return SNIPS;
     }
     return {};
 }
@@ -112,6 +116,8 @@ QVariantMap ToolboxModel::defaultOf(const QString& type) {
         e = {{"type", type}, {"color", "#fff59d"}};
     } else if (type == "laser") {
         e = {{"type", type}, {"base", "pen"}, {"color", "#ff0000"}, {"role", QString()}, {"width", 2.4}};
+    } else if (type == "snip") {
+        e = {{"type", type}, {"variant", "rect"}};  // (a picture of a rectangle or a lasso to the clipboard)
     } else {
         return {};
     }

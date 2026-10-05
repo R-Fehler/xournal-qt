@@ -7,6 +7,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Dialogs
 import QtQuick.Layouts
+import "LineStyles.js" as LineStyles
 
 Column {
     id: options
@@ -20,12 +21,12 @@ Column {
     topPadding: 4
     bottomPadding: 4
 
-    /// Upstream's line styles (StrokeStyle): its name, the dashes (in widths of the line), what it is called
+    /// Upstream's line styles (StrokeStyle): its key, what it is called (the samples: LineStyles.js)
     readonly property var lineStyles: [
-        { key: "plain", dashes: [], name: qsTr("Solid") },
-        { key: "dash", dashes: [6, 3], name: qsTr("Dashed") },
-        { key: "dashdot", dashes: [6, 3, 0.5, 3], name: qsTr("Dash-dot") },
-        { key: "dot", dashes: [0.5, 3], name: qsTr("Dotted") }
+        { key: "plain", name: qsTr("Solid") },
+        { key: "dash", name: qsTr("Dashed") },
+        { key: "dashdot", name: qsTr("Dash-dot") },
+        { key: "dot", name: qsTr("Dotted") }
     ]
 
     Rectangle { width: parent.width; height: 1; color: "#e3e5e8" }  // (a line above the options)
@@ -64,20 +65,21 @@ Column {
                         border.width: styleButton.current ? 1 : 0
                         border.color: Material.accentColor
                     }
-                    // A sample of the line (the dashes as upstream draws them: in widths of the line, round caps)
+                    // A sample of the line (LineStyles.js: dashes that show in a short line)
                     Canvas {
                         id: sample
+                        objectName: "lineStyleSample"
                         anchors.centerIn: parent
                         width: 32; height: 12
-                        readonly property var dashes: styleButton.modelData.dashes
                         onPaint: {
                             const ctx = getContext("2d")
                             ctx.reset()
                             const w = 2.5
+                            const key = styleButton.modelData.key
                             ctx.lineWidth = w
-                            ctx.lineCap = "round"
+                            ctx.lineCap = LineStyles.sampleCap(key, "round")
                             ctx.strokeStyle = "#303030"
-                            ctx.setLineDash(dashes)  // (in widths of the sample line; upstream: points)
+                            ctx.setLineDash(LineStyles.sampleDashes(key, w))
                             ctx.beginPath()
                             ctx.moveTo(w, height / 2)
                             ctx.lineTo(width - w, height / 2)

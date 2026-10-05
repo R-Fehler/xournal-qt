@@ -72,6 +72,12 @@ TEST(ToolboxModel, entriesAreNormalized) {
     EXPECT_EQ(shape.value("base"), "pen");
     EXPECT_EQ(ToolboxModel::normalized({{"type", "eraser"}, {"variant", "whiteout"}, {"width", 0}}).value("width"), 8.5);
     EXPECT_EQ(ToolboxModel::normalized({{"type", "text"}, {"role", "nonsense"}}).value("role"), "");
+    // A snip: its shape only (qt/docs/toolbox.md, "Cycling")
+    const QVariantMap snip = ToolboxModel::normalized({{"type", "snip"}, {"variant", "lasso"}, {"color", "#ff0000"}});
+    EXPECT_EQ(snip.value("variant"), "lasso");
+    EXPECT_FALSE(snip.contains("color"));
+    EXPECT_EQ(ToolboxModel::normalized({{"type", "snip"}, {"variant", "circle"}}).value("variant"), "rect");
+    EXPECT_TRUE(ToolboxModel::types().contains("snip"));
 }
 
 TEST(ToolboxModel, addChangeDuplicateAndRemove) {
@@ -367,6 +373,32 @@ TEST(ToolboxApply, theKeysTakeTheEntryOfTheirTypeUsedLast) {
     EXPECT_EQ(c.color(), QColor("#D96B00"));
     c.takeToolOfType("highlighter");
     EXPECT_EQ(m->active(), nth(m, "highlighter", 1));
+    c.shutdown();
+}
+
+TEST(ToolboxApply, aSnipEntryArmsTheSnipAndTheToolBeforeStaysTheActiveEntry) {
+    AppController c;
+    ToolboxOn on(c);
+    c.newDocument();
+    ToolboxModel* m = c.toolboxModel();
+    m->reset();
+    const QString pen = nth(m, "pen");
+    c.applyToolEntry(pen);
+    const QString snip = m->add({{"type", "snip"}, {"variant", "lasso"}});
+    ASSERT_FALSE(snip.isEmpty());
+    ASSERT_TRUE(c.applyToolEntry(snip));
+    EXPECT_EQ(c.snipShape(), "lasso");
+    EXPECT_EQ(c.tool(), "selectRegion");
+    EXPECT_TRUE(c.entryInHand(m->entry(snip)));
+    EXPECT_EQ(m->active(), pen) << "a snip is one picture: the pen is what comes back";
+    m->update(snip, {{"variant", "rect"}});
+    EXPECT_FALSE(c.entryInHand(m->entry(snip))) << "armed with the lasso, not the rectangle";
+    ASSERT_TRUE(c.applyToolEntry(snip));
+    EXPECT_EQ(c.snipShape(), "rect");
+    c.cancelSnip();
+    EXPECT_EQ(c.snipShape(), "");
+    EXPECT_EQ(c.tool(), "pen");
+    EXPECT_TRUE(c.entryInHand(m->entry(pen)));
     c.shutdown();
 }
 

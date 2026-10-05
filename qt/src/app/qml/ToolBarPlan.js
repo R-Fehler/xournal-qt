@@ -14,9 +14,10 @@
 // (a column of two, at a side), "grid" (the tools of the compact chrome: six columns, nothing overflows) and
 // "merged" (a text document: everything in the overflow, ⋮ in the format bar).
 
-/// Entries of ⋮ shown as buttons where there is room (the toolbox's command bar, qt/docs/toolbox.md): the first to
-/// give way, back into ⋮ (not into "more tools")
-var PROMOTED = ["favourite", "bookmark", "print", "share"]
+/// Entries of ⋮ shown as buttons where there is room (the toolbox's command bar, qt/docs/toolbox.md, "The command
+/// bar"): the first to give way, back into ⋮ (not into "more tools"), in this order - the tags first, sharing last
+/// (qt/ui-rework: reading, the replay of the writing, a milestone of the version history, the tags)
+var PROMOTED = ["tags", "favourite", "bookmark", "print", "milestone", "replay", "read", "share"]
 /// The steps of the ladder after 1, in order (names of buttons, or a form of the colors or widths)
 var LADDER = PROMOTED.concat([
     "widths:single",
@@ -38,9 +39,9 @@ var GROUP_OF = {
     pen: "tools", eraser: "tools", hand: "tools", touchDrawing: "tools", select: "tools", text: "tools", write: "tools",
     sticky: "tools", shape: "tools", geometry: "tools", pdfText: "tools", emoji: "tools",
     image: "insert", sticker: "insert", record: "insert", addPage: "insert",
-    search: "view", fullScreen: "view", present: "view", settings: "view",
-    new: "file", open: "file", save: "file", editAsNotes: "file", openExternally: "file",
-    share: "doc", print: "doc", bookmark: "doc", favourite: "doc"
+    search: "view", fullScreen: "view", present: "view", read: "view", replay: "view", settings: "view",
+    new: "file", open: "file", save: "file", milestone: "file", editAsNotes: "file", openExternally: "file",
+    share: "doc", print: "doc", bookmark: "doc", favourite: "doc", tags: "doc"
 }
 
 var ICON = 48       // a button

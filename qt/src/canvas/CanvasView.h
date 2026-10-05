@@ -153,6 +153,11 @@ public:
     /// taps follow links, they do not switch the check boxes of Markdown tasks; no undo from gestures. Nothing
     /// lands in the document.
     void setReadingOnly(bool on);
+    /// Reading (qt/docs/toolbox.md, "Reading"): a tap that nothing else takes (a link, a covering note) within this
+    /// many pixels of the view's left or right edge turns the page (edgeTapped); 0: off. Only while reading only.
+    void setEdgeTapWidth(double px) { edgeTapWidth = px; }
+    /// A tap at `viewPos` that nothing else took: at an edge (setEdgeTapWidth) it is edgeTapped, and true
+    bool edgeTap(QPointF viewPos);
 
     // --- the canvas turned (qt/docs/canvas-rotation.md) --------------------------------------------------------
     /// The canvas may be turned (the gesture, Ctrl+[ / Ctrl+]): not while presenting, not in a text file or a text
@@ -592,6 +597,8 @@ Q_SIGNALS:
     void playRequested(const QString& name, qint64 ts);
     /// While replaying, an element was tapped: the bar time it began (ms)
     void replayTapped(qint64 at);
+    /// Reading: a tap at the left (-1) or the right (+1) edge (setEdgeTapWidth)
+    void edgeTapped(int side);
     /// The set or geometry of pages changed.
     void pagesChanged();
     /// A selection was made or cleared.
@@ -690,6 +697,7 @@ private:
     std::vector<std::unique_ptr<CanvasPage>> pages;
     bool shown = false;
     bool readingOnly = false;
+    double edgeTapWidth = 0;
     bool replaying = false;
     std::shared_ptr<TimelineReplay> replayState;  ///< (render threads ask it for the filter, under replayMutex)
     mutable std::mutex replayMutex;

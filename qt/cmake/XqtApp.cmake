@@ -288,6 +288,7 @@ set(XQT_QML_FILES
     src/app/qml/StickerPicker.qml
     src/app/qml/StickerSaveDialog.qml
     src/app/qml/ToolboxPlan.js
+    src/app/qml/LineStyles.js
     src/app/qml/Toolbox.qml
     src/app/qml/ToolEntryButton.qml
     src/app/qml/ToolEntryEditor.qml
@@ -384,6 +385,10 @@ if(XQT_BUILD_TESTS)
     add_test(NAME FractionalScale.ui@150 COMMAND xqt-ui-tests --gtest_filter=FractionalScale.*)
     set_tests_properties(FractionalScale.ui@150 PROPERTIES LABELS ui ENVIRONMENT
         "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_LIST_DIR}/../tests/ui/offscreen-hidpi.json;QT_SCALE_FACTOR=1.5")
+    # Reading on a phone (qt/docs/toolbox.md, "Reading"): full screen on a phone's screen stays a phone
+    add_test(NAME ReadingPhone.ui@phone COMMAND xqt-ui-tests --gtest_filter=ReadingPhoneTest.*)
+    set_tests_properties(ReadingPhone.ui@phone PROPERTIES LABELS ui ENVIRONMENT
+        "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_LIST_DIR}/../tests/ui/offscreen-phone.json")
     # The presenter view with two screens (qt/docs/presenter-view.md): a laptop and a projector, off-screen
     add_test(NAME PresenterView.ui@2screens COMMAND xqt-ui-tests --gtest_filter=PresenterView.*)
     set_tests_properties(PresenterView.ui@2screens PROPERTIES LABELS ui ENVIRONMENT

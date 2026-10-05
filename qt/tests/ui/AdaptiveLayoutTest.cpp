@@ -2934,14 +2934,17 @@ TEST_F(PhoneChromeTest, theReaderIsAutomaticOnlyInATinyWindow) {
     EXPECT_EQ(choice("tiny", "chrome"), "full") << "remembered for tiny windows";
     EXPECT_TRUE(named("phoneDock")->isVisible());
     resize(412, 915);
-    // "Read" by hand on a phone (⋮ → View → Read)
+    // "Read" by hand on a phone (⋮ → View → Read): full screen, read only (qt/ui-rework; ReadingPhoneTest has more)
     QMetaObject::invokeMethod(window->findChild<QObject*>("readItem"), "triggered");
     wait(50);
-    EXPECT_EQ(chrome(), "reader");
-    EXPECT_EQ(choice("phonePortrait", "chrome"), "reader");
-    click(findItem("presentCornerMark"));
+    EXPECT_TRUE(flag("fullScreenMode"));
+    EXPECT_TRUE(flag("readOnlyOn"));
+    EXPECT_TRUE(flag("reading"));
+    EXPECT_EQ(choice("phonePortrait", "chrome"), "") << "no chrome chosen: read only belongs to full screen";
+    window->setProperty("fullScreenMode", false);
+    wait(50);
+    EXPECT_FALSE(flag("readOnlyOn")) << "full screen ends: read only with it";
     EXPECT_EQ(chrome(), "full");
-    EXPECT_EQ(choice("phonePortrait", "chrome"), "") << "the automatic chrome again";
 }
 
 // Presenting: the corner field is clearly there while the tools show (it pulses once at the start) and faint while

@@ -78,7 +78,7 @@ Rectangle {
     readonly property var planKey: [length, cell, sections.map(function(s) { return s.length }).join(","),
                                     fixedButtons.length, moreShown]
     onPlanKeyChanged: Qt.callLater(relayout)
-    Component.onCompleted: relayout()
+    Component.onCompleted: { relayout(); syncItems() }
     function relayout() {
         const input = {
             length: length - startInset - endInset - 22, cell: cell, divider: 9, head: 2, tail: moreShown ? 2 : 1,
@@ -103,7 +103,7 @@ Rectangle {
         sections: sections.map(function(s) { return s.length }), fixed: fixedButtons.length, slack: 0
     }).need + 22 + startInset + endInset
     /// The items of the middle part: entries, dividers, stacks
-    readonly property var items: {
+    readonly property var itemsNow: {
         const out = []
         const act = store.active
         if (compact) {
@@ -134,6 +134,36 @@ Rectangle {
         return out
     }
 
+    /// What the rail shows: `itemsNow`, taken only when what is where changes (an entry, a stack and the one it shows, a
+    /// divider), not when a tool's color or width does. A new list makes the Repeater build every button anew, and a
+    /// popup beside one (its editor, a stack's list) lost its place: it went to the window's corner (2026-10-05). The
+    /// buttons read their entries from the store (`entryOf`).
+    property var items: []
+    property string itemsSignature: ""
+    onItemsNowChanged: syncItems()
+    function syncItems() {
+        const sig = itemsNow.map(function(it) {
+            return it.kind + ":" + it.key + ":" + (it.entry ? it.entry.id : "")
+                   + (it.section ? ":" + it.section.map(function(e) { return e.id }).join(",") : "")
+        }).join("|")
+        if (sig === itemsSignature) return
+        itemsSignature = sig
+        items = itemsNow
+    }
+    /// An entry as the store has it now (the items keep the ids)
+    function entryOf(e) { return (store.revision, e && e.id ? store.entry(e.id) : ({})) }
+    /// The button that shows an entry now: its own, or the stack that holds it (null: none)
+    function buttonFor(id) {
+        const kids = middleGrid.children
+        for (let i = 0; i < kids.length; ++i) {
+            const it = kids[i].entryItem
+            if (!it || !kids[i].item) continue
+            if (it.kind === "entry" && it.entry.id === id) return kids[i].item
+            if (it.kind === "stack" && it.section.some(function(e) { return e.id === id })) return kids[i].item
+        }
+        return null
+    }
+
     // --- what an entry does ----------------------------------------------------------------------------------------
     /// Its name: "Pen · Body", "Highlighter · Key terms", "Arrow", "Eraser (whiteout)", …
     function entryName(e) {
@@ -150,6 +180,7 @@ Rectangle {
             const v = win.toolGroups.variant("shape", e.variant)
             return role !== "" ? v.name + " · " + role : v.name
         }
+        if (e.type === "snip") return win.toolGroups.variant("snip", e.variant === "lasso" ? "snipLasso" : "snipRect").name
         const kind = kinds[e.type] || e.type
         return role !== "" ? kind + " · " + role : kind
     }
@@ -162,13 +193,21 @@ Rectangle {
         return key
     }
     /// The entry is the tool in hand (the active entry, and the tool is still its tool)
+    /// (a snip is never the active entry: it is in hand while it is armed with its shape)
     function inHand(e) {
-        return (app.tool, app.drawingType, app.settings.revision, store.revision,
-                e && store.active === e.id && app.entryInHand(e))
+        return (app.tool, app.drawingType, app.snip, app.settings.revision, store.revision,
+                !!e && (e.type === "snip" || store.active === e.id) && app.entryInHand(e))
     }
     function tap(e, button) {
-        if (inHand(e)) editRequested(e, button)
+        if (e && e.type === "snip") cycleSnip(e)
+        else if (inHand(e)) editRequested(e, button)
         else app.applyToolEntry(e.id)
+    }
+    /// A snip (a cycling tool, ToolGroups' "snip"): a tap snips with its shape; a tap while it is armed takes the
+    /// other shape, which the entry keeps (its editor: Edit… in its menu)
+    function cycleSnip(e) {
+        if (inHand(e)) store.update(e.id, { variant: e.variant === "lasso" ? "rect" : "lasso" })
+        app.applyToolEntry(e.id)
     }
     /// The width one wheel step further (a fifth more or less), within 0.1–150 pt
     function stepWidth(e, steps) {
@@ -451,7 +490,7 @@ Rectangle {
             icon.width: 22; icon.height: 22
             iconName: "xqt-plus"
             label: qsTr("Add a tool")
-            tip: qsTr("Add a tool (a pen, highlighter, shape, eraser, text box, sticky note, laser pointer)")
+            tip: qsTr("Add a tool (a pen, highlighter, shape, eraser, text box, sticky note, laser pointer, snip)")
             onClicked: box.addRequested(addButton)
         }
         IconButton {
@@ -504,7 +543,7 @@ Rectangle {
     Component {
         id: entryComponent
         ToolEntryButton {
-            readonly property var e: parent ? parent.entryItem.entry : ({})
+            readonly property var e: parent ? box.entryOf(parent.entryItem.entry) : ({})
             objectName: "toolEntry_" + (e ? e.id : "")
             cell: box.cell
             entry: e
@@ -524,8 +563,8 @@ Rectangle {
     Component {
         id: stackComponent
         ToolEntryButton {
-            readonly property var e: parent ? parent.entryItem.entry : ({})
-            readonly property var section: parent ? parent.entryItem.section : []
+            readonly property var e: parent ? box.entryOf(parent.entryItem.entry) : ({})
+            readonly property var section: parent ? parent.entryItem.section.map(box.entryOf) : []
             objectName: "toolStack_" + (e ? e.id : "")
             reorderable: false
             cell: box.cell

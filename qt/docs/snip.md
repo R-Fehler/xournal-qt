@@ -10,7 +10,8 @@ ask the user whether they also want to paste a link to the source document and p
 - **Where:** the select button's list (press and hold, or right-click): "Snip a rectangle (copy its picture)" and
   "Snip with the lasso"; the image button's list (press and hold, or right-click): "Snip from a page (copy a
   picture)" and "Snip with the lasso" (a tap on it still opens the file picker); the keys **Shift+S** (rectangle) and
-  **Shift+L** (lasso), changeable in the shortcut sheet. The snips are only in the list: a tap on the select button
+  **Shift+L** (lasso), changeable in the shortcut sheet; with the toolbox, a **Snip** entry of one's own ("+" → Snip,
+  qt/ui-rework): its icon is its shape, a tap snips, a tap while it is armed takes the other shape (it keeps it). The snips are only in the list: a tap on the select button
   still goes rectangle ↔ lasso, and a snip is never remembered as the button's variant.
 - **One snip per activation**, as screenshot tools do: the select tool of that shape is taken, the next rectangle or
   lasso dragged over a page is copied, and the tool in hand before comes back. "Copied picture" says it worked. A tap

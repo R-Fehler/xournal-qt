@@ -1,0 +1,5 @@
+{
+    "screens": [
+        { "name": "OffscreenPhone", "x": 0, "y": 0, "width": 412, "height": 915, "logicalDpi": 96, "logicalBaseDpi": 96 }
+    ]
+}
