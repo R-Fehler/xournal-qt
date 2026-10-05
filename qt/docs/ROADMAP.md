@@ -848,7 +848,8 @@
   add one here, divider, remove), a long press and a move carries it; "+" adds one prefilled from the last of its
   kind; a short rail folds sections into stacks. The tool bar becomes a command bar with entries of ⋮ where there is
   room; a text document's format bar has undo, redo and its commands by one ladder. Reading (⋮ → View → Read) is
-  read-only with a fading reading pill and snapping up and down; presenting keeps the tools. Stored per device
+  read-only with a fading reading pill and snapping up and down (since `qt/ui-rework`: read only in full screen, the
+  edges turn the pages); presenting keeps the tools. Stored per device
   (`ToolboxModel`, JSON in the settings); the classic bar stays for one release (Settings → Pen → Tools)
   ([toolbox.md](toolbox.md)).
 
@@ -966,6 +967,16 @@
   step), open it as a copy. Share sends it without its versions unless chosen. Attached background images are not
   written again when unchanged. A lecture of 20 pages: 5–7 KB a day with deltas instead of 25–32 KB
   ([hybrid-pdf.md](hybrid-pdf.md), "Version history"). Left: compare and play (on `qt/timeline`'s play bar), pruning.
+
+- **The adaptive UI reworked, `qt/ui-rework` (2026-10-05).** Reading is read only, a toggle of full screen and
+  presenting (the floating toolbox's ⋯, the compact chrome's tools, Ctrl+Alt+R; ⋮ → View → Read and the command
+  bar's Read enter full screen with it): no ink, the tools away, a lock to write again, and big tap fields at the left
+  and right fifth of the page that turn the pages (found by the canvas: `CanvasView::edgeTap`, so links still work and
+  a swipe scrolls); the reading pill is gone, sideways and whole pages stay as page layout settings. The command bar
+  carries Read, Replay, a milestone (where versions are kept) and Tags as entries of ⋮ by the ladder. The snip is a
+  cycling tool that can be put in the toolbox ("+" → Snip; rectangle ↔ lasso, its icon shows which). Fixed: the
+  editor's dashed and dotted line buttons drew a plain line (Canvas dashes from a model are ignored), and the editor
+  went to the window's corner when something was chosen in it (the rail rebuilt its buttons) ([toolbox.md](toolbox.md)).
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):

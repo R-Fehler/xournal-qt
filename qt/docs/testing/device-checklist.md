@@ -2184,7 +2184,9 @@ screen, Present, Present without controls, Hide the tool bar and Tool bar positi
       never covers the tab strip or the ⋮ button.
 - [ ] The library's ▾ menu (the libraries), a card's ⋮, a tab's menu (right click), the layout menu (right click the
       columns button of the view pill): as wide as their entries, inside the window, not over their button.
-- [ ] View → Read (only the page): the tool bar and pills go; the faint dot in the lower left corner brings them back.
+- [ ] View → Read: since qt/ui-rework full screen read only (the lock in the corner, the edges turn the pages); the
+      reader chrome (Settings → Display → Controls at this size → Reader): the tool bar and pills go; the faint dot in
+      the lower left corner brings them back.
 - [ ] Android, Fold 7 folded (412 wide): ⋮ opens as a sheet from the bottom with a handle, the page dimmed, rows as
       tall as a finger. Tap Document: the sheet shows its entries with a back arrow and "Document"; the arrow goes
       back. View → Tool bar position: a second level. The back key: a level up, then closes the sheet.
@@ -2394,8 +2396,9 @@ Fold 7 folded (412 × 915):
 - [ ] The library (tap the library button): the same top bar, the library button marked, the title of the document
       behind it in grey (tap it: back to that document), no ⋮. At the library's top no breadcrumb row with only the
       library's name; in a folder the breadcrumbs are there.
-- [ ] ⋮ → View → Read: only the page. A dot in the lower left corner, faint; hold it: "Show the tools"; tap it: the bars
-      are back.
+- [ ] ⋮ → View → Read: full screen read only (qt/ui-rework): the lock in the upper right corner, clear of the cut-out;
+      tap the left and right edges for the pages; Esc (a keyboard cover) leaves. (The reader chrome, chosen in
+      Settings → Display: a faint dot in the lower left corner; hold it: "Show the tools"; tap it: the bars are back.)
 
 Fold 7 folded, held sideways (915 × 412):
 - [ ] The top bar across; the dock is a column at the right edge (pen, All tools, color, width, undo, redo, page
@@ -2437,7 +2440,8 @@ Safe areas, held sideways (915 × 412), both ways round (the cut-out at the left
 - [ ] The page's arrow at the left edge (open the pages) beside the cut-out; the pages drawer opens beside it (the
       drawer's color under the cut-out), its thumbnails above the gesture bar.
 - [ ] The scroll bars of the page (zoom in) clear of the cut-out and the gesture bar.
-- [ ] ⋮ → View → Read, then the compact chrome (Settings → Display → Controls at this size → Compact): the tool
+- [ ] ⋮ → View → Read (full screen read only; the lock clear of the cut-out), then the compact chrome (Settings →
+      Display → Controls at this size → Compact): the tool
       square, the tab dots, the pen pill and the view pill all clear of the cut-out and the bars.
 
 Unfolded (900 × 1000), and unfolded held sideways:
