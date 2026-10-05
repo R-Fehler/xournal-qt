@@ -41,8 +41,12 @@ Toolbox position).
 
 **Head and tail.** Undo and redo lead the rail (one place: the view pill has them no more while the toolbox is shown).
 After the user's tools come the fixed tools: hand, select (rectangle ↔ lasso, the snips in its list), write on the
-page, setsquare / compass (curtain and spotlight in its list), mark PDF text, the finger draws. They are the window's
-own buttons, lent to the rail (`Toolbox.fixedButtons`).
+page, setsquare / compass (curtain and spotlight in its list), mark PDF text, the finger draws, and **record audio**
+where the build can record ([audio.md](audio.md); its list: the play tool, the recordings). They are the window's own
+buttons, lent to the rail (`Toolbox.fixedButtons`): one place each, so the command bar leaves them out. Recording is
+among them rather than in the command bar because the rail is the one element that stays in full screen and while
+presenting (floating): a lecture is recorded there too. Folded into a stack, the stack shows the record button while
+it records. The recording and playback pills sit at the top of the page, below the toolbox when it floats at the top.
 
 ## Short rails
 
@@ -59,12 +63,13 @@ with 16 px to spare (no flicker at an edge).
 | --- | --- |
 | desktop, tablet (full chrome) | docked to its edge, taking its strip (`sideTools` at a side, `toolboxRow` at the top or the bottom); the right by default, also in tablet portrait (a 52 px rail leaves an A4 page well visible) |
 | full screen (the compact chrome), presenting with the tools | the same toolbox floating 8 px off its edge, rounded, as long as its tools; ⋯ at its end: present, present without controls, search, settings, leave full screen |
-| phone portrait | the dock at the bottom: undo, redo, the first tools that fit (the one in hand always among them), **My tools** (a sheet: every tool, "Add a tool", the other tools and commands), the page number |
+| phone portrait | the dock at the bottom: undo, redo, the first tools that fit (the one in hand always among them), **My tools** (a sheet: every tool, "Add a tool", the other tools and commands; record audio under Insert), the page number |
 | phone held sideways | the same as a rail at the right |
 | a text document (`.md`) | no toolbox (no ink): undo and redo lead its format bar |
 
-In the toolbox mode the tool bar at the top is a **command bar**: new, open, save, image, add a page, search, full
-screen, present, settings, and entries of ⋮ as buttons where there is room (share, print, bookmark, favourite; one
+In the toolbox mode the tool bar at the top is a **command bar**: open, save, image, stickers, add a page, search, full
+screen, present, settings (New is the tab strip's "+"; recording is a fixed tool of the rail), and entries of ⋮ as
+buttons where there is room (share, print, bookmark, favourite; one
 place each: ⋮ leaves out what the bar shows, and shows it again when the bar has no room for it). The classic tool
 square, the quick tools and the pen pill of full screen are classic only.
 
@@ -139,6 +144,9 @@ tools. The last eraser cannot be removed.
 at the right with undo / redo and the fixed tools, a tap and the tool in hand, the edges per size class, stacks in a
 short rail, the classic bar back, the editor, "+", the menu, carrying a tool and the grip, full screen and presenting,
 the phone's dock and sheet, the command bar's promoted entries, a text document's format bar, reading.
+`ToolboxAudioTest.*` (fake microphone): the record button among the fixed tools and not in the command bar, the
+recording pill clear of the rail, docked and floating at the top in full screen (the stack shows the recording), the
+phone's sheet; `ToolboxNoAudioTest.*`: without an audio backend nothing offers recording.
 
 ## Not done
 

@@ -24,6 +24,9 @@
 #include <QWheelEvent>
 #include <gtest/gtest.h>
 
+#include "audio/AudioDevice.h"
+#include "audio/AudioFiles.h"
+#include "audio/FakeAudio.h"
 #include "canvas/CanvasView.h"
 #include "model/Document.h"
 #include "model/Layer.h"
@@ -755,4 +758,117 @@ TEST_F(ToolboxTest, readingIsReadOnlyWithItsPillAndEscLeavesIt) {
     EXPECT_FALSE(win("reading").toBool());
     EXPECT_FALSE(canvas->property("readingOnly").toBool());
     EXPECT_TRUE(shown(find("toolbox")));
+}
+
+namespace {
+/// Recording (qt/docs/audio.md) with the fake microphone, or in a build without any audio backend
+class ToolboxAudioTest: public ToolboxTest {
+protected:
+    virtual bool withAudio() const { return true; }
+    void SetUp() override {
+        ASSERT_TRUE(tmp.isValid());
+        if (withAudio()) {
+            xqt::audio::useFakeDevices(true);
+        } else {
+            xqt::audio::useNoDevices(true);
+        }
+        xqt::audio::fake::reset();
+        xqt::audio::setAppFolder(std::filesystem::path(tmp.filePath("audio").toStdString()));
+        ToolboxTest::SetUp();
+    }
+    void TearDown() override {
+        ToolboxTest::TearDown();
+        xqt::audio::setAppFolder({});
+        xqt::audio::fake::reset();
+        xqt::audio::useFakeDevices(false);
+    }
+    QObject* audio() const { return controller->property("audio").value<QObject*>(); }
+    QTemporaryDir tmp;
+};
+class ToolboxNoAudioTest: public ToolboxAudioTest {
+protected:
+    bool withAudio() const override { return false; }
+};
+}  // namespace
+
+// The record button is a fixed tool of the rail (one place: not in the command bar too), so recording is there docked,
+// floating in full screen and on a phone's sheet; the recording pill stays in sight, clear of the toolbox
+TEST_F(ToolboxAudioTest, recordingIsAFixedToolOfTheRailAndItsPillStaysInSight) {
+    auto* box = find("toolbox");
+    auto* record = find("recordButton");
+    ASSERT_NE(record, nullptr);
+    until([&] { return shown(record) && inside(record, box); });
+    ASSERT_TRUE(shown(record));
+    EXPECT_TRUE(inside(record, find("toolboxFixed"))) << "among the fixed tools";
+    EXPECT_FALSE(inside(record, find("toolArea"))) << "not in the command bar too";
+    EXPECT_FALSE(shown(find("moreToolsButton"))) << "nothing in \"more tools\" at 1920";
+
+    click(record);
+    until([&] { return audio()->property("recording").toBool(); });
+    ASSERT_TRUE(audio()->property("recording").toBool());
+    EXPECT_TRUE(record->property("checked").toBool());
+    auto* pill = find("recordingPill");
+    until([&] { return shown(pill); });
+    EXPECT_TRUE(shown(pill));
+    EXPECT_FALSE(rectOf(pill).intersects(rectOf(box))) << "clear of the rail";
+
+    // Full screen, the toolbox at the top: it floats in the middle of the top edge, the pill below it
+    window->setProperty("fullScreenMode", true);
+    // (the window takes the screen's size, and with it another size class: the edge is chosen for that one)
+    until([&] { return box->property("floating").toBool() && window->width() != 1920; });
+    ASSERT_TRUE(box->property("floating").toBool());
+    wait(300);
+    QMetaObject::invokeMethod(window, "chooseToolboxEdge", Q_ARG(QVariant, "top"));
+    until([&] { return win("toolboxEdge").toString() == "top" && !box->property("vertical").toBool(); });
+    ASSERT_EQ(win("toolboxEdge").toString(), "top");
+    wait(200);
+    EXPECT_TRUE(shown(pill));
+    EXPECT_FALSE(rectOf(pill).intersects(rectOf(box))) << "below the floating toolbox";
+    EXPECT_GE(rectOf(pill).top(), rectOf(box).bottom());
+    if (box->property("plan").toMap().value("fixedFolded").toBool()) {
+        // (a short toolbox: the fixed tools in one stack, which shows the recording, a tap lists them)
+        auto* stack = find("toolboxFixedStack");
+        ASSERT_TRUE(shown(stack));
+        EXPECT_EQ(stack->property("iconName"), record->property("iconName")) << "the stack shows the recording";
+        click(stack);
+        until([&] { return shown(record); });
+    }
+    ASSERT_TRUE(shown(record)) << "in the floating toolbox";
+    click(record);  // (there: it stops)
+    until([&] { return !audio()->property("recording").toBool(); });
+    EXPECT_FALSE(audio()->property("recording").toBool());
+    QMetaObject::invokeMethod(find<QObject>("toolboxFixedFlyout"), "close");
+    window->setProperty("fullScreenMode", false);
+    until([&] { return !box->property("floating").toBool(); });
+
+    // A phone: in "My tools", under Insert
+    resize(412, 915);
+    until([&] { return box->property("compact").toBool(); });
+    click(find("toolboxAllButton"));
+    auto* sheet = find<QObject>("phoneToolSheet");
+    until([&] { return sheet->property("visible").toBool(); });
+    ASSERT_TRUE(sheet->property("visible").toBool());
+    auto* cell = find("toolCell_record");
+    ASSERT_NE(cell, nullptr);
+    EXPECT_TRUE(inside(cell, find("phoneToolSection_insert")));
+}
+
+// Without an audio backend nothing offers recording: not the rail, not the command bar, not the phone's sheet
+TEST_F(ToolboxNoAudioTest, withoutAudioNothingOffersRecording) {
+    ASSERT_FALSE(audio()->property("available").toBool());
+    auto* record = find("recordButton");
+    ASSERT_NE(record, nullptr);
+    EXPECT_FALSE(shown(record));
+    EXPECT_FALSE(inside(record, find("toolbox")));
+    for (const char* name: {"handButton", "touchDrawingButton"}) {
+        EXPECT_TRUE(shown(find(name)) && inside(find(name), find("toolboxFixed"))) << name;
+    }
+    resize(412, 915);
+    until([&] { return find("toolbox")->property("compact").toBool(); });
+    click(find("toolboxAllButton"));
+    auto* sheet = find<QObject>("phoneToolSheet");
+    until([&] { return sheet->property("visible").toBool(); });
+    ASSERT_TRUE(sheet->property("visible").toBool());
+    EXPECT_NE(find("toolCell_image"), nullptr);
+    EXPECT_EQ(find("toolCell_record"), nullptr);
 }

@@ -571,6 +571,10 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   has no Qt Multimedia: add conda-forge `qt6-multimedia`), the Android/macOS parts and the device checks; the play
   tool's fading of ink without a recording, a speaker chip on pages/thumbnails, "Play from here" in the selection
   pill, a settings field for Xournal++'s audio folder.
+- [x] `qt/record-place` (integration follow-up of `qt/audio`): the record button's place after `qt/toolbox` and
+  `qt/stickers`. The classic bar at 1920 px has everything again (New is the tab strip's "+"); with the toolbox
+  recording is a fixed tool of the rail (docked and floating), the pills stay clear of a floating toolbox. Left: the
+  device checks.
 - [x] `qt/hwr-search`: an MVP of handwriting search on Linux from the research (`qt/docs/research/
   handwriting-recognition.md`): search only, no training on user data, fuzzy matching over the model's candidates.
   Where the results live: the library's dot folder cache, the `.xopp`, and an invisible text layer in PDFs with
