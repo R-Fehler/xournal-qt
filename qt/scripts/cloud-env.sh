@@ -36,6 +36,8 @@ fi
 
 packages=(
     "$QT_SPEC"
+    # recording and playing audio (qt/audio, optional: without it the app offers no recording)
+    "qt6-multimedia=${QT_SPEC#qt6-main=}"
     # the C libraries of the core (qt/cmake/XojDeps.cmake), qpdf 12 (XqtQpdf.cmake), GoogleTest: see below
     poppler cairo pango glib gdk-pixbuf fontconfig expat libxml2 libxml2-devel libzip zlib libjpeg-turbo "qpdf>=12"
     # OpenGL/EGL headers and X/xkb libraries that Qt6Gui's CMake package looks for
