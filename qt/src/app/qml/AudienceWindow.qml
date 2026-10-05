@@ -1,5 +1,5 @@
-// The audience's screen of the presenter view (qt/docs/presenter-view.md): only the slide, full screen on the other
-// screen, black around it. Its page follows the presenter's; strokes being written, the laser pointer and the curtain
+// The audience's screen of the presenter view (qt/docs/presenter-view.md): only the slide (or the whole page with its
+// space for notes, when the presenter shows the notes too), full screen on the other screen, black around it. Its page follows the presenter's; strokes being written, the laser pointer and the curtain
 // show here too (PresenterConsole, CanvasView::setMirror). It takes no input on the page; the keys that go from page
 // to page work here as in the console's window (a clicker sends them to whichever window has the focus).
 import QtQuick
@@ -19,11 +19,13 @@ Window {
     transientParent: null  // (a window of its own, on its own screen: not a dialog of the console)
 
     // Only the slide: the canvas has the slide's shape, as large as the screen allows, in the middle; the view shows
-    // exactly the slide in it (ViewController::fitPageRect), so its space for notes stays out of view
+    // exactly the slide in it (ViewController::fitPageRect), so its space for notes stays out of view. With the notes
+    // shown too, the canvas has the whole page's shape and shows all of it. Following the presenter zoomed in, it has
+    // the shape of the part shown (the screen's, unless the slide's edge cuts it).
     DocumentCanvas {
         id: audienceCanvas
         objectName: "audienceCanvas"
-        readonly property size slide: audience.console.slideSize
+        readonly property size slide: audience.console.shownSize
         readonly property real scale: slide.width > 0 && slide.height > 0
                                       ? Math.min(audience.width / slide.width, audience.height / slide.height) : 1
         width: slide.width * scale
@@ -33,6 +35,14 @@ Window {
         enabled: false  // (nothing is written here: the presenter writes on the console)
         readingOnly: true
         view: audience.console.active ? audience.console.audienceView : null
+    }
+
+    // (the shape the part the audience sees is widened to, when it follows the presenter's zoom)
+    Binding {
+        target: audience.console
+        property: "audienceSize"
+        value: Qt.size(audience.width, audience.height)
+        when: audience.visible && audience.width > 0 && audience.height > 0
     }
 
     Item {

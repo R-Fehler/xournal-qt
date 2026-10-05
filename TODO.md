@@ -623,6 +623,12 @@ The other ideas (A3–A9, A15, B1–B8) stay in that file to decide later.
   note space, the next slide, a timer and the page number; the audience screen shows only the slide. After
   `qt/toolbox` (presenting chrome). Built 2026-10-05 ([presenter-view.md](qt/docs/presenter-view.md)); left: the
   device checks (window placement on X11, Wayland and Windows, a clicker, unplugging the projector).
+- [x] `qt/presenter-follow` (the author, 2026-10-05: "a toggle to show the full page in presentation as well,
+  including the note page"; "can the presenter zoom and pan the page on the Beamer as well?"): a console switch and
+  setting to show the audience the whole page with its space for notes (off by default), and the audience following
+  the console's zoom and scrolling (on by default) with a frame on the console showing what the audience sees; Fit
+  and a page change bring both back to the whole slide. Built 2026-10-05 ([presenter-view.md](qt/docs/presenter-view.md));
+  left: the device checks (smoothness on a real projector, a 4K projector zoomed in far).
 
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message

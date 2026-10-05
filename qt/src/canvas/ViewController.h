@@ -177,6 +177,8 @@ public:
     void fitHeight();
     /// Presenting: zoom so that the page fills the screen (as much as its shape allows), show it, and keep that.
     void fitPresentedPage(size_t page);
+    /// Presenting: the zoom at which the page fills the view (as much as its shape allows)
+    double presentedZoom(size_t page) const;
     /// The audience's screen of the presenter view (qt/docs/presenter-view.md): zoom so that a part of a page (the
     /// slide without its space for notes) fills the view as far as its shape allows, centre it, and keep that (also
     /// when the view changes size or the pages move).
@@ -246,8 +248,7 @@ private:
     double restY(size_t group) const;
     /// The group whose resting place is closest to a scroll position
     size_t groupNear(double scrollX) const;
-    /// Presenting: the zoom at which the page fills the view
-    double presentedZoom(size_t page) const;
+
     /// Show a group at its resting place right away
     void placeGroup(size_t group);
 

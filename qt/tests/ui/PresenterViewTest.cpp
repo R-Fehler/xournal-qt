@@ -28,6 +28,7 @@
 #include "canvas/CanvasPage.h"
 #include "canvas/CanvasView.h"
 #include "canvas/CurtainLayer.h"
+#include "canvas/ViewController.h"
 #include "session/DocumentSession.h"
 #include "session/PageNoteSpace.h"
 #include "shell/HitPages.h"
@@ -80,6 +81,8 @@ protected:
         controller->setPresenting(false);
         settings()->set("presenterView", true);  // (the settings are shared by the tests of this run)
         settings()->set("presenterSwapScreens", false);
+        settings()->set("presenterShowNotes", false);
+        settings()->set("presenterFollowView", true);
         settings()->set("toolbarMode", "classic");
         controller->shutdown();
         engine.reset();
@@ -295,6 +298,201 @@ TEST_F(PresenterView, theSlideOnTheAudiencesScreenTheConsoleOnTheLaptop) {
     EXPECT_EQ(presenterView()->mirror(), nullptr);
     EXPECT_FALSE(audienceWindow->isVisible());
     EXPECT_FALSE(panel->isVisible());
+}
+
+// "Notes for the audience too" (the console's switch, a setting): the audience sees the whole page with its space for
+// notes, at once while presenting; off again, only the slide. A page without space for notes looks the same either way.
+TEST_F(PresenterView, theAudienceSeesTheSpaceForNotesWhenAsked) {
+    if (!twoScreens) {
+        GTEST_SKIP() << "needs two screens (PresenterView.ui@2screens)";
+    }
+    const double slideWidth = session()->getDocument()->getPage(0)->getWidth();
+    const double slideHeight = session()->getDocument()->getPage(0)->getHeight();
+    ASSERT_EQ(xqt::notespace::apply(*session(), {0}, {0, 0, 0.5, 0.25, true}), 1u);
+    wait(100);
+    const double pageWidth = session()->getDocument()->getPage(0)->getWidth();
+    const double pageHeight = session()->getDocument()->getPage(0)->getHeight();
+    ASSERT_GT(pageWidth, slideWidth * 1.4);
+    ASSERT_GT(pageHeight, slideHeight * 1.2);
+    EXPECT_FALSE(console->showNotes()) << "off by default";
+
+    present();
+    ASSERT_TRUE(console->active());
+    auto* canvas = findIn(audienceWindow, "audienceCanvas");
+    ASSERT_NE(canvas, nullptr);
+    // What the audience's canvas shows of the page (page points): its size over the zoom, from the page's corner
+    auto fitted = [&] {
+        const double z = audience()->getViewController().zoom();
+        const QRectF page = audience()->pageViewRect(0);
+        return QRectF(-page.left() / z, -page.top() / z, canvas->width() / z, canvas->height() / z);
+    };
+    auto near = [](QRectF a, QRectF b) {
+        return std::abs(a.left() - b.left()) < 1 && std::abs(a.top() - b.top()) < 1 &&
+               std::abs(a.right() - b.right()) < 1 && std::abs(a.bottom() - b.bottom()) < 1;
+    };
+    const QRectF slide(0, 0, slideWidth, slideHeight);
+    const QRectF whole(0, 0, pageWidth, pageHeight);
+    EXPECT_EQ(console->shownRect(), slide);
+    EXPECT_TRUE(near(fitted(), slide)) << "only the slide";
+    EXPECT_TRUE(find("presenterNotesHint")->isVisible());
+
+    // On, from the console: at once the whole page
+    click(find("presenterShowNotes"));
+    EXPECT_TRUE(console->showNotes());
+    EXPECT_TRUE(settings()->get("presenterShowNotes").toBool()) << "remembered";
+    until([&] { return near(fitted(), whole); }, 2000);
+    EXPECT_EQ(console->shownRect(), whole);
+    EXPECT_TRUE(near(fitted(), whole)) << "the page with its space for notes";
+    EXPECT_NEAR(canvas->width() / canvas->height(), pageWidth / pageHeight, 0.01) << "the page's shape";
+    EXPECT_TRUE(audienceWindow->isVisible());
+
+    // A page without space for notes: the same either way
+    key(Qt::Key_Space);
+    settle();
+    until([&] { return audience()->currentPageNo() == 1; });
+    const QSizeF second(session()->getDocument()->getPage(1)->getWidth(), session()->getDocument()->getPage(1)->getHeight());
+    EXPECT_EQ(console->shownRect(), QRectF(QPointF(), second));
+    key(Qt::Key_Backspace);
+    settle();
+    until([&] { return audience()->currentPageNo() == 0; });
+
+    // Off again (the setting): only the slide
+    settings()->set("presenterShowNotes", false);
+    until([&] { return near(fitted(), slide); }, 2000);
+    EXPECT_EQ(console->shownRect(), slide);
+    EXPECT_TRUE(near(fitted(), slide));
+    EXPECT_FALSE(find("presenterShowNotes")->property("checked").toBool());
+}
+
+// "The audience follows my zoom" (on by default): zoomed in on the console, the audience sees the same part of the
+// slide, widened to its screen's shape, never less than the presenter sees, a frame on the console around it; Fit, a
+// page change and the switch off bring the whole slide back; with the notes shown, the part may reach into them
+TEST_F(PresenterView, theAudienceFollowsThePresentersZoom) {
+    if (!twoScreens) {
+        GTEST_SKIP() << "needs two screens (PresenterView.ui@2screens)";
+    }
+    const double slideWidth = session()->getDocument()->getPage(0)->getWidth();
+    const double slideHeight = session()->getDocument()->getPage(0)->getHeight();
+    ASSERT_EQ(xqt::notespace::apply(*session(), {0}, {0, 0, 0.5, 0, true}), 1u);
+    wait(100);
+    const double pageWidth = session()->getDocument()->getPage(0)->getWidth();
+    const QRectF slide(0, 0, slideWidth, slideHeight);
+    EXPECT_TRUE(console->followView()) << "on by default";
+
+    present();
+    ASSERT_TRUE(console->active());
+    xqt::CanvasView* view = presenterView();
+    xqt::ViewController& vc = view->getViewController();
+    auto* canvas = findIn(audienceWindow, "audienceCanvas");
+    auto* frame = find("audienceFrame");
+    ASSERT_NE(canvas, nullptr);
+    ASSERT_NE(frame, nullptr);
+    // What the audience's canvas shows of the page (points) and what the presenter sees of it
+    auto fitted = [&] {
+        const size_t page = audience()->currentPageNo();
+        const double z = audience()->getViewController().zoom();
+        const QRectF p = audience()->pageViewRect(page);
+        return QRectF(-p.left() / z, -p.top() / z, canvas->width() / z, canvas->height() / z);
+    };
+    auto seen = [&] {
+        const auto r = view->viewOnPage(view->currentPageNo());
+        return QRectF(r.x, r.y, r.width, r.height);
+    };
+    auto near = [](QRectF a, QRectF b, double d = 1) {
+        return std::abs(a.left() - b.left()) < d && std::abs(a.top() - b.top()) < d &&
+               std::abs(a.right() - b.right()) < d && std::abs(a.bottom() - b.bottom()) < d;
+    };
+    auto covers = [](QRectF outer, QRectF inner) { return outer.adjusted(-0.5, -0.5, 0.5, 0.5).contains(inner); };
+    const double screenAspect = audienceWindow->width() / double(audienceWindow->height());
+    EXPECT_EQ(console->shownRect(), slide);
+    EXPECT_FALSE(frame->isVisible()) << "no frame while the whole page shows";
+
+    // Zoomed in on the slide (the zoom pill's +): the audience sees that part, at its screen's shape
+    const QPointF middle = view->pageViewRect(0).topLeft() + QPointF(slideWidth / 2, slideHeight / 3) * vc.zoom();
+    vc.setZoom(vc.zoom() * 3, middle);
+    controller->zoomIn();
+    wait(100);
+    const QRectF part = console->shownRect();
+    EXPECT_NE(part, slide);
+    EXPECT_TRUE(covers(slide, part)) << "within the slide";
+    EXPECT_TRUE(covers(part, seen().intersected(slide))) << "never less than the presenter sees";
+    EXPECT_NEAR(part.width() / part.height(), screenAspect, 0.01) << "the audience's screen's shape";
+    until([&] { return near(fitted(), part); }, 2000);
+    EXPECT_TRUE(near(fitted(), part)) << "the audience's view shows exactly that part";
+    EXPECT_NEAR(canvas->width(), audienceWindow->width(), 1) << "the whole screen";
+    // The frame on the console: around what the audience sees
+    EXPECT_TRUE(frame->isVisible());
+    const double z = vc.zoom();
+    const QRectF p = view->pageViewRect(0);
+    EXPECT_NEAR(frame->x(), p.left() + part.left() * z, 1);
+    EXPECT_NEAR(frame->width(), part.width() * z, 1);
+    EXPECT_NEAR(frame->y(), p.top() + part.top() * z, 1);
+
+    // Scrolled: the part goes along
+    vc.panBy(QPointF(-60, -40));
+    wait(50);
+    EXPECT_NE(console->shownRect(), part);
+    EXPECT_TRUE(covers(console->shownRect(), seen().intersected(slide)));
+    until([&] { return near(fitted(), console->shownRect()); }, 2000);
+    EXPECT_TRUE(near(fitted(), console->shownRect()));
+
+    // Fit in the console: both back to the whole slide
+    click(find("presenterFit"));
+    EXPECT_EQ(vc.keptFit(), xqt::ViewController::Fit::Page);
+    EXPECT_EQ(console->shownRect(), slide);
+    until([&] { return near(fitted(), slide); }, 2000);
+    EXPECT_TRUE(near(fitted(), slide));
+    EXPECT_FALSE(frame->isVisible());
+
+    // Zoomed in again, then the next page: the audience sees it whole, the console too
+    vc.setZoom(vc.zoom() * 3, middle);
+    wait(50);
+    ASSERT_NE(console->shownRect(), slide);
+    key(Qt::Key_Space);
+    settle();
+    until([&] { return audience()->currentPageNo() == 1; });
+    const QRectF second(0, 0, session()->getDocument()->getPage(1)->getWidth(),
+                        session()->getDocument()->getPage(1)->getHeight());
+    EXPECT_EQ(console->shownRect(), second);
+    EXPECT_NEAR(vc.zoom(), vc.presentedZoom(1), 1e-6) << "the console shows the whole page too";
+    EXPECT_FALSE(frame->isVisible());
+    key(Qt::Key_Backspace);
+    settle();
+    until([&] { return audience()->currentPageNo() == 0; });
+
+    // With the notes shown: zoomed in on the slide's right edge, the part reaches into the space for notes
+    settings()->set("presenterShowNotes", true);
+    wait(50);
+    const QRectF whole(0, 0, pageWidth, slideHeight);
+    EXPECT_EQ(console->shownRect(), whole);
+    const QPointF edge = view->pageViewRect(0).topLeft() + QPointF(slideWidth, slideHeight / 2) * vc.zoom();
+    vc.setZoom(vc.zoom() * 4, edge);
+    wait(50);
+    EXPECT_GT(console->shownRect().right(), slideWidth + 10) << "beside the slide too";
+    EXPECT_LT(console->shownRect().left(), slideWidth - 10);
+    EXPECT_TRUE(covers(whole, console->shownRect()));
+    EXPECT_TRUE(covers(console->shownRect(), seen().intersected(whole)));
+    // Without the notes again: only the slide's part, still never less than the presenter sees of it
+    settings()->set("presenterShowNotes", false);
+    wait(50);
+    EXPECT_LE(console->shownRect().right(), slideWidth + 0.5);
+    EXPECT_TRUE(covers(console->shownRect(), seen().intersected(slide)));
+
+    // Off: the audience sees the whole slide, whatever the zoom here; on again: it follows at once
+    click(find("presenterFollowView"));
+    EXPECT_FALSE(console->followView());
+    EXPECT_FALSE(settings()->get("presenterFollowView").toBool()) << "remembered";
+    EXPECT_EQ(console->shownRect(), slide);
+    until([&] { return near(fitted(), slide); }, 2000);
+    EXPECT_TRUE(near(fitted(), slide));
+    EXPECT_FALSE(frame->isVisible());
+    vc.panBy(QPointF(30, 0));
+    wait(50);
+    EXPECT_EQ(console->shownRect(), slide);
+    settings()->set("presenterFollowView", true);
+    wait(50);
+    EXPECT_NE(console->shownRect(), slide);
+    EXPECT_TRUE(frame->isVisible());
 }
 
 // The time since the start: it runs from the start of the presentation, pauses, goes on, goes back to 0

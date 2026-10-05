@@ -3164,6 +3164,25 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
 - [ ] A 4K projector, a long PDF lecture: going on page by page stays quick; memory (the canvas' share) stays within its
       setting.
 
+### Notes for the audience too, the audience following the presenter's view (qt/presenter-follow)
+
+- [ ] The slide with space for notes at its right and below, presenting with the projector: "Notes for the audience
+      too" in the console: at once the projector shows the whole page (slide and space for notes, as large as it fits,
+      black around it); write in the space for notes: the audience sees it as it is written. Off: only the slide again.
+      Settings → Pen → Presenting → "The audience sees the space for notes too" is the same switch and is remembered
+      after a restart. A page without space for notes looks the same either way.
+- [ ] Zoom in on the console's page (pinch, Ctrl+wheel, the zoom pill's +) and scroll around (two fingers, the wheel,
+      the hand): the projector shows the same part of the slide, as large as its screen allows, smoothly (no flicker,
+      no lag behind the console worth noticing, sharp once the zoom settles); a thin orange frame on the console shows
+      exactly what the projector shows (on a 16:9 projector with a 3:2 laptop it reaches past the console's sides).
+      Near the slide's edge the projector stops at the edge (black beyond, never the space for notes or the next page).
+- [ ] "Fit" in the console, the zoom pill's fit, a double tap: both screens show the whole slide again, the frame goes.
+      Zoomed in, the next page (Space, a clicker): both show the next page whole.
+- [ ] With "Notes for the audience too" on, zoomed in at the slide's edge: the projector shows the space for notes
+      beside it too. "The audience follows my zoom" off: the projector keeps the whole slide whatever the console does;
+      on again: it follows at once. Settings → Pen → Presenting has the same switch, remembered after a restart.
+- [ ] A 4K projector zoomed in far: memory and smoothness stay as when not zoomed (only the part shown is drawn).
+
 ## Find and replace (qt/md-find-replace)
 
 - [ ] A `.md` (and a `.txt`): Ctrl+H opens the search bar with a second row (replace with, Aa, ab, .*, Replace, All);

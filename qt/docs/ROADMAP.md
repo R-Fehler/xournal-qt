@@ -898,6 +898,15 @@
   is the one that is not primary (a setting and a button swap them); with one screen nothing changes. Tests with two
   off-screen screens (`PresenterView.ui@2screens`) ([presenter-view.md](presenter-view.md)).
 
+- **The presenter view: notes for the audience, the audience following the zoom, `qt/presenter-follow`
+  (2026-10-05).** Two switches in the console, both remembered (Settings → Pen → Presenting). "Notes for the
+  audience too" (off by default): the audience sees the whole page with its space for notes and the ink there.
+  "The audience follows my zoom" (on by default): zoomed in on the console (pinch, Ctrl+wheel, the zoom pill,
+  scrolling), the projector shows the same part of the slide, widened to its screen's shape and kept within the slide
+  (`presenter::audienceRegion`), never less than the presenter sees; a thin frame on the console shows exactly what the
+  audience sees. Fit (console, fits, double tap) and a page change bring both back to the whole slide. The audience's
+  view is fitted again only when the part changes, and draws only what it shows ([presenter-view.md](presenter-view.md)).
+
 - **Find and replace, `qt/md-find-replace` (2026-10-05).** The search bar gets a replace row (Ctrl+H, its replace
   button, ⋮) wherever text can be written: `.md` and `.txt` files, PDF text documents, Markdown text boxes and sticky
   notes' texts of notes. Options match case, whole words and regular expressions (groups in the replacement); the

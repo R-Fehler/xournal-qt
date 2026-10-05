@@ -406,12 +406,17 @@ Popup {
                     SectionTitle { text: qsTr("Presenting") }
                     SwitchRow { objectName: "presenterViewSwitch"; key: "presenterView"; text: qsTr("Presenter view on a second screen") }
                     SwitchRow { objectName: "presenterSwapSwitch"; key: "presenterSwapScreens"; text: qsTr("Swap the screens") }
+                    SwitchRow { objectName: "presenterShowNotesSwitch"; key: "presenterShowNotes"; text: qsTr("The audience sees the space for notes too") }
+                    SwitchRow { objectName: "presenterFollowSwitch"; key: "presenterFollowView"; text: qsTr("The audience follows the zoom of the console") }
                     Hint {
                         text: qsTr("With a second screen (a projector), presenting (F5) shows only the slide there, "
                                    + "and on this screen the page with its space for notes, the next page, the clock "
                                    + "and the time since the start. Write on the page here: the audience sees it at "
                                    + "once. The audience's screen is the one that is not the main screen; swap them "
-                                   + "when it is the other way round.")
+                                   + "when it is the other way round. With the space for notes shown too, the audience "
+                                   + "sees the whole page and what is written beside the slide. Zooming in on the console "
+                                   + "shows the audience the same part of the page, as large as their screen allows; "
+                                   + "a frame on the console shows what they see.")
                     }
                     SectionTitle { text: qsTr("Grid") }
                     SwitchRow { objectName: "snapGridSwitch"; key: "snapGrid"; text: qsTr("Snap to the grid") }

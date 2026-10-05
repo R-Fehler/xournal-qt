@@ -103,10 +103,47 @@ Rectangle {
         Label {
             objectName: "presenterNotesHint"
             visible: panel.console.pageHasNotes
-            text: qsTr("The space for notes shows only here, not to the audience.")
+            text: panel.console.showNotes ? qsTr("The audience sees the space for notes too.")
+                                          : qsTr("The space for notes shows only here, not to the audience.")
             wrapMode: Text.WordWrap
             color: "#9aa0a6"
             Layout.fillWidth: true
+        }
+        // The audience sees the whole page with its space for notes (and the ink written there), not only the slide
+        // (a setting: Settings → Pen → Presenting)
+        Switch {
+            objectName: "presenterShowNotes"
+            text: qsTr("Notes for the audience too")
+            checked: panel.console.showNotes
+            focusPolicy: Qt.NoFocus
+            padding: 0
+            onToggled: app.settings.set("presenterShowNotes", checked)
+            Layout.fillWidth: true
+        }
+        // Zooming and scrolling the page here shows the audience the same part (a frame on the page shows what they
+        // see); "Fit": both back to the whole slide
+        RowLayout {
+            spacing: 8
+            Switch {
+                objectName: "presenterFollowView"
+                text: qsTr("The audience follows my zoom")
+                checked: panel.console.followView
+                focusPolicy: Qt.NoFocus
+                padding: 0
+                onToggled: app.settings.set("presenterFollowView", checked)
+                Layout.fillWidth: true
+            }
+            Button {
+                objectName: "presenterFit"
+                text: qsTr("Fit")
+                focusPolicy: Qt.NoFocus
+                flat: true
+                onClicked: panel.console.fitPage()
+                ToolTip.visible: hovered
+                ToolTip.text: panel.console.showNotes ? qsTr("The whole page on both screens")
+                                                      : qsTr("The whole slide on both screens")
+                Accessible.name: ToolTip.text
+            }
         }
         Label {
             text: qsTr("Audience: %1").arg(panel.console.audienceScreenName)

@@ -2373,6 +2373,20 @@ ApplicationWindow {
                     drop.accept(Qt.CopyAction)
             }
         }
+        // Presenting with two screens, zoomed in, the audience following (qt/docs/presenter-view.md): a thin frame
+        // around what the audience sees (the screens' shapes differ, and the slide's edge cuts what they see)
+        Rectangle {
+            objectName: "audienceFrame"
+            readonly property rect shown: app.presenter.audienceFrame
+            visible: win.presenterConsole && shown.width > 0 && shown.height > 0
+            x: shown.x
+            y: shown.y
+            width: shown.width
+            height: shown.height
+            color: "transparent"
+            border.width: 2
+            border.color: "#f29900"
+        }
         // The mouse rests on a formula of a Markdown text that cannot be drawn (shown as its source, in red): why
         ToolTip {
             objectName: "mathErrorTip"
