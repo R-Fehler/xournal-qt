@@ -575,6 +575,12 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   `qt/stickers`. The classic bar at 1920 px has everything again (New is the tab strip's "+"); with the toolbox
   recording is a fixed tool of the rail (docked and floating), the pills stay clear of a floating toolbox. Left: the
   device checks.
+- [x] `qt/hwr-multilang` (the author: "I want to support German as well … for the app we start with two models"):
+  an English and a German model both run, readings merged for search (not transcription); per-document language
+  detection to save CPU, with a choice per document; a CTC recogniser for the training block's models; the line
+  dataset export (`xournal-qt-cli hwr-lines`) and a handwriting sample. Done (qt/docs/handwriting-search.md). Left:
+  pin the German model when the training block publishes it (`ModelDownload.cpp`); the device checks with real
+  models (detection thresholds 6 lines / 0.15 / 0.5 checked on the author's notes).
 - [x] `qt/hwr-search`: an MVP of handwriting search on Linux from the research (`qt/docs/research/
   handwriting-recognition.md`): search only, no training on user data, fuzzy matching over the model's candidates.
   Where the results live: the library's dot folder cache, the `.xopp`, and an invisible text layer in PDFs with
@@ -582,7 +588,7 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   ink layout, TrOCR in ONNX Runtime (dlopen), worker + indexer, `ink-text.pack`, library search, PDF text layer,
   Settings with the model's download. Left: pin the model's revision and sha256s (`qt/scripts/hwr-model.sh` prints
   them) and run the real-model device checks; bundle the runtime in packages; text layer in plain "Export as PDF";
-  German.
+  German (built as `qt/hwr-multilang`, above).
 - [x] Rotating the canvas (like Krita): the rotate gesture, reset by a double tap or the fit buttons. A feasibility
   check first. *Built as `qt/canvas-rotate` ([canvas-rotation.md](qt/docs/canvas-rotation.md)). Left: the device
   checks (pen latency turned, the touchpad's rotate direction, the on-screen keyboard), edge scrolling and pages in the
