@@ -399,6 +399,16 @@ void CanvasView::relayout() {
 void CanvasView::clearSelection() {
     mixedSelection->clear();
     stickyNotes->clearSelection();
+    // xournal-qt: groups that come into a layer where another group has their number get new ones (moved to another
+    // page or into a note; qt/docs/groups.md)
+    if (selection && selection->getSourceLayer()) {
+        std::vector<Element*> elements;
+        for (const Element* e: selection->getElementsView()) {
+            elements.push_back(const_cast<Element*>(e));  // (the selection's own)
+        }
+        std::shared_lock lock(*session.getDocument());
+        groups::separate(elements, *selection->getSourceLayer(), *session.getDocument());
+    }
     // Deleting the EditSelection puts the elements back into their layer.
     const bool ofMarkdown = selection && markdownSelection && markdownSelection->selection == selection.get();
     selection.reset();
@@ -477,6 +487,14 @@ bool CanvasView::copySelection() {
     auto* mime = new QMimeData;
     mime->setData(XOURNAL_MIME, QByteArray(data->str, static_cast<qsizetype>(data->len)));
     g_string_free(data, TRUE);
+    // xournal-qt: the groups beside it (qt/docs/groups.md), only when there are any
+    std::vector<const Element*> copied;
+    for (const Element* e: selection->getElementsView()) {
+        copied.push_back(e);
+    }
+    if (groups::stateOf(copied).canUngroup) {
+        mime->setData(groups::CLIPBOARD_MIME, QByteArray::fromStdString(groups::clipboardNumbers(copied)));
+    }
     QString text;
     for (const Element* e: selection->getElementsView()) {
         if (e->getType() == ELEMENT_TEXT) {
@@ -777,6 +795,13 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
         sel->readSerialized(in);
         const int count = in.readInt();
         auto undo = std::make_unique<AddUndoAction>(page, false);
+        // xournal-qt: their groups (qt/docs/groups.md), with new numbers on this page
+        std::vector<groups::Id> pastedGroups;
+        if (mime->hasFormat(groups::CLIPBOARD_MIME)) {
+            pastedGroups = groups::fromClipboard(mime->data(groups::CLIPBOARD_MIME).toStdString(),
+                                                 static_cast<size_t>(std::max(0, count)));
+        }
+        std::vector<Element*> pasted;
         for (int i = 0; i < count; i++) {
             const std::string name = in.getNextObjectName();
             ElementPtr element;
@@ -794,8 +819,14 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
                 throw InputStreamException("Unknown object " + name, __FILE__, __LINE__);
             }
             element->readSerialized(in);
+            element->setGroup(pastedGroups.empty() ? 0 : pastedGroups[static_cast<size_t>(i)]);
+            pasted.push_back(element.get());
             undo->addElement(layer, element.get(), layer->indexOf(element.get()));
             sel->addElement(std::move(element), std::numeric_limits<Element::Index>::max());
+        }
+        {
+            std::shared_lock lock(*doc);
+            groups::renumber(pasted, *doc);
         }
         session.getUndoRedoHandler()->addUndoAction(std::move(undo));
 
@@ -2903,6 +2934,28 @@ void CanvasView::selectTogether(CanvasPage& page, std::vector<Layer*> notes,
     if (notes.empty() && items.empty()) {
         return;
     }
+    {
+        // xournal-qt: a group with any member selected is selected whole (qt/docs/groups.md)
+        std::shared_lock lock(*session.getDocument());
+        std::vector<Layer*> layers;
+        for (const auto& item: items) {
+            if (std::find(layers.begin(), layers.end(), item.layer) == layers.end()) {
+                layers.push_back(item.layer);
+            }
+        }
+        for (Layer* l: layers) {
+            std::vector<Element*> in;
+            for (const auto& item: items) {
+                if (item.layer == l) {
+                    in.push_back(item.element);
+                }
+            }
+            const std::vector<Element*> all = groups::withMembers(*l, in);
+            for (size_t i = in.size(); i < all.size(); ++i) {
+                items.push_back({l, all[i]});
+            }
+        }
+    }
     if (notes.size() == 1 && items.empty()) {
         stickyNotes->select(page, notes.front());  // (one note: its own selection, with its pill and handle)
         return;
@@ -2986,7 +3039,15 @@ void CanvasView::toggleSelected(CanvasPage& page, Layer* note, Element* element)
     if (element) {
         const auto at = std::find_if(items.begin(), items.end(), [&](const auto& i) { return i.element == element; });
         if (at != items.end()) {
-            items.erase(at);
+            // xournal-qt: its whole group leaves the selection (qt/docs/groups.md)
+            const Layer* layer = at->layer;
+            const uint32_t group = element->getGroup();
+            items.erase(std::remove_if(items.begin(), items.end(),
+                                       [&](const auto& i) {
+                                           return i.element == element ||
+                                                  (group != 0 && i.layer == layer && i.element->getGroup() == group);
+                                       }),
+                        items.end());
         } else {
             std::shared_lock lock(*session.getDocument());
             for (Layer* l: page.getPage()->getLayers()) {

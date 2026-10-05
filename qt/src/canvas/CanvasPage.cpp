@@ -47,6 +47,7 @@
 #include "StickyNotes.h"
 #include "TextEditor.h"
 #include "render/RenderService.h"
+#include "session/ElementGroups.h"
 #include "session/DocumentSession.h"
 #include "session/PenFill.h"
 #include "session/StickyNote.h"
@@ -362,11 +363,22 @@ bool CanvasPage::selectObjectAt(double x, double y, bool multiLayer, bool aggreg
     if (!match) {
         return false;
     }
+    // xournal-qt: a member of a group selects the whole group (qt/docs/groups.md)
+    InsertionOrderRef members;
+    {
+        std::shared_lock lock(*ctrl.getDocument());
+        const Layer* layer = aggregate && previous ? previous->getSourceLayer() : page->getSelectedLayer();
+        members = groups::withMembers(*layer, InsertionOrderRef{InsertionPositionRef(match, matchIndex)});
+    }
     if (aggregate && previous) {
-        auto sel = SelectionFactory::addElementFromActiveLayer(&ctrl, previous, match, matchIndex);
+        auto sel = members.size() > 1
+                           ? SelectionFactory::addElementsFromActiveLayer(&ctrl, previous, members)
+                           : SelectionFactory::addElementFromActiveLayer(&ctrl, previous, match, matchIndex);
         view.setSelection(sel.release());
     } else {
-        auto sel = SelectionFactory::createFromElementOnActiveLayer(&ctrl, page, this, match, matchIndex);
+        auto sel = members.size() > 1
+                           ? SelectionFactory::createFromElementsOnActiveLayer(&ctrl, page, this, members)
+                           : SelectionFactory::createFromElementOnActiveLayer(&ctrl, page, this, match, matchIndex);
         view.setSelection(sel.release());
         if (markdownBefore) {
             view.markdownSelectionMade(page, *markdownBefore);
@@ -567,8 +579,16 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
             markdownBefore = this->page->getSelectedLayerId();  // (a multi-layer selector found Markdown texts)
         }
         if (layerOfFinalizedSel) {
+            // xournal-qt: a group with any member in it is selected whole (qt/docs/groups.md)
+            const auto withGroups = [&](const InsertionOrderRef& found) {
+                std::shared_lock lock(*control.getDocument());
+                const auto layers = this->page->getLayersView();
+                return layerOfFinalizedSel <= layers.size()
+                               ? groups::withMembers(*layers[layerOfFinalizedSel - 1], found)
+                               : found;
+            };
             if (aggregate) {
-                auto sel = selector->releaseElements();
+                auto sel = withGroups(selector->releaseElements());
                 view.setSelection(
                         SelectionFactory::addElementsFromActiveLayer(&control, view.getSelection(), sel).release());
             } else {
@@ -581,8 +601,8 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
                     std::unique_lock lock(*control.getDocument());
                     this->page->setSelectedLayerId(layerOfFinalizedSel);
                 }
-                view.setSelection(SelectionFactory::createFromElementsOnActiveLayer(&control, page, this,
-                                                                                    selector->releaseElements())
+                view.setSelection(SelectionFactory::createFromElementsOnActiveLayer(
+                                          &control, page, this, withGroups(selector->releaseElements()))
                                           .release());
                 if (markdownBefore) {
                     view.markdownSelectionMade(this->page, *markdownBefore);
@@ -691,6 +711,10 @@ void CanvasPage::selectInNote(Layer* note, bool tapped) {
         }
         repaintPage();
         return;
+    }
+    {
+        std::shared_lock lock(*doc);
+        elements = groups::withMembers(*note, elements);  // xournal-qt: groups whole (qt/docs/groups.md)
     }
     view.setSelection(SelectionFactory::createFromElementsOnActiveLayer(&control, this->page, this, elements).release());
     view.noteSelectionMade(this->page, before, note);

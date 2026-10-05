@@ -40,3 +40,6 @@ rounded hole: the spotlight) are drawn in the same style.
 `xqt-sticker` is Lucide's `sticker` (a sheet with a peeled corner and a smile): the sticker tool (qt/docs/stickers.md).
 
 `xqt-zap` is Lucide's `zap`: Quick note (qt/docs/quick-note.md).
+
+`xqt-group` and `xqt-ungroup` are Lucide's `group` and `ungroup`: grouping the selected elements and ungrouping them
+(the selection's pill, qt/docs/groups.md).

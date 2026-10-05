@@ -3101,3 +3101,37 @@ offered).
       files to the trash). The library's `Templates` folder card has a template mark.
 - [ ] A document opened for reading only: no "Add a page from a template…"; a tap in the picker says no pages can be
       added. A `.md` or text document: nothing of this is offered.
+
+## Groups (qt/groups, qt/docs/groups.md)
+
+- [ ] A document with groups (made below) saved, closed and opened again: the groups are still there (a tap on a member
+      selects all of it). Autosave / recovery after killing the app: the groups are back too.
+- [ ] The same `.xopp` (and the `.xopp` exported from a PDF with notes) opened in Xournal++ 1.2 / 1.3: no message,
+      every element there and drawn as here; selected one by one (Xournal++ has no groups). Saved there and opened
+      here again: the elements are all there, ungrouped.
+- [ ] Select three strokes with the lasso: the pill shows the Group button (two overlapping boxes in a dashed frame),
+      no Ungroup. Group (or Ctrl+G): the button turns into Ungroup (two boxes apart). Undo: no group again (one
+      step); Redo: grouped again.
+- [ ] Select a group and a loose stroke (Select more): both Group and Ungroup are in the pill. Group: one group of
+      all three. Ctrl+Shift+G with the group selected: ungrouped, one undo step.
+- [ ] Hold a finger on Group / Ungroup: their names show above the finger. Ctrl+G and Ctrl+Shift+G are listed in the
+      shortcuts sheet (F1) under Editing and can be changed in Settings; Ctrl+G does not jump to the next search hit
+      any more (F3 does).
+- [ ] The reference beside the notes, written in: its selection pill has the same buttons; for reading only: none.
+- [ ] A tap with the select tool (rectangle, lasso, object select) on any member of a group selects the whole group;
+      a rectangle that touches only one member takes the whole group. Move, scale, rotate, recolour, delete it: all of
+      it, one undo step as before.
+- [ ] Select more (Ctrl+tap or the pill's toggle): a tap on a member adds the whole group, a second tap takes the
+      whole group away.
+- [ ] Erase across a grouped stroke with the stroke eraser's partial mode: the pieces still belong to the group.
+- [ ] Duplicate a page with a group, drag the group from the first page onto the copy: there they are two groups (a
+      tap selects only the dragged one).
+- [ ] Copy a group (Ctrl+C), paste (Ctrl+V): the copy is a group of its own (a tap selects the copy only, not the
+      original as well). Cut and paste: still a group.
+- [ ] Copy a group here and paste it into Xournal++ (running at the same time): pasted, ungrouped, nothing missing.
+      Copy in Xournal++ and paste here: pasted, ungrouped.
+- [ ] Several sticky notes with a grouped figure (Select more), copied and pasted: the figure is still a group.
+- [ ] Paste a sticker from the picker: a tap on any of its strokes selects the whole sticker; the pill shows Ungroup.
+      Ungroup: its strokes are selected one by one again. Ctrl+V right after saving a sticker: pasted as a group too.
+- [ ] A sticker with ink and a Markdown box: the ink is one group, the Markdown box(es) another (they are in two
+      layers).

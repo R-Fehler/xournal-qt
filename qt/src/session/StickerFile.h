@@ -47,7 +47,8 @@ bool write(Document& doc, const fs::path& target, std::string* error = nullptr);
 
 /// A sticker read back as content to paste: the elements of its first page in their order (the picture first, then
 /// the Markdown boxes, then the other layers' elements), its notes (bottom first) and the bounds around them all (the
-/// page's coordinates). Nothing (with `error`) if it cannot be read or holds nothing.
+/// page's coordinates). The elements of each layer they go into are one group (qt/docs/groups.md). Nothing (with
+/// `error`) if it cannot be read or holds nothing.
 std::optional<sticky::Group> read(const fs::path& file, std::string* error = nullptr);
 
 /// The content in the clipboard's format of a selection of notes and elements (sticky::GROUP_CLIPBOARD_MIME)

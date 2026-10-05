@@ -13,7 +13,7 @@ so they can be shared and exported/imported and viewed."
 Decided by the author (2026-10-04): a visible `Stickers/` folder per library (a fixed English name, with
 subfolders), an app-wide set in the app's data folder, the own order in a hidden file inside each sticker folder (so
 it syncs), pasted at the original size (made smaller only to fit the page), selected after pasting, also copied to the
-clipboard when saved. Grouping (`qt/groups`, pasted stickers becoming groups) is a later block.
+clipboard when saved. A pasted sticker is a group ([groups.md](groups.md)): a tap on any part selects all of it.
 
 ## Where stickers are
 
@@ -106,7 +106,6 @@ card says "Stickers" and has a sticker badge. Pictures dropped into it in a file
 
 ## Not built
 
-- Pasted stickers become groups (`qt/groups`, a later block).
 - The picker's search does not look into the stickers' text (the library's search does, for the library's set).
 - Markdown pictures of a sticker pasted into a `.xopp`: the boxes are pasted, their pictures are found only while the
   document they came from is open (as for a copied Markdown box).

@@ -538,7 +538,8 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
 - `qt/stickers`: yes (a visible `Stickers/` folder per library, an app-wide set in the app's data folder, own order
   in a hidden file that syncs, pasted at original size). `qt/groups`: yes, after the stickers, with the `xqt-group`
   attribute seam; Ctrl+G groups, Ctrl+Shift+G ungroups (one undo step each); any member selects the group; pasted
-  stickers become groups.
+  stickers become groups. *Built (`qt/groups`, qt/docs/groups.md). Left: the device checks; no nested groups, no group
+  across layers (a sticker with Markdown boxes is two groups), no sticky notes in a group.*
 - `qt/audio`: yes (Qt audio + bundled Ogg Vorbis; `.xopp` recordings in the app's audio folder as upstream; PDF
   attachments with page numbers; voice memos per page; Android foreground service; 2 s lead-in).
 - Canvas rotation (`qt/canvas-rotate`): yes, after `qt/toolbox` (90° steps first, then free with snapping).
@@ -561,8 +562,8 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
 - [x] `qt/stickers`: reusable content ("stickers", templates) per library: save a selection (ink, text, images,
   optionally a picture of the PDF behind it) to the library's sticker set, stored as `.xopp` files so they can be
   shared, viewed and copied to other libraries; a sticker tool opens a grid (last used or own order, subfolders);
-  choosing one pastes it into the page, selected. Built (qt/docs/stickers.md). Left: grouping (`qt/groups`, pasted
-  stickers become groups); the picker's search by the stickers' text; the device checks.
+  choosing one pastes it into the page, selected. Built (qt/docs/stickers.md). Left: the picker's search by the
+  stickers' text; the device checks. (Pasted stickers are groups: `qt/groups`.)
 - [x] `qt/audio`: recordings tied to pages or strokes, compatible with upstream's audio (`ts`/`fn` on strokes and
   texts). In a PDF with notes the audio files are attachments with the page number in their names, so they can be
   found without the app. Built (qt/docs/audio.md). Left: build and check the Qt Multimedia backend (the cloud env

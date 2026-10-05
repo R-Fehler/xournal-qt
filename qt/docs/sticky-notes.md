@@ -65,8 +65,8 @@ and move notes to other pages.
   `application/xournal` clipboard: strokes with their pressure, texts, images) in a stream of its own. Why each on
   its own: upstream's `ObjectInputStream::readData` copies the stream's whole buffer for every stroke it reads, so
   one stream for a note with 300 strokes took 15 ms to read (quadratic); now 1–3 ms. (Upstream's own paste of a
-  large selection has the same cost; not changed here.) The object is named `StickyNote2`: a note copied by an older
-  version is not pasted. A picture of the note (PNG, twice the page resolution, drawn as in an export: no folded
+  large selection has the same cost; not changed here.) After each element its group number ([groups.md](groups.md)).
+  The object is named `StickyNote3`: a note copied by an older version is not pasted. A picture of the note (PNG, twice the page resolution, drawn as in an export: no folded
   corner, no shade) is offered too, so pasting into another app gives a picture; it is drawn only when an app asks
   for it (`NoteMimeData`), not at every copy. Xournal++ itself does not read the note's format; the note is not
   also put there as upstream's elements, since pasting those here would give loose elements instead of a note.

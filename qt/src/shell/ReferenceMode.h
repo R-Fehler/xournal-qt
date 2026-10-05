@@ -64,6 +64,9 @@ class ReferenceMode final: public QObject {
     Q_PROPERTY(bool selectMoreAvailable READ selectMoreAvailable NOTIFY selectMoreChanged)
     Q_PROPERTY(bool selectingMore READ selectingMore WRITE setSelectingMore NOTIFY selectMoreChanged)
     Q_PROPERTY(int selectedCount READ selectedCount NOTIFY selectMoreChanged)
+    /// Groups, as on the notes (AppController's properties of the same names; only while it is written in)
+    Q_PROPERTY(bool canGroup READ canGroup NOTIFY selectionChanged)
+    Q_PROPERTY(bool canUngroup READ canUngroup NOTIFY selectionChanged)
     /// A sticky note is selected in the reference: the note's pill, as on the notes (AppController's properties of the
     /// same names; changing it only while the reference is written in)
     Q_PROPERTY(bool noteSelected READ noteSelected NOTIFY noteSelectionChanged)
@@ -110,6 +113,10 @@ public:
     bool selectingMore() const;
     void setSelectingMore(bool on);
     int selectedCount() const;
+    bool canGroup() const;
+    bool canUngroup() const;
+    Q_INVOKABLE bool groupSelection();
+    Q_INVOKABLE bool ungroupSelection();
     bool noteSelected() const;
     QColor noteColor() const;
     void setNoteColor(const QColor& color);

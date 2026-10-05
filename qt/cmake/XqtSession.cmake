@@ -93,6 +93,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/StickerFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TemplateFile.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TemplateFile.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementGroups.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/ElementGroups.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageNoteSpace.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageNoteSpace.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/Citation.h
@@ -172,9 +174,9 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/Snip.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/Snip.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasStickers.cpp
-
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TodoStamp.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TodoStamp.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasGroups.cpp
 )
 target_include_directories(xqt-canvas PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/canvas")
 target_link_libraries(xqt-canvas PUBLIC Qt6::Gui xqt-session xoj-tools)
@@ -195,6 +197,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/StickyNoteTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/StickerFileTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TemplateFileTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/GroupsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/NoteSpaceTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/CitationTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BookmarksTest.cpp
@@ -228,7 +231,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/CurtainTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PenStylesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/AudioDocumentTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PenGesturesTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PenGesturesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/GroupsCanvasTest.cpp)
     target_link_libraries(xqt-canvas-tests PRIVATE xqt-canvas Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-canvas-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-canvas-tests PRIVATE "${TEST_CONFIG_DIR}")

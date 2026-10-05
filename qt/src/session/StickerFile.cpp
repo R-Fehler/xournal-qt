@@ -200,6 +200,17 @@ std::optional<sticky::Group> read(const fs::path& file, std::string* error) {
         }
         return std::nullopt;
     }
+    // xournal-qt: a sticker is pasted as a group (qt/docs/groups.md), one in each layer it goes into (its ink and
+    // pictures; its Markdown boxes). Groups saved inside it give way to it: groups are flat. (Pasting gives them new
+    // numbers.)
+    for (const bool md: {false, true}) {
+        const auto inLayer = static_cast<size_t>(std::count(group.markdown.begin(), group.markdown.end(), md));
+        for (size_t i = 0; i < group.elements.size(); ++i) {
+            if (group.markdown[i] == md) {
+                group.elements[i]->setGroup(inLayer >= 2 ? (md ? 2 : 1) : 0);
+            }
+        }
+    }
     group.bounds = *bounds;
     return group;
 }
