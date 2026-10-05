@@ -821,6 +821,18 @@ I would expect the toolbelt rail to fill up the space and maybe even allow scrol
   stacks one by one (as designed); scrolling only as the last resort. The phone dock likewise shows as many tools as
   fit.
 
+### Recording on Windows, macOS and Android (the author, 2026-10-05; `qt/audio-platforms`)
+The release packages for Windows, macOS and Android were built without Qt Multimedia, so they offer no recording and
+no playback. The author: "let's add it to the other platforms, if no Qt license is in the way" (Qt Multimedia is
+LGPLv3/GPL like the other Qt modules; audio in and out uses the system's audio, no FFmpeg plugin needed).
+- [ ] Windows (MSYS2): Qt Multimedia in the build and in the portable folder (its audio plugins; no FFmpeg plugin
+  unless it is needed).
+- [ ] macOS (Homebrew): Qt Multimedia in the build and the bundle; the microphone usage description in Info.plist;
+  the microphone permission asked through Qt's permission API.
+- [ ] Android: Qt Multimedia in the APK; RECORD_AUDIO asked at the first recording (Qt's permission API); a
+  foreground service (type microphone) while recording, so it goes on with the screen off; the notification with
+  pause and stop.
+
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
    when a save falls back to a full write, and a check in MuPDF and pdf.js).
