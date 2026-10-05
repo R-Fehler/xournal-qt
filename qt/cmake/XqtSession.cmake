@@ -65,6 +65,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/MergedPdf.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/IncrementalPdf.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/IncrementalPdf.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfRevisions.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfRevisions.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPdf.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPdf.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ArchivePdf.h
@@ -201,6 +203,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/MergedPdfTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/HybridPdfTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/IncrementalPdfTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/PdfRevisionsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BackgroundSaveTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TextFileTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentLinkTest.cpp
