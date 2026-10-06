@@ -202,8 +202,8 @@ jobs:
           notes="qt/docs/release-notes/${tag#v}.md"
           if [ -f "$notes" ]; then
               gh release create "$tag" --draft --target "$GITHUB_SHA" --title "xournal-qt $tag" --notes-file "$notes" artifacts/* \
-                  || gh release upload "$tag" artifacts/* --clobber
+                  || { gh release upload "$tag" artifacts/* --clobber && gh release edit "$tag" --target "$GITHUB_SHA"; }
           else
               gh release create "$tag" --draft --target "$GITHUB_SHA" --title "xournal-qt $tag" --generate-notes artifacts/* \
-                  || gh release upload "$tag" artifacts/* --clobber
+                  || { gh release upload "$tag" artifacts/* --clobber && gh release edit "$tag" --target "$GITHUB_SHA"; }
           fi
