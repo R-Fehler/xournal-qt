@@ -844,6 +844,66 @@ LGPLv3/GPL like the other Qt modules; audio in and out uses the system's audio, 
   Pause/Resume and Stop through JNI; a wake lock and Qt's event loop running in the background. Left: the release
   run, the Fold 7 (screen off, the notification), the APK's size.
 
+### One UI: scrolling bars, groups, Zen (the author, 2026-10-06; for 0.8.0)
+
+The author, on 0.7.0 on the unfolded Fold 7: "on a unfolded android the user defined tools on the rail are fully
+collapsed into a single button while the system tools are expanded to the rest. I don't like that. I want the user
+tools to have higher priority and I think scrolling the tools would be good. Maybe we can let the user group tools
+into cycle groups themselves if they like? By dragging a tool and holding long over another tool? … A scrolling rail
+would help having the same ui on wide desktop or smaller screens since the tool placement and order can be the same."
+Then: "I like the new scroll design … let's get rid of all the other ui variants we have. Remove the classic toolbar
+to not drag dead weight as well. A tap should open the group list if more than 3 tools in the group. Record can go to
+the top toolbar per default. Can we let the user move things from rail to top and vice versa as well? … the top
+toolbar to allow more customization as well, so custom order, grouping, dragging from and to the rail?" And on the
+reader chrome: "The idea of the small dot chrome is to be invisible and produce a zen mode UI which fitted also for
+tiny screen document reading and referencing." Decided: "pill on the dot, zen can write, the rest of the UI rework as
+discussed".
+
+The cause of the Fold report: ToolboxPlan folds a user section as a whole; one long section can only be all or one
+button, and what its fold freed went to the fixed tools (qt/rail-fill's give-back). Folding goes away entirely.
+
+Blocks, one after another where they share `Main.qml` (1, then 2 and 4, then 3):
+
+- [ ] **1 `qt/classic-removal`**: the classic tool bar goes: the tool square, the quick tools, the classic pen pill of
+  full screen, the classic colour strip and its ladder, `toolbarMode` and Settings → Pen → Tools' choice,
+  `XQT_TOOLBAR_MODE`. A settings file with `classic` gets the toolbox (the migration `migratedToolbox` already
+  carries the pen, the eraser and the text box). Every test that ran in classic moves to the toolbox (or tests the
+  same thing through it); tests of classic-only things go with them. Shortcuts keep working (P, H, E, T, …).
+- [ ] **2 `qt/rail-scroll`**: one stored arrangement for both bars (`ToolboxModel` grows: the rail and the top bar,
+  each an ordered list of tool entries, app items by name, dividers and groups; upgraded from the toolbox JSON of
+  0.7.0). The rail **scrolls** instead of folding (`ToolboxPlan` folding removed): the same order on every screen; a
+  fade at the end that has more, half of the next cell showing; it scrolls to the tool in hand; its scroll position
+  is remembered per window class; a tap takes, a drag scrolls, a hold lifts (as now); the wheel over a gap scrolls,
+  over a tool its width (as now). Undo and redo lead it, "+" ends it (pinned). **Groups the user makes**: carry a
+  tool (hold, move) onto another and wait about 0.6 s until it shows a ring, let go: a group ("Grouped · Undo" in
+  the snackbar); moving on before the ring reorders as now. A group shows the entry used last with dots for how many
+  it holds; a tap takes it; a tap on it while one of its tools is in hand **cycles** to the next with 2 or 3 tools
+  and **opens the group's list** with more than 3; the list lets one pick, edit, carry out (ungroup one), and the
+  menu has "Ungroup". **App tools** on the rail by default: hand, select (rectangle ↔ lasso), snip (rectangle ↔
+  lasso), mark PDF text ↔ copy handwriting; they are items like the user's (carried, grouped, removed into the
+  catalog). The phone's dock becomes the same rail at the bottom edge (scrolling sideways); "My tools" becomes the
+  "+" catalog (block 3).
+- [ ] **3 `qt/top-bar`**: the top bar holds items of the same arrangement: scrolls instead of its ladder into ⋮; its
+  order and groups are the user's; items are carried between the rail and the top bar (one home per item: the
+  rail, the top bar or the menu only); a group of commands always opens its list on a tap (nothing runs by
+  accident); ⋮ stays complete and is not customized. **"+" catalog**: new tools to make and every app tool and
+  command not placed; drag or tap to place on either bar. First layout: open, save, milestone, share, print | image,
+  stickers, add page, write on the page | setsquare / compass, finger draws, **record** | search, read, replay,
+  present, full screen, **Zen** | tags, favourite, bookmark | settings. Full screen: the floating rail's ⋯ lists what
+  is on the top bar. Settings → "Back to the first layout". The Markdown format bar scrolls the same way.
+- [ ] **4 `qt/zen`**: three independent switches: full screen (as now), **Zen** (everything around the page hidden),
+  **read only** (anywhere, not only full screen). Read (Ctrl+Alt+R, ⋮ → View → Read) = Zen + read only (full screen
+  as now, except in a tiny window); present without controls = present + Zen; a tiny window (< 360 px) turns Zen on
+  automatically (leaving it there is remembered per class, as now). Zen's only mark: a small faint **dot** in the
+  lower left corner (about 10 px, about 20 % after 2 s, brighter when the pen or mouse is near; a 48 px target); a
+  tap on it opens a **pill** over the page beside it: Show controls (leaves Zen), Read only (a switch), the page
+  number (a tap: go to page), fit width / whole page; a tap on the page closes it. Zen **can write** (the tool in
+  hand; P/H/E/T). Read only: no lock icon any more; a first stroke tried shows once, at the pen, "Read only — tap the
+  dot to write"; the edge tap fields turn pages and a finger tap in the middle opens the pill. Leaving: Esc, the
+  shortcut, Show controls. Gone: the reader chrome and Settings → Display → "Controls at this size", the lock mark,
+  presenting's own corner field (the dot replaces it). Zen is a button of the top bar (block 3) and ⋮ → View → Zen,
+  with a changeable shortcut.
+
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
    when a save falls back to a full write, and a check in MuPDF and pdf.js).
