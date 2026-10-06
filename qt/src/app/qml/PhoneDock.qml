@@ -1,6 +1,7 @@
 // The phone's tool dock (qt/docs/adaptive-layout.md, "The phone chrome"; qt/docs/toolbox.md, "On a phone"): in the
 // phone classes the tools are one bar at the bottom, within reach of the thumb, instead of the command bar and the view
-// pill. It hosts the toolbox (undo, redo, the user's first tools that fit, "My tools", the page number). A text
+// pill. It hosts the toolbox: the same rail as on a larger screen, at the bottom edge (undo, redo, the same items
+// scrolling sideways, "My tools", the page number; qt/rail-scroll). A text
 // document has no ink tools: then the dock is
 //   all tools | undo | redo | the page number
 // - "All tools" opens the sheet with the other tools and the commands of the command bar;

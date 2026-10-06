@@ -5553,10 +5553,11 @@ TEST_F(MainWindowTest, theLaserPointerIsAtHandWhilePresenting) {
 // (no hover on a touch screen); a button with a long press of its own keeps it (the zoom percentage: the whole page).
 TEST_F(MainWindowTest, aFingerHeldOnAButtonShowsItsName) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
-    window->resize(1920, 1200);  // (the hand on the toolbox's rail, not in its stack of fixed tools)
+    window->resize(1920, 1200);
     wait(100);
     controller->selectTool("pen");
-    auto* hand = find<QQuickItem>("handButton");
+    // (a button of the command bar: on the toolbox's rail a held finger lifts the tool to carry it, qt/rail-scroll)
+    auto* hand = find<QQuickItem>("touchDrawingButton");
     ASSERT_NE(hand, nullptr);
     // (the rail plans anew for the new size: until the button stands still)
     QPointF was(-1, -1);
@@ -5576,25 +5577,31 @@ TEST_F(MainWindowTest, aFingerHeldOnAButtonShowsItsName) {
                                                        << hand->property("heldPointer").toBool() << ")";
     auto tipShown = [&] {
         for (QObject* o: hand->findChildren<QObject*>()) {
-            if (o->inherits("QQuickToolTip") && o->property("visible").toBool() && o->property("text").toString() == "Hand") {
+            if (o->inherits("QQuickToolTip") && o->property("visible").toBool() && o->property("text").toString() == "The finger draws") {
                 return true;
             }
         }
         return false;
     };
     until(tipShown, 1500);
-    EXPECT_TRUE(tipShown()) << "the name \"Hand\" above the finger";
+    EXPECT_TRUE(tipShown()) << "the name \"The finger draws\" above the finger";
     QTest::touchEvent(window, finger).release(0, at);
     wait(100);
     EXPECT_FALSE(hand->property("labelShown").toBool()) << "gone when let go";
-    EXPECT_EQ(controller->tool(), "pen") << "and the button was not pressed";
+    auto* settings = controller->settingsModel();
+    auto touchDrawing = [&] {
+        QVariant v;
+        QMetaObject::invokeMethod(settings, "get", Q_RETURN_ARG(QVariant, v), Q_ARG(QString, "touchDrawing"));
+        return v.toBool();
+    };
+    EXPECT_FALSE(touchDrawing()) << "and the button was not pressed";
     // A quick tap still presses it (where it is now: the rail may plan anew once the finger is let go)
     const QPoint now = hand->mapToScene(QPointF(hand->width() / 2, hand->height() / 2)).toPoint();
     QTest::touchEvent(window, finger).press(0, now);
     QTest::touchEvent(window, finger).release(0, now);
     wait(100);
-    EXPECT_EQ(controller->tool(), "hand");
-    controller->selectTool("pen");
+    EXPECT_TRUE(touchDrawing());
+    QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "touchDrawing"), Q_ARG(QVariant, false));
 
     // The zoom percentage keeps its own long press: the whole page
     auto* zoom = find<QQuickItem>("zoomButton");

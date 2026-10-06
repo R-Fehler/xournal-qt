@@ -17,7 +17,9 @@
 namespace xqt {
 
 namespace {
-constexpr int VERSION = 1;
+constexpr int VERSION = 2;
+/// The JSON of 0.7.0: the user's entries alone (upgraded on reading)
+constexpr int VERSION_1 = 1;
 constexpr double MIN_WIDTH = 0.1;
 constexpr double MAX_WIDTH = 150;
 /// A pause before a change is written (a slider dragged writes once)
@@ -63,8 +65,21 @@ const QStringList BASES{"pen", "highlighter"};
 const QStringList SNIPS{"rect", "lasso"};
 
 QVariantMap divider(const QString& id) { return QVariantMap{{"id", id}, {"divider", true}}; }
+QVariantMap appItem(const QString& id, const QString& name) { return QVariantMap{{"id", id}, {"app", name}}; }
 bool isDivider(const QVariant& v) { return v.toMap().value("divider").toBool(); }
+bool isGroup(const QVariant& v) { return v.toMap().value("group").toBool(); }
+bool isApp(const QVariant& v) { return v.toMap().contains("app"); }
+bool isTool(const QVariant& v) { return !isDivider(v) && !isGroup(v) && !isApp(v); }
 QString idOf(const QVariant& v) { return v.toMap().value("id").toString(); }
+QVariantList membersOf(const QVariant& v) { return v.toMap().value("members").toList(); }
+/// A bar's items from names ("|": a divider), ids from `n` on
+QVariantList layoutOf(const QStringList& names, int& n) {
+    QVariantList l;
+    for (const QString& name: names) {
+        l.append(name == "|" ? divider(QString("d%1").arg(++n)) : appItem(QString("a%1").arg(++n), name));
+    }
+    return l;
+}
 }  // namespace
 
 ToolboxModel::ToolboxModel(Load l, Store s, QObject* parent): QObject(parent), load(std::move(l)), store(std::move(s)) {
@@ -72,8 +87,10 @@ ToolboxModel::ToolboxModel(Load l, Store s, QObject* parent): QObject(parent), l
     writeTimer.setInterval(WRITE_DELAY_MS);
     connect(&writeTimer, &QTimer::timeout, this, &ToolboxModel::flush);
     if (!load || !fromJson(load())) {
-        list = defaultEntries();
-        tidy();
+        reset();
+        rev = 0;
+        pending = false;
+        writeTimer.stop();
     }
 }
 
@@ -211,11 +228,33 @@ QVariantList ToolboxModel::defaultEntries() {
     return l;
 }
 
+QStringList ToolboxModel::appItemNames() {
+    return {// the app's tools (the rail's at a first start, then those of the top bar)
+            "hand", "select", "snip", "pdfText", "write", "geometry", "touchDrawing",
+            // its commands
+            "record", "open", "save", "milestone", "share", "print", "image", "sticker", "addPage", "search", "read",
+            "replay", "present", "fullScreen", "zen", "tags", "favourite", "bookmark", "settings", "new"};
+}
+
+bool ToolboxModel::isAppTool(const QString& name) {
+    static const QStringList TOOLS{"hand", "select", "snip", "pdfText", "write", "geometry", "touchDrawing"};
+    return TOOLS.contains(name);
+}
+
+QStringList ToolboxModel::defaultRailApps() { return {"hand", "select", "snip", "pdfText"}; }
+
+QStringList ToolboxModel::defaultTopLayout() {
+    return {"open",   "save",   "milestone", "share",      "print", "|",   "image",    "sticker", "addPage",
+            "write",  "|",      "geometry",  "touchDrawing", "record", "|", "search",   "read",    "replay",
+            "present", "fullScreen", "zen",  "|",          "tags",  "favourite", "bookmark", "|", "settings"};
+}
+
 void ToolboxModel::setActive(const QString& id) {
     const QVariantMap e = entry(id);
-    if (e.isEmpty() || e.value("type") == "sticky") {
+    if (e.isEmpty() || !isTool(e) || e.value("type") == "sticky") {
         return;  // (a sticky note is put on the page, it is not a tool in hand)
     }
+    use(id);  // (its group shows it)
     if (activeId == id && !recent.isEmpty() && recent.first() == id) {
         return;  // (taken again: nothing to write)
     }
@@ -232,27 +271,69 @@ void ToolboxModel::setActive(const QString& id) {
     writeTimer.start();
 }
 
-QVariantMap ToolboxModel::entry(const QString& id) const {
-    const int i = indexOf(id);
-    return i >= 0 ? list[i].toMap() : QVariantMap();
-}
-
-int ToolboxModel::indexOf(const QString& id) const {
+ToolboxModel::Place ToolboxModel::locate(const QString& id) const {
     if (id.isEmpty()) {
-        return -1;
+        return {};
     }
-    for (int i = 0; i < list.size(); ++i) {
-        if (idOf(list[i]) == id) {
-            return i;
+    for (const QString& bar: {QStringLiteral("rail"), QStringLiteral("top")}) {
+        const QVariantList& l = listOf(bar);
+        for (int i = 0; i < l.size(); ++i) {
+            if (idOf(l[i]) == id) {
+                return {bar, i, -1};
+            }
+            if (isGroup(l[i])) {
+                const QVariantList m = membersOf(l[i]);
+                for (int j = 0; j < m.size(); ++j) {
+                    if (idOf(m[j]) == id) {
+                        return {bar, i, j};
+                    }
+                }
+            }
         }
     }
-    return -1;
+    return {};
 }
+
+QVariantList ToolboxModel::allItems() const {
+    QVariantList all;
+    for (const QVariantList* l: {&railList, &topList}) {
+        for (const QVariant& v: *l) {
+            all.append(v);
+            if (isGroup(v)) {
+                all.append(membersOf(v));
+            }
+        }
+    }
+    return all;
+}
+
+QVariantMap ToolboxModel::entry(const QString& id) const {
+    const Place at = locate(id);
+    if (!at.valid()) {
+        return {};
+    }
+    const QVariant& v = listOf(at.bar)[at.index];
+    return at.member < 0 ? v.toMap() : membersOf(v)[at.member].toMap();
+}
+
+QVariantList ToolboxModel::items(const QString& bar) const { return listOf(bar); }
+
+QString ToolboxModel::kindOf(const QString& id) const {
+    const QVariantMap e = entry(id);
+    if (e.isEmpty()) {
+        return {};
+    }
+    return isDivider(e) ? "divider" : isGroup(e) ? "group" : isApp(e) ? "app" : "tool";
+}
+
+QString ToolboxModel::barOf(const QString& id) const { return locate(id).bar; }
+
+int ToolboxModel::indexOf(const QString& id) const { return locate(id).index; }
 
 QVariantList ToolboxModel::tools() const {
     QVariantList l;
-    for (const QVariant& v: list) {
-        if (!isDivider(v)) {
+    for (const QVariant& v: allItems()) {
+        if (isTool(v)) {
             l.append(v);
         }
     }
@@ -262,7 +343,7 @@ QVariantList ToolboxModel::tools() const {
 QVariantList ToolboxModel::sections() const {
     QVariantList all;
     QVariantList section;
-    for (const QVariant& v: list) {
+    for (const QVariant& v: railList) {
         if (isDivider(v)) {
             if (!section.isEmpty()) {
                 all.append(QVariant(section));
@@ -280,10 +361,9 @@ QVariantList ToolboxModel::sections() const {
 
 QString ToolboxModel::newId(const QString& prefix) const {
     int n = 0;
-    for (const QVariant& v: list) {
-        const QString id = idOf(v);
+    for (const QVariant& v: allItems()) {
         bool ok = false;
-        const int k = id.mid(1).toInt(&ok);
+        const int k = idOf(v).mid(1).toInt(&ok);
         if (ok) {
             n = std::max(n, k);
         }
@@ -298,22 +378,64 @@ QString ToolboxModel::add(const QVariantMap& in, int at) {
     }
     const QString id = newId("e");
     e["id"] = id;
-    list.insert(at < 0 || at > list.size() ? list.size() : at, e);
+    if (at < 0 || at > railList.size()) {
+        // (after the user's last tool: before the app's items that end the rail)
+        at = railList.size();
+        for (int i = railList.size() - 1; i >= 0; --i) {
+            if (isTool(railList[i]) || isGroup(railList[i])) {
+                at = i + 1;
+                break;
+            }
+        }
+    }
+    railList.insert(at, e);
     changedNow();
     return id;
 }
 
-QString ToolboxModel::addAfter(const QString& id, const QVariantMap& e) {
-    const int i = indexOf(id);
-    return add(e, i < 0 ? -1 : i + 1);
+QString ToolboxModel::addAfter(const QString& id, const QVariantMap& in) {
+    const Place at = locate(id);
+    if (!at.valid() || at.bar == "rail") {
+        return add(in, at.valid() ? at.index + 1 : -1);
+    }
+    QVariantMap e = normalized(in);
+    if (e.isEmpty()) {
+        return {};
+    }
+    const QString fresh = newId("e");
+    e["id"] = fresh;
+    topList.insert(at.index + 1, e);
+    changedNow();
+    return fresh;
 }
 
+namespace {
+/// Calls `change` on the item at `at` (in its group, if it is a member) and puts it back
+template <typename F>
+void changeAt(QVariantList& l, int index, int member, F change) {
+    if (member < 0) {
+        QVariantMap e = l[index].toMap();
+        change(e);
+        l[index] = e;
+        return;
+    }
+    QVariantMap g = l[index].toMap();
+    QVariantList m = g.value("members").toList();
+    QVariantMap e = m[member].toMap();
+    change(e);
+    m[member] = e;
+    g["members"] = m;
+    l[index] = g;
+}
+}  // namespace
+
 bool ToolboxModel::update(const QString& id, const QVariantMap& fields) {
-    const int i = indexOf(id);
-    if (i < 0 || isDivider(list[i])) {
+    const Place at = locate(id);
+    QVariantMap e = entry(id);
+    if (!at.valid() || !isTool(e)) {
         return false;
     }
-    QVariantMap e = list[i].toMap();
+    const QVariantMap before = e;
     for (auto it = fields.begin(); it != fields.end(); ++it) {
         if (it.key() == "id" || it.key() == "type") {
             continue;
@@ -334,26 +456,26 @@ bool ToolboxModel::update(const QString& id, const QVariantMap& fields) {
         e["role"] = QString();
     }
     e = normalized(e);
-    if (e == list[i].toMap()) {
+    if (e == before) {
         return true;
     }
-    list[i] = e;
+    changeAt(listOf(at.bar), at.index, at.member, [&e](QVariantMap& m) { m = e; });
     changedNow();
     return true;
 }
 
 bool ToolboxModel::replace(const QString& id, const QVariantMap& in) {
-    const int i = indexOf(id);
+    const Place at = locate(id);
     QVariantMap e = normalized(in);
-    if (i < 0 || isDivider(list[i]) || e.isEmpty()) {
+    const QVariantMap old = entry(id);
+    if (!at.valid() || !isTool(old) || e.isEmpty()) {
         return false;
     }
-    const QString oldType = list[i].toMap().value("type").toString();
-    if (oldType == "eraser" && e.value("type") != "eraser" && !canRemove(id)) {
+    if (old.value("type") == "eraser" && e.value("type") != "eraser" && !canRemove(id)) {
         return false;  // (the last eraser stays)
     }
     e["id"] = id;
-    list[i] = e;
+    changeAt(listOf(at.bar), at.index, at.member, [&e](QVariantMap& m) { m = e; });
     if (e.value("type") == "sticky" && activeId == id) {
         activeId.clear();
         Q_EMIT activeChanged();
@@ -363,11 +485,25 @@ bool ToolboxModel::replace(const QString& id, const QVariantMap& in) {
 }
 
 QString ToolboxModel::duplicate(const QString& id) {
-    const QVariantMap e = entry(id);
-    if (e.isEmpty() || isDivider(e)) {
+    const Place at = locate(id);
+    QVariantMap e = entry(id);
+    if (!at.valid() || !isTool(e)) {
         return {};
     }
-    return add(e, indexOf(id) + 1);
+    const QString copy = newId("e");
+    e["id"] = copy;
+    QVariantList& l = listOf(at.bar);
+    if (at.member < 0) {
+        l.insert(at.index + 1, e);
+    } else {
+        QVariantMap g = l[at.index].toMap();
+        QVariantList m = g.value("members").toList();
+        m.insert(at.member + 1, e);
+        g["members"] = m;
+        l[at.index] = g;
+    }
+    changedNow();
+    return copy;
 }
 
 bool ToolboxModel::canRemove(const QString& id) const {
@@ -375,78 +511,277 @@ bool ToolboxModel::canRemove(const QString& id) const {
     if (e.isEmpty()) {
         return false;
     }
-    if (e.value("type") != "eraser") {
-        return true;
+    if (!isTool(e) || e.value("type") != "eraser") {
+        return true;  // (a group holding the last eraser leaves it in its place)
     }
     int erasers = 0;
-    for (const QVariant& v: list) {
-        erasers += v.toMap().value("type") == "eraser" ? 1 : 0;
+    for (const QVariant& v: allItems()) {
+        erasers += isTool(v) && v.toMap().value("type") == "eraser" ? 1 : 0;
     }
     return erasers > 1;
+}
+
+QVariant ToolboxModel::takeOut(const Place& at) {
+    QVariantList& l = listOf(at.bar);
+    if (at.member < 0) {
+        return l.takeAt(at.index);
+    }
+    QVariantMap g = l[at.index].toMap();
+    QVariantList m = g.value("members").toList();
+    const QVariant v = m.takeAt(at.member);
+    if (m.size() == 1) {
+        l[at.index] = m.first();  // (a group of one: that item again)
+    } else {
+        g["members"] = m;
+        if (g.value("last") == idOf(v)) {
+            g["last"] = idOf(m.first());
+        }
+        l[at.index] = g;
+    }
+    return v;
 }
 
 bool ToolboxModel::remove(const QString& id) {
     if (!canRemove(id)) {
         return false;
     }
-    list.removeAt(indexOf(id));
+    const Place at = locate(id);
+    const QVariant v = takeOut(at);
+    if (isGroup(v)) {
+        // Its members go (an app item into the catalog); the last eraser stays in the group's place
+        const QVariantList left = allItems();
+        bool erases = std::any_of(left.begin(), left.end(),
+                                  [](const QVariant& o) { return isTool(o) && o.toMap().value("type") == "eraser"; });
+        for (const QVariant& m: membersOf(v)) {
+            if (!erases && isTool(m) && m.toMap().value("type") == "eraser") {
+                listOf(at.bar).insert(at.index, m);
+                erases = true;
+            } else {
+                recent.removeAll(idOf(m));
+            }
+        }
+    }
     recent.removeAll(id);
     changedNow();
     return true;
 }
 
 bool ToolboxModel::move(const QString& id, int to) {
-    const int from = indexOf(id);
-    if (from < 0) {
+    const Place at = locate(id);
+    return at.valid() && moveTo(id, at.bar, to);
+}
+
+bool ToolboxModel::moveTo(const QString& id, const QString& bar, int to) {
+    const Place from = locate(id);
+    if (!from.valid() || (bar != "rail" && bar != "top")) {
         return false;
     }
-    to = std::clamp(to, 0, static_cast<int>(list.size()));
-    // `to` counts the places before the move: past itself, one less once it is taken out
-    const int target = to > from ? to - 1 : to;
-    if (target == from) {
-        return false;
+    QVariantList& dst = listOf(bar);
+    to = std::clamp(to, 0, static_cast<int>(dst.size()));
+    if (from.member < 0 && from.bar == bar && (to == from.index || to == from.index + 1)) {
+        return false;  // (its own place)
     }
-    const QVariant v = list.takeAt(from);
-    list.insert(std::clamp(target, 0, static_cast<int>(list.size())), v);
+    // A hole where it goes, then it is taken out (a group of one left is that item again: the hole stays put)
+    const QVariantMap hole{{"hole", true}};
+    dst.insert(to, hole);
+    const QVariant v = takeOut(locate(id));
+    for (int i = 0; i < dst.size(); ++i) {
+        if (dst[i].toMap().value("hole").toBool()) {
+            dst[i] = v;
+            break;
+        }
+    }
     changedNow();
     return true;
 }
 
 bool ToolboxModel::canMoveBy(const QString& id, int delta) const {
-    const int i = indexOf(id);
+    const Place at = locate(id);
+    if (!at.valid() || delta == 0) {
+        return false;
+    }
+    const int size = at.member < 0 ? listOf(at.bar).size() : membersOf(listOf(at.bar)[at.index]).size();
+    const int i = at.member < 0 ? at.index : at.member;
     const int j = i + (delta < 0 ? -1 : 1);
-    return i >= 0 && delta != 0 && j >= 0 && j < list.size();
+    return j >= 0 && j < size;
 }
 
 bool ToolboxModel::moveBy(const QString& id, int delta) {
     if (!canMoveBy(id, delta)) {
         return false;
     }
-    const int i = indexOf(id);
-    list.swapItemsAt(i, i + (delta < 0 ? -1 : 1));  // (past a divider: into the next section)
+    const Place at = locate(id);
+    QVariantList& l = listOf(at.bar);
+    const int step = delta < 0 ? -1 : 1;
+    if (at.member < 0) {
+        l.swapItemsAt(at.index, at.index + step);  // (past a divider: into the next section)
+    } else {
+        QVariantMap g = l[at.index].toMap();
+        QVariantList m = g.value("members").toList();
+        m.swapItemsAt(at.member, at.member + step);
+        g["members"] = m;
+        l[at.index] = g;
+    }
     changedNow();
     return true;
 }
 
 bool ToolboxModel::hasDividerAfter(const QString& id) const {
-    const int i = indexOf(id);
-    return i >= 0 && i + 1 < list.size() && isDivider(list[i + 1]);
+    const Place at = locate(id);
+    const QVariantList& l = listOf(at.bar);
+    return at.valid() && at.index + 1 < l.size() && isDivider(l[at.index + 1]);
 }
 
 void ToolboxModel::setDividerAfter(const QString& id, bool on) {
-    const int i = indexOf(id);
-    if (i < 0 || hasDividerAfter(id) == on) {
+    const Place at = locate(id);
+    if (!at.valid() || hasDividerAfter(id) == on) {
         return;
     }
+    QVariantList& l = listOf(at.bar);
     if (on) {
-        if (i + 1 >= list.size()) {
+        if (at.index + 1 >= l.size()) {
             return;  // (nothing after it to divide from)
         }
-        list.insert(i + 1, divider(newId("d")));
+        l.insert(at.index + 1, divider(newId("d")));
     } else {
-        list.removeAt(i + 1);
+        l.removeAt(at.index + 1);
     }
     changedNow();
+}
+
+// --- groups ------------------------------------------------------------------------------------------------------------
+
+QString ToolboxModel::group(const QString& id, const QString& onto) {
+    const Place a = locate(id);
+    Place b = locate(onto);
+    if (!a.valid() || !b.valid() || id == onto) {
+        return {};
+    }
+    const QVariant carried = entry(id);
+    if (isDivider(carried) || isDivider(entry(onto))) {
+        return {};
+    }
+    if (a.bar == b.bar && a.index == b.index && a.member >= 0 && b.member >= 0) {
+        return {};  // (two members of one group)
+    }
+    if (a.member < 0 && isGroup(carried) && a.bar == b.bar && a.index == b.index) {
+        return {};  // (a group onto one of its own members)
+    }
+    const QString fresh = newId("g");
+    // The target: the group that holds `onto`, or `onto` (made a group of one, for now)
+    const QString targetId = b.member >= 0 ? idOf(listOf(b.bar)[b.index]) : onto;
+    const QVariant v = takeOut(a);
+    b = locate(targetId);
+    if (!b.valid()) {
+        return {};  // (cannot happen: the target is not the carried one)
+    }
+    QVariantList& l = listOf(b.bar);
+    QVariantMap g;
+    QVariantList members;
+    if (isGroup(l[b.index])) {
+        g = l[b.index].toMap();
+        members = g.value("members").toList();
+    } else {
+        members.append(l[b.index]);
+        g = QVariantMap{{"id", fresh}, {"group", true}, {"last", targetId}};
+    }
+    // (a group carried onto another gives it its members)
+    const QVariantList adding = isGroup(v) ? membersOf(v) : QVariantList{v};
+    members.append(adding);
+    g["members"] = members;
+    g["last"] = isGroup(v) ? v.toMap().value("last") : QVariant(idOf(v));
+    l[b.index] = g;
+    changedNow();
+    return g.value("id").toString();
+}
+
+bool ToolboxModel::ungroup(const QString& groupId) {
+    const Place at = locate(groupId);
+    if (!at.valid() || at.member >= 0 || !isGroup(listOf(at.bar)[at.index])) {
+        return false;
+    }
+    QVariantList& l = listOf(at.bar);
+    const QVariantList m = membersOf(l.takeAt(at.index));
+    for (int i = m.size() - 1; i >= 0; --i) {
+        l.insert(at.index, m[i]);
+    }
+    changedNow();
+    return true;
+}
+
+QString ToolboxModel::groupOf(const QString& id) const {
+    const Place at = locate(id);
+    return at.valid() && at.member >= 0 ? idOf(listOf(at.bar)[at.index]) : QString();
+}
+
+QVariantList ToolboxModel::members(const QString& groupId) const {
+    const QVariantMap g = entry(groupId);
+    return isGroup(g) ? g.value("members").toList() : QVariantList();
+}
+
+QString ToolboxModel::shownOf(const QString& groupId) const {
+    const QVariantMap g = entry(groupId);
+    if (!isGroup(g)) {
+        return {};
+    }
+    const QString last = g.value("last").toString();
+    const QVariantList m = g.value("members").toList();
+    for (const QVariant& v: m) {
+        if (idOf(v) == last) {
+            return last;
+        }
+    }
+    return m.isEmpty() ? QString() : idOf(m.first());
+}
+
+void ToolboxModel::use(const QString& id) {
+    const Place at = locate(id);
+    if (!at.valid() || at.member < 0) {
+        return;
+    }
+    QVariantList& l = listOf(at.bar);
+    QVariantMap g = l[at.index].toMap();
+    if (g.value("last") == id) {
+        return;
+    }
+    g["last"] = id;
+    l[at.index] = g;
+    ++rev;
+    Q_EMIT changed();
+    pending = true;
+    writeTimer.start();
+}
+
+// --- the app's items ---------------------------------------------------------------------------------------------------
+
+QString ToolboxModel::idOfApp(const QString& name) const {
+    for (const QVariant& v: allItems()) {
+        if (isApp(v) && v.toMap().value("app") == name) {
+            return idOf(v);
+        }
+    }
+    return {};
+}
+
+QStringList ToolboxModel::unplaced() const {
+    QStringList out;
+    for (const QString& name: appItemNames()) {
+        if (idOfApp(name).isEmpty()) {
+            out << name;
+        }
+    }
+    return out;
+}
+
+QString ToolboxModel::place(const QString& name, const QString& bar, int to) {
+    if (!appItemNames().contains(name) || !idOfApp(name).isEmpty() || (bar != "rail" && bar != "top")) {
+        return {};
+    }
+    QVariantList& l = listOf(bar);
+    const QString id = newId("a");
+    l.insert(to < 0 || to > l.size() ? l.size() : to, appItem(id, name));
+    changedNow();
+    return id;
 }
 
 QVariantMap ToolboxModel::prefill(const QString& type) const {
@@ -458,8 +793,9 @@ QVariantMap ToolboxModel::prefill(const QString& type) const {
             return copy;
         }
     }
-    for (int i = list.size() - 1; i >= 0; --i) {
-        const QVariantMap e = list[i].toMap();
+    const QVariantList all = tools();
+    for (int i = all.size() - 1; i >= 0; --i) {
+        const QVariantMap e = all[i].toMap();
         if (e.value("type") == type) {
             QVariantMap copy = e;
             copy.remove("id");
@@ -476,7 +812,7 @@ QString ToolboxModel::recentOfType(const QString& type) const {
             return id;
         }
     }
-    for (const QVariant& v: list) {
+    for (const QVariant& v: tools()) {
         if (matches(v.toMap())) {
             return idOf(v);
         }
@@ -497,12 +833,53 @@ QString ToolboxModel::recentAmong(const QStringList& ids) const {
 }
 
 void ToolboxModel::reset() {
-    list = defaultEntries();
+    railList = defaultEntries();
+    topList.clear();
+    int n = 0;
+    for (const QVariant& v: railList) {
+        n = std::max(n, idOf(v).mid(1).toInt());
+    }
+    railList.append(divider(QString("d%1").arg(++n)));
+    railList.append(layoutOf(defaultRailApps(), n));
+    topList = layoutOf(defaultTopLayout(), n);
     recent.clear();
     activeId.clear();
     tidy();
     changedNow();
     Q_EMIT activeChanged();
+}
+
+void ToolboxModel::resetLayout() {
+    // The user's tools in their order (the rail's dividers between them kept), out of their groups; then the app tools
+    QVariantList mine;
+    for (const QVariantList* l: {&railList, &topList}) {
+        for (const QVariant& v: *l) {
+            if (isDivider(v)) {
+                if (l == &railList) {
+                    mine.append(v);
+                }
+            } else if (isGroup(v)) {
+                for (const QVariant& m: membersOf(v)) {
+                    if (isTool(m)) {
+                        mine.append(m);
+                    }
+                }
+            } else if (isTool(v)) {
+                mine.append(v);
+            }
+        }
+    }
+    railList = mine;
+    topList.clear();
+    tidy();  // (the dividers that divided only app items go)
+    int n = 0;
+    for (const QVariant& v: allItems()) {
+        n = std::max(n, idOf(v).mid(1).toInt());
+    }
+    railList.append(divider(QString("d%1").arg(++n)));
+    railList.append(layoutOf(defaultRailApps(), n));
+    topList = layoutOf(defaultTopLayout(), n);
+    changedNow();
 }
 
 void ToolboxModel::reload() {
@@ -513,44 +890,123 @@ void ToolboxModel::reload() {
     }
 }
 
+bool ToolboxModel::restore(const QString& json) {
+    if (!fromJson(json)) {
+        return false;
+    }
+    changedNow();
+    Q_EMIT activeChanged();
+    return true;
+}
+
 void ToolboxModel::tidy() {
-    // Dividers: none first or last, never two in a row
-    QVariantList l;
-    for (const QVariant& v: list) {
-        if (isDivider(v) && (l.isEmpty() || isDivider(l.last()))) {
-            continue;
+    QStringList apps;  // (one home per app item: the first place it has)
+    const QStringList known = appItemNames();
+    auto keepItem = [&](const QVariant& v) {
+        if (!isApp(v)) {
+            return true;
         }
-        l.append(v);
+        const QString name = v.toMap().value("app").toString();
+        if (!known.contains(name) || apps.contains(name)) {
+            return false;
+        }
+        apps << name;
+        return true;
+    };
+    for (QVariantList* bar: {&railList, &topList}) {
+        QVariantList l;
+        for (const QVariant& v: *bar) {
+            if (isGroup(v)) {
+                // Members: tools and app items (a group in a group gives its members), at least two
+                QVariantList m;
+                for (const QVariant& x: membersOf(v)) {
+                    for (const QVariant& y: isGroup(x) ? membersOf(x) : QVariantList{x}) {
+                        if (!isDivider(y) && !isGroup(y) && !y.toMap().value("hole").toBool() && keepItem(y)) {
+                            m.append(y);
+                        }
+                    }
+                }
+                if (m.size() == 1) {
+                    l.append(m.first());
+                } else if (m.size() > 1) {
+                    QVariantMap g = v.toMap();
+                    g["members"] = m;
+                    l.append(g);
+                }
+                continue;
+            }
+            // Dividers: none first or last, never two in a row
+            if (isDivider(v) && (l.isEmpty() || isDivider(l.last()))) {
+                continue;
+            }
+            if (v.toMap().value("hole").toBool() || !keepItem(v)) {
+                continue;
+            }
+            l.append(v);
+        }
+        while (!l.isEmpty() && isDivider(l.last())) {
+            l.removeLast();
+        }
+        *bar = l;
     }
-    while (!l.isEmpty() && isDivider(l.last())) {
-        l.removeLast();
-    }
-    list = l;
-    // A way to erase
-    if (std::none_of(list.begin(), list.end(), [](const QVariant& v) { return v.toMap().value("type") == "eraser"; })) {
+    // A way to erase: after the last of the user's tools on the rail
+    const QVariantList all = allItems();
+    if (std::none_of(all.begin(), all.end(),
+                     [](const QVariant& v) { return isTool(v) && v.toMap().value("type") == "eraser"; })) {
         QVariantMap e = defaultOf("eraser");
         e["id"] = newId("e");
-        list.append(e);
+        int at = 0;
+        for (int i = 0; i < railList.size(); ++i) {
+            if (isTool(railList[i]) || isGroup(railList[i])) {
+                at = i + 1;
+            }
+        }
+        railList.insert(at, e);
     }
-    // Ids: unique and present
+    // Ids: unique and present (members of groups too); a group's member shown is one of its members
     QStringList seen;
-    for (QVariant& v: list) {
+    auto fresh = [&](QVariant& v) {
         QVariantMap e = v.toMap();
-        if (e.value("id").toString().isEmpty() || seen.contains(e.value("id").toString())) {
-            e["id"] = newId(isDivider(v) ? "d" : "e");
+        const QString id = e.value("id").toString();
+        if (id.isEmpty() || seen.contains(id)) {
+            e["id"] = newId(isDivider(v) ? "d" : isGroup(v) ? "g" : isApp(v) ? "a" : "e");
+            // (newId looks at the lists as they are: the new id must be in them before the next one is made)
             v = e;
         }
         seen << e.value("id").toString();
+    };
+    for (QVariantList* bar: {&railList, &topList}) {
+        for (int i = 0; i < bar->size(); ++i) {
+            QVariant v = (*bar)[i];
+            fresh(v);
+            (*bar)[i] = v;
+            if (isGroup(v)) {
+                QVariantMap g = v.toMap();
+                QVariantList m = g.value("members").toList();
+                QStringList ids;
+                for (int j = 0; j < m.size(); ++j) {
+                    fresh(m[j]);
+                    g["members"] = m;
+                    (*bar)[i] = g;
+                    ids << idOf(m[j]);
+                }
+                if (!ids.contains(g.value("last").toString())) {
+                    g["last"] = ids.value(0);
+                }
+                (*bar)[i] = g;
+            }
+        }
     }
-    recent.erase(std::remove_if(recent.begin(), recent.end(), [this](const QString& id) { return indexOf(id) < 0; }),
+    recent.erase(std::remove_if(recent.begin(), recent.end(),
+                                [this](const QString& id) { return !isTool(entry(id)) || entry(id).isEmpty(); }),
                  recent.end());
-    if (!activeId.isEmpty() && (indexOf(activeId) < 0 || entry(activeId).value("type") == "sticky")) {
+    if (!activeId.isEmpty() && (!isTool(entry(activeId)) || entry(activeId).isEmpty() ||
+                                entry(activeId).value("type") == "sticky")) {
         activeId.clear();
     }
     if (activeId.isEmpty()) {
-        for (const QVariant& v: list) {
-            const QString type = v.toMap().value("type").toString();
-            if (!isDivider(v) && type != "sticky") {
+        for (const QVariant& v: tools()) {
+            if (v.toMap().value("type") != "sticky") {
                 activeId = idOf(v);
                 break;
             }
@@ -571,9 +1027,35 @@ QString ToolboxModel::toJson() const {
     root["version"] = VERSION;
     root["active"] = activeId;
     root["recent"] = QJsonArray::fromStringList(recent);
-    root["entries"] = QJsonArray::fromVariantList(list);
+    root["rail"] = QJsonArray::fromVariantList(railList);
+    root["top"] = QJsonArray::fromVariantList(topList);
     return QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Compact));
 }
+
+namespace {
+/// An item read from the JSON (a tool normalized, an app item, a divider, a group with its members); null: dropped
+QVariant itemFrom(const QVariantMap& m) {
+    if (m.value("divider").toBool()) {
+        return divider(m.value("id").toString());
+    }
+    if (m.value("group").toBool()) {
+        QVariantList members;
+        for (const QVariant& x: m.value("members").toList()) {
+            const QVariant y = itemFrom(x.toMap());
+            if (y.isValid() && !isDivider(y)) {
+                members.append(y);
+            }
+        }
+        return QVariantMap{{"id", m.value("id").toString()}, {"group", true}, {"members", members},
+                           {"last", m.value("last").toString()}};
+    }
+    if (m.contains("app")) {
+        return appItem(m.value("id").toString(), m.value("app").toString());
+    }
+    const QVariantMap e = ToolboxModel::normalized(m);
+    return e.isEmpty() ? QVariant() : QVariant(e);
+}
+}  // namespace
 
 bool ToolboxModel::fromJson(const QString& json) {
     if (json.trimmed().isEmpty()) {
@@ -585,22 +1067,47 @@ bool ToolboxModel::fromJson(const QString& json) {
         return false;
     }
     const QJsonObject root = doc.object();
-    if (root.value("version").toInt() != VERSION || !root.value("entries").isArray()) {
+    const int version = root.value("version").toInt();
+    const char* railKey = version == VERSION_1 ? "entries" : "rail";
+    if ((version != VERSION && version != VERSION_1) || !root.value(railKey).isArray()) {
         return false;
     }
-    QVariantList l;
-    for (const QJsonValue& v: root.value("entries").toArray()) {
-        const QVariantMap m = v.toObject().toVariantMap();
-        if (m.value("divider").toBool()) {
-            l.append(divider(m.value("id").toString()));
-        } else if (QVariantMap e = normalized(m); !e.isEmpty()) {
-            l.append(e);
+    auto read = [](const QJsonArray& a) {
+        QVariantList l;
+        for (const QJsonValue& v: a) {
+            if (const QVariant item = itemFrom(v.toObject().toVariantMap()); item.isValid()) {
+                l.append(item);
+            }
         }
+        return l;
+    };
+    QVariantList rail = read(root.value(railKey).toArray());
+    QVariantList top = read(root.value("top").toArray());
+    auto hasTool = [](const QVariantList& l) {
+        return std::any_of(l.begin(), l.end(), [](const QVariant& v) {
+            if (isGroup(v)) {
+                const QVariantList m = membersOf(v);
+                return std::any_of(m.begin(), m.end(), isTool);
+            }
+            return isTool(v);
+        });
+    };
+    if (!hasTool(rail) && !hasTool(top)) {
+        return false;  // (no tools at all: the first layout instead)
     }
-    if (std::none_of(l.begin(), l.end(), [](const QVariant& v) { return !isDivider(v); })) {
-        return false;  // (no tools at all: the defaults instead)
+    if (version == VERSION_1) {
+        // 0.7.0: the user's entries alone. The app's tools follow them on the rail (they were the rail's fixed tools,
+        // the ones that stay on it), the top bar gets its first layout; the ids after every one there is
+        int n = 0;
+        for (const QVariant& v: rail) {
+            n = std::max(n, idOf(v).mid(1).toInt());
+        }
+        rail.append(divider(QString("d%1").arg(++n)));
+        rail.append(layoutOf(defaultRailApps(), n));
+        top = layoutOf(defaultTopLayout(), n);
     }
-    list = l;
+    railList = rail;
+    topList = top;
     recent.clear();
     for (const QJsonValue& v: root.value("recent").toArray()) {
         recent << v.toString();

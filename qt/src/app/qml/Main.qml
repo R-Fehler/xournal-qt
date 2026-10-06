@@ -894,8 +894,9 @@ ApplicationWindow {
         readonly property real floatTop: win.controlsTop + (fullScreenTabs.visible ? fullScreenTabs.height : 0) + 8
         // (the view pill sits 24 px above the bottom: the rail ends 8 px above it, however tall the pill is)
         readonly property real floatBottom: win.controlsBottom - Math.max(72, viewPill.height + 24 + 8)
-        readonly property real floatLength: vertical ? Math.min(naturalLength, floatBottom - floatTop)
-                                                     : Math.min(naturalLength, win.controlsRight - win.controlsLeft - 16)
+        // (as long as its items; when they do not fit, it scrolls and ends through the middle of a cell)
+        readonly property real floatLength: vertical ? lengthFor(floatBottom - floatTop)
+                                                     : lengthFor(win.controlsRight - win.controlsLeft - 16)
         x: compact ? 0 : floating ? (edge === "right" ? win.controlsRight - width - 8 : edge === "left" ? win.controlsLeft + 8
                                         : Math.round((win.controlsLeft + win.controlsRight - width) / 2))
            : !vertical ? win.safeLeft : edge === "left" ? win.safeLeft : 0
@@ -908,12 +909,10 @@ ApplicationWindow {
                 : !vertical ? thickness : floating ? floatLength : (parent ? parent.height : 0)
         // (a rail's end clear of the navigation bar)
         endInset: vertical && !floating ? Math.max(0, win.contentItem.height - win.controlsBottom) : 0
-        // (the phone's dock: they are in the sheet of every tool)
-        // (recording, qt/docs/audio.md: a fixed tool of the rail, so it is there docked, floating in full screen and while
-        // presenting; it leaves the command bar then)
-        fixedButtons: win.toolboxShown && !compact
-                      ? [handTool, selectTool, snipTool, writeButton, geometryTool, pdfTextTool, touchDrawingTool]
-                        .concat(recordTool.offered ? [recordTool] : []) : []
+        // (the app's items on the rail are the window's buttons, lent to it while it is shown: hand, select, snip, mark
+        // PDF text at a first start; the others stay in the command bar, qt/rail-scroll)
+        appButtons: toolArea.slots
+        lending: win.toolboxShown
         onAllToolsRequested: phoneToolSheet.open()
         onPagesRequested: pageGrid.open()
         onEditRequested: function(entry, button) { toolEditor.openFor(entry, button, edge) }
@@ -999,12 +998,30 @@ ApplicationWindow {
             icon.source: app.iconUrl("xopp-fullscreen")
             onTriggered: win.fullScreenMode ? (win.fullScreenMode = false) : win.chooseChrome("full")
         }
+        // The tools that left the rail for the top bar (qt/rail-scroll), which full screen hides: here until the top
+        // bar's items are listed here (qt/top-bar)
+        MenuSeparator {}
+        Repeater {
+            model: ["write", "geometry", "touchDrawing", "record"]
+            delegate: AdaptiveMenuItem {
+                required property string modelData
+                readonly property Item button: toolArea.slots[modelData]
+                objectName: "toolboxMore_" + modelData
+                offered: button.offered !== false && toolboxPane.fixedButtons.indexOf(button) < 0
+                text: button.label !== "" ? button.label : button.name
+                icon.source: app.iconUrl(button.iconName)
+                checkable: true
+                checked: button.checked
+                onTriggered: { const b = button; Qt.callLater(function() { b.clicked() }) }
+            }
+        }
     }
     /// An entry's name for people ("Pen · Body", "Arrow", "Eraser (whiteout)")
     function toolEntryName(entry) { return toolboxPane.entryName(entry) }
     // A tool's editor: a tap on the tool in hand, Edit in its menu, "+" (qt/docs/toolbox.md, "Editing a tool")
     ToolEntryEditor { id: toolEditor; ownerOf: function(id) { return toolboxPane.buttonFor(id) } }
-    // A tool's menu (a long press, a right click): edit, move, replace, duplicate, add one here, a divider, remove
+    // A tool's menu (a long press, a right click): edit, move, replace, duplicate, add one here, a divider, remove; for
+    // an app item on the rail (hand, select, …): its own list, move, add one here, a divider, remove (into the catalog)
     AdaptiveMenu {
         id: toolEntryMenu
         objectName: "toolEntryMenu"
@@ -1013,14 +1030,29 @@ ApplicationWindow {
         property Item button: null
         readonly property string entryId: entry && entry.id ? entry.id : ""
         readonly property var store: app.toolbox
+        /// An app item's (its button: the window's)
+        readonly property bool isApp: entry && entry.app !== undefined
+        readonly property Item appButton: isApp ? toolArea.slots[entry.app] || null : null
         function openFor(e, b, pos) {
             entry = e
             button = b
             title = win.toolEntryName(e)
             openMenu(pos, b)
         }
+        // (an app item with a list of its own: select's kinds, the snips' resolution, how PDF text is marked)
+        AdaptiveMenuItem {
+            objectName: "toolOptionsItem"
+            offered: toolEntryMenu.appButton !== null && toolEntryMenu.appButton.ownHold === true
+            text: qsTr("Options…")
+            icon.source: app.iconUrl("xqt-more")
+            onTriggered: {
+                const b = toolEntryMenu.appButton
+                win.afterMenus(function() { b.pressAndHold() })
+            }
+        }
         AdaptiveMenuItem {
             objectName: "toolEditItem"
+            offered: !toolEntryMenu.isApp
             text: qsTr("Edit…")
             icon.source: app.iconUrl("xqt-pencil")
             onTriggered: {
@@ -1044,6 +1076,7 @@ ApplicationWindow {
         }
         AdaptiveMenuItem {
             objectName: "toolReplaceItem"
+            offered: !toolEntryMenu.isApp
             text: qsTr("Replace with…")
             icon.source: app.iconUrl("xqt-rotate-right")
             enabled: (toolEntryMenu.store.revision, toolEntryMenu.entry.type !== "eraser" || toolEntryMenu.store.canRemove(toolEntryMenu.entryId))
@@ -1051,6 +1084,7 @@ ApplicationWindow {
         }
         AdaptiveMenuItem {
             objectName: "toolDuplicateItem"
+            offered: !toolEntryMenu.isApp
             text: qsTr("Duplicate")
             icon.source: app.iconUrl("xqt-copy")
             onTriggered: toolEntryMenu.store.duplicate(toolEntryMenu.entryId)
@@ -1071,7 +1105,8 @@ ApplicationWindow {
         MenuSeparator {}
         AdaptiveMenuItem {
             objectName: "toolRemoveItem"
-            text: (toolEntryMenu.store.revision, toolEntryMenu.store.canRemove(toolEntryMenu.entryId))
+            text: toolEntryMenu.isApp ? qsTr("Remove from the rail")
+                  : (toolEntryMenu.store.revision, toolEntryMenu.store.canRemove(toolEntryMenu.entryId))
                   ? qsTr("Remove") : qsTr("Remove (the last eraser stays)")
             icon.source: app.iconUrl("xqt-close")
             enabled: (toolEntryMenu.store.revision, toolEntryMenu.store.canRemove(toolEntryMenu.entryId))
@@ -1124,6 +1159,24 @@ ApplicationWindow {
                 text: modelData.name
                 icon.source: app.iconUrl(modelData.icon)
                 onTriggered: toolTypeMenu.chosen(modelData.type)
+            }
+        }
+        // The app's tools taken off the rail: back on it (until the "+" catalog of qt/top-bar has every item)
+        Repeater {
+            model: toolTypeMenu.purpose === "replace" ? []
+                   : (app.toolbox.revision, app.toolbox.unplaced()).filter(function(n) {
+                         return ["hand", "select", "snip", "pdfText"].indexOf(n) >= 0 && toolArea.slots[n] !== undefined
+                     })
+            delegate: AdaptiveMenuItem {
+                required property var modelData
+                readonly property Item button: toolArea.slots[modelData]
+                objectName: "toolPlace_" + modelData
+                text: qsTr("Put back: %1").arg(button.label !== "" ? button.label : button.name)
+                icon.source: app.iconUrl(button.iconName)
+                onTriggered: {
+                    const store = app.toolbox
+                    store.place(modelData, "rail", toolTypeMenu.purpose === "addHere" ? store.indexOf(toolTypeMenu.entryId) + 1 : -1)
+                }
             }
         }
     }

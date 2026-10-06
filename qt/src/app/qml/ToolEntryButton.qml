@@ -24,8 +24,10 @@ AbstractButton {
     /// Its name (tips, the held finger, accessibility)
     property string name: ""
     property real cell: 48
-    /// It is being dragged to another place (qt/docs/toolbox.md, "Reordering"): drawn lifted with a shadow
+    /// It is being dragged to another place (qt/docs/toolbox.md, "Carrying"): drawn lifted with a shadow
     property bool dragging: false
+    /// An app item ({id, app}: the hand, select, …): the icon of its button (it has no ink)
+    property string appIcon: ""
 
     signal held(point pos)
     signal secondaryClicked(point pos)
@@ -55,6 +57,7 @@ AbstractButton {
 
     /// The icon of its kind (and variant)
     function iconOf(e) {
+        if (e && e.app !== undefined) return appIcon !== "" ? appIcon : "xqt-tools-more"
         if (!e || !e.type) return "xopp-tool-pencil"
         switch (e.type) {
         case "pen": return "xopp-tool-pencil"
@@ -136,7 +139,7 @@ AbstractButton {
         Canvas {
             id: sample
             objectName: "toolSample"
-            visible: button.type !== "sticky" && button.type !== "text" && button.type !== "snip"
+            visible: ["pen", "highlighter", "shape", "eraser", "laser"].indexOf(button.type) >= 0
             anchors.horizontalCenter: parent.horizontalCenter
             y: Math.round(parent.height / 2 + 6)
             width: 28

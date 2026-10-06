@@ -3803,3 +3803,31 @@ phone or Settings → Pen → Tools' choice describe what is gone; check the too
 - [ ] The laser pointer while presenting: the toolbox's laser entry (among the first tools) on the floating rail; its
       editor chooses pen or highlighter. Curtain and spotlight: the setsquare button held, on the floating rail.
 - [ ] Settings → Pen → Colors: under the palette's colors its source ("From: Open Color (MIT) …" for Marker).
+
+## A rail that scrolls; one arrangement for both bars (qt/rail-scroll, 0.8.0)
+
+Items above about stacks, folded sections, "the fixed tools fold into one button" or the rail "filling its room" by
+folding describe what is gone: the rail scrolls now.
+
+- [ ] Fold 7 unfolded (900 × 1000), a document: the rail at the right has every one of your tools on its own, in the
+      order of the first start; after them hand, select, snip, mark PDF text. If they do not all fit, the rail ends
+      through the middle of a tool (half of it shows) with a fade there; a swipe along the rail scrolls it, a tap takes
+      a tool, a hold lifts it. No stack, no "more tools" button on the rail.
+- [ ] Turn it (1000 × 900), fold it (the dock at the bottom: undo, redo, the same items scrolling sideways, "My
+      tools", the page number), hold it sideways (the dock a rail at the right): the same order everywhere.
+- [ ] Scroll the folded dock halfway, unfold, fold again: the dock is where it was; the unfolded rail keeps its own
+      position.
+- [ ] With a tool scrolled out of sight: press E (a keyboard), or take the tool in "My tools": the rail scrolls it into
+      view.
+- [ ] Desktop (1920 × 1080 and 1366 × 600): the mouse wheel over a gap or over hand / select scrolls the rail (when it
+      scrolls); over a pen it changes the pen's width. Undo, redo and "+" stay put while it scrolls.
+- [ ] Hold hand (or select) on the rail without moving: its menu (Options… for select's list, Move, Add a tool here,
+      the divider, "Remove from the rail"); remove it: the hand is in the command bar at the top again; "+" → "Put
+      back: Hand" brings it back to the rail. Hold and move select: it is carried like a pen.
+- [ ] Write on the page, the setsquare / compass (with curtain and spotlight in its list), the finger switch and record
+      are no longer on the rail: they are in the command bar at the top (or its "more tools" in a narrow window), and
+      in "My tools" on a phone. In full screen (F11) the floating rail's ⋯ lists them at its end: write on the page,
+      the setsquare (a tap again: the compass), the finger draws (checked while on), record audio; each works from
+      there.
+- [ ] Update from 0.7.0 with your own tools and order: the same tools in the same order, the hand, select, snip and
+      mark PDF text after them; the tool in hand as before.
