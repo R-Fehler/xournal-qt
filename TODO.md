@@ -888,6 +888,9 @@ Blocks, one after another where they share `Main.qml` (1, then 2 and 4, then 3):
   lasso), mark PDF text ↔ copy handwriting; they are items like the user's (carried, grouped, removed into the
   catalog). The phone's dock becomes the same rail at the bottom edge (scrolling sideways); "My tools" becomes the
   "+" catalog (block 3).
+- [ ] From qt/zen for block 3 or later: Android's Back key should leave Zen (it does not yet; only Esc); the Zen button
+  is not in the phone's bar (⋮ → View only); a New document button in full screen (only Ctrl+Shift+N since
+  qt/classic-removal).
 - [ ] **3 `qt/top-bar`**: the top bar holds items of the same arrangement: scrolls instead of its ladder into ⋮; its
   order and groups are the user's; items are carried between the rail and the top bar (one home per item: the
   rail, the top bar or the menu only); a group of commands always opens its list on a tap (nothing runs by
