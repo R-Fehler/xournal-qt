@@ -8341,6 +8341,9 @@ TEST_F(MainWindowTest, presentButtonHeldPresentsWithoutControls) {
         QMetaObject::invokeMethod(menu, "close");
         until([&] { return controller->presenting(); });
         ASSERT_TRUE(controller->presenting());
+        // (until the menu has faded out: Qt 6.7 and 6.8 give a key to a popup while it closes, so Escape would end
+        // the fade-out instead of presenting)
+        until([&] { return !menu->property("visible").toBool(); });
         EXPECT_TRUE(clean()) << "only the page";
         EXPECT_FALSE(find<QQuickItem>("toolbox")->isVisible());
         EXPECT_TRUE(find<QQuickItem>("zenDot")->isVisible());
