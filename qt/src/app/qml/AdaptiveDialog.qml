@@ -16,6 +16,8 @@ import QtQuick.Window
 
 Dialog {
     id: dlg
+    // (open: Android's back key is its; Zen's Back waits, qt/top-bar)
+    onOpenedChanged: if (typeof win !== "undefined" && win && win.takeBack !== undefined) win.takeBack(opened)
     /// What is declared inside: the body
     default property alias body: bodyBox.data
     /// "form", "question" or "card" (above)

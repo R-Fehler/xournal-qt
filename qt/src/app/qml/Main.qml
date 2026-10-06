@@ -1765,6 +1765,10 @@ ApplicationWindow {
         onGrouped: function(groupId, before) { win.grouped(before) }
         onRemoved: function(entry, before) { win.leftTheBars(entry, before) }
     }
+    /// Popups open that close on Android's back key (sheets, dialogs, the editor, the pickers): Zen's Back waits for
+    /// them (two shortcuts of the same key would be ambiguous: neither would act)
+    property int backTakers: 0
+    function takeBack(on) { backTakers = Math.max(0, backTakers + (on ? 1 : -1)) }
     /// The top bar is shown (at the top, in a text document's format bar, in a phone's app bar)
     readonly property bool topBarShown: !app.homeVisible && !noToolbar && !replaying
     /// A carried item made a group: "Grouped · Undo"
@@ -4947,6 +4951,19 @@ ApplicationWindow {
                 zenPill.opened = false
                 return
             }
+            if (win.readStarted) win.stopReading()
+            win.setZen(false)
+        }
+    }
+    // Android's back key (and the back gesture) leaves Zen before anything else it does (the author, 2026-10-06: "the
+    // back gesture or button should leave zen mode on android"): the controls come back (presenting: its controls);
+    // Read ends with it. A popup open over the page (a sheet, a dialog, the editor) takes it first: it is in front.
+    Shortcut {
+        objectName: "zenBackShortcut"
+        sequence: "Back"
+        enabled: win.zenShown && win.backTakers === 0 && !win.sidebarDrawerOpen
+        onActivated: {
+            zenPill.opened = false
             if (win.readStarted) win.stopReading()
             win.setZen(false)
         }

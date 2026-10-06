@@ -3921,6 +3921,9 @@ folding describe what is gone: the rail scrolls now.
       a sheet), the page number. "My tools" is gone.
 - [ ] Phone folded held sideways (915 × 412) with the system bars: the top bar sits beside the title in the app bar,
       the page number before the tab count; the rail at the right shows at least two tools between redo and its end.
+- [ ] Android: in Zen the back gesture and the back button leave Zen (the controls come back) and do not leave the app;
+      in Read they end Read; presenting without controls they bring the controls back. With the settings open in Zen,
+      Back closes the settings first.
 - [ ] A text document (.md) at 1366 × 768: undo, redo, all formatting buttons (no "Insert" menu), then the commands
       (open, save, …) in the same row, scrolling; the wheel scrolls it; ⋮ at the end. At 1920 more of the commands, at
       a wide window all.

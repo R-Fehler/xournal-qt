@@ -15,6 +15,8 @@ import "LineStyles.js" as LineStyles
 
 Popup {
     id: editor
+    // (open: Android's back key is its; Zen's Back waits, qt/top-bar)
+    onOpenedChanged: if (typeof win !== "undefined" && win && win.takeBack !== undefined) win.takeBack(opened)
     objectName: "toolEntryEditor"
     /// The entry being edited ({…}), or the draft of a new one
     property var entry: ({})

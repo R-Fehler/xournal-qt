@@ -12,6 +12,8 @@ import QtQuick.Dialogs
 
 Popup {
     id: sheet
+    // (open: Android's back key is its; Zen's Back waits, qt/top-bar)
+    onOpenedChanged: if (typeof win !== "undefined" && win && win.takeBack !== undefined) win.takeBack(opened)
     modal: true
     focus: true
     parent: Overlay.overlay

@@ -1640,6 +1640,57 @@ TEST_F(ToolboxTest, zenIsOnTheTopBarAtEverySize) {
     }
 }
 
+// Android's back key (and gesture) leaves Zen first; Read ends with it; presenting without controls gets its controls
+TEST_F(ToolboxTest, backLeavesZen) {
+    QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, true));
+    until([&] { return win("zen").toBool(); });
+    QTest::keyClick(window, Qt::Key_Back);
+    until([&] { return !win("zen").toBool(); });
+    EXPECT_FALSE(win("zen").toBool()) << "Back leaves Zen";
+    EXPECT_TRUE(shown(find("topBar")));
+    // Zen with its pill open: Back leaves Zen (not only the pill)
+    QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, true));
+    until([&] { return shown(find("zenDot")); });
+    click(find("zenDot"));
+    until([&] { return shown(find("zenPill")); });
+    QTest::keyClick(window, Qt::Key_Back);
+    until([&] { return !win("zen").toBool(); });
+    EXPECT_FALSE(win("zen").toBool());
+    EXPECT_FALSE(shown(find("zenPill")));
+    // A sheet open over the page in Zen takes Back first (it is in front); the next Back leaves Zen
+    QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, true));
+    until([&] { return win("zen").toBool(); });
+    auto* settingsPage = find<QObject>("settingsPage");
+    QMetaObject::invokeMethod(settingsPage, "open");
+    until([&] { return settingsPage->property("opened").toBool(); });
+    QTest::keyClick(window, Qt::Key_Back);
+    until([&] { return !settingsPage->property("visible").toBool(); });
+    EXPECT_FALSE(settingsPage->property("visible").toBool());
+    EXPECT_TRUE(win("zen").toBool()) << "the settings closed first";
+    wait(200);
+    QTest::keyClick(window, Qt::Key_Back);
+    until([&] { return !win("zen").toBool(); });
+    EXPECT_FALSE(win("zen").toBool());
+    // Read: Back ends it (read only, and the full screen it entered)
+    QMetaObject::invokeMethod(window, "startReading");
+    until([&] { return win("readOnlyOn").toBool() && win("zen").toBool(); });
+    QTest::keyClick(window, Qt::Key_Back);
+    until([&] { return !win("readOnlyOn").toBool(); });
+    EXPECT_FALSE(win("zen").toBool());
+    EXPECT_FALSE(win("fullScreenMode").toBool());
+    // Presenting without controls: Back shows them (presenting goes on)
+    window->showNormal();
+    QMetaObject::invokeMethod(window, "startPresenting", Q_ARG(QVariant, true));
+    until([&] { return controller->presenting() && win("zen").toBool(); });
+    QTest::keyClick(window, Qt::Key_Back);
+    until([&] { return !win("zen").toBool(); });
+    EXPECT_TRUE(controller->presenting());
+    until([&] { return shown(find("toolbox")); });
+    EXPECT_TRUE(shown(find("toolbox"))) << "the controls";
+    controller->setPresenting(false);
+    window->setProperty("fullScreenMode", false);
+}
+
 // Full screen hides the top bar: the floating rail's ⋯ lists what it holds (in its order, a group's members one by
 // one) and New
 TEST_F(ToolboxTest, inFullScreenTheMoreMenuListsTheTopBarAndNew) {
