@@ -6,7 +6,9 @@ name: xournal-qt
 
 on:
   push:
-    branches: [master-qt]
+    # (also the integration branches of the cloud sessions, so a failure on Qt 6.7 or 6.8 shows up while the work
+    # goes on, not when a release is cut)
+    branches: [master-qt, 'claude/**']
     paths:
       - 'qt/**'
       - 'src/**'
@@ -23,20 +25,47 @@ concurrency:
 
 jobs:
   linux:
-    name: Debian 13 (Qt 6.8)
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
-    # Qt 6.5 or newer is needed: Ubuntu 24.04 (the runner's own system) has 6.4, Debian 13 has 6.8.
-    container: debian:trixie
+    # Qt 6.5 or newer is needed: Ubuntu 24.04 (the runner's own system) has 6.4. Both Qt versions the release packages
+    # are built with: Debian 13 (Qt 6.8) and Ubuntu 22.04 with KDE neon's packages (Qt 6.7).
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Debian 13 (Qt 6.8)
+            container: debian:trixie
+            neon: '0'
+            key: debian13
+          - name: KDE neon / Ubuntu 22.04 (Qt 6.7)
+            container: ubuntu:22.04
+            neon: '1'
+            key: neon-jammy
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1500M
     steps:
       - name: What the checkout needs in the container
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends git ca-certificates
+          apt-get install -y --no-install-recommends git ca-certificates ccache
 
       - uses: actions/checkout@v4
 
       - name: Install the build dependencies
         run: bash qt/scripts/linux-deps.sh
+        env:
+          XQT_NEON: ${{ matrix.neon }}
+
+      # The compiler cache of the last run of this container (CMake uses ccache when it is installed): a build that
+      # changed a few files takes minutes instead of a quarter of an hour
+      - name: Compiler cache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: xqt-ccache-${{ matrix.key }}-${{ github.sha }}
+          restore-keys: xqt-ccache-${{ matrix.key }}-
 
       - name: Configure
         run: cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DXQT_BUILD_SPIKES=OFF
@@ -51,6 +80,7 @@ jobs:
         run: ctest --test-dir build -j "$(nproc)" --output-on-failure --timeout 300 --repeat until-pass:3
 
       - name: Validate archive PDFs with veraPDF
+        if: matrix.neon == '0'
         # Archive PDFs (qt/docs/hybrid-pdf.md, "Archive PDF") must be PDF/A-3b. veraPDF, the reference validator, is a
         # test tool only: the app never runs it. The tests write their archive PDFs that claim PDF/A into a folder
         # (also one saved incrementally three times, qt/pdf-incremental).
@@ -75,7 +105,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-output
+          name: test-output-${{ matrix.key }}
           path: |
             build/Testing/**
             build/**/*.log

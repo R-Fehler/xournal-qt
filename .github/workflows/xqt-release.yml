@@ -33,11 +33,14 @@ jobs:
             container: debian:trixie
             suffix: debian13
             neon: '0'
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1500M
     steps:
       - name: What the checkout needs in the container
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends git ca-certificates
+          apt-get install -y --no-install-recommends git ca-certificates ccache
 
       - uses: actions/checkout@v4
 
@@ -45,6 +48,14 @@ jobs:
         run: bash qt/scripts/linux-deps.sh
         env:
           XQT_NEON: ${{ matrix.neon }}
+
+      # (a second release run of the same version, after a fix, rebuilds only what changed)
+      - name: Compiler cache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: xqt-release-ccache-${{ matrix.suffix }}-${{ github.sha }}
+          restore-keys: xqt-release-ccache-${{ matrix.suffix }}-
 
       - name: The tag and the version of the project must say the same
         if: startsWith(github.ref, 'refs/tags/v')

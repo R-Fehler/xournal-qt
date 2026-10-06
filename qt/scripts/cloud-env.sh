@@ -89,7 +89,7 @@ export QT_QPA_PLATFORM=offscreen
 export CCACHE_DIR="\${CCACHE_DIR:-\$HOME/.cache/ccache}"
 export CCACHE_MAXSIZE="\${CCACHE_MAXSIZE:-10G}"
 # configure flags: qpdf from the env (no GitHub download), libs from the env; RPATH to the env's lib
-export XQT_CMAKE_ARGS="-G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DXQT_SYSTEM_QPDF=ON -DCMAKE_PREFIX_PATH=${ENV_PREFIX} -DCMAKE_INSTALL_RPATH=${ENV_PREFIX}/lib -DCMAKE_BUILD_RPATH=${ENV_PREFIX}/lib -DCMAKE_DISABLE_FIND_PACKAGE_GTest=ON -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=/usr/src/googletest"
+export XQT_CMAKE_ARGS="-G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DXQT_FAST_DEV=ON -DXQT_SYSTEM_QPDF=ON -DCMAKE_PREFIX_PATH=${ENV_PREFIX} -DCMAKE_INSTALL_RPATH=${ENV_PREFIX}/lib -DCMAKE_BUILD_RPATH=${ENV_PREFIX}/lib -DCMAKE_DISABLE_FIND_PACKAGE_GTest=ON -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=/usr/src/googletest"
 EOF
 here="$(dirname "$(readlink -f "$0")")"
 cp -f "$envfile" "$here/cloud-env.env" 2>/dev/null || true

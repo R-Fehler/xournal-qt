@@ -7,13 +7,19 @@ possible. `master` follows upstream, **`master-qt` is the fork's branch** and th
 ## Build and test
 
 ```sh
-cmake -S qt -B build-qt -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo   # once
+cmake -S qt -B build-qt -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DXQT_FAST_DEV=ON   # once
 cmake --build build-qt -j8 --target <the test binary you need>
 ctest --test-dir build-qt -j8 -L markdown   # labels: unit session canvas markdown quick shell ui golden
 ctest --test-dir build-qt -j8               # full suite (441 tests): at integration only, not per commit
 ```
 
 The machine is a slow 2-in-1, so every build and test run costs real time.
+
+`XQT_FAST_DEV=ON` is for development builds only (CI and releases leave it off): QML is not compiled ahead of time
+(an edit of `Main.qml` rebuilds in seconds instead of minutes), debug info is line tables only (`-g1`) and lld links
+when installed. The tests are listed when ctest runs (`PRE_TEST`), not after each link. Tiers: while working, only the
+labels or `-R` filters of what changed; the full suite once before a block is merged; the CI (`xqt-build.yml`) runs
+both Linux Qt versions (Debian 13 with 6.8, KDE neon with 6.7) on every push of `master-qt` and `claude/**`.
 - Build only the targets you need.
 - Run only the test labels, or `-R` filters, for the code you changed.
 - The full suite runs when a block is merged into `master-qt`, or when the author asks. The author runs the long

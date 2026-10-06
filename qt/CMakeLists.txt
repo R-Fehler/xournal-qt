@@ -27,6 +27,29 @@ if(XQT_USE_CCACHE AND XQT_CCACHE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
     set(CMAKE_CXX_COMPILER_LAUNCHER ${_xqt_launcher})
 endif()
 
+# A faster edit-build-test loop for development (off by default, so CI and releases build as before):
+# - QML is not compiled ahead of time (no qmlcachegen): an edit of Main.qml rebuilds in seconds instead of minutes
+#   (CI keeps the ahead-of-time compilation and its checks);
+# - debug info with line tables only (-g1): the test binaries shrink to about a quarter and link faster;
+# - the lld linker when it is installed.
+option(XQT_FAST_DEV "Faster development builds: QML not compiled ahead of time, -g1, lld" OFF)
+if(XQT_FAST_DEV)
+    foreach(_lang C CXX)
+        string(REGEX REPLACE "(^| )-g[0-9]?( |$)" " " CMAKE_${_lang}_FLAGS_RELWITHDEBINFO "${CMAKE_${_lang}_FLAGS_RELWITHDEBINFO}")
+        string(APPEND CMAKE_${_lang}_FLAGS_RELWITHDEBINFO " -g1")
+        string(REGEX REPLACE "(^| )-g[0-9]?( |$)" " " CMAKE_${_lang}_FLAGS_DEBUG "${CMAKE_${_lang}_FLAGS_DEBUG}")
+        string(APPEND CMAKE_${_lang}_FLAGS_DEBUG " -g1")
+    endforeach()
+    find_program(XQT_LLD NAMES ld.lld)
+    if(XQT_LLD AND NOT APPLE AND NOT WIN32)
+        add_link_options(-fuse-ld=lld)
+    endif()
+endif()
+
+# The tests are listed when ctest runs, not while building (gtest_discover_tests' default ran every test binary once
+# after each link: about a minute and a half of a rebuild)
+set(CMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE PRE_TEST)
+
 # Absolute path of the upstream Xournal++ sources inside this fork.
 set(XOJ_UPSTREAM_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.." CACHE INTERNAL "")
 

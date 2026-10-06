@@ -319,12 +319,18 @@ foreach(f ${XQT_QML_FILES})
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})
 endforeach()
 qt_add_library(xqt-ui STATIC)
+# (XQT_FAST_DEV: the QML is loaded from its source in the resources, not compiled ahead of time)
+set(_xqt_qml_nocachegen)
+if(XQT_FAST_DEV)
+    set(_xqt_qml_nocachegen NO_CACHEGEN)
+endif()
 qt_add_qml_module(xqt-ui
     URI XournalQt
     VERSION 1.0
     # Not next to the executables: a qmldir there would be found before the one in the resources.
     OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/qml/XournalQt"
     QML_FILES ${XQT_QML_FILES}
+    ${_xqt_qml_nocachegen}
 )
 target_link_libraries(xqt-ui PRIVATE Qt6::Quick Qt6::QuickControls2)
 
