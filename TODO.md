@@ -940,6 +940,8 @@ LGPLv3/GPL like the other Qt modules; audio in and out uses the system's audio, 
 - [ ] `Tabs.closingATabDoesNotWaitForQueuedWork` checks a fixed time limit for closing a tab: it failed once in the
   full suite at a load of about 15 and passed 6 of 6 alone. Make its limit relative (for example to one render's
   time), or measure the waiting rather than wall time.
+- [ ] `TextPdf.picturesAreCarriedInsideAPdfTextDocument` failed once in `ctest -L 'unit|session|shell' -j3`
+  (2026-10-06, while cutting 0.7.0) and passed alone and in the full suite right after. Find what it waits for.
 
 - [ ] A test leaves a settings file named `non-existing-file-path` in the current folder (found by `qt/timeline`,
   2026-10-05, in its worktree root): a test writes to the working directory instead of a temporary folder. Find it
