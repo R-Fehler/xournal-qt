@@ -892,9 +892,10 @@ Blocks, one after another where they share `Main.qml` (1, then 2 and 4, then 3):
   the end of full screen's ⋯ until block 3; a removed app tool comes back by "+" → "Put back"; a hold on an app tool
   opens the rail's menu, its own list is "Options…" there). Left for block 3: the top bar reading the stored
   arrangement, carrying between the bars, the catalog; "Back to the first layout" in Settings (`resetLayout()` exists).
-- [ ] From qt/zen for block 3 or later: Android's Back key should leave Zen (it does not yet; only Esc); the Zen button
-  is not in the phone's bar (⋮ → View only); a New document button in full screen (only Ctrl+Shift+N since
-  qt/classic-removal).
+- [ ] For block 3 (the author, 2026-10-06: "I think zen is helpful put it into the top bar. And yes the back gesture or
+  button should leave zen mode on android."): Zen is on the top bar in its first layout on every screen, phones too;
+  Android's Back (key and gesture) leaves Zen (before anything else Back does). Also: a New document button in full
+  screen (only Ctrl+Shift+N since qt/classic-removal).
 - [ ] **3 `qt/top-bar`**: the top bar holds items of the same arrangement: scrolls instead of its ladder into ⋮; its
   order and groups are the user's; items are carried between the rail and the top bar (one home per item: the
   rail, the top bar or the menu only); a group of commands always opens its list on a tap (nothing runs by
