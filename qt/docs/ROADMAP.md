@@ -1134,6 +1134,14 @@
   document's format bar scrolls with its commands at its end instead of folding. Android's Back leaves Zen first
   ([toolbox.md](toolbox.md), "The top bar"; [zen.md](zen.md)).
 
+- **The smallest zoom, `qt/min-zoom` (2026-10-06).** The author: "on my fold the 30 percent limit is too much a cannot
+  fit two pages side by side when unfolded. I would maybe put this into settings and make the default 20 percent".
+  Settings → Display → Zoom → "Smallest zoom" (5–50 %, 20 % unless set; `smallestZoom` in the xournalQt part), read by
+  every view (`CanvasView::smallestZoomSetting`); `ViewController::minZoom` also goes as low as the widest row of pages
+  needs to be seen whole (`DocumentLayout::wholeGroupZoom`; sideways a column or a pair), besides the biggest page as
+  before. Every zoom (pinch, wheel, Ctrl+minus, the fits, the reference, the presenter's screens) goes through it
+  ([adaptive-layout.md](adaptive-layout.md), "The view pill").
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

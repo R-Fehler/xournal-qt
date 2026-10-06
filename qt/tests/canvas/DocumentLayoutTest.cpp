@@ -394,3 +394,142 @@ TEST(Navigation, backAndForwardAfterJumps) {
     ASSERT_TRUE(view.navigateBack());
     EXPECT_EQ(session.getCurrentPageNo(), 0u) << "skipped the deleted page";
 }
+
+// --- the smallest zoom (ViewController::minZoom; the author, 2026-10-06: "on my fold the 30 percent limit is too much
+// a cannot fit two pages side by side when unfolded") ------------------------------------------------------------
+
+namespace {
+const QSizeF A4(595.27559, 841.88976);
+/// 100 % on the Fold 7 unfolded: about 370 ppi at a scale of about 2.2, some 2.35 logical pixels per point
+constexpr double FOLD_ZOOM100 = 2.35;
+/// Every page of `pages` wholly in the view
+::testing::AssertionResult wholeInView(const DocumentLayout& l, const ViewController& vc,
+                                       std::initializer_list<size_t> pages) {
+    const QRectF view = QRectF(QPointF(0, 0), vc.viewSize()).adjusted(-1e-6, -1e-6, 1e-6, 1e-6);
+    for (const size_t p: pages) {
+        const QRectF r = l.pageRect(p, vc.zoom()).translated(vc.contentOrigin());
+        if (!view.contains(r)) {
+            return ::testing::AssertionFailure() << "page " << p << " at " << r.x() << ", " << r.y() << " "
+                                                 << r.width() << " x " << r.height() << " in " << vc.viewSize().width()
+                                                 << " x " << vc.viewSize().height();
+        }
+    }
+    return ::testing::AssertionSuccess();
+}
+QPointF middleOf(const ViewController& vc) { return QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2); }
+}  // namespace
+
+// "Smallest zoom" (Settings → Display) is 20 % unless set, between 5 and 50 %; pinching, the wheel and Ctrl+minus
+// (all setZoom) stop there; a smallest zoom raised above the zoom brings the zoom up to it
+TEST(MinZoom, theSettingIsTheSmallestZoomTwentyPercentByDefault) {
+    Pages pages({A4, A4});
+    DocumentLayout layout = pages.layout({});
+    ViewController vc(&layout);
+    vc.setViewSize(QSizeF(1200, 1000));
+    const double z100 = vc.zoom100();
+    EXPECT_DOUBLE_EQ(vc.smallestZoom(), 0.2);
+    EXPECT_DOUBLE_EQ(vc.minZoom(), 0.2 * z100) << "the page fits whole long before";
+    vc.setZoom(0.001, middleOf(vc));
+    EXPECT_DOUBLE_EQ(vc.zoom(), 0.2 * z100) << "zooming out stops there";
+
+    vc.setSmallestZoom(0.1);
+    EXPECT_DOUBLE_EQ(vc.minZoom(), 0.1 * z100);
+    EXPECT_DOUBLE_EQ(vc.zoom(), 0.2 * z100) << "a lower smallest zoom leaves the zoom as it is";
+    vc.pinchBegin(middleOf(vc), 400);
+    vc.pinchUpdate(middleOf(vc), 10);
+    vc.pinchEnd();
+    EXPECT_DOUBLE_EQ(vc.zoom(), 0.1 * z100) << "a pinch goes as far";
+    vc.setSmallestZoom(0.01);
+    EXPECT_DOUBLE_EQ(vc.smallestZoom(), 0.05) << "5 % at least";
+    vc.zoomBy(0.1, middleOf(vc));
+    EXPECT_DOUBLE_EQ(vc.zoom(), 0.05 * z100);
+
+    QSignalSpy zoomed(&vc, &ViewController::zoomChanged);
+    vc.setSmallestZoom(0.9);
+    EXPECT_DOUBLE_EQ(vc.smallestZoom(), 0.5) << "50 % at most";
+    EXPECT_DOUBLE_EQ(vc.zoom(), 0.5 * z100) << "the zoom came up to it";
+    EXPECT_EQ(zoomed.count(), 1);
+}
+
+// Two A4 pages side by side (two columns, book spreads, a pair scrolling sideways) can be seen whole on the unfolded
+// Fold 7 (900 x 1000, and its canvas beside the rail) whatever the setting: the zoom goes low enough for the widest
+// row with its gaps and margins. At the 30 % of before, the row was wider than the canvas there.
+TEST(MinZoom, twoA4PagesSideBySideFitOnTheUnfoldedFold) {
+    EXPECT_GT(2 * A4.width() * 0.3 * FOLD_ZOOM100 + B + 2 * P, 820.0) << "the author's report: 30 % was too much";
+    Pages pages({A4, A4, A4, A4, A4, A4});
+    struct Case {
+        DocumentLayout::Config config;
+        size_t first, second;  // two pages side by side
+        const char* name;
+    };
+    DocumentLayout::Config sideways;
+    sideways.paired = true;
+    sideways.horizontal = true;
+    for (const Case& c: {Case{{2, false, 0}, 2, 3, "two columns"}, Case{{2, true, 1}, 1, 2, "book spreads"},
+                         Case{sideways, 2, 3, "pairs sideways"}}) {
+        DocumentLayout layout = pages.layout(c.config);
+        for (const QSizeF view: {QSizeF(900, 1000), QSizeF(820, 960), QSizeF(1000, 900)}) {
+            for (const int percent: {20, 30, 50}) {
+                ViewController vc(&layout);
+                vc.setZoom100(FOLD_ZOOM100);
+                vc.setSmallestZoom(percent / 100.0);
+                vc.setViewSize(view);
+                vc.setZoom(0.001, middleOf(vc));
+                EXPECT_DOUBLE_EQ(vc.zoom(), vc.minZoom());
+                EXPECT_LE(vc.zoom(), percent / 100.0 * FOLD_ZOOM100);
+                vc.scrollToPage(c.first);
+                EXPECT_TRUE(wholeInView(layout, vc, {c.first, c.second}))
+                        << c.name << " at " << view.width() << " x " << view.height() << ", " << percent << " %";
+            }
+        }
+    }
+}
+
+// The rule of before stays: a single page wider or higher than the view at the smallest zoom (an A0 poster, a long
+// strip) can be zoomed out until it is seen whole
+TEST(MinZoom, aSingleBigPageStillFitsWhole) {
+    const QSizeF a0(2383.94, 3370.39), strip(4000, 300);
+    for (const QSizeF big: {a0, strip}) {
+        Pages pages({A4, big, A4});
+        DocumentLayout layout = pages.layout({});
+        ViewController vc(&layout);
+        vc.setSmallestZoom(0.5);
+        vc.setViewSize(QSizeF(800, 600));
+        vc.setZoom(0.001, middleOf(vc));
+        EXPECT_LT(vc.zoom(), 0.5 * vc.zoom100());
+        vc.scrollToPage(1);
+        EXPECT_TRUE(wholeInView(layout, vc, {1})) << big.width() << " x " << big.height();
+    }
+}
+
+// The setting is read by every view (CanvasView::smallestZoomSetting, "smallestZoom" in the xournalQt part of
+// settings.xml) and follows a change at once
+TEST(MinZoom, theViewFollowsTheSettingLive) {
+    QTemporaryDir tmp;
+    AppContext app(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(tmp.filePath("settings.xml").toStdString()), 1);
+    Settings& settings = *app.getSettings();
+    DocumentSession session(app);
+    session.insertNewPage(1);
+    CanvasView view(session);
+    ViewController& vc = view.getViewController();
+    vc.setViewSize(QSizeF(1200, 900));
+    const double z100 = vc.zoom100();
+    EXPECT_EQ(CanvasView::smallestZoomSetting(settings), 20) << "not set: 20 %";
+    EXPECT_DOUBLE_EQ(vc.smallestZoom(), 0.2);
+    vc.setZoom(0.001, middleOf(vc));
+    EXPECT_DOUBLE_EQ(vc.zoom(), 0.2 * z100);
+
+    settings.getCustomElement("xournalQt").setInt("smallestZoom", 40);
+    Q_EMIT app.settingsChanged();
+    EXPECT_DOUBLE_EQ(vc.smallestZoom(), 0.4);
+    EXPECT_DOUBLE_EQ(vc.zoom(), 0.4 * z100) << "the zoom came up to it";
+
+    settings.getCustomElement("xournalQt").setInt("smallestZoom", 2);
+    EXPECT_EQ(CanvasView::smallestZoomSetting(settings), 5) << "clamped";
+    Q_EMIT app.settingsChanged();
+    EXPECT_DOUBLE_EQ(vc.zoom(), 0.4 * z100) << "a lower one leaves the zoom";
+    vc.zoomBy(0.01, middleOf(vc));
+    EXPECT_DOUBLE_EQ(vc.zoom(), 0.05 * z100);
+    settings.getCustomElement("xournalQt").setInt("smallestZoom", 90);
+    EXPECT_EQ(CanvasView::smallestZoomSetting(settings), 50) << "clamped";
+}

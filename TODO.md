@@ -928,6 +928,17 @@ Blocks, one after another where they share `Main.qml` (1, then 2 and 4, then 3):
   middle tap on a phone); the page number opens all pages (the page grid) rather than the typed "Go to page"; ⋮ → View
   → Zen and Read only show only where ⋮ does (not in Zen itself: the dot's pill there).
 
+### The smallest zoom (the author, 2026-10-06; `qt/min-zoom`)
+
+"we need to check what the minimum zoom level on a4 documents is, on my fold the 30 percent limit is too much a cannot
+fit two pages side by side when unfolded. I would maybe put this into settings and make the default 20 percent or so."
+
+- [x] Settings → Display → "Smallest zoom" (5–50 %, default 20 %; `smallestZoom` in the xournalQt part); the zoom also
+  goes as low as the widest row of pages needs to be seen whole (two A4 pages side by side on the unfolded Fold, any
+  setting), besides the biggest page as before; every zoom (pinch, wheel, Ctrl+minus, fits, the reference, the
+  presenter's screens) follows it. Done 2026-10-06 ([adaptive-layout.md](qt/docs/adaptive-layout.md), "The view
+  pill"). Left: the device checks on the Fold.
+
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
    when a save falls back to a full write, and a check in MuPDF and pdf.js).

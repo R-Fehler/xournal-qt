@@ -39,8 +39,17 @@ public:
     /// A new 100 % (another screen, a calibration): the pages stay as large as they are shown, only what is called
     /// 100 % changes (the percentage shown, zoom steps, the zoom range).
     void setZoom100(double value);
-    /// Upstream's DEFAULT_ZOOM_MIN (30 %), or less when the biggest page needs it to be seen whole (an A0 poster)
+    /// The smallest zoom: the setting "Smallest zoom" (smallestZoom(), 20 % by default; upstream's DEFAULT_ZOOM_MIN
+    /// was 30 %), or less when the biggest page needs it to be seen whole (an A0 poster), or the largest group of
+    /// pages (two A4 pages side by side on an unfolded phone: DocumentLayout::wholeGroupZoom)
     double minZoom() const;
+    /// The setting "Smallest zoom" as a part of 100 % (0.2: 20 %), within SMALLEST_ZOOM_MIN..MAX percent
+    double smallestZoom() const { return smallest; }
+    /// A new smallest zoom (the setting changed): a zoom below it comes up to it (the middle of the view stays)
+    void setSmallestZoom(double fractionOf100);
+    static constexpr int SMALLEST_ZOOM_DEFAULT = 20;  ///< percent
+    static constexpr int SMALLEST_ZOOM_MIN = 5;
+    static constexpr int SMALLEST_ZOOM_MAX = 50;
     double maxZoom() const { return 7.0 * z100; }  // upstream DEFAULT_ZOOM_MAX
 
     /// The size of the (upright) view the layout is seen through: the screen's (the canvas item's), or while the canvas
@@ -284,6 +293,7 @@ private:
     const DocumentLayout* layout;
     double z = 1.0;
     double z100 = 96.0 / 72.0;
+    double smallest = SMALLEST_ZOOM_DEFAULT / 100.0;
     QPointF scrollPos;  ///< content coordinate of the view's top-left corner (when content is larger than the view)
     QSizeF view;
     QSizeF screen;

@@ -693,6 +693,82 @@ TEST_F(MainWindowTest, theScreenIsCalibratedInTheSettings) {
     ASSERT_TRUE(waitOpened(sheet, false));
 }
 
+// The Fold 7 unfolded (900 x 1000, the touch profile), two columns of A4 pages: Ctrl+minus zooms out until both
+// pages of a row are seen whole, even with "Smallest zoom" at its highest (the author, 2026-10-06: "on my fold the
+// 30 percent limit is too much a cannot fit two pages side by side when unfolded"). The setting is in Settings →
+// Display.
+TEST_F(MainWindowTest, twoA4PagesSideBySideOnTheUnfoldedFold) {
+    QObject* model = controller->settingsModel();
+    const auto set = [&](const char* key, const QVariant& v) {
+        QMetaObject::invokeMethod(model, "set", Q_ARG(QString, key), Q_ARG(QVariant, v));
+    };
+    const QSize before = window->size();
+    // (the tests of a run share the settings: back as they were, also when an assertion ends the test early)
+    struct Restore {
+        std::function<void()> undo;
+        ~Restore() { undo(); }
+    } restore{[&] {
+        set("touchProfile", "auto");
+        set("smallestZoom", 20);
+        controller->setViewColumns(1);
+        window->resize(before);
+        until([&] { return window->size() == before; });
+    }};
+    set("touchProfile", "on");
+    set("smallestZoom", 50);
+    window->resize(900, 1000);
+    until([&] { return window->width() == 900 && window->height() == 1000; });
+    controller->newDocument();
+    ASSERT_TRUE(controller->insertPages(0, 0, 4, false, 4));  // (A4)
+    controller->setViewColumns(2);
+    wait(300);
+    xqt::CanvasView* view = controller->tabManager().currentView();
+    ASSERT_NE(view, nullptr);
+    auto& vc = view->getViewController();
+    const auto& layout = view->documentLayout();
+    ASSERT_EQ(layout.columns(), 2u);
+    ASSERT_NEAR(layout.pageSize(0).width(), 595.3, 0.5);
+    ASSERT_NEAR(layout.pageSize(1).height(), 841.9, 0.5);
+    EXPECT_DOUBLE_EQ(vc.smallestZoom(), 0.5);
+
+    for (int i = 0; i < 30; ++i) {
+        key(Qt::Key_Minus, Qt::ControlModifier);
+    }
+    if (vc.zoom() > vc.minZoom()) {  // (the shortcut's key may differ on this platform: the same command)
+        for (int i = 0; i < 30; ++i) {
+            controller->zoomOut();
+        }
+    }
+    EXPECT_DOUBLE_EQ(vc.zoom(), vc.minZoom());
+    vc.scrollToPage(0);
+    wait(50);
+    const QRectF canvas(QPointF(0, 0), vc.screenSize());
+    EXPECT_LE(canvas.width(), 900);
+    for (const size_t p: {size_t(0), size_t(1)}) {
+        const QRectF r = view->pageViewRect(p);
+        EXPECT_TRUE(canvas.adjusted(-0.01, -0.01, 0.01, 0.01).contains(r))
+                << "page " << p + 1 << " at " << r.x() << ", " << r.y() << " " << r.width() << " x " << r.height()
+                << " in the canvas " << canvas.width() << " x " << canvas.height() << " at "
+                << controller->zoomPercent() << " %";
+    }
+    EXPECT_NEAR(view->pageViewRect(0).top(), view->pageViewRect(1).top(), 0.5) << "side by side";
+
+    // The setting: Settings → Display → Zoom
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("displayTab"));
+    QQuickItem* row = findItem("smallestZoomRow");
+    ASSERT_NE(row, nullptr);
+    until([&] { return row->isVisible(); });
+    EXPECT_TRUE(row->isVisible());
+    EXPECT_EQ(row->property("key").toString(), "smallestZoom");
+    set("smallestZoom", 20);
+    EXPECT_DOUBLE_EQ(vc.smallestZoom(), 0.2) << "the view follows at once";
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+}
+
 namespace {
 QString fixturePath(const char8_t* rel) {
     const auto p = GET_TESTFILE(rel);

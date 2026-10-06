@@ -195,12 +195,14 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     // Column layout changed in the settings: lay out again, keep the current page in view.
     connect(&session.getApp(), &AppContext::settingsChanged, this, [this] {
         applyZoom100();  // (a screen was calibrated)
+        viewController.setSmallestZoom(smallestZoomSetting(*this->session.getSettings()) / 100.0);
         applyScrolling();
         if (layoutConfig() != layout.getConfig()) {
             relayout();
         }
     });
     applyScrolling();
+    viewController.setSmallestZoom(smallestZoomSetting(*session.getSettings()) / 100.0);
 
     updateRenderParams();
     CanvasMemory::instance().add(this);
@@ -369,6 +371,12 @@ bool CanvasView::rotateGestureSetting(Settings& settings) {
     bool on = true;
     settings.getCustomElement("xournalQt").getBool("rotateGesture", on);
     return on;
+}
+
+int CanvasView::smallestZoomSetting(Settings& settings) {
+    int percent = ViewController::SMALLEST_ZOOM_DEFAULT;
+    settings.getCustomElement("xournalQt").getInt("smallestZoom", percent);
+    return std::clamp(percent, ViewController::SMALLEST_ZOOM_MIN, ViewController::SMALLEST_ZOOM_MAX);
 }
 
 bool CanvasView::rotationGestureAllowed() const {

@@ -27,6 +27,7 @@
 #include "shell/Thumbnails.h"
 
 #include "CanvasMemory.h"
+#include "CanvasView.h"
 #include "HoverPointer.h"
 #include "PenGestures.h"
 #include "ScreenCalibration.h"
@@ -421,6 +422,15 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
         });
 
     // --- display ---
+    // The smallest zoom, percent of 100 % (ViewController::minZoom; a page or a row of pages that would not fit whole
+    // goes lower all the same)
+    add("smallestZoom", [&s] { return QVariant(CanvasView::smallestZoomSetting(s)); },
+        [&s](const QVariant& v) {
+            s.getCustomElement("xournalQt")
+                    .setInt("smallestZoom", std::clamp(v.toInt(), ViewController::SMALLEST_ZOOM_MIN,
+                                                       ViewController::SMALLEST_ZOOM_MAX));
+            s.customSettingsChanged();
+        });
     // The layout follows the window's size (qt/docs/adaptive-layout.md); off: the desktop layout at every size
     add("adaptiveLayout",
         [&s] {

@@ -1197,6 +1197,22 @@ Popup {
                               : qsTr("Not calibrated yet: 100 % follows what the screen says.")
                     }
 
+                    // How far out the pages zoom (ViewController::minZoom)
+                    SectionTitle { text: qsTr("Zoom") }
+                    SliderRow {
+                        objectName: "smallestZoomRow"
+                        key: "smallestZoom"
+                        text: qsTr("Smallest zoom")
+                        from: 5; to: 50; stepSize: 5
+                        decimals: 0
+                        suffix: " %"
+                    }
+                    Hint {
+                        text: qsTr("How far pinching, Ctrl+wheel and Ctrl+minus zoom out. A page, or a row of pages "
+                                   + "side by side, that would not fit whole at this zoom can always be zoomed out "
+                                   + "until it does.")
+                    }
+
                     // The layout for the window's size (qt/docs/adaptive-layout.md)
                     SectionTitle { text: qsTr("Window size") }
                     SwitchRow {
