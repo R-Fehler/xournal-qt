@@ -609,7 +609,10 @@ TEST_F(ToolboxTest, theScrollPositionIsRememberedPerWindowClass) {
     controller->selectTool("text");  // (no tool of the rail in hand: that one would be scrolled into view)
     resize(412, 915);
     ASSERT_TRUE(rail().scrolls);
-    scrollRail(100);
+    until([&] {  // (once the dock is laid out for its size)
+        scrollRail(100);
+        return rail().pos > 50;
+    });
     const double folded = rail().pos;
     EXPECT_GT(folded, 50);
     wait(800);  // (written after a pause)

@@ -287,7 +287,8 @@ Rectangle {
     // Where it was scrolled to, per window class (a rail of a desktop window and the phone's dock each their own)
     readonly property string sizeClass: win.adaptive.layoutClass
     onSizeClassChanged: Qt.callLater(restoreScroll)
-    onViewLengthChanged: scrollBy(0)  // (within the contents still)
+    // (within the contents still, and the tool in hand in sight: a window made smaller, the keyboard, the insets)
+    onViewLengthChanged: { scrollBy(0); Qt.callLater(revealInHand) }
     /// (the tool in hand in sight still: it matters more than the place of before)
     function restoreScroll() {
         const v = parseFloat(win.layoutChoice("toolboxScroll"))
