@@ -60,18 +60,29 @@ done
 
 # Host programs vcpkg does not download itself and that may be missing without root: bison (gettext's tools) and
 # autoconf-archive (autotools ports such as gperf). Built once into $VCPKG_ROOT/host-tools.
+# A GNU source archive: ftp.gnu.org first, then its mirrors (ftp.gnu.org could not be reached for 0.7.0's first
+# release run), each with a short connect timeout and a retry.
+gnu_fetch() {
+    local path=$1 base
+    for base in https://ftp.gnu.org/gnu https://ftpmirror.gnu.org/gnu https://mirrors.kernel.org/gnu; do
+        curl -fsSLO --connect-timeout 20 --retry 2 --retry-delay 5 "$base/$path" && return 0
+        echo "could not fetch $path from $base, trying the next mirror" >&2
+    done
+    return 1
+}
+
 host_tools() {
-    local prefix="$VCPKG_ROOT/host-tools" gnu=https://ftp.gnu.org/gnu
+    local prefix="$VCPKG_ROOT/host-tools"
     export PATH="$prefix/bin:$PATH"
     export ACLOCAL_PATH="$prefix/share/aclocal${ACLOCAL_PATH:+:$ACLOCAL_PATH}"
     export VCPKG_KEEP_ENV_VARS="ACLOCAL_PATH${VCPKG_KEEP_ENV_VARS:+;$VCPKG_KEEP_ENV_VARS}"
     mkdir -p "$prefix/src"
     if ! command -v bison >/dev/null; then
-        (cd "$prefix/src" && curl -fsSLO "$gnu/bison/bison-3.8.2.tar.xz" && tar xf bison-3.8.2.tar.xz &&
+        (cd "$prefix/src" && gnu_fetch bison/bison-3.8.2.tar.xz && tar xf bison-3.8.2.tar.xz &&
             cd bison-3.8.2 && heavy sh -c "./configure --prefix='$prefix' --disable-nls -q && make -j$jobs -s && make install -s")
     fi
     if ! ls /usr/share/aclocal/ax_*.m4 "$prefix"/share/aclocal/ax_*.m4 >/dev/null 2>&1; then
-        (cd "$prefix/src" && curl -fsSLO "$gnu/autoconf-archive/autoconf-archive-2024.10.16.tar.xz" &&
+        (cd "$prefix/src" && gnu_fetch autoconf-archive/autoconf-archive-2024.10.16.tar.xz &&
             tar xf autoconf-archive-2024.10.16.tar.xz && cd autoconf-archive-2024.10.16 &&
             ./configure --prefix="$prefix" -q && make -s install)
     fi
