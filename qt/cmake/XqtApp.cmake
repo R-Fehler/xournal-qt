@@ -292,7 +292,6 @@ set(XQT_QML_FILES
     src/app/qml/AdaptiveMenuItem.qml
     src/app/qml/MenuSheet.qml
     src/app/qml/MenuSheetHandle.qml
-    src/app/qml/ToolBarPlan.js
     src/app/qml/ToolGroups.qml
     src/app/qml/ToolCycleButton.qml
     src/app/qml/MarkdownFormatBar.qml
@@ -306,7 +305,6 @@ set(XQT_QML_FILES
     src/app/qml/BottomSheet.qml
     src/app/qml/PhoneAppBar.qml
     src/app/qml/PhoneDock.qml
-    src/app/qml/PhoneToolSheet.qml
     src/app/qml/StickerButton.qml
     src/app/qml/StickerPicker.qml
     src/app/qml/StickerSaveDialog.qml

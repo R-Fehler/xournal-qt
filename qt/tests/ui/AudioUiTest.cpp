@@ -420,8 +420,8 @@ TEST_F(AudioUiTest, thePlatformHearsOfTheRecordingAndControlsIt) {
     EXPECT_FALSE(heard[5].recording);
 }
 
-// A build without any audio backend offers no recording: no record button on the toolbox's rail or in the command
-// bar, none in the phone's sheet, Ctrl+Shift+R does nothing
+// A build without any audio backend offers no recording: no record button on the toolbox's rail or the top bar, none
+// in ⋮, Ctrl+Shift+R does nothing
 TEST_F(NoAudioUiTest, nothingOffersRecording) {
     controller->newDocument();
     wait(200);
@@ -430,18 +430,15 @@ TEST_F(NoAudioUiTest, nothingOffersRecording) {
     ASSERT_NE(record, nullptr);
     EXPECT_FALSE(record->property("offered").toBool());
     EXPECT_FALSE(record->isVisible());
-    EXPECT_FALSE(find<QQuickItem>("moreToolsButton")->isVisible());
+    EXPECT_FALSE(find<QObject>("moreCmd_record")->property("offered").toBool()) << "not in ⋮ → Tools";
     QTest::keyClick(window, Qt::Key_R, Qt::ControlModifier | Qt::ShiftModifier);
     wait(100);
     EXPECT_FALSE(audio()->property("recording").toBool());
     EXPECT_FALSE(find<QQuickItem>("recordingPill")->isVisible());
-    // The phone's sheet of every tool
+    // A phone: not on its top bar either
     window->resize(412, 915);
     wait(400);
-    auto* sheet = find<QObject>("phoneToolSheet");
-    ASSERT_NE(sheet, nullptr);
-    QMetaObject::invokeMethod(sheet, "open");
-    ASSERT_TRUE(until([&] { return sheet->property("visible").toBool(); }));
-    EXPECT_NE(itemIn(window->contentItem(), "toolCell_image"), nullptr);
-    EXPECT_EQ(itemIn(window->contentItem(), "toolCell_record"), nullptr);
+    EXPECT_FALSE(record->isVisible());
+    EXPECT_NE(itemIn(window->contentItem(), "topApp_image"), nullptr);
+    EXPECT_EQ(itemIn(window->contentItem(), "topApp_record"), nullptr);
 }

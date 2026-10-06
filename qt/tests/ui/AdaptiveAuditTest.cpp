@@ -193,7 +193,7 @@ protected:
     }
     /// The tool bar's buttons: how many show without scrolling it, and which do not
     QString toolbarFit() {
-        auto* row = findItem("toolRow");
+        auto* row = findItem("topBarTools");  // (the top bar's items, qt/top-bar)
         if (!row || !row->isVisible()) {
             return "toolbar=hidden";
         }
@@ -205,8 +205,8 @@ protected:
         int shown = 0, all = 0;
         QStringList off;
         for (QQuickItem* c: row->childItems()) {
-            if (!c->isVisible() || !c->inherits("QQuickAbstractButton")) {
-                continue;
+            if (!c->isVisible() || c->width() < 20) {
+                continue;  // (a divider)
             }
             ++all;
             const QRectF r = c->mapRectToScene(QRectF(0, 0, c->width(), c->height()));

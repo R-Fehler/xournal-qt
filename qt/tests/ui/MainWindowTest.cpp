@@ -3028,17 +3028,12 @@ TEST_F(HomeScreenFilterTest, textFilesAndImagesOpenExternally) {
     click(find<QQuickItem>("canvas"));
     type("x");
     ASSERT_TRUE(controller->modified());
-    // (a .md being written: its command bar is merged into the format bar; the button at its end where there is room,
-    // else in "more tools")
+    // (a .md being written: its top bar is the end of the format bar's row, which scrolls; the button at the top bar's
+    // end; ⋮ → Document has it too)
     auto* external = find<QQuickItem>("openExternallyButton");
     ASSERT_NE(external, nullptr);
-    if (!external->isVisible()) {
-        ASSERT_TRUE(findItem("moreToolsButton")->isVisible());
-        click(findItem("moreToolsButton"));
-        ASSERT_TRUE(waitOpened(find("moreToolsPopup"), true));
-    }
     ASSERT_TRUE(external->isVisible());
-    click(external);
+    QMetaObject::invokeMethod(external, "clicked");
     auto* dialog = find<QObject>("externalSaveDialog");
     ASSERT_NE(dialog, nullptr);
     ASSERT_TRUE(waitOpened(dialog, true));
@@ -8298,8 +8293,8 @@ TEST_F(MainWindowTest, presentingWithoutControls) {
     EXPECT_FALSE(dot->isVisible());
 }
 
-// qt/present-clean: holding the presentation button (or a right click on it, or ⋮ → "Present without controls")
-// presents without controls; a click presents with them. The shortcut is in Settings → Shortcuts.
+// qt/present-clean: the presentation button's menu (held or right-clicked on the top bar: its first entry), ⋮ → "Present
+// without controls" and Ctrl+F5 present without controls; a click presents with them. The shortcut is in Settings → Shortcuts.
 TEST_F(MainWindowTest, presentButtonHeldPresentsWithoutControls) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     window->setWidth(2000);  // (room for the whole tool bar)
@@ -8327,23 +8322,30 @@ TEST_F(MainWindowTest, presentButtonHeldPresentsWithoutControls) {
     };
     auto at = [&] { return present->mapToScene(QPointF(present->width() / 2, present->height() / 2)).toPoint(); };
 
-    // Held
-    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, at());
-    wait(QGuiApplication::styleHints()->mousePressAndHoldInterval() + 300);
-    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, at());
-    until([&] { return window->property("fullScreenMode").toBool(); });
-    ASSERT_TRUE(controller->presenting());
-    EXPECT_TRUE(clean()) << "held: only the page";
-    EXPECT_FALSE(find<QQuickItem>("toolbox")->isVisible());
-    EXPECT_TRUE(find<QQuickItem>("zenDot")->isVisible());
-    back();
-
-    // Right click
-    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier, at());
-    until([&] { return controller->presenting(); });
-    ASSERT_TRUE(controller->presenting());
-    EXPECT_TRUE(clean()) << "right click: only the page";
-    back();
+    // Held (or right-clicked): on the top bar the hold lifts it (qt/top-bar); let go, its menu, whose first entry is
+    // what its hold did: present without controls
+    auto* menu = find("toolEntryMenu");
+    for (const bool rightClick: {false, true}) {
+        if (rightClick) {
+            QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier, at());
+        } else {
+            QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, at());
+            wait(QGuiApplication::styleHints()->mousePressAndHoldInterval() + 300);
+            QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, at());
+        }
+        ASSERT_TRUE(waitOpened(menu, true)) << (rightClick ? "right click" : "held");
+        auto* options = find("toolOptionsItem");
+        ASSERT_NE(options, nullptr);
+        EXPECT_TRUE(options->property("text").toString().startsWith("Present without controls"));
+        QMetaObject::invokeMethod(options, "triggered");
+        QMetaObject::invokeMethod(menu, "close");
+        until([&] { return controller->presenting(); });
+        ASSERT_TRUE(controller->presenting());
+        EXPECT_TRUE(clean()) << "only the page";
+        EXPECT_FALSE(find<QQuickItem>("toolbox")->isVisible());
+        EXPECT_TRUE(find<QQuickItem>("zenDot")->isVisible());
+        back();
+    }
 
     // A click: with the controls
     click(present);

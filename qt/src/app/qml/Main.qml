@@ -8,7 +8,6 @@ import QtQuick.Window
 import XournalQt
 import XournalQt.Canvas
 import "Popups.js" as Popups
-import "ToolBarPlan.js" as ToolBarPlan
 import "DevicePixels.js" as DevicePixels
 
 ApplicationWindow {
@@ -241,7 +240,6 @@ ApplicationWindow {
     readonly property bool fullChrome: chromeMode === "full" && !zenShown
     /// Nothing over the page but the page: Zen (presenting without controls too), or the replay
     readonly property bool hudHidden: zenShown || (replaying && !app.homeVisible)
-    onHudHiddenChanged: if (hudHidden) phoneToolSheet.close()
 
     // --- Zen and read only (qt/docs/zen.md) ---------------------------------------------------------------------------
     /// Zen turned on by hand (⋮ → View → Zen, its keys, the command bar's button, Read)
@@ -715,6 +713,10 @@ ApplicationWindow {
         leftInset: win.safeLeft
         rightInset: win.safeRight
         visible: win.appBarShown
+        toolsShown: win.phoneChrome && win.topBarShown
+        toolsHeight: topBarPane.thickness
+        pageShown: win.toolboxInDock && win.dockVertical
+        onPagesRequested: pageGrid.open()
         onOverviewRequested: tabOverview.open()
         onRecentRequested: Popups.openAt(recentTabsMenu)
         // The documents used lately, the current one first: pick one
@@ -771,7 +773,7 @@ ApplicationWindow {
         height: 56
       }
       // Markdown being written (a .md, Markdown on a page): its formatting tools (qt/docs/md-editor.md). A text
-      // document's tool bar is merged into it: ⋮ at its end, its other buttons in "more tools" (F7.2)
+      // document's top bar is merged into it (F7.2): its items at the end of the row, ⋮ pinned at its end
       MarkdownFormatBar {
         id: formatBar
         // On a phone, while the soft keyboard is open for the page's Markdown, right above the keyboard (in the
@@ -784,6 +786,8 @@ ApplicationWindow {
         readonly property bool shown: !app.homeVisible && !app.presenting && !win.hudHidden && !markdownPanel.visible
                                       && (app.markdownOnPage || (app.textDocument === "markdown" && app.textEditable) || app.textNotes)
         visible: shown
+        // (a text document: its commands at the end of the row, the top bar; nothing folds, the row scrolls)
+        holdsCommands: win.toolsInFormatBar
         format: app.markdownFormat
         onFormatRequested: function(action, arg) {
             app.formatMarkdown(action, arg)
@@ -814,11 +818,9 @@ ApplicationWindow {
         safeBottom: win.safeBottom
         safeLeft: win.safeLeft
         safeRight: win.safeRight
-        onToolsRequested: phoneToolSheet.open()
         onPagesRequested: pageGrid.open()
         hostsToolbox: win.toolboxInDock
     }
-    PhoneToolSheet { id: phoneToolSheet }
     // The phone chrome with the soft keyboard open: the dock is gone, undo and redo stay one tap away at the end of the
     // format bar right above the keyboard
     Row {
@@ -880,14 +882,6 @@ ApplicationWindow {
         }
         ToolSeparator {}
     }
-    // ... and the commands that fit at its end, before ⋮ and "more tools" (search, full screen, save first)
-    Row {
-        id: formatCommands
-        objectName: "formatCommands"
-        parent: formatBar.trailing
-        spacing: 2
-        y: -2
-    }
     // The table editor of the formatting bar (the notes' canvas; the editor beside the page has its own)
     MarkdownTableEditor {
         id: tableEditor
@@ -927,6 +921,9 @@ ApplicationWindow {
         // (the phone's dock: at the bottom, or a rail at the right held sideways)
         edge: win.toolboxInDock ? (win.dockVertical ? "right" : "bottom") : win.toolboxEdge
         compact: win.toolboxInDock
+        // (the phone's dock: "+" at the end of its items, the room goes to the tools)
+        addInline: win.toolboxInDock
+        peer: topBarPane
         floating: win.toolboxFloating
         moreShown: floating
         z: floating ? 60 : 0
@@ -951,20 +948,18 @@ ApplicationWindow {
         // (a rail's end clear of the navigation bar)
         endInset: vertical && !floating ? Math.max(0, win.contentItem.height - win.controlsBottom) : 0
         // (the app's items on the rail are the window's buttons, lent to it while it is shown: hand, select, snip, mark
-        // PDF text at a first start; the others stay in the command bar, qt/rail-scroll)
+        // PDF text at a first start; the others are the top bar's, qt/rail-scroll)
         appButtons: toolArea.slots
         lending: win.toolboxShown
-        onAllToolsRequested: phoneToolSheet.open()
         onPagesRequested: pageGrid.open()
         onEditRequested: function(entry, button) { toolEditor.openFor(entry, button, edge) }
         onMenuRequested: function(entry, button, pos) { toolEntryMenu.openFor(entry, button, pos) }
-        onAddRequested: function(button) { toolTypeMenu.ask("add", "", button) }
+        onAddRequested: function(button) { toolTypeMenu.ask("add", "", button, "rail") }
         onMoreRequested: function(button) { toolboxMoreMenu.openMenu(undefined, button) }
         onGripMoved: function(pos) { win.toolboxEdgeTarget = win.edgeAt(pos) }
         // (a tool carried onto another and held there: a group; the snackbar can take it back)
-        onGrouped: function(groupId, before) {
-            snackbar.show(qsTr("Grouped"), false, qsTr("Undo"), function() { app.toolbox.restore(before) })
-        }
+        onGrouped: function(groupId, before) { win.grouped(before) }
+        onRemoved: function(entry, before) { win.leftTheBars(entry, before) }
         onGripDropped: function(pos) {
             const edge = win.edgeAt(pos)
             win.toolboxEdgeTarget = ""
@@ -1049,30 +1044,64 @@ ApplicationWindow {
             icon.source: app.iconUrl("xopp-fullscreen")
             onTriggered: win.fullScreenMode = false
         }
-        // The tools that left the rail for the top bar (qt/rail-scroll), which full screen hides: here until the top
-        // bar's items are listed here (qt/top-bar)
+        // What the top bar holds (full screen hides it; qt/top-bar): its items in its order, the members of a group one
+        // by one, without what is above already; and New (the tab strip's "+" is not shown in full screen)
         MenuSeparator {}
         Repeater {
-            model: ["write", "geometry", "touchDrawing", "record"]
+            model: win.topBarCommands()
             delegate: AdaptiveMenuItem {
-                required property string modelData
-                readonly property Item button: toolArea.slots[modelData]
-                objectName: "toolboxMore_" + modelData
-                offered: button.offered !== false && toolboxPane.fixedButtons.indexOf(button) < 0
-                text: button.label !== "" ? button.label : button.name
-                icon.source: app.iconUrl(button.iconName)
-                checkable: true
-                checked: button.checked
-                onTriggered: { const b = button; Qt.callLater(function() { b.clicked() }) }
+                required property var modelData
+                readonly property Item button: modelData.app !== undefined ? toolArea.slots[modelData.app] || null : null
+                readonly property bool isTool: modelData.app === undefined
+                objectName: "toolboxMore_" + (isTool ? modelData.id : modelData.app)
+                offered: isTool || (button !== null && button.offered !== false)
+                text: isTool ? win.toolEntryName(modelData) : button ? (button.label !== "" ? button.label : button.name) : ""
+                icon.source: isTool ? "" : button && button.iconName !== "" ? app.iconUrl(button.iconName) : ""
+                checkable: !isTool && button !== null && ["hand", "select", "snip", "pdfText", "geometry", "touchDrawing", "write"].indexOf(modelData.app) >= 0
+                checked: isTool ? toolboxPane.inHand(modelData) : button !== null && button.checked === true
+                onTriggered: {
+                    const b = button, e = modelData
+                    if (isTool) app.applyToolEntry(e.id)
+                    else Qt.callLater(function() { b.clicked() })
+                }
             }
         }
+        AdaptiveMenuItem {
+            objectName: "toolboxNewItem"
+            text: win.withKeys(qsTr("New document"), "newDocument")
+            icon.source: app.iconUrl("xopp-document-new")
+            onTriggered: app.newDocument()
+        }
+    }
+    /// What the top bar holds, for full screen's ⋯: its items in order (the members of a group one by one; no dividers),
+    /// without those ⋯ has of its own (present, Zen, search, settings, full screen)
+    function topBarCommands() {
+        const own = ["present", "zen", "search", "settings", "fullScreen"]
+        const out = []
+        const list = (app.toolbox.revision, app.toolbox.top)
+        for (let i = 0; i < list.length; ++i) {
+            const e = list[i]
+            const items = e.group === true ? e.members : [e]
+            for (let j = 0; j < items.length; ++j) {
+                const m = items[j]
+                if (m.divider === true || (m.app !== undefined && own.indexOf(m.app) >= 0)) continue
+                out.push(m)
+            }
+        }
+        return out
     }
     /// An entry's name for people ("Pen · Body", "Arrow", "Eraser (whiteout)")
     function toolEntryName(entry) { return toolboxPane.entryName(entry) }
     // A tool's editor: a tap on the tool in hand, Edit in its menu, "+" (qt/docs/toolbox.md, "Editing a tool")
-    ToolEntryEditor { id: toolEditor; ownerOf: function(id) { return toolboxPane.buttonFor(id) } }
-    // A tool's menu (a long press, a right click): edit, move, replace, duplicate, add one here, a divider, remove; for
-    // an app item on the rail (hand, select, …): its own list, move, add one here, a divider, remove (into the catalog)
+    ToolEntryEditor {
+        id: toolEditor
+        ownerOf: function(id) { return toolboxPane.buttonFor(id) || topBarPane.buttonFor(id) }
+    }
+    /// The bar that shows an item of the arrangement (the rail or the top bar)
+    function paneOf(id) { return app.toolbox.barOf(id) === "top" ? topBarPane : toolboxPane }
+    // A tool's menu (a long press, a right click): edit, move, replace, duplicate, add one here, a divider, to the other
+    // bar, remove; for an app item (hand, select, open, …): its own list, move, add one here, a divider, to the other
+    // bar, off the bars (into the catalog); for a group: its list, ungroup, …
     AdaptiveMenu {
         id: toolEntryMenu
         objectName: "toolEntryMenu"
@@ -1086,17 +1115,22 @@ ApplicationWindow {
         readonly property bool isGroup: entry && entry.group === true
         readonly property bool isTool: !isApp && !isGroup
         readonly property Item appButton: isApp ? toolArea.slots[entry.app] || null : null
+        /// The bar it is on ("rail", "top") and that bar
+        readonly property string bar: (store.revision, entryId !== "" ? store.barOf(entryId) : "rail")
+        readonly property Item pane: bar === "top" ? topBarPane : toolboxPane
         function openFor(e, b, pos) {
             entry = e
             button = b
             title = win.toolEntryName(e)
             openMenu(pos, b)
         }
-        // (an app item with a list of its own: select's kinds, the snips' resolution, how PDF text is marked)
+        // (an app item with a long press of its own: select's kinds, the snips' resolution, how PDF text is marked, the
+        // templates of a new page, present without controls, …: on a bar the hold lifts it, so its own is here)
         AdaptiveMenuItem {
             objectName: "toolOptionsItem"
             offered: toolEntryMenu.appButton !== null && toolEntryMenu.appButton.ownHold === true
-            text: qsTr("Options…")
+            text: toolEntryMenu.appButton && toolEntryMenu.appButton.holdText !== undefined ? toolEntryMenu.appButton.holdText
+                                                                                            : qsTr("Options…")
             icon.source: app.iconUrl("xqt-more")
             onTriggered: {
                 const b = toolEntryMenu.appButton
@@ -1111,7 +1145,8 @@ ApplicationWindow {
             icon.source: app.iconUrl("xqt-tools-more")
             onTriggered: {
                 const id = toolEntryMenu.entryId, b = toolEntryMenu.button
-                win.afterMenus(function() { toolboxPane.openGroup(id, b) })
+                const pane = toolEntryMenu.pane
+                win.afterMenus(function() { pane.openGroup(id, b) })
             }
         }
         AdaptiveMenuItem {
@@ -1127,21 +1162,21 @@ ApplicationWindow {
             text: qsTr("Edit…")
             icon.source: app.iconUrl("xqt-pencil")
             onTriggered: {
-                const e = toolEntryMenu.entry, b = toolEntryMenu.button
-                win.afterMenus(function() { toolEditor.openFor(app.toolbox.entry(e.id), b, toolboxPane.edge) })
+                const e = toolEntryMenu.entry, b = toolEntryMenu.button, edge = toolEntryMenu.pane.edge
+                win.afterMenus(function() { toolEditor.openFor(app.toolbox.entry(e.id), b, edge) })
             }
         }
         AdaptiveMenuItem {
             objectName: "toolMoveEarlierItem"
-            text: toolboxPane.vertical ? qsTr("Move up") : qsTr("Move left")
-            icon.source: app.iconUrl(toolboxPane.vertical ? "xqt-chevron-up" : "xqt-chevron-left")
+            text: toolEntryMenu.pane.vertical ? qsTr("Move up") : qsTr("Move left")
+            icon.source: app.iconUrl(toolEntryMenu.pane.vertical ? "xqt-chevron-up" : "xqt-chevron-left")
             enabled: (toolEntryMenu.store.revision, toolEntryMenu.store.canMoveBy(toolEntryMenu.entryId, -1))
             onTriggered: toolEntryMenu.store.moveBy(toolEntryMenu.entryId, -1)
         }
         AdaptiveMenuItem {
             objectName: "toolMoveLaterItem"
-            text: toolboxPane.vertical ? qsTr("Move down") : qsTr("Move right")
-            icon.source: app.iconUrl(toolboxPane.vertical ? "xqt-chevron-down" : "xqt-chevron-right")
+            text: toolEntryMenu.pane.vertical ? qsTr("Move down") : qsTr("Move right")
+            icon.source: app.iconUrl(toolEntryMenu.pane.vertical ? "xqt-chevron-down" : "xqt-chevron-right")
             enabled: (toolEntryMenu.store.revision, toolEntryMenu.store.canMoveBy(toolEntryMenu.entryId, 1))
             onTriggered: toolEntryMenu.store.moveBy(toolEntryMenu.entryId, 1)
         }
@@ -1164,7 +1199,20 @@ ApplicationWindow {
             objectName: "toolAddHereItem"
             text: qsTr("Add a tool here…")
             icon.source: app.iconUrl("xqt-plus")
-            onTriggered: { const id = toolEntryMenu.entryId, b = toolEntryMenu.button; win.afterMenus(function() { toolTypeMenu.ask("addHere", id, b) }) }
+            onTriggered: {
+                const id = toolEntryMenu.entryId, b = toolEntryMenu.button, bar = toolEntryMenu.bar
+                win.afterMenus(function() { toolTypeMenu.ask("addHere", id, b, bar) })
+            }
+        }
+        // To the other bar, at its end (carrying it there by hand does the same)
+        AdaptiveMenuItem {
+            objectName: "toolOtherBarItem"
+            text: toolEntryMenu.bar === "top" ? qsTr("Move to the rail") : qsTr("Move to the top bar")
+            icon.source: app.iconUrl(toolEntryMenu.bar === "top" ? "xqt-columns" : "xqt-panel-top")
+            onTriggered: {
+                const other = toolEntryMenu.bar === "top" ? "rail" : "top"
+                toolEntryMenu.store.moveTo(toolEntryMenu.entryId, other, toolEntryMenu.store.items(other).length)
+            }
         }
         AdaptiveMenuItem {
             objectName: "toolDividerItem"
@@ -1176,8 +1224,8 @@ ApplicationWindow {
         MenuSeparator {}
         AdaptiveMenuItem {
             objectName: "toolRemoveItem"
-            offered: !toolEntryMenu.isGroup
-            text: toolEntryMenu.isApp ? qsTr("Remove from the rail")
+            offered: true
+            text: toolEntryMenu.isGroup ? qsTr("Remove the group") : toolEntryMenu.isApp ? qsTr("Off the bars (into +)")
                   : (toolEntryMenu.store.revision, toolEntryMenu.store.canRemove(toolEntryMenu.entryId))
                   ? qsTr("Remove") : qsTr("Remove (the last eraser stays)")
             icon.source: app.iconUrl("xqt-close")
@@ -1185,7 +1233,9 @@ ApplicationWindow {
             onTriggered: toolEntryMenu.store.remove(toolEntryMenu.entryId)
         }
     }
-    // The kinds of tools: for "+" (at the end), "Add a tool here…" (after an entry) and "Replace with…"
+    // The catalog ("+" at the end of either bar, "Add a tool here…" after an item; qt/top-bar): a new tool of a kind
+    // (the editor makes it), and every app tool and command on neither bar, by section; a tap puts it at the end of the
+    // bar it was opened from (or after the item). "Replace with…": the kinds alone. On a phone a sheet.
     AdaptiveMenu {
         id: toolTypeMenu
         objectName: "toolTypeMenu"
@@ -1194,13 +1244,19 @@ ApplicationWindow {
         property string purpose: "add"
         property string entryId: ""
         property Item button: null
-        function ask(why, id, b) {
+        /// The bar it adds to: "rail", "top"
+        property string bar: "rail"
+        function ask(why, id, b, toBar) {
             purpose = why
             entryId = id
             button = b
-            title = why === "replace" ? qsTr("Replace with") : qsTr("Add a tool")
+            bar = toBar === "top" ? "top" : "rail"
+            title = why === "replace" ? qsTr("Replace with") : bar === "top" ? qsTr("Add to the top bar") : qsTr("Add to the rail")
             openMenu(undefined, b)
         }
+        /// Where an item goes on the bar: after the item it was asked from, else at the end (-1)
+        function place() { return purpose === "addHere" ? app.toolbox.indexOf(entryId) + 1 : -1 }
+        readonly property string edge: bar === "top" ? "top" : toolboxPane.edge
         function chosen(type) {
             const store = app.toolbox
             const b = button
@@ -1208,13 +1264,26 @@ ApplicationWindow {
                 const fresh = store.prefill(type)
                 if (store.replace(entryId, fresh)) {
                     if (type !== "sticky" && type !== "snip") app.applyToolEntry(entryId)
-                    const id = entryId
-                    win.afterMenus(function() { toolEditor.openFor(store.entry(id), b, toolboxPane.edge) })
+                    const id = entryId, edge = win.paneOf(id).edge
+                    win.afterMenus(function() { toolEditor.openFor(store.entry(id), b, edge) })
                 }
                 return
             }
-            const at = purpose === "addHere" ? store.indexOf(entryId) + 1 : -1
-            win.afterMenus(function() { toolEditor.openNew(type, at, b, toolboxPane.edge) })
+            const at = place(), toBar = bar, edge = toolTypeMenu.edge
+            win.afterMenus(function() { toolEditor.openNew(type, at, b, edge, toBar) })
+        }
+        /// An app item on neither bar, put on this one
+        function placeItem(name) {
+            const store = app.toolbox
+            const id = store.place(name, bar, place())
+            if (id !== "") Qt.callLater(function() { const p = win.paneOf(id); p.reveal(p.buttonFor(id)) })
+        }
+        // (a new tool)
+        AdaptiveMenuItem {
+            objectName: "catalogSection_new"
+            offered: toolTypeMenu.purpose !== "replace"
+            enabled: false
+            text: qsTr("A new tool")
         }
         Repeater {
             model: [{ type: "pen", icon: "xopp-tool-pencil", name: qsTr("Pen") },
@@ -1228,29 +1297,48 @@ ApplicationWindow {
             delegate: AdaptiveMenuItem {
                 required property var modelData
                 objectName: "toolType_" + modelData.type
+                offered: !win.textDoc || toolTypeMenu.purpose === "replace"
                 text: modelData.name
                 icon.source: app.iconUrl(modelData.icon)
                 onTriggered: toolTypeMenu.chosen(modelData.type)
             }
         }
-        // The app's tools taken off the rail: back on it (until the "+" catalog of qt/top-bar has every item)
+        // Every app tool and command on neither bar, by section (a section's title, then its items)
         Repeater {
-            model: toolTypeMenu.purpose === "replace" ? []
-                   : (app.toolbox.revision, app.toolbox.unplaced()).filter(function(n) {
-                         return ["hand", "select", "snip", "pdfText"].indexOf(n) >= 0 && toolArea.slots[n] !== undefined
-                     })
+            model: toolTypeMenu.purpose === "replace" ? [] : win.catalogRows()
             delegate: AdaptiveMenuItem {
                 required property var modelData
-                readonly property Item button: toolArea.slots[modelData]
-                objectName: "toolPlace_" + modelData
-                text: qsTr("Put back: %1").arg(button.label !== "" ? button.label : button.name)
-                icon.source: app.iconUrl(button.iconName)
-                onTriggered: {
-                    const store = app.toolbox
-                    store.place(modelData, "rail", toolTypeMenu.purpose === "addHere" ? store.indexOf(toolTypeMenu.entryId) + 1 : -1)
-                }
+                readonly property bool heading: modelData.section !== undefined
+                readonly property Item button: heading ? null : toolArea.slots[modelData.name] || null
+                objectName: heading ? "catalogSection_" + modelData.section : "catalog_" + modelData.name
+                enabled: !heading
+                text: heading ? modelData.title : button ? (button.label !== "" ? button.label : button.name) : ""
+                icon.source: !heading && button && button.iconName !== "" ? app.iconUrl(button.iconName) : ""
+                onTriggered: if (!heading) toolTypeMenu.placeItem(modelData.name)
             }
         }
+    }
+    /// The catalog's rows of the app's items on neither bar (and offered here): [{section, title}, {name}, …]
+    function catalogRows() {
+        const sections = [
+            { section: "tools", title: qsTr("Tools"), names: ["hand", "select", "snip", "pdfText", "write", "geometry", "touchDrawing"] },
+            { section: "insert", title: qsTr("Insert"), names: ["image", "sticker", "addPage", "record"] },
+            { section: "view", title: qsTr("View"), names: ["search", "read", "replay", "present", "fullScreen", "zen"] },
+            { section: "document", title: qsTr("Document"), names: ["new", "open", "save", "milestone", "share", "print",
+                                                                    "tags", "favourite", "bookmark", "settings"] }
+        ]
+        const free = (app.toolbox.revision, app.toolbox.unplaced())
+        const out = []
+        sections.forEach(function(sec) {
+            const names = sec.names.filter(function(n) {
+                const b = toolArea.slots[n]
+                return free.indexOf(n) >= 0 && b && b.offered !== false
+            })
+            if (names.length === 0) return
+            out.push({ section: sec.section, title: sec.title })
+            names.forEach(function(n) { out.push({ name: n }) })
+        })
+        return out
     }
     /// Runs `then` once the menus (and a phone's menu sheet) have gone: a dialog or editor opened from a menu entry
     function afterMenus(then) {
@@ -1264,34 +1352,36 @@ ApplicationWindow {
         }
         menuSheet.closed.connect(after)
     }
-    // The command bar: one row at the top (qt/docs/toolbox.md, "The command bar"), placed by ToolBarPlan.js; merged
-    // into a text document's format bar; put away (the buttons kept, out of sight) in the compact chrome and in Zen
-    // and while the bar is hidden
-    Item { id: toolsAway; visible: false; anchors.fill: parent }
+    /// An entry of ⋮ that does what a button of the bars does (`slot`: its name; qt/top-bar: ⋮ is complete)
+    component CommandItem: AdaptiveMenuItem {
+        property string slot
+        readonly property Item button: toolArea.slots[slot] || null
+        objectName: "moreCmd_" + slot
+        offered: button !== null && button.offered !== false
+        text: button ? (button.label !== "" ? button.label : button.name) : ""
+        icon.source: button && button.iconName !== "" ? app.iconUrl(button.iconName) : ""
+        checkable: ["hand", "select", "snip", "pdfText", "geometry", "touchDrawing", "write"].indexOf(slot) >= 0
+        checked: button !== null && button.checked === true
+        onTriggered: {
+            const b = button
+            // (a checkable entry toggles itself: it follows its button again)
+            checked = Qt.binding(function() { return b !== null && b.checked === true })
+            win.afterMenus(function() { b.clicked() })
+        }
+    }
+    // The window's buttons of the app's items (tools and commands, qt/docs/toolbox.md): kept here, out of sight, and
+    // lent to the bar that holds each of them in the arrangement (the rail or the top bar, ToolboxModel); one not placed
+    // stays here (⋮ and the catalog reach it). The buttons of the moment (the emoji while writing, edit as notes, open
+    // externally) sit at the top bar's end, before "+".
     Item {
         id: toolArea
         objectName: "toolArea"
-        parent: win.noToolbar ? toolsAway : topTools
-        anchors.fill: parent
-        anchors.topMargin: win.noToolbar ? 0 : 4
-        anchors.bottomMargin: win.noToolbar ? 0 : 4
-        // (clear of a cut-out or a navigation bar at the side)
-        anchors.leftMargin: win.noToolbar ? 0 : 6 + win.safeLeft
-        anchors.rightMargin: win.noToolbar ? 0 : 6 + win.safeRight
+        visible: false
         Material.foreground: "#303030"
-
-        /// The layout of the plan: "row" or "merged" (a text document's format bar)
-        readonly property string planLayout: win.toolsInFormatBar ? "merged" : "row"
         /// Where the popups of the buttons open: below the bar
         readonly property string popupSide: "top"
-        /// The plan in effect (ToolBarPlan.plan)
-        property var plan: null
-        property var lastInput: null
-        /// The buttons in "more tools", in their order
-        property var overflowNames: []
-        /// The buttons by their names in the plan, in their order (edit, tools, insert, view, file)
+        /// The buttons by their names (the app items' names of ToolboxModel, and the buttons of the moment)
         readonly property var slots: ({
-            undo: undoTool, redo: redoTool,
             hand: handTool, touchDrawing: touchDrawingTool, select: selectTool, snip: snipTool, write: writeButton,
             geometry: geometryTool, pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, sticker: stickerTool,
             record: recordTool, addPage: addPageTool, search: searchTool,
@@ -1301,223 +1391,73 @@ ApplicationWindow {
             openExternally: openExternallyTool,
             share: shareTool, print: printTool, bookmark: bookmarkTool, favourite: favouriteTool, tags: tagsTool
         })
-        readonly property var order: ["undo", "redo",
-                                      "hand", "touchDrawing", "select", "snip", "write", "geometry", "pdfText", "emoji",
-                                      "image", "sticker", "record", "addPage", "search",
-                                      "fullScreen", "present", "read", "zen", "replay", "settings", "new", "open", "save",
-                                      "milestone", "editAsNotes", "openExternally", "share", "print", "bookmark",
-                                      "favourite", "tags"]
-        /// The buttons in the bar now (an entry of ⋮ shown as a button is not in ⋮ too)
-        property var barNames: []
-        function inBar(n) { return barNames.indexOf(n) >= 0 }
-        /// What the plan depends on: a change lays the bar out again (once, after the bindings settle)
-        readonly property var planKey: [planLayout, win.phoneChrome, width, height, win.textDoc, formatBar.width,
-                                        order.map(function(n) { return slots[n].offered !== false }),
-                                        win.toolboxShown, toolboxPane.fixedButtons.length]
-        /// The buttons the toolbox holds while it is shown (the fixed tools: lent to it, placed by it)
-        function lentToToolbox(n) { return toolboxPane.fixedButtons.indexOf(slots[n]) >= 0 }
-        onPlanKeyChanged: Qt.callLater(relayout)
-        Connections {
-            target: win.adaptive
-            function onHeldChanged() { if (!win.adaptive.held) Qt.callLater(toolArea.relayout) }
-        }
+        /// The buttons of the moment: not items of the arrangement; at the top bar's end while they are offered
+        readonly property var momentary: ["emoji", "editAsNotes", "openExternally"]
         Component.onCompleted: {
-            order.forEach(function(n) {
-                const item = slots[n]
-                item.clicked.connect(function() { toolArea.slotUsed(item) })
-            })
-            relayout()
-        }
-
-        function offeredNames() {
-            return order.filter(function(n) { return slots[n].offered !== false && !lentToToolbox(n) })
-        }
-        /// Lays the bar out for the room it has (not while a pointer is held: no change under a stroke)
-        function relayout() {
-            if (win.adaptive.held || width <= 0) return
-            const input = { layout: planLayout, width: width, height: height, items: offeredNames() }
-            if (input.layout === "merged") input.keep = formatBarKeeps(input.items)
-            let p = ToolBarPlan.plan(input)
-            // The hysteresis: a bar that grows takes a richer plan only once there are 24 px to spare (the same
-            // buttons otherwise: no flicker at an edge)
-            const last = lastInput
-            if (plan && last && last.layout === input.layout && last.items.join() === input.items.join()
-                    && last.height === input.height && input.width > last.width && input.width - last.width < 64) {
-                const slack = Object.assign({}, input, { width: input.width - 24 })
-                const lean = ToolBarPlan.plan(slack)
-                if (ToolBarPlan.richness(lean) <= ToolBarPlan.richness(plan)) {
-                    p = ToolBarPlan.plan(Object.assign({}, input, { width: last.width }))
-                    p = relocate(p, input)
-                    input.width = last.width  // (the plan stays the one of that width)
-                }
-            }
-            lastInput = input
-            apply(p)
-        }
-        /// A text document (qt/docs/toolbox.md, "Text documents"): the commands its format bar has room for, by one
-        /// ladder with the bar's own folding - the inserts into "+ Insert" first, then the commands of low priority into
-        /// "more tools", then the headings into one button, then search, full screen and save too; then the row scrolls.
-        readonly property var keyCommands: ["search", "fullScreen", "save"]
-        function formatBarKeeps(items) {
-            const fb = formatBar
-            const cmds = items.filter(function(n) { return slots[n] && slots[n].promoted !== true })
-            const key = cmds.filter(function(n) { return keyCommands.indexOf(n) >= 0 })
-            function w(n) { return n > 0 ? n * 48 + (n - 1) * 2 + 4 : 0 }
-            const room = fb.width - fb.leftInset - fb.rightInset - 12 - (win.undoInFormatBar ? 96 : 0)
-                         - 48 /* ⋮ */ - 4
-            const more = 50  // ("more tools", once something is in it)
-            const full = fb.levelsWidth + fb.marksWidth + fb.insertsWidth + 4
-            const inserts = fb.levelsWidth + fb.marksWidth + fb.insertLabelWidth + 4
-            const levels = fb.levelButtonWidth + fb.marksWidth + fb.insertLabelWidth + 4
-            const rest = cmds.length > key.length ? more : 0
-            if (room - full >= w(cmds.length) || room - inserts >= w(cmds.length)) return cmds
-            if (room - inserts >= w(key.length) + rest || room - levels >= w(key.length) + rest) return key
-            return []
-        }
-        /// The same plan, with the end at the bar's end again
-        function relocate(p, input) {
-            if (p.layout === "row") p.end.x += width - input.width
-            return p
-        }
-        function apply(p) {
-            plan = p
-            const shown = []
-            order.forEach(function(n) {
-                const item = slots[n]
-                const at = p.placed[n]
-                if (lentToToolbox(n)) {
-                    return  // (the toolbox places it)
-                } else if (item.offered === false) {
-                    item.parent = toolBank
-                } else if (at) {
-                    item.parent = barContent
-                    item.x = at.x
-                    item.y = at.y
-                } else if (p.layout === "merged" && at === undefined && p.overflow.indexOf(n) < 0) {
-                    item.parent = toolBank
-                } else if (p.overflow.indexOf(n) >= 0 && item.promoted === true) {
-                    item.parent = toolBank  // (an entry of ⋮ without room: in ⋮ again)
-                } else if (p.overflow.indexOf(n) >= 0) {
-                    shown.push(n)
-                } else {
-                    item.parent = toolBank
-                }
-            })
-            // "More tools": its buttons in their order, one under the other (two columns when there are many)
-            const columns = shown.length > 8 ? 2 : 1
-            overflowContent.columns = columns
-            shown.forEach(function(n, i) {
-                const item = slots[n]
-                item.parent = overflowContent
-                item.x = (i % columns) * overflowContent.cellWidth
-                item.y = Math.floor(i / columns) * 52
-            })
-            overflowNames = shown
-            barNames = Object.keys(p.placed)
-            dividerRepeater.model = p.dividers
-            barContent.width = p.contentWidth
-            barContent.height = Math.min(p.contentHeight, toolFlick.height)
-            barContent.implicitHeight = p.contentHeight
-            // The end: ⋮ and "more tools", at the end of the row, at the format bar's end for a text document; the
-            // phone chrome: ⋮ at the end of the app bar (its "All tools" holds the rest)
-            const dock = win.phoneChrome
-            toolEnd.parent = dock ? phoneAppBar.moreSlot : p.layout === "merged" ? formatBar.trailing : toolArea
-            // (the commands kept in a text document's format bar: before ⋮)
-            const keep = p.layout === "merged" ? (p.kept || []) : []
-            keep.forEach(function(n) { slots[n].parent = formatCommands })
-            barNames = barNames.concat(keep)
-            toolEnd.x = dock ? 0 : p.layout === "merged" ? Qt.binding(function() { return formatCommands.width > 0 ? formatCommands.width + 4 : 0 })
-                                                         : p.end.x
-            toolEnd.y = dock ? 0 : p.layout === "merged" ? -2 : p.end.y
-            moreToolsButton.offered = shown.length > 0 && !dock
-        }
-        /// A button of "more tools" was used: it closes, unless the button opened a menu of its own
-        function slotUsed(item) {
-            if (item.parent !== overflowContent) return
-            Qt.callLater(function() {
-                if (!Popups.hasOpenPopup(item)) moreToolsPopup.close()
+            momentary.forEach(function(n) {
+                const b = slots[n]
+                b.parent = topBarPane.leadingTail
+                b.visible = Qt.binding(function() { return b.offered !== false })
             })
         }
-
-        // (the buttons not shown: those not offered for this document)
+        // (the buttons on neither bar, and those not offered for this document)
         Item { id: toolBank; visible: false }
-
-        Flickable {
-            id: toolFlick
-            anchors.fill: parent
-            contentWidth: barContent.width
-            contentHeight: barContent.implicitHeight
-            flickableDirection: Flickable.VerticalFlick
-            boundsBehavior: Flickable.StopAtBounds
-            // (the bar fits what it shows: the rest is in "more tools")
-            interactive: false
-            clip: true
-            Item {
-                id: barContent
-                objectName: "toolRow"
-                Repeater {
-                    id: dividerRepeater
-                    delegate: Rectangle {
-                        required property var modelData
-                        x: modelData.x
-                        y: modelData.y
-                        // (a line: whole device pixels thin)
-                        width: modelData.w <= 1 ? DevicePixels.whole(modelData.w, Screen.devicePixelRatio) : modelData.w
-                        height: modelData.h <= 1 ? DevicePixels.whole(modelData.h, Screen.devicePixelRatio) : modelData.h
-                        color: "#d5d8dc"
-                    }
-                }
-            }
-        }
-
-        // ⋮ and "more tools": pinned at the end, never scrolled away
-        Row {
-            id: toolEnd
-            objectName: "toolEnd"
-            spacing: 2
-            layoutDirection: Qt.RightToLeft  // (⋮ last, at the very end)
+    }
+    // ⋮: pinned at the very end of the top bar (a text document: of its format bar; the phone chrome: of the app bar)
+    Row {
+        id: toolEnd
+        objectName: "toolEnd"
+        parent: win.phoneChrome ? phoneAppBar.moreSlot : win.toolsInFormatBar ? formatBar.trailing : topBarPane.trailingTail
+        y: win.toolsInFormatBar && !win.phoneChrome ? -2 : 0
+        spacing: 2
             IconButton {
                 objectName: "moreButton"
                 iconName: "xqt-more"
                 label: qsTr("More")
                 tip: qsTr("More")
                 onClicked: Popups.openAt(moreMenu)
-                // The ⋮ menu (qt/docs/adaptive-layout.md, "Menus" and "One place for each action"): what has no button
-                // of its own. Every action with a button in the tool bar (or its "more tools"), the view pill or the
-                // sidebar is not here too (keyboard shortcuts stay); a sheet with drill-in on phones.
+                // The ⋮ menu (qt/docs/adaptive-layout.md, "Menus"): complete since qt/top-bar - every command, whether
+                // a bar shows it or not (the bars are the user's to arrange; ⋮ is not), the commands of the bars in
+                // its submenus; a sheet with drill-in on phones.
                 AdaptiveMenu {
                     id: moreMenu
                     objectName: "moreMenu"
                     AdaptiveMenuItem { objectName: "saveAsItem"; offered: !win.textDoc; text: qsTr("Save as…"); icon.source: app.iconUrl("xopp-document-save"); onTriggered: openSaveDialog(null) }
-                    AdaptiveMenuItem { objectName: "shareItem"; offered: !toolArea.inBar("share"); text: qsTr("Share…"); icon.source: app.iconUrl("xqt-share"); onTriggered: shareDialog.openFor("") }
-                    AdaptiveMenuItem { objectName: "printItem"; offered: !toolArea.inBar("print"); text: qsTr("Print… (Ctrl+P)"); icon.source: app.iconUrl("xopp-document-print"); onTriggered: printDialog.open() }
-                    // Find and replace: where text can be written (the search itself is a button of the bar)
+                    AdaptiveMenuItem { objectName: "shareItem"; text: qsTr("Share…"); icon.source: app.iconUrl("xqt-share"); onTriggered: shareDialog.openFor("") }
+                    AdaptiveMenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); icon.source: app.iconUrl("xopp-document-print"); onTriggered: printDialog.open() }
+                    // Find and replace: where text can be written (the search itself: View → Search, and the bars)
                     AdaptiveMenuItem { objectName: "replaceItem"; offered: app.canReplace && !win.reading; text: qsTr("Find and replace (Ctrl+H)"); icon.source: app.iconUrl("xqt-replace"); onTriggered: searchBar.openReplace() }
-                    AdaptiveMenuItem {
-                        objectName: "bookmarkPageItem"
-                        readonly property bool marked: (app.bookmarks, app.isBookmarked(app.pageNumber - 1))
-                        offered: app.canBookmark && !toolArea.inBar("bookmark")
-                        text: marked ? qsTr("Remove the bookmark of this page") : qsTr("Bookmark this page")
-                        icon.source: app.iconUrl(marked ? "xqt-bookmark-filled" : "xqt-bookmark")
-                        icon.color: "transparent"
-                        onTriggered: app.toggleBookmark(app.pageNumber - 1)
-                    }
-                    // A favourite: a star kept beside the file, never in it (qt/docs/bookmarks.md)
-                    AdaptiveMenuItem {
-                        objectName: "favouriteDocumentItem"
-                        offered: app.canFavourite && !toolArea.inBar("favourite")
-                        text: app.favourite ? qsTr("Remove from favourites") : qsTr("Add to favourites")
-                        icon.source: app.iconUrl(app.favourite ? "xqt-star-filled" : "xqt-star")
-                        icon.color: "transparent"
-                        onTriggered: app.favourite = !app.favourite
-                    }
                     MenuSeparator {}
-                    // The document as a file: its name, other ways of editing it, links (Open externally and Edit as
-                    // notes are buttons of the tool bar)
+                    // The document as a file: new, open, save, its name, other ways of editing it, links, its bookmark
+                    // and star
                     AdaptiveMenu {
                         objectName: "moreDocumentMenu"
                         title: qsTr("Document")
                         iconName: "xqt-file-text"
+                        CommandItem { slot: "new" }
+                        CommandItem { slot: "open" }
+                        CommandItem { slot: "save" }
+                        CommandItem { slot: "editAsNotes" }
+                        CommandItem { slot: "openExternally" }
+                        AdaptiveMenuItem {
+                            objectName: "bookmarkPageItem"
+                            readonly property bool marked: (app.bookmarks, app.isBookmarked(app.pageNumber - 1))
+                            offered: app.canBookmark
+                            text: marked ? qsTr("Remove the bookmark of this page") : qsTr("Bookmark this page")
+                            icon.source: app.iconUrl(marked ? "xqt-bookmark-filled" : "xqt-bookmark")
+                            icon.color: "transparent"
+                            onTriggered: app.toggleBookmark(app.pageNumber - 1)
+                        }
+                        // A favourite: a star kept beside the file, never in it (qt/docs/bookmarks.md)
+                        AdaptiveMenuItem {
+                            objectName: "favouriteDocumentItem"
+                            offered: app.canFavourite
+                            text: app.favourite ? qsTr("Remove from favourites") : qsTr("Add to favourites")
+                            icon.source: app.iconUrl(app.favourite ? "xqt-star-filled" : "xqt-star")
+                            icon.color: "transparent"
+                            onTriggered: app.favourite = !app.favourite
+                        }
+                        MenuSeparator {}
                         // Quick note (qt/docs/quick-note.md): a new note in the library's Inbox, or a line in today's
                         // Markdown note there (Settings → Documents). Here, not at the top of ⋮ (at most 10 entries
                         // there): a new document, as the shortcut sheet's group "Document" has it
@@ -1539,7 +1479,7 @@ ApplicationWindow {
                         AdaptiveMenuItem { objectName: "versionHistoryItem"; offered: !win.textDoc; text: qsTr("Version history…"); icon.source: app.iconUrl("xqt-history"); onTriggered: win.showHistory() }
                         AdaptiveMenuItem {
                             objectName: "saveWithMessageItem"
-                            offered: !win.textDoc && !toolArea.inBar("milestone")
+                            offered: !win.textDoc
                             readonly property var keys: win.keysOf("saveWithMessage")
                             text: keys.length > 0 ? qsTr("Save with a message… (%1)").arg(keys[0]) : qsTr("Save with a message…")
                             icon.source: app.iconUrl("xqt-flag")
@@ -1570,7 +1510,6 @@ ApplicationWindow {
                         // Its tags: a PDF's keywords, without typing into it (qt/docs/tags.md)
                         AdaptiveMenuItem {
                             objectName: "documentTagsMenuItem"
-                            offered: !toolArea.inBar("tags")
                             text: qsTr("Tags…")
                             icon.source: app.iconUrl("xqt-tag")
                             onTriggered: documentTagsDialog.openFor(app.currentDocumentPath())
@@ -1671,12 +1610,34 @@ ApplicationWindow {
                             }
                         }
                     }
-                    // How the document is shown (all pages, full screen and presenting are buttons of the view pill and
-                    // the tool bar; hiding the tool bar is the tab on its edge)
+                    // The app's tools and what is put on the page (the buttons of the bars, wherever they are)
+                    AdaptiveMenu {
+                        objectName: "moreToolsMenu"
+                        title: qsTr("Tools")
+                        iconName: "xqt-tools-more"
+                        offered: !win.textDoc
+                        CommandItem { slot: "hand" }
+                        CommandItem { slot: "select" }
+                        CommandItem { slot: "snip" }
+                        CommandItem { slot: "pdfText" }
+                        CommandItem { slot: "write" }
+                        CommandItem { slot: "geometry" }
+                        CommandItem { slot: "touchDrawing" }
+                        MenuSeparator {}
+                        CommandItem { slot: "image" }
+                        CommandItem { slot: "sticker" }
+                        CommandItem { slot: "addPage" }
+                        CommandItem { slot: "record" }
+                    }
+                    // How the document is shown (all pages are the view pill's; hiding the top bar is the tab on its
+                    // edge)
                     AdaptiveMenu {
                         objectName: "moreViewMenu"
                         title: qsTr("View")
                         iconName: "xqt-eye"
+                        CommandItem { slot: "search" }
+                        CommandItem { slot: "fullScreen" }
+                        CommandItem { slot: "present" }
                         // (the phone chrome: its tab count)
                         AdaptiveMenuItem { objectName: "allDocumentsItem"; offered: !win.phoneChrome; text: qsTr("All open documents"); icon.source: app.iconUrl("xqt-tabs-grid"); onTriggered: tabOverview.open() }
                         // Phones: the view pill has no room for the page layout button
@@ -1694,7 +1655,6 @@ ApplicationWindow {
                         // Zen: only the page and a faint dot (qt/docs/zen.md)
                         AdaptiveMenuItem {
                             objectName: "zenItem"
-                            offered: !toolArea.inBar("zen")
                             checkable: true
                             checked: win.zenShown
                             text: win.withKeys(qsTr("Zen (only the page)"), "zen")
@@ -1714,7 +1674,7 @@ ApplicationWindow {
                         // Read: Zen and read only, in full screen
                         AdaptiveMenuItem {
                             objectName: "readItem"
-                            offered: !win.textDoc && !toolArea.inBar("read")
+                            offered: !win.textDoc
                             text: win.withKeys(qsTr("Read (Zen, read only)"), "readOnly")
                             icon.source: app.iconUrl("xqt-book-open")
                             onTriggered: win.startReading()
@@ -1736,7 +1696,7 @@ ApplicationWindow {
                             DarkItem { objectName: "darkPagesSystemItem"; text: qsTr("With the system's dark mode"); mode: "system" }
                         }
                         // The document's timeline: how it was written, with its recordings (qt/docs/timeline.md)
-                        AdaptiveMenuItem { objectName: "replayItem"; offered: !win.textDoc && !toolArea.inBar("replay"); text: qsTr("Replay the writing"); icon.source: app.iconUrl("xqt-replay"); onTriggered: app.timeline.start() }
+                        AdaptiveMenuItem { objectName: "replayItem"; offered: !win.textDoc; text: qsTr("Replay the writing"); icon.source: app.iconUrl("xqt-replay"); onTriggered: app.timeline.start() }
                         MenuSeparator {}
                         // The toolbox's edge in this size class (qt/docs/toolbox.md); the phone classes have their dock
                         AdaptiveMenu {
@@ -1775,110 +1735,51 @@ ApplicationWindow {
                         AdaptiveMenuItem { objectName: "helpRestartTutorialItem"; offered: app.tutorialExists; text: qsTr("Start the tutorial again…"); icon.source: app.iconUrl("xopp-edit-undo"); onTriggered: restartTutorialDialog.open() }
                         AdaptiveMenuItem { objectName: "helpShortcutsItem"; text: qsTr("Keyboard shortcuts (F1)"); icon.source: app.iconUrl("xqt-keyboard"); onTriggered: shortcutSheet.open() }
                     }
+                    CommandItem { slot: "settings" }
                 }
             }
-            // What does not fit into the bar: its buttons, with their names
-            IconButton {
-                id: moreToolsButton
-                objectName: "moreToolsButton"
-                property bool offered: false
-                visible: offered
-                iconName: "xqt-tools-more"
-                label: qsTr("More tools")
-                tip: qsTr("More tools (what does not fit into the bar)")
-                checked: moreToolsPopup.visible
-                onClicked: moreToolsPopup.visible ? moreToolsPopup.close() : moreToolsPopup.open()
-                Popup {
-                    id: moreToolsPopup
-                    objectName: "moreToolsPopup"
-                    // below the bar, at the button's end, inside the window (margins)
-                    x: parent.width - width
-                    y: 0
-                    onAboutToShow: {
-                        const bar = toolArea.mapToItem(moreToolsButton, 0, 0)
-                        y = bar.y + toolArea.height + 8
-                    }
-                    margins: 8
-                    padding: 6
-                    modal: false
-                    focus: true  // (Esc closes it)
-                    background: Rectangle {
-                        radius: 12
-                        color: "#ffffff"
-                        border.width: 1
-                        border.color: "#d5d8dc"
-                    }
-                    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
-                    // (a tool chosen in it: back to writing)
-                    Connections {
-                        target: app
-                        enabled: moreToolsPopup.opened
-                        function onToolChanged() { if (!Popups.hasOpenPopupIn(overflowContent)) moreToolsPopup.close() }
-                    }
-                    contentItem: Flickable {
-                        implicitWidth: overflowContent.width
-                        implicitHeight: overflowContent.height
-                        contentWidth: overflowContent.width
-                        contentHeight: overflowContent.height
-                        interactive: contentHeight > height
-                        boundsBehavior: Flickable.StopAtBounds
-                        clip: true
-                        Item {
-                            id: overflowContent
-                            objectName: "overflowContent"
-                            property int columns: 1
-                            readonly property real cellWidth: Math.min(220, (win.width - 32) / columns)
-                            width: columns * cellWidth
-                            height: Math.ceil(toolArea.overflowNames.length / columns) * 52
-                            // Each button's name beside it; a tap on the name is a tap on the button
-                            Repeater {
-                                model: toolArea.overflowNames
-                                delegate: Label {
-                                    required property string modelData
-                                    required property int index
-                                    readonly property var button: toolArea.slots[modelData]
-                                    objectName: "overflowLabel_" + modelData
-                                    x: (index % overflowContent.columns) * overflowContent.cellWidth + 56
-                                    y: Math.floor(index / overflowContent.columns) * 52
-                                    width: overflowContent.cellWidth - 60
-                                    height: 48
-                                    verticalAlignment: Text.AlignVCenter
-                                    elide: Text.ElideRight
-                                    text: button ? button.name : ""
-                                    color: button && button.enabled ? "#303030" : "#9e9e9e"
-                                    TapHandler { onTapped: if (parent.button && parent.button.enabled) parent.button.clicked() }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // --- the buttons (placed by relayout(); `offered`: there at all for this document) ---
-        // Undo and redo first, never in "more tools" (qt/undo-redo); where the bar is not shown the view pill has them
-        IconButton {
-            id: undoTool
-            objectName: "toolUndoButton"
-            parent: toolBank
-            property bool offered: win.undoInToolBar
-            iconName: "xopp-edit-undo"
-            label: qsTr("Undo")
-            tip: win.withKeys(qsTr("Undo"), "undo")
-            enabled: app.canUndo
-            onClicked: app.undo()
-        }
-        IconButton {
-            id: redoTool
-            objectName: "toolRedoButton"
-            parent: toolBank
-            property bool offered: win.undoInToolBar
-            iconName: "xopp-edit-redo"
-            label: qsTr("Redo")
-            tip: win.withKeys(qsTr("Redo"), "redo")
-            enabled: app.canRedo
-            onClicked: app.redo()
-        }
+    }
+    // The top bar (qt/docs/toolbox.md, "The top bar"; qt/top-bar): the other list of the arrangement, in the user's order
+    // with its dividers and groups; it scrolls sideways as the rail does, "+" (the catalog) and ⋮ pinned at its end. In
+    // a text document it is the end of the format bar's row; on a phone, in the app bar
+    Toolbox {
+        id: topBarPane
+        bar: "top"
+        edge: "top"
+        peer: toolboxPane
+        /// In a text document: inside the format bar's row (that row scrolls), as long as its items
+        readonly property bool inline: win.toolsInFormatBar && !win.phoneChrome
+        parent: win.phoneChrome ? phoneAppBar.toolsSlot : inline ? formatBar.commandsSlot : topTools
+        visible: win.topBarShown
+        headShown: win.undoInToolBar
+        // (in the format bar: its buttons' size)
+        cell: inline ? 40 : win.adaptive.touchProfile ? win.adaptive.minTarget : 44
+        x: inline || win.phoneChrome ? 0 : win.safeLeft + 2
+        width: inline ? naturalLength : parent ? parent.width - (win.phoneChrome ? 0 : win.safeLeft + win.safeRight + 4) : 0
+        height: parent ? parent.height : 0
+        appButtons: toolArea.slots
+        lending: win.topBarShown
+        onEditRequested: function(entry, button) { toolEditor.openFor(entry, button, "top") }
+        onMenuRequested: function(entry, button, pos) { toolEntryMenu.openFor(entry, button, pos) }
+        onAddRequested: function(button) { toolTypeMenu.ask("add", "", button, "top") }
+        onGrouped: function(groupId, before) { win.grouped(before) }
+        onRemoved: function(entry, before) { win.leftTheBars(entry, before) }
+    }
+    /// The top bar is shown (at the top, in a text document's format bar, in a phone's app bar)
+    readonly property bool topBarShown: !app.homeVisible && !noToolbar && !replaying
+    /// A carried item made a group: "Grouped · Undo"
+    function grouped(before) {
+        snackbar.show(qsTr("Grouped"), false, qsTr("Undo"), function() { app.toolbox.restore(before) })
+    }
+    /// A carried item let go away from both bars left them: "Removed · Undo" (an app item: "… is in + now")
+    function leftTheBars(entry, before) {
+        const text = entry && entry.app !== undefined ? qsTr("%1 is in + now").arg(toolEntryName(entry))
+                                                       : qsTr("Removed: %1").arg(toolEntryName(entry))
+        snackbar.show(text, false, qsTr("Undo"), function() { app.toolbox.restore(before) })
+    }
+    Item {
+        // --- the buttons of the app's items (lent to the bar that holds them; `offered`: there at all for this
+        // document; undo and redo are the heads of the rail and the top bar) ---
         // (the pens, highlighters, erasers, shapes, text boxes and sticky notes are the toolbox's entries; the buttons
         // below are its fixed tools, lent to it, and the commands)
         IconButton {
@@ -1923,6 +1824,7 @@ ApplicationWindow {
             tip: qsTr("Write on the page: Markdown, shown formatted (Ctrl+Alt+M). Hold: its source beside the page")
             checked: textFlowPanel.visible || markdownPanel.visible || app.markdownOnPage
             ownHold: true
+            readonly property string holdText: qsTr("Markdown source beside the page…")
             onClicked: {
                 if (textFlowPanel.visible) textFlowPanel.close(true)
                 else if (markdownPanel.visible) markdownPanel.close(true)
@@ -2085,6 +1987,7 @@ ApplicationWindow {
             label: qsTr("Image")
             tip: qsTr("Insert an image (hold: snip a picture from a page)")
             ownHold: true
+            readonly property string holdText: qsTr("Snip a picture, a picture file, a check box…")
             onClicked: imageDialog.open()
             onPressAndHold: Popups.openAt(imageMenu)
             TapHandler {
@@ -2143,6 +2046,7 @@ ApplicationWindow {
             label: qsTr("Add a page")
             tip: qsTr("Add a page after the current one (press and hold: a template, background, size, several pages)")
             ownHold: true
+            readonly property string holdText: qsTr("A template, background, size, several pages…")
             onClicked: app.addPageAfterCurrent()
             onPressAndHold: Popups.openAt(addPageMenu)
             TapHandler {
@@ -2227,8 +2131,10 @@ ApplicationWindow {
             property bool offered: !win.fullScreenMode
             iconName: "xopp-presentation-mode"
             label: qsTr("Present")
-            tip: qsTr("Present (F5; hold: only the page, Ctrl+F5)")
+            tip: qsTr("Present (F5; hold: its menu with \"Present without controls\", Ctrl+F5)")
             ownHold: true
+            /// What its long press does (in its menu on a bar)
+            readonly property string holdText: qsTr("Present without controls (Ctrl+F5)")
             onClicked: win.startPresenting()
             onPressAndHold: win.startPresenting(true)
             TapHandler {
@@ -2298,14 +2204,11 @@ ApplicationWindow {
             tip: qsTr("Open externally (in the app the system has for this file)")
             onClicked: win.openExternally()
         }
-        // Entries of ⋮ as buttons of the command bar where there is room (qt/docs/toolbox.md; one place for each
-        // action: ⋮ leaves out what the bar shows); without room, and on a phone, they are in ⋮
+        // Commands of the top bar's first layout that ⋮ has too (qt/docs/toolbox.md, "The top bar": ⋮ is complete)
         IconButton {
             id: shareTool
             objectName: "shareButton"
             parent: toolBank
-            property bool offered: !win.phoneLayout
-            property bool promoted: true
             iconName: "xqt-share"
             label: qsTr("Share")
             tip: qsTr("Share…")
@@ -2315,8 +2218,6 @@ ApplicationWindow {
             id: printTool
             objectName: "printButton"
             parent: toolBank
-            property bool offered: !win.phoneLayout
-            property bool promoted: true
             iconName: "xopp-document-print"
             label: qsTr("Print")
             tip: qsTr("Print… (Ctrl+P)")
@@ -2327,8 +2228,7 @@ ApplicationWindow {
             objectName: "bookmarkButton"
             parent: toolBank
             readonly property bool marked: (app.bookmarks, app.isBookmarked(app.pageNumber - 1))
-            property bool offered: !win.phoneLayout && app.canBookmark
-            property bool promoted: true
+            property bool offered: app.canBookmark
             iconName: marked ? "xqt-bookmark-filled" : "xqt-bookmark"
             checked: marked
             label: marked ? qsTr("Bookmarked") : qsTr("Bookmark")
@@ -2339,23 +2239,20 @@ ApplicationWindow {
             id: favouriteTool
             objectName: "favouriteButton"
             parent: toolBank
-            property bool offered: !win.phoneLayout && app.canFavourite
-            property bool promoted: true
+            property bool offered: app.canFavourite
             iconName: app.favourite ? "xqt-star-filled" : "xqt-star"
             checked: app.favourite
             label: qsTr("Favourite")
             tip: app.favourite ? qsTr("Remove from favourites") : qsTr("Add to favourites")
             onClicked: app.favourite = !app.favourite
         }
-        // More of ⋮ in the command bar where there is room (qt/ui-rework; qt/docs/toolbox.md, "The command bar"):
-        // reading, the replay of the writing, a milestone of the version history (where the document keeps
-        // versions), the tags
+        // Reading, the replay of the writing, a milestone of the version history (where the document keeps versions),
+        // the tags (qt/ui-rework)
         IconButton {
             id: readTool
             objectName: "readButton"
             parent: toolBank
-            property bool offered: !win.phoneLayout && !win.textDoc
-            property bool promoted: true
+            property bool offered: !win.textDoc
             iconName: "xqt-book-open"
             label: qsTr("Read")
             tip: win.withKeys(qsTr("Read: Zen and read only, in full screen (the edges turn the pages)"), "readOnly")
@@ -2366,8 +2263,6 @@ ApplicationWindow {
             id: zenTool
             objectName: "zenButton"
             parent: toolBank
-            property bool offered: !win.phoneLayout
-            property bool promoted: true
             iconName: "xqt-zen"
             label: qsTr("Zen")
             tip: win.withKeys(qsTr("Zen: only the page (the dot in the lower left corner brings the controls back)"), "zen")
@@ -2377,8 +2272,7 @@ ApplicationWindow {
             id: replayTool
             objectName: "replayButton"
             parent: toolBank
-            property bool offered: !win.phoneLayout && !win.textDoc
-            property bool promoted: true
+            property bool offered: !win.textDoc
             iconName: "xqt-replay"
             label: qsTr("Replay")
             tip: qsTr("Replay the writing (how this document was written)")
@@ -2388,8 +2282,7 @@ ApplicationWindow {
             id: milestoneTool
             objectName: "milestoneButton"
             parent: toolBank
-            property bool offered: !win.phoneLayout && !win.textDoc && app.versions.on
-            property bool promoted: true
+            property bool offered: !win.textDoc && app.versions.on
             iconName: "xqt-flag"
             label: qsTr("Milestone")
             tip: win.withKeys(qsTr("Save with a message (a milestone of the version history)"), "saveWithMessage")
@@ -2399,8 +2292,6 @@ ApplicationWindow {
             id: tagsTool
             objectName: "tagsButton"
             parent: toolBank
-            property bool offered: !win.phoneLayout
-            property bool promoted: true
             iconName: "xqt-tag"
             label: qsTr("Tags")
             tip: qsTr("Tags of this document…")
@@ -3429,6 +3320,7 @@ ApplicationWindow {
 
     FileDialog {
         id: openDialog
+        objectName: "openDialog"
         title: qsTr("Open document or PDF")
         currentFolder: app.openFolder()
         nameFilters: [qsTr("Documents (*.xopp *.xoj *.pdf *.md *.png *.jpg *.jpeg *.webp *.heic *.heif)"),

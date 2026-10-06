@@ -20,8 +20,10 @@ Popup {
     property var entry: ({})
     /// Editing an entry of the toolbox ("": a new one, added with "Add")
     property string entryId: ""
-    /// Where a new one goes (an index among entries and dividers; -1: at the end)
+    /// Where a new one goes (an index among the items of its bar; -1: at the end: on the rail after the user's last
+    /// tool) and the bar ("rail", "top")
     property int addAt: -1
+    property string addBar: "rail"
     /// The button it opened from (it opens beside it, towards the page)
     property Item owner: null
     /// The button that shows an entry now (Toolbox.buttonFor): the owner again when the rail made its buttons anew
@@ -43,9 +45,10 @@ Popup {
         open()
     }
     /// Make a new tool of this type, prefilled from the last one of its type
-    function openNew(type, at, button, edgeName) {
+    function openNew(type, at, button, edgeName, bar) {
         entryId = ""
         addAt = at === undefined ? -1 : at
+        addBar = bar === "top" ? "top" : "rail"
         entry = store.normalize(store.prefill(type))
         owner = button
         edge = edgeName || "right"
@@ -70,7 +73,8 @@ Popup {
         if (store.active === entryId) app.applyToolEntry(entryId)
     }
     function add() {
-        const id = store.add(entry, addAt)
+        const id = store.add(entry, addBar === "rail" ? addAt : -1)
+        if (id !== "" && addBar === "top") store.moveTo(id, "top", addAt >= 0 ? addAt : store.top.length)
         close()
         if (id !== "") {
             app.applyToolEntry(id)

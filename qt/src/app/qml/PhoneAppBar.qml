@@ -4,8 +4,10 @@
 // - a swipe along the bar (only the bar: the page keeps every touch) goes to the next or the previous document;
 // - the tab count: a tap shows all open documents (after the double-tap time, so a double tap does not flash them), a
 //   double tap goes back to the document used before (Alt+Tab), a long press lists the documents used lately;
-// - ⋮ is the tool bar's own (Main.qml puts it into `moreSlot`); on the home screen there is none.
-// New documents come from the overview and the library.
+// - ⋮ is the top bar's own (Main.qml puts it into `moreSlot`); on the home screen there is none.
+// It hosts the top bar (qt/top-bar: the same items as on a larger screen, scrolling sideways, "+" at its end; Main.qml
+// puts it into `toolsSlot`): a second row under the title where the bar is narrow (a phone upright), else in the row
+// between the title and the tab count (a phone held sideways). New documents come from the overview and the library.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -21,10 +23,21 @@ Rectangle {
     property real rightInset: 0
     /// Where ⋮ goes (Main.qml puts the tool bar's end there)
     readonly property Item moreSlot: moreHolder
+    /// Where the top bar goes (Main.qml puts it there), and whether it is shown, and how tall it is
+    readonly property Item toolsSlot: toolsHolder
+    property bool toolsShown: false
+    property real toolsHeight: 52
+    /// The top bar in a row of its own under the title (a narrow bar: a phone upright)
+    readonly property bool twoRows: width < 600
+    /// The title's row: as tall as the top bar where that sits in it
+    readonly property real rowHeight: toolsShown && !twoRows ? Math.max(48, toolsHeight) : 48
     signal overviewRequested()
     signal recentRequested()
+    /// The page number in the bar (a phone held sideways), and its tap: all pages
+    property bool pageShown: false
+    signal pagesRequested()
     readonly property int target: win.adaptive.touchProfile ? win.adaptive.minTarget : 44
-    implicitHeight: 48 + topInset
+    implicitHeight: rowHeight + topInset + (toolsShown && twoRows ? toolsHeight : 0)
     color: "#f1f3f4"
 
     Hairline {  // the line towards the page
@@ -33,27 +46,12 @@ Rectangle {
         color: "#d5d8dc"
     }
 
-    // A swipe along the bar: the next document (to the left) or the previous one (to the right)
-    DragHandler {
-        id: swipe
-        objectName: "phoneTabSwipe"
-        target: null
-        yAxis.enabled: false
-        property real dx: 0
-        onCentroidChanged: if (active) dx = centroid.scenePosition.x - centroid.scenePressPosition.x
-        onActiveChanged: {
-            if (active) {
-                dx = 0
-                return
-            }
-            if (Math.abs(dx) < 40 || app.tabs.count < 2) return
-            if (dx < 0) app.nextTab()
-            else app.previousTab()
-        }
-    }
-
     RowLayout {
-        anchors.fill: parent
+        id: titleRow
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: bar.rowHeight
         anchors.topMargin: bar.topInset
         anchors.leftMargin: 2 + bar.leftInset
         anchors.rightMargin: 2 + bar.rightInset
@@ -78,10 +76,30 @@ Rectangle {
         Item {
             id: titleArea
             objectName: "phoneTitleArea"
-            Layout.fillWidth: true
+            Layout.fillWidth: bar.twoRows || !bar.toolsShown
+            Layout.preferredWidth: bar.twoRows || !bar.toolsShown ? -1 : Math.max(120, Math.round(bar.width * 0.24))
             Layout.fillHeight: true
             Layout.leftMargin: 6
             Layout.rightMargin: 6
+            // A swipe along the title: the next document (to the left) or the previous one (to the right) (only there:
+            // the top bar beside it scrolls)
+            DragHandler {
+                id: swipe
+                objectName: "phoneTabSwipe"
+                target: null
+                yAxis.enabled: false
+                property real dx: 0
+                onCentroidChanged: if (active) dx = centroid.scenePosition.x - centroid.scenePressPosition.x
+                onActiveChanged: {
+                    if (active) {
+                        dx = 0
+                        return
+                    }
+                    if (Math.abs(dx) < 40 || app.tabs.count < 2) return
+                    if (dx < 0) app.nextTab()
+                    else app.previousTab()
+                }
+            }
             Label {
                 id: titleLabel
                 objectName: "phoneTitle"
@@ -138,6 +156,30 @@ Rectangle {
             HoverHandler { id: titleHover }
         }
 
+        // (the top bar beside the title: a phone held sideways)
+        Item {
+            id: inlineTools
+            visible: bar.toolsShown && !bar.twoRows
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+        }
+        // The page number (a phone held sideways: the dock at the side gives its room to the tools): all pages
+        ToolButton {
+            objectName: "phonePageButton"
+            visible: bar.pageShown && !app.homeVisible
+            implicitHeight: bar.target
+            focusPolicy: Qt.NoFocus
+            text: app.pageNumber + " / " + app.pageCount
+            font.pixelSize: 13
+            leftPadding: 8
+            rightPadding: 8
+            Material.foreground: "#3c4043"
+            Accessible.name: qsTr("All pages")
+            ToolTip.visible: hovered
+            ToolTip.text: qsTr("All pages, the contents and the zoom (Ctrl+Alt+G)")
+            ToolTip.delay: 600
+            onClicked: bar.pagesRequested()
+        }
         // The open documents: their number in a square. A tap: all of them; a double tap: the one used before; a long
         // press: the ones used lately
         AbstractButton {
@@ -208,5 +250,16 @@ Rectangle {
             implicitWidth: children.length > 0 ? children[0].width : 0
             implicitHeight: children.length > 0 ? children[0].height : bar.target
         }
+    }
+
+    // The top bar: under the title (upright), or in the row (sideways)
+    Item {
+        id: toolsHolder
+        objectName: "phoneToolsSlot"
+        visible: bar.toolsShown
+        x: bar.twoRows ? bar.leftInset : titleRow.x + inlineTools.x
+        y: bar.twoRows ? bar.topInset + bar.rowHeight : bar.topInset
+        width: bar.twoRows ? bar.width - bar.leftInset - bar.rightInset : inlineTools.width
+        height: bar.toolsHeight
     }
 }
