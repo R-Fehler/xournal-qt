@@ -85,7 +85,7 @@ short.
   (the replay starts where the recording is heard and plays on). The document is replayed from the start, paused.
 - **The play bar** at the bottom of the page (`timelineBar`, below "The play bar"). ← and → go 5 s, Home and End to
   the ends, Space plays and pauses, Esc leaves. **The tools are put away** (`win.replaying`): the toolbox (docked or
-  floating), the command bar with its tab, the phone's dock, the view pill and the pills; the tab strip and a phone's
+  floating), the top bar with its tab, the phone's dock, the view pill and the pills; the tab strip and a phone's
   app bar (with ⋮) stay. (Before qt/replay-polish only the toolbox was hidden: the command bar then took its tools back
   and showed the classic tool bar, the phone's dock its classic tools; `TimelineUiTest.theToolboxModeShowsNoClassicToolBarDuringOrAfterAReplay`.
   The classic tool bar was removed in 0.8.0.)

@@ -130,14 +130,14 @@ Four separate things (audit D5; since qt/zen, 0.8.0, Zen and read only are switc
 
 | | What | Set by |
 | --- | --- | --- |
-| `chromeMode` | `full` (tab strip, command bar, the docked toolbox, sidebar; in the phone classes the app bar and the tool dock, below), `compact` (the full-screen chrome: tab dots, the floating toolbox, the view pill; on a phone too) | full screen (`fullScreenMode`) |
+| `chromeMode` | `full` (tab strip, top bar, the docked toolbox, sidebar; in the phone classes the app bar and the tool dock, below), `compact` (the full-screen chrome: tab dots, the floating toolbox, the view pill; on a phone too) | full screen (`fullScreenMode`) |
 | `windowFullScreen` | the window's state (`showFullScreen()`) | full screen (F11) |
 | `app.presenting` | black around the pages, page by page | F5 |
 | `zen` | everything around the page hidden (`hudHidden`; `fullChrome` is false): only the page and the dot in its lower left corner | ⋮ → View → Zen, Ctrl+Alt+Z, Read; automatic in a tiny window; presenting without controls |
 
 - **Full screen** (F11, `fullScreenMode`, as before) is the compact chrome in a full-screen window. Leaving it gives
   the window back its state and ends presenting, as before.
-- **Zen** hides the HUD (`win.hudHidden`: the command bar, the toolbox, the pills, the format bar) and the chrome
+- **Zen** hides the HUD (`win.hudHidden`: the top bar, the toolbox, the pills, the format bar) and the chrome
   around the page (`win.fullChrome` false: the tab strip, the sidebar and its arrow, the phone's app bar and dock; the
   compact chrome's tab dots); the dot in the lower left corner and its pill bring it back. The pen writes on. Presenting
   without controls (`cleanPage`) is presenting in Zen.
@@ -196,68 +196,39 @@ How a menu uses it:
 
 ### The ⋮ menu
 
-Nine entries at the top (at most), the rest one level deeper. Since qt/adaptive-toolbar it holds only what has no
-button of its own ("One place for each action", below):
+At most ten entries at the top, the rest one level deeper. Since qt/top-bar it is **complete**: every command is in it,
+whether a bar shows it or not (the bars are the user's to arrange, ⋮ is not; [toolbox.md](toolbox.md), "The top bar").
 
 | Top level | Inside |
 | --- | --- |
 | Save as… (not for text files) | |
 | Share… | |
 | Print… (Ctrl+P) | |
-| Bookmark this page / Remove the bookmark of this page | |
-| Add to favourites / Remove from favourites | |
-| **Document ▸** | Rename…, Edit anyway (as plain text)…, Open as PDF document, Remove unused images…, Linked from…, Copy link to this page |
-| **Export ▸** | Export as plain PDF…, Export for the archive…, Export as Markdown |
-| **Page ▸** (not for text files) | Insert pages…, Background of this page…, Page size…, Space for notes…, Start a chapter here… |
-| **View ▸** | All open documents (not in the phone chrome: its tab count), Page layout… (where the view pill has no button for it: phone portrait, the compact pill, the phone chrome), Present without controls (Ctrl+F5), Read (full screen, read only: the edges turn the pages; Ctrl+Alt+R), Dark pages ▸, Replay the writing, Toolbox position ▸ (Right, Left, Top, Bottom, Automatic for this window size; not in the phone classes: their dock). (Tool bar position ▸ went with the classic tool bar in 0.8.0.) |
+| Find and replace (where text can be written) | |
+| **Document ▸** | New document, Open…, Save, Edit as notes / Open externally (where offered), Bookmark this page / Remove the bookmark, Add to / Remove from favourites, Quick note, Rename…, the password, Version history…, Save with a message… (the milestone), Edit anyway…, Open as PDF document, Remove unused images…, Tags…, Handwriting language ▸, Adopt annotations…, Linked from…, Copy link to this page |
+| **Export ▸** | Export as plain PDF…, Export pages as pictures…, Export for the archive…, Export as Markdown |
+| **Page ▸** (not for text files) | Insert pages…, Background of this page…, Page size…, Space for notes…, Start a chapter here…, Rotate ▸, … |
+| **Tools ▸** (not for text files) | Hand, Select, Snip, Mark PDF text, Write on the page, Setsquare / compass, The finger draws; Image, Stickers, Add a page, Record audio (the bars' buttons: `moreCmd_<name>`) |
+| **View ▸** | Search, Full screen, Present, All open documents (not in the phone chrome), Page layout… (where the view pill has no button for it), Curtain, Spotlight, Present without controls (Ctrl+F5), Zen, Read only, Read, Dark pages ▸, Replay the writing, Toolbox position ▸ (not in the phone classes) |
+| **Help ▸** | Introduction, Tutorial, Keyboard shortcuts |
+| **Settings** | |
 
-Entries that depend on the document (a `.md`: Open as PDF document, Remove unused images; a text file: no Save as, no
-Page) are left out as before. "Markdown source beside the page" is in the menu of the writing button (its long
-press). Entries and submenus have icons where an obvious one exists (`AdaptiveMenu.iconName` for a submenu's entry);
-the phone sheet shows them too.
+Entries that depend on the document are left out as before. "Markdown source beside the page" is in the menu of the
+writing button (its long press). Entries and submenus have icons where an obvious one exists; the phone sheet shows them
+too.
 
 ## The tool bar (`qt/adaptive-toolbar`)
 
-**The classic tool bar was removed in 0.8.0** (qt/classic-removal; [toolbox.md](toolbox.md)): its tools, colors and
-widths, its places (two rows at the top or the bottom, a rail at a side; `layout/<class>/toolbar`, ⋮ → View → Tool bar
-position, the older `app.toolbarPosition`), the tool square of full screen with its quick tools, the pen pill and the
-classic dock of a phone are gone. The tools are the **toolbox**'s (docked beside the page, floating in full screen,
-the dock of a phone), and the bar at the top is the **command bar**: one row of commands. What follows describes it;
-the history of the classic bar is in git (and in [ui-adaptive-audit.md](ui-adaptive-audit.md)).
+**The classic tool bar was removed in 0.8.0** (qt/classic-removal; [toolbox.md](toolbox.md)), and the command bar that
+followed it, with its ladder (`ToolBarPlan.js`: buttons giving way into ⋮ and a "more tools" button as the room ran
+short), was replaced by **the top bar** (qt/top-bar): the other list of the toolbox's arrangement, in the user's order,
+which **scrolls** instead of folding, with "+" (the catalog) and ⋮ pinned at its end ([toolbox.md](toolbox.md), "The
+top bar"). The author's decisions of 2026-09-26 still hold: a single A4 page stays well visible; ⋮ pinned at the end;
+nothing scrolls away silently (the fade and the half cell at the end that has more; ⋮ is complete).
 
-The author's decisions of 2026-09-26 still hold for it: a single A4 page stays well visible; ⋮ pinned at the end;
-what does not fit goes into a "more tools" button next to ⋮, never scrolled away silently.
-
-### What goes where: ToolBarPlan.js
-
-`qt/src/app/qml/ToolBarPlan.js` is a pure function of the room (the bar's width) and the buttons offered for the
-document. `toolArea` in `Main.qml` lays the buttons out by it (they are placed, not in a Layout), and again when the
-room or the buttons change. Groups, in order: **edit** (undo and redo, only where the toolbox is not shown: a text
-document whose bar is not merged into its format bar; never in "more tools", qt/undo-redo), **tools** (the toolbox's
-app tools the rail does not hold: the finger draws, write on the page, the setsquare; the emoji while writing), **insert** (image, stickers, record audio
-where the build can record, add a page), **view** (search, full screen, present, read,
-replay, settings), **doc** (share, print, bookmark, favourite, tags) and **file** (new where the tab strip has no "+",
-open, save, a milestone; a `.md`: edit as notes; a text file: open externally). ⋮ and "more tools" are pinned at the
-end.
-
-As the room runs short, buttons give way one by one: the entries of ⋮ shown as buttons go back into ⋮ first (tags,
-favourite, bookmark, print, milestone, replay, read, share; [toolbox.md](toolbox.md), "The command bar"), then
-low-priority buttons go into **"more tools"**: New, Open, Save, Settings, Present, Full screen, Edit as notes, Search,
-Stickers, Record, Open externally, then the fixed tools where the bar holds them. A notes document's bar has room for
-all its commands down to the phone classes (whose phone chrome has no bar: the app bar's ⋮ and "My tools"). The plan is
-deterministic; a bar that grows takes a richer plan only with 24 px to spare (no flicker at an edge), and nothing
-changes while a pointer is held (a stroke).
-
-**"More tools"** (`moreToolsButton`, », next to ⋮) opens `moreToolsPopup` below the bar: the buttons themselves, each
-with its name beside it (a tap on the name is a tap on the button), two columns when there are more than eight. It
-closes after a button was used, unless the button opened a menu of its own, and when a tool is chosen.
-
-**A text document** being written (a `.md` with its format bar): the command bar is merged into the format bar (F7.2):
-undo and redo at its start, the commands that fit and ⋮ and "more tools" at its end (`MarkdownFormatBar.trailing`;
-the ladder: [toolbox.md](toolbox.md), "Text documents"). One row instead of two.
-
-The compact chrome and Zen have no command bar (its buttons are kept out of sight); the floating toolbox's ⋯
-holds present, read only, Zen, search, settings and the way back.
+The top bar is the same element as the rail (`Toolbox.qml`, `bar: "top"`): `topTools` holds it in the full chrome; in
+a text document it is the end of the format bar's row; in the phone chrome the app bar holds it (below). The compact
+chrome and Zen do not show it: the floating toolbox's ⋯ lists its items and New.
 
 The tab that puts the bar away sits in the middle of its top edge towards the pages (⋮ keeps the end); a slim strip at
 the top brings it back. Its target reaches into the pages, `minTarget` deep in the touch profile. The toolbox stays
@@ -266,7 +237,7 @@ where it is meanwhile.
 ### Cycling buttons
 
 Tools that do almost the same share one button (`ToolCycleButton.qml`, the logic in `ToolGroups.qml`, `win.toolGroups`):
-the app tools of the rail and the command bar, the phone's sheet "My tools", and the toolbox's snip entry.
+the app tools of the bars, ⋮ → Tools, and the toolbox's snip entry.
 
 | Group | Variants (a tap goes through them) | Only in its list |
 | --- | --- | --- |
@@ -308,7 +279,7 @@ have the snipping screenshots as a cycling tool in the toolbelt"):
   eraser's kind and size (the toolbox's entries), the setsquare and the compass (their group), snapping to the grid
   (Settings).
 
-The **text box** and **writing on the page** stay two tools: writing on the page is an app tool (the command bar's since 0.8.0) switched
+The **text box** and **writing on the page** stay two tools: writing on the page is an app tool (the top bar's at a first start since 0.8.0) switched
 on and off by its button (a tap while it is on ends it); the text box is an entry of the toolbox (its font in its
 editor). The text box is always a Markdown text box; the plain text tool is no longer offered (T takes the toolbox's
 text box). Plain texts in documents are still drawn, and the text box tool still edits them as plain text (a tap on
@@ -316,7 +287,7 @@ one: `CanvasView`, "an ordinary text there is edited as it is").
 
 ### Labels without hover
 
-Every button of the tool bar, the pills and "more tools" says what it is by its icon; where an icon alone was
+Every button of the bars and the pills says what it is by its icon; where an icon alone was
 ambiguous it was replaced (below). Without hover (a finger):
 
 - a finger held on a button (`IconButton`) shows its name (`label`) above the finger while held; letting go then does
@@ -326,7 +297,7 @@ ambiguous it was replaced (below). Without hover (a finger):
   Markdown source beside the page), the text box (the font), Mark PDF text (how it marks), Add a page (Insert
   pages…), Present (without controls), the page layout (its menu), the zoom percentage (the whole page), a color (its
   menu). A menu it opens shows the button's name on top (`AdaptiveMenu.titleShown`);
-- "more tools" shows the names beside the buttons; the phone sheet shows the menus' icons and names.
+- ⋮ and the catalog show the names beside the icons; the phone sheet shows the menus' icons and names.
 
 **Icons changed** (in `qt/resources/icons`, Lucide's or drawn in their style; see its README): the finger draws
 (`xqt-finger-draw`), mark PDF text (`xqt-mark-text`), the text box (`xqt-text-box`), writing on the page
@@ -366,40 +337,38 @@ a function: the result goes through a property of its own, `clearY`.)
 
 ### One place for each action
 
-The author's rule: only one way to do things, to reduce menu clutter. No ⋮ entry repeats a button of the tool bar
-(or its "more tools"), the view pill or the sidebar; keyboard shortcuts stay. Where the button can be out of sight:
+The author's rule: only one way to do things, to reduce menu clutter. The buttons of the app's items have one home each
+(the rail, the top bar, or neither: the catalog), arranged by the user; ⋮ has every command as well (qt/top-bar: so
+nothing can be arranged out of reach), and the view pill and the sidebar keep theirs. Where the button can be out of
+sight:
 
 | Action | Its one place | Keys | With the bar put away / in the compact chrome | In the phone chrome |
 | --- | --- | --- | --- | --- |
-| Pen, highlighter, eraser, text box, sticky note, shapes, laser pointer, snip (each with its color, width, …: the editor) | the toolbox's entries | P H E T | the toolbox (docked; floating in the compact chrome) | the dock and "My tools" |
-| Hand, select, snip, mark PDF text | the rail's app tools (items of its arrangement, qt/rail-scroll; removed: the command bar) | A S L, Shift+S | as above | the dock and "My tools" |
-| The finger draws, write on the page, setsquare / compass (since 0.8.0 off the rail: the top bar's, qt/top-bar) | command bar / more tools | Ctrl+Alt+M | the floating toolbox's ⋯ | "My tools" |
-| Insert image (was also ⋮ → Page) | command bar / more tools | I | | "My tools" |
-| Add a page (long press: Insert pages…) | command bar / more tools | Ctrl+N | ⋮ → Page → Insert pages… is kept (a dialog: several pages, background, size) | "My tools" (hold: Insert pages…) |
-| Search | command bar / more tools | Ctrl+F | the floating toolbox's ⋯ | "My tools" |
-| Full screen (was also ⋮ → View) | command bar / more tools | F11 | in full screen: "Leave full screen" in the floating toolbox's ⋯, Esc | "My tools" |
-| Present (was also ⋮ → View) | command bar / more tools | F5 | the floating toolbox's ⋯ | "My tools" |
-| Present without controls | ⋮ → View (it differs from Present) | Ctrl+F5; a long press on Present | the floating toolbox's ⋯ | ⋮ → View; hold Present in "My tools" |
-| Settings (was also ⋮) | command bar / more tools | Ctrl+, | the floating toolbox's ⋯; the home screen's settings | "My tools" |
-| New | the tab strip's + (the full chrome: the bar has no New button there, since `qt/record-place`) | Ctrl+Shift+N | the keys (the compact chrome has no tab strip; the classic tool square had New until 0.8.0) | "My tools"; new documents also in the tab overview and the library |
-| Open, Save | command bar / more tools | Ctrl+O, Ctrl+S | the keys | "My tools" |
-| Record audio (hold: the play tool, the recordings) | command bar / more tools (on the rail until 0.8.0) | Ctrl+Shift+R | the floating toolbox's ⋯ | "My tools" → Insert |
-| Edit as notes, Open externally (were also ⋮ → Document) | command bar / more tools (a `.md`: in the format bar or its more tools) | | | "My tools" |
+| Pen, highlighter, eraser, text box, sticky note, shapes, laser pointer, snip (each with its color, width, …: the editor) | the toolbox's entries (on the rail, or carried to the top bar) | P H E T | the toolbox (docked; floating in the compact chrome) | the dock (the top bar in the app bar) |
+| Hand, select, snip, mark PDF text | items of the arrangement, the rail's at a first start | A S L, Shift+S | as above; ⋮ → Tools | the dock; ⋮ → Tools |
+| The finger draws, write on the page, setsquare / compass | items of the arrangement, the top bar's at a first start | Ctrl+Alt+M | the floating toolbox's ⋯ (what the top bar holds); ⋮ → Tools | the top bar in the app bar; ⋮ → Tools |
+| Insert image, stickers, add a page (its menu: templates, Insert pages…), record audio | the top bar's at a first start | I, Ctrl+N, Ctrl+Shift+R | the floating toolbox's ⋯; ⋮ → Tools (⋮ → Page → Insert pages… is kept) | the top bar; ⋮ → Tools |
+| Search, full screen, present, Zen, read, replay | the top bar's at a first start | Ctrl+F, F11, F5, Ctrl+Alt+Z, Ctrl+Alt+R | the floating toolbox's ⋯ (in full screen: "Leave full screen", Esc); ⋮ → View | the top bar; ⋮ → View |
+| Present without controls | ⋮ → View (it differs from Present); Present's menu on a bar (held) | Ctrl+F5 | the floating toolbox's ⋯ | ⋮ → View |
+| Settings | the top bar's at a first start; ⋮ → Settings | Ctrl+, | the floating toolbox's ⋯; the home screen's settings | the top bar; ⋮ |
+| New | the tab strip's + where it is shown | Ctrl+Shift+N | the floating toolbox's ⋯ → New document (qt/top-bar) | the catalog can place it; ⋮ → Document; the tab overview and the library |
+| Open, Save, share, print, a milestone, tags, favourite, bookmark | the top bar's at a first start | Ctrl+O, Ctrl+S, Ctrl+P | the floating toolbox's ⋯ | the top bar; ⋮ |
+| Edit as notes, Open externally | the top bar's end, while offered (not items of the arrangement) | | | the top bar; ⋮ → Document |
 | All pages (was also ⋮ → View) | view pill (the compact pill: its page number) | Ctrl+Alt+G | the view pill stays in the compact chrome | the dock's page number |
 | Contents overview (was the tool bar) | view pill | Ctrl+Alt+O | as above | the page grid's pill (the dock's page number) |
 | Page layout | view pill (long press: the menu); phone portrait and the compact pill: ⋮ → View → Page layout… | | | ⋮ → View → Page layout… |
 | Zoom fits | view pill's percentage | Ctrl+0, Ctrl+1 | | the page grid's pill (its zoom %); pinch |
 | The page sidebar (was the tool bar's Pages button) | the arrow at the canvas's edge / the sidebar's edge | | not in the compact chrome | the arrow (a drawer) |
-| Hide the command bar (was also ⋮ → View) | the tab on the bar's edge | | the strip at the top edge shows it again | – (the dock stays; Zen hides everything) |
+| Hide the top bar (was also ⋮ → View) | the tab on the bar's edge | | the strip at the top edge shows it again | – (the dock stays; Zen hides everything) |
 | Toolbox position | ⋮ → View → Toolbox position; its grip dragged to an edge | | | – (the dock) |
 | Snap to the grid (was the shapes menu) | Settings | | | Settings |
 | Plain text box (removed) | – (T and the text box make Markdown text boxes; plain texts are still edited) | | | – |
 | All open documents | the tab strip's overview button, ⋮ → View | Ctrl+Shift+E | the tab dots (compact) | the tab count of the app bar (a tap; a double tap: the document used before; a long press: the ones used lately) |
-| Undo, redo | the head of the toolbox (never in "more tools"; qt/undo-redo, before: the view pill); a text document: the start of its format bar | Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y (the tips show the keys set) | the floating toolbox; a text document in the compact chrome: the view pill | the dock; with the soft keyboard open, the end of the format bar above it |
+| Undo, redo | the head of the toolbox (pinned; qt/undo-redo, before: the view pill); a text document: the start of its format bar | Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y (the tips show the keys set) | the floating toolbox; a text document in the compact chrome: the view pill | the dock; with the soft keyboard open, the end of the format bar above it |
 
-Zen hides everything; its dot and the dot's pill bring the controls back ([zen.md](zen.md)). Zen: ⋮ → View → Zen, the
-command bar's button where there is room, Ctrl+Alt+Z, the floating toolbox's ⋯. Read only: ⋮ → View → Read only, the
-dot's pill, the floating toolbox's ⋯.
+Zen hides everything; its dot and the dot's pill bring the controls back ([zen.md](zen.md)). Zen: the top bar (on every
+screen, phones too), ⋮ → View → Zen, Ctrl+Alt+Z, the floating toolbox's ⋯; Android's Back leaves it. Read only: ⋮ →
+View → Read only, the dot's pill, the floating toolbox's ⋯.
 
 ## Panels (`qt/adaptive-panels`)
 
@@ -433,8 +402,12 @@ reference's pill is its page number and a ⋮ with the rest (`referenceMoreButto
 
 ### The format bar
 
-`MarkdownFormatBar.qml` is a flexible filler like the tool bar. On a desktop and a tablet it takes the richest form
-that fits the room left of its trailing buttons (a text document's » and ⋮), in this order:
+`MarkdownFormatBar.qml`. **A text document's** bar holds its commands since qt/top-bar: undo and redo at its start, all
+the formatting as buttons, then the top bar itself at the end of the same row (`formatCommands`), ⋮ pinned at its end;
+nothing folds, and the row scrolls as the bars do (its view ends through the middle of a button, a fade at the end
+that has more, the wheel scrolls it; `holdsCommands`, `scrollsAsBar`). At 1366 px the formatting and the first
+commands are in sight, at about 1800 px everything. Markdown on a page and the panel's bar (no commands) keep the ladder:
+on a desktop and a tablet they take the richest form that fits, in this order:
 
 1. everything as buttons: ¶ H1 H2 H3 | the six marks | the four lists | code block, table, formula block, image, rule,
    page break;
@@ -445,8 +418,6 @@ that fits the room left of its trailing buttons (a text document's » and ⋮), 
    "Insert" gets its word back if it fits then;
 5. only then (a window under ~680 px, 600×800) the row scrolls.
 
-A text document's merged bar (» and ⋮ at its end): all buttons at 1024 px and wider, "¶ ▾ … + Insert" at 800, "¶ ▾ … +"
-at 720 (a 2-in-1 upright), scrolling at 600.
 
 The marks and the lists always stay in the row. On a phone the row scrolls sideways (the norm of mobile editors), with
 fading edges where there is more (`formatBarFadeLeft`, `formatBarFadeRight`); while the soft keyboard is open for the
@@ -599,47 +570,48 @@ phone portrait) and unfolded (900 × 1000: tablet portrait, which keeps the tabl
 bar and the docked toolbox), and very small or slim desktop windows of the same classes.
 
 In the phone classes (`win.phoneLayout`: phone portrait, phone short, tiny, by the layout class) the full chrome is the
-**phone chrome** (`win.phoneChrome`): no tab strip, no command bar and no view pill, but
+**phone chrome** (`win.phoneChrome`): no tab strip, no bar of its own for the top bar and no view pill, but
 
-**The app bar** (`PhoneAppBar.qml`, `phoneAppBar`, 48 px below the status bar, `safeTop`):
+**The app bar** (`PhoneAppBar.qml`, `phoneAppBar`, 48 px below the status bar, `safeTop`; with the top bar under it
+upright):
 
 | Where | What |
 | --- | --- |
 | left | the library (`phoneHomeButton`) |
-| middle | the document's title (`phoneTitle`, elided in the middle, ● when it has changes) with small dots for the open documents under it (`phoneTabDots`; more than 12: "3 / 14"). A **swipe along the bar** (`phoneTabSwipe`, 40 px): to the left the next document, to the right the previous one (round the ends); only on the bar, the page keeps every touch |
+| middle | the document's title (`phoneTitle`, elided in the middle, ● when it has changes) with small dots for the open documents under it (`phoneTabDots`; more than 12: "3 / 14"). A **swipe along the title** (`phoneTabSwipe`, 40 px): to the left the next document, to the right the previous one (round the ends); only there, the page keeps every touch and the top bar scrolls |
+| the top bar (qt/top-bar) | **the same top bar as on a larger screen** (its items in the user's order, scrolling, "+" at its end; `phoneToolsSlot`): upright (a bar narrower than 600 px) a row of its own under the title (the app bar is then 48 px + the top bar's 56 taller); held sideways in the row between the title (a quarter of the width) and the tab count. Zen is on it |
+| held sideways | the page number (`phonePageButton`: all pages), before the tab count: the dock at the side gives its room to the tools |
 | right | the **tab count** (`phoneTabCount`, the number in a square): a tap shows all open documents (after the double-tap time, like the zoom %, so a double tap does not flash them); a **double tap** goes back to the document used before (Alt+Tab: `app.previousUsedTab()`, the order of use kept by `TabManager::usedOrder`); a **long press** lists the documents used lately, the current one first (`recentTabsMenu`, a sheet) |
-| far right | ⋮, the command bar's own (`toolEnd` goes into `phoneAppBar.moreSlot`) |
+| far right | ⋮, the top bar's own (`toolEnd` goes into `phoneAppBar.moreSlot`) |
 
 New documents come from the overview ("+") and the library. Ctrl+Tab and Ctrl+Shift+Tab work as before. On the home
 screen of a phone class the app bar stays in every chrome (the way back to the documents): the home button is marked,
 the title is the document behind the home screen (greyed; a tap goes back to it), no ⋮.
 
-**The tool dock** (`PhoneDock.qml`, `phoneDock`) instead of the command bar and the pills: it hosts **the toolbox**
+**The tool dock** (`PhoneDock.qml`, `phoneDock`) instead of the view pill: it hosts **the toolbox**
 ([toolbox.md](toolbox.md), "Where it is"): undo and redo, the rail's items scrolling sideways (the one in hand
-scrolled into view), **My tools** and the page number (`toolboxPageButton`: all pages; the page grid's pill has the
+scrolled into view) with **"+"** (the catalog, a sheet; `toolboxAddInline`) after them, and the page number
+(`toolboxPageButton`: all pages; the page grid's pill has the
 **contents** and the **zoom %** there, its fits as a sheet; a fit goes back to the page; no − / +, the pinch sets the
 columns). While the soft keyboard is open (the dock gone) undo and redo are at the end of the format bar above it
-(`keyboardUndoButton`, `keyboardRedoButton`). A text document (no ink tools) keeps the dock's own cells: All tools
-(`dockToolsButton`), undo, redo (`dockUndoButton`, `dockRedoButton`) and the page number (`dockPageButton`). (The
-classic dock's tool in use, color and width cells went with the classic tool bar in 0.8.0.)
+(`keyboardUndoButton`, `keyboardRedoButton`). A text document (no ink tools) keeps the dock's own cells: undo, redo
+(`dockUndoButton`, `dockRedoButton`) and the page number (`dockPageButton`); its commands are the top bar's and ⋮'s.
+(The classic dock's tool in use, color and width cells went with the classic tool bar in 0.8.0; "All tools" with "My
+tools" in qt/top-bar.)
 
 - Phone portrait: at the bottom, above the navigation bar (`win.safeBottom`), in the window's footer: the page ends
   above it and keeps the whole width.
 - Held sideways (phone short, or a tiny window in landscape; `win.dockVertical`): a **rail at the right side**, the
-  same cells from the top down, below the app bar. A phone in landscape lacks height, not width. The page, the
-  Markdown source beside it and the reference end at the rail (`win.dockRail`).
+  same cells from the top down, below the app bar; the page number is in the app bar then (qt/top-bar: with the
+  insets the rail had room for about one tool once undo, redo, "My tools" and the page number took theirs). A phone in
+  landscape lacks height, not width. The page, the Markdown source beside it and the reference end at the rail
+  (`win.dockRail`).
 - Full screen (the compact chrome) on a phone: the toolbox floats at its edge as on a desktop (since 0.8.0; before, the
   classic tool square was there).
 
-**My tools** (`PhoneToolSheet.qml`, `phoneToolSheet`, a `BottomSheet`): the user's tools first (`sheetEntry_<id>`: a
-tap takes one, a tap on the one in hand edits it, a long press its menu) and "Add a tool", then every other tool and
-variant as a cell with its icon and its name under it (`toolCell_<group>_<variant>`, `toolCell_<button>`), in
-sections: Other tools (hand, the finger draws, write on the page, mark PDF text ↔ copy handwriting, the emoji while
-writing), Select and snip, Setsquare and compass, Insert (image, stickers, record, add a page), Document and view
-(search, present, full screen, settings, new, open, save, edit as notes, open externally). One tap takes it and the
-sheet goes; a long press on a button with a long press of its own does that (Add a page: Insert pages…; Present:
-without controls; Write on the page: its source). This sheet is the phone's "more tools" (»): the phone chrome has
-none.
+**My tools** (the sheet of every tool, `PhoneToolSheet.qml`) is gone since qt/top-bar: the tools and commands are on
+the two bars (the same items as on a larger screen), every command is in ⋮, and "+" (the catalog, a sheet) adds a tool
+or puts an item that is on neither bar onto one.
 
 **Sheets**: `BottomSheet.qml` is the sheet of the phone classes that is not a menu: as wide as the window (at most
 640 px), at most 85 % high (the rest scrolls), above `safeBottom`, the handle of `MenuSheet`, Esc and the back key
@@ -692,7 +664,7 @@ bottom inset (0 where a footer took it: the dock, the keyboard's room).
 | --- | --- |
 | top | the app bar (`topInset`), the tab strip, the tab dots and the floating toolbox of the compact chrome, the search bar, the geometry pill, full-screen sheets and dialogs, Settings, the tab overview |
 | bottom | the dock, the floating toolbox, the view pill, the back / forward pill, the note of a file shown read-only, the selection and note pills, the snackbar (in the document and on the home screen), the page grid's and the contents' pills, the reference's pill, the canvas's scroll bars, the Zen dot and its pill, presenting's page number, the drawer's lists, the Markdown source's text, bottom sheets (menus, a tool's editor, page menu, emoji, the reference's page field), dialogs, Settings, the tab overview, the home screen's "+" and selection bar |
-| left / right | the app bar's and the tab strip's ends, the command bar, the docked toolbox (it grows by the inset), the dock's rail (the right inset) and its row, the drawer (beside a left cut-out, `sidebarLeftFill` has its color under it), the sidebar's arrow, the floating toolbox, the view pill, the scroll bars, the Markdown source beside the page, the format bar's row, the home screen (its color under the insets), the sheets (as wide as the safe area, centred in it), dialogs, Settings, the tab overview |
+| left / right | the app bar's and the tab strip's ends, the top bar, the docked toolbox (it grows by the inset), the dock's rail (the right inset) and its row, the drawer (beside a left cut-out, `sidebarLeftFill` has its color under it), the sidebar's arrow, the floating toolbox, the view pill, the scroll bars, the Markdown source beside the page, the format bar's row, the home screen (its color under the insets), the sheets (as wide as the safe area, centred in it), dialogs, Settings, the tab overview |
 
 Bottom sheets take their place from `win.sheetWidth`, `sheetX`, `sheetBottom` (the keyboard's top while it is open,
 else the window's bottom) and `sheetBottomPadding` (the room for the navigation bar under their last row);
@@ -727,7 +699,7 @@ The author's decisions of 2026-09-26 on the audit's proposals:
 
 | Step | When (automatic) | What changes | Block |
 | --- | --- | --- | --- |
-| 0 | desktop wide, room for the sidebar | everything as today; the tool bar grouped, ⋮ pinned (**done**; since 0.8.0 the command bar and the toolbox) | `qt/adaptive-toolbar` |
+| 0 | desktop wide, room for the sidebar | everything as today; the tool bar grouped, ⋮ pinned (**done**; since 0.8.0 the toolbox, since qt/top-bar the scrolling top bar) | `qt/adaptive-toolbar` |
 | 1 | window < ~1110 px, or tablet portrait | the sidebar is a drawer (**done**; the slide, Esc and the phone width: qt/adaptive-panels); the Markdown source below the page in portrait, the reference top and bottom (**done**) | this block, `qt/adaptive-panels` |
 | 1b | tablet portrait (a 2-in-1 or Surface upright) | **two tool rows** of the classic bar at the top (**done**; removed in 0.8.0 with it: the toolbox's slim rail at the right leaves an A4 page well visible) | `qt/adaptive-toolbar`, `qt/classic-removal` |
 | 2 | phone portrait (w < 600) or short (h < 560) | the phone chrome in the window: the app bar (the title, tab dots, the tab count), a **bottom tool dock** in phone portrait and a rail at the side in landscape (**done**); dialogs and menus as sheets (**done**) | `qt/phone-chrome`, `qt/adaptive-menus`, `qt/adaptive-dialogs` |
@@ -799,12 +771,12 @@ so they are not size classes either:
 - `XQT_UI_ADAPTIVE=1 ./xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.allSizesDialogs'`: the same for all 48 dialogs
   (document, library, settings) at the 18 sizes (about a minute). `XQT_UI_DIALOG_SHOTS=<folder>` saves a picture of
   each (without the dialogs' backgrounds off-screen, except full-screen sheets).
-- The command bar and the toolbox (qt/adaptive-toolbar; since 0.8.0 `checkToolBar` checks the toolbox), in the same
-  checks at the five sizes (and all 18 with `XQT_UI_ADAPTIVE=1`): ⋮ shown and outside anything that scrolls; the
-  toolbox docked with undo and redo at its head and the tools that are never hidden on its rail or in a stack of it;
-  "more tools" only when something is in it; the view pill inside the window; nothing in "more tools" at 960×1392;
-  the phone chrome's dock with the toolbox and "My tools". `theToolsFitAt720`, `moreToolsHoldsWhatDoesNotFit` (a text
-  document's format bar), `sidebarArrowOpensAndCloses`, `viewPillWithContentsInsideAndClearOfTheReference` (five
+- The top bar and the toolbox (qt/adaptive-toolbar; since 0.8.0 `checkToolBar` checks the toolbox, since qt/top-bar
+  the top bar), in the same checks at the five sizes (and all 18 with `XQT_UI_ADAPTIVE=1`): ⋮ shown and outside
+  anything that scrolls; the toolbox docked with undo and redo at its head; the finger switch and writing on the top
+  bar; no "more tools"; the view pill inside the window; the phone chrome's dock with the toolbox, the app bar with the
+  top bar and Zen on it. `theToolsFitAt720` (the top bar scrolls), `newIsTheTabStripsPlusWhereThereIsOne`,
+  `sidebarArrowOpensAndCloses`, `viewPillWithContentsInsideAndClearOfTheReference` (five
   sizes, a reference open). (`twoRowsFitAt720`, `toolBarPlaceIsChosenPerSizeClass` and
   `colorsAndWidthsTakeTheRoomThereIs` went with the classic bar.)
   `XQT_TOOLBAR_SHOTS=<folder> ./xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.toolBarPictures'` saves pictures of
@@ -813,9 +785,10 @@ so they are not size classes either:
   half, below at 60 %; the page's width; the view pill inside it), `sourceDividerIsDraggedAndRememberedPerClass`,
   `referenceSplitFollowsTheAreaAndItsPillsStayApart` (the five sizes: orientation, the ratio kept, both pills inside
   their halves and apart, the narrow pill and its ⋮ sheet), `compactViewPillOnAPhone`, `sidebarDrawerKeysAndPhoneWidth`
-  (Esc, the back key, 85 %, larger thumbnails, the modes), `formatBarFoldsIntoInsertInsteadOfScrolling` (no
-  scrolling at 1920, 1280 and 960, at 800 and 720 only once all is folded; the Insert menu fits and its rule goes in;
-  40 px headings with touch; a phone scrolls with fading edges), `pillsKeepClearOfTheViewPill` (selection, back /
+  (Esc, the back key, 85 %, larger thumbnails, the modes), `formatBarFoldsIntoInsertInsteadOfScrolling` (a text
+  document: nothing folds, the commands at the row's end, the formatting first in sight, the row scrolls at 1280 and
+  narrower; Markdown on a page: the Insert menu at 800 and it fits; 40 px headings with touch; a phone scrolls with
+  fading edges), `pillsKeepClearOfTheViewPill` (selection, back /
   forward, the floating toolbox at the right and the bottom edge).
 - `MainWindowTest.zoomPercentageTapDoubleTapAndHold`, `cyclingToolButtons`, `theEraserEntryErasesTheWayItsEditorSays`,
   `theGeometryButtonPutsTheSetsquareOnThePage`, `aFingerHeldOnAButtonShowsItsName`.
@@ -830,12 +803,12 @@ so they are not size classes either:
   `theTabOverviewOpensFromTheTabDotsOnAPhone`.
 - The phone chrome (qt/phone-chrome), `PhoneChromeTest.*` (label `ui`, about 30 s): the app bar and the dock at 412 ×
   915, 915 × 412 and 340 × 700 with a bottom safe area of 24 px (inside the window, above it, the rail at the side),
-  the toolbox in the dock, every tool in "My tools"; a swipe on the bar; the tab count's tap (after
+  the toolbox in the dock, the top bar in the app bar; a swipe on the title; the tab count's tap (after
   the double-tap time), double tap (A → B → C: back to B, and to C) and long press (the sheet of the ones used lately,
-  in that order); a tool's editor, its menu and "My tools" as sheets at the bottom, a tool from the sheet in the dock;
+  in that order); a tool's editor, its menu and the catalog as sheets at the bottom, the tool in hand in the dock;
   the page number's grid with the contents and the zoom; Zen automatic only in a tiny window (left: remembered) and
   its pill inside it; presenting without controls with the Zen dot, with the controls none; no tab dragged out with `mobilePlatform`; no breadcrumbs at the library's
-  top; the Fold 7 folded and unfolded (900 × 1000 and 960 × 1392: the command bar and the docked toolbox). In the checks at the five sizes
+  top; the Fold 7 folded and unfolded (900 × 1000 and 960 × 1392: the top bar and the docked toolbox). In the checks at the five sizes
   and the full walk, `checkPhoneChrome` replaces the tool bar's checks in the phone classes. `Tabs.theOrderOfUse`
   (label `shell`): the order of use.
 - Safe areas and the soft keyboard (qt/safe-areas-keyboard), `SafeAreasKeyboardTest.*` (label `ui`, about 25 s):

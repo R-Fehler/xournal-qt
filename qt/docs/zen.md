@@ -8,13 +8,13 @@ Three switches, each on its own; the window's state (full screen) is the third:
 
 | | What | How |
 | --- | --- | --- |
-| **Full screen** (`win.fullScreenMode`) | the compact chrome in a full-screen window, as before | F11, the command bar's button |
-| **Zen** (`win.zen`) | everything around the page hidden: the toolbox (docked, floating, the phone's dock), the command bar, the tab strip and the tab dots, the phone's app bar, the sidebar and its arrow, the view pill, the back / forward pill and the other pills over the page (`win.hudHidden`). The pen keeps writing | ⋮ → View → Zen (checkable), the command bar's `zen` slot (a button where there is room; block 3's top bar places it), **Ctrl+Alt+Z** (changeable), the floating toolbox's ⋯; automatic in a tiny window |
+| **Full screen** (`win.fullScreenMode`) | the compact chrome in a full-screen window, as before | F11, the top bar's button |
+| **Zen** (`win.zen`) | everything around the page hidden: the toolbox (docked, floating, the phone's dock), the top bar, the tab strip and the tab dots, the phone's app bar, the sidebar and its arrow, the view pill, the back / forward pill and the other pills over the page (`win.hudHidden`). The pen keeps writing | the top bar's Zen (`zenButton`, in its first layout on every screen, phones too; qt/top-bar), ⋮ → View → Zen (checkable), **Ctrl+Alt+Z** (changeable), the floating toolbox's ⋯; automatic in a tiny window |
 | **Read only** (`win.readOnly`) | the page cannot be written on (`DocumentCanvas.readingOnly`): the pen and the fingers scroll, PDF text can be selected and copied; the left and right fifths of the page turn the pages | ⋮ → View → Read only (checkable), the dot's pill, the floating toolbox's ⋯ |
 
 Combinations:
 
-- **Read** (Ctrl+Alt+R, ⋮ → View → Read, the command bar's Read): Zen and read only, in full screen (a tiny window stays
+- **Read** (Ctrl+Alt+R, ⋮ → View → Read, the top bar's Read): Zen and read only, in full screen (a tiny window stays
   a window). Ctrl+Alt+R again ends it: read only off, and Zen and full screen where Read turned them on. Esc ends it and
   leaves Zen. "Show controls" leaves only Zen (read only and full screen stay).
 - **Present without controls** (Ctrl+F5, the Present button held, ⋮ → View): presenting in Zen. While presenting, Zen
@@ -52,6 +52,13 @@ write" in full screen, "Read only — ⋮ → View → Read only to write" in a 
 ## Leaving
 
 Esc (the pill first, a selection first; while presenting Esc ends presenting), Zen's keys again, "Show controls".
+**Android's Back** (the key and the back gesture; the author, 2026-10-06: "the back gesture or button should leave zen
+mode on android") leaves Zen before anything else Back does (qt/top-bar; `zenBackShortcut`): the pill closes with it,
+Read ends (read only off, and the full screen it entered), presenting without controls gets its controls back
+(presenting goes on). Only a popup open over the page takes Back first, since it is in front: a sheet, a dialog, the
+tool editor, the stickers or the emoji (they count themselves open, `win.takeBack`, so that two shortcuts on one key are
+never ambiguous); the next Back leaves Zen. Tested off-screen with `Qt::Key_Back` (`ToolboxTest.backLeavesZen`); the
+gesture itself is on the device checklist.
 Read ends with its keys again or Esc. Showing the home screen ends Zen by hand, Read and read only.
 
 ## Gone
@@ -61,7 +68,7 @@ The reader chrome (`chromeMode` "reader", its automatic switch in a tiny window,
 no longer read; the compact chrome is full screen's only), presenting's own corner field (`presentCornerMark`: the Zen
 dot replaces it while presenting without controls) and the lock mark.
 
-Tests: `ReadingTest` (ToolboxTest.cpp: Read, read only on its own, Zen hides all but the page and the dot, the pill and
+Tests: `ToolboxTest.backLeavesZen`, `ToolboxTest.zenIsOnTheTopBarAtEverySize`, `ReadingTest` (ToolboxTest.cpp: Read, read only on its own, Zen hides all but the page and the dot, the pill and
 its entries, Zen writes, the note once), `PhoneChromeTest.zenIsAutomaticOnlyInATinyWindow`,
 `PhoneChromeTest.presentingWithoutControlsHasTheZenDot`, `MainWindowTest.presentingWithoutControls`,
 `ReadingPhone.ui@phone`.
