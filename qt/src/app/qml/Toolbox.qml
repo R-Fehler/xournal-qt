@@ -1,11 +1,15 @@
 // The toolbox (qt/docs/toolbox.md): the user's own tools in a rail docked to a side of the canvas (right by default;
 // left, top or bottom by choice, per window size), like pens lying sorted in a box on the table. One element in the
-// window, in full screen and on phones (the dock: the same rail at the bottom edge).
-//   head   undo, redo (pinned)
-//   middle the rail's items as the arrangement has them (ToolboxModel): the user's tools, dividers, and the app's own
-//          tools (hand, select, snip, mark PDF text by default: the window's buttons, lent to the rail); it scrolls
-//   tail   "+" (add a tool), ⋯ (full screen: what the tab strip and the command bar hold there); a phone's dock: "My
-//          tools" and the page number (pinned)
+// window, in full screen and on phones (the dock: the same rail at the bottom edge). The same element is the top bar
+// (`bar: "top"`, qt/top-bar): the other list of the one arrangement, sideways, without a grip.
+//   head   undo, redo (pinned; the top bar: only where no rail is shown)
+//   middle the bar's items as the arrangement has them (ToolboxModel): the user's tools, dividers, groups, and the app's
+//          own tools and commands (hand, select, …; open, save, …: the window's buttons, lent to the bar); it scrolls
+//   tail   "+" (the catalog: a new tool, or an item not placed), ⋯ (full screen: what the top bar holds there); a
+//          phone's dock: the page number ("+" at the end of its items there); the top bar: what Main puts there (the
+//          buttons of the moment, ⋮) (pinned)
+// An item is carried between the two bars (`peer`): held until it lifts, over the other bar it shows a drop line there;
+// let go away from both, it leaves the bars (a tool is removed, an app item goes back into the catalog).
 // The middle scrolls when its items do not fit (qt/rail-scroll; before, sections folded into stacks): the same order on
 // every screen, nothing folded. When it scrolls, it ends through the middle of a cell (half of the next one shows) and
 // fades at the end that has more; a tool taken by a key or elsewhere is scrolled into view; where it was scrolled to is
@@ -21,7 +25,24 @@ import "DevicePixels.js" as DevicePixels
 
 Rectangle {
     id: box
-    objectName: "toolbox"
+    objectName: isTop ? "topBar" : "toolbox"
+    /// The list of the arrangement it shows: "rail" (beside the page) or "top" (the top bar)
+    property string bar: "rail"
+    readonly property bool isTop: bar === "top"
+    /// The other bar (an item carried over it goes there)
+    property Item peer: null
+    /// Undo and redo at its head (the rail: always; the top bar: only where no rail is shown)
+    property bool headShown: !isTop
+    /// "+" at the end of its items, scrolling with them (the phone's dock: its room goes to the tools)
+    property bool addInline: false
+    /// The name of one of its parts: the rail's as before, the top bar's of its own ("toolboxMiddle" → "topBarMiddle")
+    function named(n) {
+        if (!isTop) return n
+        if (n.indexOf("toolbox") === 0) return "topBar" + n.substring(7)
+        if (n.indexOf("rail") === 0) return "top" + n.substring(4)
+        if (n.indexOf("tool") === 0) return "top" + n.substring(4)
+        return n
+    }
     /// The edge it is docked to: "left", "right", "top", "bottom"
     property string edge: "right"
     readonly property bool vertical: edge === "left" || edge === "right"
@@ -29,15 +50,15 @@ Rectangle {
     property bool floating: false
     /// ⋯ at its end (full screen: present, leave full screen, search, settings)
     property bool moreShown: false
-    /// The phone's dock (qt/docs/toolbox.md, "On a phone"): undo, redo, the same items scrolling sideways, "My tools"
-    /// (the sheet with all of them and "Add a tool") and the page number
+    /// The phone's dock (qt/docs/toolbox.md, "On a phone"): undo, redo, the same items scrolling sideways, "+" at their
+    /// end, and the page number
     property bool compact: false
     /// The window's buttons of the app's items by name (Main.qml's toolArea.slots): those on the rail are lent to it
     property var appButtons: ({})
     /// It is shown: the buttons of its app items are its own (the command bar leaves them out)
     property bool lending: false
     /// The size of a tool's cell: a finger's target in the touch profile
-    readonly property real cell: win.adaptive.touchProfile ? win.adaptive.minTarget : 44
+    property real cell: win.adaptive.touchProfile ? win.adaptive.minTarget : 44
     /// Its thickness across the edge
     readonly property real thickness: cell + 8
     /// Room at its ends that is not its own (a navigation bar under a rail's end, a cut-out)
@@ -53,16 +74,17 @@ Rectangle {
     signal menuRequested(var entry, Item button, point pos)
     signal addRequested(Item button)
     signal moreRequested(Item button)
-    /// The phone's dock: "My tools" (the sheet of every tool) and the page number (all pages)
-    signal allToolsRequested()
+    /// The phone's dock: the page number (all pages)
     signal pagesRequested()
     /// Its grip dragged: to another edge of the window (the window highlights the edge it would go to)
     signal gripMoved(point scenePos)
     signal gripDropped(point scenePos)
     /// A tool carried onto another made a group (`before`: the arrangement to go back to, "Grouped · Undo")
     signal grouped(string groupId, string before)
+    /// An item carried away from both bars left them (`before`: the arrangement to go back to, "Removed · Undo")
+    signal removed(var entry, string before)
 
-    color: "#ffffff"
+    color: isTop ? "transparent" : "#ffffff"
     radius: floating ? 14 : 0
     border.width: floating ? 1 : 0
     border.color: "#d5d8dc"
@@ -70,7 +92,7 @@ Rectangle {
     readonly property real hair: DevicePixels.whole(1, Screen.devicePixelRatio)
     // The line towards the pages (docked)
     Rectangle {
-        visible: !box.floating
+        visible: !box.floating && !box.isTop
         color: "#d5d8dc"
         x: box.edge === "left" ? parent.width - box.hair : 0
         y: box.edge === "top" ? parent.height - box.hair : 0
@@ -85,9 +107,11 @@ Rectangle {
         return b && b.offered !== false ? b : null
     }
     /// The rail's items as the arrangement has them: {kind: "entry" | "app" | "group" | "divider", key, id, entry, name}
+    /// The bar's list in the arrangement
+    readonly property var barList: (store.revision, isTop ? store.top : store.entries)
     readonly property var itemsNow: {
         const out = []
-        const list = (store.revision, store.entries)
+        const list = barList
         for (let i = 0; i < list.length; ++i) {
             const e = list[i]
             if (e.divider === true) {
@@ -169,6 +193,12 @@ Rectangle {
     function tapGroup(gid, button) {
         const ms = groupMembers(gid)
         if (ms.length === 0) return
+        // A group with a command in it (open, share, Zen, the finger switch, …): its list, always; nothing runs by
+        // accident (qt/top-bar)
+        if (ms.some(isCommand)) {
+            openGroup(gid, button)
+            return
+        }
         let at = -1
         for (let i = 0; i < ms.length; ++i) if (memberInHand(ms[i])) at = i
         if (at < 0) takeMember(groupShown(gid))
@@ -184,7 +214,7 @@ Rectangle {
     }
     /// An app tool of a group taken another way (a key, the sheet): the group shows it
     function noteAppUse() {
-        const list = store.entries
+        const list = barList
         for (let i = 0; i < list.length; ++i) {
             if (list[i].group !== true) continue
             const ms = list[i].members
@@ -196,14 +226,17 @@ Rectangle {
 
     // --- the lengths: the middle scrolls when its items do not fit ----------------------------------------------------
     readonly property real length: vertical ? height : width
-    /// Where the middle begins along the rail (after the grip, the head and its line)
-    readonly property real middleStart: (vertical ? headGrid.y + headGrid.height : headGrid.x + headGrid.width) + 9
+    /// Where the middle begins along the rail (after the grip, the head and its line; without a head, after the grip or
+    /// the inset)
+    readonly property real middleStart: headShown ? (vertical ? headGrid.y + headGrid.height : headGrid.x + headGrid.width) + 9
+                                                  : (grip.visible ? (vertical ? grip.y + grip.height : grip.x + grip.width)
+                                                                  : startInset) + 4
     /// What the rail takes along its length besides the middle (none of it depends on the rail's length)
     readonly property real overhead: middleStart + 9 + (vertical ? tailGrid.height : tailGrid.width) + 4 + endInset
     /// The room of the middle as laid out now
     readonly property real middleRoom: length - overhead
     /// The length the middle's items take (and a little room after the last, for the mark of a place there)
-    readonly property real contentLength: itemsLength(items) + 4
+    readonly property real contentLength: itemsLength(items) + (addInline ? cell : 0) + 4
     function itemsLength(list) {
         let n = 0
         for (let i = 0; i < list.length; ++i) n += list[i].kind === "divider" ? 9 : cell
@@ -219,6 +252,7 @@ Rectangle {
             if (items[i].kind !== "divider" && at + cell / 2 <= room) best = at + cell / 2
             at += items[i].kind === "divider" ? 9 : cell
         }
+        if (addInline && at + cell / 2 <= room) best = at + cell / 2
         return best
     }
     readonly property real viewLength: cutFor(middleRoom)
@@ -226,6 +260,23 @@ Rectangle {
     readonly property bool scrolls: contentLength > middleRoom + 0.5
     /// Its length with every item in sight (a floating rail is no longer than that)
     readonly property real naturalLength: overhead + contentLength
+    /// The middles of its buttons along it (a row it sits in ends through one of them: a text document's format bar)
+    function cutPoints() {
+        const out = []
+        const kids = middleGrid.children
+        for (let i = 0; i < kids.length; ++i) {
+            const k = kids[i]
+            if (!k.visible || (vertical ? k.height : k.width) < 20) continue
+            out.push(vertical ? middle.y + k.y + k.height / 2 - middle.contentY : middle.x + k.x + k.width / 2 - middle.contentX)
+        }
+        const tail = tailGrid.children
+        for (let i = 0; i < tail.length; ++i) {
+            const k = tail[i]
+            if (!k.visible || (vertical ? k.height : k.width) < 20) continue
+            out.push(vertical ? tailGrid.y + k.y + k.height / 2 : tailGrid.x + k.x + k.width / 2)
+        }
+        return out
+    }
     /// The length it takes when it may have `available` (floating: as long as its items, or cut through a cell)
     function lengthFor(available) {
         return naturalLength <= available ? naturalLength : overhead + cutFor(available - overhead)
@@ -273,6 +324,8 @@ Rectangle {
     }
     /// An app item that is a tool in hand (not a switch or a command)
     function isTool(name) { return ["hand", "select", "snip", "pdfText", "geometry"].indexOf(name) >= 0 }
+    /// A member that does something when tapped rather than being taken in hand: an app item that is not such a tool
+    function isCommand(m) { return !!m && m.app !== undefined && !isTool(m.app) }
     function revealInHand() { reveal(inHandButton()) }
     // A tool taken by a key, the sheet, a menu or the rail itself: in sight
     Connections {
@@ -290,8 +343,9 @@ Rectangle {
     // (within the contents still, and the tool in hand in sight: a window made smaller, the keyboard, the insets)
     onViewLengthChanged: { scrollBy(0); Qt.callLater(revealInHand) }
     /// (the tool in hand in sight still: it matters more than the place of before)
+    readonly property string scrollKey: isTop ? "topBarScroll" : "toolboxScroll"
     function restoreScroll() {
-        const v = parseFloat(win.layoutChoice("toolboxScroll"))
+        const v = parseFloat(win.layoutChoice(scrollKey))
         scrollTo(isNaN(v) ? 0 : v)
         revealInHand()
     }
@@ -300,7 +354,7 @@ Rectangle {
         interval: 600
         onTriggered: {
             if (middle.moving) return restart()
-            win.chooseLayout("toolboxScroll", box.scrollPos > 0.5 ? String(Math.round(box.scrollPos)) : "")
+            win.chooseLayout(box.scrollKey, box.scrollPos > 0.5 ? String(Math.round(box.scrollPos)) : "")
         }
     }
     onScrollPosChanged: if (scrolls) rememberScroll.restart()
@@ -375,13 +429,17 @@ Rectangle {
     }
 
     // --- carrying: an item held, then moved to another place (qt/docs/toolbox.md, "Carrying") ---------------------------
-    /// The item being carried ("": none), where it would go (an index among the rail's items; -1: nowhere, it goes
-    /// back), and the mark of that place (along the rail, in the items' coordinates)
+    /// The item being carried ("": none), where it would go on this bar (an index among its items; -1: not here), and
+    /// the mark of that place (along the bar, in the items' coordinates)
     property string dragId: ""
     property var dragEntry: ({})
     property int dropIndex: -1
     property real dropMark: -1
+    /// Where the carried one is drawn (its centre, in the scene): along the bar it is over, else under the pointer
     property point dragPoint
+    /// The bar it would go to (this one, the other one), or none: it is away from both and leaves the bars
+    property Item dropBar: null
+    readonly property bool dragAway: dragId !== "" && dropBar === null
     /// The item the carried one is held over ("": none) and, once it was held there long enough (about 0.6 s), the one
     /// that shows a ring: let go there, the two are a group
     property string hoverId: ""
@@ -398,21 +456,47 @@ Rectangle {
         if (id !== "") dwell.restart()
         else dwell.stop()
     }
+    /// How far a point of the scene lies from the bar across it (0: over it); Infinity beyond its ends or where it is not
+    /// shown
+    function reach(scenePos) {
+        if (!visible || width <= 0 || height <= 0) return Infinity
+        const p = box.mapFromItem(null, scenePos.x, scenePos.y)
+        const along = vertical ? p.y : p.x, size = vertical ? height : width
+        if (along < -cell / 2 || along > size + cell / 2) return Infinity
+        const across = vertical ? p.x : p.y, thick = vertical ? width : height
+        return across < 0 ? -across : across > thick ? across - thick : 0
+    }
+    /// The centre line of the bar at a point of the scene (the carried one is drawn on it)
+    function onLine(scenePos) {
+        const p = box.mapFromItem(null, scenePos.x, scenePos.y)
+        const half = cell / 2
+        const q = vertical ? Qt.point(width / 2, Math.max(half, Math.min(height - half, p.y)))
+                           : Qt.point(Math.max(half, Math.min(width - half, p.x)), height / 2)
+        return box.mapToItem(null, q.x, q.y)
+    }
+    /// The carried item moved: over this bar, over the other one, or away from both (more than a cell and a half off)
     function dragTo(e, scenePos) {
         dragId = e.id
         dragEntry = e
-        const local = box.mapFromItem(null, scenePos.x, scenePos.y)
-        dragPoint = local
-        // Let go away from the rail: nothing changes (it goes back)
-        const away = vertical ? (local.x < -cell * 1.5 || local.x > width + cell * 1.5)
-                              : (local.y < -cell * 1.5 || local.y > height + cell * 1.5)
-        if (away) {
-            dropIndex = -1
-            dropMark = -1
-            hoverOver("")
+        const own = reach(scenePos)
+        const other = peer ? peer.reach(scenePos) : Infinity
+        if (Math.min(own, other) > cell * 1.5) {
+            dropBar = null
+            dragPoint = scenePos
+            clearDrop()
+            if (peer) peer.clearDrop()
             return
         }
-        // Near an end of a rail that scrolls: it scrolls along
+        const target = other < own ? peer : box
+        dropBar = target
+        dragPoint = target.onLine(scenePos)
+        if (target !== box) clearDrop()
+        else if (peer) peer.clearDrop()
+        target.dragOver(e, scenePos)
+    }
+    /// The carried item (from either bar) over this bar: the place it would go, or the item it would group with
+    function dragOver(e, scenePos) {
+        // Near an end of a bar that scrolls: it scrolls along
         const m = middle.mapFromItem(null, scenePos.x, scenePos.y)
         const pos = vertical ? m.y : m.x, size = vertical ? middle.height : middle.width
         if (scrolls) {
@@ -446,26 +530,50 @@ Rectangle {
             }
             mark = start + extent
         }
-        dropIndex = best >= 0 ? best : store.entries.length
+        dropIndex = best >= 0 ? best : barList.length
         dropMark = mark
+    }
+    /// Nothing marked on this bar
+    function clearDrop() {
+        dropIndex = -1
+        dropMark = -1
+        hoverOver("")
     }
     function dropAt(e, scenePos) {
         dragTo(e, scenePos)
+        const target = dropBar
+        if (target === null) {
+            leaveBars(e)
+        } else {
+            target.dropHere(e)
+        }
+        endDrag()
+        groupFlyout.close()
+    }
+    /// Let go over this bar: a group with the item that shows a ring, else in the marked place
+    function dropHere(e) {
         if (ringId !== "") {
             const before = store.snapshot()
             const g = store.group(e.id, ringId)
             if (g !== "") grouped(g, before)
         } else if (dropIndex >= 0) {
-            store.move(e.id, dropIndex)
+            store.moveTo(e.id, bar, dropIndex)
         }
-        endDrag()
-        groupFlyout.close()
+        clearDrop()
+    }
+    /// Let go away from both bars: it leaves them (a tool is removed, an app item goes into the catalog; a group with
+    /// its members); the last eraser stays where it is
+    function leaveBars(e) {
+        if (!store.canRemove(e.id)) return
+        const before = store.snapshot()
+        const entry = store.entry(e.id)
+        if (store.remove(e.id)) removed(entry, before)
     }
     function endDrag() {
         dragId = ""
-        dropIndex = -1
-        dropMark = -1
-        hoverOver("")
+        dropBar = null
+        clearDrop()
+        if (peer) peer.clearDrop()
     }
 
     // --- the app's buttons, lent to the rail ---------------------------------------------------------------------------
@@ -473,7 +581,7 @@ Rectangle {
     readonly property var fixedButtons: {
         if (!lending) return []
         const out = []
-        const list = (store.revision, store.entries)
+        const list = barList
         for (let i = 0; i < list.length; ++i) {
             const e = list[i]
             const names = e.app !== undefined ? [e.app]
@@ -497,11 +605,12 @@ Rectangle {
         for (let p = b.parent; p; p = p.parent) {
             if (p === box) {
                 b.parent = bank
-                break
+                b.width = Qt.binding(function() { return b.implicitWidth })
+                b.height = Qt.binding(function() { return b.implicitHeight })
+                return
             }
         }
-        b.width = Qt.binding(function() { return b.implicitWidth })
-        b.height = Qt.binding(function() { return b.implicitHeight })
+        // (not here any more: the other bar has it, and its size)
     }
     /// Takes a button into a cell of the rail
     function lend(b, cellItem) {
@@ -509,8 +618,9 @@ Rectangle {
         b.parent = cellItem
         b.x = 0
         b.y = 0
-        b.width = cell
-        b.height = cell
+        // (bound: the bar's cells change size with it, the top bar's in a text document's format bar)
+        b.width = Qt.binding(function() { return box.cell })
+        b.height = Qt.binding(function() { return box.cell })
     }
     onLendingChanged: if (lending) Qt.callLater(lendAll)
     /// (shown again: the cells take their buttons back from the command bar)
@@ -527,8 +637,8 @@ Rectangle {
     // The grip (a dotted cap at its start): the only place that moves the rail itself, to another edge
     Item {
         id: grip
-        objectName: "toolboxGrip"
-        visible: !box.compact  // (a phone's dock stays where it is)
+        objectName: box.named("toolboxGrip")
+        visible: !box.compact && !box.isTop  // (a phone's dock stays where it is; the top bar is where it is)
         x: box.vertical ? 0 : box.startInset
         y: box.vertical ? box.startInset : 0
         width: box.vertical ? box.width : 14
@@ -563,14 +673,15 @@ Rectangle {
     }
     Grid {
         id: headGrid
-        objectName: "toolboxHead"
+        objectName: box.named("toolboxHead")
         columns: box.vertical ? 1 : -1
         rows: box.vertical ? -1 : 1
         spacing: 0
-        x: box.vertical ? 4 : (grip.visible ? grip.x + grip.width : box.startInset + 4)
-        y: box.vertical ? (grip.visible ? grip.y + grip.height : box.startInset + 4) : 4
+        x: box.vertical ? (box.width - box.cell) / 2 : (grip.visible ? grip.x + grip.width : box.startInset + 4)
+        y: box.vertical ? (grip.visible ? grip.y + grip.height : box.startInset + 4) : (box.height - box.cell) / 2
         IconButton {
-            objectName: "toolboxUndoButton"
+            objectName: box.isTop ? "toolUndoButton" : "toolboxUndoButton"
+            visible: box.headShown
             width: box.cell; height: box.cell
             icon.width: 22; icon.height: 22
             iconName: "xopp-edit-undo"
@@ -580,7 +691,8 @@ Rectangle {
             onClicked: app.undo()
         }
         IconButton {
-            objectName: "toolboxRedoButton"
+            objectName: box.isTop ? "toolRedoButton" : "toolboxRedoButton"
+            visible: box.headShown
             width: box.cell; height: box.cell
             icon.width: 22; icon.height: 22
             iconName: "xopp-edit-redo"
@@ -591,6 +703,7 @@ Rectangle {
         }
     }
     Rectangle {  // (between the head and the tools)
+        visible: box.headShown
         color: "#e3e5e8"
         x: box.vertical ? 10 : headGrid.x + headGrid.width + 4
         y: box.vertical ? headGrid.y + headGrid.height + 4 : 10
@@ -600,7 +713,7 @@ Rectangle {
 
     Flickable {
         id: middle
-        objectName: "toolboxMiddle"
+        objectName: box.named("toolboxMiddle")
         x: box.vertical ? 0 : box.middleStart
         y: box.vertical ? box.middleStart : 0
         width: box.vertical ? box.width : box.viewLength
@@ -613,11 +726,11 @@ Rectangle {
         clip: true
         Grid {
             id: middleGrid
-            objectName: "toolboxTools"
+            objectName: box.named("toolboxTools")
             columns: box.vertical ? 1 : -1
             rows: box.vertical ? -1 : 1
-            x: box.vertical ? 4 : 0
-            y: box.vertical ? 0 : 4
+            x: box.vertical ? (box.width - box.cell) / 2 : 0
+            y: box.vertical ? 0 : (box.height - box.cell) / 2
             spacing: 0
             Repeater {
                 model: box.items
@@ -628,6 +741,18 @@ Rectangle {
                                      : modelData.kind === "group" ? groupComponent : entryComponent
                     property var entryItem: modelData
                 }
+            }
+            // "+" at the end of the items (the phone's dock: no room is pinned for it)
+            IconButton {
+                id: addInlineButton
+                objectName: box.named("toolboxAddInline")
+                visible: box.addInline
+                width: box.cell; height: box.cell
+                icon.width: 22; icon.height: 22
+                iconName: "xqt-plus"
+                label: qsTr("Add")
+                tip: addButton.tip
+                onClicked: box.addRequested(addInlineButton)
             }
         }
         // A sideways rail: the mouse wheel (up and down) scrolls it too
@@ -642,7 +767,7 @@ Rectangle {
     }
     // The fades at the ends that have more
     Rectangle {
-        objectName: "toolboxFadeStart"
+        objectName: box.named("toolboxFadeStart")
         visible: box.scrolls && box.scrollPos > 0.5
         x: middle.x
         y: middle.y
@@ -655,7 +780,7 @@ Rectangle {
         }
     }
     Rectangle {
-        objectName: "toolboxFadeEnd"
+        objectName: box.named("toolboxFadeEnd")
         visible: box.scrolls && box.scrollPos < box.contentLength - box.viewLength - 0.5
         x: box.vertical ? middle.x : middle.x + middle.width - width
         y: box.vertical ? middle.y + middle.height - height : middle.y
@@ -668,13 +793,15 @@ Rectangle {
         }
     }
 
-    // The carried tool, under the pointer (along the rail), and the mark of where it would go
+    // The carried tool: along the bar it is over (this one or the other), else under the pointer, marked as leaving
+    // the bars; drawn over everything (it may be carried from one bar to the other)
     ToolEntryButton {
         id: dragGhost
-        objectName: "toolDragGhost"
+        objectName: box.named("toolDragGhost")
+        parent: Overlay.overlay
         visible: box.dragId !== ""
         enabled: false
-        z: 10
+        z: 1000
         cell: box.cell
         entry: box.dragEntry
         appIcon: box.dragEntry && box.dragEntry.app !== undefined && box.appButtons[box.dragEntry.app]
@@ -682,12 +809,29 @@ Rectangle {
         dragging: true
         inkColor: (app.colorPalette, box.store.revision, box.dragId !== "" && box.dragEntry.type !== undefined
                    ? app.toolEntryColor(box.dragEntry) : "#303030")
-        x: box.vertical ? (box.width - width) / 2 : Math.max(0, Math.min(box.width - width, box.dragPoint.x - width / 2))
-        y: box.vertical ? Math.max(0, Math.min(box.height - height, box.dragPoint.y - height / 2)) : (box.height - height) / 2
+        readonly property point at: parent ? parent.mapFromItem(null, box.dragPoint.x, box.dragPoint.y) : Qt.point(0, 0)
+        x: at.x - width / 2
+        y: at.y - height / 2
+        opacity: box.dragAway ? 0.75 : 1
+        // Away from both bars: let go, it leaves them
+        Label {
+            objectName: box.named("toolDragAway")
+            visible: box.dragAway && box.store.canRemove(box.dragId)
+            anchors.top: parent.bottom
+            anchors.topMargin: 6
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: box.dragEntry && box.dragEntry.app !== undefined ? qsTr("Off the bars") : qsTr("Remove")
+            font.pixelSize: 12
+            color: "#ffffff"
+            padding: 4
+            leftPadding: 8
+            rightPadding: 8
+            background: Rectangle { radius: 8; color: "#c62828" }
+        }
     }
     Rectangle {
-        objectName: "toolDropMark"
-        visible: box.dragId !== "" && box.dropIndex >= 0 && box.ringId === ""
+        objectName: box.named("toolDropMark")
+        visible: box.dropIndex >= 0 && box.ringId === ""
         z: 9
         color: Material.accentColor
         radius: 2
@@ -700,47 +844,50 @@ Rectangle {
 
     Grid {
         id: tailGrid
-        objectName: "toolboxTail"
+        objectName: box.named("toolboxTail")
         columns: box.vertical ? 1 : -1
         rows: box.vertical ? -1 : 1
-        x: box.vertical ? 4 : box.width - width - 4 - box.endInset
-        y: box.vertical ? box.height - height - 4 - box.endInset : 4
+        x: box.vertical ? (box.width - box.cell) / 2 : box.width - width - 4 - box.endInset
+        y: box.vertical ? box.height - height - 4 - box.endInset : (box.height - box.cell) / 2
+        // (the top bar: the buttons of the moment before "+": the emoji while writing, edit as notes, open externally)
+        Row {
+            id: leadingTail
+            visible: children.length > 0
+            spacing: 0
+        }
         IconButton {
             id: addButton
-            objectName: "toolboxAddButton"
-            visible: !box.compact  // (a phone: in the sheet of every tool)
-            width: box.cell; height: box.cell
+            objectName: box.named("toolboxAddButton")
+            visible: !box.addInline
+            width: box.cell; height: visible ? box.cell : 0
             icon.width: 22; icon.height: 22
             iconName: "xqt-plus"
-            label: qsTr("Add a tool")
-            tip: qsTr("Add a tool (a pen, highlighter, shape, eraser, text box, sticky note, laser pointer, snip)")
+            label: qsTr("Add")
+            tip: box.isTop ? qsTr("Add to the top bar: a new tool, or a tool or command that is on neither bar")
+                           : qsTr("Add to the rail: a new tool (a pen, highlighter, shape, eraser, …), or a tool or command that is on neither bar")
             onClicked: box.addRequested(addButton)
+        }
+        // (the top bar: ⋮, pinned at the very end)
+        Row {
+            id: trailingTail
+            visible: children.length > 0
+            spacing: 0
         }
         IconButton {
             id: moreButton
-            objectName: "toolboxMoreButton"
+            objectName: box.named("toolboxMoreButton")
             visible: box.moreShown
             width: box.cell; height: visible ? box.cell : 0
             icon.width: 22; icon.height: 22
             iconName: "xqt-more"
             label: qsTr("More")
-            tip: qsTr("More (present, search, settings, leave full screen)")
+            tip: qsTr("More (what the top bar holds, present, search, settings, leave full screen)")
             onClicked: box.moreRequested(moreButton)
         }
-        // The phone's dock: every tool, and the page number
-        IconButton {
-            objectName: "toolboxAllButton"
-            visible: box.compact
-            width: box.cell; height: box.cell
-            icon.width: 22; icon.height: 22
-            iconName: "xqt-tools-more"
-            label: qsTr("My tools")
-            tip: qsTr("My tools: every tool, add one, the other tools")
-            onClicked: box.allToolsRequested()
-        }
+        // The phone's dock: the page number (held sideways: in the app bar, the room goes to the tools)
         ToolButton {
-            objectName: "toolboxPageButton"
-            visible: box.compact && !app.homeVisible
+            objectName: box.named("toolboxPageButton")
+            visible: box.compact && !box.vertical && !app.homeVisible
             width: box.cell + 8; height: box.cell
             focusPolicy: Qt.NoFocus
             text: app.pageNumber + "/" + app.pageCount
@@ -749,6 +896,9 @@ Rectangle {
             onClicked: box.pagesRequested()
         }
     }
+    /// Where Main puts the top bar's buttons of the moment (before "+") and ⋮ (after it)
+    property alias leadingTail: leadingTail
+    property alias trailingTail: trailingTail
 
     Component {
         id: dividerComponent
@@ -805,7 +955,7 @@ Rectangle {
             readonly property var it: parent ? parent.entryItem : null
             readonly property string name: it ? it.name : ""
             readonly property Item button: name !== "" ? box.appButton(name) : null
-            objectName: "railApp_" + name
+            objectName: box.named("railApp_") + name
             width: box.cell
             height: box.cell
             /// Carried: its place stays faint; held: lifted
@@ -878,10 +1028,12 @@ Rectangle {
                 onClicked: function(mouse) {
                     if (mouse.button === Qt.RightButton) box.menuRequested(appCell.it.entry, appCell, Qt.point(mouse.x, mouse.y))
                     else if (!armed && appCell.button) {
-                        appCell.button.clicked()
+                        const b = appCell.button
+                        b.clicked()
                         if (appCell.inList) {
                             box.store.use(appCell.it.id)
-                            groupFlyout.close()
+                            // (the list closes, unless the button opened a list of its own: the stickers, …)
+                            Qt.callLater(function() { if (!Popups.hasOpenPopup(b)) groupFlyout.close() })
                         } else {
                             box.reveal(appCell)
                         }
@@ -899,7 +1051,7 @@ Rectangle {
             readonly property var members: box.groupMembers(gid)
             readonly property var shownMember: box.groupShown(gid)
             readonly property bool isApp: shownMember.app !== undefined
-            objectName: "railGroup_" + gid
+            objectName: box.named("railGroup_") + gid
             cell: box.cell
             entry: shownMember
             appIcon: isApp && box.appButton(shownMember.app) ? box.appButton(shownMember.app).iconName : ""
@@ -923,7 +1075,7 @@ Rectangle {
     // A group's list: its members, beside the group (towards the page)
     Popup {
         id: groupFlyout
-        objectName: "toolGroupFlyout"
+        objectName: box.named("toolGroupFlyout")
         property string gid: ""
         property Item owner: null
         parent: owner

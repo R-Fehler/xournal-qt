@@ -1,11 +1,10 @@
 // The phone's tool dock (qt/docs/adaptive-layout.md, "The phone chrome"; qt/docs/toolbox.md, "On a phone"): in the
 // phone classes the tools are one bar at the bottom, within reach of the thumb, instead of the command bar and the view
 // pill. It hosts the toolbox: the same rail as on a larger screen, at the bottom edge (undo, redo, the same items
-// scrolling sideways, "My tools", the page number; qt/rail-scroll). A text
-// document has no ink tools: then the dock is
-//   all tools | undo | redo | the page number
-// - "All tools" opens the sheet with the other tools and the commands of the command bar;
-// - the page number: a tap shows all pages (the contents and the zoom are there).
+// scrolling sideways with "+" at their end, the page number; qt/rail-scroll, qt/top-bar). A text document has no ink
+// tools: then the dock is
+//   undo | redo | the page number
+// (its commands are the top bar's, in the app bar, and ⋮'s); the page number: a tap shows all pages.
 // Held sideways (a phone in landscape) it is a rail at the right side, the same buttons from the top down.
 import QtQuick
 import QtQuick.Controls
@@ -26,7 +25,6 @@ Rectangle {
     /// The toolbox fills the dock (qt/docs/toolbox.md, "On a phone"): its own cells give way
     property bool hostsToolbox: false
     readonly property Item toolboxSlot: toolboxHolder
-    signal toolsRequested()
     signal pagesRequested()
     /// The bar's thickness
     readonly property int barSize: 56
@@ -69,24 +67,11 @@ Rectangle {
         y: dock.vertical ? 4 : 0
         width: dock.vertical ? dock.barSize : dock.width - 8 - dock.safeLeft - dock.safeRight
         height: dock.vertical ? dock.height - 8 - dock.safeBottom : dock.barSize
-        columns: dock.vertical ? 1 : 4
-        rows: dock.vertical ? 4 : 1
+        columns: dock.vertical ? 1 : 3
+        rows: dock.vertical ? 3 : 1
         rowSpacing: 0
         columnSpacing: 0
 
-        // Every tool, with its name
-        Cell {
-            IconButton {
-                objectName: "dockToolsButton"
-                anchors.centerIn: parent
-                implicitWidth: parent.side
-                implicitHeight: parent.side
-                iconName: "xqt-layout-grid"
-                label: qsTr("All tools")
-                tip: qsTr("All tools, with their names")
-                onClicked: dock.toolsRequested()
-            }
-        }
         Cell {
             IconButton {
                 objectName: "dockUndoButton"

@@ -824,8 +824,8 @@ I would expect the toolbelt rail to fill up the space and maybe even allow scrol
   old plan, and it counted 22 px too much room. Left: the check on the device.)
 - [x] The rail always uses the room it has: every tool on its own while they fit; when they do not, sections fold into
   stacks one by one (as designed); scrolling only as the last resort. The phone dock likewise shows as many tools as
-  fit. (Freed room goes back to earlier sections, then the fixed tools. Left: the dock held sideways has room for one
-  or two tools beside undo, redo, "My tools" and the page number.)
+  fit. (Freed room goes back to earlier sections, then the fixed tools. The dock held sideways: "My tools" and the page
+  number left it in qt/top-bar.)
 
 ### Recording on Windows, macOS and Android (the author, 2026-10-05; `qt/audio-platforms`)
 The release packages for Windows, macOS and Android were built without Qt Multimedia, so they offer no recording and
@@ -892,11 +892,13 @@ Blocks, one after another where they share `Main.qml` (1, then 2 and 4, then 3):
   the end of full screen's ⋯ until block 3; a removed app tool comes back by "+" → "Put back"; a hold on an app tool
   opens the rail's menu, its own list is "Options…" there). Left for block 3: the top bar reading the stored
   arrangement, carrying between the bars, the catalog; "Back to the first layout" in Settings (`resetLayout()` exists).
-- [ ] For block 3 (the author, 2026-10-06: "I think zen is helpful put it into the top bar. And yes the back gesture or
+- [x] For block 3 (the author, 2026-10-06: "I think zen is helpful put it into the top bar. And yes the back gesture or
   button should leave zen mode on android."): Zen is on the top bar in its first layout on every screen, phones too;
   Android's Back (key and gesture) leaves Zen (before anything else Back does). Also: a New document button in full
   screen (only Ctrl+Shift+N since qt/classic-removal).
-- [ ] **3 `qt/top-bar`**: the top bar holds items of the same arrangement: scrolls instead of its ladder into ⋮; its
+  Done 2026-10-06 in qt/top-bar (a popup open over the page in Zen takes Back first; New in full screen's ⋯). Left: the
+  back gesture on the device.
+- [x] **3 `qt/top-bar`**: the top bar holds items of the same arrangement: scrolls instead of its ladder into ⋮; its
   order and groups are the user's; items are carried between the rail and the top bar (one home per item: the
   rail, the top bar or the menu only); a group of commands always opens its list on a tap (nothing runs by
   accident); ⋮ stays complete and is not customized. **"+" catalog**: new tools to make and every app tool and
@@ -904,6 +906,11 @@ Blocks, one after another where they share `Main.qml` (1, then 2 and 4, then 3):
   stickers, add page, write on the page | setsquare / compass, finger draws, **record** | search, read, replay,
   present, full screen, **Zen** | tags, favourite, bookmark | settings. Full screen: the floating rail's ⋯ lists what
   is on the top bar. Settings → "Back to the first layout". The Markdown format bar scrolls the same way.
+  Done 2026-10-06 ([qt/docs/toolbox.md](qt/docs/toolbox.md), "The top bar"; ⋮ is complete, not "hiding what is in
+  sight"; "+" and ⋮ at the top bar's end; on a phone the app bar hosts the top bar, a row of its own upright; held
+  sideways the page number moved to the app bar so the rail has room; on a bar a hold lifts, a button's own hold is
+  the first entry of its menu). Left: dragging out of the catalog onto a bar (a tap places); carrying to the top bar
+  in full screen; the device checks.
 - [x] **4 `qt/zen`**: three independent switches: full screen (as now), **Zen** (everything around the page hidden),
   **read only** (anywhere, not only full screen). Read (Ctrl+Alt+R, ⋮ → View → Read) = Zen + read only (full screen
   as now, except in a tiny window); present without controls = present + Zen; a tiny window (< 360 px) turns Zen on

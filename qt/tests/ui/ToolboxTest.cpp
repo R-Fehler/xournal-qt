@@ -10,6 +10,7 @@
 #include <functional>
 #include <cmath>
 #include <type_traits>
+#include <map>
 #include <memory>
 
 #include <QCoreApplication>
@@ -223,11 +224,12 @@ protected:
         double cutShown = 0;
         QString text;
     };
-    RailState rail() const {
+    /// ... of the rail, or of the top bar (`top`)
+    RailState rail(bool top = false) const {
         RailState s;
-        auto* box = find("toolbox");
-        auto* middle = find("toolboxMiddle");
-        auto* grid = find("toolboxTools");
+        auto* box = find(top ? "topBar" : "toolbox");
+        auto* middle = find(top ? "topBarMiddle" : "toolboxMiddle");
+        auto* grid = find(top ? "topBarTools" : "toolboxTools");
         if (!box || !middle || !grid) {
             return s;
         }
@@ -239,8 +241,8 @@ protected:
         });
         for (QQuickItem* k: kids) {
             const QList<QQuickItem*> in = k->childItems();
-            if (in.isEmpty() || !shown(k)) {
-                continue;
+            if (in.isEmpty() || !shown(k) || k->objectName().endsWith("AddInline")) {
+                continue;  // (the phone's "+" at the end of the dock's items)
             }
             const QString n = in.first()->objectName();
             s.order << (n.isEmpty() ? QString("|") : n);
@@ -275,37 +277,80 @@ protected:
                          .arg(s.scrolls ? ", scrolls" : "");
         return s;
     }
-    /// The rail's items as the arrangement has them, by the names of their buttons
-    QStringList arranged() const {
+    /// The window's button of an app item (toolArea.slots)
+    QObject* slot(const QString& name) const {
+        const QVariantMap slots = find<QObject>("toolArea")->property("slots").toMap();
+        return slots.value(name).value<QObject*>();
+    }
+    /// The rail's items (or the top bar's) as the arrangement has them, by the names of their buttons; the app items
+    /// not offered here are left out, and the dividers that would then lead, end or follow another
+    QStringList arranged(bool top = false) const {
         QStringList out;
-        for (const QVariant& v: tools()->entries()) {
+        const QString app = top ? "topApp_" : "railApp_", group = top ? "topGroup_" : "railGroup_";
+        for (const QVariant& v: top ? tools()->topItems() : tools()->entries()) {
             const QVariantMap m = v.toMap();
-            out << (m.value("divider").toBool() ? QString("|")
-                    : m.contains("app")         ? "railApp_" + m.value("app").toString()
-                    : m.value("group").toBool() ? "railGroup_" + m.value("id").toString()
-                                                : "toolEntry_" + m.value("id").toString());
+            if (m.contains("app")) {
+                QObject* b = slot(m.value("app").toString());
+                if (!b || !b->property("offered").value<bool>() && b->property("offered").isValid()) {
+                    continue;
+                }
+            }
+            const QString n = m.value("divider").toBool() ? QString("|")
+                              : m.contains("app")         ? app + m.value("app").toString()
+                              : m.value("group").toBool() ? group + m.value("id").toString()
+                                                          : "toolEntry_" + m.value("id").toString();
+            if (n == "|" && (out.isEmpty() || out.last() == "|")) {
+                continue;
+            }
+            out << n;
+        }
+        while (!out.isEmpty() && out.last() == "|") {
+            out.removeLast();
         }
         return out;
     }
-    /// Wholly in the view of the rail's middle, along the rail (the tool in hand is lifted a little across it)
+    /// Wholly in the view of the rail's middle (or the top bar's), along it (the tool in hand is lifted a little across
+    /// it)
     bool inSight(QQuickItem* item) const {
         if (!shown(item)) {
             return false;
         }
-        const bool vertical = find("toolbox")->property("vertical").toBool();
-        const QRectF sight = rectOf(find("toolboxMiddle"));
+        const bool top = inside(item, find("topBar"));
+        const bool vertical = find(top ? "topBar" : "toolbox")->property("vertical").toBool();
+        const QRectF sight = rectOf(find(top ? "topBarMiddle" : "toolboxMiddle"));
         // (the cell that holds it: not lifted, not scaled)
         QQuickItem* cell = item;
-        while (cell->parentItem() && cell->parentItem()->objectName() != "toolboxTools") {
+        const QString grid = top ? "topBarTools" : "toolboxTools";
+        while (cell->parentItem() && cell->parentItem()->objectName() != grid) {
             cell = cell->parentItem();
         }
         const QRectF r = rectOf(cell);
         return vertical ? r.top() >= sight.top() - 0.5 && r.bottom() <= sight.bottom() + 0.5
                         : r.left() >= sight.left() - 0.5 && r.right() <= sight.right() + 0.5;
     }
-    void scrollRail(double pos) {
-        QMetaObject::invokeMethod(find("toolbox"), "scrollTo", Q_ARG(QVariant, pos));
+    void scrollRail(double pos, bool top = false) {
+        QMetaObject::invokeMethod(find(top ? "topBar" : "toolbox"), "scrollTo", Q_ARG(QVariant, pos));
         wait(50);
+    }
+    /// Carries what is under `from` (held until it lifts) along `path` to `to`, waiting `dwellMs` at the path's end
+    void carry(const QPoint& from, const std::vector<QPoint>& path, int dwellMs, const QPoint& to) {
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+        wait(550);
+        QPoint at = from;
+        for (const QPoint& p: path) {
+            for (int k = 1; k <= 6; ++k) {
+                QTest::mouseMove(window, at + (p - at) * k / 6);
+                wait(15);
+            }
+            at = p;
+        }
+        wait(dwellMs);
+        for (int k = 1; k <= 4; ++k) {
+            QTest::mouseMove(window, at + (to - at) * k / 4);
+            wait(15);
+        }
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, to);
+        wait(150);
     }
     /// The rail shows the arrangement as it is (the same order on every screen, nothing folded): all of it in sight, or
     /// it scrolls, its view ending through the middle of a cell, a fade at the end that has more
@@ -395,13 +440,12 @@ TEST_F(ToolboxTest, dockedAtTheRightWithUndoAndRedoTheToolsAndTheAppTools) {
         EXPECT_GE(rectOf(b).top(), last - 0.5) << name << ": after the user's tools, in their order";
         last = rectOf(b).bottom();
     }
-    // Write on the page, the setsquare and the finger switch left the rail: the command bar has them (qt/top-bar will
-    // place them in the top bar's own arrangement)
+    // Write on the page, the setsquare and the finger switch left the rail: the top bar has them (its first layout)
     for (const char* name: {"textModeButton", "geometryButton", "touchDrawingButton"}) {
         auto* b = find(name);
         ASSERT_TRUE(shown(b)) << name;
         EXPECT_FALSE(inside(b, box)) << name;
-        EXPECT_TRUE(inside(b, find("toolArea"))) << name;
+        EXPECT_TRUE(inside(b, find("topBar"))) << name;
     }
     EXPECT_TRUE(shown(find("toolboxAddButton")));
     // The classic tools are gone (0.8.0): the toolbox's entries are the pens, erasers, shapes, text boxes and notes
@@ -934,19 +978,28 @@ TEST_F(ToolboxTest, aToolHeldThenMovedIsCarriedToAnotherPlace) {
     EXPECT_FALSE(shown(find("toolDragGhost")));
     EXPECT_FALSE(find<QObject>("toolEntryMenu")->property("visible").toBool()) << "carried: no menu";
 
-    // Let go away from the rail: it goes back
+    // Let go away from both bars: it leaves them (qt/top-bar: one home per item, the rail, the top bar or none);
+    // "Removed · Undo" brings it back
     const int before = tools()->indexOf(pen);
     const QPoint at = rectOf(entry(pen)).center().toPoint();
     QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, at);
     wait(550);
     for (int k = 1; k <= 8; ++k) {
-        QTest::mouseMove(window, at + QPoint(-40 * k, -20 * k));
+        QTest::mouseMove(window, at + QPoint(-40 * k, 20 * k));
         wait(15);
     }
     EXPECT_FALSE(shown(find("toolDropMark")));
-    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, at + QPoint(-320, -160));
-    wait(100);
-    EXPECT_EQ(tools()->indexOf(pen), before);
+    EXPECT_FALSE(shown(find("topDropMark")));
+    EXPECT_TRUE(shown(find("toolDragAway"))) << "marked: it leaves the bars";
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, at + QPoint(-320, 160));
+    until([&] { return tools()->indexOf(pen) < 0; });
+    EXPECT_EQ(tools()->indexOf(pen), -1) << "removed";
+    EXPECT_TRUE(find("snackbarText")->property("text").toString().startsWith("Removed"));
+    QMetaObject::invokeMethod(find("snackbarAction"), "clicked");
+    until([&] { return tools()->indexOf(pen) == before; });
+    EXPECT_EQ(tools()->indexOf(pen), before) << "undone";
+    until([&] { return shown(entry(pen)); });
+    wait(150);  // (the rail laid out anew)
 
     // Held and let go without moving: its menu
     QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, rectOf(entry(pen)).center().toPoint());
@@ -1196,7 +1249,7 @@ TEST_F(ToolboxTest, inFullScreenTheSameToolboxFloatsAndPresentingHidesIt) {
     EXPECT_FALSE(box->property("floating").toBool()) << "docked again";
 }
 
-TEST_F(ToolboxTest, onAPhoneTheDockIsTheSameRailAndTheSheetHoldsThemAll) {
+TEST_F(ToolboxTest, onAPhoneTheDockIsTheSameRailWithPlusAtItsEnd) {
     resize(412, 915);
     auto* box = find("toolbox");
     until([&] { return box->property("compact").toBool(); });
@@ -1205,118 +1258,521 @@ TEST_F(ToolboxTest, onAPhoneTheDockIsTheSameRailAndTheSheetHoldsThemAll) {
     EXPECT_FALSE(shown(find("dockToolButton"))) << "the dock's own cells give way";
     EXPECT_FALSE(shown(find("dockColorSlot")));
     EXPECT_TRUE(shown(find("toolboxUndoButton")));
-    EXPECT_TRUE(shown(find("toolboxAllButton")));
     EXPECT_TRUE(shown(find("toolboxPageButton")));
-    EXPECT_FALSE(shown(find("toolboxAddButton"))) << "in the sheet";
+    EXPECT_EQ(find("toolboxAllButton"), nullptr) << "\"My tools\" is gone: the catalog (qt/top-bar)";
+    EXPECT_FALSE(shown(find("toolboxAddButton"))) << "not pinned: its room goes to the tools";
     const QRectF dock = rectOf(box);
     EXPECT_GT(dock.top(), 800) << "at the bottom";
     EXPECT_LE(dock.right(), 412.5);
-    // The same items as the rail, scrolling sideways (the app tools too)
+    // The same items as the rail, scrolling sideways (the app tools too), "+" after them
     expectRail("the dock");
     EXPECT_TRUE(rail().scrolls);
     EXPECT_FALSE(box->property("vertical").toBool());
     EXPECT_TRUE(inside(find("handButton"), box));
+    auto* plus = find("toolboxAddInline");
+    ASSERT_TRUE(shown(plus));
+    EXPECT_GE(rectOf(plus).left(), rectOf(find("railApp_pdfText")).right() - 0.5) << "after the items";
     // The tool in hand is scrolled into the dock
     const QString laser = nth("laser");
     controller->applyToolEntry(laser);
     until([&] { return inSight(entry(laser)); });
     EXPECT_TRUE(inSight(entry(laser))) << "the tool in hand in sight";
     EXPECT_TRUE(dock.contains(rectOf(entry(laser)).center()));
-    // My tools: all of them, a tap takes one
-    click(find("toolboxAllButton"));
-    auto* sheet = find<QObject>("phoneToolSheet");
+    // "+": the catalog, a sheet
+    scrollRail(1e6);
+    click(plus);
+    auto* sheet = find<QObject>("menuSheet");
     until([&] { return sheet->property("visible").toBool(); });
-    ASSERT_TRUE(sheet->property("visible").toBool());
-    for (const QVariant& v: tools()->tools()) {
-        EXPECT_NE(find("sheetEntry_" + v.toMap().value("id").toString()), nullptr);
-    }
-    EXPECT_NE(find("sheetAddTool"), nullptr);
-    const QString yellow = nth("highlighter");
-    auto* cell = find("sheetEntry_" + yellow);
-    until([&] { return shown(cell); });
-    click(cell);
-    until([&] { return tools()->active() == yellow; });
-    EXPECT_EQ(controller->tool(), "highlighter");
+    ASSERT_TRUE(sheet->property("visible").toBool()) << "the catalog is a sheet on a phone";
+    QTest::keyClick(window, Qt::Key_Escape);
     until([&] { return !sheet->property("visible").toBool(); });
 
-    // Held sideways: a rail at the right
+    // Held sideways: a rail at the right; the page number in the app bar (the rail's room goes to the tools)
     resize(915, 412);
     until([&] { return box->property("vertical").toBool(); });
     EXPECT_TRUE(box->property("vertical").toBool());
     EXPECT_NEAR(rectOf(box).right(), 915, 1);
+    EXPECT_FALSE(shown(find("toolboxPageButton")));
+    EXPECT_TRUE(shown(find("phonePageButton")));
+    EXPECT_TRUE(inside(find("phonePageButton"), find("phoneAppBar")));
 }
 
-TEST_F(ToolboxTest, theCommandBarShowsEntriesOfTheMoreMenuWhereThereIsRoom) {
-    auto* moreMenu = find<QObject>("moreMenu");
-    ASSERT_NE(moreMenu, nullptr);
-    // (the entries of ⋮ in its submenus: found by their names)
-    auto item = [&](const char* name) { return window->findChild<QObject*>(name); };
-    // (qt/ui-rework: reading, the replay of the writing and the tags too; a milestone where versions are kept)
-    const std::vector<std::pair<const char*, const char*>> promoted{
-            {"shareButton", "shareItem"}, {"printButton", "printItem"}, {"readButton", "readItem"},
-            {"zenButton", "zenItem"}, {"replayButton", "replayItem"}, {"tagsButton", "documentTagsMenuItem"}};
-    auto check = [&](int w, int h) {
-        resize(w, h);
-        for (const auto& [button, name]: promoted) {
-            const bool inBar = shown(find(button));
-            QObject* entry = item(name);
-            ASSERT_NE(entry, nullptr) << name;
-            EXPECT_NE(inBar, entry->property("offered").toBool())
-                    << button << " at " << w << ": in the bar or in ⋮, never both, never neither";
-        }
+// --- the top bar (qt/top-bar; qt/docs/toolbox.md, "The top bar") ------------------------------------------------------
+
+// The top bar shows the other list of the arrangement in the user's order, with its dividers and groups (the items not
+// offered here skipped, not removed); it scrolls as the rail does: half of the next cell, a fade, the wheel; "+" and ⋮
+// are pinned at its end
+TEST_F(ToolboxTest, theTopBarShowsTheStoredArrangementAndScrolls) {
+    auto* bar = find("topBar");
+    ASSERT_TRUE(shown(bar));
+    EXPECT_TRUE(inside(bar, find("topTools")));
+    until([&] { return rail(true).cells > 0; });
+    RailState s = rail(true);
+    EXPECT_EQ(s.order, arranged(true)) << "the stored order";
+    EXPECT_FALSE(s.scrolls) << s.text.toStdString();
+    // The first layout: open, save, (milestone), share, print | image, stickers, add page, write | …
+    const QStringList first = arranged(true).mid(0, 6);
+    EXPECT_EQ(first, (QStringList{"topApp_open", "topApp_save", "topApp_share", "topApp_print", "|", "topApp_image"}))
+            << "a new document keeps no versions: the milestone is skipped";
+    EXPECT_FALSE(tools()->idOfApp("milestone").isEmpty()) << "skipped, not removed";
+    for (const char* name: {"openButton", "zenButton", "settingsButton", "textModeButton"}) {
+        EXPECT_TRUE(inside(find(name), bar)) << name;
+    }
+    // "+" and ⋮ pinned at its end, ⋮ last
+    auto* plus = find("topBarAddButton");
+    auto* more = find("moreButton");
+    ASSERT_TRUE(shown(plus));
+    ASSERT_TRUE(shown(more));
+    EXPECT_TRUE(inside(more, bar));
+    EXPECT_GT(rectOf(more).left(), rectOf(plus).left());
+    EXPECT_NEAR(rectOf(more).right(), rectOf(bar).right(), 8);
+
+    // The order is the store's: an item moved there moves on the bar
+    tools()->moveTo(tools()->idOfApp("settings"), "top", 0);
+    until([&] { return rail(true).order.value(0) == "topApp_settings"; });
+    EXPECT_EQ(rail(true).order, arranged(true));
+    tools()->resetLayout();
+
+    // Narrower: it scrolls, through the middle of a cell, a fade at the end that has more; ⋮ stays in sight
+    resize(1000, 800);
+    until([&] { return rail(true).scrolls; });
+    s = rail(true);
+    SCOPED_TRACE(s.text.toStdString());
+    const double cell = bar->property("cell").toDouble();
+    EXPECT_TRUE(s.scrolls);
+    EXPECT_NEAR(s.cutShown, cell / 2, 1) << "half of the next cell shows";
+    EXPECT_TRUE(shown(find("topBarFadeEnd")));
+    EXPECT_FALSE(shown(find("topBarFadeStart")));
+    EXPECT_TRUE(rectOf(bar).contains(rectOf(more))) << "⋮ pinned";
+    // The wheel scrolls it; a drag at once scrolls it and runs nothing
+    const QPoint over = rectOf(find("topApp_save")).center().toPoint();
+    QWheelEvent down(over, window->mapToGlobal(over), QPoint(), QPoint(0, -120), Qt::NoButton, Qt::NoModifier,
+                     Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(window, &down);
+    until([&] { return rail(true).pos > 10; });
+    EXPECT_GT(rail(true).pos, 10) << "the wheel scrolls it";
+    EXPECT_TRUE(shown(find("topBarFadeStart")));
+    scrollRail(0, true);
+    const QPoint from = rectOf(find("topApp_print")).center().toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+    for (int k = 1; k <= 10; ++k) {
+        QTest::mouseMove(window, from - QPoint(20 * k, 0));
+        wait(10);
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, from - QPoint(200, 0));
+    until([&] { return rail(true).pos > 20; });
+    EXPECT_GT(rail(true).pos, 20) << "a drag scrolls";
+    EXPECT_FALSE(find<QObject>("printDialog")->property("visible").toBool()) << "and runs nothing";
+    // A tap runs it
+    scrollRail(1e6, true);
+    click(find("topApp_zen"));
+    until([&] { return win("zen").toBool(); });
+    EXPECT_TRUE(win("zen").toBool()) << "Zen from the top bar";
+    QTest::keyClick(window, Qt::Key_Escape);
+    until([&] { return !win("zen").toBool(); });
+}
+
+// One home per item, carried between the bars: held until it lifts, carried onto the other bar (it shows where it
+// goes), within the top bar, onto an item there (the ring: a group), away from both (into the catalog)
+TEST_F(ToolboxTest, itemsAreCarriedBetweenTheRailAndTheTopBar) {
+    auto* bar = find("topBar");
+    until([&] { return rail(true).cells > 0; });
+    // A pen from the rail onto the top bar, before "search"
+    const QString pen = nth("pen", 1);
+    const QRectF search = rectOf(find("topApp_search"));
+    const QPoint beforeSearch(int(search.left()) + 4, int(search.center().y()));
+    const QPoint start = rectOf(entry(pen)).center().toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, start);
+    wait(550);
+    for (int k = 1; k <= 12; ++k) {
+        QTest::mouseMove(window, start + (beforeSearch - start) * k / 12);
+        wait(15);
+    }
+    EXPECT_TRUE(shown(find("topDropMark"))) << "the top bar shows where it goes";
+    EXPECT_FALSE(shown(find("toolDropMark"))) << "the rail does not";
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, beforeSearch);
+    until([&] { return tools()->barOf(pen) == "top"; });
+    ASSERT_EQ(tools()->barOf(pen), "top");
+    EXPECT_EQ(tools()->indexOf(pen) + 1, tools()->indexOf(tools()->idOfApp("search"))) << "before search";
+    until([&] { return inside(entry(pen), bar); });
+    EXPECT_TRUE(inside(entry(pen), bar)) << "drawn on the top bar";
+    EXPECT_FALSE(inside(entry(pen), find("toolbox")));
+    // A tool on the top bar is a tool: a tap takes it
+    click(entry(pen));
+    until([&] { return tools()->active() == pen; });
+    EXPECT_EQ(controller->tool(), "pen");
+
+    // "search" from the top bar onto the rail, after the first pen
+    const QString searchId = tools()->idOfApp("search");
+    const QRectF firstPen = rectOf(entry(nth("pen")));
+    const QPoint afterFirst(int(firstPen.center().x()), int(firstPen.bottom()) - 3);
+    carry(rectOf(find("topApp_search")).center().toPoint(), {afterFirst + QPoint(-20, 0)}, 0, afterFirst);
+    until([&] { return tools()->barOf(searchId) == "rail"; });
+    ASSERT_EQ(tools()->barOf(searchId), "rail");
+    EXPECT_EQ(tools()->indexOf(searchId), tools()->indexOf(nth("pen")) + 1);
+    until([&] { return shown(find("railApp_search")); });
+    EXPECT_TRUE(inside(find("searchButton"), find("toolbox"))) << "its button is lent to the rail now";
+    click(find("railApp_search"));
+    until([&] { return find("searchBar")->isVisible(); });
+    EXPECT_TRUE(find("searchBar")->isVisible()) << "and does what it did";
+    QTest::keyClick(window, Qt::Key_Escape);
+
+    // Within the top bar: "print" before "open"
+    const QString print = tools()->idOfApp("print"), open = tools()->idOfApp("open");
+    const QRectF openRect = rectOf(find("topApp_open"));
+    carry(rectOf(find("topApp_print")).center().toPoint(), {}, 0,
+          QPoint(int(openRect.left()) + 4, int(openRect.center().y())));
+    until([&] { return tools()->indexOf(print) < tools()->indexOf(open); });
+    EXPECT_EQ(tools()->indexOf(print) + 1, tools()->indexOf(open));
+    EXPECT_EQ(rail(true).order, arranged(true));
+
+    // Onto an item until the ring shows: a group ("Grouped · Undo")
+    const QString share = tools()->idOfApp("share"), save = tools()->idOfApp("save");
+    const QPoint overSave = rectOf(find("topApp_save")).center().toPoint();
+    const QPoint fromShare = rectOf(find("topApp_share")).center().toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, fromShare);
+    wait(550);
+    for (int k = 1; k <= 8; ++k) {
+        QTest::mouseMove(window, fromShare + (overSave - fromShare) * k / 8);
+        wait(15);
+    }
+    auto ringed = [&] {
+        QQuickItem* r = under(find("topApp_save"), "toolRing");
+        return r && r->isVisible();
     };
-    check(1920, 1080);
-    for (const auto& [button, name]: promoted) {
-        EXPECT_TRUE(shown(find(button))) << button << ": room for it at 1920";
+    until(ringed, 2000);
+    EXPECT_TRUE(ringed()) << "the ring after about 0.6 s";
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, overSave);
+    until([&] { return !tools()->groupOf(share).isEmpty(); });
+    const QString g = tools()->groupOf(share);
+    ASSERT_FALSE(g.isEmpty());
+    EXPECT_EQ(tools()->groupOf(save), g);
+    EXPECT_EQ(tools()->barOf(g), "top");
+    EXPECT_EQ(find("snackbarText")->property("text").toString(), "Grouped");
+    until([&] { return shown(find("topGroup_" + g)); });
+    EXPECT_TRUE(shown(find("topGroup_" + g)));
+
+    // Away from both bars: the app item goes into the catalog ("… is in + now · Undo")
+    const QString tags = tools()->idOfApp("tags");
+    const QPoint t = rectOf(find("topApp_tags")).center().toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, t);
+    wait(550);
+    for (int k = 1; k <= 8; ++k) {
+        QTest::mouseMove(window, t + QPoint(0, 50 * k));
+        wait(15);
     }
-    EXPECT_FALSE(shown(find("moreToolsButton"))) << "nothing in \"more tools\"";
-    EXPECT_FALSE(shown(find("milestoneButton"))) << "a new document keeps no versions";
-    EXPECT_TRUE(item("saveWithMessageItem")->property("offered").toBool());
-    // One place each: the rail's app tools are not in the bar; those that left the rail are
-    for (const char* onRail: {"handButton", "selectButton", "snipButton", "pdfTextButton"}) {
-        EXPECT_FALSE(inside(find(onRail), find("topTools"))) << onRail;
+    EXPECT_TRUE(shown(find("topDragAway"))) << "marked: it leaves the bars";
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, t + QPoint(0, 400));
+    until([&] { return tools()->idOfApp("tags").isEmpty(); });
+    EXPECT_TRUE(tools()->unplaced().contains("tags")) << "in the catalog";
+    EXPECT_FALSE(inside(find("tagsButton"), bar));
+    EXPECT_TRUE(find<QObject>("documentTagsMenuItem")->property("offered").toBool()) << "⋮ still has it";
+    QMetaObject::invokeMethod(find("snackbarAction"), "clicked");
+    until([&] { return !tools()->idOfApp("tags").isEmpty(); });
+    EXPECT_EQ(tools()->idOfApp("tags"), tags) << "undone";
+    // The menu of an item: to the other bar
+    auto* menu = find<QObject>("toolEntryMenu");
+    until([&] { return shown(find("topApp_tags")); });
+    QMetaObject::invokeMethod(menu, "openFor", Q_ARG(QVariant, tools()->entry(tags)),
+                              Q_ARG(QVariant, QVariant::fromValue<QObject*>(find("topApp_tags"))), Q_ARG(QVariant, QVariant()));
+    trigger(menu, "toolOtherBarItem");
+    EXPECT_EQ(tools()->barOf(tags), "rail");
+    EXPECT_EQ(tools()->indexOf(tags), tools()->entries().size() - 1) << "at the rail's end";
+}
+
+// A group of commands opens its list on a tap: nothing runs by accident; a group of tools on the top bar cycles as on
+// the rail
+TEST_F(ToolboxTest, aGroupOfCommandsOpensItsListOnATap) {
+    const QString open = tools()->idOfApp("open"), save = tools()->idOfApp("save");
+    const QString g = tools()->group(save, open);
+    ASSERT_FALSE(g.isEmpty());
+    auto* face = find("topGroup_" + g);
+    until([&] { return shown(face = find("topGroup_" + g)); });
+    ASSERT_TRUE(shown(face));
+    wait(150);  // (the bar laid out anew)
+    click(face);
+    auto* list = find<QObject>("topGroupFlyout");
+    until([&] { return list->property("visible").toBool(); });
+    EXPECT_TRUE(list->property("visible").toBool()) << "its list";
+    EXPECT_FALSE(find<QObject>("openDialog")->property("visible").toBool()) << "nothing ran";
+    QMetaObject::invokeMethod(list, "close");
+    until([&] { return !list->property("visible").toBool(); });
+    // Zen in a group: a tap lists, a tap in the list runs it
+    const QString zen = tools()->idOfApp("zen"), full = tools()->idOfApp("fullScreen");
+    const QString g2 = tools()->group(zen, full);
+    until([&] { return shown(find("topGroup_" + g2)); });
+    wait(150);
+    scrollRail(1e6, true);
+    click(find("topGroup_" + g2));
+    until([&] { return list->property("visible").toBool(); });
+    EXPECT_FALSE(win("zen").toBool()) << "nothing ran";
+    auto* zenCell = find("topApp_zen");
+    until([&] { return shown(zenCell = find("topApp_zen")); });
+    click(zenCell);
+    until([&] { return win("zen").toBool(); });
+    EXPECT_TRUE(win("zen").toBool()) << "picked in the list";
+    wait(300);  // (the list closes: it would take Esc)
+    QTest::keyClick(window, Qt::Key_Escape);
+    until([&] { return !win("zen").toBool(); });
+
+    // Tools on the top bar: hand and select (moved there), grouped: a tap takes one, again the other
+    const QString hand = tools()->idOfApp("hand"), select = tools()->idOfApp("select");
+    tools()->moveTo(hand, "top", 0);
+    const QString g3 = tools()->group(select, hand);
+    scrollRail(0, true);
+    auto* tools3 = find("topGroup_" + g3);
+    until([&] { return shown(tools3 = find("topGroup_" + g3)); });
+    wait(150);
+    click(tools3);
+    until([&] { return controller->tool() == "selectRect" || controller->tool() == "selectRegion"; });
+    EXPECT_TRUE(controller->tool().startsWith("select")) << "the one shown (carried in last)";
+    click(tools3);
+    until([&] { return controller->tool() == "hand"; });
+    EXPECT_EQ(controller->tool(), "hand") << "two tools: the next";
+    EXPECT_FALSE(list->property("visible").toBool());
+}
+
+// "+" (the catalog): a new tool of a kind, or an app item on neither bar, put at the end of the bar it was opened from
+TEST_F(ToolboxTest, theCatalogAddsToEitherBar) {
+    auto* catalog = find<QObject>("toolTypeMenu");
+    // Off the bars: tags (from the top bar) and hand (from the rail)
+    ASSERT_TRUE(tools()->remove(tools()->idOfApp("tags")));
+    ASSERT_TRUE(tools()->remove(tools()->idOfApp("hand")));
+    EXPECT_TRUE(tools()->unplaced().contains("tags"));
+    // From the top bar's "+": the kinds, and what is on neither bar, by section; it goes to the top bar's end
+    click(find("topBarAddButton"));
+    until([&] { return catalog->property("visible").toBool(); });
+    EXPECT_EQ(catalog->property("title").toString(), "Add to the top bar");
+    for (const char* name: {"toolType_pen", "toolType_snip", "catalogSection_tools", "catalog_hand",
+                            "catalogSection_document", "catalog_tags"}) {
+        ASSERT_NE(entryOf(catalog, name), nullptr) << name;
+        EXPECT_TRUE(entryOf(catalog, name)->property("offered").toBool()) << name;
     }
-    for (const char* inBar: {"textModeButton", "geometryButton", "touchDrawingButton"}) {
-        EXPECT_TRUE(inside(find(inBar), find("topTools"))) << inBar;
+    EXPECT_EQ(entryOf(catalog, "catalog_open"), nullptr) << "on a bar: not offered";
+    EXPECT_EQ(entryOf(catalog, "toolPlace_hand"), nullptr) << "\"Put back\" is gone";
+    trigger(catalog, "catalog_tags");
+    const QString tags = tools()->idOfApp("tags");
+    ASSERT_FALSE(tags.isEmpty());
+    EXPECT_EQ(tools()->barOf(tags), "top");
+    EXPECT_EQ(tools()->indexOf(tags), tools()->topItems().size() - 1) << "at its end";
+    until([&] { return inside(find("tagsButton"), find("topBar")); });
+    EXPECT_TRUE(inside(find("tagsButton"), find("topBar")));
+    // From the rail's "+": to the rail's end
+    click(find("toolboxAddButton"));
+    until([&] { return catalog->property("visible").toBool(); });
+    EXPECT_EQ(catalog->property("title").toString(), "Add to the rail");
+    trigger(catalog, "catalog_hand");
+    const QString hand = tools()->idOfApp("hand");
+    EXPECT_EQ(tools()->barOf(hand), "rail");
+    EXPECT_EQ(tools()->indexOf(hand), tools()->entries().size() - 1);
+    until([&] { return inside(find("handButton"), find("toolbox")); });
+    EXPECT_TRUE(inside(find("handButton"), find("toolbox")));
+    // A new tool from the top bar's "+": the editor, then at the top bar's end
+    const int count = tools()->tools().size();
+    click(find("topBarAddButton"));
+    trigger(catalog, "toolType_highlighter");
+    until([&] { return editorOpen(); });
+    click(find("toolEditorAdd"));
+    until([&] { return tools()->tools().size() == count + 1; });
+    const QString added = tools()->active();
+    EXPECT_EQ(tools()->entry(added).value("type"), "highlighter");
+    EXPECT_EQ(tools()->barOf(added), "top");
+    EXPECT_EQ(tools()->indexOf(added), tools()->topItems().size() - 1);
+    until([&] { return inside(entry(added), find("topBar")); });
+    EXPECT_TRUE(inside(entry(added), find("topBar")));
+}
+
+// Settings → "Back to the first layout": both bars as at a first start, asked first; the tools stay
+TEST_F(ToolboxTest, backToTheFirstLayout) {
+    const QString pen = nth("pen", 2);
+    tools()->moveTo(pen, "top", 0);
+    tools()->remove(tools()->idOfApp("tags"));
+    tools()->moveTo(tools()->idOfApp("search"), "rail", 0);
+    tools()->group(tools()->idOfApp("save"), tools()->idOfApp("open"));
+    const int count = tools()->tools().size();
+    auto* settingsPage = find<QObject>("settingsPage");
+    QMetaObject::invokeMethod(settingsPage, "open");
+    until([&] { return settingsPage->property("opened").toBool(); });
+    auto* button = find("resetBarsButton");
+    ASSERT_NE(button, nullptr);
+    QMetaObject::invokeMethod(button, "clicked");
+    auto* dialog = find<QObject>("resetBarsDialog");
+    until([&] { return dialog->property("opened").toBool(); });
+    ASSERT_TRUE(dialog->property("opened").toBool()) << "asked first";
+    EXPECT_TRUE(tools()->unplaced().contains("tags")) << "nothing changed yet";
+    QMetaObject::invokeMethod(dialog, "accept");
+    until([&] { return !tools()->unplaced().contains("tags"); });
+    QStringList top;
+    for (const QVariant& v: tools()->topItems()) {
+        const QVariantMap m = v.toMap();
+        top << (m.value("divider").toBool() ? QString("|") : m.value("app").toString());
     }
-    // The ladder: the tags give way first, sharing last
-    check(1366, 768);
-    check(1024, 700);
-    check(800, 600);
-    resize(1920, 1080);
-    const int full = qRound(find("topTools")->width());
-    for (int w = full; w >= 600; w -= 40) {
-        resize(w, 900);
-        if (!shown(find("tagsButton"))) {
-            break;
+    EXPECT_EQ(top, xqt::ToolboxModel::defaultTopLayout());
+    EXPECT_EQ(tools()->tools().size(), count) << "the tools stay";
+    EXPECT_EQ(tools()->barOf(pen), "rail") << "on the rail";
+    QMetaObject::invokeMethod(settingsPage, "close");
+}
+
+// Zen is on the top bar at every size, phones too (the author, 2026-10-06: "I think zen is helpful put it into the top
+// bar")
+TEST_F(ToolboxTest, zenIsOnTheTopBarAtEverySize) {
+    for (const auto& [w, h]: std::vector<std::pair<int, int>>{{1920, 1080}, {1366, 768}, {900, 1000}, {1000, 900},
+                                                              {412, 915}, {915, 412}}) {
+        resize(w, h);
+        const std::string at = std::to_string(w) + "x" + std::to_string(h);
+        auto* bar = find("topBar");
+        ASSERT_TRUE(shown(bar)) << at;
+        auto* zen = find("zenButton");
+        ASSERT_TRUE(inside(zen, bar)) << at;
+        EXPECT_EQ(rail(true).order, arranged(true)) << at << ": the same order";
+        if (win("phoneLayout").toBool()) {
+            EXPECT_TRUE(inside(bar, find("phoneAppBar"))) << at << ": in the app bar";
         }
-        EXPECT_TRUE(shown(find("shareButton"))) << "at " << w << ": the tags go before sharing";
+        QMetaObject::invokeMethod(bar, "reveal", Q_ARG(QVariant, QVariant::fromValue<QObject*>(find("topApp_zen"))));
+        until([&] { return inSight(find("topApp_zen")); });
+        ASSERT_TRUE(inSight(find("topApp_zen"))) << at << ": " << rail(true).text.toStdString();
+        click(find("topApp_zen"));
+        until([&] { return win("zen").toBool(); });
+        EXPECT_TRUE(win("zen").toBool()) << at;
+        EXPECT_FALSE(shown(bar)) << at << ": hidden in Zen";
+        QTest::keyClick(window, Qt::Key_Escape);
+        until([&] { return !win("zen").toBool(); });
     }
-    // Reading from the bar: Zen and read only, full screen; the keys again end it
-    resize(1920, 1080);
-    click(find("readButton"));
-    until([&] { return win("readOnlyOn").toBool(); });
-    EXPECT_TRUE(win("fullScreenMode").toBool());
-    EXPECT_TRUE(win("zen").toBool());
-    QTest::keyClick(window, Qt::Key_R, Qt::ControlModifier | Qt::AltModifier);
+}
+
+// Android's back key (and gesture) leaves Zen first; Read ends with it; presenting without controls gets its controls
+TEST_F(ToolboxTest, backLeavesZen) {
+    QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, true));
+    until([&] { return win("zen").toBool(); });
+    QTest::keyClick(window, Qt::Key_Back);
+    until([&] { return !win("zen").toBool(); });
+    EXPECT_FALSE(win("zen").toBool()) << "Back leaves Zen";
+    EXPECT_TRUE(shown(find("topBar")));
+    // Zen with its pill open: Back leaves Zen (not only the pill)
+    QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, true));
+    until([&] { return shown(find("zenDot")); });
+    click(find("zenDot"));
+    until([&] { return shown(find("zenPill")); });
+    QTest::keyClick(window, Qt::Key_Back);
+    until([&] { return !win("zen").toBool(); });
+    EXPECT_FALSE(win("zen").toBool());
+    EXPECT_FALSE(shown(find("zenPill")));
+    // A sheet open over the page in Zen takes Back first (it is in front); the next Back leaves Zen
+    QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, true));
+    until([&] { return win("zen").toBool(); });
+    auto* settingsPage = find<QObject>("settingsPage");
+    QMetaObject::invokeMethod(settingsPage, "open");
+    until([&] { return settingsPage->property("opened").toBool(); });
+    QTest::keyClick(window, Qt::Key_Back);
+    until([&] { return !settingsPage->property("visible").toBool(); });
+    EXPECT_FALSE(settingsPage->property("visible").toBool());
+    EXPECT_TRUE(win("zen").toBool()) << "the settings closed first";
+    wait(200);
+    QTest::keyClick(window, Qt::Key_Back);
+    until([&] { return !win("zen").toBool(); });
+    EXPECT_FALSE(win("zen").toBool());
+    // Read: Back ends it (read only, and the full screen it entered)
+    QMetaObject::invokeMethod(window, "startReading");
+    until([&] { return win("readOnlyOn").toBool() && win("zen").toBool(); });
+    QTest::keyClick(window, Qt::Key_Back);
     until([&] { return !win("readOnlyOn").toBool(); });
     EXPECT_FALSE(win("zen").toBool());
     EXPECT_FALSE(win("fullScreenMode").toBool());
-    // Zen from the bar (qt/zen; the top bar places it in its first layout): the window stays as it is
+    // Presenting without controls: Back shows them (presenting goes on)
     window->showNormal();
-    resize(1920, 1080);
-    until([&] { return shown(find("zenButton")); });
-    click(find("zenButton"));
-    until([&] { return win("zen").toBool(); });
-    EXPECT_TRUE(win("zen").toBool());
-    EXPECT_FALSE(win("fullScreenMode").toBool());
-    EXPECT_FALSE(win("readOnlyOn").toBool());
-    QTest::keyClick(window, Qt::Key_Escape);
+    QMetaObject::invokeMethod(window, "startPresenting", Q_ARG(QVariant, true));
+    until([&] { return controller->presenting() && win("zen").toBool(); });
+    QTest::keyClick(window, Qt::Key_Back);
     until([&] { return !win("zen").toBool(); });
-    EXPECT_FALSE(win("zen").toBool());
+    EXPECT_TRUE(controller->presenting());
+    until([&] { return shown(find("toolbox")); });
+    EXPECT_TRUE(shown(find("toolbox"))) << "the controls";
+    controller->setPresenting(false);
+    window->setProperty("fullScreenMode", false);
 }
 
-TEST_F(ToolboxTest, aTextDocumentHasUndoRedoAndItsCommandsInTheFormatBar) {
+// Full screen hides the top bar: the floating rail's ⋯ lists what it holds (in its order, a group's members one by
+// one) and New
+TEST_F(ToolboxTest, inFullScreenTheMoreMenuListsTheTopBarAndNew) {
+    const QString pen = nth("pen", 1);
+    tools()->moveTo(pen, "top", 0);
+    tools()->group(tools()->idOfApp("save"), tools()->idOfApp("open"));
+    window->setProperty("fullScreenMode", true);
+    auto* box = find("toolbox");
+    until([&] { return box->property("floating").toBool(); });
+    EXPECT_FALSE(shown(find("topBar")));
+    click(find("toolboxMoreButton"));
+    auto* menu = find<QObject>("toolboxMoreMenu");
+    until([&] { return menu->property("visible").toBool(); });
+    for (const QString& name: {"toolboxMore_" + pen, QString("toolboxMore_open"), QString("toolboxMore_save"),
+                               QString("toolboxMore_share"), QString("toolboxMore_geometry"), QString("toolboxMore_write"),
+                               QString("toolboxMore_touchDrawing"), QString("toolboxNewItem")}) {
+        QObject* e = entryOf(menu, name.toUtf8().constData());
+        ASSERT_NE(e, nullptr) << name.toStdString();
+        EXPECT_TRUE(e->property("offered").toBool()) << name.toStdString();
+    }
+    EXPECT_EQ(entryOf(menu, "toolboxMore_fullScreen"), nullptr) << "not twice";
+    EXPECT_EQ(entryOf(menu, "toolboxMore_zen"), nullptr) << "⋯ has its own";
+    QObject* tabsModel = controller->property("tabs").value<QObject*>();
+    const int tabs = tabsModel->property("count").toInt();
+    trigger(menu, "toolboxNewItem");
+    until([&] { return tabsModel->property("count").toInt() == tabs + 1; });
+    EXPECT_EQ(tabsModel->property("count").toInt(), tabs + 1) << "a new document";
+    click(find("toolboxMoreButton"));
+    trigger(menu, ("toolboxMore_" + pen).toUtf8().constData());
+    until([&] { return tools()->active() == pen; });
+    EXPECT_EQ(tools()->active(), pen) << "a tool of the top bar, taken from ⋯";
+    window->setProperty("fullScreenMode", false);
+}
+
+// Nothing is unreachable: every app item offered here is on a bar or in ⋮ (complete since qt/top-bar), at the sizes
+// the author uses; ⋮ itself is in sight
+TEST_F(ToolboxTest, nothingIsUnreachable) {
+    // (⋮'s entry for each app item that is not a "moreCmd_")
+    const std::map<QString, QString> inMore{
+            {"share", "shareItem"}, {"print", "printItem"}, {"milestone", "saveWithMessageItem"},
+            {"tags", "documentTagsMenuItem"}, {"zen", "zenItem"}, {"read", "readItem"}, {"replay", "replayItem"},
+            {"bookmark", "bookmarkPageItem"}, {"favourite", "favouriteDocumentItem"}};
+    // Some off the bars: ⋮ has them
+    tools()->remove(tools()->idOfApp("share"));
+    tools()->remove(tools()->idOfApp("select"));
+    for (const auto& [w, h]: std::vector<std::pair<int, int>>{{1920, 1080}, {1366, 768}, {900, 1000}, {412, 915}}) {
+        resize(w, h);
+        const std::string at = std::to_string(w) + "x" + std::to_string(h);
+        auto* more = find("moreButton");
+        ASSERT_TRUE(shown(more)) << at;
+        EXPECT_TRUE(QRectF(0, 0, window->width(), window->height()).contains(rectOf(more))) << at << ": ⋮ in sight";
+        for (const QString& name: xqt::ToolboxModel::appItemNames()) {
+            QObject* b = slot(name);
+            ASSERT_NE(b, nullptr) << name.toStdString();
+            if (b->property("offered").isValid() && !b->property("offered").toBool()) {
+                continue;  // (not offered here: a new document keeps no versions, the tab strip has New, …)
+            }
+            const QString entryName = inMore.count(name) ? inMore.at(name) : "moreCmd_" + name;
+            QObject* e = find<QObject>(entryName);
+            ASSERT_NE(e, nullptr) << at << ": " << entryName.toStdString();
+            EXPECT_TRUE(e->property("offered").toBool()) << at << ": " << name.toStdString() << " in ⋮";
+            const QString bar = tools()->barOf(tools()->idOfApp(name));
+            if (!bar.isEmpty()) {
+                EXPECT_TRUE(inside(qobject_cast<QQuickItem*>(b), find(bar == "top" ? "topBar" : "toolbox")))
+                        << at << ": " << name.toStdString() << " on its bar";
+            }
+        }
+    }
+    // ⋮'s entry does what the button does
+    resize(1920, 1080);
+    QObject* moreMenu = find<QObject>("moreMenu");
+    QMetaObject::invokeMethod(find("moreButton"), "clicked");
+    until([&] { return moreMenu->property("visible").toBool(); });
+    QMetaObject::invokeMethod(find<QObject>("moreCmd_select"), "triggered");
+    QMetaObject::invokeMethod(moreMenu, "close");
+    until([&] { return controller->tool().startsWith("select"); });
+    EXPECT_TRUE(controller->tool().startsWith("select")) << "select from ⋮ → Tools";
+}
+
+// A text document: undo and redo at the start of its format bar, the formatting first, then the commands (the top
+// bar, at the end of the row); nothing folds, the row scrolls as the bars do; ⋮ pinned at its end
+TEST_F(ToolboxTest, aTextDocumentsFormatBarScrollsWithItsCommands) {
     QTemporaryDir dir;
     const QString md = dir.path() + "/notes.md";
     {
@@ -1331,21 +1787,51 @@ TEST_F(ToolboxTest, aTextDocumentHasUndoRedoAndItsCommandsInTheFormatBar) {
     EXPECT_TRUE(shown(find("formatUndoButton")));
     EXPECT_TRUE(shown(find("formatRedoButton")));
     EXPECT_FALSE(find("undoButton")->isVisible()) << "not in the view pill too";
+    EXPECT_FALSE(shown(find("topTools"))) << "one row";
     auto* commands = find("formatCommands");
     ASSERT_NE(commands, nullptr);
-    until([&] { return inside(find("searchButton"), commands); });
-    for (const char* name: {"searchButton", "fullScreenButton", "saveButton"}) {
-        EXPECT_TRUE(shown(find(name)) && inside(find(name), commands)) << name << " stays at 1366";
-    }
-    EXPECT_FALSE(find<QObject>("formatBarFlick")->property("interactive").toBool()) << "no scrolling at 1366";
-    resize(1920, 1080);
-    until([&] { return inside(find("settingsButton"), commands); });
+    auto* bar = find("topBar");
+    until([&] { return inside(bar, commands); });
+    ASSERT_TRUE(inside(bar, commands)) << "the top bar at the end of the row";
     for (const char* name: {"searchButton", "fullScreenButton", "saveButton", "settingsButton"}) {
-        EXPECT_TRUE(shown(find(name)) && inside(find(name), commands)) << name << " at 1920";
+        EXPECT_TRUE(inside(find(name), bar)) << name;
     }
-    resize(720, 1000);
-    until([&] { return !inside(find("searchButton"), commands); });
-    EXPECT_FALSE(shown(find("searchButton")) && inside(find("searchButton"), commands)) << "in \"more tools\" at 720";
+    wait(300);  // (laid out)
+    auto* flick = find("formatBarFlick");
+    auto* fb = find("markdownFormatBar");
+    EXPECT_FALSE(fb->property("insertsInMenu").toBool()) << "nothing folds";
+    EXPECT_TRUE(shown(find("mdImage")));
+    EXPECT_LT(rectOf(find("mdBold")).right(), rectOf(find("searchButton")).left()) << "the formatting first";
+    EXPECT_TRUE(flick->property("interactive").toBool()) << "it scrolls at 1366";
+    EXPECT_FALSE(inside(find("moreButton"), flick)) << "⋮ pinned";
+    EXPECT_TRUE(shown(find("moreButton")));
+    // Its view ends through the middle of a button, the fade at the end that has more
+    const QRectF view = rectOf(flick);
+    bool cut = false;
+    std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+        for (QQuickItem* c: i->childItems()) {
+            if (c->isVisible() && c->inherits("QQuickAbstractButton") && c->width() >= 30) {
+                const QRectF r = rectOf(c);
+                cut = cut || (r.left() < view.right() - 5 && r.right() > view.right() + 5);
+            }
+            walk(c);
+        }
+    };
+    walk(flick);
+    EXPECT_TRUE(cut) << "a button cut at the view's end";
+    EXPECT_TRUE(shown(find("formatBarFadeRight")));
+    // The wheel scrolls it
+    const QPoint over = rectOf(find("mdBold")).center().toPoint();
+    QWheelEvent down(over, window->mapToGlobal(over), QPoint(), QPoint(0, -120), Qt::NoButton, Qt::NoModifier,
+                     Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(window, &down);
+    until([&] { return flick->property("contentX").toDouble() > 10; });
+    EXPECT_GT(flick->property("contentX").toDouble(), 10) << "the wheel scrolls it";
+    // Wide: everything in sight
+    resize(2400, 1000);
+    until([&] { return !flick->property("interactive").toBool(); });
+    EXPECT_FALSE(flick->property("interactive").toBool()) << "no scrolling at 2400";
+    EXPECT_TRUE(rectOf(flick).contains(rectOf(find("settingsButton"))));
 }
 
 /// Zen and read only (qt/docs/zen.md; qt/zen): three switches of their own - full screen, Zen (only the page and the
@@ -1797,14 +2283,14 @@ protected:
 // The record button left the rail (qt/rail-scroll; qt/top-bar puts it in the top bar's first layout): it is in the
 // command bar, one place, not on the rail too; the recording pill stays in sight, clear of the toolbox, docked and
 // floating (stopped there with its own stop), and a phone's sheet has it under Insert
-TEST_F(ToolboxAudioTest, recordingIsInTheCommandBarAndItsPillStaysInSight) {
+TEST_F(ToolboxAudioTest, recordingIsOnTheTopBarAndItsPillStaysInSight) {
     auto* box = find("toolbox");
     auto* record = find("recordButton");
     ASSERT_NE(record, nullptr);
     until([&] { return shown(record); });
     ASSERT_TRUE(shown(record));
     EXPECT_FALSE(inside(record, box)) << "not on the rail";
-    EXPECT_TRUE(inside(record, find("toolArea"))) << "in the command bar";
+    EXPECT_TRUE(inside(record, find("topBar"))) << "on the top bar (its first layout)";
 
     click(record);
     until([&] { return audio()->property("recording").toBool(); });
@@ -1834,34 +2320,30 @@ TEST_F(ToolboxAudioTest, recordingIsInTheCommandBarAndItsPillStaysInSight) {
     window->setProperty("fullScreenMode", false);
     until([&] { return !box->property("floating").toBool(); });
 
-    // A phone: in "My tools", under Insert
+    // A phone: on the top bar in the app bar, as everywhere; and ⋮ → Tools
     resize(412, 915);
     until([&] { return box->property("compact").toBool(); });
-    click(find("toolboxAllButton"));
-    auto* sheet = find<QObject>("phoneToolSheet");
-    until([&] { return sheet->property("visible").toBool(); });
-    ASSERT_TRUE(sheet->property("visible").toBool());
-    auto* cell = find("toolCell_record");
-    ASSERT_NE(cell, nullptr);
-    EXPECT_TRUE(inside(cell, find("phoneToolSection_insert")));
+    EXPECT_TRUE(inside(record, find("phoneAppBar")));
+    EXPECT_TRUE(find<QObject>("moreCmd_record")->property("offered").toBool());
 }
 
-// Without an audio backend nothing offers recording: not the rail, not the command bar, not the phone's sheet
+// Without an audio backend nothing offers recording: not the rail, not the top bar, not ⋮, not the catalog
 TEST_F(ToolboxNoAudioTest, withoutAudioNothingOffersRecording) {
     ASSERT_FALSE(audio()->property("available").toBool());
     auto* record = find("recordButton");
     ASSERT_NE(record, nullptr);
     EXPECT_FALSE(shown(record));
     EXPECT_FALSE(inside(record, find("toolbox")));
-    EXPECT_FALSE(inside(record, find("toolArea")) && shown(record)) << "not in the command bar";
+    EXPECT_FALSE(inside(record, find("topBar")) && shown(record)) << "not on the top bar";
+    EXPECT_FALSE(find("topApp_record")) << "its place is skipped";
     EXPECT_TRUE(shown(find("handButton")) && inside(find("handButton"), find("toolbox")));
-    EXPECT_TRUE(shown(find("touchDrawingButton")) && inside(find("touchDrawingButton"), find("toolArea")));
-    resize(412, 915);
-    until([&] { return find("toolbox")->property("compact").toBool(); });
-    click(find("toolboxAllButton"));
-    auto* sheet = find<QObject>("phoneToolSheet");
-    until([&] { return sheet->property("visible").toBool(); });
-    ASSERT_TRUE(sheet->property("visible").toBool());
-    EXPECT_NE(find("toolCell_image"), nullptr);
-    EXPECT_EQ(find("toolCell_record"), nullptr);
+    EXPECT_TRUE(shown(find("touchDrawingButton")) && inside(find("touchDrawingButton"), find("topBar")));
+    EXPECT_FALSE(find<QObject>("moreCmd_record")->property("offered").toBool()) << "nor ⋮";
+    // ... nor the catalog, though it is on neither bar
+    tools()->remove(tools()->idOfApp("record"));
+    click(find("topBarAddButton"));
+    auto* catalog = find<QObject>("toolTypeMenu");
+    until([&] { return catalog->property("visible").toBool(); });
+    EXPECT_EQ(entryOf(catalog, "catalog_record"), nullptr);
+    QMetaObject::invokeMethod(catalog, "close");
 }

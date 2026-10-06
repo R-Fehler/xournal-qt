@@ -318,18 +318,12 @@ protected:
     }
     // --- the tool bar (qt/adaptive-toolbar) ---
     QQuickItem* named(const char* name) const { return window->findChild<QQuickItem*>(name); }
-    /// The plan the tool bar is laid out by (ToolBarPlan.js)
-    QVariantMap toolPlan() const {
-        const QVariant v = named("toolArea")->property("plan");
-        return v.canConvert<QJSValue>() ? v.value<QJSValue>().toVariant().toMap() : v.toMap();
-    }
-    QStringList overflowNames() const {
-        const QVariant v = named("toolArea")->property("overflowNames");
-        return v.canConvert<QJSValue>() ? v.value<QJSValue>().toVariant().toStringList() : v.toStringList();
-    }
-    /// A button of the tool bar in "more tools"
-    static bool inOverflow(QQuickItem* button) {
-        return button && button->parentItem() && button->parentItem()->objectName() == "overflowContent";
+    /// The top bar (qt/top-bar): the arrangement's other list, scrolling
+    QQuickItem* topBar() const { return named("topBar"); }
+    /// An item of the top bar: on it, in sight or scrolled out of it
+    bool onTheTopBar(QQuickItem* button) const {
+        auto* bar = topBar();
+        return button && bar && bar->isVisible() && bar->isAncestorOf(button);
     }
     static bool inScrollingArea(QQuickItem* item) {
         for (QQuickItem* p = item ? item->parentItem() : nullptr; p; p = p->parentItem()) {
@@ -358,20 +352,21 @@ protected:
     }
     // --- the phone chrome (qt/phone-chrome) ---
     bool phoneChrome() const { return window->property("phoneChrome").toBool(); }
-    /// The phone chrome instead of the command bar: the app bar at the top (the library, the title, the tab count, ⋮;
-    /// no tab strip), the dock at the bottom or the side holding the toolbox (undo, redo, the first tools that fit with
-    /// the one in hand among them, "My tools", the page number; above the bottom safe area), no view pill; every tool in
-    /// the sheet "My tools"
+    /// The phone chrome: the app bar at the top (the library, the title, the tab count, ⋮; no tab strip) hosting the top
+    /// bar, the dock at the bottom or the side holding the toolbox (undo, redo, the items scrolling with "+" after them,
+    /// the page number; above the bottom safe area), no view pill
     void checkPhoneChrome(const std::string& at) {
         auto* bar = named("phoneAppBar");
         ASSERT_NE(bar, nullptr);
         EXPECT_TRUE(bar->isVisible()) << at << ": the app bar";
         EXPECT_FALSE(named("tabStrip")->isVisible()) << at << ": no tab strip";
-        EXPECT_FALSE(named("topTools")->isVisible()) << at << ": no command bar";
+        EXPECT_FALSE(named("topTools")->isVisible()) << at << ": no bar of its own for the top bar";
+        EXPECT_TRUE(onTheTopBar(named("zenButton"))) << at << ": the top bar, Zen on it";
+        EXPECT_TRUE(bar->isAncestorOf(topBar())) << at << ": the top bar in the app bar";
         EXPECT_FALSE(named("viewPill")->isVisible()) << at << ": the dock has the view pill's buttons";
         const QRectF barRect = sceneRect(bar);
         EXPECT_NEAR(barRect.top(), 0, 1) << at << ": at the top";
-        EXPECT_LE(barRect.height(), 48 + window->property("safeTop").toDouble() + 1) << at << ": slim";
+        EXPECT_LE(barRect.height(), 48 + topBar()->height() + window->property("safeTop").toDouble() + 1) << at << ": slim";
         for (const char* name: {"phoneHomeButton", "phoneTitle", "phoneTabCount", "moreButton"}) {
             auto* item = findItem(name);
             ASSERT_NE(item, nullptr) << name;
@@ -389,8 +384,9 @@ protected:
         EXPECT_TRUE(dock->isAncestorOf(box)) << at << ": the toolbox in the dock";
         const double safeBottom = window->property("safeBottom").toDouble();
         const QString inHand = controller->toolboxModel()->active();
-        for (const QString& name: {QString("toolboxUndoButton"), QString("toolboxRedoButton"), QString("toolboxAllButton"),
-                                   QString("toolboxPageButton"), "toolEntry_" + inHand}) {
+        const bool sideways = box->property("vertical").toBool();
+        for (const QString& name: {QString("toolboxUndoButton"), QString("toolboxRedoButton"),
+                                   QString(sideways ? "toolboxUndoButton" : "toolboxPageButton"), "toolEntry_" + inHand}) {
             auto* item = findItem(name.toUtf8().constData());
             ASSERT_NE(item, nullptr) << at << ": " << name.toStdString();
             EXPECT_TRUE(shownInWindow(item)) << at << ": " << name.toStdString();
@@ -399,31 +395,10 @@ protected:
             EXPECT_LE(sceneRect(item).bottom(), window->height() - safeBottom + 0.5)
                     << at << ": " << name.toStdString() << " above the bottom safe area";
         }
-        EXPECT_FALSE(named("moreToolsButton")->isVisible()) << at << ": no \"more tools\": the dock's \"My tools\"";
-        // Every tool in the sheet "My tools": the user's, then the other tools
-        auto* toolSheet = window->findChild<QObject*>("phoneToolSheet");
-        ASSERT_NE(toolSheet, nullptr);
-        click(findItem("toolboxAllButton"));
-        ASSERT_TRUE(opened(toolSheet, true)) << at << ": My tools";
-        settled(toolSheet);
-        const QRectF r = popupRect(toolSheet);
-        EXPECT_TRUE(insideWindow(r)) << at << ": the sheet of all tools";
-        EXPECT_NEAR(r.bottom(), window->height(), 1.5) << at << ": at the bottom";
-        QStringList cells;
-        for (const char* type: {"pen", "highlighter", "eraser", "text", "sticky"}) {
-            cells << "sheetEntry_" + entryOf(type);
+        EXPECT_EQ(named("toolboxAllButton"), nullptr) << at << ": no \"My tools\": the catalog";
+        if (sideways) {
+            EXPECT_TRUE(shownInWindow(findItem("phonePageButton"))) << at << ": held sideways, the page number in the app bar";
         }
-        cells << "toolCell_hand" << "toolCell_touchDrawing" << "toolCell_select_selectRect" << "toolCell_select_selectRegion"
-              << "toolCell_write";
-        for (const QString& cell: cells) {
-            auto* c = findItem(cell.toUtf8().constData());
-            ASSERT_NE(c, nullptr) << at << ": " << cell.toStdString();
-            EXPECT_TRUE(c->isVisible()) << at << ": " << cell.toStdString();
-            EXPECT_TRUE(r.adjusted(-1, -1, 1, 1).contains(sceneRect(c)) || inScrollingArea(c)) << at << ": " << cell.toStdString();
-            EXPECT_FALSE(c->property("name").toString().isEmpty()) << at << ": " << cell.toStdString() << ": its name";
-        }
-        QTest::keyClick(window, Qt::Key_Escape);
-        EXPECT_TRUE(opened(toolSheet, false)) << at;
     }
     /// ⋮ inside the window, not in a scrolling area; the toolbox docked with undo and redo at its head and the tools
     /// that are never hidden on it (on their own, or in a stack of a short rail); the commands in the bar or in "more
@@ -444,11 +419,10 @@ protected:
         for (const char* name: {"handButton", "selectButton", "snipButton", "pdfTextButton"}) {
             EXPECT_TRUE(onTheRail(named(name))) << at << ": " << name << " on the rail";
         }
-        // (they left the rail, qt/rail-scroll: the command bar has them, or its "more tools")
+        // (they left the rail, qt/rail-scroll: the top bar has them)
         for (const char* name: {"touchDrawingButton", "textModeButton"}) {
             EXPECT_FALSE(onTheRail(named(name))) << at << ": " << name;
-            EXPECT_TRUE(named("toolArea")->isAncestorOf(named(name)) || inOverflow(named(name)))
-                    << at << ": " << name << " in the command bar";
+            EXPECT_TRUE(onTheTopBar(named(name))) << at << ": " << name << " on the top bar";
         }
         for (const char* type: {"pen", "eraser", "text", "sticky"}) {
             EXPECT_TRUE(onTheRail(toolEntry(entryOf(type)))) << at << ": the " << type << " on the rail";
@@ -463,18 +437,13 @@ protected:
             EXPECT_TRUE(shownInWindow(undo)) << at << ": undo at the toolbox's head";
             EXPECT_TRUE(shownInWindow(redo)) << at << ": redo at the toolbox's head";
             EXPECT_TRUE(box->isAncestorOf(undo)) << at;
-            EXPECT_FALSE(overflowNames().contains("undo") || overflowNames().contains("redo")) << at;
-            EXPECT_FALSE(named("toolUndoButton")->isVisible()) << at << ": not in the command bar too";
+            EXPECT_FALSE(named("toolUndoButton")->isVisible()) << at << ": not on the top bar too";
             EXPECT_FALSE(named("undoButton")->isVisible()) << at << ": not in the view pill too";
             EXPECT_FALSE(named("redoButton")->isVisible()) << at << ": not in the view pill too";
             EXPECT_TRUE(undo->property("tip").toString().contains("Ctrl+Z")) << at << ": the keys in its tip";
         }
-        auto* moreTools = named("moreToolsButton");
-        EXPECT_EQ(moreTools->isVisible(), !overflowNames().isEmpty()) << at << ": \"more tools\" when something is in it";
-        if (moreTools->isVisible()) {
-            EXPECT_TRUE(shownInWindow(moreTools)) << at;
-            EXPECT_FALSE(inScrollingArea(moreTools)) << at;
-        }
+        EXPECT_TRUE(shownInWindow(topBar())) << at << ": the top bar";
+        EXPECT_EQ(named("moreToolsButton"), nullptr) << at << ": no \"more tools\": the top bar scrolls";
         // The view pill: inside the window
         auto* pill = named("viewPill");
         EXPECT_TRUE(insideWindow(sceneRect(pill))) << at << ": the view pill inside the window";
@@ -827,9 +796,7 @@ void AdaptiveLayoutTest::checkSizes(const std::vector<WindowSize>& sizes, bool l
             expectInside("doc");
             EXPECT_TRUE(moreButtonShown()) << at << ": the tool bar's ⋮ shown without scrolling";
             checkToolBar(at);
-            if (s.w == 960 && s.h == 1392) {
-                EXPECT_TRUE(overflowNames().isEmpty()) << at << ": all commands shown (" << overflowNames().join(',').toStdString() << ")";
-            }
+
         }
         if (menus) {
             checkMoreMenu(at, fullWalk || (s.w == 1280 && s.h == 800));
@@ -1962,24 +1929,19 @@ TEST_F(AdaptiveLayoutTest, theFloatingToolboxFitsAShortWindow) {
 
 // --- the tool bar (qt/adaptive-toolbar) -----------------------------------------------------------------------------
 
-// A portrait 2-in-1 at 125 % (720 wide): the toolbox holds every tool (on its rail or in a stack); the command bar is
-// one row, and only commands go into "more tools" (the entries of ⋮ shown as buttons go back into ⋮)
+// A portrait 2-in-1 at 125 % (720 wide): the toolbox holds every tool on its rail; the top bar is one row above the
+// page that scrolls (qt/top-bar: no ladder into "more tools" any more), ⋮ pinned at its end
 TEST_F(AdaptiveLayoutTest, theToolsFitAt720) {
     openDocument();
     resize(720, 1232);
     ASSERT_EQ(sizeClass(), "tabletPortrait");
-    EXPECT_EQ(toolPlan().value("layout").toString(), "row");
     checkToolBar("720x1232");
-    const QStringList lowPriority{"new", "open", "save", "settings", "present", "fullScreen", "search", "editAsNotes",
-                                  "openExternally", "addPage", "sticker", "record", "image", "emoji"};
-    for (const QString& n: overflowNames()) {
-        EXPECT_TRUE(lowPriority.contains(n)) << n.toStdString() << " is not a low-priority button";
-    }
-    EXPECT_LT(sceneRect(named("toolArea")).bottom(), sceneRect(named("canvas")).top() + 1) << "the bar above the page";
+    EXPECT_TRUE(topBar()->property("scrolls").toBool()) << "it scrolls at 720";
+    EXPECT_LT(sceneRect(topBar()).bottom(), sceneRect(named("canvas")).top() + 1) << "the bar above the page";
 }
 
-// New has one place (qt/docs/adaptive-layout.md, "One place for each action"): the tab strip's "+" where the tab strip
-// is shown; a button of the tools only where it is not (the compact chrome's tools, the phone's sheet)
+// New has one place where a tab strip is shown (qt/docs/adaptive-layout.md, "One place for each action"): the tab
+// strip's "+"; its item of the arrangement is offered only where there is none (the compact chrome's ⋯, a phone)
 TEST_F(AdaptiveLayoutTest, newIsTheTabStripsPlusWhereThereIsOne) {
     openDocument();
     resize(1920, 1080);
@@ -1987,8 +1949,7 @@ TEST_F(AdaptiveLayoutTest, newIsTheTabStripsPlusWhereThereIsOne) {
     ASSERT_NE(newButton, nullptr);
     EXPECT_TRUE(shownInWindow(named("newTabButton")));
     EXPECT_FALSE(newButton->property("offered").toBool());
-    EXPECT_FALSE(newButton->isVisible()) << "not in the bar too";
-    EXPECT_FALSE(overflowNames().contains("new"));
+    EXPECT_FALSE(newButton->isVisible()) << "not on a bar too";
     compactChrome(true);
     wait(200);
     EXPECT_FALSE(named("newTabButton")->isVisible());
@@ -1996,40 +1957,7 @@ TEST_F(AdaptiveLayoutTest, newIsTheTabStripsPlusWhereThereIsOne) {
     compactChrome(false);
     wait(200);
     resize(412, 915);
-    EXPECT_TRUE(newButton->property("offered").toBool()) << "the phone's sheet has it";
-}
-
-// What does not fit goes into "more tools", next to ⋮: its buttons with their names; a button used there closes it.
-// (The command bar of a notes document has room for its commands down to the phones; a text document's, merged into
-// its format bar, puts them there.)
-TEST_F(AdaptiveLayoutTest, moreToolsHoldsWhatDoesNotFit) {
-    std::ofstream(root / "kalman.md") << "# Lecture 3\n\n## Kalman filter\n\nThe **prediction** step.\n";
-    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "kalman.md").string())));
-    wait(400);
-    resize(800, 600);
-    const QStringList names = overflowNames();
-    ASSERT_FALSE(names.isEmpty()) << "a narrow window's format bar has more than fits";
-    auto* moreTools = named("moreToolsButton");
-    ASSERT_TRUE(shownInWindow(moreTools));
-    EXPECT_LT(std::abs(sceneRect(moreTools).right() - sceneRect(named("moreButton")).left()), 8) << "beside ⋮";
-    auto* popup = window->findChild<QObject*>("moreToolsPopup");
-    ASSERT_NE(popup, nullptr);
-    click(moreTools);
-    ASSERT_TRUE(opened(popup, true));
-    EXPECT_TRUE(insideWindow(popupRect(popup)));
-    for (const QString& n: names) {
-        auto* label = findItem(("overflowLabel_" + n).toUtf8().constData());
-        ASSERT_NE(label, nullptr) << n.toStdString();
-        EXPECT_FALSE(label->property("text").toString().isEmpty()) << n.toStdString() << ": its name beside it";
-        EXPECT_TRUE(shownInWindow(label)) << n.toStdString();
-    }
-    ASSERT_TRUE(names.contains("settings"));
-    click(named("settingsButton"));
-    EXPECT_TRUE(opened(popup, false)) << "used: it closes";
-    auto* settingsPage = window->findChild<QObject*>("settingsPage");
-    until([&] { return settingsPage->property("visible").toBool(); });
-    EXPECT_TRUE(settingsPage->property("visible").toBool());
-    QMetaObject::invokeMethod(settingsPage, "close");
+    EXPECT_TRUE(newButton->property("offered").toBool()) << "a phone: the catalog and ⋮ have it";
 }
 
 // The sidebar's arrow: at the canvas's left edge it opens the sidebar; at the sidebar's edge it closes it
@@ -2090,7 +2018,8 @@ TEST_F(AdaptiveLayoutTest, viewPillWithContentsInsideAndClearOfTheReference) {
         EXPECT_TRUE(insideWindow(sceneRect(refPill))) << at << ": the reference's pill inside the window";
         if (phoneChrome()) {  // (the dock has the view pill's buttons, the contents in the page grid)
             EXPECT_FALSE(pill->isVisible()) << at;
-            EXPECT_TRUE(shownInWindow(named("toolboxPageButton"))) << at;
+            // (held sideways the page number is in the app bar: the rail's room goes to the tools)
+            EXPECT_TRUE(shownInWindow(named("toolboxPageButton")) || shownInWindow(named("phonePageButton"))) << at;
             continue;
         }
         EXPECT_TRUE(insideWindow(sceneRect(pill))) << at << ": the view pill inside the window";
@@ -2373,10 +2302,10 @@ TEST_F(AdaptiveLayoutTest, sidebarDrawerKeysAndPhoneWidth) {
     EXPECT_FALSE(sidebar->isVisible()) << "a page picked: closed";
 }
 
-// The format bar of a text document: all its tools as buttons where there is room; the inserts in "Insert" in a
-// narrower window, then the headings in one button and the commands in "more tools"; the row scrolls only once all of
-// that is folded (with undo and redo at its start, below 800 px: qt/docs/toolbox.md, "Text documents"); on a phone the
-// row scrolls, with a fading edge
+// The format bar of a text document holds its commands (the top bar, at the end of its row; qt/top-bar): nothing folds,
+// the formatting first, then the commands, the row scrolls as the bars do; undo and redo at its start. Markdown written
+// on a page (no commands) keeps the ladder: the inserts in "Insert" where the room is short. On a phone the row scrolls,
+// with a fading edge
 TEST_F(AdaptiveLayoutTest, formatBarFoldsIntoInsertInsteadOfScrolling) {
     std::ofstream(root / "kalman.md") << "# Lecture 3\n\n## Kalman filter\n\nThe **prediction** step.\n";
     ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "kalman.md").string())));
@@ -2391,29 +2320,25 @@ TEST_F(AdaptiveLayoutTest, formatBarFoldsIntoInsertInsteadOfScrolling) {
         resize(s.w, s.h);
         const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
         ASSERT_TRUE(bar->isVisible()) << at;
-        if (scrolls()) {  // (only once everything is folded)
-            EXPECT_LE(s.w, 800) << at << ": no sideways scrolling on a wider desktop or a tablet";
-            EXPECT_TRUE(bar->property("levelsInMenu").toBool()) << at << ": the headings in one button";
-            EXPECT_TRUE(bar->property("insertIconOnly").toBool()) << at << ": the inserts in one button";
-            EXPECT_EQ(named("formatCommands")->width(), 0) << at << ": the commands in \"more tools\"";
+        EXPECT_FALSE(bar->property("insertsInMenu").toBool()) << at << ": nothing folds";
+        EXPECT_TRUE(named("formatCommands")->isAncestorOf(topBar())) << at << ": the commands at the row's end";
+        EXPECT_FALSE(named("mdInsertButton")->isVisible()) << at;
+        EXPECT_TRUE(named("mdImage")->isVisible()) << at;
+        for (const char* stays: {"mdParagraph", "mdBold", "mdItalic", "mdLink"}) {
+            EXPECT_TRUE(shownInWindow(named(stays))) << at << ": " << stays << " in sight first";
         }
-        const bool inMenu = bar->property("insertsInMenu").toBool();
-        EXPECT_EQ(named("mdInsertButton")->isVisible(), inMenu) << at;
-        EXPECT_EQ(named("mdImage")->isVisible(), !inMenu) << at;
-        for (const char* stays: {"mdBold", "mdItalic", "mdLink", "mdBulletList", "mdNumberedList", "mdTaskList"}) {
-            EXPECT_TRUE(shownInWindow(named(stays))) << at << ": " << stays << " stays in the row";
-        }
-        EXPECT_TRUE(shownInWindow(named("mdParagraph")) || shownInWindow(named("mdBlockButton"))) << at;
-        if (s.w >= 1920) {
-            EXPECT_FALSE(inMenu) << at << ": room for all";
-            EXPECT_GT(named("formatCommands")->width(), 0) << at << ": and for the commands";
+        if (s.w <= 1280) {
+            EXPECT_TRUE(scrolls()) << at << ": the row scrolls";
         }
     }
+    // Markdown on a page of notes (no commands): the ladder, the inserts in "Insert" at 800
+    openDocument();
     resize(800, 600);
+    controller->writeMarkdownOnPage();
+    until([&] { return bar->isVisible() && !bar->property("holdsCommands").toBool(); });
+    wait(200);
     ASSERT_TRUE(bar->property("insertsInMenu").toBool()) << "800 px: the inserts in a menu";
-    // Its entries work: a rule at the cursor
-    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(named("canvas")));
-    wait(100);
+    // Its menu fits
     auto* insert = named("mdInsertButton");
     QMetaObject::invokeMethod(insert, "clicked");
     auto* menu = window->findChild<QObject*>("mdInsertMenu");
@@ -2421,13 +2346,8 @@ TEST_F(AdaptiveLayoutTest, formatBarFoldsIntoInsertInsteadOfScrolling) {
     settled(menu);
     checkMenuGeometry("800x600", menu, insert, true);
     EXPECT_NE(menuEntries(menu).size(), 0u);
-    const std::string before = controller->tabManager().currentSession()->currentText();
-    QMetaObject::invokeMethod(window->findChild<QObject*>("mdInsertRule"), "triggered");
     QMetaObject::invokeMethod(menu, "close");
     wait(100);
-    const std::string after = controller->tabManager().currentSession()->currentText();
-    EXPECT_NE(after.find("---"), std::string::npos) << after;
-    EXPECT_NE(after, before);
     // The heading buttons are 40 wide in the touch profile
     QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "touchProfile"), Q_ARG(QVariant, "on"));
     resize(1920, 1080);
@@ -2514,7 +2434,7 @@ TEST_F(AdaptiveLayoutTest, toolBarPictures) {
         settled(window->findChild<QObject*>(popup));
     };
     auto closePopups = [&] {
-        for (const char* name: {"moreToolsPopup", "toolboxMoreMenu", "fitMenu", "menuSheet", "phoneToolSheet"}) {
+        for (const char* name: {"toolTypeMenu", "toolboxMoreMenu", "fitMenu", "menuSheet"}) {
             if (QObject* popup = window->findChild<QObject*>(name)) {
                 QMetaObject::invokeMethod(popup, "close");
             }
@@ -2536,8 +2456,8 @@ TEST_F(AdaptiveLayoutTest, toolBarPictures) {
     shot("bar-800x600-narrow");
     resize(412, 915);
     shot("bar-412x915-phone");
-    openPopup("toolboxAllButton", "phoneToolSheet");
-    shot("bar-412x915-my-tools");
+    openPopup("toolboxAddInline", "menuSheet");
+    shot("bar-412x915-catalog");
     closePopups();
     // The zoom's menu, a text document's merged bar
     resize(960, 1392);
@@ -2754,10 +2674,9 @@ TEST_F(PhoneChromeTest, theTabCountTapDoubleTapAndLongPress) {
     EXPECT_EQ(controller->currentTab(), 0) << "picked: A";
 }
 
-// A tool's editor (its colors and width), its menu and "My tools" are sheets at the bottom on a phone; a cell of "My
-// tools" takes its tool (a variant: the select's lasso), the dock shows the tool in hand (qt/docs/toolbox.md, "On a
-// phone"; the classic dock's color and width buttons went in 0.8.0)
-TEST_F(PhoneChromeTest, theEditorTheMenuAndMyToolsAreSheets) {
+// A tool's editor (its colors and width), its menu and the catalog ("+", which replaced "My tools" in qt/top-bar) are
+// sheets at the bottom on a phone; the dock shows the tool in hand (qt/docs/toolbox.md, "Where it is")
+TEST_F(PhoneChromeTest, theEditorTheMenuAndTheCatalogAreSheets) {
     openDocument();
     resize(412, 915);
     auto atTheBottom = [&](QObject* popup, const char* what) {
@@ -2783,38 +2702,20 @@ TEST_F(PhoneChromeTest, theEditorTheMenuAndMyToolsAreSheets) {
     atTheBottom(window->findChild<QObject*>("toolEntryEditor"), "the editor");
     QMetaObject::invokeMethod(toolEntry(pen), "held", Q_ARG(QPointF, QPointF(0, 0)));
     atTheBottom(sheet(), "a tool's menu");
-    click(findItem("toolboxAllButton"));
-    atTheBottom(window->findChild<QObject*>("phoneToolSheet"), "my tools");
-
-    // A variant from the sheet: the lasso; a tool of mine from it: the eraser, in the dock then
-    auto* toolSheet = window->findChild<QObject*>("phoneToolSheet");
-    click(findItem("toolboxAllButton"));
-    ASSERT_TRUE(opened(toolSheet, true));
-    settled(toolSheet);
-    click(findItem("toolCell_select_selectRegion"));
-    EXPECT_TRUE(opened(toolSheet, false)) << "a tool taken: back to the page";
-    until([&] { return controller->property("tool").toString() == "selectRegion"; });
-    EXPECT_EQ(controller->property("tool").toString(), "selectRegion");
+    // "+" at the end of the dock's items: the catalog, a sheet; a tool of the top bar from it is a tap away
+    QMetaObject::invokeMethod(named("toolbox"), "scrollTo", Q_ARG(QVariant, 1e6));
+    wait(100);
+    click(findItem("toolboxAddInline"));
+    atTheBottom(sheet(), "the catalog");
+    // The eraser taken from the dock: in the dock then
     const QString eraser = entryOf("eraser");
-    click(findItem("toolboxAllButton"));
-    ASSERT_TRUE(opened(toolSheet, true));
-    settled(toolSheet);
-    click(findItem(("sheetEntry_" + eraser).toUtf8().constData()));
-    EXPECT_TRUE(opened(toolSheet, false));
+    controller->applyToolEntry(eraser);
     until([&] { return controller->property("tool").toString() == "eraser"; });
-    EXPECT_EQ(controller->property("tool").toString(), "eraser");
     QQuickItem* inDock = nullptr;
     until([&] { return (inDock = toolEntry(eraser)) && shownInWindow(inDock); });
     ASSERT_NE(inDock, nullptr);
     EXPECT_TRUE(sceneRect(named("phoneDock")).adjusted(-1, -1, 1, 1).contains(sceneRect(inDock)))
             << "the tool in hand is in the dock";
-    // The hand: from the sheet's other tools
-    click(findItem("toolboxAllButton"));
-    ASSERT_TRUE(opened(toolSheet, true));
-    settled(toolSheet);
-    click(findItem("toolCell_hand"));
-    until([&] { return controller->property("tool").toString() == "hand"; });
-    EXPECT_EQ(controller->property("tool").toString(), "hand");
     controller->applyToolEntry(pen);
 }
 
@@ -3030,7 +2931,7 @@ TEST_F(PhoneChromeTest, theFold7FoldedAndUnfolded) {
             EXPECT_FALSE(named("phoneDock")->isVisible()) << at;
             EXPECT_TRUE(named("tabStrip")->isVisible()) << at << ": the tab strip";
             EXPECT_TRUE(named("topTools")->isVisible()) << at;
-            EXPECT_EQ(toolPlan().value("layout").toString(), "row") << at << ": the command bar, one row";
+            EXPECT_TRUE(named("topTools")->isAncestorOf(topBar())) << at << ": the top bar, one row";
             EXPECT_FALSE(named("toolbox")->property("compact").toBool()) << at << ": the toolbox docked, not the dock";
             EXPECT_TRUE(named("viewPill")->isVisible()) << at;
             checkToolBar(at);
@@ -3571,20 +3472,22 @@ TEST_F(SafeAreasKeyboardTest, theHomeScreensIconButtonsHaveShortLabels) {
     EXPECT_GE(seen, 10);
 }
 
-// Writing on the page chosen from the sheet of all tools keeps the focus on the page, also after the sheet's closing
-// animation (a closing popup gives the focus back to what had it: the window or the button; on Android the on-screen
+// Writing on the page chosen from ⋮ → Tools (a sheet on a phone) keeps the focus on the page, also after the sheet's
+// closing animation (a closing popup gives the focus back to what had it: the window or the button; on Android the on-screen
 // keyboard closes as soon as something that takes no text has the focus); a tap on a dock button takes no focus
 TEST_F(PhoneChromeTest, writingChosenFromTheSheetKeepsTheFocusOnThePage) {
     openDocument();
     resize(412, 915);
     auto* canvas = named("canvas");
     ASSERT_NE(canvas, nullptr);
-    click(findItem("toolboxAllButton"));
-    auto* toolSheet = window->findChild<QObject*>("phoneToolSheet");
-    ASSERT_TRUE(opened(toolSheet, true));
-    settled(toolSheet);
-    click(findItem("toolCell_write"));
-    EXPECT_TRUE(opened(toolSheet, false));
+    QMetaObject::invokeMethod(findItem("moreButton"), "clicked");
+    QObject* menus = sheet();
+    ASSERT_TRUE(opened(menus, true));
+    settled(menus);
+    click(sheetRow("moreToolsMenu"));
+    wait(300);
+    click(sheetRow("moreCmd_write"));
+    EXPECT_TRUE(opened(menus, false));
     until([&] { return controller->markdownOnPage(); });
     ASSERT_TRUE(controller->markdownOnPage());
     wait(600);  // (the sheet's closing animation is over)
@@ -3600,7 +3503,7 @@ TEST_F(PhoneChromeTest, writingChosenFromTheSheetKeepsTheFocusOnThePage) {
 
     // What Android does (the device's log): the closing sheet gives the focus back to the button that opened it, or to
     // the window; the page takes it back while its text is written
-    findItem("toolboxAllButton")->forceActiveFocus();
+    findItem("moreButton")->forceActiveFocus();
     until([&] { return canvas->hasActiveFocus(); });
     EXPECT_TRUE(canvas->hasActiveFocus()) << "back from the button";
     window->contentItem()->forceActiveFocus();
@@ -3608,11 +3511,11 @@ TEST_F(PhoneChromeTest, writingChosenFromTheSheetKeepsTheFocusOnThePage) {
     EXPECT_TRUE(canvas->hasActiveFocus()) << "back from the window";
     // A tap on a tool button never takes the focus (Tab still reaches it)
     EXPECT_EQ(findItem("toolboxUndoButton")->property("focusPolicy").toInt(), static_cast<int>(Qt::TabFocus));
-    EXPECT_EQ(findItem("toolboxAllButton")->property("focusPolicy").toInt(), static_cast<int>(Qt::TabFocus));
+    EXPECT_EQ(findItem("moreButton")->property("focusPolicy").toInt(), static_cast<int>(Qt::TabFocus));
     // Not while nothing is written: the button keeps it then
     controller->endMarkdownOnPage();
     until([&] { return !canvas->property("textEditing").toBool(); });
-    findItem("toolboxAllButton")->forceActiveFocus();
+    findItem("moreButton")->forceActiveFocus();
     wait(100);
     EXPECT_FALSE(canvas->hasActiveFocus()) << "no text written: the focus stays where it went";
 }

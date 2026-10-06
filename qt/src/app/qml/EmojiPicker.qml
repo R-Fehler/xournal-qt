@@ -10,6 +10,8 @@ import XournalQt.Canvas
 
 Popup {
     id: picker
+    // (open: Android's back key is its; Zen's Back waits, qt/top-bar)
+    onOpenedChanged: if (typeof win !== "undefined" && win && win.takeBack !== undefined) win.takeBack(opened)
     objectName: "emojiPicker"
     signal picked(string emoji)
     /// The item it opens beside (not a sheet), and where in its coordinates

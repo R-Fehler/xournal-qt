@@ -12,6 +12,8 @@ import QtQuick.Layouts
 
 Popup {
     id: sheet
+    // (open: Android's back key is its; Zen's Back waits, qt/top-bar)
+    onOpenedChanged: if (typeof win !== "undefined" && win && win.takeBack !== undefined) win.takeBack(opened)
     objectName: "menuSheet"
     parent: Overlay.overlay
     modal: true

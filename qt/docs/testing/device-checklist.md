@@ -3884,3 +3884,46 @@ folding describe what is gone: the rail scrolls now.
 - [ ] Select and snip grouped (carry snip onto select): a tap takes the one shown, the next tap the other. Press S or
       Shift+S: the group shows the one taken. Ungrouped, select again cycles rectangle ↔ lasso on its own.
 - [ ] Restart: the groups, their order and the tool each shows are as they were. The folded dock shows the same groups.
+
+## The top bar: the arrangement's other list, carried to and from the rail (qt/top-bar, 0.8.0)
+
+- [ ] Desktop 1920 × 1080: the top bar shows open, save, (milestone where the document keeps versions), share, print |
+      image, stickers, add a page, write on the page | setsquare, the finger draws, record | search, read, replay,
+      present, full screen, Zen | tags, (favourite in a library), bookmark | settings, then "+" and ⋮ at its end. A
+      document in a library with versions on: the milestone and the favourite appear in their places.
+- [ ] 1366 × 768 and the Fold 7 unfolded (900 × 1000, 1000 × 900): the bar scrolls sideways, half of the next button
+      shows and the end fades; a swipe scrolls it (nothing runs), the mouse wheel scrolls it, a tap runs a button; "+"
+      and ⋮ stay put. Where it was scrolled to is kept per window size.
+- [ ] Hold a pen on the rail until it lifts, carry it up onto the top bar: the top bar shows the drop line; let go: the
+      pen is on the top bar, a tap takes it, a tap on it in hand opens its editor below it. Carry it back onto the
+      rail. The same with a finger and with the pen.
+- [ ] Hold "search" on the top bar, carry it onto the rail; it searches from there. Carry "share" onto "save" and keep
+      it there until the ring shows: a group ("Grouped · Undo"). A tap on the group always opens its list (nothing is
+      shared or saved by the tap); a tap in the list runs it. Hand and select grouped on the top bar: a tap takes one,
+      the next tap the other.
+- [ ] Carry "tags" away from both bars (into the page): it shows "Off the bars", let go: "Tags is in + now · Undo";
+      Undo brings it back. Carry a pen away: "Remove", let go: "Removed: … · Undo". The last eraser cannot leave.
+- [ ] "+" at the top bar's end: "A new tool" with the kinds, then what is on neither bar by section (Tools, Insert,
+      View, Document); a tap on "Tags" puts it at the top bar's end, a new highlighter (Add in its editor) too. "+" at
+      the rail's end puts an item at the rail's end. Hold an item: "Move to the rail" / "Move to the top bar", "Off the
+      bars (into +)".
+- [ ] Hold "Present" (or "Add a page", "Image", "Stickers", "Record") on a bar: it lifts; let go without moving: its menu,
+      whose first entry is what its hold did before (Present without controls, the templates, …).
+- [ ] ⋮ is complete whatever the bars hold: Document (new, open, save, bookmark, favourite, …), Tools (hand, select,
+      snip, mark PDF text, write, setsquare, finger, image, stickers, add a page, record), View (search, full screen,
+      present, Zen, read, replay), Settings at its end; each entry does what its button does.
+- [ ] Settings → Pen → "Back to the first layout…": asked first; both bars as at a first start, your pens kept on the
+      rail.
+- [ ] Full screen (F11): the floating rail's ⋯ lists the top bar's items in their order (a group's members one by one)
+      and "New document", which opens a new tab.
+- [ ] Phone folded upright (412 × 915): the app bar has the title row and under it the same top bar, scrolling; Zen is
+      on it (scroll to it). The dock at the bottom: undo, redo, the tools scrolling with "+" after them (the catalog as
+      a sheet), the page number. "My tools" is gone.
+- [ ] Phone folded held sideways (915 × 412) with the system bars: the top bar sits beside the title in the app bar,
+      the page number before the tab count; the rail at the right shows at least two tools between redo and its end.
+- [ ] Android: in Zen the back gesture and the back button leave Zen (the controls come back) and do not leave the app;
+      in Read they end Read; presenting without controls they bring the controls back. With the settings open in Zen,
+      Back closes the settings first.
+- [ ] A text document (.md) at 1366 × 768: undo, redo, all formatting buttons (no "Insert" menu), then the commands
+      (open, save, …) in the same row, scrolling; the wheel scrolls it; ⋮ at the end. At 1920 more of the commands, at
+      a wide window all.

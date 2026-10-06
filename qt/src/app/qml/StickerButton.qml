@@ -15,6 +15,8 @@ IconButton {
     label: qsTr("Stickers")
     tip: qsTr("Stickers: paste saved content (hold: save the selection as a sticker)")
     ownHold: true
+    /// What its long press does (in its menu on a bar)
+    readonly property string holdText: qsTr("Save the selection as a sticker…")
     onClicked: stickerPicker.open()
     onPressAndHold: stickerPicker.saveSelection()
     TapHandler {

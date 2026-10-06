@@ -17,6 +17,8 @@ import "Popups.js" as Popups
 
 Popup {
     id: picker
+    // (open: Android's back key is its; Zen's Back waits, qt/top-bar)
+    onOpenedChanged: if (typeof win !== "undefined" && win && win.takeBack !== undefined) win.takeBack(opened)
     objectName: key + "Picker"
     /// "stickers" or "templates"
     property string mode: "stickers"

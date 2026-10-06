@@ -1120,6 +1120,20 @@
   them. Groups: a tool held over another until a ring shows; a tap cycles with two or three members and opens the list
   with more ([toolbox.md](toolbox.md)).
 
+- **The top bar, `qt/top-bar` (2026-10-06, for 0.8.0).** The author: "Can we let the user move things from rail to top
+  and vice versa as well? … the top toolbar to allow more customization as well, so custom order, grouping, dragging
+  from and to the rail?" and "I think zen is helpful put it into the top bar. And yes the back gesture or button should
+  leave zen mode on android." The top bar is the other list of the arrangement, drawn by the same element as the rail
+  (`Toolbox.qml`, `bar: "top"`): the user's order, dividers and groups, scrolling as the rail does (the command bar's
+  ladder into ⋮ and "more tools", `ToolBarPlan.js`, is gone), "+" and ⋮ pinned at its end. Items are carried between
+  the bars (one home each; away from both: off the bars, with Undo); a group with a command opens its list on every
+  tap. "+" is the catalog on both bars (a new tool, or every item on neither bar, by section; it replaced "Put back"
+  and the phone's "My tools"). ⋮ is complete (Document, Tools, View, Settings). First layout with Zen on every screen;
+  Settings → "Back to the first layout…". Full screen's ⋯ lists the top bar and New. The phone's app bar hosts the top
+  bar (a row of its own upright); held sideways the page number moved to the app bar so the rail has room. A text
+  document's format bar scrolls with its commands at its end instead of folding. Android's Back leaves Zen first
+  ([toolbox.md](toolbox.md), "The top bar"; [zen.md](zen.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

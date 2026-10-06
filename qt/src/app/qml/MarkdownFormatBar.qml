@@ -6,10 +6,12 @@
 // take the focus: the text keeps it, and the keyboard stays.
 //
 // Where the room is short (qt/docs/adaptive-layout.md, "The format bar"): on a desktop or a tablet the bar takes the
-// richest form that fits, as the tool bar does - everything as buttons; then the inserts in an "Insert" menu; then the
-// block's kind as one button with a menu too. The block's kind, the marks and the lists stay in the row. Only when
-// even that does not fit does the row scroll. On a phone the row scrolls sideways (the norm in mobile editors), with
-// fading edges that show there is more.
+// richest form that fits - everything as buttons; then the inserts in an "Insert" menu; then the block's kind as one
+// button with a menu too. The block's kind, the marks and the lists stay in the row. Only when even that does not fit
+// does the row scroll. On a phone the row scrolls sideways (the norm in mobile editors), with fading edges that show
+// there is more. A text document's bar holds its commands too (the top bar, at the row's end; qt/top-bar): then
+// nothing folds, the row scrolls as the bars do (all formatting first, then the commands; its view ends through the
+// middle of a button, the wheel scrolls it).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -45,6 +47,10 @@ Rectangle {
     readonly property var adaptiveLayout: typeof win !== "undefined" && win ? win.adaptive : null
     /// A phone: the row scrolls, nothing goes into menus
     readonly property bool phone: adaptiveLayout !== null && adaptiveLayout.phone
+    /// The row holds the commands at its end (a text document: Main.qml puts the top bar into `commandsSlot`): nothing
+    /// folds, the row scrolls like the bars
+    property bool holdsCommands: false
+    readonly property bool scrollsAsBar: phone || holdsCommands
     readonly property bool touch: adaptiveLayout !== null && adaptiveLayout.touchProfile
 
     // --- the form that fits (priority + overflow) ---
@@ -53,7 +59,25 @@ Rectangle {
     readonly property real buttonWidth: 40
     readonly property real separatorWidth: separatorProbe.implicitWidth
     /// The room of the row (the bar less its trailing buttons)
-    readonly property real room: flick.width
+    readonly property real room: fullRoom
+    readonly property real fullRoom: (trailingSlot.width > 0 ? trailingSlot.x - 4 : bar.width - bar.rightInset) - flick.x
+    /// Where a row that scrolls ends: through the middle of a button, so that half of the next one shows (all of it when
+    /// everything fits)
+    function cutFor(room) {
+        if (flick.contentWidth <= room + 0.5 || room < 60) return Math.max(0, room)
+        let best = room
+        const kids = Array.prototype.slice.call(row.children).concat([commandsHolder])
+        for (let i = 0; i < kids.length; ++i) {
+            const c = kids[i]
+            if (!c.visible || c.width < 20) continue
+            const points = c.cutPoints !== undefined ? c.cutPoints() : [c.width / 2]
+            for (let j = 0; j < points.length; ++j) {
+                const p = c.x + points[j]
+                if (p <= room && p > room - 200) best = p
+            }
+        }
+        return best
+    }
     function groupWidth(n, w) { return n * w + (n - 1) * spacing }
     readonly property real marksWidth: groupWidth(6, buttonWidth) + separatorWidth + groupWidth(4, buttonWidth)
                                        + 4 * spacing
@@ -63,7 +87,7 @@ Rectangle {
     readonly property real insertLabelWidth: separatorWidth + spacing + insertProbe.implicitWidth + spacing
     readonly property real insertIconWidth: separatorWidth + spacing + buttonWidth + spacing
     /// 1. The inserts go into the "Insert" menu (not on a phone: its row scrolls)
-    readonly property bool insertsInMenu: !phone && room < levelsWidth + marksWidth + insertsWidth + 4
+    readonly property bool insertsInMenu: !scrollsAsBar && room < levelsWidth + marksWidth + insertsWidth + 4
     /// 3. The block's kind as one button with a menu, when even the row with a plain "+" for the inserts does not fit
     readonly property bool levelsInMenu: insertsInMenu && room < levelsWidth + marksWidth + insertIconWidth + 4
     /// 2. "Insert" without its word (a "+"), where the word does not fit
@@ -134,6 +158,8 @@ Rectangle {
     property alias trailing: trailingSlot
     /// At its start, outside what scrolls: a text document's undo and redo with the toolbox (Main.qml puts them here)
     property alias leading: leadingSlot
+    /// At the end of the row, inside what scrolls: a text document's commands (Main.qml puts the top bar here)
+    property alias commandsSlot: commandsHolder
     Item {
         id: leadingSlot
         objectName: bar.named("formatBarLeading")
@@ -159,15 +185,23 @@ Rectangle {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.left: leadingSlot.width > 0 ? leadingSlot.right : parent.left
-        anchors.right: trailingSlot.left
         anchors.leftMargin: leadingSlot.width > 0 ? 4 : 6 + bar.leftInset
-        anchors.rightMargin: trailingSlot.width > 0 ? 4 : bar.rightInset
-        contentWidth: row.implicitWidth
+        width: bar.holdsCommands ? bar.cutFor(bar.fullRoom) : bar.fullRoom
+        contentWidth: row.implicitWidth + (commandsHolder.width > 0 ? commandsSeparator.width + commandsHolder.width : 0)
         contentHeight: height
         flickableDirection: Flickable.HorizontalFlick
         boundsBehavior: Flickable.StopAtBounds
         interactive: contentWidth > width
         clip: true
+        // The mouse wheel scrolls it too (up and down: sideways)
+        WheelHandler {
+            enabled: flick.interactive
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: function(event) {
+                const d = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x
+                flick.contentX = Math.max(0, Math.min(flick.contentWidth - flick.width, flick.contentX - d / 2))
+            }
+        }
 
         RowLayout {
             id: row
@@ -277,6 +311,7 @@ Rectangle {
             FormatButton { objectName: bar.named("mdImage"); visible: !bar.insertsInMenu; iconName: "xopp-tool-image"; tip: qsTr("Image… (a picture file, saved with the document)"); label: qsTr("Image…"); onClicked: imagePicker.open() }
             FormatButton { objectName: bar.named("mdRule"); visible: !bar.insertsInMenu; iconName: "xqt-rule"; tool: "rule"; tip: qsTr("Horizontal rule (---)"); label: qsTr("Horizontal rule") }
             FormatButton { objectName: bar.named("mdPageBreak"); visible: !bar.insertsInMenu; iconName: "xqt-page-break"; tool: "pageBreak"; tip: qsTr("Page break"); label: qsTr("Page break") }
+
             // "Insert": the same, as a menu, where the row has no room for them
             IconButton {
                 id: insertButton
@@ -350,6 +385,24 @@ Rectangle {
                 }
             }
             Item { Layout.fillWidth: true }
+        }
+        // The commands (a text document: the top bar), after the formatting, in the same row
+        ToolSeparator {
+            id: commandsSeparator
+            x: row.implicitWidth
+            height: flick.height
+            visible: commandsHolder.width > 0
+        }
+        Item {
+            id: commandsHolder
+            objectName: bar.named("formatCommands")
+            x: row.implicitWidth + commandsSeparator.width
+            width: childrenRect.width
+            height: flick.height
+            function cutPoints() {
+                const c = children.length > 0 ? children[0] : null
+                return c && c.cutPoints !== undefined ? c.cutPoints().map(function(p) { return c.x + p }) : []
+            }
         }
     }
     // The row scrolls: its edges fade where there is more (a phone; a very narrow window)

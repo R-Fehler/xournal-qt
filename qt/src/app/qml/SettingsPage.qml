@@ -12,6 +12,8 @@ import QtQuick.Dialogs
 
 Popup {
     id: sheet
+    // (open: Android's back key is its; Zen's Back waits, qt/top-bar)
+    onOpenedChanged: if (typeof win !== "undefined" && win && win.takeBack !== undefined) win.takeBack(opened)
     modal: true
     focus: true
     parent: Overlay.overlay
@@ -282,7 +284,14 @@ Popup {
                     Hint {
                         text: qsTr("The toolbox holds your own tools, each with its color and width, beside the page "
                                    + "(drag its dotted grip to another edge). Tap a tool to take it, tap it again to "
-                                   + "change it; hold it for its menu, hold and move it to sort it.")
+                                   + "change it; hold it for its menu, hold and move it to sort it, onto another to "
+                                   + "group them, onto the top bar or away from both bars. + adds a tool or a command.")
+                    }
+                    // Both bars as at a first start, the tools kept (qt/top-bar)
+                    Button {
+                        objectName: "resetBarsButton"
+                        text: qsTr("Back to the first layout…")
+                        onClicked: resetBarsDialog.open()
                     }
                     Button {
                         objectName: "resetToolboxButton"
@@ -1817,6 +1826,26 @@ Popup {
             }
         }
         function textOf(combination) { return app.shortcuts.keyText(combination) }
+    }
+    // Both bars back to their first layout: the rail and the top bar as at a first start; the user's tools stay (on the
+    // rail, in their order, out of their groups)
+    AdaptiveDialog {
+        id: resetBarsDialog
+        objectName: "resetBarsDialog"
+        kind: "question"
+        preferredWidth: 420
+        title: qsTr("Back to the first layout?")
+        Label {
+            width: resetBarsDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("The rail and the top bar are arranged as at the first start: their order, groups and dividers. "
+                       + "Your tools stay on the rail, with their colors and widths.")
+        }
+        footer: DialogButtonBox {
+            Button { objectName: "resetBarsConfirm"; text: qsTr("Reset"); DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
+            Button { text: qsTr("Cancel"); DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+        }
+        onAccepted: app.toolbox.resetLayout()
     }
     // The toolbox back to its first tools (its order, colors and widths are lost)
     AdaptiveDialog {
