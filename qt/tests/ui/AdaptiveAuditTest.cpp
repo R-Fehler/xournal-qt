@@ -434,17 +434,6 @@ void AdaptiveAuditTest::walk() {
         window->resize(s.w, s.h);
         wait(500);
         shot("fullscreenChrome");
-        if (auto* square = findItem("quickToolSquare")) {
-            QMetaObject::invokeMethod(square, "forceActiveFocus");
-            QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
-                              square->mapToScene(QPointF(square->width() / 2, square->height() / 2)).toPoint());
-            wait(400);
-            QObject* tools = find("quickTools");
-            shot("quickTools", tools ? QString("popup h=%1 w=%2").arg(tools->property("height").toDouble())
-                                               .arg(tools->property("width").toDouble())
-                                     : QString());
-            closePopups();
-        }
         QMetaObject::invokeMethod(window, "startPresenting", Q_ARG(QVariant, false));
         wait(300);
         window->showNormal();

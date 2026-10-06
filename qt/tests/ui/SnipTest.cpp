@@ -186,25 +186,26 @@ protected:
 };
 }  // namespace
 
-// (the classic tool bar: the snips in the select list; with the toolbox a button of their own, CopyToolsTest)
-TEST_F(SnipTest, aSnipFromTheSelectListCopiesThePictureWithItsSourceAndGivesTheToolBack) {
+// (the snip button: a fixed tool of the toolbox's rail; its list holds both shapes and the resolution, CopyToolsTest)
+TEST_F(SnipTest, aSnipFromTheSnipButtonsListCopiesThePictureWithItsSourceAndGivesTheToolBack) {
     makeSource("source.xopp");
     controller->selectTool("pen");
-    auto* select = find<QQuickItem>("selectButton");
-    auto* selects = find<QObject>("selectButtonVariants");
-    ASSERT_NE(select, nullptr);
-    ASSERT_NE(selects, nullptr);
-    QMetaObject::invokeMethod(select, "pressAndHold");
-    until([&] { return selects->property("visible").toBool(); });
-    QObject* entry = entryOf(selects, "variant_snipRect");
+    auto* snip = find<QQuickItem>("snipButton");
+    auto* snips = find<QObject>("snipButtonVariants");
+    ASSERT_NE(snip, nullptr);
+    ASSERT_NE(snips, nullptr);
+    QMetaObject::invokeMethod(snip, "pressAndHold");
+    until([&] { return snips->property("visible").toBool(); });
+    QObject* entry = entryOf(snips, "variant_snipRect");
     ASSERT_NE(entry, nullptr);
     QMetaObject::invokeMethod(entry, "triggered");
-    until([&] { return !selects->property("visible").toBool(); });
+    until([&] { return !snips->property("visible").toBool(); });
     wait(300);  // (the menu's closing transition)
     EXPECT_EQ(controller->snipShape(), "rect");
     EXPECT_EQ(controller->tool(), "selectRect");
-    EXPECT_TRUE(select->property("checked").toBool());
-    EXPECT_EQ(select->property("currentKey").toString(), "snipRect");
+    EXPECT_TRUE(snip->property("checked").toBool());
+    EXPECT_EQ(snip->property("currentKey").toString(), "snipRect");
+    EXPECT_FALSE(find<QQuickItem>("selectButton")->property("checked").toBool()) << "the snip's button";
 
     drag({{80, 150}, {320, 250}});
     until([&] { return clipboardHasSnip(); });

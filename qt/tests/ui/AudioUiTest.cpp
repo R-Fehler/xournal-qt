@@ -420,8 +420,8 @@ TEST_F(AudioUiTest, thePlatformHearsOfTheRecordingAndControlsIt) {
     EXPECT_FALSE(heard[5].recording);
 }
 
-// A build without any audio backend offers no recording: no record button in the classic bar (it has room for
-// everything at 1920 then too), none in the phone's sheet, Ctrl+Shift+R does nothing
+// A build without any audio backend offers no recording: no record button on the toolbox's rail or in the command
+// bar, none in the phone's sheet, Ctrl+Shift+R does nothing
 TEST_F(NoAudioUiTest, nothingOffersRecording) {
     controller->newDocument();
     wait(200);
@@ -430,8 +430,6 @@ TEST_F(NoAudioUiTest, nothingOffersRecording) {
     ASSERT_NE(record, nullptr);
     EXPECT_FALSE(record->property("offered").toBool());
     EXPECT_FALSE(record->isVisible());
-    EXPECT_EQ(find<QQuickItem>("widthStrip")->property("mode").toString(), "full");
-    EXPECT_EQ(find<QQuickItem>("colorStrip")->property("mode").toString(), "full");
     EXPECT_FALSE(find<QQuickItem>("moreToolsButton")->isVisible());
     QTest::keyClick(window, Qt::Key_R, Qt::ControlModifier | Qt::ShiftModifier);
     wait(100);

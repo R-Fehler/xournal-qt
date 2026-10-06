@@ -334,7 +334,7 @@ TEST_F(SettingsModelTest, layoutChoicesPerSizeClass) {
     EXPECT_EQ(model->layoutChoice("desktopWide", "sidebar"), "");
     model->setLayoutChoice("desktopWide", "sidebar", "hidden");
     model->setLayoutChoice("tabletPortrait", "sidebar", "shown");
-    model->setLayoutChoice("tabletPortrait", "toolbar", "twoRowsBottom");
+    model->setLayoutChoice("tabletPortrait", "toolbox", "bottom");
     EXPECT_EQ(changed.count(), 3);
     EXPECT_EQ(model->layoutChoice("desktopWide", "sidebar"), "hidden");
     EXPECT_EQ(model->layoutChoice("tabletPortrait", "sidebar"), "shown");
@@ -349,13 +349,13 @@ TEST_F(SettingsModelTest, layoutChoicesPerSizeClass) {
     auto again = std::make_unique<AppContext>(fs::path(XQT_BUILD_RESOURCE_DIR),
                                               fs::path(tmp.filePath("settings.xml").toStdString()), 1);
     SettingsModel reread(*again);
-    EXPECT_EQ(reread.layoutChoice("tabletPortrait", "toolbar"), "twoRowsBottom");
+    EXPECT_EQ(reread.layoutChoice("tabletPortrait", "toolbox"), "bottom");
 
     model->setLayoutChoice("desktopWide", "sidebar", "auto");
     EXPECT_EQ(model->layoutChoice("desktopWide", "sidebar"), "");
     model->resetLayoutChoices();
     EXPECT_FALSE(model->hasLayoutChoices());
-    EXPECT_EQ(model->layoutChoice("tabletPortrait", "toolbar"), "");
+    EXPECT_EQ(model->layoutChoice("tabletPortrait", "toolbox"), "");
     EXPECT_EQ(model->get("fuzzyTypos").toInt(), before) << "the other settings stay";
 }
 

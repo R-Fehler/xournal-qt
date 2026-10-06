@@ -78,7 +78,7 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             // many desktops)
             {"lockScroll", tr("Scroll the document and the reference together"), view, {}},
             {"present", tr("Present (full screen, page by page)"), view, {"F5"}},
-            // (only the page: no pill, no tool square; again while presenting: the controls back)
+            // (only the page: no floating toolbox; again while presenting: the controls back)
             {"presentClean", tr("Present without controls"), view, {"Ctrl+F5"}},
             // (qt/docs/toolbox.md, "Reading": full screen without ink, the edges turn the pages; again: write again)
             {"readOnly", tr("Read only (full screen, the edges turn the pages)"), view, {"Ctrl+Alt+R"}},

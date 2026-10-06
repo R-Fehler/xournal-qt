@@ -235,8 +235,9 @@ class AppController: public QObject {
     /// The adjustable width of the tool (points; 0: the tool has no sizes). Setting it selects it (size 5).
     Q_PROPERTY(double customWidth READ customWidth WRITE setCustomWidth NOTIFY toolChanged)
     Q_PROPERTY(QVariantList palette READ palette CONSTANT)
-    /// The colors in the tool bar (user's choice; default: the first colors of the palette, with orange)
-    Q_PROPERTY(QVariantList toolbarColors READ toolbarColors NOTIFY toolbarColorsChanged)
+    /// The colors of the deprecated text mode's color row (TextFlowPanel): the first colors of the palette, with orange
+    /// (or the colors the classic tool bar of before 0.8.0 kept in the setting "toolbarColors")
+    Q_PROPERTY(QVariantList toolbarColors READ toolbarColors CONSTANT)
     /// Color of PDF text highlights, one of three presets
     Q_PROPERTY(QColor pdfHighlightColor READ pdfHighlightColor WRITE setPdfHighlightColor NOTIFY pdfTextModeChanged)
     Q_PROPERTY(QVariantList pdfHighlightColors READ pdfHighlightColors CONSTANT)
@@ -262,14 +263,8 @@ class AppController: public QObject {
     /// The last page of the Markdown text being edited (the page's text flows over pages)
     Q_PROPERTY(int markdownLastPage READ markdownLastPage NOTIFY markdownChanged)
     Q_PROPERTY(double markdownOverflow READ markdownOverflow NOTIFY markdownChanged)
-    /// Where the tool bar is: "top", "left" or "right"
-    Q_PROPERTY(QString toolbarPosition READ toolbarPosition WRITE setToolbarPosition NOTIFY toolbarPositionChanged)
-    /// The tool bar is put away (the small tool square of the full screen takes over)
-    Q_PROPERTY(bool toolbarHidden READ toolbarHidden WRITE setToolbarHidden NOTIFY toolbarPositionChanged)
-    /// The pen pill without a tool bar: its colors, which side of the screen it is on, and where along that side
-    Q_PROPERTY(QVariantList penColors READ penColors NOTIFY penPillChanged)
-    Q_PROPERTY(QString penPillSide READ penPillSide WRITE setPenPillSide NOTIFY penPillChanged)
-    Q_PROPERTY(double penPillOffset READ penPillOffset WRITE setPenPillOffset NOTIFY penPillChanged)
+    /// The command bar is put away (its tab at the top edge; a slim strip brings it back)
+    Q_PROPERTY(bool toolbarHidden READ toolbarHidden WRITE setToolbarHidden NOTIFY toolbarHiddenChanged)
     Q_PROPERTY(int zoomPercent READ zoomPercent NOTIFY zoomChanged)
     /// The canvas turned (qt/docs/canvas-rotation.md): degrees clockwise, in [0, 360); 0 upright
     Q_PROPERTY(double canvasRotation READ canvasRotation NOTIFY canvasRotationChanged)
@@ -486,10 +481,6 @@ public:
     void storeCustomWidths();
     /// Upstream's palette without white
     QVariantList defaultToolbarColors() const;
-    /// Add a color to the tool bar (not twice) / remove the color at `index` / back to the default colors.
-    Q_INVOKABLE void addToolbarColor(const QColor& color);
-    Q_INVOKABLE void removeToolbarColor(int index);
-    Q_INVOKABLE void resetToolbarColors();
     QColor pdfHighlightColor() const;
     void setPdfHighlightColor(const QColor& color);
     QVariantList pdfHighlightColors() const;
@@ -529,22 +520,11 @@ public:
     Q_INVOKABLE bool entryInHand(const QVariantMap& entry) const;
     /// The color an entry draws with now: its role's in the chosen palette, else its own
     Q_INVOKABLE QColor toolEntryColor(const QVariantMap& entry) const;
-    /// The keys P, H, E, T with the toolbox: its entry of that type used last ("pen", "highlighter", "eraser",
-    /// "text"); without one, the plain tool
+    /// The keys P, H, E, T: the toolbox's entry of that type used last ("pen", "highlighter", "eraser", "text");
+    /// without one, the plain tool
     Q_INVOKABLE void takeToolOfType(const QString& type);
-    /// The toolbox (not the classic tool bar) is in use (setting toolbarMode)
-    bool toolboxMode() const;
-    QString toolbarPosition() const;
     bool toolbarHidden() const;
     void setToolbarHidden(bool hidden);
-    QVariantList penColors() const;
-    Q_INVOKABLE void addPenColor(const QColor& color);
-    Q_INVOKABLE void removePenColor(int index);
-    Q_INVOKABLE void resetPenColors();
-    QString penPillSide() const;
-    void setPenPillSide(const QString& side);
-    double penPillOffset() const;
-    void setPenPillOffset(double offset);
     bool textFlowActive() const;
     int textFlowPage() const { return flowPage; }
     double textFlowOverflow() const { return flowOverflow; }
@@ -631,7 +611,6 @@ public:
     Q_INVOKABLE void updateMarkdown(const QString& source);
     /// Done (keep: one undo step) or cancel.
     Q_INVOKABLE void endMarkdown(bool keep);
-    void setToolbarPosition(const QString& position);
     int zoomPercent() const;
     int pageNumber() const;
     int pageCount() const;
@@ -1771,7 +1750,6 @@ Q_SIGNALS:
     /// A followed link's file is gone and nothing like it is in the library: the window offers to locate it (relinkTo).
     void linkTargetMissing(const QString& name);
     void copiedPagesChanged();
-    void toolbarColorsChanged();
     void colorPaletteChanged();
     void insertPagesRequested(int position);
     void pageBackgroundRequested(const QList<int>& pages);
@@ -1779,8 +1757,7 @@ Q_SIGNALS:
     void pageSizeRequested(const QList<int>& pages);
     void printRequested(const QList<int>& pages);
     void chapterRequested(int page);
-    void toolbarPositionChanged();
-    void penPillChanged();
+    void toolbarHiddenChanged();
     void textFlowChanged();
     void markdownChanged();
     void markdownOnPageChanged();
@@ -2070,7 +2047,6 @@ private:
     bool recoveryPending = false;
     QString pdfMode = "highlight";
     void applyPdfTextMode();
-    void storeToolbarColors(const QVariantList& colors);
     /// The roles of the tools' colors (setting "colorRoles": "pen=marker:warnings;highlighter=classic:keyTerms")
     QMap<QString, QString> colorRoles() const;
     void storeColorRoles(const QMap<QString, QString>& roles);

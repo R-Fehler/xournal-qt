@@ -9,7 +9,7 @@ import "Popups.js" as Popups
 
 IconButton {
     id: button
-    /// The group of ToolGroups: "pen", "select", "shape", "geometry", "eraser"
+    /// The group of ToolGroups: "select", "snip", "geometry"
     property string group
     /// Where the logic is (Main.qml's `toolGroups`)
     property var groups: win.toolGroups
@@ -92,10 +92,6 @@ IconButton {
             text: qsTr("Take it off the page")
             icon.source: app.iconUrl("xqt-close")
             onTriggered: app.toggleGeometryTool("")
-        }
-        // The pen's options: its line style and filling (the pen draws the shapes too)
-        PenStyleOptions {
-            offered: (button.group === "pen" || button.group === "shape") && (app.hasLineStyle || app.hasFill)
         }
     }
 }

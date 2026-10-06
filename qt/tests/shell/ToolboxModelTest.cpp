@@ -11,6 +11,8 @@
 #include <QSignalSpy>
 #include <gtest/gtest.h>
 
+#include "control/settings/Settings.h"
+#include "session/AppContext.h"
 #include "shell/SettingsModel.h"
 #include "shell/ToolboxModel.h"
 
@@ -252,14 +254,6 @@ TEST(ToolboxModel, reset) {
 // --- taking an entry: the tool in hand gets everything it holds (AppToolbox.cpp) --------------------------------------
 
 namespace {
-/// The toolbox in use for one test (the other shell tests keep the classic tools: XQT_TOOLBAR_MODE)
-struct ToolboxOn {
-    AppController& c;
-    explicit ToolboxOn(AppController& c): c(c) {
-        qobject_cast<SettingsModel*>(c.settingsModel())->set("toolbarMode", "toolbox");
-    }
-    ~ToolboxOn() { qobject_cast<SettingsModel*>(c.settingsModel())->set("toolbarMode", "classic"); }
-};
 QString nth(ToolboxModel* m, const QString& type, int n = 0) {
     for (const QVariant& v: m->tools()) {
         if (v.toMap().value("type") == type && n-- == 0) {
@@ -272,7 +266,6 @@ QString nth(ToolboxModel* m, const QString& type, int n = 0) {
 
 TEST(ToolboxApply, anEntryGivesTheToolAllItsSettings) {
     AppController c;
-    ToolboxOn on(c);
     c.setColorPalette("classic");
     c.newDocument();
     ToolboxModel* m = c.toolboxModel();
@@ -341,7 +334,6 @@ TEST(ToolboxApply, anEntryGivesTheToolAllItsSettings) {
 
 TEST(ToolboxApply, theEntryInHandFollowsAPaletteSwitch) {
     AppController c;
-    ToolboxOn on(c);
     c.setColorPalette("classic");
     ToolboxModel* m = c.toolboxModel();
     m->reset();
@@ -360,7 +352,6 @@ TEST(ToolboxApply, theEntryInHandFollowsAPaletteSwitch) {
 
 TEST(ToolboxApply, theKeysTakeTheEntryOfTheirTypeUsedLast) {
     AppController c;
-    ToolboxOn on(c);
     c.setColorPalette("classic");
     ToolboxModel* m = c.toolboxModel();
     m->reset();
@@ -378,7 +369,6 @@ TEST(ToolboxApply, theKeysTakeTheEntryOfTheirTypeUsedLast) {
 
 TEST(ToolboxApply, aSnipEntryArmsTheSnipAndTheToolBeforeStaysTheActiveEntry) {
     AppController c;
-    ToolboxOn on(c);
     c.newDocument();
     ToolboxModel* m = c.toolboxModel();
     m->reset();
@@ -417,4 +407,53 @@ TEST(ToolboxApply, theFirstToolsComeFromTheToolsOfBefore) {
     EXPECT_EQ(fromBefore.tools().size(), 10);
     qobject_cast<SettingsModel*>(c.settingsModel())->set("eraserMode", "default");
     c.shutdown();
+}
+
+// 0.8.0 removed the classic tool bar: a settings file of before (toolbarMode "classic", or nothing, and no toolbox yet)
+// gets the toolbox, whose first tools carry the pen's color and width, the eraser's kind and the text box's font of
+// before; the tool in hand at the start is the toolbox's, and the keys take its entries
+TEST(ToolboxApply, aSettingsFileOfTheClassicToolBarGetsTheToolboxWithTheToolsOfBefore) {
+    for (const char* mode: {"classic", ""}) {
+        {
+            AppController before;
+            before.toolboxModel()->flush();
+            before.selectTool("pen");
+            before.setColor(QColor("#336699"));
+            before.setCustomWidth(2.26);
+            before.setMarkdownFontSize(17);
+            qobject_cast<SettingsModel*>(before.settingsModel())->set("eraserMode", "deleteStroke");
+            Settings* s = before.context().getSettings();
+            before.shutdown();
+            // (what 0.7.0 wrote with the classic tool bar: its mode, no toolbox)
+            s->getCustomElement("xournalQt").setString("toolbarMode", mode);
+            s->getCustomElement("xournalQt").setString("toolbox", "");
+            s->save();
+        }
+        AppController after;
+        ToolboxModel* m = after.toolboxModel();
+        const QVariantMap pen = m->entry(nth(m, "pen"));
+        EXPECT_EQ(pen.value("color"), "#336699") << mode;
+        EXPECT_EQ(pen.value("role"), "") << mode;
+        EXPECT_DOUBLE_EQ(pen.value("width").toDouble(), 2.26) << mode;
+        EXPECT_EQ(m->entry(nth(m, "eraser")).value("variant"), "deleteStroke") << mode;
+        EXPECT_DOUBLE_EQ(m->entry(nth(m, "text")).value("font").toMap().value("size").toDouble(), 17) << mode;
+        EXPECT_EQ(m->tools().size(), 10) << mode << ": the first tools";
+        // The pen in hand is the toolbox's first pen
+        EXPECT_EQ(m->active(), nth(m, "pen")) << mode;
+        EXPECT_EQ(after.tool(), "pen") << mode;
+        EXPECT_EQ(after.color(), QColor("#336699")) << mode;
+        EXPECT_DOUBLE_EQ(after.customWidth(), 2.26) << mode;
+        // E and T: the toolbox's eraser and text box
+        after.takeToolOfType("eraser");
+        EXPECT_EQ(after.tool(), "eraser") << mode;
+        EXPECT_EQ(m->active(), nth(m, "eraser")) << mode;
+        EXPECT_EQ(qobject_cast<SettingsModel*>(after.settingsModel())->get("eraserMode"), "deleteStroke") << mode;
+        after.takeToolOfType("text");
+        EXPECT_EQ(after.tool(), "text") << mode;
+        EXPECT_DOUBLE_EQ(after.markdownFontSize(), 17) << mode;
+        // (the next tests of this run start from the first tools)
+        qobject_cast<SettingsModel*>(after.settingsModel())->set("eraserMode", "default");
+        m->reset();
+        after.shutdown();
+    }
 }

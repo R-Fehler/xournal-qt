@@ -83,7 +83,6 @@ protected:
         settings()->set("presenterSwapScreens", false);
         settings()->set("presenterShowNotes", false);
         settings()->set("presenterFollowView", true);
-        settings()->set("toolbarMode", "classic");
         controller->shutdown();
         engine.reset();
         controller.reset();
@@ -579,8 +578,6 @@ TEST_F(PresenterView, swapScreensAndTheToolboxBesideThePanel) {
     if (!twoScreens) {
         GTEST_SKIP() << "needs two screens (PresenterView.ui@2screens)";
     }
-    settings()->set("toolbarMode", "toolbox");
-    wait(100);
     QScreen* laptop = QGuiApplication::primaryScreen();
     QScreen* projector = QGuiApplication::screens().at(1);
     present();

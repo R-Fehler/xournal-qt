@@ -277,25 +277,15 @@ Popup {
                     width: parent.width - 48
                     x: 24
                     spacing: 10
-                    // The toolbox or the classic tool bar (qt/docs/toolbox.md)
+                    // The toolbox (qt/docs/toolbox.md)
                     SectionTitle { text: qsTr("Tools") }
-                    ComboRow {
-                        objectName: "toolbarModeRow"
-                        key: "toolbarMode"; text: qsTr("The tools")
-                        options: [
-                            { text: qsTr("My toolbox (my own pens, highlighters, …)"), value: "toolbox" },
-                            { text: qsTr("Classic tool bar"), value: "classic" }
-                        ]
-                    }
                     Hint {
                         text: qsTr("The toolbox holds your own tools, each with its color and width, beside the page "
                                    + "(drag its dotted grip to another edge). Tap a tool to take it, tap it again to "
-                                   + "change it; hold it for its menu, hold and move it to sort it. The classic tool "
-                                   + "bar stays for one more release.")
+                                   + "change it; hold it for its menu, hold and move it to sort it.")
                     }
                     Button {
                         objectName: "resetToolboxButton"
-                        visible: (sheet.s.revision, sheet.s.get("toolbarMode")) === "toolbox"
                         text: qsTr("Back to the first tools…")
                         onClicked: resetToolboxDialog.open()
                     }
@@ -426,8 +416,8 @@ Popup {
                     SwitchRow { objectName: "snapGridSwitch"; key: "snapGrid"; text: qsTr("Snap to the grid") }
                     Hint {
                         text: qsTr("Selections that are moved and the corners of shapes jump onto the nearest point "
-                                   + "of a half-centimetre grid when they come close to it (as in Xournal++). Also in "
-                                   + "the shapes menu of the tool bar. Hold Alt to do the opposite for a moment.")
+                                   + "of a half-centimetre grid when they come close to it (as in Xournal++). Hold Alt "
+                                   + "to do the opposite for a moment.")
                     }
                     SectionTitle { text: qsTr("Colors") }
                     ComboRow {
@@ -461,12 +451,23 @@ Popup {
                             }
                         }
                     }
+                    // Where the chosen palette comes from (its source and license)
                     Hint {
-                        text: qsTr("The color chooser of the tool bar has a tab for each palette. Each color of a "
-                                   + "palette has a meaning (warnings, key terms, headings, …) that stays the same in "
-                                   + "every palette: a color taken from a palette follows when another palette is "
-                                   + "chosen. With the highlighter the palettes give their highlight colors, half "
-                                   + "see-through on light paper and stronger on dark paper.")
+                        objectName: "colorPaletteSource"
+                        readonly property string source: {
+                            const all = app.colorPalettes
+                            for (let i = 0; i < all.length; ++i) if (all[i].id === app.colorPalette) return all[i].source || ""
+                            return ""
+                        }
+                        visible: source !== ""
+                        text: qsTr("From: %1").arg(source)
+                    }
+                    Hint {
+                        text: qsTr("A tool's editor (a tap on the tool in hand) offers the palette's colors and this "
+                                   + "choice too. Each color of a palette has a meaning (warnings, key terms, headings, "
+                                   + "…) that stays the same in every palette: a tool with a palette's color follows "
+                                   + "when another palette is chosen. With the highlighter the palettes give their "
+                                   + "highlight colors, half see-through on light paper and stronger on dark paper.")
                     }
                     Item { Layout.preferredHeight: 16 }
                 }

@@ -19,7 +19,6 @@
 #include "session/AppContext.h"
 #include "session/PenFill.h"
 #include "shell/ColorPalettes.h"
-#include "shell/SettingsModel.h"
 #include "shell/ToolboxModel.h"
 
 #include "AppController.h"
@@ -47,8 +46,6 @@ double widthOf(ToolHandler& th, ToolType type) {
 }  // namespace
 
 QObject* AppController::toolboxObject() const { return toolbox; }
-
-bool AppController::toolboxMode() const { return SettingsModel::toolbarMode(*app->getSettings()) == "toolbox"; }
 
 QString AppController::migratedToolbox() const {
     // The tools of before: the pen's color and width, the highlighter's, the eraser's kind and width, the font, the
@@ -213,7 +210,7 @@ bool AppController::applyToolEntry(const QString& id) {
             th->setSize(static_cast<ToolSize>(best));
         }
     } else if (type == "text") {
-        setTextMarkdown(true);  // (the toolbox's text box is a Markdown text box, as the tool bar's)
+        setTextMarkdown(true);  // (the toolbox's text box is a Markdown text box)
         th->selectTool(TOOL_TEXT);
         takeColor(TOOL_TEXT);
         const QVariantMap font = e.value("font").toMap();

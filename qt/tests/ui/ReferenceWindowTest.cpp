@@ -563,29 +563,29 @@ TEST_F(ReferenceWindowTest, theMenusOpenAReference) {
     EXPECT_EQ(controller->currentTab(), 0);
 }
 
-TEST_F(ReferenceWindowTest, itWorksInFullScreenAndWithTheToolBarAtASide) {
+TEST_F(ReferenceWindowTest, itWorksInFullScreenAndWithTheToolboxAtAnyEdge) {
     ref().showTab(1);
     wait(50);
-    for (const char* position: {"left", "right", "top"}) {
-        controller->setToolbarPosition(position);
-        wait(50);
-        auto* tools = findItem("sideTools");
+    auto* box = findItem("toolbox");
+    ASSERT_NE(box, nullptr);
+    for (const char* edge: {"left", "right", "top", "bottom"}) {
+        QMetaObject::invokeMethod(window, "chooseToolboxEdge", Q_ARG(QVariant, QString(edge)));
+        wait(100);
         const QRectF m = sceneRect(main), r = sceneRect(reference);
-        EXPECT_FALSE(m.intersects(r)) << position;
-        if (tools->isVisible()) {
-            const QRectF t = sceneRect(tools);
-            EXPECT_FALSE(t.intersects(m)) << position;
-            EXPECT_FALSE(t.intersects(r)) << position;
-        }
+        EXPECT_FALSE(m.intersects(r)) << edge;
+        ASSERT_TRUE(box->isVisible()) << edge;
+        const QRectF t = sceneRect(box);
+        EXPECT_FALSE(t.intersects(m)) << edge << ": docked beside the pages";
+        EXPECT_FALSE(t.intersects(r)) << edge;
     }
+    QMetaObject::invokeMethod(window, "chooseToolboxEdge", Q_ARG(QVariant, QString("right")));
     window->setProperty("fullScreenMode", true);
     wait(200);
     EXPECT_TRUE(reference->isVisible());
     const QRectF m = sceneRect(main), r = sceneRect(reference);
     EXPECT_NEAR(m.width() + r.width() + 8, split->width(), 1.5);
-    auto* square = findItem("quickToolSquare");
-    ASSERT_TRUE(square->isVisible());
-    EXPECT_TRUE(m.contains(sceneRect(square))) << "the tool square is over the main document";
+    ASSERT_TRUE(box->isVisible()) << "the toolbox floats in full screen";
+    EXPECT_TRUE(box->property("floating").toBool());
     window->setProperty("fullScreenMode", false);
     wait(200);
 }
@@ -633,7 +633,7 @@ TEST_F(ReferenceWindowTest, theEditSwitchLetsThePenWriteInTheReference) {
     // button stayed grey: it asked the notes, which have nothing to redo)
     EXPECT_TRUE(controller->canUndo());
     EXPECT_TRUE(controller->canRedo()) << "the stroke undone in the reference can be redone";
-    auto* redo = findItem("toolRedoButton");
+    auto* redo = findItem("toolboxRedoButton");
     ASSERT_NE(redo, nullptr);
     ASSERT_TRUE(redo->isVisible());
     EXPECT_TRUE(redo->isEnabled());

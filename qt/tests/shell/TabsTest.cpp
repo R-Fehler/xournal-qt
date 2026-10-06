@@ -343,25 +343,15 @@ TEST(Windows, closingAWindowKeepsDocumentsWithUnsavedChanges) {
     QCoreApplication::processEvents();
 }
 
-TEST(ToolbarColors, orangeByDefaultAddRemoveReset) {
+// (the colors of the deprecated text mode's color row; the classic tool bar that let them be changed was removed in
+// 0.8.0)
+TEST(ToolbarColors, orangeByDefault) {
     AppController c;
-    c.resetToolbarColors();
     const QVariantList defaults = c.toolbarColors();
     ASSERT_EQ(defaults.size(), 10) << "the Xournal++ palette without white";
     EXPECT_EQ(defaults[8].value<QColor>(), QColor(255, 128, 0)) << "orange";
     EXPECT_EQ(defaults[9].value<QColor>(), QColor(255, 255, 0)) << "yellow";
     EXPECT_FALSE(defaults.contains(QColor(Qt::white)));
-    QSignalSpy changed(&c, &AppController::toolbarColorsChanged);
-    c.addToolbarColor(QColor("#123456"));
-    c.addToolbarColor(QColor("#123456"));  // not twice
-    EXPECT_EQ(c.toolbarColors().size(), 11);
-    EXPECT_EQ(c.toolbarColors().last().value<QColor>(), QColor("#123456"));
-    c.removeToolbarColor(0);  // black
-    EXPECT_EQ(c.toolbarColors().size(), 10);
-    EXPECT_NE(c.toolbarColors().first().value<QColor>(), QColor(Qt::black));
-    EXPECT_GE(changed.count(), 2);
-    c.resetToolbarColors();
-    EXPECT_EQ(c.toolbarColors(), defaults);
 
     // Highlight colors: three presets, yellow first
     ASSERT_EQ(c.pdfHighlightColors().size(), 3);
@@ -401,6 +391,8 @@ TEST(ToolSizes, fiveWidthsTheFifthAdjustableAndRemembered) {
         c.setSize(2);
         EXPECT_EQ(c.size(), 2);
         EXPECT_NE(th->getThickness(), 6.25);
+        // (the eraser in hand at the end: the next start takes the toolbox's eraser, the pen keeps its state)
+        c.takeToolOfType("eraser");
     }
     AppController again;  // the width is in the settings
     again.selectTool("pen");

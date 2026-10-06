@@ -1,7 +1,8 @@
 // The record button (qt/docs/audio.md, "In the app"): a tap starts recording for this document (a voice memo of the
 // page shown; ink written meanwhile plays the moment it was written), a tap again stops it. Held (or right-clicked):
-// the play tool (tap ink to hear it) and the document's recordings. Self-contained, so the tool bar's owner can put it
-// anywhere: it is in the "insert" group after the image button (ToolBarPlan.js) and in the phone's tool sheet.
+// the play tool (tap ink to hear it) and the document's recordings. Self-contained, so its owner can put it anywhere:
+// it is a fixed tool of the toolbox's rail, in the "insert" group of the command bar where the rail does not hold it
+// (ToolBarPlan.js), and in the phone's sheet "My tools".
 import QtQuick
 import QtQuick.Controls
 import "Popups.js" as Popups

@@ -103,7 +103,7 @@ ApplicationWindow {
         adaptive: (app.settings.revision, app.settings.get("adaptiveLayout"))
         touchSetting: (app.settings.revision, app.settings.get("touchProfile"))
     }
-    /// What was chosen by hand in this size class ("": the automatic choice): "sidebar", "chrome", later "toolbar"
+    /// What was chosen by hand in this size class ("": the automatic choice): "sidebar", "chrome", "toolbox"
     /// "Save page as template…" for page index `page` (qt/docs/templates.md; the page menus)
     function openTemplateSave(page) { templateSaveDialog.openForPage(page) }
     /// Pages as files (PageFiles.qml, qt/docs/page-files.md), from the page menus: "insert" (from a file, after page
@@ -232,7 +232,7 @@ ApplicationWindow {
                                                           * (1 - (sourceShareLive >= 0 ? sourceShareLive : sourcePageShare)))
 
     // The chrome: "full" (tab strip, tool bar, sidebar; in the phone classes the app bar and the tool dock), "compact"
-    // (full screen's: the tab dots, the tool square, the pen pill, the view pill) or "reader" (no HUD; the corner mark
+    // (full screen's: the tab dots, the floating toolbox, the view pill) or "reader" (no HUD; the corner mark
     // brings it back). Separate from the window's state (windowFullScreen) and from presenting (black, page by page).
     // Full screen (F11, fullScreenMode) is the compact chrome in a full-screen window; otherwise the chrome is what was
     // chosen for this size class, else the automatic one: the reader in a tiny window, everywhere else "full".
@@ -247,9 +247,9 @@ ApplicationWindow {
     readonly property bool fullChrome: chromeMode === "full"
     /// Nothing over the page but the page: presenting without controls, or the reader chrome
     readonly property bool hudHidden: cleanPage || (chromeMode === "reader" && !app.homeVisible) || (replaying && !app.homeVisible)
-    onHudHiddenChanged: if (hudHidden) { quickTools.close(); phoneToolSheet.close() }
+    onHudHiddenChanged: if (hudHidden) phoneToolSheet.close()
     /// Read only (qt/docs/toolbox.md, "Reading"; qt/ui-rework): a toggle of full screen and presenting (the floating
-    /// toolbox's ⋯, the compact chrome's tools, Ctrl+Alt+R; ⋮ → View → Read enters full screen with it). Off again
+    /// toolbox's ⋯, Ctrl+Alt+R; ⋮ → View → Read enters full screen with it). Off again
     /// when full screen ends or the home screen is shown.
     property bool readOnly: false
     /// Where read only can be on: full screen or the compact chrome, presenting (a document with pages)
@@ -271,9 +271,8 @@ ApplicationWindow {
     /// The tools are put away: nothing over the page (hudHidden), or read only (the page, its number and zoom)
     readonly property bool toolsHidden: hudHidden || readOnlyOn
     /// The document's timeline is replayed (qt/docs/timeline.md): the page as of a moment and the play bar at the
-    /// bottom, read-only; no tools (as reading), the play bar's keys. The tool bar (classic or the toolbox's command bar,
-    /// at any edge) and the phone's dock are put away meanwhile: with the toolbox hidden, the bar would otherwise take
-    /// the tools back and show the classic tool bar (qt/replay-polish)
+    /// bottom, read-only; no tools (as reading), the play bar's keys. The command bar and the phone's dock are put away
+    /// meanwhile (qt/replay-polish)
     readonly property bool replaying: app.timeline.active
     function chooseChrome(mode) { chooseLayout("chrome", mode === chromeAuto ? "" : mode) }
 
@@ -281,7 +280,7 @@ ApplicationWindow {
     /// A phone class (by the layout class: "Adapt the layout" off keeps the desktop layout at every size)
     readonly property bool phoneLayout: ["phonePortrait", "phoneShort", "tiny"].indexOf(adaptive.layoutClass) >= 0
     /// The full chrome of a phone: the app bar at the top (the library, the title, the tab count, ⋮) instead of the tab
-    /// strip, and the tool dock at the bottom instead of the tool bar, the pen pill and the view pill
+    /// strip, and the tool dock at the bottom instead of the command bar and the view pill
     readonly property bool phoneChrome: phoneLayout && fullChrome
     /// The app bar: the phone chrome, and the home screen of a phone class in any chrome (the way back to the documents)
     readonly property bool appBarShown: phoneLayout && (fullChrome || app.homeVisible)
@@ -293,34 +292,13 @@ ApplicationWindow {
     /// The dock beside the page (a rail): what sits at the window's right edge ends at it
     readonly property bool dockRail: dockShown && dockVertical
 
-    // --- the tool bar's place (qt/docs/adaptive-layout.md, "The tool bar") ------------------------------------------
-    /// Chosen by hand in this size class (⋮ → View → Tool bar position): "top", "twoRowsTop", "twoRowsBottom",
-    /// "railLeft", "railRight"; "": the automatic place
-    readonly property string toolbarChoice: {
-        const c = layoutChoice("toolbar")
-        return ["top", "twoRowsTop", "twoRowsBottom", "railLeft", "railRight"].indexOf(c) >= 0 ? c : ""
-    }
-    /// The automatic place: two rows at the top on a portrait tablet (a single A4 page keeps the whole width), else
-    /// the place of the older setting (top, left, right)
-    readonly property string toolbarAuto: adaptive.layoutClass === "tabletPortrait" ? "twoRowsTop"
-                                          : app.toolbarPosition === "left" ? "railLeft"
-                                          : app.toolbarPosition === "right" ? "railRight" : "top"
-    /// A window too narrow for the tools that are never hidden in one row (not a phone): two rows automatically
-    readonly property string toolbarAutoLayout: toolbarAuto === "top" && toolArea.autoTwoRows ? "twoRowsTop" : toolbarAuto
-    /// (with the toolbox: one row of commands at the top; the tools are in the toolbox)
-    readonly property string toolbarLayout: toolboxMode && !phoneLayout ? "top"
-                                            : toolbarChoice !== "" ? toolbarChoice : toolbarAutoLayout
-    function chooseToolbar(layout) { chooseLayout("toolbar", layout === toolbarAutoLayout ? "" : layout) }
-    /// Its edge: "top", "bottom", "left", "right"
-    readonly property string toolbarPosition: toolbarLayout === "railLeft" ? "left" : toolbarLayout === "railRight" ? "right"
-                                              : toolbarLayout === "twoRowsBottom" ? "bottom" : "top"
-    readonly property bool sideToolbar: toolbarPosition === "left" || toolbarPosition === "right"
-    readonly property bool twoToolRows: toolbarLayout === "twoRowsTop" || toolbarLayout === "twoRowsBottom"
-    /// A text document's tool bar is merged into its format bar: one row, ⋮ at its end (F7.2)
-    readonly property bool toolsInFormatBar: textDoc && formatBar.shown && !sideToolbar && fullChrome && !app.toolbarHidden
-                                             && !phoneChrome
-    /// The cycling buttons' groups (ToolGroups.qml): the tool bar, the compact chrome's tools and the pen pill
-    readonly property ToolGroups toolGroups: ToolGroups { snipButton: win.toolboxShown }
+    // --- the command bar (qt/docs/toolbox.md, "The command bar") -----------------------------------------------------
+    // One row at the top: the commands (the tools are in the toolbox). The classic tool bar of before, with its places
+    // (two rows, a rail at a side, the bottom), was removed in 0.8.0.
+    /// A text document's command bar is merged into its format bar: one row, ⋮ at its end (F7.2)
+    readonly property bool toolsInFormatBar: textDoc && formatBar.shown && fullChrome && !app.toolbarHidden && !phoneChrome
+    /// The cycling buttons' groups (ToolGroups.qml): the fixed tools of the toolbox (select, snip, setsquare, text)
+    readonly property ToolGroups toolGroups: ToolGroups {}
     /// Opens a menu from an entry of another one: on a phone once the sheet of that one has gone
     function openAfterMenus(menu) {
         if (!menuSheet.visible) {
@@ -333,20 +311,11 @@ ApplicationWindow {
         }
         menuSheet.closed.connect(then)
     }
-    /// The text box tool: a Markdown text box (the bar offers no plain one; old plain texts are edited as they are)
-    function takeTextBox() {
-        app.textMarkdown = true
-        app.selectTool("text")
-    }
-    /// Full screen (F11): the compact chrome - no tab strip, tool bar or page sidebar; a small square shows the current
-    /// tool, a tap on it offers the tools (the same ones) and colors. The page / zoom pill stays - in a full-screen
-    /// window (windowFullScreen).
+    /// Full screen (F11): the compact chrome - no tab strip, command bar or page sidebar; the toolbox floats over the
+    /// page. The page / zoom pill stays - in a full-screen window (windowFullScreen).
     property bool fullScreenMode: false
     onFullScreenModeChanged: {
-        if (!fullScreenMode) {
-            quickTools.close()
-            app.presenting = false  // (presenting is full screen)
-        }
+        if (!fullScreenMode) app.presenting = false  // (presenting is full screen)
         windowFullScreen = fullScreenMode
     }
     /// The window's state: full screen or not (showFullScreen). Full screen (fullScreenMode) sets it; on its own it
@@ -396,22 +365,20 @@ ApplicationWindow {
             else showNormal()
         }
     }
-    /// No tool bar: in the compact or reader chrome, or when it was put away - the small tool square takes over. (The
-    /// phone chrome has its dock instead, and nothing to put away.)
+    /// No command bar: in the compact or reader chrome, or when it was put away. (The phone chrome has its dock
+    /// instead, and nothing to put away.)
     readonly property bool noToolbar: !fullChrome || (app.toolbarHidden && !phoneChrome)
     /// The document is a text file (a .md, a .txt): written with the keyboard, no ink tools (qt/docs/md-editor.md)
     readonly property bool textDoc: app.textDocument !== ""
-    /// Undo and redo lead the tool bar while it is shown (a row, two rows, a rail); the view pill has them while it is
-    /// not (the compact or reader chrome, the bar put away, a text document's tool bar merged into its format bar),
-    /// the dock in the phone chrome: one place at a time (qt/docs/adaptive-layout.md, "One place for each action")
+    /// Undo and redo: the toolbox's head while it is shown; else they lead the command bar while it is shown (a text
+    /// document), its format bar when the bar is merged into it, the view pill while no bar is shown (the compact or
+    /// reader chrome, the bar put away), the dock in the phone chrome: one place at a time
+    /// (qt/docs/adaptive-layout.md, "One place for each action")
     readonly property bool undoInToolBar: !noToolbar && !toolsInFormatBar && !phoneChrome && !toolboxShown
-    /// A text document with the toolbox: undo and redo lead its format bar (qt/docs/toolbox.md, "Text documents")
-    readonly property bool undoInFormatBar: toolboxMode && toolsInFormatBar
+    /// A text document: undo and redo lead its format bar (qt/docs/toolbox.md, "Text documents")
+    readonly property bool undoInFormatBar: toolsInFormatBar
 
     // --- the toolbox (qt/docs/toolbox.md) ----------------------------------------------------------------------------
-    /// The toolbox of one's own tools (the default) instead of the classic tool bar (setting toolbarMode)
-    readonly property bool toolboxMode: (app.settings.revision, app.settings.get("toolbarMode")) !== "classic"
-    onToolboxModeChanged: if (toolboxMode) app.applyToolEntry(app.toolbox.active)
     /// Its edge chosen by hand in this size class (⋮ → View → Toolbox position): "left", "right", "top", "bottom"
     readonly property string toolboxChoice: {
         const c = layoutChoice("toolbox")
@@ -425,21 +392,19 @@ ApplicationWindow {
     function chooseToolboxEdge(edge) { chooseLayout("toolbox", edge === toolboxAuto ? "" : edge) }
     /// Docked beside the page, taking its strip: the toolbox in the full chrome of a desktop or a tablet (a text
     /// document has no ink tools: its format bar holds undo and redo)
-    readonly property bool toolboxDocked: toolboxMode && fullChrome && !phoneLayout && !app.homeVisible && !textDoc
-                                          && !replaying
-    /// Floating over the page, a little off its edge: the compact chrome (full screen, presenting with the tools)
-    readonly property bool toolboxFloating: toolboxMode && chromeMode === "compact" && !phoneLayout && !app.homeVisible
-                                            && !textDoc && !toolsHidden
+    readonly property bool toolboxDocked: fullChrome && !phoneLayout && !app.homeVisible && !textDoc && !replaying
+    /// Floating over the page, a little off its edge: the compact chrome (full screen, presenting with the tools), on
+    /// a phone too
+    readonly property bool toolboxFloating: chromeMode === "compact" && !app.homeVisible && !textDoc && !toolsHidden
     /// In the phone's dock (at the bottom, or the rail at the right held sideways): its first tools, "My tools"
-    readonly property bool toolboxInDock: toolboxMode && dockShown && !textDoc && !replaying
+    readonly property bool toolboxInDock: dockShown && !textDoc && !replaying
     /// The toolbox is shown (docked, or floating in full screen and on phones)
     readonly property bool toolboxShown: toolboxDocked || toolboxFloating || toolboxInDock
     /// The strip it takes at the top or the bottom (0: none, or at a side)
     readonly property real toolboxTop: toolboxDocked && toolboxEdge === "top" ? toolboxRow.height : 0
     readonly property real toolboxBottom: toolboxDocked && toolboxEdge === "bottom" ? toolboxRow.height : 0
-    /// The side a column of tools takes ("left", "right"; ""): the classic bar as a rail, or the toolbox
-    readonly property string sideEdge: sideToolbar && !toolboxMode ? toolbarPosition
-                                       : toolboxDocked && toolboxVertical ? toolboxEdge : ""
+    /// The side the docked toolbox takes ("left", "right"; "": none, or at the top or the bottom)
+    readonly property string sideEdge: toolboxDocked && toolboxVertical ? toolboxEdge : ""
     /// A button's tip with the keys of its action as they are set ("Redo (Ctrl+Shift+Z, Ctrl+Y)")
     function withKeys(text, id) {
         const keys = keysOf(id)
@@ -486,8 +451,8 @@ ApplicationWindow {
             if (app.presenter.active) app.presenter.placeWindows(audienceWindow, win)
         }
     }
-    /// Presenting without controls (Ctrl+F5, or holding the presentation button): only the page shows, no pen pill,
-    /// no tool square, no other overlay; the faint mark in the lower left corner (presentCornerMark) or Ctrl+F5
+    /// Presenting without controls (Ctrl+F5, or holding the presentation button): only the page shows, no floating
+    /// toolbox, no other overlay; the faint mark in the lower left corner (presentCornerMark) or Ctrl+F5
     /// brings them back and hides them again. Every presentation starts as it is asked for: F5 with the controls.
     property bool presentClean: false
     readonly property bool cleanPage: app.presenting && presentClean
@@ -759,11 +724,10 @@ ApplicationWindow {
         id: topTools
         objectName: "topTools"
         width: parent.width
-        visible: !app.homeVisible && win.toolbarPosition === "top" && !win.noToolbar && !win.toolsInFormatBar
-                 && !win.phoneChrome && !win.replaying
+        visible: !app.homeVisible && !win.noToolbar && !win.toolsInFormatBar && !win.phoneChrome && !win.replaying
         Material.background: "#ffffff"
         Material.foreground: "#303030"
-        height: win.twoToolRows ? 106 : 56
+        height: 56
       }
       // Markdown being written (a .md, Markdown on a page): its formatting tools (qt/docs/md-editor.md). A text
       // document's tool bar is merged into it: ⋮ at its end, its other buttons in "more tools" (F7.2)
@@ -789,22 +753,11 @@ ApplicationWindow {
         }
       }
     }
-    // Two rows at the bottom (the class's choice; closer to the fingertips, like the address bar of a phone's browser)
+    // The footer: the phone's dock, a phone's format bar above the soft keyboard
     footer: Column {
       id: footerColumn
       // Room for the soft keyboard: what is above the footer ends above it (the pages, the source, the pills)
       bottomPadding: win.keyboardHeight
-      ToolBar {
-        id: bottomTools
-        objectName: "bottomTools"
-        width: parent.width
-        visible: !app.homeVisible && win.toolbarPosition === "bottom" && !win.noToolbar && !win.toolsInFormatBar
-                 && !win.phoneChrome && !win.replaying
-        Material.background: "#ffffff"
-        Material.foreground: "#303030"
-        height: visible ? 106 + (win.keyboardOpen ? 0 : win.safeBottom) : 0
-        Hairline { width: parent.width; color: "#d5d8dc" }  // (the line towards the pages)
-      }
     }
     // The phone's tool dock: at the bottom (in the footer, above the navigation bar), or a rail at the right side when
     // the phone is held sideways (qt/docs/adaptive-layout.md, "The phone chrome")
@@ -900,26 +853,17 @@ ApplicationWindow {
         onClosed: if (formatBar.visible) canvas.forceActiveFocus()
     }
 
-    // The tools: a row or two at the top, two rows at the bottom, or a column at the left or right side (the layout
-    // for this size class, qt/docs/adaptive-layout.md "The tool bar"). One set of buttons, placed by ToolBarPlan.js.
+    // The toolbox docked at the left or the right side (its strip; at the top or the bottom it is in toolboxRow)
     Rectangle {
         id: sideTools
         objectName: "sideTools"
-        /// The toolbox docked at a side (else the classic bar as a rail)
         readonly property bool holdsToolbox: win.toolboxDocked && win.toolboxVertical
-        visible: holdsToolbox || (!app.homeVisible && win.sideToolbar && !win.noToolbar && !win.phoneChrome && !win.replaying)
-        width: !visible ? 0 : (holdsToolbox ? toolboxPane.thickness : 104) + (win.sideEdge === "right" ? win.safeRight : win.safeLeft)
+        visible: holdsToolbox
+        width: !visible ? 0 : toolboxPane.thickness + (win.sideEdge === "right" ? win.safeRight : win.safeLeft)
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         x: win.sideEdge === "right" ? parent.width - width : 0
         color: "#ffffff"
-        Hairline {  // the line towards the pages
-            visible: !sideTools.holdsToolbox  // (the toolbox draws its own)
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            x: win.sideEdge === "right" ? 0 : parent.width - thickness
-            color: "#d5d8dc"
-        }
     }
     // The toolbox docked at the top or the bottom (at a side it is in sideTools)
     Rectangle {
@@ -948,7 +892,8 @@ ApplicationWindow {
         // Floating: no longer than its tools, centred along its edge, 8 px off it (clear of the tab dots at the top
         // and the view pill at the bottom); docked: the whole edge
         readonly property real floatTop: win.controlsTop + (fullScreenTabs.visible ? fullScreenTabs.height : 0) + 8
-        readonly property real floatBottom: win.controlsBottom - 72
+        // (the view pill sits 24 px above the bottom: the rail ends 8 px above it, however tall the pill is)
+        readonly property real floatBottom: win.controlsBottom - Math.max(72, viewPill.height + 24 + 8)
         readonly property real floatLength: vertical ? Math.min(naturalLength, floatBottom - floatTop)
                                                      : Math.min(naturalLength, win.controlsRight - win.controlsLeft - 16)
         x: compact ? 0 : floating ? (edge === "right" ? win.controlsRight - width - 8 : edge === "left" ? win.controlsLeft + 8
@@ -1194,27 +1139,26 @@ ApplicationWindow {
         }
         menuSheet.closed.connect(after)
     }
+    // The command bar: one row at the top (qt/docs/toolbox.md, "The command bar"), placed by ToolBarPlan.js; merged
+    // into a text document's format bar; put away (the buttons kept, out of sight) in the compact and reader chrome
+    // and while the bar is hidden
+    Item { id: toolsAway; visible: false; anchors.fill: parent }
     Item {
         id: toolArea
         objectName: "toolArea"
-        parent: win.noToolbar ? quickToolsHolder
-                : win.sideToolbar ? sideTools : win.toolbarPosition === "bottom" ? bottomTools : topTools
+        parent: win.noToolbar ? toolsAway : topTools
         anchors.fill: parent
         anchors.topMargin: win.noToolbar ? 0 : 4
-        anchors.bottomMargin: win.toolbarPosition === "bottom" ? 4 + (win.keyboardOpen ? 0 : win.safeBottom)
-                              : win.noToolbar ? 0
-                              : win.sideToolbar ? 4 + Math.max(0, win.contentItem.height - win.controlsBottom)  // (a rail's ⋮ above the navigation bar)
-                              : 4
-        // (clear of a cut-out or a navigation bar at the side: the bar's own edge, or a rail's)
-        anchors.leftMargin: win.noToolbar ? 0 : (win.sideToolbar ? 3 : 6) + (win.toolbarPosition === "right" ? 0 : win.safeLeft)
-        anchors.rightMargin: win.noToolbar ? 0 : (win.sideToolbar ? 3 : 6) + (win.toolbarPosition === "left" ? 0 : win.safeRight)
+        anchors.bottomMargin: win.noToolbar ? 0 : 4
+        // (clear of a cut-out or a navigation bar at the side)
+        anchors.leftMargin: win.noToolbar ? 0 : 6 + win.safeLeft
+        anchors.rightMargin: win.noToolbar ? 0 : 6 + win.safeRight
         Material.foreground: "#303030"
 
-        /// The layout of the plan: "row", "twoRows", "rail", "grid" (the compact chrome's tools) or "merged"
-        readonly property string planLayout: win.noToolbar ? "grid" : win.toolsInFormatBar ? "merged"
-                                             : win.sideToolbar ? "rail" : win.twoToolRows ? "twoRows" : "row"
-        /// Where the popups of the buttons open: below a top bar, above a bottom one, beside a rail
-        readonly property string popupSide: win.noToolbar ? "left" : win.toolbarPosition
+        /// The layout of the plan: "row" or "merged" (a text document's format bar)
+        readonly property string planLayout: win.toolsInFormatBar ? "merged" : "row"
+        /// Where the popups of the buttons open: below the bar
+        readonly property string popupSide: "top"
         /// The plan in effect (ToolBarPlan.plan)
         property var plan: null
         property var lastInput: null
@@ -1223,18 +1167,17 @@ ApplicationWindow {
         /// The buttons by their names in the plan, in their order (edit, tools, insert, view, file)
         readonly property var slots: ({
             undo: undoTool, redo: redoTool,
-            pen: penTool, eraser: eraserTool, hand: handTool, touchDrawing: touchDrawingTool, select: selectTool,
-            snip: snipTool, text: textTool, write: writeButton, sticky: stickyTool, shape: shapeTool, geometry: geometryTool,
-            pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, sticker: stickerTool, record: recordTool, addPage: addPageTool,
-            search: searchTool,
+            hand: handTool, touchDrawing: touchDrawingTool, select: selectTool, snip: snipTool, write: writeButton,
+            geometry: geometryTool, pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, sticker: stickerTool,
+            record: recordTool, addPage: addPageTool, search: searchTool,
             fullScreen: fullScreenTool, present: presentTool, read: readTool, replay: replayTool, settings: settingsTool,
             new: newTool, open: openTool, save: saveTool, milestone: milestoneTool, editAsNotes: editAsNotesTool,
             openExternally: openExternallyTool,
             share: shareTool, print: printTool, bookmark: bookmarkTool, favourite: favouriteTool, tags: tagsTool
         })
         readonly property var order: ["undo", "redo",
-                                      "pen", "eraser", "hand", "touchDrawing", "select", "snip", "text", "write", "sticky",
-                                      "shape", "geometry", "pdfText", "emoji", "image", "sticker", "record", "addPage", "search",
+                                      "hand", "touchDrawing", "select", "snip", "write", "geometry", "pdfText", "emoji",
+                                      "image", "sticker", "record", "addPage", "search",
                                       "fullScreen", "present", "read", "replay", "settings", "new", "open", "save",
                                       "milestone", "editAsNotes", "openExternally", "share", "print", "bookmark",
                                       "favourite", "tags"]
@@ -1242,9 +1185,8 @@ ApplicationWindow {
         property var barNames: []
         function inBar(n) { return barNames.indexOf(n) >= 0 }
         /// What the plan depends on: a change lays the bar out again (once, after the bindings settle)
-        readonly property var planKey: [planLayout, win.phoneChrome, width, height, win.textDoc, app.toolbarColors.length,
-                                        formatBar.width, win.toolboxMode,
-                                        colorStrip.others.length, order.map(function(n) { return slots[n].offered !== false }),
+        readonly property var planKey: [planLayout, win.phoneChrome, width, height, win.textDoc, formatBar.width,
+                                        order.map(function(n) { return slots[n].offered !== false }),
                                         win.toolboxShown, toolboxPane.fixedButtons.length]
         /// The buttons the toolbox holds while it is shown (the fixed tools: lent to it, placed by it)
         function lentToToolbox(n) { return toolboxPane.fixedButtons.indexOf(slots[n]) >= 0 }
@@ -1264,40 +1206,17 @@ ApplicationWindow {
         function offeredNames() {
             return order.filter(function(n) { return slots[n].offered !== false && !lentToToolbox(n) })
         }
-        /// One row at the top would hide a tool that is never hidden (not on a phone): two rows then, as long as the
-        /// place is the automatic one (with 32 px to spare before it goes back to one row)
-        property bool autoTwoRows: false
         /// Lays the bar out for the room it has (not while a pointer is held: no change under a stroke)
         function relayout() {
             if (win.adaptive.held || width <= 0) return
-            // (with the toolbox the colors and widths are its tools' own)
-            const input = {
-                layout: planLayout, width: width, height: height, items: offeredNames(),
-                colors: !win.textDoc && !win.toolboxShown, widths: !win.textDoc && !win.toolboxShown,
-                presets: app.toolbarColors.length, recents: colorStrip.others.length
-            }
-            // (the automatic top bar: one row, or two when one would hide the important tools)
-            // (the toolbox's command bar is always one row)
-            const autoTop = win.toolbarChoice === "" && win.toolbarAuto === "top" && !win.adaptive.phone
-                            && !win.noToolbar && !win.toolsInFormatBar && !win.toolboxMode
-            let two = false
-            if (autoTop) {
-                const room = win.width - 12 - (autoTwoRows ? 32 : 0)
-                two = ToolBarPlan.hidesImportant(ToolBarPlan.plan(Object.assign({}, input, { layout: "row", width: room })))
-            }
-            if (two !== autoTwoRows) {
-                autoTwoRows = two  // (the bar changes its layout; the plan follows)
-                Qt.callLater(relayout)  // (also where the layout stays the same)
-                return
-            }
+            const input = { layout: planLayout, width: width, height: height, items: offeredNames() }
             if (input.layout === "merged") input.keep = formatBarKeeps(input.items)
             let p = ToolBarPlan.plan(input)
             // The hysteresis: a bar that grows takes a richer plan only once there are 24 px to spare (the same
-            // buttons and layout otherwise: no flicker at an edge)
+            // buttons otherwise: no flicker at an edge)
             const last = lastInput
             if (plan && last && last.layout === input.layout && last.items.join() === input.items.join()
-                    && last.presets === input.presets && last.recents === input.recents && last.height === input.height
-                    && input.width > last.width && input.width - last.width < 64) {
+                    && last.height === input.height && input.width > last.width && input.width - last.width < 64) {
                 const slack = Object.assign({}, input, { width: input.width - 24 })
                 const lean = ToolBarPlan.plan(slack)
                 if (ToolBarPlan.richness(lean) <= ToolBarPlan.richness(plan)) {
@@ -1309,13 +1228,11 @@ ApplicationWindow {
             lastInput = input
             apply(p)
         }
-        /// A text document with the toolbox (qt/docs/toolbox.md, "Text documents"): the commands its format bar has room
-        /// for, by one ladder with the bar's own folding - the inserts into "+ Insert" first, then the commands of low
-        /// priority into "more tools", then the headings into one button, then search, full screen and save too; then
-        /// the row scrolls. (The classic bar: everything in "more tools".)
+        /// A text document (qt/docs/toolbox.md, "Text documents"): the commands its format bar has room for, by one
+        /// ladder with the bar's own folding - the inserts into "+ Insert" first, then the commands of low priority into
+        /// "more tools", then the headings into one button, then search, full screen and save too; then the row scrolls.
         readonly property var keyCommands: ["search", "fullScreen", "save"]
         function formatBarKeeps(items) {
-            if (!win.toolboxMode) return []
             const fb = formatBar
             const cmds = items.filter(function(n) { return slots[n] && slots[n].promoted !== true })
             const key = cmds.filter(function(n) { return keyCommands.indexOf(n) >= 0 })
@@ -1333,7 +1250,7 @@ ApplicationWindow {
         }
         /// The same plan, with the end at the bar's end again
         function relocate(p, input) {
-            if (p.layout === "row" || p.layout === "twoRows") p.end.x += width - input.width
+            if (p.layout === "row") p.end.x += width - input.width
             return p
         }
         function apply(p) {
@@ -1371,37 +1288,22 @@ ApplicationWindow {
             })
             overflowNames = shown
             barNames = Object.keys(p.placed)
-            // The strips (the phone chrome: its dock's cycling buttons)
-            const dock = win.phoneChrome
-            colorStrip.parent = dock ? phoneDock.colorSlot : p.placed.colors ? barContent : toolBank
-            widthStrip.parent = dock ? phoneDock.widthSlot : p.placed.widths ? barContent : toolBank
-            colorStrip.mode = dock ? "single" : p.colors
-            colorStrip.recentCount = p.recent
-            widthStrip.mode = dock ? "single" : p.widths
-            colorStrip.columns = p.stripColumns
-            widthStrip.columns = p.stripColumns
-            colorStrip.cell = p.layout === "rail" || p.layout === "grid" ? p.cell : 40
-            widthStrip.cell = colorStrip.cell
-            if (dock) { colorStrip.x = 0; colorStrip.y = 0; widthStrip.x = 0; widthStrip.y = 0 }
-            if (p.placed.colors && !dock) { colorStrip.x = p.placed.colors.x; colorStrip.y = p.placed.colors.y }
-            if (p.placed.widths && !dock) { widthStrip.x = p.placed.widths.x; widthStrip.y = p.placed.widths.y }
             dividerRepeater.model = p.dividers
             barContent.width = p.contentWidth
-            barContent.height = p.layout === "grid" ? p.contentHeight : Math.min(p.contentHeight, toolFlick.height)
+            barContent.height = Math.min(p.contentHeight, toolFlick.height)
             barContent.implicitHeight = p.contentHeight
-            // The end: ⋮ and "more tools", at the end of the first row, the bottom of a rail, the format bar's end
-            // for a text document, one more cell of the grid; the phone chrome: ⋮ at the end of the app bar (its
-            // "All tools" holds what does not fit)
-            toolEnd.parent = dock ? phoneAppBar.moreSlot : p.layout === "merged" ? formatBar.trailing
-                             : p.layout === "grid" ? barContent : toolArea
+            // The end: ⋮ and "more tools", at the end of the row, at the format bar's end for a text document; the
+            // phone chrome: ⋮ at the end of the app bar (its "All tools" holds the rest)
+            const dock = win.phoneChrome
+            toolEnd.parent = dock ? phoneAppBar.moreSlot : p.layout === "merged" ? formatBar.trailing : toolArea
             // (the commands kept in a text document's format bar: before ⋮)
             const keep = p.layout === "merged" ? (p.kept || []) : []
             keep.forEach(function(n) { slots[n].parent = formatCommands })
             barNames = barNames.concat(keep)
             toolEnd.x = dock ? 0 : p.layout === "merged" ? Qt.binding(function() { return formatCommands.width > 0 ? formatCommands.width + 4 : 0 })
                                                          : p.end.x
-            toolEnd.y = dock ? 0 : p.layout === "merged" ? -2 : p.layout === "rail" ? toolArea.height - toolEnd.height : p.end.y
-            moreToolsButton.offered = shown.length > 0 && p.layout !== "grid" && !dock
+            toolEnd.y = dock ? 0 : p.layout === "merged" ? -2 : p.end.y
+            moreToolsButton.offered = shown.length > 0 && !dock
         }
         /// A button of "more tools" was used: it closes, unless the button opened a menu of its own
         function slotUsed(item) {
@@ -1417,15 +1319,12 @@ ApplicationWindow {
         Flickable {
             id: toolFlick
             anchors.fill: parent
-            // (a rail keeps ⋮ at its bottom, outside what could scroll)
-            anchors.bottomMargin: toolArea.planLayout === "rail" ? toolEnd.height + 2 : 0
             contentWidth: barContent.width
             contentHeight: barContent.implicitHeight
             flickableDirection: Flickable.VerticalFlick
             boundsBehavior: Flickable.StopAtBounds
-            // Only the compact chrome's tools scroll (a small window); the bars fit what they show (the rest is in
-            // "more tools")
-            interactive: toolArea.planLayout === "grid" && contentHeight > height
+            // (the bar fits what it shows: the rest is in "more tools")
+            interactive: false
             clip: true
             Item {
                 id: barContent
@@ -1694,12 +1593,10 @@ ApplicationWindow {
                         // The document's timeline: how it was written, with its recordings (qt/docs/timeline.md)
                         AdaptiveMenuItem { objectName: "replayItem"; offered: !win.textDoc && !toolArea.inBar("replay"); text: qsTr("Replay the writing"); icon.source: app.iconUrl("xqt-replay"); onTriggered: app.timeline.start() }
                         MenuSeparator {}
-                        // Where the tool bar is, in this size class (the automatic place: "Automatic"); the phone
-                        // classes have their dock instead
-                        // The toolbox's edge in this size class (qt/docs/toolbox.md)
+                        // The toolbox's edge in this size class (qt/docs/toolbox.md); the phone classes have their dock
                         AdaptiveMenu {
                             objectName: "toolboxPositionMenu"
-                            offered: win.toolboxMode && !win.phoneLayout
+                            offered: !win.phoneLayout
                             title: qsTr("Toolbox position")
                             iconName: "xqt-panel-top"
                             component EdgeItem: AdaptiveMenuItem {
@@ -1719,31 +1616,6 @@ ApplicationWindow {
                                 checkable: true
                                 checked: win.toolboxChoice === ""
                                 onTriggered: win.chooseLayout("toolbox", "")
-                            }
-                        }
-                        AdaptiveMenu {
-                            objectName: "toolbarPositionMenu"
-                            offered: !win.phoneLayout && !win.toolboxMode
-                            title: qsTr("Tool bar position")
-                            iconName: "xqt-panel-top"
-                            component PositionItem: AdaptiveMenuItem {
-                                property string position
-                                checkable: true
-                                checked: win.toolbarLayout === position
-                                onTriggered: win.chooseToolbar(position)
-                            }
-                            PositionItem { objectName: "toolbarTopItem"; text: qsTr("Top"); position: "top" }
-                            PositionItem { objectName: "toolbarTwoRowsTopItem"; text: qsTr("Two rows at the top"); position: "twoRowsTop" }
-                            PositionItem { objectName: "toolbarTwoRowsBottomItem"; text: qsTr("Two rows at the bottom"); position: "twoRowsBottom" }
-                            PositionItem { objectName: "toolbarLeftItem"; text: qsTr("Left"); position: "railLeft" }
-                            PositionItem { objectName: "toolbarRightItem"; text: qsTr("Right"); position: "railRight" }
-                            MenuSeparator {}
-                            AdaptiveMenuItem {
-                                objectName: "toolbarAutoItem"
-                                text: qsTr("Automatic for this window size")
-                                checkable: true
-                                checked: win.toolbarChoice === ""
-                                onTriggered: win.chooseLayout("toolbar", "")
                             }
                         }
                     }
@@ -1774,16 +1646,12 @@ ApplicationWindow {
                 Popup {
                     id: moreToolsPopup
                     objectName: "moreToolsPopup"
-                    // below the bar (above it at the bottom, beside a rail), at the button's end, inside the window
-                    // (margins)
-                    x: win.toolbarPosition === "left" ? parent.width + 4
-                       : win.toolbarPosition === "right" ? -width - 4 : parent.width - width
+                    // below the bar, at the button's end, inside the window (margins)
+                    x: parent.width - width
                     y: 0
                     onAboutToShow: {
                         const bar = toolArea.mapToItem(moreToolsButton, 0, 0)
-                        y = win.toolbarPosition === "bottom" ? bar.y - height - 8
-                            : win.sideToolbar ? moreToolsButton.height - height
-                            : bar.y + toolArea.height + 8
+                        y = bar.y + toolArea.height + 8
                     }
                     margins: 8
                     padding: 6
@@ -1866,9 +1734,8 @@ ApplicationWindow {
             enabled: app.canRedo
             onClicked: app.redo()
         }
-        // (with the toolbox: its entries are the pens, highlighters, erasers, shapes, text boxes and sticky notes)
-        ToolCycleButton { id: penTool; objectName: "penButton"; parent: toolBank; group: "pen"; property bool offered: !win.textDoc && !win.toolboxShown }
-        ToolCycleButton { id: eraserTool; objectName: "eraserButton"; parent: toolBank; group: "eraser"; property bool offered: !win.textDoc && !win.toolboxShown }
+        // (the pens, highlighters, erasers, shapes, text boxes and sticky notes are the toolbox's entries; the buttons
+        // below are its fixed tools, lent to it, and the commands)
         IconButton {
             id: handTool
             objectName: "handButton"
@@ -1895,61 +1762,8 @@ ApplicationWindow {
         }
         ToolCycleButton { id: selectTool; objectName: "selectButton"; parent: toolBank; group: "select"; property bool offered: !win.textDoc }
         // Snip (qt/docs/snip.md): one tap away, a fixed tool of the rail (qt/copy-tools); a tap while armed: the other
-        // shape. (The classic tool bar keeps the snips in the select list: a button more there squeezes the widths.)
-        ToolCycleButton { id: snipTool; objectName: "snipButton"; parent: toolBank; group: "snip"; property bool offered: !win.textDoc && win.toolboxShown }
-        // A text box, written in Markdown and shown formatted (the only text box the bar offers; old plain texts are
-        // still edited as they are). Tapped again, held or right-clicked: the font.
-        IconButton {
-            id: textTool
-            objectName: "textButton"
-            parent: toolBank
-            property bool offered: !win.textDoc && !win.toolboxShown
-            iconName: "xqt-text-box"
-            label: qsTr("Text box")
-            tip: qsTr("Text box (T): tap to write, tap a text to edit it; tap again or hold: the font")
-            checked: app.tool === "text"
-            ownHold: true
-            onClicked: checked ? fontPopup.open() : win.takeTextBox()
-            onPressAndHold: fontPopup.open()
-            TapHandler {
-                acceptedButtons: Qt.RightButton
-                acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
-                onTapped: fontPopup.open()
-            }
-            Popup {
-                id: fontPopup
-                objectName: "fontPopup"
-                // (the phone chrome: its button is not shown; in the middle, above the dock)
-                parent: win.phoneChrome ? Overlay.overlay : textTool
-                x: win.phoneChrome ? Math.round((parent.width - width) / 2)
-                   : toolArea.popupSide === "left" ? parent.width : toolArea.popupSide === "right" ? -width : 0
-                y: win.phoneChrome ? parent.height - height - phoneDock.height - 8
-                   : toolArea.popupSide === "bottom" ? -height : toolArea.popupSide === "top" ? parent.height : 0
-                margins: 8
-                padding: 12
-                ColumnLayout {
-                    spacing: 8
-                    Label { text: qsTr("Text box: the font"); font.weight: Font.DemiBold }
-                    ComboBox {
-                        id: familyBox
-                        Layout.preferredWidth: 260
-                        model: fontPopup.opened ? app.fontFamilies() : []
-                        currentIndex: model.indexOf(app.fontFamily)
-                        onActivated: app.fontFamily = currentText
-                    }
-                    RowLayout {
-                        Label { text: qsTr("Size"); Layout.fillWidth: true }
-                        SpinBox {
-                            objectName: "fontSizeBox"
-                            from: 4; to: 200
-                            value: Math.round(app.textMarkdown ? app.markdownFontSize : app.fontSize)
-                            editable: true
-                            onValueModified: app.textMarkdown ? app.markdownFontSize = value : app.fontSize = value
-                        }
-                    }
-                }
-            }
-        }
+        // shape
+        ToolCycleButton { id: snipTool; objectName: "snipButton"; parent: toolBank; group: "snip"; property bool offered: !win.textDoc }
         // Writing on the page with the keyboard: Markdown, formatted while typing (hold: its source beside the page).
         // DEPRECATED (2026-09-26): the text mode (TextFlowPanel, TextFlow) is no longer offered here; its code stays
         // for now (qt/docs/text-mode.md).
@@ -2006,18 +1820,6 @@ ApplicationWindow {
                 function onVisibleChanged() { if (markdownPanel.visible) writeButton.markdownMode = true }
             }
         }
-        // A sticky note in the middle of the visible page, selected
-        IconButton {
-            id: stickyTool
-            objectName: "stickyNoteButton"
-            parent: toolBank
-            property bool offered: !win.textDoc && !win.toolboxShown
-            iconName: "xqt-sticky-note"
-            label: qsTr("Sticky note")
-            tip: qsTr("Sticky note (write on it, cover with it)")
-            onClicked: app.insertStickyNote()
-        }
-        ToolCycleButton { id: shapeTool; objectName: "shapeButton"; parent: toolBank; group: "shape"; property bool offered: !win.textDoc && !win.toolboxShown }
         ToolCycleButton { id: geometryTool; objectName: "geometryButton"; parent: toolBank; group: "geometry"; property bool offered: !win.textDoc }
         // Text on the page (ToolGroups "text"): marking PDF text (highlight, underline, strike through, select) ↔ copying
         // handwriting as text (one sweep over ink, then the tool before; qt/copy-tools). A tap while one is in use: the
@@ -2129,8 +1931,6 @@ ApplicationWindow {
                 onPicked: function(emoji) { close(); canvas.insertText(emoji) }
             }
         }
-        ColorStrip { id: colorStrip; parent: toolBank; side: toolArea.popupSide }
-        WidthStrip { id: widthStrip; parent: toolBank; side: toolArea.popupSide }
         IconButton {
             id: imageTool
             objectName: "imageButton"
@@ -2353,13 +2153,13 @@ ApplicationWindow {
             tip: qsTr("Open externally (in the app the system has for this file)")
             onClicked: win.openExternally()
         }
-        // The toolbox's command bar (qt/docs/toolbox.md): entries of ⋮ as buttons where there is room (one place for
-        // each action: ⋮ leaves out what the bar shows); without room they are in ⋮
+        // Entries of ⋮ as buttons of the command bar where there is room (qt/docs/toolbox.md; one place for each
+        // action: ⋮ leaves out what the bar shows); without room, and on a phone, they are in ⋮
         IconButton {
             id: shareTool
             objectName: "shareButton"
             parent: toolBank
-            property bool offered: win.toolboxMode && !win.phoneLayout
+            property bool offered: !win.phoneLayout
             property bool promoted: true
             iconName: "xqt-share"
             label: qsTr("Share")
@@ -2370,7 +2170,7 @@ ApplicationWindow {
             id: printTool
             objectName: "printButton"
             parent: toolBank
-            property bool offered: win.toolboxMode && !win.phoneLayout
+            property bool offered: !win.phoneLayout
             property bool promoted: true
             iconName: "xopp-document-print"
             label: qsTr("Print")
@@ -2382,7 +2182,7 @@ ApplicationWindow {
             objectName: "bookmarkButton"
             parent: toolBank
             readonly property bool marked: (app.bookmarks, app.isBookmarked(app.pageNumber - 1))
-            property bool offered: win.toolboxMode && !win.phoneLayout && app.canBookmark
+            property bool offered: !win.phoneLayout && app.canBookmark
             property bool promoted: true
             iconName: marked ? "xqt-bookmark-filled" : "xqt-bookmark"
             checked: marked
@@ -2394,7 +2194,7 @@ ApplicationWindow {
             id: favouriteTool
             objectName: "favouriteButton"
             parent: toolBank
-            property bool offered: win.toolboxMode && !win.phoneLayout && app.canFavourite
+            property bool offered: !win.phoneLayout && app.canFavourite
             property bool promoted: true
             iconName: app.favourite ? "xqt-star-filled" : "xqt-star"
             checked: app.favourite
@@ -2404,12 +2204,12 @@ ApplicationWindow {
         }
         // More of ⋮ in the command bar where there is room (qt/ui-rework; qt/docs/toolbox.md, "The command bar"):
         // reading, the replay of the writing, a milestone of the version history (where the document keeps
-        // versions), the tags. The classic bar has none of them (its ⋮ keeps them).
+        // versions), the tags
         IconButton {
             id: readTool
             objectName: "readButton"
             parent: toolBank
-            property bool offered: win.toolboxMode && !win.phoneLayout && !win.textDoc
+            property bool offered: !win.phoneLayout && !win.textDoc
             property bool promoted: true
             iconName: "xqt-book-open"
             label: qsTr("Read")
@@ -2420,7 +2220,7 @@ ApplicationWindow {
             id: replayTool
             objectName: "replayButton"
             parent: toolBank
-            property bool offered: win.toolboxMode && !win.phoneLayout && !win.textDoc
+            property bool offered: !win.phoneLayout && !win.textDoc
             property bool promoted: true
             iconName: "xqt-replay"
             label: qsTr("Replay")
@@ -2431,7 +2231,7 @@ ApplicationWindow {
             id: milestoneTool
             objectName: "milestoneButton"
             parent: toolBank
-            property bool offered: win.toolboxMode && !win.phoneLayout && !win.textDoc && app.versions.on
+            property bool offered: !win.phoneLayout && !win.textDoc && app.versions.on
             property bool promoted: true
             iconName: "xqt-flag"
             label: qsTr("Milestone")
@@ -2442,7 +2242,7 @@ ApplicationWindow {
             id: tagsTool
             objectName: "tagsButton"
             parent: toolBank
-            property bool offered: win.toolboxMode && !win.phoneLayout
+            property bool offered: !win.phoneLayout
             property bool promoted: true
             iconName: "xqt-tag"
             label: qsTr("Tags")
@@ -2743,7 +2543,14 @@ ApplicationWindow {
                                                 referenceSplit.pillRect.width, referenceSplit.pillRect.height)
         x: Math.max(win.canvasControlsLeft + 8, win.canvasControlsRight - width
                     - (win.canvasControlsRight - win.canvasControlsLeft - width >= 56 ? 28 : 8))
-        readonly property real lowY: win.canvasControlsBottom - 24 - height
+        /// (above the toolbox floating at the bottom edge where the two would meet: full screen, on a phone held
+        /// upright too)
+        readonly property real lowY: {
+            const y = win.canvasControlsBottom - 24 - height
+            const t = toolboxPane
+            const meetsToolbox = win.toolboxFloating && t.edge === "bottom" && x < t.x + t.width && x + width > t.x
+            return meetsToolbox ? Math.min(y, t.y - 12 - height) : y
+        }
         readonly property bool meetsReference: refPill.width > 0 && x < refPill.x + refPill.width && x + width > refPill.x
                                                && lowY < refPill.y + refPill.height && lowY + height > refPill.y
         y: meetsReference ? refPill.y - height - 12 : lowY
@@ -4451,16 +4258,6 @@ ApplicationWindow {
         onAccepted: app.exportPdf(selectedFile)
     }
 
-    ColorDialog {
-        id: colorDialog
-        title: qsTr("Add a color to the tool bar")
-        selectedColor: app.color
-        onAccepted: {
-            app.addToolbarColor(selectedColor)
-            app.setColor(selectedColor)
-        }
-    }
-
     FileDialog {
         id: imageDialog
         title: qsTr("Insert image")
@@ -4794,8 +4591,8 @@ ApplicationWindow {
             function onPresentingChanged() { if (app.presenting) presentIndicator.flash(); else presentIndicator.opacity = 0 }
         }
     }
-    // Presenting: a mark in the lower left corner; a tap (click, pen, finger) hides the controls - the pen pill, the
-    // tool square - or shows them again, as Ctrl+F5 does (qt/present-clean). While the controls show it is clearly there
+    // Presenting: a mark in the lower left corner; a tap (click, pen, finger) hides the controls - the floating
+    // toolbox - or shows them again, as Ctrl+F5 does (qt/present-clean). While the controls show it is clearly there
     // (a dot of the accent color in a ring; it pulses once when presenting starts), while they are hidden it is faint,
     // barely there on a projector. Its name ("Hide the tools" / "Show the tools") on hover and while a finger is held
     // on it (letting go then does not tap it). The target around it is a finger wide.
@@ -5176,39 +4973,32 @@ ApplicationWindow {
         }
     }
 
-    // Putting the tool bar away and getting it back: a small tab in the middle of its edge towards the pages (⋮ keeps the
-    // end of the bar), and a slim strip while it is away. A finger gets a target of minTarget around the tab.
+    // Putting the command bar away and getting it back: a small tab in the middle of its edge towards the pages (⋮
+    // keeps the end of the bar), and a slim strip while it is away. A finger gets a target of minTarget around the tab.
     Item {
         objectName: "toolbarToggle"
         visible: !app.homeVisible && win.fullChrome && !app.toolbarHidden && !win.toolsInFormatBar && !win.phoneChrome
                  && !win.replaying
         z: 58
-        readonly property string edge: win.toolbarPosition
-        readonly property bool side: edge === "left" || edge === "right"
         /// The target: a finger's size in the touch profile, reaching into the pages (not over the bar's buttons)
         readonly property real grip: win.adaptive.touchProfile ? win.adaptive.minTarget : 18
-        width: side ? grip : 42
-        height: side ? 42 : grip
+        width: 42
+        height: grip
         // Half over the bar's edge, the rest into the pages
-        x: edge === "left" ? sideTools.width - 9 : edge === "right" ? parent.width - sideTools.width - width + 9
-           : Math.round((parent.width - width) / 2)
-        y: side ? Math.round(win.controlsBottom * 0.75) : edge === "bottom" ? parent.height - height + 9 : -9  // (a rail: clear of the sidebar's arrow)
+        x: Math.round((parent.width - width) / 2)
+        y: -9
         Rectangle {
-            x: parent.edge === "right" ? parent.width - width : 0
-            y: parent.edge === "bottom" ? parent.height - height : 0
-            width: parent.side ? 18 : 42
-            height: parent.side ? 42 : 18
+            width: 42
+            height: 18
             radius: 6
             color: "#ffffff"
             border.width: 1
             border.color: "#d5d8dc"
-            Image {  // towards the bar it puts away: up, down, left or right
+            Image {  // up, towards the bar it puts away
                 anchors.centerIn: parent
                 source: app.iconUrl("xqt-chevron-up")
                 sourceSize.width: 15
                 sourceSize.height: 15
-                rotation: win.toolbarPosition === "left" ? -90 : win.toolbarPosition === "right" ? 90
-                          : win.toolbarPosition === "bottom" ? 180 : 0
             }
         }
         TapHandler { onTapped: app.toolbarHidden = true }
@@ -5217,29 +5007,26 @@ ApplicationWindow {
         ToolTip.delay: 600
         HoverHandler { id: hoverHandler }
     }
-    // While it is away: a slim strip at the edge where it was (top, bottom, left or right) brings it back
+    // While it is away: a slim strip at the top edge brings it back
     Rectangle {
         id: toolbarShow
         objectName: "toolbarShow"
         visible: !app.homeVisible && win.fullChrome && app.toolbarHidden && !win.phoneChrome && !win.replaying
-        readonly property string side: win.toolbarPosition
-        z: 60  // over the edge of the pen pill, which sits at the right edge by default
-        width: side === "top" || side === "bottom" ? 96 : 16
-        height: side === "top" || side === "bottom" ? 16 : 96
-        x: side === "left" ? win.controlsLeft : side === "right" ? win.controlsRight - width : Math.round((parent.width - width) / 2)
-        y: side === "top" ? win.controlsTop : side === "bottom" ? win.controlsBottom - height
-                                                                : Math.round((win.controlsBottom - height) / 2)
+        z: 60
+        width: 96
+        height: 16
+        x: Math.round((parent.width - width) / 2)
+        y: win.controlsTop
         radius: 8
         color: "#f1f3f4"
         border.width: 1
         border.color: "#d5d8dc"
         opacity: showHover.hovered ? 1 : 0.75
-        Image {  // where the bar comes in from: down from the top, up from the bottom, into the pages from a side
+        Image {  // where the bar comes in from: down from the top
             anchors.centerIn: parent
             source: app.iconUrl("xqt-chevron-down")
             sourceSize.width: 15
             sourceSize.height: 15
-            rotation: toolbarShow.side === "left" ? -90 : toolbarShow.side === "right" ? 90 : toolbarShow.side === "bottom" ? 180 : 0
         }
         TapHandler { onTapped: app.toolbarHidden = false }
         HoverHandler { id: showHover }
@@ -5248,8 +5035,6 @@ ApplicationWindow {
         ToolTip.delay: 600
     }
 
-    // Without a tool bar and with an ink tool: colors, width and pen / highlighter at a side of the screen
-    PenPill { avoid: viewPill }
     // The setsquare / compass: what it can do, and putting it aside for a moment
     GeometryPill {
         id: geometryPill
@@ -5319,187 +5104,6 @@ ApplicationWindow {
         anchors.rightMargin: 20 + canvas.x + canvas.width - win.canvasControlsRight
         z: 57
     }
-    ColorDialog {
-        id: pillColorDialog
-        onAccepted: app.addPenColor(selectedColor)
-    }
-
-    // Full screen: the current tool in a small square (drag it anywhere); a tap offers all tools and colors.
-    Rectangle {
-        id: quickToolSquare
-        objectName: "quickToolSquare"
-        // Only in the compact chrome (full screen): with the bar merely put away, the arrow strip brings it back at
-        // once. Not while presenting without controls, nor in the reader chrome.
-        // (the classic tools only: the toolbox floats in full screen instead)
-        visible: win.chromeMode === "compact" && !app.homeVisible && !win.toolsHidden && !win.toolboxShown
-        z: 60
-        x: win.canvasControlsLeft + 16  // (over the main document, also when a reference is beside it)
-        y: win.canvasControlsTop + 16
-        width: 56
-        height: 56
-        radius: 12
-        color: "#f7ffffff"
-        border.width: 2
-        border.color: app.color
-        readonly property var toolIcons: ({
-            "pen": "xopp-tool-pencil", "highlighter": "xopp-tool-highlighter", "eraser": "xopp-tool-eraser",
-            "hand": "xopp-hand", "text": "xopp-tool-text", "selectRect": "xopp-select-rect",
-            "selectRegion": "xopp-select-lasso", "selectPdfTextLinear": "xopp-select-pdf-text-ht",
-            "selectPdfTextRect": "xopp-select-pdf-text-area", "laserPointerPen": "xopp-laser-pointer",
-            "laserPointerHighlighter": "xopp-laser-pointer"
-        })
-        Image {
-            anchors.centerIn: parent
-            source: app.iconUrl(quickToolSquare.toolIcons[app.tool] || "xopp-tool-pencil")
-            sourceSize.width: 30
-            sourceSize.height: 30
-        }
-        Rectangle {  // the color
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            anchors.margins: 5
-            width: 14; height: 14; radius: 7
-            color: app.color
-            border.width: 1
-            border.color: "#80000000"
-        }
-        DragHandler {
-            target: parent
-            xAxis.minimum: win.controlsLeft; xAxis.maximum: win.controlsRight - quickToolSquare.width
-            yAxis.minimum: win.controlsTop; yAxis.maximum: win.controlsBottom - quickToolSquare.height
-        }
-        TapHandler { onTapped: quickTools.visible ? quickTools.close() : quickTools.open() }
-    }
-    Popup {
-        id: quickTools
-        objectName: "quickTools"
-        parent: Overlay.overlay
-        // next to the square, inside the window
-        // (in the window's coordinates: the overlay's; clear of the safe area and the keyboard)
-        readonly property real roomTop: win.contentItem.y + win.controlsTop + 8
-        readonly property real roomBottom: win.contentItem.y + win.controlsBottom - 8
-        x: Math.max(win.controlsLeft + 8, Math.min(quickToolSquare.x + quickToolSquare.width + 8, win.controlsRight - width - 8))
-        y: Math.max(roomTop, Math.min(win.contentItem.y + quickToolSquare.y, roomBottom - height))
-        padding: 8
-        width: 6 * 50 + 30
-        height: Math.min(roomBottom - roomTop, quickToolsColumn.implicitHeight + 16)
-        Column {
-            id: quickToolsColumn
-            width: parent.width
-            spacing: 4
-            // The tools take what is left above the two buttons, which stay inside the window (the tools scroll: F6.4)
-            Item {
-                id: quickToolsHolder
-                width: parent.width
-                height: Math.max(0, Math.min(barContent.implicitHeight,
-                                             quickTools.roomBottom - quickTools.roomTop - quickTools.topPadding - quickTools.bottomPadding
-                                             - laserToggle.height - presentToggle.height - leaveFullScreen.height
-                                             - (readOnlyToggle.visible ? readOnlyToggle.height + quickToolsColumn.spacing : 0)
-                                             - (curtainToggles.visible ? curtainToggles.height + quickToolsColumn.spacing : 0)
-                                             - 3 * quickToolsColumn.spacing))
-            }
-            // The laser pointer at once (presenting: point at what is said; its ink fades): again, back to the pen
-            Button {
-                id: laserToggle
-                objectName: "laserPointerButton"
-                width: parent.width
-                flat: true
-                readonly property bool on: win.toolGroups.isLaser(app.tool)
-                highlighted: on
-                icon.source: app.iconUrl("xopp-laser-pointer")
-                text: on ? qsTr("Back to the pen") : qsTr("Laser pointer")
-                onClicked: {
-                    quickTools.close()
-                    if (win.toolGroups.isLaser(app.tool)) win.toolGroups.activate("pen", "pen")
-                    else win.toolGroups.activate("pen", "laserPointerPen")
-                }
-            }
-            // The curtain (B) and the spotlight (Shift+B): hiding part of the page while presenting
-            Row {
-                id: curtainToggles
-                width: parent.width
-                visible: !win.textDoc
-                Button {
-                    objectName: "curtainToggleButton"
-                    width: parent.width / 2
-                    flat: true
-                    icon.source: app.iconUrl("xqt-curtain")
-                    text: app.curtain === "curtain" ? qsTr("Curtain off") : qsTr("Curtain")
-                    onClicked: {
-                        quickTools.close()
-                        app.toggleCurtain("curtain")
-                    }
-                }
-                Button {
-                    objectName: "spotlightToggleButton"
-                    width: parent.width / 2
-                    flat: true
-                    icon.source: app.iconUrl("xqt-spotlight")
-                    text: app.curtain === "spotlight" ? qsTr("Spotlight off") : qsTr("Spotlight")
-                    onClicked: {
-                        quickTools.close()
-                        app.toggleCurtain("spotlight")
-                    }
-                }
-            }
-            // Read only (qt/docs/toolbox.md, "Reading"): the pen does not write, the edges turn the pages
-            Button {
-                id: readOnlyToggle
-                objectName: "readOnlyToggleButton"
-                visible: win.readOnlyOffered
-                width: parent.width
-                flat: true
-                icon.source: app.iconUrl("xqt-lock")
-                text: qsTr("Read only (no ink; the edges turn the pages)")
-                onClicked: {
-                    quickTools.close()
-                    win.toggleReadOnly()
-                }
-            }
-            Button {
-                id: presentToggle
-                objectName: "presentToggleButton"
-                width: parent.width
-                flat: true
-                icon.source: app.iconUrl("xopp-presentation-mode")
-                text: app.presenting ? qsTr("Stop presenting (Esc)") : qsTr("Present (F5)")
-                onClicked: {
-                    quickTools.close()
-                    app.presenting = !app.presenting
-                }
-                // held: without controls (only the page)
-                onPressAndHold: {
-                    quickTools.close()
-                    if (app.presenting) win.presentClean = true
-                    else win.startPresenting(true)
-                }
-            }
-            // Full screen: back to the window; the compact chrome chosen in a window: back to the full chrome
-            Button {
-                id: leaveFullScreen
-                objectName: "leaveFullScreenButton"
-                width: parent.width
-                flat: true
-                text: !win.fullScreenMode ? qsTr("Show the tabs and the tool bar")
-                                          : qsTr("Leave full screen") + (app.presenting ? "" : qsTr(" (Esc)"))
-                onClicked: {
-                    if (win.fullScreenMode) {
-                        win.fullScreenMode = false
-                    } else {
-                        quickTools.close()
-                        win.chooseChrome("full")
-                    }
-                }
-            }
-        }
-        // A tool, color or size was chosen: back to writing
-        Connections {
-            target: app
-            enabled: quickTools.opened
-            function onToolChanged() { quickTools.close() }
-        }
-    }
-
     InsertPagesDialog { id: insertPagesDialog }
     // Page templates (qt/docs/templates.md): the picker (in the middle of the window, a sheet on a phone) and saving
     StickerPicker { id: templatePicker; mode: "templates" }
@@ -5585,8 +5189,8 @@ ApplicationWindow {
     // the overviews and the settings search or edit what is typed)
     readonly property bool toolKeys: docKeys && !pageGrid.visible && !contentsOverview.visible && !tabOverview.visible
                                      && !settingsPage.visible
-    // (with the toolbox: the entry of that type used last, with its color and width)
-    Shortcut { sequences: win.keysOf("toolPen"); enabled: toolKeys; onActivated: win.toolboxMode ? app.takeToolOfType("pen") : app.selectTool("pen") }
+    // (the toolbox's entry of that type used last, with its color and width)
+    Shortcut { sequences: win.keysOf("toolPen"); enabled: toolKeys; onActivated: app.takeToolOfType("pen") }
     // A page number: the first digit opens the jump, which takes the following keys itself. (A field or a text on
     // the page that is typed into takes its digits first.)
     component DigitKey: Shortcut {
@@ -5623,9 +5227,9 @@ ApplicationWindow {
     Shortcut { sequence: "Home"; enabled: win.presentKeys; onActivated: app.firstPage() }
     Shortcut { sequence: "End"; enabled: win.presentKeys; onActivated: app.lastPage() }
 
-    Shortcut { sequences: win.keysOf("toolEraser"); enabled: toolKeys; onActivated: win.toolboxMode ? app.takeToolOfType("eraser") : app.selectTool("eraser") }
-    Shortcut { sequences: win.keysOf("toolHighlighter"); enabled: toolKeys; onActivated: win.toolboxMode ? app.takeToolOfType("highlighter") : app.selectTool("highlighter") }
-    Shortcut { sequences: win.keysOf("toolText"); enabled: toolKeys; onActivated: win.toolboxMode ? app.takeToolOfType("text") : win.takeTextBox() }  // (a Markdown text box)
+    Shortcut { sequences: win.keysOf("toolEraser"); enabled: toolKeys; onActivated: app.takeToolOfType("eraser") }
+    Shortcut { sequences: win.keysOf("toolHighlighter"); enabled: toolKeys; onActivated: app.takeToolOfType("highlighter") }
+    Shortcut { sequences: win.keysOf("toolText"); enabled: toolKeys; onActivated: app.takeToolOfType("text") }
     Shortcut { sequences: win.keysOf("toolSelect"); enabled: toolKeys; onActivated: app.selectTool("selectRect") }
     Shortcut { sequences: win.keysOf("toolLasso"); enabled: toolKeys; onActivated: app.selectTool("selectRegion") }
     Shortcut { sequences: win.keysOf("snip"); enabled: toolKeys; onActivated: app.startSnip("rect") }
