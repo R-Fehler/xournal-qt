@@ -1370,8 +1370,8 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] Ctrl+1 (or the fit menu → "Real size, 100 %"): the pill shows 100 %, and a page measures its paper size
       (A4: 21.0 cm wide) with the ruler. Draw a 10 cm line with the set square: 10 cm on the screen. The compass
       and the set square show centimetres that match the ruler.
-- [ ] Ctrl+0 still fits the width, fit page still fits the page; zooming out and in stops at 30 % and 700 %
-      of the real size.
+- [ ] Ctrl+0 still fits the width, fit page still fits the page; zooming out and in stops at the smallest zoom of
+      Settings → Display (20 % unless set) and 700 % of the real size.
       The document is not changed by the calibration (no "unsaved" mark).
 - [ ] KDE Wayland with fractional scaling: calibrate at 125 %, switch the display to 150 % in the system settings:
       Ctrl+1 is still real size without calibrating again. The same on X11 if at hand.
@@ -1944,7 +1944,7 @@ Design: [md-images.md](../md-images.md).
       on A5 and A4 still 2 cm.
 - [ ] "Start a chapter here…" on an A7 card: the heading sits at the card's margins, not 2 cm in.
 - [ ] An A0 poster with a few hundred strokes (or a PDF poster opened and annotated): fit page (and pinching out)
-      shows the whole page; the zoom goes below 30 % for it. Zoom to 100 %, 300 %, 700 %: what is in view gets sharp
+      shows the whole page; the zoom goes below the smallest zoom (Settings → Display) for it. Zoom to 100 %, 300 %, 700 %: what is in view gets sharp
       after the zoom rests, the app stays responsive, and its memory (XQT_PERF=1, or the system monitor) stays low:
       about the view's size in pixels four times over per page, not the whole poster (was 1.2 GB at 300 %, nothing
       drawn at 700 %).
@@ -3930,3 +3930,13 @@ folding describe what is gone: the rail scrolls now.
 - [ ] A text document (.md) at 1366 × 768: undo, redo, all formatting buttons (no "Insert" menu), then the commands
       (open, save, …) in the same row, scrolling; the wheel scrolls it; ⋮ at the end. At 1920 more of the commands, at
       a wide window all.
+
+## The smallest zoom (qt/min-zoom)
+
+- [ ] The Fold 7 unfolded, upright and turned, an A4 document with two pages side by side (the page layout button →
+      two pages, or book): pinch out as far as it goes: both pages of a row are whole beside the rail, with room
+      around them. The same with Ctrl+minus on a keyboard, and in the reference's half.
+- [ ] Settings → Display → Zoom: "Smallest zoom" shows 20 %. Set 50 %: pinching out stops at 50 % on the desktop
+      (the zoom pill), but on the unfolded Fold the two pages still fit whole (it stops lower, as low as they need).
+      Set 5 %: an A4 page shrinks to a stamp. A zoom below a newly raised value comes up to it at once.
+- [ ] The setting survives a restart.

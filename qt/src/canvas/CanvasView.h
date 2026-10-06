@@ -99,6 +99,9 @@ public:
     /// Two fingers (and the touchpad's rotate gesture) turn the canvas (setting "rotateGesture" of ours, default on;
     /// qt/docs/canvas-rotation.md)
     static bool rotateGestureSetting(Settings& settings);
+    /// The smallest zoom in percent of 100 % (setting "smallestZoom" of ours, Settings → Display; default 20,
+    /// ViewController::SMALLEST_ZOOM_MIN..MAX)
+    static int smallestZoomSetting(Settings& settings);
     /// A gesture may turn the canvas now: allowed here and the setting on
     bool rotationGestureAllowed() const;
     /// Snapping up and down too, while the view is read (qt/docs/zen.md): with the setting snapPages

@@ -61,6 +61,33 @@ void DocumentLayout::update(Document& doc, const std::vector<PageRef>& pages, Co
     for (size_t r = 0; r < rowCount; ++r) {
         rowPrefix[r + 1] = rowPrefix[r] + rowHeight[r];
     }
+
+    // The largest group, across and up and down (wholeGroupZoom: each the most of all groups, which is at most a
+    // little more than needed when the widest group is not the one with the most gaps)
+    groupWidthPts = groupWidthGaps = groupHeightPts = groupHeightGaps = 0;
+    for (size_t g = 0, count = groupCount(); g < count; ++g) {
+        const Span span = groupSpan(g);
+        groupWidthPts = std::max(groupWidthPts, span.right - span.left);
+        groupWidthGaps = std::max(groupWidthGaps, gapPrefix[span.c1] - gapPrefix[span.c0]);
+        const auto [first, last] = groupPages(g);
+        size_t r0 = 0, r1 = 0;
+        double top = 0, bottom = 0;
+        for (size_t i = first; i <= last; ++i) {
+            const size_t r = cellOf(i).row;
+            const double t = rowPrefix[r] + (rowHeight[r] - sizes[i].height()) / 2.0;
+            const double b = t + sizes[i].height();
+            if (i == first || t < top) {
+                r0 = r;
+                top = t;
+            }
+            if (i == first || b > bottom) {
+                r1 = r;
+                bottom = b;
+            }
+        }
+        groupHeightPts = std::max(groupHeightPts, bottom - top);
+        groupHeightGaps = std::max(groupHeightGaps, static_cast<double>(r1 - std::min(r0, r1)) * PADDING_BETWEEN);
+    }
 }
 
 DocumentLayout::Cell DocumentLayout::cellOf(size_t page) const {
@@ -235,28 +262,32 @@ std::pair<size_t, size_t> DocumentLayout::pagesIn(const QRectF& content, double 
     return {first, last};
 }
 
-double DocumentLayout::fitWidthZoom(double viewWidth, size_t page) const {
-    if (sizes.empty()) {
-        return 0;
-    }
+DocumentLayout::Span DocumentLayout::groupSpan(size_t group) const {
     // The pages of the group, from the left edge of the leftmost to the right edge of the rightmost: their widths
     // and the room left in their columns grow with the zoom (points), the gaps between the columns do not (pixels).
-    const auto [first, last] = groupPages(groupOf(std::min(page, sizes.size() - 1)));
-    size_t c0 = 0, c1 = 0;
-    double left = 0, right = 0;
+    const auto [first, last] = groupPages(group);
+    Span span;
     for (size_t i = first; i <= last; ++i) {
         const size_t c = cellOf(i).col;
         const double l = colPrefix[c] + offsetInColumn(i);
         const double r = l + sizes[i].width();
-        if (i == first || c < c0 || (c == c0 && l < left)) {
-            c0 = c;
-            left = l;
+        if (i == first || c < span.c0 || (c == span.c0 && l < span.left)) {
+            span.c0 = c;
+            span.left = l;
         }
-        if (i == first || c > c1 || (c == c1 && r > right)) {
-            c1 = c;
-            right = r;
+        if (i == first || c > span.c1 || (c == span.c1 && r > span.right)) {
+            span.c1 = c;
+            span.right = r;
         }
     }
+    return span;
+}
+
+double DocumentLayout::fitWidthZoom(double viewWidth, size_t page) const {
+    if (sizes.empty()) {
+        return 0;
+    }
+    const auto [c0, c1, left, right] = groupSpan(groupOf(std::min(page, sizes.size() - 1)));
     const double width = right - left;
     if (width <= 0) {
         return 0;
@@ -280,6 +311,15 @@ double DocumentLayout::fitHeightZoom(double viewHeight) const {
     }
     const double gaps = static_cast<double>(rowCount - 1) * PADDING_BETWEEN;
     return (viewHeight - 2 * padding() - gaps) / rowPrefix[rowCount];
+}
+
+double DocumentLayout::wholeGroupZoom(QSizeF view) const {
+    if (sizes.empty() || groupWidthPts <= 0 || groupHeightPts <= 0) {
+        return 0;
+    }
+    const double across = (view.width() - 2 * padding() - groupWidthGaps) / groupWidthPts;
+    const double down = (view.height() - 2 * padding() - groupHeightGaps) / groupHeightPts;
+    return std::max(0.0, std::min(across, down));
 }
 
 }  // namespace xqt

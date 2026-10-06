@@ -23,15 +23,34 @@ ViewController::ViewController(const DocumentLayout* layout, QObject* parent): Q
 }
 
 double ViewController::minZoom() const {
-    double lowest = 0.3 * z100;
-    if (const QSizeF page = layout->largestPage(); !view.isEmpty() && !page.isEmpty()) {
+    double lowest = smallest * z100;
+    if (view.isEmpty()) {
+        return lowest;
+    }
+    // The biggest page can be seen whole
+    if (const QSizeF page = layout->largestPage(); !page.isEmpty()) {
         const double pad = 2 * layout->padding();
         const double whole = std::min((view.width() - pad) / page.width(), (view.height() - pad) / page.height());
         if (whole > 0) {
             lowest = std::min(lowest, whole);
         }
     }
+    // And a whole row of pages (two side by side), whatever the setting
+    if (const double row = layout->wholeGroupZoom(view); row > 0) {
+        lowest = std::min(lowest, row);
+    }
     return lowest;
+}
+
+void ViewController::setSmallestZoom(double fraction) {
+    fraction = std::clamp(fraction, SMALLEST_ZOOM_MIN / 100.0, SMALLEST_ZOOM_MAX / 100.0);
+    if (fraction == smallest) {
+        return;
+    }
+    smallest = fraction;
+    if (initialized && !view.isEmpty() && z < minZoom()) {
+        setZoom(minZoom(), viewCentre);
+    }
 }
 
 void ViewController::setViewSize(QSizeF size) {

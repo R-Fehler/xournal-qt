@@ -316,6 +316,13 @@ more):
 - a double click / double tap, or a long press: the whole page; a right click: the menu at once;
 - pinch, Ctrl+wheel, Ctrl+plus / minus / 0 and the middle button zoom as before.
 
+How far out every zoom goes (pinch, wheel, Ctrl+minus, the fits, the reference's view, the presenter's screens): to
+**Settings → Display → Zoom → "Smallest zoom"** (5–50 % of the real size, 20 % unless set; `smallestZoom` in the
+xournalQt part of settings.xml; `ViewController::minZoom`), and further whenever that is still too close to see the
+biggest page whole, or the widest row of pages with its gaps (two A4 pages side by side on the unfolded Fold 7,
+`DocumentLayout::wholeGroupZoom`; sideways: a column or a pair). Before, it stopped at upstream's 30 %, which on the
+unfolded Fold 7 (100 % being some 2.35 px per point there) kept two A4 pages beside the rail from fitting.
+
 It never runs out of its canvas (since qt/adaptive-panels: 28 px from the canvas's right edge, 8 where that is too
 much; beside a reference or the Markdown source it stays in its own half), and it moves up above the reference's
 pill where the two would meet. In phone portrait (and tiny) the page layout button is left out: ⋮ → View → Page

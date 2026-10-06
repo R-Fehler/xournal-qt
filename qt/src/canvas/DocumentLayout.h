@@ -94,6 +94,10 @@ public:
     QRectF rowSpan(size_t page, double zoom) const { return groupRect(groupOf(page), zoom); }
     /// Zoom at which all rows fit into the view height (scrolling sideways: "fit to the window height").
     double fitHeightZoom(double viewHeight) const;
+    /// The highest zoom at which every group (a row of pages; sideways a column or a pair) can be seen whole in a view
+    /// of this size: the widest one fits its width and the highest one its height, with their gaps and the margins
+    /// (two A4 pages side by side on an unfolded phone, ViewController::minZoom). 0: no pages, or no room at all.
+    double wholeGroupZoom(QSizeF view) const;
 
 private:
     struct Cell {
@@ -111,6 +115,13 @@ private:
     size_t slotOf(size_t col, size_t row) const;
     /// Columns in a group (scrolling sideways: 2 for pairs)
     size_t groupColumns() const { return config.paired ? 2 : 1; }
+    /// The pages of a group across: from the left edge of the leftmost (column c0, `left` points into the columns)
+    /// to the right edge of the rightmost (column c1, `right`)
+    struct Span {
+        size_t c0 = 0, c1 = 0;
+        double left = 0, right = 0;
+    };
+    Span groupSpan(size_t group) const;
 
     Config config;
     std::vector<QSizeF> sizes;
@@ -121,6 +132,9 @@ private:
     std::vector<double> colWidth, rowHeight;  ///< points
     std::vector<double> colPrefix, rowPrefix;  ///< sum of the widths/heights before (points)
     std::vector<double> gapPrefix;             ///< sum of the gaps before a column (pixels)
+    /// The widest group's pages across (points) and the most gaps between them (pixels); the same up and down
+    /// (wholeGroupZoom)
+    double groupWidthPts = 0, groupWidthGaps = 0, groupHeightPts = 0, groupHeightGaps = 0;
 };
 
 }  // namespace xqt
