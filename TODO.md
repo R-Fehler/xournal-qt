@@ -864,11 +864,16 @@ button, and what its fold freed went to the fixed tools (qt/rail-fill's give-bac
 
 Blocks, one after another where they share `Main.qml` (1, then 2 and 4, then 3):
 
-- [ ] **1 `qt/classic-removal`**: the classic tool bar goes: the tool square, the quick tools, the classic pen pill of
+- [x] **1 `qt/classic-removal`**: the classic tool bar goes: the tool square, the quick tools, the classic pen pill of
   full screen, the classic colour strip and its ladder, `toolbarMode` and Settings → Pen → Tools' choice,
   `XQT_TOOLBAR_MODE`. A settings file with `classic` gets the toolbox (the migration `migratedToolbox` already
   carries the pen, the eraser and the text box). Every test that ran in classic moves to the toolbox (or tests the
   same thing through it); tests of classic-only things go with them. Shortcuts keep working (P, H, E, T, …).
+  Done 2026-10-06 (the toolbox floats in full screen on phones too; the palette's source moved to Settings → Pen →
+  Colors). Left: New in full screen only by its keys (the tool square had it; block 3's "+" catalog / ⋯ can take it);
+  a `.md`'s format bar at 800 px and less scrolls a little once all is folded (undo and redo at its start; block 3's
+  scrolling format bar replaces the ladder); the highlighter's opacity hint of the classic chooser is not in the
+  editor.
 - [ ] **2 `qt/rail-scroll`**: one stored arrangement for both bars (`ToolboxModel` grows: the rail and the top bar,
   each an ordered list of tool entries, app items by name, dividers and groups; upgraded from the toolbox JSON of
   0.7.0). The rail **scrolls** instead of folding (`ToolboxPlan` folding removed): the same order on every screen; a

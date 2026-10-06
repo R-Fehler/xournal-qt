@@ -15,8 +15,9 @@ canvas) but a rectangle with rounded corners, the part the class is to look at. 
   list. A tap on the button still goes from the setsquare to the compass: they are not tools of their own, they lie
   over the page whatever tool is in hand.
 - ⋮ → View → **Curtain (B)**, **Spotlight (Shift+B)**.
-- Full screen and presenting: the tool square → **Curtain**, **Spotlight**.
-- On a phone: All tools → Setsquare, compass and curtain.
+- Full screen and presenting: the setsquare button of the floating toolbox, held (the classic tool square's
+  **Curtain** and **Spotlight** went in 0.8.0).
+- On a phone: My tools → Setsquare, compass and curtain.
 
 The curtain comes over the lower half of the part of the page in view, down to the bottom of the page and a little
 beyond its sides; the spotlight's hole in the middle of the part of the page in view (six tenths of its width, three

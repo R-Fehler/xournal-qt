@@ -85,10 +85,10 @@ short.
   (the replay starts where the recording is heard and plays on). The document is replayed from the start, paused.
 - **The play bar** at the bottom of the page (`timelineBar`, below "The play bar"). ← and → go 5 s, Home and End to
   the ends, Space plays and pauses, Esc leaves. **The tools are put away** (`win.replaying`): the toolbox (docked or
-  floating), the tool bar at any edge (the classic one, or the toolbox's command bar) with its tab, the phone's dock,
-  the classic tool square and the pen pill, the view pill and the pills; the tab strip and a phone's app bar (with ⋮)
-  stay. (Before qt/replay-polish only the toolbox was hidden: the command bar then took its tools back and showed the
-  classic tool bar, the phone's dock its classic tools; `TimelineUiTest.theToolboxModeShowsNoClassicToolBarDuringOrAfterAReplay`.)
+  floating), the command bar with its tab, the phone's dock, the view pill and the pills; the tab strip and a phone's
+  app bar (with ⋮) stay. (Before qt/replay-polish only the toolbox was hidden: the command bar then took its tools back
+  and showed the classic tool bar, the phone's dock its classic tools; `TimelineUiTest.theToolboxModeShowsNoClassicToolBarDuringOrAfterAReplay`.
+  The classic tool bar was removed in 0.8.0.)
 - **Audio** plays where it overlaps, through `app.audio` (the same player as the playback pill, which is hidden
   meanwhile): at 1× only (at other speeds the replay is silent); the clock follows what is heard when they drift
   apart by more than 250 ms; a recording that ended or cannot be played is not started again until the next jump.
@@ -163,8 +163,8 @@ understand for the first time user." `TimelineBar.qml`, placed by `Main.qml`.
 Tests (`TimelineUiTest`, label `ui`): the title and "0:02 · 4 Oct, 08:00", the elapsed part, the mark, one row and
 40 px with the mouse, 48 px and the slider 48 high with the touch profile, inside the page
 (`thePlayBarSaysWhatItIsAndItsControlsAreSizedForTheInput`); the hint once, again from the title
-(`theFirstReplayShowsAHintOnce`); no classic tool bar in the toolbox mode during and after a replay, in a window, in
-full screen and in a phone's chrome (`theToolboxModeShowsNoClassicToolBarDuringOrAfterAReplay`). On a phone's screen
+(`theFirstReplayShowsAHintOnce`); no tools outside the toolbox during and after a replay, in a window, in full screen
+and in a phone's chrome (`theToolboxModeShowsNoClassicToolBarDuringOrAfterAReplay`). On a phone's screen
 (`TimelinePhone.ui@phone`, `offscreen-phone.json`, the touch profile, a navigation bar of 40 px): two rows, every
 control 48 px under the slider's row, the time not cut, above the navigation bar, off the edges, no dock and no view
 pill; a finger drags the handle: the replay's time moves, the time is shown above the finger, the page does not scroll;

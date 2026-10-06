@@ -10,8 +10,8 @@ Settings → Documents → **Quick note** (`quickNote` in the `xournalQt` part o
 - **A new note** (`note`, the default): a new document in the library's folder `Inbox/`, named by the date and time,
   `2026-10-04 21-30.xopp`, or `2026-10-04 21-30.pdf` (a PDF with notes) when documents are kept as PDF files
   (Settings → Documents → Keep documents as; the same rule as New document). A second note in the same minute is
-  `2026-10-04 21-30 (2)`. It is saved at once, opens in a new tab, and the pen is taken (the toolbox's pen used last,
-  or the plain pen with the classic tool bar; a pen in hand stays).
+  `2026-10-04 21-30 (2)`. It is saved at once, opens in a new tab, and the pen is taken (the toolbox's pen used last;
+  a pen in hand stays).
 - **A line in today's Markdown note** (`daily`): `- 21:30 ` is added at the end of `Inbox/2026-10-04.md` (after a line
   break when the file does not end with one), which opens with the cursor after the time. When that note is open in a
   tab already, the line goes into the open text (one undo step; its unsaved changes stay); otherwise into the file
