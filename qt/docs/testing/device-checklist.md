@@ -3856,6 +3856,9 @@ folding describe what is gone: the rail scrolls now.
       position.
 - [ ] With a tool scrolled out of sight: press E (a keyboard), or take the tool in "My tools": the rail scrolls it into
       view.
+- [ ] The first pen in hand, fold the phone (or start the app folded): the pen is lifted up towards the page at once,
+      wholly in the dock's view at its start; it does not slide sideways from the left, cut at the dock's edge. The
+      laser in hand with the dock left scrolled to its start: folded, the dock scrolls the laser into view.
 - [ ] Desktop (1920 × 1080 and 1366 × 600): the mouse wheel over a gap or over hand / select scrolls the rail (when it
       scrolls); over a pen it changes the pen's width. Undo, redo and "+" stay put while it scrolls.
 - [ ] Hold hand (or select) on the rail without moving: its menu (Options… for select's list, Move, Add a tool here,

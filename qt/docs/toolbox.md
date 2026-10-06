@@ -51,7 +51,7 @@ start.
 
 | Gesture | What it does |
 | --- | --- |
-| tap | picks the tool up: the tool in hand gets everything it holds (`AppController::applyToolEntry`); it is lifted towards the page |
+| tap | picks the tool up: the tool in hand gets everything it holds (`AppController::applyToolEntry`); it is lifted towards the page (the rail moved to another edge: towards the page at once, never along the rail, where it would leave the view at its start) |
 | tap on the tool in hand | its **editor**, beside it towards the page (a sheet on a phone): a preview stroke, the color (the palette's roles, the colors used lately, a hex code, the picker), the width (0.1–150 pt on a log slider, shown in mm, and the five sizes as dots), the line style, the filling (the line's color or another, its opacity), the eraser's kind, the shape and what draws it, the font, the note's pastel. A change is written at once and the tool in hand follows; there is no OK |
 | the mouse wheel over a tool | its width, a fifth more or less per notch |
 | long press (400 ms, not moved), right click | its **menu**: Edit…, Move up/down (left/right), Replace with…, Duplicate, Add a tool here…, Add/Remove the divider after it, Remove (not the last eraser) |

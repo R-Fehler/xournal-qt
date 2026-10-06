@@ -993,6 +993,12 @@ Blocks, one after another where they share `Main.qml` (1, then 2 and 4, then 3):
   `PhoneChromeTest.thePresentationTapField` (since qt/zen `presentingWithoutControlsHasTheZenDot`) failed once each
   (5 of 5 alone): harden them to wait for the state, then
   drop the repeat.
+- [x] `PhoneChromeTest.theAppBarAndTheDockAtAPhonesSizes` failed every release CI run (Debian 13, Qt 6.8, 3 of 3) and
+  6 of 6 with six copies at once (Qt 6.9 too), always at 412 × 915 on the first pen in hand. A real fault, not the
+  test's wait (2026-10-06): the lift of the tool in hand animated its direction, so when the rail moved from the right
+  to the dock at the bottom the pen slid 5 px along the dock, out of its view at its start (no scrolling reaches
+  there), until the animation ended (late under load). Now only the lift's amount is animated
+  (`ToolEntryButton.liftShown`); `ToolboxTest.theToolInHandIsInTheDocksViewAfterTheWindowBecomesAPhones`.
 - [x] `CanvasMemoryTest.twoViewsOfOneDocumentShareTheLimit` was a real overshoot: renders a trimmed view started
   earlier landed after the trim uncounted. Fixed in `qt/two-views-memory` (2026-09-26): a trimmed view re-plans on
   every render that lands.

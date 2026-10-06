@@ -673,6 +673,63 @@ TEST_F(ToolboxTest, theScrollPositionIsRememberedPerWindowClass) {
     touchProfile("auto");
 }
 
+// The tool in hand is in the rail's view once a window is made a phone's (the rail moved to the dock at the bottom),
+// whatever place the dock remembers: the first pen at the start of the rail, the laser far along it. Its lift turns
+// towards the page at once: it never slides along the rail (the first cell went 5 px out of the dock's view at its
+// start, where no scrolling reaches, for as long as the turn was animated: on a slow phone at the start, long enough
+// for PhoneChromeTest to find it there under load, 2026-10-06)
+TEST_F(ToolboxTest, theToolInHandIsInTheDocksViewAfterTheWindowBecomesAPhones) {
+    touchProfile("on");
+    auto* box = find("toolbox");
+    const auto dockSettled = [&] {
+        return box->property("compact").toBool() && !box->property("vertical").toBool() && rail().cells > 0;
+    };
+    /// The button itself (lifted, not only its cell) wholly in the view of the rail's middle
+    const auto inView = [&](QQuickItem* button) {
+        return shown(button) && inSight(button) &&
+               rectOf(find("toolboxMiddle")).adjusted(-1, -1, 1, 1).contains(rectOf(button));
+    };
+    struct Case {
+        QString inHand;
+        double remembered;  // (where the dock was left: its start, its end)
+    };
+    for (const Case& c: {Case{nth("pen"), 1e6}, Case{nth("laser"), 0}, Case{nth("pen"), 0}}) {
+        // The dock left at a place, with no tool of the rail in hand (that one would be scrolled into view)
+        controller->selectTool("text");
+        resize(412, 915);
+        until(dockSettled);
+        until([&] {
+            scrollRail(c.remembered);
+            return std::abs(rail().pos - (c.remembered > 0 ? rail().content - rail().view : 0)) < 1;
+        });
+        wait(800);  // (written after a pause)
+        // On the desktop, the tool taken; then the window is a phone's again
+        resize(1920, 1080);
+        controller->applyToolEntry(c.inHand);
+        until([&] { return entry(c.inHand) && entry(c.inHand)->property("inHand").toBool(); });
+        wait(200);  // (lifted towards the page, at the left)
+        auto* button = entry(c.inHand);
+        ASSERT_NE(button, nullptr);
+        const std::string at = c.inHand.toStdString() + ", the dock left at " + std::to_string(c.remembered);
+        window->resize(412, 915);
+        // Every few ms while the dock lays itself out: lifted across the rail only, never along it
+        double along = 0;
+        QElapsedTimer t;
+        t.start();
+        while (t.elapsed() < 600) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 2);
+            if (dockSettled()) {
+                const QRectF cell = rectOf(button->parentItem());
+                along = std::max(along, std::abs(rectOf(button).left() - cell.left()));
+            }
+        }
+        EXPECT_LT(along, 0.5) << at << ": the lift slid along the dock by " << along;
+        until([&] { return dockSettled() && inView(button); });
+        EXPECT_TRUE(inView(button)) << at << ": " << rail().text.toStdString();
+    }
+    touchProfile("auto");
+}
+
 TEST_F(ToolboxTest, aTapOnTheToolInHandOpensItsEditorAndAChangeIsTakenAtOnce) {
     const QString pen = nth("pen");
     controller->applyToolEntry(nth("highlighter"));

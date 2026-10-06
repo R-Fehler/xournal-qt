@@ -82,11 +82,15 @@ AbstractButton {
     /// Held (ready to be carried) or carried: lifted off the rail, larger, with a shadow (not the rail moving)
     readonly property bool lifted: dragging || armed
     readonly property real lift: lifted ? 0 : (inHand ? 5 : 0)
+    /// The lift as drawn: picking up and putting down are animated, the direction is not. The rail moving to another
+    /// edge (a window made a phone's: the dock at the bottom) turns it at once: animated, the tool in hand slid along
+    /// the rail from the old direction to the new one, and the first cell out of the rail's view at its start, where
+    /// no scrolling reaches, until the animation ended (on a slow phone at the start, a while)
+    property real liftShown: lift
+    Behavior on liftShown { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
     transform: Translate {
-        x: button.towardsPage === "left" ? -button.lift : button.towardsPage === "right" ? button.lift : 0
-        y: button.towardsPage === "up" ? -button.lift : button.towardsPage === "down" ? button.lift : 0
-        Behavior on x { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
-        Behavior on y { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+        x: button.towardsPage === "left" ? -button.liftShown : button.towardsPage === "right" ? button.liftShown : 0
+        y: button.towardsPage === "up" ? -button.liftShown : button.towardsPage === "down" ? button.liftShown : 0
     }
     scale: lifted ? 1.15 : 1
     // (carried: its place stays faint, the carried one follows the pointer)
