@@ -1327,8 +1327,8 @@ ApplicationWindow {
             const inserts = fb.levelsWidth + fb.marksWidth + fb.insertLabelWidth + 4
             const levels = fb.levelButtonWidth + fb.marksWidth + fb.insertLabelWidth + 4
             const rest = cmds.length > key.length ? more : 0
-            if (room - full >= w(cmds) || room - inserts >= w(cmds)) return cmds
-            if (room - inserts >= w(key) + rest || room - levels >= w(key) + rest) return key
+            if (room - full >= w(cmds.length) || room - inserts >= w(cmds.length)) return cmds
+            if (room - inserts >= w(key.length) + rest || room - levels >= w(key.length) + rest) return key
             return []
         }
         /// The same plan, with the end at the bar's end again

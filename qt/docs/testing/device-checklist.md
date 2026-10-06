@@ -3773,3 +3773,9 @@ checks only that the library is there and the devices can be listed).
 
 - [ ] 150 % scaling (Windows or KDE): the toolbox's line towards the page and its dividers are as sharp as the command
       bar's (one device pixel, not a blurred 1.5).
+
+## A text document's format bar on a tablet (qt/classic-removal)
+
+- [ ] A `.md` at 960 × 1392 (a Surface upright): the format bar shows undo, redo, the headings, the marks, the lists
+      and the inserts' button without scrolling; the commands in » at its end (before 0.8.0 every command was kept and
+      the row scrolled the lists out of sight). At 1920 the commands are buttons at its end.
