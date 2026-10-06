@@ -37,18 +37,13 @@ The author's role-based palettes as tabs in the color chooser, next to the color
 
 ## The chooser (`ColorChooser.qml`)
 
-One popup (a bottom sheet in the phone classes) with a tab bar: "Colors" (the colors one has, the ones used lately,
-"Add a color…") and one tab per palette. A palette's tab shows its roles as small pieces of the current page's paper
-with the color on it and the role's name under it (also the tool tip): the ink as a dot, or with the highlighter the
-highlight color as a marker stroke at the opacity the rule gives on this page. The palette's credits (`source`) are
-shown under it; a dark palette on light paper (or the other way round) says what paper it is made for.
+Since 0.8.0 the colors are chosen in a tool's **editor** (the toolbox, [toolbox.md](toolbox.md)): the palette (a combo
+box; app-wide, as Settings → Pen → Colors), its roles with their names (the ink, or with a highlighter the highlight
+color), the colors used lately, a hex code and the picker; a bottom sheet in the phone classes. Settings → Pen → Colors
+shows the chosen palette's colors and its credits (`source`, `colorPaletteSource`).
 
-It opens on the tab of the palette the color in hand came from, else on the tab shown last.
-
-Where it is:
-- the tool bar's colors (`ColorStrip.qml`): "+" in the full form, the palette button in the recent form, a long press
-  on the cycling color button in the single form (the phone dock: as a sheet);
-- the pen pill of the compact chrome (`PenPill.qml`): its "+", with the pill's colors in the first tab.
+The classic tool bar's chooser (`ColorChooser.qml`: a popup with a tab per palette, from the bar's colors and the pen
+pill of the compact chrome) was removed with the classic tool bar in 0.8.0.
 
 ## Dark pages and dark paper ([dark-pages.md](dark-pages.md))
 

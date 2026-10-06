@@ -260,14 +260,12 @@ set(XQT_QML_FILES
     src/app/qml/MarkdownPanel.qml
     src/app/qml/EmojiSuggestions.qml
     src/app/qml/EmojiPicker.qml
-    src/app/qml/CustomWidthPopup.qml
     src/app/qml/AppendPages.qml
     src/app/qml/PageJump.qml
     src/app/qml/BackgroundDialog.qml
     src/app/qml/ChapterDialog.qml
     src/app/qml/ContextPill.qml
     src/app/qml/PdfTextHandles.qml
-    src/app/qml/PenPill.qml
     src/app/qml/GeometryPill.qml
     src/app/qml/CurtainPill.qml
     src/app/qml/PrintDialog.qml
@@ -297,10 +295,6 @@ set(XQT_QML_FILES
     src/app/qml/ToolBarPlan.js
     src/app/qml/ToolGroups.qml
     src/app/qml/ToolCycleButton.qml
-    src/app/qml/ColorStrip.qml
-    src/app/qml/ColorChooser.qml
-    src/app/qml/WidthStrip.qml
-    src/app/qml/PenStyleOptions.qml
     src/app/qml/MarkdownFormatBar.qml
     src/app/qml/MarkdownTableEditor.qml
     src/app/qml/LookUpMenu.qml

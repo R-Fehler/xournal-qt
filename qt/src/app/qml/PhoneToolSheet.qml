@@ -1,8 +1,10 @@
-// Every tool of the phone chrome in one sheet (qt/docs/adaptive-layout.md, "The phone chrome"): the dock shows the
-// tool in use; its "All tools" button opens this. Each tool and each variant of a cycling button (ToolGroups.qml) is a
-// cell with its icon and its name: one tap takes it. The other buttons of the tool bar (insert, search, present,
-// settings, new, open, save, …) follow; a tap on them is a tap on the tool bar's button, a long press is its long
-// press (the text box: the font; Add a page: Insert pages…; Present: without controls; Write on the page: its source).
+// Every tool of the phone chrome in one sheet, "My tools" (qt/docs/adaptive-layout.md, "The phone chrome";
+// qt/docs/toolbox.md, "On a phone"): the dock shows the first tools of the toolbox; its "My tools" button opens this.
+// The user's tools first (a tap takes one, a tap on the one in hand edits it, a long press: its menu), "+", then the
+// other tools: each tool and each variant of a cycling button (ToolGroups.qml) is a cell with its icon and its name,
+// one tap takes it. The other buttons of the command bar (insert, search, present, settings, new, open, save, …)
+// follow; a tap on them is a tap on the bar's button, a long press is its long press (Add a page: Insert pages…;
+// Present: without controls; Write on the page: its source).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -10,30 +12,22 @@ import QtQuick.Controls.Material
 BottomSheet {
     id: sheet
     objectName: "phoneToolSheet"
-    title: toolbox ? qsTr("My tools") : qsTr("All tools")
-    /// With the toolbox (qt/docs/toolbox.md, "On a phone"): the user's tools first (a tap takes one, a tap on the one
-    /// in hand edits it, a long press: its menu), "+", then the other tools; the pens, erasers, shapes, text boxes and
-    /// sticky notes are the user's tools then
-    readonly property bool toolbox: win.toolboxMode
+    title: qsTr("My tools")
 
-    /// The tool bar's buttons by name (Main.qml's toolArea.slots)
+    /// The command bar's buttons by name (Main.qml's toolArea.slots)
     readonly property var slots: toolArea.slots
     readonly property var groups: win.toolGroups
-    /// The group's button in the tool bar
-    readonly property var groupSlot: ({ pen: "pen", eraser: "eraser", select: "select", snip: "snip", shape: "shape",
-                                        geometry: "geometry", text: "pdfText" })
+    /// The group's button (a fixed tool of the toolbox)
+    readonly property var groupSlot: ({ select: "select", snip: "snip", geometry: "geometry", text: "pdfText" })
 
     function variantCells(group) {
         return groups.variants(group).map(function(v) { return { group: group, key: v.key } })
     }
     readonly property var sections: [
-        { name: "draw", title: toolbox ? qsTr("Other tools") : qsTr("Write and draw"),
-          cells: toolbox ? [{ slot: "hand" }, { slot: "touchDrawing" }, { slot: "write" }].concat(variantCells("text"), [{ slot: "emoji" }])
-                         : variantCells("pen").concat(variantCells("eraser"), [{ slot: "hand" }, { slot: "touchDrawing" },
-                           { slot: "text" }, { slot: "write" }, { slot: "sticky" }], variantCells("text"), [{ slot: "emoji" }]) },
+        { name: "draw", title: qsTr("Other tools"),
+          cells: [{ slot: "hand" }, { slot: "touchDrawing" }, { slot: "write" }].concat(variantCells("text"), [{ slot: "emoji" }]) },
         // (the snips beside the selection: the same rectangle or lasso, its picture copied)
         { name: "select", title: qsTr("Select and snip"), cells: variantCells("select").concat(variantCells("snip")) },
-        { name: "shape", title: qsTr("Shapes"), cells: toolbox ? [] : variantCells("shape") },
         { name: "geometry", title: qsTr("Setsquare, compass and curtain"), cells: variantCells("geometry") },
         { name: "insert", title: qsTr("Insert"), cells: [{ slot: "image" }, { slot: "sticker" }, { slot: "record" }, { slot: "addPage" }] },
         { name: "document", title: qsTr("Document and view"),
@@ -75,13 +69,13 @@ BottomSheet {
         // The user's tools (the toolbox), and "+"
         Column {
             objectName: "phoneToolSection_mine"
-            visible: sheet.toolbox && !win.textDoc
+            visible: !win.textDoc
             width: parent.width
             Flow {
                 x: 8
                 width: parent.width - 16
                 Repeater {
-                    model: sheet.toolbox ? (app.toolbox.revision, app.toolbox.tools()) : []
+                    model: (app.toolbox.revision, app.toolbox.tools())
                     delegate: Item {
                         id: mine
                         required property var modelData

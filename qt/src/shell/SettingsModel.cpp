@@ -463,18 +463,9 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             s.customSettingsChanged();
         });
 
-    // The toolbox or the classic tool bar (qt/docs/toolbox.md)
-    add("toolbarMode", [&s] { return QVariant(toolbarMode(s)); },
-        [&s](const QVariant& v) {
-            const QString mode = v.toString();
-            if (mode == "toolbox" || mode == "classic") {
-                s.getCustomElement("xournalQt").setString("toolbarMode", mode.toStdString());
-                s.customSettingsChanged();
-            }
-        });
-
     // The variant last used of each cycling tool button (qt/docs/adaptive-layout.md, "Cycling buttons"), as
-    // "group=variant;…", e.g. "pen=highlighter;shape=arrow" (the eraser's is eraserMode)
+    // "group=variant;…", e.g. "select=selectRegion;snip=snipLasso" (a "shape=" of the classic tool bar of before 0.8.0
+    // gives the toolbox's first shape, AppController::migratedToolbox)
     add("toolVariants",
         [&s] {
             std::string v;
@@ -486,7 +477,7 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             s.customSettingsChanged();
         });
 
-    // The colors used last (the tool bar's "recent" colors), newest first: "#rrggbb,…"
+    // The colors used last (the toolbox editor's "colors used lately"), newest first: "#rrggbb,…"
     add("recentColors",
         [&s] {
             std::string v;
@@ -696,16 +687,6 @@ QStringList SettingsModel::keys() const {
         k << key;
     }
     return k;
-}
-
-QString SettingsModel::toolbarMode(Settings& settings) {
-    std::string stored;
-    settings.getCustomElement("xournalQt").getString("toolbarMode", stored);
-    if (stored == "toolbox" || stored == "classic") {
-        return QString::fromStdString(stored);
-    }
-    const QByteArray env = qgetenv("XQT_TOOLBAR_MODE");
-    return env == "classic" ? QStringLiteral("classic") : QStringLiteral("toolbox");
 }
 
 QVariant SettingsModel::get(const QString& key) const {

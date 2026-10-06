@@ -91,7 +91,6 @@ protected:
         wait(100);
     }
     void TearDown() override {
-        settings()->set("toolbarMode", "classic");  // (the other UI tests keep the classic bar)
         handwriting(false);
         controller->shutdown();
         engine.reset();
@@ -192,10 +191,9 @@ protected:
 };
 }  // namespace
 
-// Snip is one tap away: with the toolbox a fixed tool of the rail (a tap while armed: the other shape), and the select
-// button's list holds the selections only (one place each); the classic tool bar keeps the snips in the select list
+// Snip is one tap away: a fixed tool of the rail (a tap while armed: the other shape), and the select button's list
+// holds the selections only (one place each)
 TEST_F(CopyToolsTest, snipHasAButtonOfItsOwn) {
-    settings()->set("toolbarMode", "toolbox");
     makeNotes();
     controller->selectTool("pen");
     auto* snip = find("snipButton");
@@ -228,14 +226,6 @@ TEST_F(CopyToolsTest, snipHasAButtonOfItsOwn) {
     wait(50);
     EXPECT_EQ(controller->snipShape(), "");
     EXPECT_EQ(controller->tool(), "pen");
-
-    // The classic tool bar: no button, the snips in the select list as before
-    settings()->set("toolbarMode", "classic");
-    until([&] { return !snip->isVisible(); });
-    EXPECT_FALSE(snip->isVisible());
-    openList("selectButton", "selectButtonVariants");
-    EXPECT_NE(entryOf(selects, "variant_snipRect"), nullptr);
-    QMetaObject::invokeMethod(selects, "close");
 }
 
 // The text tools' second tool: a sweep over handwriting puts its words on the clipboard as text, the tool before is

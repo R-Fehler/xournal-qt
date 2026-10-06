@@ -140,13 +140,13 @@ copies it and writes absolute names; Save as `.xopp` puts it into the app's audi
 `PlaybackPill.qml`, `RecordingsDialog.qml`. The QML is self-contained so `qt/toolbox` can place the button wherever
 its toolbox wants it.
 
-- **Where the button is**: the classic tool bar's "insert" group, after the stickers (`ToolBarPlan.js`: group
-  `insert`; in the overflow ladder after the stickers, before Open externally); with the toolbox (the default) among
-  its **fixed tools**, after "the finger draws" (`Toolbox.fixedButtons`), so it is in the docked rail and in the
-  floating one of full screen and presenting, and not in the command bar (one place); in the phone's "All tools" /
-  "My tools" sheet under Insert (`PhoneToolSheet.qml`). Offered only when recording is available (a build with Qt
-  Multimedia, or `XQT_FAKE_AUDIO=1`) and not in a text file; without it the classic bar, the rail and the sheet have
-  no record button and Ctrl+Shift+R does nothing. Ctrl+Shift+R starts and stops.
+- **Where the button is**: among the toolbox's **fixed tools**, after "the finger draws" (`Toolbox.fixedButtons`), so
+  it is in the docked rail and in the floating one of full screen and presenting, and not in the command bar (one
+  place; where the rail does not hold it, the command bar's "insert" group, `ToolBarPlan.js`); in the phone's "My
+  tools" sheet under Insert (`PhoneToolSheet.qml`). Offered only when recording is available (a build with Qt
+  Multimedia, or `XQT_FAKE_AUDIO=1`) and not in a text file; without it the rail and the sheet have no record button
+  and Ctrl+Shift+R does nothing. Ctrl+Shift+R starts and stops. (The classic tool bar's "insert" group had it until
+  0.8.0.)
 - **The pills** (recording, playback) sit at the top of the page, in the middle; below the toolbox when it floats at
   the top edge (full screen, presenting).
 - **Recording**: a tap starts recording for the document of this tab; the recording is a voice memo of the page shown
@@ -168,7 +168,7 @@ Tests: `AudioUiTest` (label `ui`, fake devices with their timers): record from t
 stroke tied to the recording and the page's memo, stop, the play tool on the stroke, the playback pill's pause and ×;
 the list of recordings from the button's menu, removing one and undo; a recording belongs to its tab (another tab's
 ink is not tied, closing the tab ends it); `NoAudioUiTest` (`audio::useNoDevices`, as a build without Qt Multimedia):
-no record button anywhere, the classic bar at 1920 px with everything expanded, Ctrl+Shift+R does nothing.
+no record button anywhere (the rail, the command bar), Ctrl+Shift+R does nothing.
 
 ## Platforms
 

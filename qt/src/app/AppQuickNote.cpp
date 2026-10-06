@@ -45,13 +45,9 @@ bool AppController::quickNoteAt(const QDateTime& when) {
         if (!createDocumentAt(inbox / (stem + (pdfOnly() ? ".pdf" : ".xopp")))) {
             return false;
         }
-        // Ready for the pen (a pen of the toolbox when there is one; the pen in hand stays)
+        // Ready for the pen (the toolbox's pen used last; the pen in hand stays)
         if (tool() != QLatin1String("pen")) {
-            if (toolboxMode()) {
-                takeToolOfType("pen");
-            } else {
-                selectTool("pen");
-            }
+            takeToolOfType("pen");
         }
         return true;
     }

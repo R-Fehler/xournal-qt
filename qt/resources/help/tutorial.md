@@ -8,8 +8,8 @@ This is a **copy** for you. It is kept in the app's own folder, not in your libr
 folders. To keep it with your documents, choose **⋮ → Save as…** and a folder of your library. Help → **Start the
 tutorial again** gives you a fresh copy.
 
-> **PLACEHOLDER · SCREENSHOT:** the whole window with this tutorial open: the tool bar, the page, the pill with the
-> page number at the bottom right, the slim sidebar tab at the left edge.
+> **PLACEHOLDER · SCREENSHOT:** the whole window with this tutorial open: the tool bar at the top, the toolbox at the
+> right, the page, the pill with the page number at the bottom right, the slim sidebar tab at the left edge.
 
 This tutorial is a **text document inside a PDF**: the text is Markdown that you can still edit with the keyboard, and
 the pen writes on top of it. You will learn more about that on the Markdown pages.
@@ -18,12 +18,13 @@ the pen writes on top of it. You will learn more about that on the Markdown page
 
 ## 1. Write with the pen
 
-Take the **pen** (the pencil in the tool bar, or the key **P**) and write your name in the space below.
+Your tools lie in the **toolbox** beside the page (at the right; drag its dotted grip to another edge). Take a
+**pen** there (a tap, or the key **P**) and write your name in the space below.
 
 - With a pen on a touch screen, the pen writes and your **finger scrolls and zooms** (pinch). Your hand can rest on
   the screen while you write.
-- On a phone, the tools are in the dock at the bottom; the first button is the tool in use.
-- Without a pen, Settings → Touch → "Draw with the finger" (or the finger button in the tool bar) lets the finger
+- On a phone, the toolbox is the dock at the bottom; **My tools** at its end has all of them.
+- Without a pen, Settings → Touch → "Draw with the finger" (or the finger button in the toolbox) lets the finger
   write.
 
 > **PLACEHOLDER · INK:** a handwritten "try me" arrow pointing at the empty space below.
@@ -34,16 +35,17 @@ Write here:
 
 ## 2. Color and width
 
-Next to the pen are the **colors** and the **width**.
+Each tool of the toolbox has its own **color** and **width**: the toolbox starts with three pens (body text, key
+terms, warnings) and two highlighters.
 
-- Tap a color, then write a word in it.
-- Tap the width button: each tap takes the next width. Press and hold it to see all of them.
-- Press and hold a color to remove it; "+" adds a color of your own.
+- Take another pen, then write a word in it.
+- Tap the pen in your hand again: its **editor** opens beside it, with the colors of the palette, the colors used
+  lately, the width (a slider, and five sizes) and the line style. A change counts at once.
+- The mouse wheel over a tool changes its width; **+** at the end of the toolbox adds a tool of your own.
 
 Try three colors and two widths below.
 
-> **PLACEHOLDER · SCREENSHOT:** the colors and the width button in the tool bar, with the width list open (press and
-> hold).
+> **PLACEHOLDER · SCREENSHOT:** the editor of a pen, open beside the toolbox.
 
 > **PLACEHOLDER · INK:** three short lines in different colors and widths, as an example.
 
@@ -51,8 +53,7 @@ Try three colors and two widths below.
 
 ## 3. Highlight
 
-The pen button holds the **pen and the highlighter**: tap it again while the pen is in hand and it becomes the
-highlighter (or press **H**). Highlight the sentence below.
+Take a **highlighter** from the toolbox (or press **H**) and highlight the sentence below.
 
 **Highlight me: the highlighter is translucent, so the text stays readable.**
 
@@ -68,13 +69,13 @@ hold it, to choose how it marks. Try it on one of your PDFs later.
 
 Write a few words below, then take the **eraser** (or press **E**) and erase one of them.
 
-The eraser button has three kinds; tap it again to take the next one:
+The eraser has three kinds; tap it again while it is in hand to choose in its editor:
 
 - **Eraser**: removes what it touches.
 - **Whiteout**: paints white over it.
 - **Whole strokes**: removes every stroke it touches, completely.
 
-Its size is the width in the tool bar. With many pens, the button on the pen erases while you hold it.
+Its size is in its editor too. With many pens, the button on the pen erases while you hold it.
 
 > **PLACEHOLDER · INK:** a scribbled word, half erased, as an example.
 
@@ -103,12 +104,12 @@ Draw and move here:
 Draw a line below, then undo it.
 
 - **Ctrl+Z** undoes, **Ctrl+Y** (or Ctrl+Shift+Z) redoes.
-- The arrows are also in the pill at the bottom right of the window (on a phone: in the dock).
+- The arrows are also at the start of the toolbox (on a phone: in the dock).
 - On a touch screen: a **tap with two fingers** undoes, a tap with three fingers redoes.
 
 Everything you do with pages (adding, moving, deleting them) can be undone the same way.
 
-> **PLACEHOLDER · SCREENSHOT:** the pill at the bottom right with the undo and redo arrows.
+> **PLACEHOLDER · SCREENSHOT:** the start of the toolbox with the undo and redo arrows.
 
 <div style="page-break-after: always"></div>
 
@@ -177,8 +178,8 @@ Try it: open this tutorial beside itself and scroll the two sides independently.
 
 ## 11. Full screen and presenting
 
-- **Full screen** (the button in the tool bar, or **F11**): only the page, a small square with the current tool (tap
-  it for all tools and colors; drag it out of the way) and the page pill. Esc leaves it.
+- **Full screen** (the button in the tool bar, or **F11**): only the page, the toolbox floating at its edge (its ⋯:
+  present, read only, search, settings, leave full screen) and the page pill. Esc leaves it.
 - **Present** (**F5**): full screen on black, one page at a time, from the current page; the arrow keys, Page Up and
   Page Down or a swipe go on. Esc goes back to full-screen editing.
 - **Present without controls** (Ctrl+F5, or press and hold the Present button): only the page.
@@ -187,7 +188,7 @@ Try it: open this tutorial beside itself and scroll the two sides independently.
   swipe still scrolls, and text of a PDF can still be selected. The lock in the corner (or Ctrl+Alt+R) lets you write
   again, Esc leaves full screen.
 
-> **PLACEHOLDER · SCREENSHOT:** full screen with the small tool square and the page pill.
+> **PLACEHOLDER · SCREENSHOT:** full screen with the floating toolbox and the page pill.
 
 <div style="page-break-after: always"></div>
 
@@ -196,7 +197,7 @@ Try it: open this tutorial beside itself and scroll the two sides independently.
 Text you type can be **Markdown**, shown formatted while you type: headings with `#`, **bold** with `**`, lists with
 `-`, check lists with `- [ ]`, formulas with `$…$` (like $E = mc^2$), tables, code and pictures.
 
-- On any page of notes: **Write on the page** in the tool bar (or **Ctrl+Alt+M**), then type.
+- On any page of notes: **Write on the page** in the toolbox (or **Ctrl+Alt+M**), then type.
 - **Text box** (**T**): tap somewhere on the page and type a Markdown text box there.
 - The **formatting bar** under the tool bar does it for you if you do not know the syntax.
 

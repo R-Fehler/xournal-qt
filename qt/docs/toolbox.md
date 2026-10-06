@@ -12,6 +12,14 @@ The author's decisions: a rail docked to any side of the canvas, **right by defa
 for one release (Settings → Pen → Tools); the eraser is an entry; a folded section opens a list; the tools are stored
 per device. Reading and presenting are two modes over one "tools hidden" view (below).
 
+**The classic tool bar was removed in 0.8.0** (qt/classic-removal; the author, 2026-10-06: "let's get rid of all the
+other ui variants we have. Remove the classic toolbar to not drag dead weight as well."). Gone with it: the tool
+square of full screen and its quick tools, the pen pill, the colour strip and the widths of the bar (and their ladder
+in `ToolBarPlan.js`), the bar's places (two rows, a rail at a side, the bottom), the classic dock of a phone (the tool
+in use, the color, the width), the setting `toolbarMode` (Settings → Pen → Tools) and `XQT_TOOLBAR_MODE`. The toolbox
+is the only way the tools are arranged; a settings file that chose the classic bar gets the toolbox (below, "After an
+update").
+
 ## Using it
 
 **My tools.** Each entry is a tool with its settings: a pen (color or palette role, width, line style, filling), a
@@ -22,8 +30,11 @@ cycling tool: a tap while it is armed takes the other shape, qt/ui-rework). Divi
 
 The first start: three pens (body, key terms, warnings) | two highlighters (key terms, definitions) | the eraser | a
 line, a text box, a sticky note | the laser pointer. The pens and highlighters take their colors from the **palette
-roles** ([color-palettes.md](color-palettes.md)): choosing another palette recolors them. After an update from the
-classic tool bar the first pen has the pen's color and width of before, the eraser its kind, the text box the font.
+roles** ([color-palettes.md](color-palettes.md)): choosing another palette recolors them. **After an update** from
+the classic tool bar (a settings file without a toolbox, whatever its `toolbarMode` says: `classic`, `toolbox` or
+nothing; `AppController::migratedToolbox`) the first pen has the pen's color and width of before, the highlighter its
+width, the eraser its kind, the text box the font, the shape the one used last; the first pen is in hand at the
+start.
 
 | Gesture | What it does |
 | --- | --- |
@@ -79,16 +90,16 @@ a Fold 7 unfolded, which arrive after its new size, left it folded with half the
 | Window | Toolbox |
 | --- | --- |
 | desktop, tablet (full chrome) | docked to its edge, taking its strip (`sideTools` at a side, `toolboxRow` at the top or the bottom); the right by default, also in tablet portrait (a 52 px rail leaves an A4 page well visible) |
-| full screen (the compact chrome), presenting with the tools | the same toolbox floating 8 px off its edge, rounded, as long as its tools; ⋯ at its end: present, present without controls, search, settings, leave full screen |
+| full screen (the compact chrome), presenting with the tools | the same toolbox floating 8 px off its edge, rounded, as long as its tools (it ends above the view pill); ⋯ at its end: present, present without controls, read only, search, settings, leave full screen. On a phone too (since 0.8.0: the classic tool square went): at the bottom upright (the view pill moves above it), at the right held sideways |
 | phone portrait | the dock at the bottom: undo, redo, the first tools that fit (the one in hand always among them), **My tools** (a sheet: every tool, "Add a tool", the other tools and commands; record audio under Insert), the page number |
 | phone held sideways | the same as a rail at the right |
 | a text document (`.md`) | no toolbox (no ink): undo and redo lead its format bar |
 | replaying the writing | no toolbox, and no command bar, its tab or phone dock either: the play bar only ([timeline.md](timeline.md)) |
 
-In the toolbox mode the tool bar at the top is a **command bar**: open, save, image, stickers, add a page, search, full
-screen, present, settings (New is the tab strip's "+"; recording is a fixed tool of the rail), and entries of ⋮ as
-buttons where there is room (one place each: ⋮ leaves out what the bar shows, and shows it again when the bar has no
-room for it). The classic tool square, the quick tools and the pen pill of full screen are classic only.
+The tool bar at the top is a **command bar**, one row: open, save, image, stickers, add a page, search, full screen,
+present, settings (New is the tab strip's "+"; recording is a fixed tool of the rail), and entries of ⋮ as buttons
+where there is room (one place each: ⋮ leaves out what the bar shows, and shows it again when the bar has no room for
+it). Its tab at the top edge puts it away (a slim strip brings it back); the toolbox stays then.
 
 ### The command bar (qt/ui-rework)
 
@@ -128,7 +139,10 @@ Weighed and left where they are (one place each):
 **A text document's format bar** (with the toolbox): undo and redo at its start, then the formatting, then the commands
 that fit, then » and ⋮. One ladder for both: the inserts go into "+ Insert" first, then the commands of low priority
 into », then the headings into one button, then search, full screen and save into » too; only then the row scrolls. At
-1366 px search, full screen and save stay. Find and replace adds no button to this ladder: it is the search bar's
+1366 px search, full screen and save stay; at 1920 all commands; below 800 px (with undo and redo at its start) the
+folded row scrolls a little. (qt/classic-removal: the room the commands take was counted as nothing, so a text document
+kept all of them and its row scrolled at 960 px, the lists out of sight; found once the layout tests ran with the
+toolbox.) Find and replace adds no button to this ladder: it is the search bar's
 second row (Ctrl+H, the bar's replace button, ⋮ → Find and replace; [md-editor.md](md-editor.md)).
 
 ## Reading and presenting
@@ -139,14 +153,14 @@ prev page with big touch areas on the left and right side of the screen." So rea
 (qt/ui-rework): it is **read only**, a toggle of full screen and of presenting. The reading pill is gone.
 
 - **Read only** (`win.readOnly`; on where `win.readOnlyOffered`: full screen, the compact chrome, presenting): the
-  floating toolbox's ⋯ → "Read only", the compact chrome's tools (the classic tool square's popup, phones' full
-  screen), **Ctrl+Alt+R** (a shortcut of its own, changeable), and **⋮ → View → Read**, which enters full screen with
+  floating toolbox's ⋯ → "Read only" (on a phone too), **Ctrl+Alt+R** (a shortcut of its own, changeable), and
+  **⋮ → View → Read**, which enters full screen with
   it on (so does Ctrl+Alt+R in a window). While it is on:
   - the page cannot be written on (`DocumentCanvas.readingOnly`): the pen and the fingers scroll, PDF text can still be
     selected, copied and looked up (decided: selecting text writes nothing, and reading is where one copies a quote);
     no ink by accident;
-  - the tools are hidden (`win.toolsHidden`: the floating toolbox, the classic tool square and pen pill); the view
-    pill (the page number, the zoom and its fits, the page layout) stays, as in full screen;
+  - the tools are hidden (`win.toolsHidden`: the floating toolbox); the view pill (the page number, the zoom and its
+    fits, the page layout) stays, as in full screen;
   - **big tap fields at the left and right edges**: a fifth of the page's width each (at least 48 px), its whole height,
     invisible. A tap there goes to the previous or the next page (in full screen to its top, presenting: the slide); a
     short arrow appears at that edge. The page finds the taps itself (`DocumentCanvas.edgeTapWidth`, `edgeTapped`;
@@ -185,8 +199,8 @@ close when a tool is taken in them; their buttons stay while they are open.
 
 ## Line styles
 
-The samples of a line style (the editor's four buttons, its preview, the ink of a tool on the rail, the classic pen's
-options) are drawn by `LineStyles.js`. Two things of Qt's Canvas made them all solid once (the author, 2026-10-05:
+The samples of a line style (the editor's four buttons, its preview, the ink of a tool on the rail) are drawn by
+`LineStyles.js`. Two things of Qt's Canvas made them all solid once (the author, 2026-10-05:
 "the dashed and dotted line buttons just show a regular line"): `setLineDash()` takes only a JavaScript array, and a
 list that came through a model (a Repeater's `modelData.dashes`) is silently ignored; and, like `QPen`, it measures
 the dashes in widths of the line, not in pixels, so upstream's `[6, 3]` on a 2.6 px sample of 17 px is one dash. The
@@ -218,8 +232,9 @@ the tool still has the color the entry gave it. Widths are points, 0.1 to 150. T
 width of their own: the nearest size is taken. Unknown fields and kinds are dropped; broken JSON gives the first
 tools. The last eraser cannot be removed.
 
-`toolbarMode` (`toolbox` or `classic`; Settings → Pen → Tools, with "Back to the first tools…"). While it is not set,
-`XQT_TOOLBAR_MODE` gives the default; the shell, canvas and UI tests of before set it to `classic`.
+Settings → Pen → Tools: "Back to the first tools…" (the toolbox of a first start). The setting `toolbarMode` and
+`XQT_TOOLBAR_MODE` of before 0.8.0 are not read any more (a stored `toolbarMode` stays in the file, unused); the
+shell, canvas and UI tests run with the toolbox.
 
 ## Code
 
@@ -237,10 +252,15 @@ tools. The last eraser cannot be removed.
 
 ## Tests
 
-`CopyToolsTest.*` (`-L ui`): the snip button among the fixed tools, not in the select list (the classic bar keeps
-them there), the text tools' cycle. `ToolboxModel.*` and `ToolboxApply.*` (`-L shell`), `ViewSnapping.*` (`-L canvas`), `ToolboxTest.*` (`-L ui`): docked
-at the right with undo / redo and the fixed tools, a tap and the tool in hand, the edges per size class, stacks in a
-short rail, the classic bar back, the editor, "+", the menu, carrying a tool and the grip, full screen and presenting,
+Since 0.8.0 every UI, shell and canvas test runs with the toolbox (the classic bar's tests moved to it, or went with
+it where they tested what is gone: the five widths of the bar, the pen pill, the tool square).
+`ToolboxApply.aSettingsFileOfTheClassicToolBarGetsTheToolboxWithTheToolsOfBefore` (`-L shell`): a settings file of
+0.7.0 with `toolbarMode` `classic` (or nothing) and no toolbox gets the first tools with the pen, the eraser and the text
+box of before, the pen in hand, E and T taking its entries.
+`CopyToolsTest.*` (`-L ui`): the snip button among the fixed tools, not in the select list, the text tools' cycle.
+`ToolboxModel.*` and `ToolboxApply.*` (`-L shell`), `ViewSnapping.*` (`-L canvas`), `ToolboxTest.*` (`-L ui`): docked
+at the right with undo / redo and the fixed tools (the classic buttons gone), a tap and the tool in hand, the edges per
+size class, stacks in a short rail, the editor, "+", the menu, carrying a tool and the grip, full screen and presenting,
 the phone's dock and sheet, the command bar's promoted entries, a text document's format bar, reading; the rail fills
 its room at the Fold 7's sizes (900 × 1000, 1000 × 900, the dock at 412 × 915 and 915 × 412) with the touch profile,
 with and without a phone's insets, and plans anew when folded, unfolded, turned and when the insets change at one

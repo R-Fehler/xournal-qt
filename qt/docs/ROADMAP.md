@@ -1085,6 +1085,19 @@
   the fixed tools. Tested at the Fold's sizes with the touch profile and a phone's insets, and folded → unfolded →
   turned → folded ([toolbox.md](toolbox.md)).
 
+- **The classic tool bar removed, `qt/classic-removal` (2026-10-06, for 0.8.0).** The author: "let's get rid of all the
+  other ui variants we have. Remove the classic toolbar to not drag dead weight as well." Gone: the classic bar's tools,
+  colour strip and widths (and their ladder in `ToolBarPlan.js`), its places (two rows, a rail at a side, the bottom),
+  the tool square of full screen and its quick tools, the pen pill and its color chooser, the classic dock of a phone,
+  `toolbarMode` (Settings → Pen → Tools) and `XQT_TOOLBAR_MODE`, and the C++ only they used (`penColors`, the pen
+  pill's place, `toolbarPosition`, adding and removing toolbar colors). The toolbox is the only arrangement: the bar at
+  the top is one row of commands, the toolbox floats in full screen on a phone too, a settings file that chose the
+  classic bar gets the toolbox made from its tools of before. Every shell, canvas and UI test runs with the toolbox
+  now; that found three faults of the toolbox, fixed: its lines were 1.5 device pixels at 150 %, a text document's
+  format bar kept every command (their width counted as nothing) and scrolled its lists away at 960 px, and the rail
+  floating at a side met the view pill. The palette's source moved to Settings → Pen → Colors
+  ([toolbox.md](toolbox.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

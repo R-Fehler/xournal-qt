@@ -1,8 +1,8 @@
 /*
  * xournal-qt: the toolbox in the real window (qt/docs/toolbox.md): the user's own tools in a rail docked to a side of
  * the canvas (right by default), undo and redo at its head, the fixed tools lent to it; a tap picks a tool up, sections
- * fold into stacks when the rail is short, the edge is chosen per window size. The classic tool bar comes back with
- * toolbarMode=classic.
+ * fold into stacks when the rail is short, the edge is chosen per window size. (The classic tool bar was removed in
+ * 0.8.0: the toolbox is the only one.)
  *
  * @license GNU GPLv2 or later
  */
@@ -54,7 +54,6 @@ protected:
     void SetUp() override {
         controller = std::make_unique<AppController>();
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
-        settings()->set("toolbarMode", "toolbox");
         settings()->resetLayoutChoices();
         controller->toolboxModel()->reset();
         controller->setColorPalette("classic");
@@ -77,7 +76,6 @@ protected:
     }
     void TearDown() override {
         settings()->resetLayoutChoices();
-        settings()->set("toolbarMode", "classic");  // (the other UI tests keep the classic bar)
         controller->shutdown();
         engine.reset();
         controller.reset();
@@ -376,11 +374,11 @@ TEST_F(ToolboxTest, dockedAtTheRightWithUndoAndRedoAndTheFixedTools) {
     }
     EXPECT_EQ(shown(find("toolboxFixedStack")), fixedShown < 7);
     EXPECT_TRUE(shown(find("toolboxAddButton")));
-    // The classic tools are not in the command bar
-    for (const char* name: {"penButton", "eraserButton", "shapeButton", "textButton", "stickyNoteButton"}) {
-        EXPECT_FALSE(shown(find(name))) << name;
+    // The classic tools are gone (0.8.0): the toolbox's entries are the pens, erasers, shapes, text boxes and notes
+    for (const char* name: {"penButton", "eraserButton", "shapeButton", "textButton", "stickyNoteButton",
+                            "colorStrip", "widthStrip"}) {
+        EXPECT_EQ(find(name), nullptr) << name;
     }
-    EXPECT_FALSE(shown(find("colorStrip")));
     EXPECT_TRUE(shown(find("searchButton"))) << "the commands stay at the top";
 
     // Undo from the rail
@@ -557,21 +555,6 @@ TEST_F(ToolboxTest, theRailPlansAnewWhenThePhoneIsFoldedUnfoldedAndTurned) {
     expectRailFills("unfolded, the insets after the size", true);
     EXPECT_EQ(rail().cells, unfolded.cells) << "as many as unfolded with the insets at once";
     touchProfile("auto");
-}
-
-TEST_F(ToolboxTest, theClassicBarComesBackWithItsSetting) {
-    settings()->set("toolbarMode", "classic");
-    until([&] { return !shown(find("toolbox")) && shown(find("penButton"))
-                       && find("handButton")->width() == find("handButton")->implicitWidth(); });
-    EXPECT_FALSE(shown(find("toolbox")));
-    EXPECT_TRUE(shown(find("penButton")));
-    EXPECT_TRUE(shown(find("handButton")));
-    EXPECT_FALSE(inside(find("handButton"), find("toolbox")));
-    EXPECT_TRUE(shown(find("toolUndoButton")));
-    EXPECT_EQ(find("handButton")->width(), find("handButton")->implicitWidth()) << "its own size again";
-    settings()->set("toolbarMode", "toolbox");
-    until([&] { return shown(find("toolbox")) && inside(find("handButton"), find("toolbox")); });
-    EXPECT_TRUE(inside(find("handButton"), find("toolbox")));
 }
 
 TEST_F(ToolboxTest, aTapOnTheToolInHandOpensItsEditorAndAChangeIsTakenAtOnce) {
@@ -932,8 +915,8 @@ TEST_F(ToolboxTest, inFullScreenTheSameToolboxFloatsAndPresentingHidesIt) {
     });
     ASSERT_TRUE(shown(box));
     EXPECT_TRUE(box->property("floating").toBool());
-    EXPECT_FALSE(shown(find("quickToolSquare"))) << "the classic tool square is not there";
-    EXPECT_FALSE(shown(find("penPill")));
+    EXPECT_EQ(find("quickToolSquare"), nullptr) << "the classic tool square is gone";
+    EXPECT_EQ(find("penPill"), nullptr);
     EXPECT_FALSE(shown(find("topTools")));
     const QRectF r = rectOf(box);
     EXPECT_NEAR(r.right(), window->width() - 8, 2) << "8 px off the right edge";
@@ -1152,8 +1135,6 @@ protected:
         EXPECT_TRUE(win("reading").toBool());
         EXPECT_TRUE(canvas->property("readingOnly").toBool());
         EXPECT_FALSE(shown(find("toolbox"))) << "no tools";
-        EXPECT_FALSE(shown(find("quickToolSquare")));
-        EXPECT_FALSE(shown(find("penPill")));
         EXPECT_EQ(find("readingPill"), nullptr) << "the reading pill is gone";
         EXPECT_TRUE(shown(find("readOnlyMark"))) << "the lock says so";
         // The fields: a fifth of the width at each edge, the page's whole height

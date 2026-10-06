@@ -9,9 +9,8 @@ ask the user whether they also want to paste a link to the source document and p
 
 - **Where:** with the toolbox, a **fixed tool of the rail** after select (qt/copy-tools, the author: "Snip should be
   one click away … not hidden behind the normal select tool"): its icon is its shape, a tap snips, a tap while it is
-  armed takes the other shape (remembered); held: both shapes and the resolution. In the classic tool bar: the select
-  button's list (press and hold, or right-click): "Snip a rectangle (copy its picture)" and "Snip with the lasso".
-  Everywhere: the image button's list (press and hold, or right-click): "Snip from a page (copy a picture)" and "Snip
+  armed takes the other shape (remembered); held: both shapes and the resolution. (The classic tool bar had them in the
+  select button's list until 0.8.0.) Everywhere: the image button's list (press and hold, or right-click): "Snip from a page (copy a picture)" and "Snip
   with the lasso" (a tap on it still opens the file picker); the keys **Shift+S** (rectangle) and **Shift+L** (lasso),
   changeable in the shortcut sheet; a **Snip** entry of one's own in the toolbox ("+" → Snip, qt/ui-rework). A tap on
   the select button still goes rectangle ↔ lasso, and a snip is never remembered as the select button's variant.
@@ -77,8 +76,8 @@ ask the user whether they also want to paste a link to the source document and p
 
 Tests: `RegionRender.*` (`-L unit`: the ink and the PDF in the area at their place, only the part on the page, the
 background alone, the lasso's transparency, the scale and the size limit), `CopyToolsTest.snipHasAButtonOfItsOwn`
-(`-L ui`: the rail's button, its cycle, Shift+S, not in the select list; the classic bar's list), `SnipTest.*` (`-L ui`:
-the resolution's effect on the picture's size and the note, the limit at the screen's; the select list and
+(`-L ui`: the rail's button, its cycle, Shift+S, not in the select list), `SnipTest.*` (`-L ui`:
+the resolution's effect on the picture's size and the note, the limit at the screen's; the snip button's list and
 the image menu, the clipboard's formats and source, the tool given back, Escape and other tools, a view for reading
 only, the pasted size and the link marker, no offer without a file, the Markdown link in a `.md`).
 

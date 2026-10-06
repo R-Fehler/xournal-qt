@@ -106,6 +106,7 @@
 #include "shell/TabManager.h"
 #include "shell/PageSketches.h"
 #include "shell/Thumbnails.h"
+#include "shell/ToolboxModel.h"
 #include "util/PathUtil.h"
 
 #include "AppController.h"
@@ -205,6 +206,26 @@ protected:
         QTest::mouseClick(window, Qt::LeftButton, m,
                           item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
         wait(50);
+    }
+    /// The toolbox (qt/docs/toolbox.md): the id of its `n`th entry of a type ("pen", "highlighter", "eraser", "shape",
+    /// "text", "sticky", "laser", "snip"), and its button on the rail
+    QString toolEntryId(const QString& type, int n = 0) const {
+        for (const QVariant& v: controller->toolboxModel()->tools()) {
+            if (v.toMap().value("type") == type && n-- == 0) {
+                return v.toMap().value("id").toString();
+            }
+        }
+        return {};
+    }
+    QQuickItem* toolEntry(const QString& id) const { return findItem(("toolEntry_" + id).toUtf8().constData()); }
+    /// The entry's button on the rail, or the stack that shows it where its section is folded (a short rail)
+    QQuickItem* onRail(const QString& id) const {
+        QQuickItem* b = toolEntry(id);
+        if (b && b->isVisible()) {
+            return b;
+        }
+        QQuickItem* stack = findItem(("toolStack_" + id).toUtf8().constData());
+        return stack && stack->isVisible() ? stack : nullptr;
     }
     /// An entry of a menu by its name (entries made by a Repeater are not found through the objects' parents)
     static QObject* entryOf(QObject* menu, const char* name) {
@@ -471,12 +492,13 @@ TEST_F(MainWindowTest, thePointerOverThePageIsADotOrTheCrosshair) {
 }
 
 // Drawing with the finger: a toggle in the tool bar and the same setting in Settings -> Touch (off on the desktop).
-TEST_F(MainWindowTest, fingerDrawingIsAToggleInTheToolBarAndASetting) {
+TEST_F(MainWindowTest, fingerDrawingIsAToggleInTheToolboxAndASetting) {
     auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
     ASSERT_NE(settings, nullptr);
     EXPECT_FALSE(settings->get("touchDrawing").toBool()) << "off by default";
+    window->resize(1920, 1200);  // (the rail has room for every fixed tool on its own)
     controller->newDocument();
-    auto* button = findItem("touchDrawingButton");
+    auto* button = find<QQuickItem>("touchDrawingButton");
     ASSERT_NE(button, nullptr);
     until([&] { return button->isVisible(); });
     EXPECT_FALSE(button->property("checked").toBool());
@@ -2569,7 +2591,7 @@ TEST_F(HomeScreenMarkdownTest, aMarkdownFileIsWrittenInAndSavedBack) {
     }
     ASSERT_TRUE(controller->openPath(QString::fromStdString(file.string())));
     wait(100);
-    EXPECT_FALSE(findItem("eraserButton")->isVisible()) << "no ink tools for a text file";
+    EXPECT_FALSE(find<QQuickItem>("toolbox")->isVisible()) << "no ink tools for a text file";
     auto* canvas = find<QQuickItem>("canvas");
     click(canvas);  // the cursor goes where the page was clicked
     type("Hello");
@@ -2619,12 +2641,13 @@ TEST_F(HomeScreenMarkdownTest, theUndoAndRedoButtonsFollowTheTextBeingWritten) {
     xqt::MarkdownEditor* editor = view->getMarkdownEditor();
     ASSERT_NE(editor, nullptr);
     const std::string before = editor->text();
-    auto* undoButton = find<QQuickItem>("undoButton");
-    auto* redoButton = find<QQuickItem>("redoButton");
+    auto* undoButton = find<QQuickItem>("formatUndoButton");
+    auto* redoButton = find<QQuickItem>("formatRedoButton");
     ASSERT_NE(undoButton, nullptr);
     ASSERT_NE(redoButton, nullptr);
-    ASSERT_TRUE(redoButton->isVisible()) << "a text document: in the view pill (its tool bar is in the format bar)";
+    ASSERT_TRUE(redoButton->isVisible()) << "a text document: at the start of its format bar (its commands are there)";
     EXPECT_FALSE(find<QQuickItem>("toolUndoButton")->isVisible()) << "one place at a time";
+    EXPECT_FALSE(find<QQuickItem>("redoButton")->isVisible()) << "not in the view pill either";
     EXPECT_FALSE(controller->canRedo());
 
     type("Hello");
@@ -3005,11 +3028,17 @@ TEST_F(HomeScreenFilterTest, textFilesAndImagesOpenExternally) {
     click(find<QQuickItem>("canvas"));
     type("x");
     ASSERT_TRUE(controller->modified());
-    // (a .md being written: its tool bar is merged into the format bar, the button in "more tools")
-    ASSERT_TRUE(findItem("moreToolsButton")->isVisible());
-    click(findItem("moreToolsButton"));
-    ASSERT_TRUE(waitOpened(find("moreToolsPopup"), true));
-    click(find<QQuickItem>("openExternallyButton"));
+    // (a .md being written: its command bar is merged into the format bar; the button at its end where there is room,
+    // else in "more tools")
+    auto* external = find<QQuickItem>("openExternallyButton");
+    ASSERT_NE(external, nullptr);
+    if (!external->isVisible()) {
+        ASSERT_TRUE(findItem("moreToolsButton")->isVisible());
+        click(findItem("moreToolsButton"));
+        ASSERT_TRUE(waitOpened(find("moreToolsPopup"), true));
+    }
+    ASSERT_TRUE(external->isVisible());
+    click(external);
     auto* dialog = find<QObject>("externalSaveDialog");
     ASSERT_NE(dialog, nullptr);
     ASSERT_TRUE(waitOpened(dialog, true));
@@ -3294,88 +3323,76 @@ TEST_F(MainWindowTest, fourOrFiveFingersShowThePagesOrTheDocuments) {
     EXPECT_FALSE(overviewShown());
 }
 
-TEST_F(MainWindowTest, fiveWidthsInTheToolBar) {
-    window->setWidth(1920);  // room for the whole tool bar (full HD)
-    wait(100);
-    auto* fifth = findItem("customSizeButton");
-    ASSERT_NE(fifth, nullptr);
-    click(findItem("sizeButton4"));
-    EXPECT_EQ(controller->size(), 4) << "the fourth width (very thick)";
-
-    click(fifth);  // the fifth: the tool's own width
-    EXPECT_EQ(controller->size(), 5);
-    const double before = controller->customWidth();
-    EXPECT_GT(before, 0);
-
-    click(fifth);  // again: change it
-    auto* popup = find<QObject>("customWidthPopup");  // a Popup is no Item
-    ASSERT_NE(popup, nullptr);
-    EXPECT_TRUE(popup->property("visible").toBool());
-    click(findItem("customWidthMore"));
-    EXPECT_GT(controller->customWidth(), before);
-    click(findItem("customWidthLess"));
-    click(findItem("customWidthLess"));
-    EXPECT_LT(controller->customWidth(), before);
-    EXPECT_EQ(controller->size(), 5);
-}
-
-TEST_F(MainWindowTest, toolbarMovesToTheLeftOrRight) {
-    auto* gridButton = find<QQuickItem>("penButton");  // a tool bar button
+// The toolbox docked at the left or right side, or the top (⋮ → View → Toolbox position; the right by default); the
+// page sidebar stays right of it at the left. (The classic tool bar's places went with it in 0.8.0.)
+TEST_F(MainWindowTest, theToolboxMovesToTheLeftOrRightOrTheTop) {
+    auto* box = find<QQuickItem>("toolbox");
     auto* canvas = find<QQuickItem>("canvas");
-    ASSERT_NE(gridButton, nullptr);
+    ASSERT_NE(box, nullptr);
+    until([&] { return box->isVisible(); });
     auto sceneX = [](QQuickItem* i) { return i->mapToScene(QPointF(0, 0)).x(); };
-    const double canvasWidthOnTop = canvas->width();
+    EXPECT_GT(sceneX(box), window->width() - 80) << "the right by default";
+    EXPECT_LE(sceneX(canvas) + canvas->width(), sceneX(box) + 1);
+    const double canvasWidthAtTheRight = canvas->width();
 
-    controller->setToolbarPosition("left");
-    wait(50);
-    EXPECT_LT(sceneX(gridButton), 110);
-    EXPECT_GT(gridButton->mapToScene(QPointF(0, 0)).y(), 0) << "below the tab strip, not in the header";
-    EXPECT_LT(canvas->width(), canvasWidthOnTop);
-    EXPECT_GE(sceneX(find<QQuickItem>("sidebar")), 100) << "the page sidebar right of the tools";
+    QMetaObject::invokeMethod(window, "chooseToolboxEdge", Q_ARG(QVariant, QString("left")));
+    until([&] { return sceneX(box) < 10; });
+    EXPECT_LT(sceneX(box), 10);
+    EXPECT_GT(box->mapToScene(QPointF(0, 0)).y(), 0) << "below the tab strip, not in the header";
+    EXPECT_GE(sceneX(find<QQuickItem>("sidebar")), box->width() - 1) << "the page sidebar right of the tools";
+    EXPECT_GE(sceneX(canvas), box->width() - 1);
 
-    controller->setToolbarPosition("right");
-    wait(50);
-    EXPECT_GT(sceneX(gridButton), window->width() - 110);
-    EXPECT_LE(sceneX(canvas) + canvas->width(), window->width() - 100);
+    QMetaObject::invokeMethod(window, "chooseToolboxEdge", Q_ARG(QVariant, QString("top")));
+    until([&] { return box->width() > window->width() / 2; });
+    EXPECT_GT(canvas->width(), canvasWidthAtTheRight) << "the whole width for the pages";
+    EXPECT_GE(canvas->mapToScene(QPointF(0, 0)).y(), box->mapToScene(QPointF(0, box->height())).y() - 1);
 
-    controller->setToolbarPosition("top");
-    wait(50);
-    EXPECT_DOUBLE_EQ(canvas->width(), canvasWidthOnTop);
-    EXPECT_EQ(controller->toolbarPosition(), "top");
+    QMetaObject::invokeMethod(window, "chooseToolboxEdge", Q_ARG(QVariant, QString("right")));
+    until([&] { return sceneX(box) > window->width() - 80; });
+    EXPECT_DOUBLE_EQ(canvas->width(), canvasWidthAtTheRight);
 }
 
-TEST_F(MainWindowTest, fullScreenShowsOnlyTheCurrentTool) {
-    auto* square = find<QQuickItem>("quickToolSquare");
-    ASSERT_NE(square, nullptr);
-    EXPECT_FALSE(square->isVisible());
+// Full screen (F11): no tab strip, command bar or page sidebar; the toolbox floats over the page and the view pill
+// stays. A tool is taken there as in the window. (The classic tool square of full screen went in 0.8.0.)
+TEST_F(MainWindowTest, fullScreenShowsTheToolboxFloatingOverThePage) {
+    auto* box = find<QQuickItem>("toolbox");
+    ASSERT_NE(box, nullptr);
+    until([&] { return box->isVisible(); });
+    EXPECT_FALSE(box->property("floating").toBool());
+    EXPECT_EQ(find<QQuickItem>("quickToolSquare"), nullptr);
     key(Qt::Key_F11);
     EXPECT_TRUE(window->property("fullScreenMode").toBool());
-    EXPECT_TRUE(square->isVisible());
+    until([&] { return box->isVisible() && box->property("floating").toBool(); });
+    EXPECT_TRUE(box->isVisible());
+    EXPECT_TRUE(box->property("floating").toBool());
     EXPECT_FALSE(find<QQuickItem>("sidebar")->isVisible());
-    auto* gridButton = find<QQuickItem>("penButton");  // a tool bar button
-    EXPECT_FALSE(gridButton->isVisible()) << "the tools are hidden";
+    EXPECT_FALSE(find<QQuickItem>("topTools")->isVisible()) << "the commands are put away";
     EXPECT_TRUE(find<QQuickItem>("viewPill")->isVisible()) << "page number, zoom and the page grid stay";
 
-    // Tap the square: all tools; choosing one closes them
-    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, square->mapToScene(QPointF(28, 28)).toPoint());
-    QObject* tools = find("quickTools");
-    ASSERT_TRUE(waitOpened(tools, true));
-    QQuickItem* eraser = nullptr;
-    for (auto* i: window->contentItem()->window()->findChildren<QQuickItem*>()) {
-        if (i->property("iconName").toString() == "xopp-tool-eraser" && i->isVisible()) {
-            eraser = i;
-        }
-    }
-    ASSERT_NE(eraser, nullptr);
-    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
-                      eraser->mapToScene(QPointF(eraser->width() / 2, eraser->height() / 2)).toPoint());
+    // A tap on a tool of the floating rail takes it (on a short screen its sections are folded into stacks: the one of
+    // the tool in hand lists the others)
+    controller->takeToolOfType("eraser");
     EXPECT_EQ(controller->tool(), "eraser");
-    EXPECT_TRUE(waitOpened(tools, false));
+    const QString pen = toolEntryId("pen");
+    const QString eraser = toolEntryId("eraser");
+    until([&] { return onRail(pen) != nullptr || onRail(eraser) != nullptr; });
+    if (QQuickItem* b = onRail(pen)) {
+        click(b);
+    } else {
+        click(onRail(eraser));  // (a tap on the stack of the tool in hand: its list)
+        QQuickItem* inList = nullptr;
+        until([&] { return (inList = findItem(("stackEntry_" + pen).toUtf8().constData())) && inList->isVisible(); });
+        ASSERT_NE(inList, nullptr);
+        click(inList);
+    }
+    EXPECT_EQ(controller->tool(), "pen");
+    EXPECT_EQ(controller->toolboxModel()->active(), pen);
 
     key(Qt::Key_Escape);  // leaves full screen
     EXPECT_FALSE(window->property("fullScreenMode").toBool());
-    EXPECT_TRUE(gridButton->isVisible());
-    controller->selectTool("pen");
+    until([&] { return !box->property("floating").toBool(); });
+    EXPECT_FALSE(box->property("floating").toBool()) << "docked again";
+    EXPECT_TRUE(find<QQuickItem>("topTools")->isVisible());
 }
 
 // Full screen from a button in the tool bar, and back out with the finger alone (no F11, no Escape)
@@ -3397,18 +3414,16 @@ TEST_F(MainWindowTest, fullScreenButtonAndBackByTouch) {
     until([&] { return window->property("fullScreenMode").toBool(); });
     ASSERT_TRUE(window->property("fullScreenMode").toBool()) << "the button goes full screen";
 
-    // The way back: the tool square, then "Leave full screen"
-    auto* square = find<QQuickItem>("quickToolSquare");
-    ASSERT_NE(square, nullptr);
-    ASSERT_TRUE(square->isVisible());
-    tap(square);
-    QObject* tools = find("quickTools");
-    ASSERT_TRUE(waitOpened(tools, true));
-    EXPECT_FALSE(button->isVisible()) << "not twice: the tools offer \"Leave full screen\" right below";
-    auto* leave = findItem("leaveFullScreenButton");
-    if (!leave) {
-        leave = find<QQuickItem>("leaveFullScreenButton");
-    }
+    // The way back: ⋯ at the end of the floating toolbox, then "Leave full screen"
+    auto* more = find<QQuickItem>("toolboxMoreButton");
+    ASSERT_NE(more, nullptr);
+    until([&] { return more->isVisible(); });
+    ASSERT_TRUE(more->isVisible());
+    tap(more);
+    QObject* menu = find("toolboxMoreMenu");
+    ASSERT_TRUE(waitOpened(menu, true));
+    EXPECT_FALSE(button->isVisible()) << "not twice: the menu offers \"Leave full screen\"";
+    auto* leave = qobject_cast<QQuickItem*>(entryOf(menu, "toolboxLeaveFullScreenItem"));
     ASSERT_NE(leave, nullptr);
     ASSERT_TRUE(leave->isVisible());
     tap(leave);
@@ -3651,14 +3666,15 @@ TEST_F(MainWindowTest, zoomPercentageTapDoubleTapAndHold) {
     EXPECT_EQ(controller->zoomPercent(), wide) << "Ctrl+0: the width";
 }
 
+// The command bar is put away by the tab on its edge, and back by a slim strip; the toolbox stays where it is
 TEST_F(MainWindowTest, theToolBarCanBePutAway) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
-    auto* tools = find<QQuickItem>("sideTools");
-    auto* square = find<QQuickItem>("quickToolSquare");  // the small tool square
-    auto* pen = find<QQuickItem>("penButton");  // a tool bar button
-    ASSERT_NE(pen, nullptr);
-    EXPECT_TRUE(pen->isVisible());
+    auto* search = find<QQuickItem>("searchButton");  // a button of the command bar
+    auto* box = find<QQuickItem>("toolbox");
+    ASSERT_NE(search, nullptr);
+    until([&] { return search->isVisible() && box->isVisible(); });
+    EXPECT_TRUE(search->isVisible());
 
     // The little tab at the end of the bar puts it away
     auto* toggle = find<QQuickItem>("toolbarToggle");
@@ -3678,19 +3694,18 @@ TEST_F(MainWindowTest, theToolBarCanBePutAway) {
 
     controller->setToolbarHidden(true);
     wait(80);
-    EXPECT_FALSE(find<QQuickItem>("sideTools")->isVisible()) << "no bar at the side either";
-    ASSERT_NE(square, nullptr);
-    EXPECT_FALSE(square->isVisible()) << "the tool square is for full screen only";
+    EXPECT_FALSE(search->isVisible()) << "the commands are away";
+    EXPECT_FALSE(find<QQuickItem>("topTools")->isVisible());
+    EXPECT_TRUE(box->isVisible()) << "the toolbox stays";
+    EXPECT_FALSE(box->property("floating").toBool());
 
     controller->setToolbarHidden(false);
     wait(80);
-    EXPECT_TRUE(pen->isVisible());
-    EXPECT_FALSE(square->isVisible());
-    (void)tools;
+    EXPECT_TRUE(search->isVisible());
 }
 
-// Docked at a side, the little tab points towards the bar it puts away, and the strip that brings the bar back is at
-// that side, pointing into the pages (where the bar will come from).
+// The little tab points up, towards the bar it puts away, and the strip that brings the bar back is at the top edge,
+// pointing into the pages (where the bar will come from). (The classic tool bar could be at a side; it went in 0.8.0.)
 TEST_F(MainWindowTest, theToolBarTabAndStripFollowTheDockSide) {
     auto* toggle = find<QQuickItem>("toolbarToggle");
     auto* show = find<QQuickItem>("toolbarShow");
@@ -3734,10 +3749,9 @@ TEST_F(MainWindowTest, theToolBarTabAndStripFollowTheDockSide) {
         const char* hideArrow;  // towards the bar
         const char* showArrow;  // from the bar into the pages
     };
-    for (const Case c: {Case{"top", "up", "down"}, Case{"left", "left", "right"}, Case{"right", "right", "left"}}) {
+    for (const Case c: {Case{"top", "up", "down"}}) {
         SCOPED_TRACE(c.position);
         controller->setToolbarHidden(false);
-        controller->setToolbarPosition(c.position);
         wait(60);
         ASSERT_TRUE(toggle->isVisible());
         EXPECT_EQ(pointsTo(toggle), c.hideArrow) << "the tab points towards the bar it puts away";
@@ -3764,54 +3778,6 @@ TEST_F(MainWindowTest, theToolBarTabAndStripFollowTheDockSide) {
         until([&] { return !controller->toolbarHidden(); });
         EXPECT_FALSE(controller->toolbarHidden()) << "a tap on the strip brings the bar back";
     }
-    controller->setToolbarPosition("top");
-}
-
-TEST_F(MainWindowTest, penPillWithoutAToolBar) {
-    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
-    wait(50);
-    auto* pill = find<QQuickItem>("penPill");
-    ASSERT_NE(pill, nullptr);
-    EXPECT_FALSE(pill->isVisible()) << "the tool bar is there, no pill";
-
-    controller->setToolbarHidden(true);
-    controller->selectTool("pen");
-    wait(80);
-    EXPECT_TRUE(pill->isVisible());
-
-    // The colors of the pill
-    // (items a Repeater made have no QObject parent: through the item tree)
-    std::vector<QQuickItem*> colors;
-    std::function<void(QQuickItem*)> collect = [&](QQuickItem* item) {
-        for (QQuickItem* child: item->childItems()) {
-            if (child->objectName() == "penPillColor") {
-                colors.push_back(child);
-            }
-            collect(child);
-        }
-    };
-    collect(pill);
-    QQuickItem* second = colors.size() > 1 ? colors[1] : nullptr;
-    ASSERT_NE(second, nullptr) << "three colors to start with";
-    click(second);
-    EXPECT_EQ(controller->color(), QColor(0xff, 0x00, 0x00)) << "red";
-
-    // The width goes through the five of the tool bar, one per tap, and starts over after the fifth
-    const int size = controller->size();
-    click(findItem("penPillWidth"));
-    EXPECT_EQ(controller->size(), size >= 5 ? 1 : size + 1);
-    for (int i = 0; i < 4; ++i) {
-        click(findItem("penPillWidth"));
-    }
-    EXPECT_EQ(controller->size(), size) << "five taps: round once";
-    click(findItem("penPillTool"));
-    EXPECT_EQ(controller->tool(), "highlighter");
-    click(findItem("penPillTool"));
-    EXPECT_EQ(controller->tool(), "pen");
-
-    controller->setToolbarHidden(false);
-    wait(80);
-    EXPECT_FALSE(pill->isVisible());
 }
 
 TEST_F(MainWindowTest, ctrlShiftShortcutsWork) {
@@ -4567,11 +4533,14 @@ TEST_F(MainWindowTest, aPressOnTheCanvasClosesAnOpenMenu) {
     EXPECT_EQ(elements(), before) << "that press must not draw";
 }
 
-// The setsquare and the compass sit in the shapes menu (they are not a way of drawing, they lie on the page).
-TEST_F(MainWindowTest, theToolBarHasAStickyNoteButton) {
-    auto* button = find<QQuickItem>("stickyNoteButton");
+// A sticky note is a tool of the toolbox (its entry: a tap places a note in its color)
+TEST_F(MainWindowTest, theToolboxHasAStickyNote) {
+    window->resize(1920, 1200);  // (every tool of the rail on its own)
+    const QString sticky = toolEntryId("sticky");
+    ASSERT_FALSE(sticky.isEmpty());
+    QQuickItem* button = nullptr;
+    until([&] { return (button = toolEntry(sticky)) && button->isVisible(); });
     ASSERT_NE(button, nullptr);
-    until([&] { return button->isVisible(); });
     ASSERT_TRUE(button->isVisible());
     EXPECT_FALSE(controller->noteSelected());
     click(button);
@@ -4582,11 +4551,12 @@ TEST_F(MainWindowTest, theToolBarHasAStickyNoteButton) {
 TEST_F(MainWindowTest, theStickyNoteButtonPlacesANoteWithItsPill) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
-    window->setWidth(1920);  // (the button in sight)
+    window->resize(1920, 1200);  // (the toolbox's sticky note in sight)
     wait(100);
-    auto* item = find<QQuickItem>("stickyNoteButton");
+    const QString sticky = toolEntryId("sticky");
+    QQuickItem* item = nullptr;
+    until([&] { return (item = toolEntry(sticky)) && item->isVisible(); });
     ASSERT_NE(item, nullptr);
-    until([&] { return item->isVisible(); });
     click(item);
     until([&] { return controller->noteSelected(); });
     ASSERT_TRUE(controller->noteSelected()) << "the new note is selected";
@@ -4981,7 +4951,7 @@ TEST_F(MainWindowTest, theGeometryButtonPutsTheSetsquareOnThePage) {
     qobject_cast<xqt::SettingsModel*>(controller->settingsModel())->set("toolVariants", "");  // (the setsquare first)
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
-    window->setWidth(1920);  // (the button in sight)
+    window->resize(1920, 1200);  // (the button in sight: every fixed tool of the toolbox on its own)
     wait(100);
     auto* item = find<QQuickItem>("geometryButton");
     ASSERT_NE(item, nullptr);
@@ -5063,7 +5033,7 @@ TEST_F(MainWindowTest, theGeometryButtonPutsTheSetsquareOnThePage) {
 TEST_F(MainWindowTest, theCurtainComesWithBAndTheSetsquaresList) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
-    window->setWidth(1920);  // (the setsquare button in sight)
+    window->resize(1920, 1200);  // (the setsquare button in sight: a fixed tool of the toolbox)
     wait(100);
     EXPECT_TRUE(controller->curtain().isEmpty());
     key(Qt::Key_B);
@@ -5361,257 +5331,242 @@ TEST_F(MainWindowTest, aLongPressOnPdfTextAlsoOffersPaste) {
     xqt::PenHover::instance().reset();
 }
 
-// The eraser is a cycling button: a tap takes the eraser as it erased last; tapped again, the next way (standard,
-// whiteout, whole strokes); held or right-clicked, all of them with their names. Its size: the widths of the bar.
-TEST_F(MainWindowTest, theEraserButtonCyclesHowItErases) {
+// The eraser is a tool of the toolbox: a tap takes it with its kind (standard, whiteout, whole strokes) and its size,
+// as its editor (a tap on it in hand) sets them; E takes it as it erased last. (The classic bar's cycling eraser button
+// went in 0.8.0.)
+TEST_F(MainWindowTest, theEraserEntryErasesTheWayItsEditorSays) {
     auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
     settings->set("eraserMode", "default");
-    auto* button = find<QQuickItem>("eraserButton");
-    ASSERT_NE(button, nullptr);
+    window->resize(1920, 1200);  // (every tool of the rail on its own)
+    wait(100);
     EXPECT_EQ(find<QObject>("eraserMenu"), nullptr) << "no menu of its own any more";
-    auto* menu = find<QObject>("eraserButtonVariants");
-    ASSERT_NE(menu, nullptr);
+    EXPECT_EQ(find<QObject>("eraserButton"), nullptr) << "the classic eraser button is gone";
+    const QString eraser = toolEntryId("eraser");
+    ASSERT_FALSE(eraser.isEmpty());
+    controller->takeToolOfType("pen");
+    QQuickItem* button = nullptr;
+    until([&] { return (button = toolEntry(eraser)) && button->isVisible(); });
+    ASSERT_NE(button, nullptr);
     click(button);
     EXPECT_EQ(controller->tool(), "eraser");
     EXPECT_EQ(settings->get("eraserMode").toString(), QStringLiteral("default")) << "the first tap takes the eraser";
-    EXPECT_FALSE(menu->property("visible").toBool());
-    click(button);
-    EXPECT_EQ(settings->get("eraserMode").toString(), QStringLiteral("whiteout")) << "the next way";
-    click(button);
-    EXPECT_EQ(settings->get("eraserMode").toString(), QStringLiteral("deleteStroke"));
-    EXPECT_EQ(button->property("iconName").toString(), QStringLiteral("xqt-eraser-stroke")) << "its icon says which";
-    click(button);
-    EXPECT_EQ(settings->get("eraserMode").toString(), QStringLiteral("default")) << "and round again";
 
-    // Another tool, then the eraser again: as it erased last
-    click(button);  // (whiteout)
-    controller->selectTool("pen");
+    // Its editor: the ways it erases
+    auto* editor = find<QObject>("toolEntryEditor");
+    ASSERT_NE(editor, nullptr);
     click(button);
+    ASSERT_TRUE(waitOpened(editor, true)) << "a tap on the tool in hand: its editor";
+    for (const char* kind: {"whiteout", "deleteStroke"}) {
+        QQuickItem* k = nullptr;
+        until([&] { return (k = findItem((std::string("editorEraser_") + kind).c_str())) && k->isVisible(); });
+        ASSERT_NE(k, nullptr) << kind;
+        click(k);
+        until([&] { return settings->get("eraserMode").toString() == kind; });
+        EXPECT_EQ(settings->get("eraserMode").toString(), QString(kind)) << "the tool in hand follows";
+        EXPECT_EQ(controller->toolboxModel()->entry(eraser).value("variant").toString(), QString(kind));
+        EXPECT_EQ(controller->tool(), "eraser");
+    }
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(editor, false));
+
+    // Another tool, then E: the eraser as it erased last
+    controller->takeToolOfType("pen");
+    EXPECT_EQ(controller->tool(), "pen");
+    key(Qt::Key_E);
     EXPECT_EQ(controller->tool(), "eraser");
-    EXPECT_EQ(settings->get("eraserMode").toString(), QStringLiteral("whiteout"));
-
-    // The right mouse button lists them, with another tool in hand
-    controller->selectTool("pen");
-    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier,
-                      button->mapToScene(QPointF(button->width() / 2, button->height() / 2)).toPoint());
-    until([&] { return menu->property("visible").toBool(); });
-    EXPECT_TRUE(menu->property("visible").toBool()) << "right click";
-    EXPECT_EQ(menu->property("title").toString(), QStringLiteral("Eraser")) << "named as the button";
-    ASSERT_NE(entryOf(menu, "variant_deleteStroke"), nullptr);
-    QMetaObject::invokeMethod(entryOf(menu, "variant_deleteStroke"), "triggered");
     EXPECT_EQ(settings->get("eraserMode").toString(), QStringLiteral("deleteStroke"));
-    EXPECT_EQ(controller->tool(), "eraser") << "choosing a way takes the eraser";
+    controller->toolboxModel()->update(eraser, {{"variant", "default"}});
     settings->set("eraserMode", "default");
-    controller->selectTool("pen");
+    controller->takeToolOfType("pen");
 }
 
-// The cycling buttons (qt/docs/adaptive-layout.md, "Cycling buttons"): pen ↔ highlighter, select rectangle ↔ lasso and
-// the shapes share a button each. A tap on the button in use takes the next variant; from another tool it takes the
-// one used last; a long press lists them (the multi-layer selections only there); the keys take a variant directly
-// and the button follows. What was used last is kept over a restart. The shapes menu is gone.
+// The cycling buttons (qt/docs/adaptive-layout.md, "Cycling buttons"): select rectangle ↔ lasso, the snips, the
+// setsquare and the text tools share a button each (fixed tools of the toolbox). A tap on the button in use takes the
+// next variant; from another tool it takes the one used last; a long press lists them (the multi-layer selections
+// only there); the keys take a variant directly and the button follows. What was used last is kept over a restart.
+// The shapes menu is gone; the pens, highlighters and shapes are the toolbox's entries (ToolboxTest).
 TEST_F(MainWindowTest, cyclingToolButtons) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
-    window->setWidth(1920);
+    window->resize(1920, 1200);
     wait(100);
-    controller->selectTool("pen");
-    controller->setDrawingType("default");
-    auto* pen = find<QQuickItem>("penButton");
+    controller->takeToolOfType("pen");
     auto* select = find<QQuickItem>("selectButton");
-    auto* shape = find<QQuickItem>("shapeButton");
-    ASSERT_NE(pen, nullptr);
     ASSERT_NE(select, nullptr);
-    ASSERT_NE(shape, nullptr);
+    until([&] { return select->isVisible(); });
     EXPECT_EQ(find<QObject>("setsquareItem"), nullptr) << "no shapes menu";
     EXPECT_EQ(find<QObject>("snapGridItem"), nullptr);
-    EXPECT_TRUE(pen->property("checked").toBool());
-    click(pen);
-    EXPECT_EQ(controller->tool(), "highlighter") << "the pen in use: a tap takes the highlighter";
-    EXPECT_EQ(pen->property("iconName").toString(), QStringLiteral("xopp-tool-highlighter"));
+    EXPECT_EQ(find<QObject>("penButton"), nullptr) << "the classic pen button is gone";
+    EXPECT_EQ(find<QObject>("shapeButton"), nullptr);
     click(select);
     EXPECT_EQ(controller->tool(), "selectRect");
-    EXPECT_FALSE(pen->property("checked").toBool());
-    click(pen);
-    EXPECT_EQ(controller->tool(), "highlighter") << "from another tool: the one used last";
-    key(Qt::Key_P);
-    EXPECT_EQ(controller->tool(), "pen");
-    EXPECT_EQ(pen->property("iconName").toString(), QStringLiteral("xopp-tool-pencil")) << "the key: the button follows";
-    click(select);
+    EXPECT_TRUE(select->property("checked").toBool());
     click(select);
     EXPECT_EQ(controller->tool(), "selectRegion") << "rectangle ↔ lasso";
+    key(Qt::Key_P);
+    EXPECT_EQ(controller->tool(), "pen") << "P: the toolbox's pen";
+    EXPECT_EQ(controller->toolboxModel()->active(), toolEntryId("pen"));
+    EXPECT_FALSE(select->property("checked").toBool());
+    click(select);
+    EXPECT_EQ(controller->tool(), "selectRegion") << "from another tool: the one used last";
+    key(Qt::Key_S);
+    EXPECT_EQ(controller->tool(), "selectRect");
+    EXPECT_EQ(select->property("currentKey").toString(), QStringLiteral("selectRect")) << "the key: the button follows";
+    key(Qt::Key_L);
+    EXPECT_EQ(controller->tool(), "selectRegion");
 
-    // The shapes: a long press lists them all; one picked, the pen draws it
-    auto* shapes = find<QObject>("shapeButtonVariants");
-    ASSERT_NE(shapes, nullptr);
-    QMetaObject::invokeMethod(shape, "pressAndHold");
-    until([&] { return shapes->property("visible").toBool(); });
-    ASSERT_TRUE(shapes->property("visible").toBool()) << "a long press: the list";
-    EXPECT_EQ(shapes->property("title").toString(), QStringLiteral("Shapes"));
-    ASSERT_NE(entryOf(shapes, "variant_arrow"), nullptr);
-    EXPECT_EQ(shapes->property("count").toInt(), 9)
-            << "the seven shapes (and the geometry's entry, not offered; the pen's options)";
-    QMetaObject::invokeMethod(entryOf(shapes, "variant_arrow"), "triggered");
-    until([&] { return !shapes->property("visible").toBool(); });
-    EXPECT_EQ(controller->drawingType(), QStringLiteral("arrow"));
-    EXPECT_EQ(controller->tool(), "pen");
-    EXPECT_TRUE(shape->property("checked").toBool());
-    EXPECT_FALSE(pen->property("checked").toBool()) << "the pen button is freehand";
-    click(shape);
-    EXPECT_EQ(controller->drawingType(), QStringLiteral("doubleArrow")) << "a tap: the next shape";
-    click(pen);
-    EXPECT_EQ(controller->drawingType(), QStringLiteral("default")) << "the pen button: freehand again";
-    click(pen);  // (the highlighter)
     // The multi-layer selections: in the list only
     auto* selects = find<QObject>("selectButtonVariants");
     ASSERT_NE(selects, nullptr);
     QMetaObject::invokeMethod(select, "pressAndHold");
     until([&] { return selects->property("visible").toBool(); });
+    EXPECT_EQ(selects->property("title").toString(), QStringLiteral("Select"));
+    EXPECT_EQ(entryOf(selects, "variant_snipRect"), nullptr) << "the snips have a button of their own";
     ASSERT_NE(entryOf(selects, "variant_selectMultiLayerRect"), nullptr);
     QMetaObject::invokeMethod(entryOf(selects, "variant_selectMultiLayerRect"), "triggered");
     EXPECT_EQ(controller->tool(), "selectMultiLayerRect");
     EXPECT_TRUE(select->property("checked").toBool());
+    QMetaObject::invokeMethod(selects, "close");
+    until([&] { return !selects->property("visible").toBool(); });
     click(select);
     EXPECT_EQ(controller->tool(), "selectRect") << "a tap from the list-only one: the first of the cycle";
+    click(select);
+    EXPECT_EQ(controller->tool(), "selectRegion");
 
-    // Kept over a restart: the highlighter, the double arrow
+    // Kept over a restart: the lasso
+    controller->takeToolOfType("pen");
     restart();
-    auto* again = find<QQuickItem>("penButton");
+    auto* again = find<QQuickItem>("selectButton");
     ASSERT_NE(again, nullptr);
-    EXPECT_EQ(again->property("iconName").toString(), QStringLiteral("xopp-tool-highlighter")) << "the one used last";
-    EXPECT_EQ(find<QQuickItem>("shapeButton")->property("iconName").toString(), QStringLiteral("xopp-draw-double-arrow"));
+    EXPECT_EQ(again->property("currentKey").toString(), QStringLiteral("selectRegion")) << "the one used last";
+    EXPECT_EQ(again->property("iconName").toString(), QStringLiteral("xopp-select-lasso"));
     auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
     settings->set("toolVariants", "");
-    controller->selectTool("pen");
 }
 
-// The pen's options (qt/pen-styles): the menu of the pen and shape buttons offers upstream's line styles while the pen
-// is in hand (the highlighter has none, as upstream); the pen keeps the one chosen, also over a restart.
-TEST_F(MainWindowTest, thePensMenuOffersItsLineStyles) {
+// The pen's options (qt/pen-styles): the editor of a pen of the toolbox offers upstream's line styles and the filling
+// (the highlighter has no line styles, as upstream; its filling stays); the entry keeps the style chosen, also over a
+// restart. (The classic pen button's menu went in 0.8.0.)
+TEST_F(MainWindowTest, thePensEditorOffersItsLineStyles) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
-    window->setWidth(1920);
+    window->resize(1920, 1200);
     wait(100);
-    controller->selectTool("pen");
-    controller->setDrawingType("default");
-    controller->setLineStyle("plain");
-    auto* pen = find<QQuickItem>("penButton");
-    auto* menu = find<QObject>("penButtonVariants");
-    ASSERT_NE(pen, nullptr);
-    ASSERT_NE(menu, nullptr);
-    QMetaObject::invokeMethod(pen, "pressAndHold");
-    until([&] { return menu->property("visible").toBool(); });
-    ASSERT_TRUE(menu->property("visible").toBool());
-    auto* options = qobject_cast<QQuickItem*>(entryOf(menu, "penStyleOptions"));
-    ASSERT_NE(options, nullptr);
-    EXPECT_TRUE(options->isVisible());
-    EXPECT_GT(options->height(), 0);
-    const auto childNamed = [](QQuickItem* root, const QString& name) {
-        std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* it) -> QQuickItem* {
-            if (it->objectName() == name) return it;
-            for (QQuickItem* c: it->childItems()) {
-                if (QQuickItem* f = walk(c)) return f;
-            }
-            return nullptr;
-        };
-        return walk(root);
-    };
-    for (const char* name: {"lineStyle_plain", "lineStyle_dash", "lineStyle_dashdot", "lineStyle_dot"}) {
-        EXPECT_NE(childNamed(options, name), nullptr) << name;
+    const QString pen = toolEntryId("pen");
+    ASSERT_TRUE(controller->applyToolEntry(pen));
+    EXPECT_EQ(controller->lineStyle(), QStringLiteral("plain"));
+    QQuickItem* button = nullptr;
+    until([&] { return (button = toolEntry(pen)) && button->isVisible(); });
+    ASSERT_NE(button, nullptr);
+    auto* editor = find<QObject>("toolEntryEditor");
+    click(button);
+    ASSERT_TRUE(waitOpened(editor, true));
+    auto* styles = findItem("toolEditorLineStyles");
+    ASSERT_NE(styles, nullptr);
+    EXPECT_TRUE(styles->isVisible());
+    for (const char* name: {"editorLineStyle_plain", "editorLineStyle_dash", "editorLineStyle_dashdot",
+                            "editorLineStyle_dot"}) {
+        EXPECT_NE(findItem(name), nullptr) << name;
     }
-    auto* dash = childNamed(options, "lineStyle_dash");
-    ASSERT_NE(dash, nullptr);
-    until([&] { return dash->isVisible() && dash->width() > 0; });
-    click(dash);
+    click(findItem("editorLineStyle_dash"));
+    until([&] { return controller->lineStyle() == "dash"; });
     EXPECT_EQ(controller->lineStyle(), QStringLiteral("dash")) << "a tap on the sample chooses it";
+    EXPECT_EQ(controller->toolboxModel()->entry(pen).value("lineStyle").toString(), QStringLiteral("dash"));
 
-    // The filling: on, then a color of the bar, then the line's color again
-    controller->setFillEnabled(false);
-    auto* fillSwitch = childNamed(options, "fillSwitch");
-    ASSERT_NE(fillSwitch, nullptr);
-    click(fillSwitch);
+    // The filling: on, its color the line's (or another), then off
+    auto* fill = findItem("toolEditorFillSwitch");
+    ASSERT_NE(fill, nullptr);
+    click(fill);
+    until([&] { return controller->fillEnabled(); });
     EXPECT_TRUE(controller->fillEnabled()) << "the switch fills";
-    auto* colorRow = childNamed(options, "fillColorRow");
-    ASSERT_NE(colorRow, nullptr);
-    until([&] { return colorRow->isVisible() && colorRow->height() > 0; });
-    EXPECT_TRUE(colorRow->isVisible()) << "the colors of the filling show once it is on";
-    auto* barColor = childNamed(colorRow, "fillColor");
-    ASSERT_NE(barColor, nullptr);
-    until([&] { return barColor->width() > 0; });
-    click(barColor);
-    EXPECT_GT(controller->fillColor().alpha(), 0) << "another color";
-    click(childNamed(colorRow, "fillSameColor"));
-    EXPECT_EQ(controller->fillColor().alpha(), 0) << "the line's color again";
-    controller->setFillEnabled(false);
-    QMetaObject::invokeMethod(menu, "close");
-    until([&] { return !menu->property("visible").toBool(); });
+    auto* same = findItem("toolEditorFillSame");
+    ASSERT_NE(same, nullptr);
+    until([&] { return same->isVisible(); });
+    EXPECT_TRUE(same->isVisible()) << "the colors of the filling show once it is on";
+    EXPECT_EQ(controller->fillColor().alpha(), 0) << "the line's color";
+    click(fill);
+    until([&] { return !controller->fillEnabled(); });
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(editor, false));
 
     // The highlighter has no line styles (its filling stays)
-    controller->selectTool("highlighter");
+    const QString highlighter = toolEntryId("highlighter");
+    ASSERT_TRUE(controller->applyToolEntry(highlighter));
     EXPECT_FALSE(controller->hasLineStyle());
-    EXPECT_TRUE(options->property("offered").toBool()) << "the options of its filling";
-    controller->selectTool("pen");
+    click(toolEntry(highlighter));
+    ASSERT_TRUE(waitOpened(editor, true));
+    EXPECT_FALSE(findItem("toolEditorLineStyles")->isVisible());
+    EXPECT_TRUE(findItem("toolEditorFill")->isVisible()) << "the options of its filling";
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(editor, false));
+    controller->takeToolOfType("pen");
     EXPECT_EQ(controller->lineStyle(), QStringLiteral("dash")) << "the pen kept its style";
 
-    // Kept over a restart (upstream's tool settings)
+    // Kept over a restart (the toolbox's entry, taken again at the start)
     restart();
     EXPECT_EQ(controller->lineStyle(), QStringLiteral("dash"));
-    controller->setLineStyle("plain");
+    controller->toolboxModel()->update(pen, {{"lineStyle", "plain"}});
+    controller->applyToolEntry(pen);
 }
 
-// The laser pointer (qt/pen-styles): upstream's laser pen and highlighter in the pen button's list, and at once from
-// the tools of full screen and presenting (the tool square); the pen pill stays for it (its color, its width).
+// The laser pointer (qt/pen-styles): upstream's laser pen and highlighter are a tool of the toolbox (the laser entry,
+// drawn with the pen or the highlighter), one tap away on the rail that floats while presenting. (The classic tool
+// square's laser button and the pen pill went in 0.8.0.)
 TEST_F(MainWindowTest, theLaserPointerIsAtHandWhilePresenting) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
-    window->setWidth(1920);
+    window->resize(1920, 1200);
     wait(100);
-    controller->selectTool("pen");
-    controller->setDrawingType("default");
-    auto* menu = find<QObject>("penButtonVariants");
-    ASSERT_NE(menu, nullptr);
-    ASSERT_NE(entryOf(menu, "variant_laserPointerPen"), nullptr) << "in the pen button's list";
-    ASSERT_NE(entryOf(menu, "variant_laserPointerHighlighter"), nullptr);
-    QMetaObject::invokeMethod(entryOf(menu, "variant_laserPointerHighlighter"), "triggered");
-    EXPECT_EQ(controller->tool(), QStringLiteral("laserPointerHighlighter"));
-    EXPECT_TRUE(find<QQuickItem>("penButton")->property("checked").toBool()) << "the pen button shows it";
-    click(find<QQuickItem>("penButton"));
-    EXPECT_EQ(controller->tool(), QStringLiteral("pen")) << "a tap: back to the pen";
+    auto* tools = controller->toolboxModel();
+    const QString pen = toolEntryId("pen");
+    const QString laser = toolEntryId("laser");
+    ASSERT_FALSE(laser.isEmpty()) << "a laser pointer among the first tools";
+    tools->move(laser, 0);  // (first on the rail, a section of its own: in sight on a short screen too)
+    tools->setDividerAfter(laser, true);
+    controller->applyToolEntry(pen);
 
     QMetaObject::invokeMethod(window, "startPresenting", Q_ARG(QVariant, false));  // (F5)
     ASSERT_TRUE(controller->presenting());
-    auto* square = find<QQuickItem>("quickToolSquare");
-    ASSERT_NE(square, nullptr);
-    until([&] { return square->isVisible(); });
-    ASSERT_TRUE(square->isVisible()) << "presenting: the tool square";
-    QObject* tools = find("quickTools");
-    click(square);
-    ASSERT_TRUE(waitOpened(tools, true));
-    QQuickItem* laser = findItem("laserPointerButton");
-    ASSERT_NE(laser, nullptr);
-    click(laser);
-    EXPECT_EQ(controller->tool(), QStringLiteral("laserPointerPen")) << "one tap from the tool square";
-    ASSERT_TRUE(waitOpened(tools, false));
-    auto* pill = find<QQuickItem>("penPill");
-    ASSERT_NE(pill, nullptr);
-    until([&] { return pill->isVisible(); });
-    EXPECT_TRUE(pill->isVisible()) << "the pen pill for its color and width";
-    click(square);
-    ASSERT_TRUE(waitOpened(tools, true));
-    laser = findItem("laserPointerButton");
-    EXPECT_EQ(laser->property("text").toString(), QStringLiteral("Back to the pen"));
-    click(laser);
-    EXPECT_EQ(controller->tool(), QStringLiteral("pen"));
-    ASSERT_TRUE(waitOpened(tools, false));
+    auto* box = find<QQuickItem>("toolbox");
+    until([&] { return box->isVisible() && box->property("floating").toBool(); });
+    ASSERT_TRUE(box->isVisible()) << "presenting: the toolbox floats";
+    // (the window takes the screen's size: the rail floats at its new edge)
+    const auto inWindow = [&](QQuickItem* item) {
+        return item && item->isVisible() &&
+               QRectF(0, 0, window->width(), window->height())
+                       .contains(item->mapRectToScene(QRectF(0, 0, item->width(), item->height())));
+    };
+    QQuickItem* button = nullptr;
+    until([&] { return inWindow(button = onRail(laser)); });
+    ASSERT_TRUE(inWindow(button));
+    click(button);
+    EXPECT_EQ(controller->tool(), QStringLiteral("laserPointerPen")) << "one tap on the rail";
+    // Drawn with the highlighter: the laser highlighter
+    tools->update(laser, {{"base", "highlighter"}});
+    controller->applyToolEntry(laser);
+    EXPECT_EQ(controller->tool(), QStringLiteral("laserPointerHighlighter"));
+    key(Qt::Key_P);
+    EXPECT_EQ(controller->tool(), QStringLiteral("pen")) << "back to the pen (P: the toolbox's pen used last)";
     window->setProperty("fullScreenMode", false);  // (stops presenting)
     until([&] { return !controller->presenting(); });
+    tools->reset();
 }
 
 // On a touch screen a finger held on a plain button shows its name above the finger, and letting go does not press it
 // (no hover on a touch screen); a button with a long press of its own keeps it (the zoom percentage: the whole page).
 TEST_F(MainWindowTest, aFingerHeldOnAButtonShowsItsName) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
-    window->setWidth(1920);
+    window->resize(1920, 1200);  // (the hand on the toolbox's rail, not in its stack of fixed tools)
     wait(100);
     controller->selectTool("pen");
     auto* hand = find<QQuickItem>("handButton");
     ASSERT_NE(hand, nullptr);
+    // (the rail plans anew for the new size: until the button stands still)
+    QPointF was(-1, -1);
+    until([&] {
+        const QPointF now = hand->mapToScene(QPointF(0, 0));
+        const bool still = hand->isVisible() && now == was;
+        was = now;
+        wait(100);
+        return still;
+    });
     ASSERT_TRUE(hand->isVisible());
     static QPointingDevice* finger = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
     const QPoint at = hand->mapToScene(QPointF(hand->width() / 2, hand->height() / 2)).toPoint();
@@ -5633,9 +5588,10 @@ TEST_F(MainWindowTest, aFingerHeldOnAButtonShowsItsName) {
     wait(100);
     EXPECT_FALSE(hand->property("labelShown").toBool()) << "gone when let go";
     EXPECT_EQ(controller->tool(), "pen") << "and the button was not pressed";
-    // A quick tap still presses it
-    QTest::touchEvent(window, finger).press(0, at);
-    QTest::touchEvent(window, finger).release(0, at);
+    // A quick tap still presses it (where it is now: the rail may plan anew once the finger is let go)
+    const QPoint now = hand->mapToScene(QPointF(hand->width() / 2, hand->height() / 2)).toPoint();
+    QTest::touchEvent(window, finger).press(0, now);
+    QTest::touchEvent(window, finger).release(0, now);
     wait(100);
     EXPECT_EQ(controller->tool(), "hand");
     controller->selectTool("pen");
@@ -5944,8 +5900,8 @@ TEST_F(MainWindowTest, addingAPageIsUndoneLikeEverythingElse) {
     until([&] { return snackbarText->property("text").toString().startsWith(QStringLiteral("Redone:")); });
     EXPECT_TRUE(snackbarText->property("text").toString().startsWith(QStringLiteral("Redone:")));
 
-    // The undo button of the tool bar as well
-    click(find<QQuickItem>("toolUndoButton"));
+    // The undo button of the toolbox as well
+    click(find<QQuickItem>("toolboxUndoButton"));
     EXPECT_EQ(controller->pageCount(), pages);
 }
 
@@ -6112,6 +6068,8 @@ TEST_F(HomeScreenTest, movesToAnotherLibraryAndWarnsAboutDownloads) {
 
 // Markdown: written beside the page into a box (a text in the layer "Markdown"), opened again with the text tool.
 TEST_F(MainWindowTest, theWritingButtonWritesMarkdownOnThePageItsSourceIsInItsMenu) {
+    window->resize(1920, 1200);  // (the button on the toolbox's rail, not in its stack of fixed tools)
+    wait(100);
     auto* panel = find<QQuickItem>("markdownPanel");
     auto* button = find<QQuickItem>("textModeButton");
     ASSERT_NE(panel, nullptr);
@@ -6368,8 +6326,8 @@ TEST_F(MainWindowTest, theUndoAndRedoButtonsFollowAMarkdownBoxBeingWritten) {
                 ->mapToScene(view->pageViewRect(0).topLeft() + QPointF(x, y) * view->getViewController().zoom())
                 .toPoint();
     };
-    auto* undoButton = find<QQuickItem>("toolUndoButton");
-    auto* redoButton = find<QQuickItem>("toolRedoButton");
+    auto* undoButton = find<QQuickItem>("toolboxUndoButton");
+    auto* redoButton = find<QQuickItem>("toolboxRedoButton");
     ASSERT_NE(undoButton, nullptr);
     ASSERT_NE(redoButton, nullptr);
     ASSERT_TRUE(undoButton->isVisible());
@@ -6844,13 +6802,13 @@ TEST_F(MainWindowTest, textModeTypesThePageText) {
     click(find<QQuickItem>("textFlowDone"));
     EXPECT_FALSE(panel->isVisible());
     EXPECT_FALSE(controller->textFlowActive());
-    // One step for the whole text; undo / redo lead the tool bar
-    auto* undoButton = find<QQuickItem>("toolUndoButton");
+    // One step for the whole text; undo / redo lead the toolbox
+    auto* undoButton = find<QQuickItem>("toolboxUndoButton");
     ASSERT_NE(undoButton, nullptr);
-    EXPECT_TRUE(find<QQuickItem>("toolRow")->isAncestorOf(undoButton));
+    EXPECT_TRUE(find<QQuickItem>("toolboxHead")->isAncestorOf(undoButton));
     click(undoButton);
     EXPECT_TRUE(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).empty());
-    click(find<QQuickItem>("toolRedoButton"));
+    click(find<QQuickItem>("toolboxRedoButton"));
     EXPECT_EQ(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).size(), 5u);
 
     // Cancel restores the page
@@ -8090,7 +8048,7 @@ TEST_F(MainWindowTest, presentingGoesPageByPageAndBackToEditing) {
     };
     const double editZoom = vc.zoom();
     auto* pill = find<QQuickItem>("viewPill");
-    auto* square = find<QQuickItem>("quickToolSquare");
+    auto* square = find<QQuickItem>("toolbox");  // (floating while presenting)
     auto* indicator = find<QQuickItem>("presentPageIndicator");
     ASSERT_NE(indicator, nullptr);
 
@@ -8168,18 +8126,20 @@ TEST_F(MainWindowTest, presentingGoesPageByPageAndBackToEditing) {
     EXPECT_EQ(controller->pageNumber(), 5);
     EXPECT_TRUE(pill->isVisible());
 
-    // From the tools of the full screen: present, and back
-    QMetaObject::invokeMethod(find("quickTools"), "open");
-    ASSERT_TRUE(waitOpened(find("quickTools"), true));
-    QQuickItem* toggle = findItem("presentToggleButton");
-    if (!toggle) {
-        toggle = find<QQuickItem>("presentToggleButton");
-    }
-    ASSERT_NE(toggle, nullptr);
-    QMetaObject::invokeMethod(toggle, "clicked");
+    // From ⋯ of the floating toolbox: present, and back
+    auto* more = find<QQuickItem>("toolboxMoreButton");
+    ASSERT_NE(more, nullptr);
+    until([&] { return more->isVisible(); });
+    click(more);
+    QObject* menu = find("toolboxMoreMenu");
+    ASSERT_TRUE(waitOpened(menu, true));
+    QObject* presentItem = entryOf(menu, "toolboxPresentItem");
+    ASSERT_NE(presentItem, nullptr);
+    QMetaObject::invokeMethod(presentItem, "triggered");
+    QMetaObject::invokeMethod(menu, "close");
     EXPECT_TRUE(controller->presenting());
     EXPECT_EQ(controller->pageNumber(), 5) << "from the current page";
-    EXPECT_TRUE(waitOpened(find("quickTools"), false)) << "the tools close";
+    EXPECT_TRUE(waitOpened(menu, false));
     // Leaving full screen ends presenting too
     key(Qt::Key_F11);
     EXPECT_FALSE(window->property("fullScreenMode").toBool());
@@ -8201,7 +8161,7 @@ TEST_F(MainWindowTest, presentingGoesPageByPageAndBackToEditing) {
     EXPECT_FALSE(window->property("fullScreenMode").toBool()) << "the second Escape leaves full screen";
 }
 
-// qt/present-clean: Ctrl+F5 presents without controls: no pen pill, no tool square, no page number, only a faint
+// qt/present-clean: Ctrl+F5 presents without controls: no floating toolbox, no page number, only a faint
 // mark in the lower left corner, a finger wide. A tap on it (finger or mouse) brings the controls back, another hides
 // them; Ctrl+F5 does the same while presenting. The keys and the pen work as ever. Escape ends it; F5 presents with
 // the controls. The mark is not there outside presenting.
@@ -8217,11 +8177,9 @@ TEST_F(MainWindowTest, presentingWithoutControls) {
         until([&] { return !vc.isAnimating(); }, 2000);
         wait(30);
     };
-    auto* penPill = find<QQuickItem>("penPill");
-    auto* square = find<QQuickItem>("quickToolSquare");
+    auto* square = find<QQuickItem>("toolbox");  // (floating while presenting with the controls)
     auto* mark = find<QQuickItem>("presentCornerMark");
     auto* number = find<QQuickItem>("presentPageIndicator");
-    ASSERT_NE(penPill, nullptr);
     ASSERT_NE(square, nullptr);
     ASSERT_NE(mark, nullptr);
     ASSERT_NE(number, nullptr);
@@ -8234,8 +8192,7 @@ TEST_F(MainWindowTest, presentingWithoutControls) {
     wait(100);
     EXPECT_TRUE(clean());
     EXPECT_TRUE(view->isPresenting());
-    EXPECT_FALSE(penPill->isVisible()) << "no pill";
-    EXPECT_FALSE(square->isVisible()) << "no tool square";
+    EXPECT_FALSE(square->isVisible()) << "no toolbox";
     EXPECT_FALSE(number->isVisible()) << "not even the page number";
     EXPECT_FALSE(find<QQuickItem>("viewPill")->isVisible());
     EXPECT_FALSE(find<QQuickItem>("fullScreenTabs")->isVisible());
@@ -8283,8 +8240,7 @@ TEST_F(MainWindowTest, presentingWithoutControls) {
     wait(50);
     EXPECT_FALSE(clean());
     EXPECT_TRUE(controller->presenting());
-    EXPECT_TRUE(penPill->isVisible()) << "the pill is back";
-    EXPECT_TRUE(square->isVisible()) << "the tool square is back";
+    EXPECT_TRUE(square->isVisible()) << "the toolbox is back";
     EXPECT_TRUE(mark->isVisible()) << "the mark stays, to hide them again";
     EXPECT_EQ(strokes(), before + 1) << "the tap did not write";
     key(Qt::Key_Space);
@@ -8293,7 +8249,6 @@ TEST_F(MainWindowTest, presentingWithoutControls) {
     // Another tap (the mouse this time): hidden again
     click(mark);
     EXPECT_TRUE(clean());
-    EXPECT_FALSE(penPill->isVisible());
     EXPECT_FALSE(square->isVisible());
     // Ctrl+F5 while presenting does the same
     key(Qt::Key_F5, Qt::ControlModifier);
@@ -8318,7 +8273,6 @@ TEST_F(MainWindowTest, presentingWithoutControls) {
     wait(50);
     EXPECT_FALSE(clean());
     EXPECT_TRUE(square->isVisible());
-    EXPECT_TRUE(penPill->isVisible());
     EXPECT_TRUE(mark->isVisible());
     key(Qt::Key_Escape);
     key(Qt::Key_Escape);
@@ -8363,7 +8317,7 @@ TEST_F(MainWindowTest, presentButtonHeldPresentsWithoutControls) {
     until([&] { return window->property("fullScreenMode").toBool(); });
     ASSERT_TRUE(controller->presenting());
     EXPECT_TRUE(clean()) << "held: only the page";
-    EXPECT_FALSE(find<QQuickItem>("quickToolSquare")->isVisible());
+    EXPECT_FALSE(find<QQuickItem>("toolbox")->isVisible());
     EXPECT_TRUE(find<QQuickItem>("presentCornerMark")->isVisible());
     back();
 
@@ -8379,7 +8333,7 @@ TEST_F(MainWindowTest, presentButtonHeldPresentsWithoutControls) {
     until([&] { return controller->presenting(); });
     ASSERT_TRUE(controller->presenting());
     EXPECT_FALSE(clean());
-    EXPECT_TRUE(find<QQuickItem>("quickToolSquare")->isVisible());
+    EXPECT_TRUE(find<QQuickItem>("toolbox")->isVisible());
     back();
 
     // The ⋮ menu has it too
@@ -8443,10 +8397,11 @@ TEST_F(MainWindowTest, fullScreenTabDotsSwitchDocuments) {
     EXPECT_EQ(dots->property("currentIndex").toInt(), 2);
     EXPECT_GE(bar->height(), 24) << "big enough for a finger";
     EXPECT_LT(bar->mapToScene(QPointF(0, bar->height())).y(), 40) << "at the top";
-    auto* square = find<QQuickItem>("quickToolSquare");
+    auto* box = find<QQuickItem>("toolbox");  // (floating at the right edge)
+    ASSERT_TRUE(box->isVisible());
     const QRectF barRect(bar->mapToScene(QPointF(0, 0)), bar->size());
-    const QRectF squareRect(square->mapToScene(QPointF(0, 0)), square->size());
-    EXPECT_FALSE(barRect.intersects(squareRect)) << "not over the tool square";
+    const QRectF boxRect(box->mapToScene(QPointF(0, 0)), box->size());
+    EXPECT_FALSE(barRect.intersects(boxRect)) << "not over the toolbox";
 
     // A swipe along the bar: the next / previous document, and its title for a moment
     static QPointingDevice* finger = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
@@ -9328,6 +9283,8 @@ TEST_F(HomeScreenMarkdownTest, aMarkdownFileHasTheFormattingBar) {
 // into "kalman.assets/" and linked at the cursor; a pasted picture is saved there as image-….png; picture files
 // dropped on the page are copied and linked. Each is one undo step of the text; undo leaves the files.
 TEST_F(HomeScreenMarkdownTest, picturesArePickedPastedAndDroppedIntoAMarkdownFile) {
+    window->setWidth(1920);  // (room in the format bar for its inserts beside undo, redo and the commands)
+    wait(100);
     const fs::path md = root / "kalman.md";
     ASSERT_TRUE(controller->openPath(QString::fromStdString(md.string())));
     wait(100);
@@ -9512,6 +9469,8 @@ TEST_F(HomeScreenMarkdownTest, removeUnusedImagesListsThemFirst) {
 TEST_F(MainWindowTest, emojiSuggestionsAndPickerWhileWritingOnThePage) {
     const QString smiley = QString::fromUtf8("\xf0\x9f\x98\x83");
     const QString party = QString::fromUtf8("\xf0\x9f\x8e\x89");
+    window->resize(1280, 1200);  // (room below the cursor for the list, beside the toolbox's rail)
+    wait(100);
     controller->setMarkdownInPanel(false);
     controller->setTextMarkdown(false);
     controller->selectTool("text");
@@ -10193,16 +10152,23 @@ TEST_F(MainWindowTest, togglingABookmarkOnAPage) {
     until([&] { return controller->pageNumber() == 2; });
     EXPECT_EQ(controller->pageNumber(), 2);
 
-    // The ⋮ menu: this page's bookmark, removed; undo brings it back, a second undo takes the name back
+    // The command bar's bookmark (an entry of ⋮ shown as a button where there is room): this page's bookmark,
+    // removed; undo brings it back, a second undo takes the name back
+    window->setWidth(1920);
+    auto* barButton = find<QQuickItem>("bookmarkButton");
+    ASSERT_NE(barButton, nullptr);
+    until([&] { return barButton->isVisible(); });
+    ASSERT_TRUE(barButton->isVisible());
+    EXPECT_TRUE(barButton->property("checked").toBool());
+    EXPECT_EQ(barButton->property("tip").toString(), "Remove the bookmark of this page");
     QObject* more = find("moreMenu");
     QMetaObject::invokeMethod(more, "open");
     ASSERT_TRUE(waitOpened(more, true));
-    auto* moreItem = findItem("bookmarkPageItem");
-    ASSERT_NE(moreItem, nullptr);
-    EXPECT_EQ(moreItem->property("text").toString(), "Remove the bookmark of this page");
-    click(moreItem);
-    EXPECT_TRUE(controller->bookmarks().isEmpty());
+    EXPECT_FALSE(findItem("bookmarkPageItem") && findItem("bookmarkPageItem")->isVisible()) << "one place each";
+    QMetaObject::invokeMethod(more, "close");
     EXPECT_TRUE(waitOpened(more, false));
+    click(barButton);
+    EXPECT_TRUE(controller->bookmarks().isEmpty());
     key(Qt::Key_Z, Qt::ControlModifier);
     EXPECT_EQ(controller->bookmarkOf(1), "Proof");
     key(Qt::Key_Z, Qt::ControlModifier);

@@ -1,44 +1,29 @@
 // The cycling tool buttons (qt/docs/adaptive-layout.md, "Cycling buttons"): tools that do almost the same share one
 // button. A tap on it while its tool is in use takes the next variant; a tap while another tool is in use takes it
-// with the variant last used (remembered per group, in the settings); a long press lists all variants. The tool bar,
-// the tools of the compact chrome and the pen pill use the same groups, so they behave alike.
-//   pen       pen ↔ highlighter (freehand); the laser pointer and laser highlighter in the list only
-//   select    rectangle ↔ lasso (the multi-layer ones only in the list; the snips too in the classic tool bar)
-//   snip      rectangle ↔ lasso snip (one picture to the clipboard, then the tool before, qt/docs/snip.md): with the
-//             toolbox a fixed tool of its own (qt/copy-tools, `snipButton`); the toolbox's snip entry cycles the same way
+// with the variant last used (remembered per group, in the settings); a long press lists all variants. The fixed
+// tools of the toolbox, the phone's sheet "My tools" and the toolbox's snip entry use the same groups.
+//   select    rectangle ↔ lasso (the multi-layer ones only in the list)
+//   snip      rectangle ↔ lasso snip (one picture to the clipboard, then the tool before, qt/docs/snip.md): a fixed
+//             tool of the toolbox (qt/copy-tools); the toolbox's snip entry cycles the same way
 //   text      mark PDF text ↔ copy handwriting as text (one sweep over ink, its words to the clipboard, then the tool
 //             before; qt/docs/handwriting-search.md); the PDF text tool's button, whose list also says how it marks
-//   shape     line, rectangle, ellipse, arrow, double arrow, coordinate system, recognized shapes (the pen draws them)
 //   geometry  setsquare ↔ compass (on the page; the geometry pill takes it away); curtain and spotlight only in the list (they are
 //             not tools of their own: they lie over the page whatever tool is in hand, qt/docs/curtain.md)
-//   eraser    standard ↔ whiteout ↔ whole strokes (its size: the widths of the tool bar)
-// The keyboard's tools (P, H, S, L, E) take a variant directly; the button follows and remembers it.
+// The kinds of shapes and erasers are listed here too (the toolbox's editor offers them); the toolbox's entries take
+// them. The keyboard's tools (S, L, Shift+S, Shift+L) take a variant directly; the button follows and remembers it.
 import QtQuick
 
 QtObject {
     id: groups
 
     readonly property var defs: ({
-        "pen": {
-            name: qsTr("Pen and highlighter"),
-            variants: [
-                { key: "pen", icon: "xopp-tool-pencil", name: qsTr("Pen") },
-                { key: "highlighter", icon: "xopp-tool-highlighter", name: qsTr("Highlighter") },
-                // Upstream's laser tools: ink that fades a while after the pen is lifted, never in the document
-                { key: "laserPointerPen", icon: "xopp-laser-pointer", name: qsTr("Laser pointer"), listOnly: true },
-                { key: "laserPointerHighlighter", icon: "xopp-laser-pointer", name: qsTr("Laser highlighter"), listOnly: true }
-            ]
-        },
         "select": {
             name: qsTr("Select"),
             variants: [
                 { key: "selectRect", icon: "xopp-select-rect", name: qsTr("Select a rectangle") },
                 { key: "selectRegion", icon: "xopp-select-lasso", name: qsTr("Lasso") },
                 { key: "selectMultiLayerRect", icon: "xopp-select-rect", name: qsTr("Rectangle on all layers"), listOnly: true },
-                { key: "selectMultiLayerRegion", icon: "xopp-select-lasso", name: qsTr("Lasso on all layers"), listOnly: true },
-                // (the classic tool bar: the snips stay in this list, as before; with the toolbox they have a button)
-                { key: "snipRect", icon: "xqt-snip-rect", name: qsTr("Snip a rectangle (copy its picture)"), listOnly: true, snip: "rect", classic: true },
-                { key: "snipLasso", icon: "xqt-snip-lasso", name: qsTr("Snip with the lasso (copy its picture)"), listOnly: true, snip: "lasso", classic: true }
+                { key: "selectMultiLayerRegion", icon: "xopp-select-lasso", name: qsTr("Lasso on all layers"), listOnly: true }
             ]
         },
         // The snips as a group of their own (their button, the toolbox's snip entry): the icon shows which
@@ -95,12 +80,7 @@ QtObject {
         { key: "veryHigh", name: qsTr("Very high resolution (600 dpi)"), short: qsTr("600 dpi") }
     ]
     function name(group) { return defs[group].name }
-    /// The snips have a button of their own (the toolbox's fixed tools, qt/copy-tools): not in the select list then
-    property bool snipButton: false
-    function variants(group) {
-        const vs = defs[group].variants
-        return snipButton ? vs.filter(function(v) { return v.classic !== true }) : vs
-    }
+    function variants(group) { return defs[group].variants }
     /// The variants a tap goes through (not the list-only ones)
     function cycle(group) { return defs[group].variants.filter(function(v) { return !v.listOnly }) }
     /// A variant that is the curtain (put out or taken away beside the group's tool, never remembered as its variant)
@@ -121,14 +101,8 @@ QtObject {
 
     /// The variant in use now ("": the group's tool is not in use)
     function activeKey(group) {
-        const tool = app.tool, type = app.drawingType
-        if (group === "pen")
-            return (tool === "pen" || tool === "highlighter") && type === "default" ? tool
-                   : isLaser(tool) ? tool : ""
-        if (group === "shape")
-            return (tool === "pen" || tool === "highlighter") && type !== "default" && type !== "dontChange"
-                   && type !== "spline" ? type : ""
-        if (group === "snip" || (group === "select" && app.snip !== "" && !snipButton))
+        const tool = app.tool
+        if (group === "snip")
             return app.snip === "" ? "" : app.snip === "lasso" ? "snipLasso" : "snipRect"
         // (the select tool in hand snips, or copies handwriting: the snip button's, the text button's)
         if (group === "select" && (app.snip !== "" || app.inkCopy)) return ""
@@ -137,11 +111,8 @@ QtObject {
         if (group === "select")
             return ["selectRect", "selectRegion", "selectMultiLayerRect", "selectMultiLayerRegion"].indexOf(tool) >= 0 ? tool : ""
         if (group === "geometry") return app.geometryTool
-        if (group === "eraser") return tool === "eraser" ? last("eraser") : ""
         return ""
     }
-    /// Upstream's laser tools (laserPointerPen, laserPointerHighlighter)
-    function isLaser(tool) { return tool === "laserPointerPen" || tool === "laserPointerHighlighter" }
     function isActive(group) { return activeKey(group) !== "" }
     /// The variant the button shows: the one in use, else the one last used
     function current(group) {
@@ -159,20 +130,12 @@ QtObject {
     }
     /// The variant last used of a group (the first one at the start)
     function last(group) {
-        if (group === "eraser") {
-            const mode = (app.settings.revision, app.settings.get("eraserMode"))
-            return ["default", "whiteout", "deleteStroke"].indexOf(mode) >= 0 ? mode : "default"
-        }
         const key = remembered[group]
         const vs = defs[group].variants
         for (let i = 0; i < vs.length; ++i) if (vs[i].key === key) return key
         return vs[0].key
     }
     function remember(group, key) {
-        if (group === "eraser") {
-            app.settings.set("eraserMode", key)
-            return
-        }
         if (remembered[group] === key) return
         const map = Object.assign({}, remembered)
         map[group] = key
@@ -191,12 +154,7 @@ QtObject {
             if (group === "snip") remember(group, key)  // (the select button stays the selection's)
             return
         }
-        if (group === "pen") {
-            app.selectTool(key)
-            if (!isLaser(key)) app.drawingType = "default"  // (the pen keeps its shape: back to freehand)
-        } else if (group === "shape") {
-            app.drawingType = key  // (the pen, or the highlighter in hand, draws it)
-        } else if (group === "select") {
+        if (group === "select") {
             app.selectTool(key)
         } else if (group === "text") {
             if (key === "copyInkText") {
@@ -206,9 +164,6 @@ QtObject {
             }
         } else if (group === "geometry") {
             if (app.geometryTool !== key) app.toggleGeometryTool(key)
-        } else if (group === "eraser") {
-            app.settings.set("eraserMode", key)
-            app.selectTool("eraser")
         }
         remember(group, key)
     }
@@ -225,7 +180,7 @@ QtObject {
         else activate(group)
     }
 
-    /// The colors used last, newest first (the tool bar's "recent" colors; at most 12)
+    /// The colors used last, newest first (the toolbox editor's "colors used lately"; at most 12)
     readonly property var recentColors: {
         const text = String((app.settings.revision, app.settings.get("recentColors")) || "")
         return text === "" ? [] : text.split(",")
@@ -241,7 +196,7 @@ QtObject {
     readonly property Connections followTools: Connections {
         target: app
         function onToolChanged() {
-            ["pen", "shape", "select", "geometry", "text"].forEach(function(g) {
+            ["select", "geometry", "text"].forEach(function(g) {
                 const a = groups.activeKey(g)
                 if (a !== "" && groups.snipOf(g, a) === "") groups.remember(g, a)
             })

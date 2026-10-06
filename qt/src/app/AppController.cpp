@@ -213,7 +213,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     connect(this, &AppController::colorPaletteChanged, this, [this] {
         const QVariantMap e = toolbox->entry(toolbox->active());
         // (only while the tool still has the color the entry gave it: a color changed since stays)
-        if (toolboxMode() && !e.value("role").toString().isEmpty() && entryInHand(e) && color() == appliedEntryColor) {
+        if (!e.value("role").toString().isEmpty() && entryInHand(e) && color() == appliedEntryColor) {
             applyToolEntry(toolbox->active());
         }
     });
@@ -314,9 +314,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     });
     journalFile = SessionRecovery::defaultJournalFile();
     connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, &AppController::applicationStateChanged);
-    if (toolboxMode()) {
-        applyToolEntry(toolbox->active());  // (the tool of the last time, with all its settings)
-    }
+    applyToolEntry(toolbox->active());  // (the tool of the last time, with all its settings)
 }
 
 // A window of its own: the same settings, tools, library and rendering, but its own documents.
@@ -1839,37 +1837,6 @@ QVariantList AppController::toolbarColors() const {
     return defaultToolbarColors();
 }
 
-void AppController::storeToolbarColors(const QVariantList& list) {
-    QStringList names;
-    for (const QVariant& c: list) {
-        names << c.value<QColor>().name();
-    }
-    app->getSettings()->getCustomElement(CUSTOM).setString("toolbarColors", names.join(',').toStdString());
-    app->getSettings()->customSettingsChanged();
-    Q_EMIT toolbarColorsChanged();
-}
-
-void AppController::addToolbarColor(const QColor& color) {
-    QVariantList list = toolbarColors();
-    for (const QVariant& c: list) {
-        if (c.value<QColor>().rgb() == color.rgb()) {
-            return;
-        }
-    }
-    list.append(QColor(color.rgb()));
-    storeToolbarColors(list);
-}
-
-void AppController::removeToolbarColor(int index) {
-    QVariantList list = toolbarColors();
-    if (index >= 0 && index < list.size()) {
-        list.removeAt(index);
-        storeToolbarColors(list);
-    }
-}
-
-void AppController::resetToolbarColors() { storeToolbarColors(defaultToolbarColors()); }
-
 QVariantList AppController::colorPalettes() const { return ColorPalettes::builtIn().toVariant(); }
 
 QString AppController::colorPalette() const {
@@ -2082,20 +2049,6 @@ void AppController::applyMarkdownText() {
     }
 }
 
-QString AppController::toolbarPosition() const {
-    std::string stored;
-    app->getSettings()->getCustomElement(CUSTOM).getString("toolbarPosition", stored);
-    return stored == "left" || stored == "right" ? QString::fromStdString(stored) : QStringLiteral("top");
-}
-
-void AppController::setToolbarPosition(const QString& position) {
-    if (position != toolbarPosition() && (position == "top" || position == "left" || position == "right")) {
-        app->getSettings()->getCustomElement(CUSTOM).setString("toolbarPosition", position.toStdString());
-        app->getSettings()->customSettingsChanged();
-        Q_EMIT toolbarPositionChanged();
-    }
-}
-
 bool AppController::toolbarHidden() const {
     bool hidden = false;
     app->getSettings()->getCustomElement(CUSTOM).getBool("toolbarHidden", hidden);
@@ -2106,87 +2059,8 @@ void AppController::setToolbarHidden(bool hidden) {
     if (hidden != toolbarHidden()) {
         app->getSettings()->getCustomElement(CUSTOM).setBool("toolbarHidden", hidden);
         app->getSettings()->customSettingsChanged();
-        Q_EMIT toolbarPositionChanged();
+        Q_EMIT toolbarHiddenChanged();
     }
-}
-
-QVariantList AppController::penColors() const {
-    std::string stored;
-    QVariantList list;
-    if (app->getSettings()->getCustomElement(CUSTOM).getString("penColors", stored)) {
-        for (const QString& name: QString::fromStdString(stored).split(',', Qt::SkipEmptyParts)) {
-            if (const QColor color(name.trimmed()); color.isValid()) {
-                list.append(color);
-            }
-        }
-        return list;
-    }
-    return {QColor(Qt::black), QColor(0xff, 0x00, 0x00), QColor(0x31, 0x71, 0xd8)};  // black, red, blue
-}
-
-namespace {
-void storePenColors(Settings* settings, const QVariantList& list) {
-    QStringList names;
-    for (const QVariant& c: list) {
-        names << c.value<QColor>().name();
-    }
-    settings->getCustomElement("xournalQt").setString("penColors", names.join(',').toStdString());
-    settings->customSettingsChanged();
-}
-}  // namespace
-
-void AppController::addPenColor(const QColor& color) {
-    QVariantList list = penColors();
-    for (const QVariant& c: list) {
-        if (c.value<QColor>().rgb() == color.rgb()) {
-            return;
-        }
-    }
-    list.append(QColor(color.rgb()));
-    storePenColors(app->getSettings(), list);
-    Q_EMIT penPillChanged();
-}
-
-void AppController::removePenColor(int index) {
-    QVariantList list = penColors();
-    if (index >= 0 && index < list.size() && list.size() > 1) {
-        list.removeAt(index);
-        storePenColors(app->getSettings(), list);
-        Q_EMIT penPillChanged();
-    }
-}
-
-void AppController::resetPenColors() {
-    app->getSettings()->getCustomElement(CUSTOM).setString("penColors", std::string());
-    app->getSettings()->customSettingsChanged();
-    Q_EMIT penPillChanged();
-}
-
-QString AppController::penPillSide() const {
-    std::string stored;
-    app->getSettings()->getCustomElement(CUSTOM).getString("penPillSide", stored);
-    return stored == "left" || stored == "top" || stored == "bottom" ? QString::fromStdString(stored)
-                                                                     : QStringLiteral("right");
-}
-
-void AppController::setPenPillSide(const QString& side) {
-    if (side != penPillSide() && (side == "left" || side == "right" || side == "top" || side == "bottom")) {
-        app->getSettings()->getCustomElement(CUSTOM).setString("penPillSide", side.toStdString());
-        app->getSettings()->customSettingsChanged();
-        Q_EMIT penPillChanged();
-    }
-}
-
-double AppController::penPillOffset() const {
-    double offset = 0.35;
-    app->getSettings()->getCustomElement(CUSTOM).getDouble("penPillOffset", offset);
-    return std::clamp(offset, 0.0, 1.0);
-}
-
-void AppController::setPenPillOffset(double offset) {
-    app->getSettings()->getCustomElement(CUSTOM).setDouble("penPillOffset", std::clamp(offset, 0.0, 1.0));
-    app->getSettings()->customSettingsChanged();
-    Q_EMIT penPillChanged();
 }
 
 QVariantList AppController::pdfHighlightColors() const {

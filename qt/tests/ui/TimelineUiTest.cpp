@@ -80,7 +80,6 @@ protected:
     }
     void TearDown() override {
         settings()->resetLayoutChoices();
-        settings()->set("toolbarMode", "classic");  // (the other UI tests keep the classic bar)
         settings()->set("touchProfile", "auto");
         controller->shutdown();
         engine.reset();
@@ -136,13 +135,11 @@ protected:
         until([&] { return window->width() == w && window->height() == h; });
         wait(300);  // (the size class, then the plans settle)
     }
-    /// What the classic tool bar shows (qt/docs/toolbox.md): its tools, the colors and widths, undo and redo in the
-    /// bar, the classic dock of a phone. None of it is there in the toolbox mode.
+    /// Tools outside the toolbox (qt/docs/toolbox.md): undo and redo in the command bar, the phone dock's own buttons
+    /// (a text document's). None of it is there beside the toolbox. (The classic tool bar was removed in 0.8.0.)
     QStringList classicToolsShown() const {
         QStringList out;
-        for (const char* name: {"penButton", "eraserButton", "shapeButton", "colorStrip", "widthStrip",
-                                 "toolUndoButton", "toolRedoButton", "dockColorSlot", "dockWidthSlot", "dockToolButton",
-                                 "quickToolSquare", "penPill"}) {
+        for (const char* name: {"toolUndoButton", "toolRedoButton", "dockToolsButton", "dockUndoButton"}) {
             if (shown(find<QQuickItem>(name))) {
                 out << name;
             }
@@ -344,11 +341,10 @@ TEST_F(TimelineUiTest, theRecordingIsHeardWhereItIs) {
     QMetaObject::invokeMethod(timeline(), "stop");
 }
 
-// The author's test of 0.6.0: "when replay is on the classic toolbar appears again". In the toolbox mode a replay hides
-// the tools and brings back no classic tool bar, neither while it replays nor after it: in a window, in full screen and
-// in a phone's chrome (its dock)
+// The author's test of 0.6.0: "when replay is on the classic toolbar appears again". A replay hides the tools and
+// brings back nothing but the toolbox, neither while it replays nor after it: in a window, in full screen and in a
+// phone's chrome (its dock)
 TEST_F(TimelineUiTest, theToolboxModeShowsNoClassicToolBarDuringOrAfterAReplay) {
-    settings()->set("toolbarMode", "toolbox");
     settings()->resetLayoutChoices();
     controller->toolboxModel()->reset();
     writeTwoStrokes();
@@ -363,7 +359,7 @@ TEST_F(TimelineUiTest, theToolboxModeShowsNoClassicToolBarDuringOrAfterAReplay) 
         EXPECT_TRUE(shown(find<QQuickItem>("timelineBar"))) << where;
         EXPECT_EQ(classicToolsShown().join(", ").toStdString(), "") << where << ": no classic tool bar while it replays";
         EXPECT_FALSE(shown(toolbox)) << where << ": no tools while it replays";
-        for (const char* name: {"topTools", "bottomTools", "sideTools", "toolbarToggle", "toolbarShow", "phoneDock"}) {
+        for (const char* name: {"topTools", "sideTools", "toolbarToggle", "toolbarShow", "phoneDock"}) {
             EXPECT_FALSE(shown(find<QQuickItem>(name))) << where << ": " << name << " is put away while it replays";
         }
         click(find<QObject>("timelineClose"));

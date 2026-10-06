@@ -3050,8 +3050,8 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
 - [ ] A `.md` document at 1366: undo and redo at the start of the format bar, search, full screen, save before »;
       narrower: the inserts fold first, then the other commands go into », then the headings, then search and save.
 - [ ] ⋮ → View → Read: full screen read only (since qt/ui-rework; see "The adaptive UI reworked" below).
-- [ ] Settings → Pen → Tools: "Classic tool bar" brings back the old bar, pen pill and tool square; "My toolbox" brings
-      the toolbox back; "Back to the first tools…" resets it.
+- [ ] (Obsolete since 0.8.0: the classic tool bar is gone, see "The classic tool bar removed" below.) Settings → Pen →
+      Tools: "Back to the first tools…" resets the toolbox.
 - [ ] First start after the update: the toolbox's first pen has the pen's color and width of before; the eraser
       erases as it did (standard, whiteout or whole strokes); the text box has the font of before.
 - [ ] Restart: the tool in hand is the entry taken last, with its color and width.
@@ -3359,10 +3359,8 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
 
 ## New is the tab strip's "+"; the record button's place (qt/record-place)
 
-- [ ] A 1920 × 1080 screen, the window maximised, the classic tool bar (Settings → Pen → Tools), a build with Qt
-      Multimedia: one row with every button, all palette colors and "+", the five widths and the record button;
-      nothing in "more tools". The bar has no New button; the tab strip's "+" makes a new document.
-- [ ] Full screen (F11) with the classic bar: the tool square's tools have New (there is no tab strip there).
+- [ ] (Obsolete since 0.8.0, no classic bar any more.) The command bar has no New button; the tab strip's "+" makes a
+      new document.
 - [ ] A phone (Fold 7 folded): "All tools" has New under "Document and view".
 - [ ] The toolbox (the default), a build with Qt Multimedia: the record button is among the fixed tools after "the
       finger draws", not in the command bar. A tap records; the red pill is at the top of the page, clear of the rail.
@@ -3768,3 +3766,40 @@ checks only that the library is there and the devices can be listed).
       background now, `android.app.background_running`).
 - [ ] Android: notifications refused (Android 13+): recording still works with the screen off; the recording shows in
       the task manager's "active apps" instead of the drawer.
+
+## The toolbox's lines at 150 % (qt/classic-removal)
+
+- [ ] 150 % scaling (Windows or KDE): the toolbox's line towards the page and its dividers are as sharp as the command
+      bar's (one device pixel, not a blurred 1.5).
+
+## A text document's format bar on a tablet (qt/classic-removal)
+
+- [ ] A `.md` at 960 × 1392 (a Surface upright): the format bar shows undo, redo, the headings, the marks, the lists
+      and the inserts' button without scrolling; the commands in » at its end (before 0.8.0 every command was kept and
+      the row scrolled the lists out of sight). At 1920 the commands are buttons at its end.
+
+## The classic tool bar removed (qt/classic-removal, 0.8.0)
+
+Items above that mention the classic tool bar, the tool square of full screen, its quick tools, the pen pill, the
+colour strip, the five widths of the bar, two tool rows, the tool bar at a side or at the bottom, the classic dock of a
+phone or Settings → Pen → Tools' choice describe what is gone; check the toolbox instead.
+
+- [ ] Update from 0.7.0 with the classic tool bar chosen (Settings → Pen → Tools: "Classic tool bar") and a pen of your
+      own color and width, the eraser on whiteout, a text box font of your own: after the update the toolbox is there
+      (no choice in Settings → Pen → Tools, only "Back to the first tools…"); its first pen has that color and width
+      and is in hand, the eraser whiteouts, the text box has the font. P, H, E and T take the toolbox's entries.
+- [ ] Update from 0.7.0 with the toolbox already in use: nothing changes; the tools and their order are as before.
+- [ ] Desktop window (1920 × 1080 and 1280 × 800): one row of commands at the top, the toolbox at the right; ⋮ → View
+      has "Toolbox position" and no "Tool bar position". The tab on the top edge puts the command bar away (the
+      toolbox stays), the slim strip at the top brings it back.
+- [ ] Full screen (F11) and presenting (F5): the toolbox floats at its edge; its ⋯ has present, read only, search,
+      settings and "Leave full screen". No small tool square, no pen pill. The floating rail at the right ends above
+      the view pill (both visible, not overlapping), also with the touch profile.
+- [ ] Fold 7 folded, "My tools" → Full screen (or F11 with a keyboard): the toolbox floats at the bottom, the view pill
+      sits above it; a pen taken there writes; ⋯ → "Leave full screen" goes back to the dock. Held sideways: the
+      toolbox floats at the right.
+- [ ] Fold 7 folded, a `.md` open: the dock has "All tools", undo, redo and the page number (no ink tools);
+      "All tools" lists the commands.
+- [ ] The laser pointer while presenting: the toolbox's laser entry (among the first tools) on the floating rail; its
+      editor chooses pen or highlighter. Curtain and spotlight: the setsquare button held, on the floating rail.
+- [ ] Settings → Pen → Colors: under the palette's colors its source ("From: Open Color (MIT) …" for Marker).

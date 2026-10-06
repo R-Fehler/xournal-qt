@@ -59,10 +59,6 @@ public:
     /// ("handWhenOpening" in the touch part). On by default on Android, where one finger is expected to scroll; off
     /// on the desktop, where the tool stays as it was.
     static bool handWhenOpening(Settings& settings);
-    /// The tools: "toolbox" (the docked toolbox of one's own tools, qt/docs/toolbox.md; the default) or "classic" (the
-    /// tool bar of before, kept for one release). Setting "toolbarMode" in the xournalQt part; while it is not set,
-    /// XQT_TOOLBAR_MODE gives the default (the UI tests of the classic bar set it).
-    static QString toolbarMode(Settings& settings);
     int systemMemory() const;
 
     int revision() const { return rev; }
@@ -94,7 +90,7 @@ public:
     Q_INVOKABLE void resetScreenCalibration(QWindow* window);
 
     // --- the layout chosen by hand per size class (qt/docs/adaptive-layout.md) ---------------------------------
-    /// What was chosen for `what` ("sidebar", "toolbar", "chrome") in the size class `sizeClass` (AdaptiveLayout's
+    /// What was chosen for `what` ("sidebar", "toolbox", "chrome") in the size class `sizeClass` (AdaptiveLayout's
     /// names), stored as "layout/<class>/<what>" in the xournalQt part; "": nothing, the automatic choice applies.
     /// Changes count as a revision, so `(settings.revision, settings.layoutChoice(...))` follows them.
     Q_INVOKABLE QString layoutChoice(const QString& sizeClass, const QString& what) const;
