@@ -15,7 +15,7 @@
  *
  * The phone chrome (qt/phone-chrome; PhoneChromeTest): in the phone classes the app bar (the library, the title with
  * the tab dots, the tab count, ⋮) instead of the tab strip, the tool dock instead of the tool bar and the pills, the
- * sheets of all tools, the colors and the widths, the reader of a tiny window, the presenting's tap field, one window
+ * sheets of all tools, the colors and the widths, Zen in a tiny window, presenting's Zen dot, one window
  * on Android and iOS, the library's top without breadcrumbs, the Fold 7 folded and unfolded.
  *
  * What later blocks fix is listed as known (knownOutside, expectLater): the test passes now and is made stricter by
@@ -244,6 +244,17 @@ protected:
         wait(150);  // (the bindings and the layout follow)
     }
     QString sizeClass() const { return adaptive->property("sizeClass").toString(); }
+    /// The compact chrome (full screen's: the tab dots, the floating toolbox, the view pill) in the window as it is:
+    /// full screen, then the window back at its size. (The chrome chosen for a size class, Settings → Display →
+    /// "Controls at this size", is gone since 0.8.0; the tests still look at the compact chrome at every size.)
+    void compactChrome(bool on) {
+        const QSize size = window->size();
+        window->setProperty("fullScreenMode", on);
+        if (on) {
+            window->setProperty("windowFullScreen", false);
+        }
+        resize(size.width(), size.height());
+    }
     bool flag(const char* name) const { return window->property(name).toBool(); }
     QString choice(const char* sizeClass, const char* what) const {
         QString v;
@@ -1517,7 +1528,7 @@ TEST_F(AdaptiveLayoutTest, theTabOverviewOpensFromTheTabDotsOnAPhone) {
     ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "notes.xopp").string())));
     wait(200);
     resize(412, 915);
-    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
+    compactChrome(true);
     wait(150);
     auto* dots = findItem("fullScreenTabs");
     ASSERT_NE(dots, nullptr);
@@ -1710,8 +1721,8 @@ TEST_F(AdaptiveLayoutTest, touchProfile) {
     QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "touchProfile"), Q_ARG(QVariant, "auto"));
 }
 
-// The chrome is its own thing: full screen (F11) is the compact chrome in a full-screen window, as before; the compact
-// and the reader chrome can be chosen in a normal window (kept for the size class), without full screen.
+// The chrome is its own thing: full screen (F11) is the compact chrome in a full-screen window, as before; Zen is apart
+// from both (qt/zen: the reader chrome and the chrome chosen per size class are gone).
 TEST_F(AdaptiveLayoutTest, chromeModeApartFromTheWindowState) {
     openDocument();
     resize(1400, 850);
@@ -1731,33 +1742,11 @@ TEST_F(AdaptiveLayoutTest, chromeModeApartFromTheWindowState) {
     EXPECT_TRUE(flag("windowFullScreen")) << "full screen is the compact chrome in a full-screen window";
     EXPECT_TRUE(square->isVisible());
     EXPECT_TRUE(square->property("floating").toBool());
-    QTest::keyClick(window, Qt::Key_F11);
-    wait(50);
-    EXPECT_EQ(chrome(), "full");
-    EXPECT_FALSE(flag("windowFullScreen"));
-    window->showNormal();
-    resize(1400, 850);  // (the off-screen "screen" is 800 x 600: full screen made the window that small)
-
-    // Compact, chosen: in the window as it is
-    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
-    wait(50);
-    EXPECT_EQ(chrome(), "compact");
-    EXPECT_FALSE(flag("windowFullScreen"));
-    EXPECT_FALSE(flag("fullScreenMode"));
-    EXPECT_NE(window->visibility(), QWindow::FullScreen);
-    EXPECT_TRUE(square->isVisible()) << "the toolbox";
-    EXPECT_TRUE(square->property("floating").toBool()) << "floating over the page";
     EXPECT_FALSE(findItem("sidebar")->isVisible());
     if (tabStrip) {
         EXPECT_FALSE(tabStrip->isVisible());
     }
-    EXPECT_EQ(choice("desktopWide", "chrome"), "compact");
-    resize(960, 1392);
-    EXPECT_EQ(chrome(), "full") << "another class: its own choice (none)";
-    resize(1400, 850);
-    EXPECT_EQ(chrome(), "compact");
-
-    // ⋯ of its toolbox ends with the way back to the full chrome
+    // ⋯ of its toolbox ends with the way out of full screen
     click(findItem("toolboxMoreButton"));
     auto* menu = window->findChild<QObject*>("toolboxMoreMenu");
     ASSERT_NE(menu, nullptr);
@@ -1769,25 +1758,33 @@ TEST_F(AdaptiveLayoutTest, chromeModeApartFromTheWindowState) {
         }
     }
     ASSERT_NE(back, nullptr);
-    EXPECT_EQ(back->property("text").toString(), "Show the tabs and the tool bar");
+    EXPECT_TRUE(back->property("text").toString().startsWith("Leave full screen"));
     QMetaObject::invokeMethod(back, "triggered");
     QMetaObject::invokeMethod(menu, "close");
     EXPECT_EQ(chrome(), "full");
-    EXPECT_EQ(choice("desktopWide", "chrome"), "");
+    EXPECT_FALSE(flag("windowFullScreen"));
+    until([&] { return !menu->property("visible").toBool(); });  // (it fades out: Esc would be its until then)
+    ASSERT_FALSE(menu->property("visible").toBool());
+    window->showNormal();
+    resize(1400, 850);  // (the off-screen "screen" is 800 x 600: full screen made the window that small)
+    window->requestActivate();  // (the keys: the window has them again after full screen)
+    until([&] { return window->isActive(); });
+    EXPECT_EQ(findItem("chromeChoiceRow"), nullptr) << "no chrome chosen per size class any more (0.8.0)";
 
-    // Reader: no HUD; the corner mark brings the chrome back
-    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "reader"));
+    // Zen: apart from the chrome and the window's state; nothing around the page
+    QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, true));
     wait(50);
-    EXPECT_EQ(chrome(), "reader");
+    EXPECT_TRUE(flag("zen"));
+    EXPECT_EQ(chrome(), "full") << "Zen is no chrome of its own";
+    EXPECT_FALSE(flag("fullChrome"));
     EXPECT_TRUE(flag("hudHidden"));
+    EXPECT_FALSE(flag("windowFullScreen"));
     EXPECT_FALSE(viewPill->isVisible());
     EXPECT_FALSE(square->isVisible());
-    EXPECT_FALSE(flag("windowFullScreen"));
-    auto* mark = findItem("presentCornerMark");
-    ASSERT_NE(mark, nullptr);
-    EXPECT_TRUE(mark->isVisible());
-    click(mark);
-    EXPECT_EQ(chrome(), "full");
+    EXPECT_TRUE(findItem("zenDot")->isVisible());
+    QTest::keyClick(window, Qt::Key_Escape);
+    wait(50);
+    EXPECT_FALSE(flag("zen")) << "Esc leaves it";
     EXPECT_TRUE(viewPill->isVisible());
 
     // Presenting is still full screen, page by page; leaving full screen ends it
@@ -1953,7 +1950,7 @@ TEST_F(AdaptiveLayoutTest, theFloatingToolboxFitsAShortWindow) {
                                WindowSize{915, 412, "phone-landscape"}, WindowSize{412, 915, "phone-portrait"}}) {
         resize(s.w, s.h);
         const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
-        QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
+        compactChrome(true);
         wait(150);
         auto* box = named("toolbox");
         ASSERT_TRUE(shownInWindow(box)) << at;
@@ -1969,7 +1966,7 @@ TEST_F(AdaptiveLayoutTest, theFloatingToolboxFitsAShortWindow) {
         EXPECT_TRUE(insideWindow(popupRect(phoneClass() ? sheet() : menu))) << at << ": its menu";
         QTest::keyClick(window, Qt::Key_Escape);
         EXPECT_TRUE(opened(phoneClass() ? sheet() : menu, false)) << at;
-        QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
+        compactChrome(false);
         wait(30);
     }
 }
@@ -2003,11 +2000,11 @@ TEST_F(AdaptiveLayoutTest, newIsTheTabStripsPlusWhereThereIsOne) {
     EXPECT_FALSE(newButton->property("offered").toBool());
     EXPECT_FALSE(newButton->isVisible()) << "not in the bar too";
     EXPECT_FALSE(overflowNames().contains("new"));
-    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
+    compactChrome(true);
     wait(200);
     EXPECT_FALSE(named("newTabButton")->isVisible());
     EXPECT_TRUE(newButton->property("offered").toBool()) << "offered where there is no tab strip";
-    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
+    compactChrome(false);
     wait(200);
     resize(412, 915);
     EXPECT_TRUE(newButton->property("offered").toBool()) << "the phone's sheet has it";
@@ -2069,11 +2066,11 @@ TEST_F(AdaptiveLayoutTest, sidebarArrowOpensAndCloses) {
     wait(50);
     EXPECT_GE(arrow->width(), 48);
     QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "touchProfile"), Q_ARG(QVariant, "auto"));
-    // Not in the reader chrome
-    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "reader"));
+    // Not in Zen
+    QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, true));
     wait(50);
     EXPECT_FALSE(arrow->isVisible());
-    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
+    QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, false));
 }
 
 // The view pill: the contents button beside the page grid, no − / +, inside the window at the five sizes and clear of
@@ -2275,7 +2272,7 @@ TEST_F(AdaptiveLayoutTest, compactViewPillOnAPhone) {
     EXPECT_FALSE(named("pageNumberButton")->isVisible());
     resize(412, 915);
     // (the phone chrome has its dock instead of the view pill: the compact pill is the compact chrome's here)
-    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
+    compactChrome(true);
     wait(100);
     ASSERT_TRUE(pill->isVisible());
     ASSERT_TRUE(pill->property("compact").toBool());
@@ -2295,7 +2292,7 @@ TEST_F(AdaptiveLayoutTest, compactViewPillOnAPhone) {
     EXPECT_TRUE(grid->isVisible()) << "the page number opens all pages";
     QMetaObject::invokeMethod(grid, "close");
     until([&] { return !grid->isVisible(); });
-    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
+    compactChrome(false);
     // Beside the Markdown source of a desktop window made small: the compact pill too, and ⋮ offers the page layout
     resize(1024, 700);
     auto* panel = findItem("markdownPanel");
@@ -2327,11 +2324,11 @@ TEST_F(AdaptiveLayoutTest, undoAndRedoHaveOnePlaceAtATime) {
     controller->setToolbarHidden(false);
     wait(150);
     // The compact chrome: the floating toolbox
-    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
+    compactChrome(true);
     wait(150);
     EXPECT_TRUE(shownInWindow(boxUndo)) << "the compact chrome: the floating toolbox";
     EXPECT_FALSE(pillUndo->isVisible());
-    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
+    compactChrome(false);
     wait(150);
     // A text document: its format bar; in the compact chrome the view pill
     std::ofstream(root / "kalman.md") << "# Lecture 3\n\nThe **prediction** step.\n";
@@ -2340,12 +2337,12 @@ TEST_F(AdaptiveLayoutTest, undoAndRedoHaveOnePlaceAtATime) {
     EXPECT_TRUE(shownInWindow(named("formatUndoButton"))) << "a text document: its format bar";
     EXPECT_FALSE(boxUndo->isVisible());
     EXPECT_FALSE(pillUndo->isVisible());
-    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
+    compactChrome(true);
     wait(150);
     EXPECT_TRUE(shownInWindow(pillUndo)) << "a text document in the compact chrome: the view pill";
     EXPECT_TRUE(shownInWindow(pillRedo));
     EXPECT_FALSE(named("formatUndoButton")->isVisible());
-    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
+    compactChrome(false);
     wait(150);
     EXPECT_FALSE(pillUndo->isVisible());
 }
@@ -2595,7 +2592,8 @@ TEST_F(AdaptiveLayoutTest, moreMenuRepeatsNoButton) {
                             "insertStickyNoteItem", "openExternallyItem", "editAsNotesItem", "hideToolbarItem"}) {
         EXPECT_EQ(window->findChild<QObject*>(gone), nullptr) << gone << " is a button: not in ⋮ too";
     }
-    for (const char* kept: {"presentCleanItem", "insertPagesItem", "readItem", "allDocumentsItem", "toolboxPositionMenu"}) {
+    for (const char* kept: {"presentCleanItem", "insertPagesItem", "readItem", "zenItem", "readOnlyItem", "allDocumentsItem",
+                            "toolboxPositionMenu"}) {
         EXPECT_NE(window->findChild<QObject*>(kept), nullptr) << kept << " differs from any button: kept";
     }
     // The buttons are there instead
@@ -2608,8 +2606,7 @@ TEST_F(AdaptiveLayoutTest, moreMenuRepeatsNoButton) {
 // --- the phone chrome (qt/phone-chrome) -----------------------------------------------------------------------------
 
 namespace {
-/// The phone chrome: the app bar and the tool dock of the phone classes, the reader of a tiny window, the presenting's
-/// tap field, one window on Android and iOS, the library's top without breadcrumbs, the Fold 7 folded and unfolded
+/// The phone chrome: the app bar and the tool dock of the phone classes, Zen in a tiny window, presenting's Zen dot, one window on Android and iOS, the library's top without breadcrumbs, the Fold 7 folded and unfolded
 class PhoneChromeTest: public AdaptiveLayoutTest {
 protected:
     /// Three documents open, A B C, used in that order (C is the current one)
@@ -2650,7 +2647,7 @@ TEST_F(PhoneChromeTest, theAppBarAndTheDockAtAPhonesSizes) {
         resize(s.w, s.h);
         const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
         if (sizeClass() == "tiny") {
-            QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
+            QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, false));  // (Zen of a tiny window: left)
             wait(100);
         }
         // (under load the bar and the dock lay themselves out a little after the resize)
@@ -2866,72 +2863,104 @@ TEST_F(PhoneChromeTest, thePageNumberOpensThePagesWithTheContentsAndTheZoom) {
     EXPECT_FALSE(grid->isVisible());
 }
 
-// The reader (no HUD) is the automatic chrome only of a tiny window (under 360 px either way); a phone keeps its
-// tools. Its corner field brings them back, for this size class.
-TEST_F(PhoneChromeTest, theReaderIsAutomaticOnlyInATinyWindow) {
+// Zen (only the page and the dot) is automatic only in a tiny window (under 360 px either way); a phone keeps its tools.
+// Leaving it there is remembered for tiny windows (qt/docs/zen.md).
+TEST_F(PhoneChromeTest, zenIsAutomaticOnlyInATinyWindow) {
     openDocument();
     auto chrome = [&] { return window->property("chromeMode").toString(); };
     for (const WindowSize& s: {WindowSize{412, 915, ""}, WindowSize{915, 412, ""}, WindowSize{1280, 500, ""},
                                WindowSize{960, 1392, ""}}) {
         resize(s.w, s.h);
         EXPECT_EQ(chrome(), "full") << s.w << "x" << s.h;
+        EXPECT_FALSE(flag("zen")) << s.w << "x" << s.h;
     }
     for (const WindowSize& s: {WindowSize{340, 700, ""}, WindowSize{700, 340, ""}}) {
         resize(s.w, s.h);
         ASSERT_EQ(sizeClass(), "tiny");
-        EXPECT_EQ(chrome(), "reader") << s.w << "x" << s.h << ": the reader, automatically";
+        EXPECT_TRUE(flag("zen")) << s.w << "x" << s.h << ": Zen, automatically";
+        EXPECT_FALSE(flag("readOnlyOn")) << "Zen writes";
         EXPECT_TRUE(flag("hudHidden"));
         EXPECT_FALSE(named("phoneAppBar")->isVisible());
         EXPECT_FALSE(named("phoneDock")->isVisible());
-        EXPECT_TRUE(findItem("presentCornerMark")->isVisible()) << "the corner field";
+        EXPECT_TRUE(findItem("zenDot")->isVisible()) << "the dot";
     }
-    click(findItem("presentCornerMark"));
-    EXPECT_EQ(chrome(), "full") << "the field brings the tools back";
-    EXPECT_EQ(choice("tiny", "chrome"), "full") << "remembered for tiny windows";
+    // Its pill fits the tiny window
+    click(findItem("zenDot"));
+    auto* pill = findItem("zenPill");
+    until([&] { return pill->isVisible(); });
+    ASSERT_TRUE(pill->isVisible());
+    EXPECT_TRUE(QRectF(0, 0, window->width(), window->height()).contains(sceneRect(pill))) << "the pill fits";
+    click(findItem("zenShowControls"));
+    EXPECT_FALSE(flag("zen")) << "Show controls";
+    EXPECT_EQ(choice("tiny", "zen"), "off") << "remembered for tiny windows";
     EXPECT_TRUE(named("phoneDock")->isVisible());
+    resize(340, 700);
+    EXPECT_FALSE(flag("zen")) << "a tiny window of the other shape: the same class, the same choice";
     resize(412, 915);
-    // "Read" by hand on a phone (⋮ → View → Read): full screen, read only (qt/ui-rework; ReadingPhoneTest has more)
+    // Read by hand on a phone (⋮ → View → Read): Zen and read only, full screen (ReadingPhoneTest has more)
     QMetaObject::invokeMethod(window->findChild<QObject*>("readItem"), "triggered");
     wait(50);
     EXPECT_TRUE(flag("fullScreenMode"));
     EXPECT_TRUE(flag("readOnlyOn"));
-    EXPECT_TRUE(flag("reading"));
-    EXPECT_EQ(choice("phonePortrait", "chrome"), "") << "no chrome chosen: read only belongs to full screen";
-    window->setProperty("fullScreenMode", false);
+    EXPECT_TRUE(flag("zen"));
+    EXPECT_EQ(choice("phonePortrait", "zen"), "") << "nothing remembered outside a tiny window";
+    QTest::keyClick(window, Qt::Key_Escape);
     wait(50);
-    EXPECT_FALSE(flag("readOnlyOn")) << "full screen ends: read only with it";
+    EXPECT_FALSE(flag("readOnlyOn")) << "Esc ends Read: read only";
+    EXPECT_FALSE(flag("zen")) << "... Zen";
+    EXPECT_FALSE(flag("fullScreenMode")) << "... and the full screen it entered";
     EXPECT_EQ(chrome(), "full");
+    // Zen by hand in the tiny window again: automatic again there
+    resize(340, 700);
+    QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, true));
+    wait(50);
+    EXPECT_TRUE(flag("zen"));
+    EXPECT_EQ(choice("tiny", "zen"), "");
+    // Read in a tiny window: stays in the window; ended, Zen stays (it was on before)
+    QMetaObject::invokeMethod(window, "toggleReading");
+    wait(50);
+    EXPECT_TRUE(flag("readOnlyOn"));
+    EXPECT_FALSE(flag("fullScreenMode")) << "a tiny window stays a window";
+    EXPECT_EQ(window->width(), 340);
+    QMetaObject::invokeMethod(window, "toggleReading");
+    wait(50);
+    EXPECT_FALSE(flag("readOnlyOn"));
+    EXPECT_TRUE(flag("zen")) << "Zen was on before Read";
+    // From 0.7.0: the reader chrome left in a tiny window (its choice "full") stays left
+    QMetaObject::invokeMethod(settings, "resetLayoutChoices");
+    QMetaObject::invokeMethod(settings, "setLayoutChoice", Q_ARG(QString, "tiny"), Q_ARG(QString, "chrome"),
+                              Q_ARG(QString, "full"));
+    wait(50);
+    EXPECT_FALSE(flag("zen")) << "the reader left there in 0.7.0";
+    window->showNormal();
 }
 
-// Presenting: the corner field is clearly there while the tools show (it pulses once at the start) and faint while
-// they are hidden; its name says what a tap does
-TEST_F(PhoneChromeTest, thePresentationTapField) {
+// Presenting: with the controls no dot (Ctrl+F5 or the floating toolbox's ⋯ hide them); without controls (Zen) the
+// dot, whose pill brings them back (presentingWithoutControls has more)
+TEST_F(PhoneChromeTest, presentingWithoutControlsHasTheZenDot) {
     openDocument();
     resize(1280, 800);
-    auto* mark = findItem("presentCornerMark");
-    auto* dot = findItem("presentCornerDot");
-    ASSERT_NE(mark, nullptr);
+    auto* dot = findItem("zenDot");
     ASSERT_NE(dot, nullptr);
+    EXPECT_EQ(findItem("presentCornerMark"), nullptr) << "presenting's own corner field is gone";
     QMetaObject::invokeMethod(window, "startPresenting", Q_ARG(QVariant, false));
     wait(100);
-    EXPECT_TRUE(mark->isVisible());
-    EXPECT_GT(mark->property("pulse").toDouble(), 0) << "it pulses when presenting starts";
-    EXPECT_TRUE(mark->property("highlighted").toBool()) << "the tools show: clearly visible";
-    EXPECT_EQ(mark->property("labelText").toString(), "Hide the tools");
-    until([&] { return mark->property("pulse").toDouble() == 0; });
-    EXPECT_GE(dot->property("opacity").toDouble(), 0.9);
-    EXPECT_TRUE(findItem("presentCornerRing")->isVisible()) << "a ring around it";
-    click(mark);
-    EXPECT_TRUE(flag("presentClean")) << "a tap hides the tools";
-    EXPECT_FALSE(mark->property("highlighted").toBool());
-    EXPECT_EQ(mark->property("labelText").toString(), "Show the tools");
-    QTest::mouseMove(window, QPoint(window->width() / 2, window->height() / 2));  // (the pointer over it lights it up)
-    wait(250);
-    EXPECT_LE(dot->property("opacity").toDouble(), 0.3) << "faint while they are hidden";
-    EXPECT_FALSE(findItem("presentCornerRing")->isVisible());
-    click(mark);
-    EXPECT_FALSE(flag("presentClean")) << "and shows them again";
+    EXPECT_FALSE(dot->isVisible()) << "with the controls: no dot";
+    EXPECT_TRUE(findItem("toolbox")->isVisible());
+    QTest::keyClick(window, Qt::Key_F5, Qt::ControlModifier);
+    wait(50);
+    EXPECT_TRUE(flag("presentClean"));
+    EXPECT_TRUE(flag("zen")) << "present without controls = present + Zen";
+    EXPECT_TRUE(dot->isVisible());
+    EXPECT_FALSE(findItem("toolbox")->isVisible());
+    click(dot);
+    until([&] { return findItem("zenPill")->isVisible(); });
+    click(findItem("zenShowControls"));
+    EXPECT_FALSE(flag("presentClean")) << "Show controls: presenting with them";
+    EXPECT_TRUE(controller->property("presenting").toBool());
+    EXPECT_FALSE(dot->isVisible());
     controller->setProperty("presenting", false);
+    EXPECT_FALSE(flag("zen")) << "presenting's Zen ends with it";
     window->setProperty("fullScreenMode", false);
     wait(100);
     window->showNormal();
@@ -3266,7 +3295,7 @@ TEST_F(SafeAreasKeyboardTest, controlsStayOutOfTheSafeArea) {
         until([&] { return !grid->isVisible(); });
         // The compact chrome: the floating toolbox (on a phone too), the tab dots
         controller->selectTool("pen");
-        QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
+        compactChrome(true);
         wait(150);
         shot("insets-compact-" + at);
         for (const char* name: {"toolbox", "fullScreenTabs", "viewPill"}) {
@@ -3274,7 +3303,7 @@ TEST_F(SafeAreasKeyboardTest, controlsStayOutOfTheSafeArea) {
         }
         EXPECT_TRUE(named("toolbox")->isVisible()) << at;
         EXPECT_TRUE(named("toolbox")->property("floating").toBool()) << at;
-        QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
+        compactChrome(false);
         wait(100);
         expectInside("doc");
     }

@@ -932,11 +932,14 @@ TEST_F(ToolboxTest, inFullScreenTheSameToolboxFloatsAndPresentingHidesIt) {
     until([&] { return controller->presenting(); });
     EXPECT_TRUE(controller->presenting());
     EXPECT_TRUE(shown(box)) << "presenting keeps the tools (writing on the slides)";
-    // The corner field hides them, and shows them again
-    click(find("presentCornerMark"));
+    // ⋯ → "Hide the tools": presenting in Zen; the dot's pill shows them again
+    click(more);
+    trigger(menu, "toolboxPresentCleanItem");
     until([&] { return !shown(box); });
     EXPECT_FALSE(shown(box));
-    click(find("presentCornerMark"));
+    click(find("zenDot"));
+    until([&] { return shown(find("zenPill")); });
+    click(find("zenShowControls"));
     until([&] { return shown(box); });
     EXPECT_TRUE(shown(box));
     controller->setPresenting(false);
@@ -1002,7 +1005,7 @@ TEST_F(ToolboxTest, theCommandBarShowsEntriesOfTheMoreMenuWhereThereIsRoom) {
     // (qt/ui-rework: reading, the replay of the writing and the tags too; a milestone where versions are kept)
     const std::vector<std::pair<const char*, const char*>> promoted{
             {"shareButton", "shareItem"}, {"printButton", "printItem"}, {"readButton", "readItem"},
-            {"replayButton", "replayItem"}, {"tagsButton", "documentTagsMenuItem"}};
+            {"zenButton", "zenItem"}, {"replayButton", "replayItem"}, {"tagsButton", "documentTagsMenuItem"}};
     auto check = [&](int w, int h) {
         resize(w, h);
         for (const auto& [button, name]: promoted) {
@@ -1037,13 +1040,28 @@ TEST_F(ToolboxTest, theCommandBarShowsEntriesOfTheMoreMenuWhereThereIsRoom) {
         }
         EXPECT_TRUE(shown(find("shareButton"))) << "at " << w << ": the tags go before sharing";
     }
-    // Reading from the bar: full screen, read only
+    // Reading from the bar: Zen and read only, full screen; the keys again end it
     resize(1920, 1080);
     click(find("readButton"));
     until([&] { return win("readOnlyOn").toBool(); });
     EXPECT_TRUE(win("fullScreenMode").toBool());
-    window->setProperty("fullScreenMode", false);
+    EXPECT_TRUE(win("zen").toBool());
+    QTest::keyClick(window, Qt::Key_R, Qt::ControlModifier | Qt::AltModifier);
     until([&] { return !win("readOnlyOn").toBool(); });
+    EXPECT_FALSE(win("zen").toBool());
+    EXPECT_FALSE(win("fullScreenMode").toBool());
+    // Zen from the bar (qt/zen; the top bar places it in its first layout): the window stays as it is
+    window->showNormal();
+    resize(1920, 1080);
+    until([&] { return shown(find("zenButton")); });
+    click(find("zenButton"));
+    until([&] { return win("zen").toBool(); });
+    EXPECT_TRUE(win("zen").toBool());
+    EXPECT_FALSE(win("fullScreenMode").toBool());
+    EXPECT_FALSE(win("readOnlyOn").toBool());
+    QTest::keyClick(window, Qt::Key_Escape);
+    until([&] { return !win("zen").toBool(); });
+    EXPECT_FALSE(win("zen").toBool());
 }
 
 TEST_F(ToolboxTest, aTextDocumentHasUndoRedoAndItsCommandsInTheFormatBar) {
@@ -1078,8 +1096,8 @@ TEST_F(ToolboxTest, aTextDocumentHasUndoRedoAndItsCommandsInTheFormatBar) {
     EXPECT_FALSE(shown(find("searchButton")) && inside(find("searchButton"), commands)) << "in \"more tools\" at 720";
 }
 
-/// Reading (qt/docs/toolbox.md, "Reading"; qt/ui-rework): read only in full screen and presenting, the edges turn the
-/// pages, no ink, the tools back when it ends
+/// Zen and read only (qt/docs/zen.md; qt/zen): three switches of their own - full screen, Zen (only the page and the
+/// dot), read only (the edges turn the pages, no ink) - and Read, Zen and read only together
 class ReadingTest: public ToolboxTest {
 protected:
     void SetUp() override {
@@ -1100,8 +1118,8 @@ protected:
         return n;
     }
     /// A stroke with the mouse (the pen in hand) across the middle of the page
-    void stroke() {
-        const QPoint a = rectOf(find("canvas")).center().toPoint();
+    void stroke(QPoint offset = {}) {
+        const QPoint a = rectOf(find("canvas")).center().toPoint() + offset;
         QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, a);
         for (int k = 1; k <= 6; ++k) {
             QTest::mouseMove(window, a + QPoint(10 * k, 8 * k));
@@ -1118,13 +1136,24 @@ protected:
         wait(80);
     }
     bool readOnly() const { return window->property("readOnlyOn").toBool(); }
-    /// ⋮ → View → Read, then the checks every size shares: full screen, read only, the tools away, the edges turn the
-    /// pages, no ink, Esc gives everything back
+    bool zen() const { return window->property("zen").toBool(); }
+    QObject* note() const { return find<QObject>("readOnlyNote"); }
     /// Full screen has taken the screen's size (the window follows it a little later)
     void fullScreenSettled() {
         until([&] { return window->size() == window->screen()->size(); });
         wait(300);
     }
+    /// The dot's pill, open
+    QQuickItem* openPill() {
+        auto* pill = find("zenPill");
+        if (!shown(pill)) {
+            click(find("zenDot"));
+            until([&] { return shown(pill); });
+        }
+        return pill;
+    }
+    /// ⋮ → View → Read, then the checks every size shares: full screen, Zen, read only, the edges turn the pages, no
+    /// ink (said once), a finger's tap in the middle opens the dot's pill, Esc gives everything back
     void readAndLeave() {
         auto* canvas = find("canvas");
         QMetaObject::invokeMethod(find<QObject>("readItem"), "triggered");
@@ -1132,11 +1161,14 @@ protected:
         ASSERT_TRUE(readOnly());
         fullScreenSettled();
         EXPECT_TRUE(win("fullScreenMode").toBool()) << "full screen";
+        EXPECT_TRUE(zen()) << "Zen";
         EXPECT_TRUE(win("reading").toBool());
         EXPECT_TRUE(canvas->property("readingOnly").toBool());
         EXPECT_FALSE(shown(find("toolbox"))) << "no tools";
+        EXPECT_FALSE(shown(find("viewPill"))) << "no view pill";
         EXPECT_EQ(find("readingPill"), nullptr) << "the reading pill is gone";
-        EXPECT_TRUE(shown(find("readOnlyMark"))) << "the lock says so";
+        EXPECT_EQ(find("readOnlyMark"), nullptr) << "no lock (0.8.0)";
+        EXPECT_TRUE(shown(find("zenDot"))) << "the dot";
         // The fields: a fifth of the width at each edge, the page's whole height
         auto* next = find("readingNextField");
         ASSERT_TRUE(shown(next));
@@ -1144,10 +1176,18 @@ protected:
         EXPECT_NEAR(rectOf(next).height(), rectOf(canvas).height(), 1);
         EXPECT_GE(rectOf(next).width(), std::max(48.0, rectOf(canvas).width() * 0.19));
         EXPECT_LE(rectOf(next).width(), std::max(48.0, rectOf(canvas).width() * 0.26));
-        // The pen writes nothing
+        // The pen writes nothing; the first stroke says so, at the pen, once
         const size_t before = ink();
+        EXPECT_FALSE(shown(qobject_cast<QQuickItem*>(note())));
         stroke();
         EXPECT_EQ(ink(), before) << "no ink by accident";
+        until([&] { return shown(qobject_cast<QQuickItem*>(note())); });
+        EXPECT_TRUE(shown(qobject_cast<QQuickItem*>(note()))) << "the note";
+        EXPECT_EQ(find("readOnlyNoteText")->property("text").toString(), "Read only — tap the dot to write");
+        EXPECT_LT(QLineF(rectOf(qobject_cast<QQuickItem*>(note())).center(),
+                         rectOf(canvas).center() + QPointF(60, 48)).length(), 200) << "at the pen";
+        stroke(QPoint(-100, 0));
+        EXPECT_EQ(note()->property("toldCount").toInt(), 1) << "once";
         // The edges turn the pages, with a hint where it was tapped
         controller->firstPage();
         until([&] { return page() == 1; });
@@ -1187,11 +1227,23 @@ protected:
         EXPECT_LT(y1, y0) << "the page scrolled under the swipe";
         EXPECT_LT(find("readingNextHint")->opacity(), 0.01) << "a swipe is no tap";
         EXPECT_EQ(ink(), before);
-        // Esc: out of full screen, the tools again
+        // A finger's tap in the middle: the dot's pill (a tap on the page closes it)
+        wait(400);  // (no double tap with the swipe)
+        const QPoint middle = rectOf(canvas).center().toPoint();
+        QTest::touchEvent(window, finger).press(1, middle);
+        QTest::touchEvent(window, finger).release(1, middle);
+        until([&] { return shown(find("zenPill")); });
+        EXPECT_TRUE(shown(find("zenPill"))) << "a tap in the middle: the pill";
+        QTest::touchEvent(window, finger).press(1, middle + QPoint(0, 60));
+        QTest::touchEvent(window, finger).release(1, middle + QPoint(0, 60));
+        until([&] { return !shown(find("zenPill")); });
+        EXPECT_FALSE(shown(find("zenPill"))) << "a tap on the page closes it";
+        // Esc: out of Read - Zen, read only and its full screen
         QTest::keyClick(window, Qt::Key_Escape);
         until([&] { return !win("fullScreenMode").toBool(); });
         EXPECT_FALSE(win("fullScreenMode").toBool());
         EXPECT_FALSE(readOnly());
+        EXPECT_FALSE(zen());
         EXPECT_FALSE(canvas->property("readingOnly").toBool());
         EXPECT_FALSE(shown(find("readingNextField")));
         stroke();
@@ -1199,7 +1251,7 @@ protected:
     }
 };
 
-TEST_F(ReadingTest, onADesktopReadIsFullScreenReadOnlyAndTheEdgesTurnThePages) {
+TEST_F(ReadingTest, onADesktopReadIsZenReadOnlyInFullScreen) {
     readAndLeave();
     until([&] { return shown(find("toolbox")); });
     EXPECT_TRUE(shown(find("toolbox"))) << "the toolbox docked again";
@@ -1222,7 +1274,7 @@ protected:
     }
 };
 
-TEST_F(ReadingPhoneTest, onAPhoneReadIsFullScreenReadOnlyAndTheEdgesTurnThePages) {
+TEST_F(ReadingPhoneTest, onAPhoneReadIsZenReadOnlyInFullScreen) {
     resize(412, 915);
     until([&] { return find("toolbox")->property("compact").toBool(); });
     ASSERT_EQ(win("phoneLayout").toBool(), true);
@@ -1232,37 +1284,69 @@ TEST_F(ReadingPhoneTest, onAPhoneReadIsFullScreenReadOnlyAndTheEdgesTurnThePages
     EXPECT_TRUE(find("toolbox")->property("compact").toBool()) << "the phone's dock again";
 }
 
-TEST_F(ReadingTest, readOnlyIsAToggleOfFullScreenAndPresenting) {
+// Read only is a switch of its own: in a window with every tool shown (⋮ → View → Read only), in full screen (the
+// floating toolbox's ⋯), while presenting (Read: Zen and read only); no lock, the first stroke says so once
+TEST_F(ReadingTest, readOnlyIsASwitchOfItsOwn) {
+    auto* box = find("toolbox");
+    // In the window: the tools stay, the pen writes nothing, a note says how to write again
+    QObject* item = find<QObject>("readOnlyItem");
+    ASSERT_NE(item, nullptr);
+    EXPECT_TRUE(item->property("checkable").toBool());
+    QMetaObject::invokeMethod(item, "triggered");
+    until([&] { return readOnly(); });
+    ASSERT_TRUE(readOnly());
+    EXPECT_FALSE(win("fullScreenMode").toBool()) << "not full screen";
+    EXPECT_FALSE(zen()) << "not Zen";
+    EXPECT_TRUE(shown(box)) << "the tools stay";
+    EXPECT_TRUE(item->property("checked").toBool());
+    EXPECT_EQ(find("readOnlyMark"), nullptr) << "no lock";
+    EXPECT_TRUE(shown(find("readingNextField"))) << "the edges turn the pages";
+    const size_t before = ink();
+    stroke();
+    EXPECT_EQ(ink(), before);
+    until([&] { return shown(qobject_cast<QQuickItem*>(note())); });
+    EXPECT_EQ(find("readOnlyNoteText")->property("text").toString(), "Read only — ⋮ → View → Read only to write");
+    stroke(QPoint(-100, 0));
+    EXPECT_EQ(note()->property("toldCount").toInt(), 1) << "once";
+    QMetaObject::invokeMethod(item, "triggered");
+    until([&] { return !readOnly(); });
+    stroke();
+    EXPECT_GT(ink(), before) << "writes again";
+    // Turned on again: a new read-only time, the note again
+    QMetaObject::invokeMethod(item, "triggered");
+    until([&] { return readOnly(); });
+    stroke(QPoint(-100, -60));
+    EXPECT_EQ(note()->property("toldCount").toInt(), 2) << "said again after read only was off";
+    QMetaObject::invokeMethod(item, "triggered");
+    until([&] { return !readOnly(); });
+
+    // Full screen: the floating toolbox's ⋯
     window->setProperty("fullScreenMode", true);
     fullScreenSettled();
-    auto* box = find("toolbox");
     until([&] { return shown(box) && box->property("floating").toBool(); });
-    // The floating toolbox's ⋯: read only
     click(find("toolboxMoreButton"));
     trigger(find<QObject>("toolboxMoreMenu"), "toolboxReadOnlyItem");
     until([&] { return readOnly(); });
     ASSERT_TRUE(readOnly());
-    EXPECT_FALSE(shown(box));
+    EXPECT_TRUE(shown(box)) << "the floating toolbox stays (Zen hides it)";
     EXPECT_TRUE(win("fullScreenMode").toBool());
-    // The lock: write again, still full screen
-    click(find("readOnlyButton"));
+    click(find("toolboxMoreButton"));
+    trigger(find<QObject>("toolboxMoreMenu"), "toolboxReadOnlyItem");
     until([&] { return !readOnly(); });
     EXPECT_FALSE(readOnly());
-    until([&] { return shown(box); });
-    EXPECT_TRUE(shown(box));
-    EXPECT_TRUE(win("fullScreenMode").toBool());
-    // The key, while presenting: page by page
+    // Presenting: Read (the keys) is presenting in Zen with read only; page by page
     QMetaObject::invokeMethod(window, "startPresenting", Q_ARG(QVariant, false));
     until([&] { return controller->presenting(); });
     wait(300);  // (presenting has settled: the console placed, the window active)
     QTest::keyClick(window, Qt::Key_R, Qt::ControlModifier | Qt::AltModifier);
     until([&] { return readOnly(); });
     ASSERT_TRUE(readOnly());
+    EXPECT_TRUE(win("presentClean").toBool()) << "presenting without controls";
     EXPECT_TRUE(find("canvas")->property("readingOnly").toBool());
     EXPECT_FALSE(shown(box));
-    const size_t before = ink();
+    const size_t before2 = ink();
     stroke();
-    EXPECT_EQ(ink(), before);
+    EXPECT_EQ(ink(), before2);
     tapField("readingNextField");
     until([&] { return page() == 2; });
     EXPECT_EQ(page(), 2) << "the next slide";
@@ -1271,16 +1355,160 @@ TEST_F(ReadingTest, readOnlyIsAToggleOfFullScreenAndPresenting) {
     EXPECT_FALSE(readOnly());
     until([&] { return shown(box); });
     EXPECT_TRUE(shown(box)) << "presenting with the tools again";
+    EXPECT_TRUE(controller->presenting());
     controller->setPresenting(false);
     window->setProperty("fullScreenMode", false);
     until([&] { return !box->property("floating").toBool(); });
-    // Not in a window: the key there enters full screen with it
-    QTest::keyClick(window, Qt::Key_R, Qt::ControlModifier | Qt::AltModifier);
+}
+
+// Zen (qt/docs/zen.md): only the page and a faint dot in the lower left corner; the pen writes, P/H/E/T take tools
+TEST_F(ReadingTest, zenHidesEverythingButThePageAndTheDot) {
+    resize(1280, 800);
+    auto* canvas = find("canvas");
+    QObject* item = find<QObject>("zenItem");
+    ASSERT_NE(item, nullptr);
+    EXPECT_TRUE(item->property("checkable").toBool());
+    QMetaObject::invokeMethod(item, "triggered");
+    until([&] { return zen(); });
+    ASSERT_TRUE(zen());
+    EXPECT_FALSE(win("fullScreenMode").toBool()) << "Zen is no full screen";
+    EXPECT_FALSE(readOnly()) << "nor read only";
+    for (const char* gone: {"toolbox", "topTools", "toolArea", "tabStrip", "sidebarArrow", "viewPill", "sidebar", "phoneDock",
+                            "phoneAppBar"}) {
+        EXPECT_FALSE(shown(find(gone))) << gone << " is hidden";
+    }
+    auto* dot = find("zenDot");
+    ASSERT_TRUE(shown(dot));
+    // In the lower left corner of the page, a finger wide; what shows of it is a 10 px dot, faint after 2 s
+    const QRectF target = rectOf(dot);
+    EXPECT_GE(target.width(), 48);
+    EXPECT_GE(target.height(), 48);
+    EXPECT_NEAR(target.left(), rectOf(canvas).left(), 1);
+    EXPECT_NEAR(target.bottom(), rectOf(canvas).bottom(), 1);
+    auto* mark = find("zenDotMark");
+    ASSERT_NE(mark, nullptr);
+    EXPECT_LE(mark->width(), 12);
+    EXPECT_GE(mark->width(), 8);
+    until([&] { return mark->opacity() <= 0.21; }, 4000);
+    EXPECT_LE(mark->opacity(), 0.21) << "about 20 % after 2 s";
+    // The mouse near it: clearer
+    QTest::mouseMove(window, (target.topRight() + QPointF(40, -20)).toPoint());
+    until([&] { return mark->opacity() > 0.5; }, 2000);
+    EXPECT_GT(mark->opacity(), 0.5) << "brighter while the pointer is near";
+    QTest::mouseMove(window, rectOf(canvas).center().toPoint());
+    // Safe areas: the dot keeps clear of them
+    safeArea(0, 0, 30, 20);
+    EXPECT_NEAR(rectOf(dot).left(), rectOf(canvas).left() + 20, 1);
+    EXPECT_NEAR(rectOf(dot).bottom(), rectOf(canvas).bottom() - 30, 1);
+    safeArea(0, 0, 0, 0);
+    // The pen writes, the keys take the tools
+    const size_t before = ink();
+    stroke();
+    EXPECT_EQ(ink(), before + 1) << "Zen writes";
+    QTest::keyClick(window, Qt::Key_H);
+    until([&] { return controller->tool() == "highlighter"; });
+    EXPECT_EQ(controller->tool(), "highlighter");
+    stroke(QPoint(-120, -80));
+    EXPECT_EQ(ink(), before + 2);
+    QTest::keyClick(window, Qt::Key_P);
+    until([&] { return controller->tool() == "pen"; });
+    EXPECT_EQ(controller->tool(), "pen");
+    // Its keys (Ctrl+Alt+Z) leave it, and enter it again; Esc leaves it
+    QTest::keyClick(window, Qt::Key_Z, Qt::ControlModifier | Qt::AltModifier);
+    until([&] { return !zen(); });
+    EXPECT_FALSE(zen());
+    EXPECT_TRUE(shown(find("toolbox")));
+    QTest::keyClick(window, Qt::Key_Z, Qt::ControlModifier | Qt::AltModifier);
+    until([&] { return zen(); });
+    EXPECT_TRUE(zen());
+    QTest::keyClick(window, Qt::Key_Escape);
+    until([&] { return !zen(); });
+    EXPECT_FALSE(zen()) << "Esc";
+    EXPECT_TRUE(shown(find("toolbox")));
+    EXPECT_TRUE(shown(find("viewPill")));
+    // Settings → Shortcuts: Zen on Ctrl+Alt+Z, Read on Ctrl+Alt+R
+    auto* shortcuts = qobject_cast<QAbstractItemModel*>(controller->shortcutsModel());
+    ASSERT_NE(shortcuts, nullptr);
+    const auto roles = shortcuts->roleNames();
+    const int idRole = roles.key("actionId"), keysRole = roles.key("keys");
+    QMap<QString, QString> byId;
+    for (int r = 0; r < shortcuts->rowCount(); ++r) {
+        byId[shortcuts->data(shortcuts->index(r, 0), idRole).toString()] =
+                shortcuts->data(shortcuts->index(r, 0), keysRole).toString();
+    }
+    EXPECT_EQ(byId.value("zen"), "Ctrl+Alt+Z");
+    EXPECT_EQ(byId.value("readOnly"), "Ctrl+Alt+R");
+}
+
+// The dot's pill (qt/docs/zen.md): beside the dot over the page (the page does not move); Show controls, Read only, the
+// page number (all pages), fit the width / the whole page; a tap on the page closes it and writes nothing
+TEST_F(ReadingTest, theZenDotsPillAndItsEntries) {
+    resize(1280, 800);
+    auto* canvas = find("canvas");
+    QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, true));
+    until([&] { return zen(); });
+    wait(300);  // (the page takes the room of the bars)
+    const QRectF canvasBefore = rectOf(canvas);
+    const double y0 = canvas->property("contentY").toDouble();
+    auto* pill = openPill();
+    ASSERT_TRUE(shown(pill));
+    const QRectF dot = rectOf(find("zenDot"));
+    EXPECT_GE(rectOf(pill).left(), dot.right() - 8) << "beside the dot";
+    EXPECT_NEAR(rectOf(pill).bottom(), dot.bottom(), 8);
+    EXPECT_EQ(rectOf(canvas), canvasBefore) << "the page does not move";
+    EXPECT_EQ(canvas->property("contentY").toDouble(), y0);
+    for (const char* name: {"zenShowControls", "zenReadOnly", "zenPage", "zenFitWidth", "zenFitPage"}) {
+        EXPECT_TRUE(shown(find(name))) << name;
+        EXPECT_TRUE(rectOf(pill).adjusted(-1, -1, 1, 1).contains(rectOf(find(name)))) << name << " in the pill";
+    }
+    EXPECT_EQ(find("zenPage")->property("text").toString(), "1 / 3");
+    // A tap on the page closes it, and writes nothing
+    const size_t before = ink();
+    click(canvas);
+    until([&] { return !shown(pill); });
+    EXPECT_FALSE(shown(pill));
+    EXPECT_EQ(ink(), before) << "the tap that closed it did not write";
+    // Read only: a switch
+    openPill();
+    click(find("zenReadOnly"));
     until([&] { return readOnly(); });
-    EXPECT_TRUE(win("fullScreenMode").toBool());
-    window->setProperty("fullScreenMode", false);
+    EXPECT_TRUE(readOnly());
+    EXPECT_TRUE(zen());
+    EXPECT_TRUE(find("zenReadOnly")->property("checked").toBool());
+    click(find("zenReadOnly"));
     until([&] { return !readOnly(); });
-    EXPECT_FALSE(readOnly()) << "full screen ends: read only with it";
+    EXPECT_FALSE(readOnly());
+    window->setProperty("readOnly", true);
+    EXPECT_TRUE(find("zenReadOnly")->property("checked").toBool()) << "follows read only turned on elsewhere";
+    window->setProperty("readOnly", false);
+    // The fits
+    openPill();
+    click(find("zenFitPage"));
+    until([&] { return !shown(pill); });
+    wait(300);
+    const int whole = controller->property("zoomPercent").toInt();
+    openPill();
+    click(find("zenFitWidth"));
+    wait(300);
+    const int width = controller->property("zoomPercent").toInt();
+    EXPECT_GT(width, whole) << "the width of a portrait page in a landscape window: larger than the whole page";
+    // The page number: all pages, to go to one
+    openPill();
+    click(find("zenPage"));
+    auto* grid = find("pageGrid");
+    until([&] { return shown(grid); });
+    EXPECT_TRUE(shown(grid));
+    EXPECT_FALSE(shown(pill));
+    QMetaObject::invokeMethod(grid, "close");
+    until([&] { return !shown(grid); });
+    // Show controls: Zen ends
+    openPill();
+    click(find("zenShowControls"));
+    until([&] { return !zen(); });
+    EXPECT_FALSE(zen());
+    EXPECT_FALSE(shown(pill));
+    EXPECT_FALSE(shown(find("zenDot")));
+    EXPECT_TRUE(shown(find("toolbox")));
 }
 
 namespace {

@@ -943,6 +943,12 @@ void DocumentCanvasItem::setView(QObject* object) {
         input = std::make_unique<xqt::CanvasInput>(*canvasView);
         connect(canvasView, &xqt::CanvasView::updateRequested, this, &QQuickItem::update);
         connect(canvasView, &xqt::CanvasView::edgeTapped, this, &DocumentCanvasItem::edgeTapped);
+        connect(canvasView, &xqt::CanvasView::middleTapped, this, [this](QPointF viewPos, int count) {
+            Q_EMIT middleTapped(canvasView->getViewController().viewToScreen(viewPos), count);
+        });
+        connect(canvasView, &xqt::CanvasView::writingRefused, this, [this](QPointF viewPos) {
+            Q_EMIT writingRefused(canvasView->getViewController().viewToScreen(viewPos));
+        });
         connect(canvasView, &xqt::CanvasView::pagesChanged, this, &QQuickItem::update);
         connect(canvasView, &xqt::CanvasView::pagesChanged, this, &DocumentCanvasItem::viewportChanged);
         connect(&canvasView->getViewController(), &xqt::ViewController::changed, this,

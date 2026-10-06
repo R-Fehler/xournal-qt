@@ -62,7 +62,7 @@ class DocumentCanvasItem: public QQuickItem {
     /// Reading (qt/docs/toolbox.md): a drag or a fling up and down comes to rest on a row of pages, when the setting
     /// snapPages is on (CanvasView::setSnapVertically)
     Q_PROPERTY(bool snapVertically READ snapVertically WRITE setSnapVertically NOTIFY snapVerticallyChanged)
-    /// Reading (qt/docs/toolbox.md, "Reading"): taps within this many pixels of the left or right edge that nothing
+    /// Reading (qt/docs/zen.md): taps within this many pixels of the left or right edge that nothing
     /// else takes are edgeTapped (the window turns the page); 0: off (CanvasView::setEdgeTapWidth)
     Q_PROPERTY(qreal edgeTapWidth READ edgeTapWidth WRITE setEdgeTapWidth NOTIFY edgeTapWidthChanged)
     /// The canvas may be turned here (qt/docs/canvas-rotation.md; the reference beside the notes may not:
@@ -216,6 +216,10 @@ Q_SIGNALS:
     void edgeTapWidthChanged();
     /// Reading: a tap at the left (-1) or the right (+1) edge
     void edgeTapped(int side);
+    /// Reading: a finger's tap between the edges, at `pos` (item coordinates); `count` 2: a double tap's second tap
+    void middleTapped(QPointF pos, int count);
+    /// Reading only: a stroke was tried with a writing tool, let go at `pos` (item coordinates)
+    void writingRefused(QPointF pos);
     void snapVerticallyChanged();
     void rotatableChanged();
     void darkPagesChanged();

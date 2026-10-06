@@ -1098,6 +1098,16 @@
   floating at a side met the view pill. The palette's source moved to Settings → Pen → Colors
   ([toolbox.md](toolbox.md)).
 
+- **Zen, `qt/zen` (2026-10-06, for 0.8.0).** The author: "the read only mode still has this big ass lock icon … The
+  idea of the small dot chrome is to be invisible and produce a zen mode UI which fitted also for tiny screen document
+  reading and referencing"; decided "pill on the dot, zen can write". Three switches of their own: full screen, **Zen**
+  (everything around the page hidden, the pen writes; a faint 10 px dot in the lower left corner whose pill has Show
+  controls, Read only, the page number, the fits; Ctrl+Alt+Z, ⋮ → View → Zen, the command bar's `zen` slot) and **read
+  only** (anywhere; the lock is gone: the first stroke tried says so once, at the pen). Read (Ctrl+Alt+R) is Zen and
+  read only in full screen; present without controls is presenting in Zen; a tiny window is in Zen by itself (left:
+  remembered). Gone: the reader chrome, "Controls at this size" with the chrome chosen per class, presenting's corner
+  field ([zen.md](zen.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

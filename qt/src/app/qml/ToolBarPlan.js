@@ -9,8 +9,8 @@
 
 /// Entries of ⋮ shown as buttons where there is room (qt/docs/toolbox.md, "The command bar"): the first to give way,
 /// back into ⋮ (not into "more tools"), in this order - the tags first, sharing last (qt/ui-rework: reading, the replay
-/// of the writing, a milestone of the version history, the tags)
-var PROMOTED = ["tags", "favourite", "bookmark", "print", "milestone", "replay", "read", "share"]
+/// of the writing, a milestone of the version history, the tags; qt/zen: Zen)
+var PROMOTED = ["tags", "favourite", "bookmark", "print", "milestone", "replay", "zen", "read", "share"]
 /// The steps of the ladder, in order (names of buttons)
 var LADDER = PROMOTED.concat([
     // (Open externally after Search, the stickers and recording: for a file shown here, a text file or an image, it
@@ -29,7 +29,7 @@ var GROUP_OF = {
     hand: "tools", touchDrawing: "tools", select: "tools", snip: "tools", write: "tools", geometry: "tools",
     pdfText: "tools", emoji: "tools",
     image: "insert", sticker: "insert", record: "insert", addPage: "insert",
-    search: "view", fullScreen: "view", present: "view", read: "view", replay: "view", settings: "view",
+    search: "view", fullScreen: "view", present: "view", read: "view", zen: "view", replay: "view", settings: "view",
     new: "file", open: "file", save: "file", milestone: "file", editAsNotes: "file", openExternally: "file",
     share: "doc", print: "doc", bookmark: "doc", favourite: "doc", tags: "doc"
 }

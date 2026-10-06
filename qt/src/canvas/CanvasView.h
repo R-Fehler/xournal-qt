@@ -101,7 +101,7 @@ public:
     static bool rotateGestureSetting(Settings& settings);
     /// A gesture may turn the canvas now: allowed here and the setting on
     bool rotationGestureAllowed() const;
-    /// Snapping up and down too, while the view is read (qt/docs/toolbox.md, "Reading"): with the setting snapPages
+    /// Snapping up and down too, while the view is read (qt/docs/zen.md): with the setting snapPages
     /// a drag or a fling comes to rest on a row of pages
     void setSnapVertically(bool on);
     /// Presenting: one page after the other, each filling the view, a swipe goes one page on; the layout and zoom
@@ -155,11 +155,14 @@ public:
     /// taps follow links, they do not switch the check boxes of Markdown tasks; no undo from gestures. Nothing
     /// lands in the document.
     void setReadingOnly(bool on);
-    /// Reading (qt/docs/toolbox.md, "Reading"): a tap that nothing else takes (a link, a covering note) within this
+    /// Reading (qt/docs/zen.md): a tap that nothing else takes (a link, a covering note) within this
     /// many pixels of the view's left or right edge turns the page (edgeTapped); 0: off. Only while reading only.
     void setEdgeTapWidth(double px) { edgeTapWidth = px; }
     /// A tap at `viewPos` that nothing else took: at an edge (setEdgeTapWidth) it is edgeTapped, and true
     bool edgeTap(QPointF viewPos);
+    /// A finger's tap that nothing else took, between the edges: middleTapped while reading only with the edge taps on
+    /// (`count` 2: the second tap of a double tap, which zooms)
+    void middleTap(QPointF viewPos, int count);
 
     // --- the canvas turned (qt/docs/canvas-rotation.md) --------------------------------------------------------
     /// The canvas may be turned (the gesture, Ctrl+[ / Ctrl+]): not while presenting, not in a text file or a text
@@ -607,6 +610,11 @@ Q_SIGNALS:
     void replayTapped(qint64 at);
     /// Reading: a tap at the left (-1) or the right (+1) edge (setEdgeTapWidth)
     void edgeTapped(int side);
+    /// Reading: a finger's tap in the middle (middleTap; the window's read only in Zen opens its pill)
+    void middleTapped(QPointF viewPos, int count);
+    /// Reading only: a stroke was tried with a tool that writes (released at `viewPos`); the window says once that
+    /// the page is read only (qt/docs/zen.md)
+    void writingRefused(QPointF viewPos);
     /// The set or geometry of pages changed.
     void pagesChanged();
     /// A selection was made or cleared.

@@ -1214,17 +1214,6 @@ Popup {
                                                 + "What you show or hide by hand is kept for each kind of window.")
                                          : qsTr("The window keeps the desktop layout at every size."))
                     }
-                    ComboRow {
-                        // The chrome chosen for this kind of window (stored as a layout choice, not a setting)
-                        objectName: "chromeChoiceRow"
-                        text: qsTr("Controls at this size")
-                        // (automatic: all, and in a tiny window none)
-                        options: [{ text: win.phoneLayout ? qsTr("All (app bar, tool dock)") : qsTr("All (tabs, tool bar)"), value: "full" },
-                                  { text: qsTr("Compact (as in full screen)"), value: "compact" },
-                                  { text: qsTr("None (reading)"), value: "reader" }]
-                        getter: function() { return win.chromeSetting }
-                        setter: function(v) { win.chooseChrome(v) }
-                    }
                     Button {
                         objectName: "resetLayoutButton"
                         text: qsTr("Reset the layout choices")

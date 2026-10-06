@@ -176,17 +176,23 @@ Try it: open this tutorial beside itself and scroll the two sides independently.
 
 <div style="page-break-after: always"></div>
 
-## 11. Full screen and presenting
+## 11. Full screen, Zen and presenting
 
 - **Full screen** (the button in the tool bar, or **F11**): only the page, the toolbox floating at its edge (its ⋯:
-  present, read only, search, settings, leave full screen) and the page pill. Esc leaves it.
+  present, read only, Zen, search, settings, leave full screen) and the page pill. Esc leaves it.
+- **Zen** (**⋮ → View → Zen**, or **Ctrl+Alt+Z**): everything around the page goes; a faint dot stays in its lower left
+  corner. The pen still writes, and P, H, E and T take the pen, the highlighter, the eraser and the text box. Tap the
+  dot: **Show controls**, **Read only**, the page number (all pages, to go to one), fit the width or the whole page.
+  Esc leaves Zen too. A very small window (a split screen) is in Zen by itself.
+- **Read only** (**⋮ → View → Read only**, or the dot's pill): the pen and the fingers do not write. Tap the left or the
+  right edge of the page for the previous or the next page; a swipe still scrolls, and text of a PDF can still be
+  selected. Try to write and a short note tells you how to write again.
+- **Read** (**⋮ → View → Read**, or **Ctrl+Alt+R**): Zen and read only together, in full screen. Ctrl+Alt+R again or Esc
+  ends it.
 - **Present** (**F5**): full screen on black, one page at a time, from the current page; the arrow keys, Page Up and
   Page Down or a swipe go on. Esc goes back to full-screen editing.
-- **Present without controls** (Ctrl+F5, or press and hold the Present button): only the page.
-- **Read only** (**⋮ → View → Read**, or **Ctrl+Alt+R**; in full screen also the toolbox's ⋯): full screen where the
-  pen and the fingers do not write. Tap the left or the right edge of the page for the previous or the next page; a
-  swipe still scrolls, and text of a PDF can still be selected. The lock in the corner (or Ctrl+Alt+R) lets you write
-  again, Esc leaves full screen.
+- **Present without controls** (Ctrl+F5, or press and hold the Present button): presenting in Zen, only the page and
+  the dot.
 
 > **PLACEHOLDER · SCREENSHOT:** full screen with the floating toolbox and the page pill.
 
