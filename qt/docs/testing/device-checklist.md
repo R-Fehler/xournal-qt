@@ -3768,3 +3768,8 @@ checks only that the library is there and the devices can be listed).
       background now, `android.app.background_running`).
 - [ ] Android: notifications refused (Android 13+): recording still works with the screen off; the recording shows in
       the task manager's "active apps" instead of the drawer.
+
+## The toolbox's lines at 150 % (qt/classic-removal)
+
+- [ ] 150 % scaling (Windows or KDE): the toolbox's line towards the page and its dividers are as sharp as the command
+      bar's (one device pixel, not a blurred 1.5).

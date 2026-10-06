@@ -16,6 +16,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import "ToolboxPlan.js" as ToolboxPlan
 import "Popups.js" as Popups
+import "DevicePixels.js" as DevicePixels
 
 Rectangle {
     id: box
@@ -59,14 +60,16 @@ Rectangle {
     radius: floating ? 14 : 0
     border.width: floating ? 1 : 0
     border.color: "#d5d8dc"
+    /// A line's thickness: a whole number of device pixels (one at 100 % to 175 %, two at 200 %; qt/docs/hidpi.md)
+    readonly property real hair: DevicePixels.whole(1, Screen.devicePixelRatio)
     // The line towards the pages (docked)
     Rectangle {
         visible: !box.floating
         color: "#d5d8dc"
-        x: box.edge === "left" ? parent.width - 1 : 0
-        y: box.edge === "top" ? parent.height - 1 : 0
-        width: box.vertical ? 1 : parent.width
-        height: box.vertical ? parent.height : 1
+        x: box.edge === "left" ? parent.width - box.hair : 0
+        y: box.edge === "top" ? parent.height - box.hair : 0
+        width: box.vertical ? box.hair : parent.width
+        height: box.vertical ? parent.height : box.hair
     }
 
     // --- what is shown ----------------------------------------------------------------------------------------------
@@ -399,8 +402,8 @@ Rectangle {
         color: "#e3e5e8"
         x: box.vertical ? 10 : headGrid.x + headGrid.width + 4
         y: box.vertical ? headGrid.y + headGrid.height + 4 : 10
-        width: box.vertical ? box.width - 20 : 1
-        height: box.vertical ? 1 : box.height - 20
+        width: box.vertical ? box.width - 20 : box.hair
+        height: box.vertical ? box.hair : box.height - 20
     }
 
     Flickable {
@@ -545,8 +548,8 @@ Rectangle {
             height: box.vertical ? 9 : box.cell
             Rectangle {
                 anchors.centerIn: parent
-                width: box.vertical ? box.cell - 16 : 1
-                height: box.vertical ? 1 : box.cell - 16
+                width: box.vertical ? box.cell - 16 : box.hair
+                height: box.vertical ? box.hair : box.cell - 16
                 color: "#d5d8dc"
             }
         }
