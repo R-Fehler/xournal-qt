@@ -74,7 +74,8 @@ is stored per class in the app's settings (the `xournalQt` part of `settings.xml
 | `<what>` | Values | Used by |
 | --- | --- | --- |
 | `sidebar` | `shown`, `hidden` (none: automatic) | this block |
-| `chrome` | `compact`, `reader` (none: automatic, the full chrome) | this block |
+| `chrome` | (the chrome chosen for the class, `compact` or `reader`; not read since 0.8.0: Zen, [zen.md](zen.md)) | – |
+| `zen` | `off` in a tiny window: Zen left there by hand (none: automatic, Zen in a tiny window) | `qt/zen` ([zen.md](zen.md)) |
 | `toolbar` | (the classic tool bar's place; not read since 0.8.0) | – |
 | `sourceSplit` | the page's share of the height above the Markdown source below it, `0.2` to `0.8` (none: 0.5, a phone 0.4) | `qt/adaptive-panels` (below) |
 | `toolbox` | `left`, `right`, `top`, `bottom` (none: automatic, the right; a phone upright: the bottom) | `qt/toolbox` ([toolbox.md](toolbox.md)) |
@@ -88,7 +89,8 @@ Turning a Surface to portrait gives the portrait choices, and back to landscape 
 
 **Settings → Display → Window size**: "Adapt the layout to the window size" (`adaptiveLayout`, on by default; off:
 the desktop layout at every size, the choices are those of `desktopWide`), the class the window is in now and its
-size, "Controls at this size" (the chrome choice of this class), and "Reset the layout choices".
+size, and "Reset the layout choices". ("Controls at this size", the chrome chosen for a class, went in 0.8.0: Zen is a
+switch of its own, [zen.md](zen.md).)
 
 ## The page sidebar (step 1 of the ladder)
 
@@ -105,7 +107,7 @@ size, "Controls at this size" (the chrome choice of this class), and "Reset the 
 - The same arrow sits at the sidebar's edge while it is open ("‹") and closes it: a docked sidebar is then `hidden`
   for this class where it would be shown automatically. Showing it again where there is room clears the choice.
 - The arrow: a slim tab at 40 % of the canvas's height (clear of the search bar at the top and the pills at the
-  bottom), `minTarget` wide in the touch profile (24 px otherwise). Not in the compact or reader chrome, not while
+  bottom), `minTarget` wide in the touch profile (24 px otherwise). Not in the compact chrome or Zen, not while
   presenting, and not while the tool bar is put away (unless the sidebar is open: then it closes it).
 
 `win.showSidebar(shown)` and `win.dockSidebar()` are the functions; `sidebarDocked`, `sidebarAsDrawer` and
@@ -124,27 +126,29 @@ The drawer (qt/adaptive-panels):
 
 ## The chrome, apart from the window state
 
-Three separate things (audit D5):
+Four separate things (audit D5; since qt/zen, 0.8.0, Zen and read only are switches of their own, [zen.md](zen.md)):
 
 | | What | Set by |
 | --- | --- | --- |
-| `chromeMode` | `full` (tab strip, command bar, the docked toolbox, sidebar; in the phone classes the app bar and the tool dock, below), `compact` (the full-screen chrome: tab dots, the floating toolbox, the view pill; on a phone too), `reader` (no HUD) | the class's choice (else automatic: `reader` in a tiny window, `full` elsewhere), full screen |
+| `chromeMode` | `full` (tab strip, command bar, the docked toolbox, sidebar; in the phone classes the app bar and the tool dock, below), `compact` (the full-screen chrome: tab dots, the floating toolbox, the view pill; on a phone too) | full screen (`fullScreenMode`) |
 | `windowFullScreen` | the window's state (`showFullScreen()`) | full screen (F11) |
 | `app.presenting` | black around the pages, page by page | F5 |
+| `zen` | everything around the page hidden (`hudHidden`; `fullChrome` is false): only the page and the dot in its lower left corner | ⋮ → View → Zen, Ctrl+Alt+Z, Read; automatic in a tiny window; presenting without controls |
 
 - **Full screen** (F11, `fullScreenMode`, as before) is the compact chrome in a full-screen window. Leaving it gives
   the window back its state and ends presenting, as before.
-- **Compact** chosen for a class (Settings → Display) shows the same chrome inside the window, without full screen.
-  The floating toolbox's ⋯ then ends with "Show the tabs and the tool bar" instead of "Leave full screen".
-- **Reader** hides the HUD (`win.hudHidden`: the command bar, the toolbox, the pills, the format bar); the faint mark
-  in the lower left corner (the one of presenting) brings the full chrome back. Presenting without controls
-  (`cleanPage`) also counts as `hudHidden`.
+- **Zen** hides the HUD (`win.hudHidden`: the command bar, the toolbox, the pills, the format bar) and the chrome
+  around the page (`win.fullChrome` false: the tab strip, the sidebar and its arrow, the phone's app bar and dock; the
+  compact chrome's tab dots); the dot in the lower left corner and its pill bring it back. The pen writes on. Presenting
+  without controls (`cleanPage`) is presenting in Zen.
+- **Read only** is apart from all of these (anywhere): [zen.md](zen.md).
 - The home screen always keeps the tab strip (it is the way back to the documents); in the phone classes the app bar.
 
-The automatic chrome (`win.chromeAuto`, qt/phone-chrome): the reader in a **tiny** window (under 360 px either way:
-split screen, Android's pop-up view), `full` everywhere else; "Read" (⋮ → View) is the choice by hand. `chromeSetting`
-is the class's choice or the automatic one; `chooseChrome(mode)` stores `""` when the mode is the automatic one (so in a
-tiny window "full" is stored). Settings → Display → "Controls at this size" shows `chromeSetting`.
+Zen of itself (`win.zenAuto`, since qt/zen; before, the reader chrome of qt/phone-chrome): in a **tiny** window (under
+360 px either way: split screen, Android's pop-up view), nowhere else. Leaving it there stores `off` for the tiny class;
+Zen turned on there again stores `""` (automatic again). Gone in 0.8.0: the reader chrome (`chromeMode` "reader",
+`chromeAuto`, `chromeSetting`, `chooseChrome`) and the compact chrome chosen for a class in a normal window (Settings →
+Display → "Controls at this size"): the compact chrome is full screen's.
 
 ## Menus (`qt/adaptive-menus`)
 
@@ -252,8 +256,8 @@ closes after a button was used, unless the button opened a menu of its own, and 
 undo and redo at its start, the commands that fit and ⋮ and "more tools" at its end (`MarkdownFormatBar.trailing`;
 the ladder: [toolbox.md](toolbox.md), "Text documents"). One row instead of two.
 
-The compact and the reader chrome have no command bar (its buttons are kept out of sight); the floating toolbox's ⋯
-holds present, read only, search, settings and the way back.
+The compact chrome and Zen have no command bar (its buttons are kept out of sight); the floating toolbox's ⋯
+holds present, read only, Zen, search, settings and the way back.
 
 The tab that puts the bar away sits in the middle of its top edge towards the pages (⋮ keeps the end); a slim strip at
 the top brings it back. Its target reaches into the pages, `minTarget` deep in the touch profile. The toolbox stays
@@ -331,7 +335,7 @@ layout (`xqt-page-single` / `xqt-book-open`), "more tools" (`xqt-tools-more`), a
 
 ### The view pill
 
-Undo and redo while the tool bar is not shown (it is put away, the compact or reader chrome, a text document whose tool
+Undo and redo while the tool bar is not shown (it is put away, the compact chrome, a text document whose tool
 bar is merged into its format bar; `win.undoInToolBar`: otherwise they lead the tool bar), the page layout, the page
 grid, **the contents** (moved here from the tool bar), the page number, and a small **zoom percentage** (no − / + any
 more):
@@ -365,7 +369,7 @@ a function: the result goes through a property of its own, `clearY`.)
 The author's rule: only one way to do things, to reduce menu clutter. No ⋮ entry repeats a button of the tool bar
 (or its "more tools"), the view pill or the sidebar; keyboard shortcuts stay. Where the button can be out of sight:
 
-| Action | Its one place | Keys | With the bar put away / in the compact or reader chrome | In the phone chrome |
+| Action | Its one place | Keys | With the bar put away / in the compact chrome | In the phone chrome |
 | --- | --- | --- | --- | --- |
 | Pen, highlighter, eraser, text box, sticky note, shapes, laser pointer, snip (each with its color, width, …: the editor) | the toolbox's entries | P H E T | the toolbox (docked; floating in the compact chrome) | the dock and "My tools" |
 | Hand, the finger draws, select, snip, write on the page, setsquare / compass, mark PDF text, record | the toolbox's fixed tools | A S L, Shift+S, Ctrl+Alt+M, Ctrl+Shift+R | as above | "My tools" |
@@ -384,15 +388,17 @@ The author's rule: only one way to do things, to reduce menu clutter. No ⋮ ent
 | Contents overview (was the tool bar) | view pill | Ctrl+Alt+O | as above | the page grid's pill (the dock's page number) |
 | Page layout | view pill (long press: the menu); phone portrait and the compact pill: ⋮ → View → Page layout… | | | ⋮ → View → Page layout… |
 | Zoom fits | view pill's percentage | Ctrl+0, Ctrl+1 | | the page grid's pill (its zoom %); pinch |
-| The page sidebar (was the tool bar's Pages button) | the arrow at the canvas's edge / the sidebar's edge | | not in the compact or reader chrome | the arrow (a drawer) |
-| Hide the command bar (was also ⋮ → View) | the tab on the bar's edge | | the strip at the top edge shows it again | – (the dock stays; "Read" hides everything) |
+| The page sidebar (was the tool bar's Pages button) | the arrow at the canvas's edge / the sidebar's edge | | not in the compact chrome | the arrow (a drawer) |
+| Hide the command bar (was also ⋮ → View) | the tab on the bar's edge | | the strip at the top edge shows it again | – (the dock stays; Zen hides everything) |
 | Toolbox position | ⋮ → View → Toolbox position; its grip dragged to an edge | | | – (the dock) |
 | Snap to the grid (was the shapes menu) | Settings | | | Settings |
 | Plain text box (removed) | – (T and the text box make Markdown text boxes; plain texts are still edited) | | | – |
 | All open documents | the tab strip's overview button, ⋮ → View | Ctrl+Shift+E | the tab dots (compact) | the tab count of the app bar (a tap; a double tap: the document used before; a long press: the ones used lately) |
 | Undo, redo | the head of the toolbox (never in "more tools"; qt/undo-redo, before: the view pill); a text document: the start of its format bar | Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y (the tips show the keys set) | the floating toolbox; a text document in the compact chrome: the view pill | the dock; with the soft keyboard open, the end of the format bar above it |
 
-The reader chrome hides everything; its corner field brings the full chrome back (as before).
+Zen hides everything; its dot and the dot's pill bring the controls back ([zen.md](zen.md)). Zen: ⋮ → View → Zen, the
+command bar's button where there is room, Ctrl+Alt+Z, the floating toolbox's ⋯. Read only: ⋮ → View → Read only, the
+dot's pill, the floating toolbox's ⋯.
 
 ## Panels (`qt/adaptive-panels`)
 
@@ -639,16 +645,13 @@ none.
 close it. A tool's editor (`toolEntryEditor`: its colors, width, …) is a sheet of the same form in the phone classes
 (its `asSheet`); the menus were already (`MenuSheet`).
 
-**The reader**: automatic only in a tiny window (`chromeAuto`); elsewhere chosen in Settings → Display. No HUD, read
-only, and the edges turn the pages (as read only in full screen, [toolbox.md](toolbox.md), "Reading and presenting");
-the corner field brings the chrome back (and in a tiny window stores "full" for that class). ⋮ → View → Read is no
-longer the reader chrome but full screen with read only on (qt/ui-rework).
+**Zen in a tiny window** (since qt/zen; the reader chrome before): automatic only there (`zenAuto`); everywhere else
+chosen by hand. Only the page and the dot; the pen writes; the dot's pill shows the controls again (and in a tiny
+window stores `off` for that class). ⋮ → View → Read is Zen with read only, in full screen ([zen.md](zen.md)).
 
-**The corner field** (`presentCornerMark`) of presenting and of the reader: a 48 px target in the lower left corner of
-the page. While the tools show (presenting with controls: `highlighted`) it is clearly there: an accent-colored dot in
-a ring; it **pulses** once when presenting (or the reader) starts. While they are hidden (without controls, the reader)
-it is a faint grey dot (the pointer or the pen over it makes it clearer). Its name (`labelText`): "Hide the tools" /
-"Show the tools", as a tip on hover and while a finger is held on it (letting go then does not tap it).
+**The Zen dot** (`zenDot`) replaces the corner field of presenting and of the reader (`presentCornerMark`, gone in
+0.8.0): a 48 px target in the lower left corner of the page, a 10 px grey dot faint after 2 s, clearer when the pointer
+or the pen is near; a tap opens its pill. Presenting with the controls has no dot (Ctrl+F5 hides them).
 
 **Android and iOS** (`win.adaptive.mobilePlatform`, the platform, not the size): one window. No tab is dragged out of
 the tab strip into a window of its own (`TabStrip.undockable`), and the tab menu has no "Move to a window of its own".
@@ -687,7 +690,7 @@ bottom inset (0 where a footer took it: the dock, the keyboard's room).
 | Edge | What keeps clear |
 | --- | --- |
 | top | the app bar (`topInset`), the tab strip, the tab dots and the floating toolbox of the compact chrome, the search bar, the geometry pill, full-screen sheets and dialogs, Settings, the tab overview |
-| bottom | the dock, the floating toolbox, the view pill, the back / forward pill, the note of a file shown read-only, the selection and note pills, the snackbar (in the document and on the home screen), the page grid's and the contents' pills, the reference's pill, the canvas's scroll bars, the presenting corner field and page number, the drawer's lists, the Markdown source's text, bottom sheets (menus, a tool's editor, page menu, emoji, the reference's page field), dialogs, Settings, the tab overview, the home screen's "+" and selection bar |
+| bottom | the dock, the floating toolbox, the view pill, the back / forward pill, the note of a file shown read-only, the selection and note pills, the snackbar (in the document and on the home screen), the page grid's and the contents' pills, the reference's pill, the canvas's scroll bars, the Zen dot and its pill, presenting's page number, the drawer's lists, the Markdown source's text, bottom sheets (menus, a tool's editor, page menu, emoji, the reference's page field), dialogs, Settings, the tab overview, the home screen's "+" and selection bar |
 | left / right | the app bar's and the tab strip's ends, the command bar, the docked toolbox (it grows by the inset), the dock's rail (the right inset) and its row, the drawer (beside a left cut-out, `sidebarLeftFill` has its color under it), the sidebar's arrow, the floating toolbox, the view pill, the scroll bars, the Markdown source beside the page, the format bar's row, the home screen (its color under the insets), the sheets (as wide as the safe area, centred in it), dialogs, Settings, the tab overview |
 
 Bottom sheets take their place from `win.sheetWidth`, `sheetX`, `sheetBottom` (the keyboard's top while it is open,
@@ -727,7 +730,7 @@ The author's decisions of 2026-09-26 on the audit's proposals:
 | 1 | window < ~1110 px, or tablet portrait | the sidebar is a drawer (**done**; the slide, Esc and the phone width: qt/adaptive-panels); the Markdown source below the page in portrait, the reference top and bottom (**done**) | this block, `qt/adaptive-panels` |
 | 1b | tablet portrait (a 2-in-1 or Surface upright) | **two tool rows** of the classic bar at the top (**done**; removed in 0.8.0 with it: the toolbox's slim rail at the right leaves an A4 page well visible) | `qt/adaptive-toolbar`, `qt/classic-removal` |
 | 2 | phone portrait (w < 600) or short (h < 560) | the phone chrome in the window: the app bar (the title, tab dots, the tab count), a **bottom tool dock** in phone portrait and a rail at the side in landscape (**done**); dialogs and menus as sheets (**done**) | `qt/phone-chrome`, `qt/adaptive-menus`, `qt/adaptive-dialogs` |
-| 3 | **tiny only** (w or h < 360) | the reader chrome, automatically; everywhere else "Read" is a manual choice (**done**) | `qt/phone-chrome` |
+| 3 | **tiny only** (w or h < 360) | the reader chrome, automatically; everywhere else "Read" is a manual choice (**done**; since 0.8.0 Zen, [zen.md](zen.md)) | `qt/phone-chrome`, `qt/zen` |
 
 ## How a later block plugs in
 
@@ -829,8 +832,8 @@ so they are not size classes either:
   the toolbox in the dock, every tool in "My tools"; a swipe on the bar; the tab count's tap (after
   the double-tap time), double tap (A → B → C: back to B, and to C) and long press (the sheet of the ones used lately,
   in that order); a tool's editor, its menu and "My tools" as sheets at the bottom, a tool from the sheet in the dock;
-  the page number's grid with the contents and the zoom; the reader automatic only in a tiny window; the corner field
-  (highlighted, pulse, faint, its names); no tab dragged out with `mobilePlatform`; no breadcrumbs at the library's
+  the page number's grid with the contents and the zoom; Zen automatic only in a tiny window (left: remembered) and
+  its pill inside it; presenting without controls with the Zen dot, with the controls none; no tab dragged out with `mobilePlatform`; no breadcrumbs at the library's
   top; the Fold 7 folded and unfolded (900 × 1000 and 960 × 1392: the command bar and the docked toolbox). In the checks at the five sizes
   and the full walk, `checkPhoneChrome` replaces the tool bar's checks in the phone classes. `Tabs.theOrderOfUse`
   (label `shell`): the order of use.

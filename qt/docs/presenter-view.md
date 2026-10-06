@@ -21,7 +21,8 @@ presenting is as before.
   console. Strokes being written, the laser pointer,
   the curtain and the spotlight ([curtain.md](curtain.md)) show there at once, without the curtain's handles.
 - **The console**: at the left the current page with its space for notes, presenting as on one screen (fitted to
-  the screen, page by page, black around it; the floating toolbox, the corner field, the page number for a moment);
+  the screen, page by page, black around it; the floating toolbox, the page number for a moment; without controls the
+  Zen dot, [zen.md](zen.md));
   at the right the panel:
   - the time of day (the locale's short format) and the time since the start (m:ss, h:mm:ss after an hour), with
     pause/go on and back to 0:00; it starts when the presentation starts (pausing keeps it, ending forgets it);

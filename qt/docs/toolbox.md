@@ -10,7 +10,7 @@ wide screen; a reading mode without the edit tools.
 
 The author's decisions: a rail docked to any side of the canvas, **right by default**; the classic tool bar is kept
 for one release (Settings → Pen → Tools); the eraser is an entry; a folded section opens a list; the tools are stored
-per device. Reading and presenting are two modes over one "tools hidden" view (below).
+per device. Zen hides it with everything else around the page; read only and presenting are apart from it (below).
 
 **The classic tool bar was removed in 0.8.0** (qt/classic-removal; the author, 2026-10-06: "let's get rid of all the
 other ui variants we have. Remove the classic toolbar to not drag dead weight as well."). Gone with it: the tool
@@ -90,7 +90,7 @@ a Fold 7 unfolded, which arrive after its new size, left it folded with half the
 | Window | Toolbox |
 | --- | --- |
 | desktop, tablet (full chrome) | docked to its edge, taking its strip (`sideTools` at a side, `toolboxRow` at the top or the bottom); the right by default, also in tablet portrait (a 52 px rail leaves an A4 page well visible) |
-| full screen (the compact chrome), presenting with the tools | the same toolbox floating 8 px off its edge, rounded, as long as its tools (it ends above the view pill); ⋯ at its end: present, present without controls, read only, search, settings, leave full screen. On a phone too (since 0.8.0: the classic tool square went): at the bottom upright (the view pill moves above it), at the right held sideways |
+| full screen (the compact chrome), presenting with the tools | the same toolbox floating 8 px off its edge, rounded, as long as its tools (it ends above the view pill); ⋯ at its end: present, present without controls (presenting: hide the tools), read only, Zen, search, settings, leave full screen. On a phone too (since 0.8.0: the classic tool square went): at the bottom upright (the view pill moves above it), at the right held sideways |
 | phone portrait | the dock at the bottom: undo, redo, the first tools that fit (the one in hand always among them), **My tools** (a sheet: every tool, "Add a tool", the other tools and commands; record audio under Insert), the page number |
 | phone held sideways | the same as a rail at the right |
 | a text document (`.md`) | no toolbox (no ink): undo and redo lead its format bar |
@@ -115,12 +115,14 @@ qt/ui-rework the entries of ⋮ shown as buttons where there is room (`ToolBarPl
 | | Print | Print… | always |
 | | **Milestone** (`milestoneButton`, the flag) | Document → Save with a message… (Ctrl+Alt+S) | only where the document keeps versions |
 | | **Replay** (`replayButton`) | View → Replay the writing | not for a text document |
-| | **Read** (`readButton`) | View → Read (full screen, read only; Ctrl+Alt+R) | not for a text document |
+| | **Zen** (`zenButton`, a page with a dot; qt/zen) | View → Zen (Ctrl+Alt+Z) | not on a phone (⋮ there) |
+| | **Read** (`readButton`) | View → Read (Zen, read only; Ctrl+Alt+R) | not for a text document |
 | last | Share | Share… | always |
 
-They sit with their kind: Read and Replay after Present (view), Milestone after Save (file), Tags after Favourite
-(document). Measured off-screen with a new document (no favourite): everything up to 1920 and down to 860 px; the tags
-go into ⋮ at 800, the bookmark at 760, print at 720, the replay at 680; Read and Share stay longest. Below that the
+They sit with their kind: Read, Zen and Replay after Present (view), Milestone after Save (file), Tags after Favourite
+(document). Measured off-screen with a new document (no favourite), before Zen came: everything up to 1920 and down to
+860 px; the tags go into ⋮ at 800, the bookmark at 760, print at 720, the replay at 680; Read and Share stay longest.
+Zen's button makes each of these steps one button (50 px) wider. Block 3's scrolling top bar replaces this ladder. Below that the
 ladder of before goes on (the commands into "more tools").
 
 Weighed and left where they are (one place each):
@@ -145,36 +147,44 @@ kept all of them and its row scrolled at 960 px, the lists out of sight; found o
 toolbox.) Find and replace adds no button to this ladder: it is the search bar's
 second row (Ctrl+H, the bar's replace button, ⋮ → Find and replace; [md-editor.md](md-editor.md)).
 
-## Reading and presenting
+## Zen, read only and presenting
 
-The author (2026-10-05): "The reader mode sucks. The menu is half cut off the lower part of the screen and I feel like
-we should just reuse the full screen or present mode with a read only / readmode toggle that allows skipping to next
-prev page with big touch areas on the left and right side of the screen." So reading is no mode of its own any more
-(qt/ui-rework): it is **read only**, a toggle of full screen and of presenting. The reading pill is gone.
+The author (2026-10-05): "The reader mode sucks. … we should just reuse the full screen or present mode with a read
+only / readmode toggle that allows skipping to next prev page with big touch areas on the left and right side of the
+screen." Then (2026-10-06): "the read only mode still has this big ass lock icon … The idea of the small dot chrome is
+to be invisible and produce a zen mode UI which fitted also for tiny screen document reading and referencing." So since
+qt/zen (0.8.0) there are three switches of their own: full screen, **Zen** and **read only**; Read is Zen and read only
+together ([zen.md](zen.md) has the whole of it).
 
-- **Read only** (`win.readOnly`; on where `win.readOnlyOffered`: full screen, the compact chrome, presenting): the
-  floating toolbox's ⋯ → "Read only" (on a phone too), **Ctrl+Alt+R** (a shortcut of its own, changeable), and
-  **⋮ → View → Read**, which enters full screen with
-  it on (so does Ctrl+Alt+R in a window). While it is on:
+- **Zen** (`win.zen`): only the page and a faint dot in its lower left corner; everything around the page is hidden
+  (`win.hudHidden`: this toolbox, docked or floating, the command bar, the tabs, the sidebar's arrow, the pills). The
+  tool in hand keeps writing, P, H, E, T take the tools. The dot's pill: Show controls, Read only, the page number,
+  fit the width / the whole page. ⋮ → View → Zen, the command bar's Zen, Ctrl+Alt+Z, the floating toolbox's ⋯;
+  automatic in a tiny window (leaving it there is remembered for the class). Esc leaves it.
+- **Read only** (`win.readOnly`; anywhere, with or without Zen or full screen; ⋮ → View → Read only, the dot's pill,
+  the floating toolbox's ⋯ → "Read only"). The tools stay where they are (Zen hides them, read only does not). While it
+  is on:
   - the page cannot be written on (`DocumentCanvas.readingOnly`): the pen and the fingers scroll, PDF text can still be
     selected, copied and looked up (decided: selecting text writes nothing, and reading is where one copies a quote);
     no ink by accident;
-  - the tools are hidden (`win.toolsHidden`: the floating toolbox); the view pill (the page number, the zoom and its
-    fits, the page layout) stays, as in full screen;
   - **big tap fields at the left and right edges**: a fifth of the page's width each (at least 48 px), its whole height,
     invisible. A tap there goes to the previous or the next page (in full screen to its top, presenting: the slide); a
     short arrow appears at that edge. The page finds the taps itself (`DocumentCanvas.edgeTapWidth`, `edgeTapped`;
     `CanvasView::edgeTap`): a tap that is a link or opens a covering note does that instead, a swipe or a drag
     scrolls, and taps in a row turn page after page (no double tap there). The fields in `Main.qml`
-    (`readingTapFields`) only show the hint and let the presses through (`inputTransparent`);
-  - a **lock** in the upper right corner (`readOnlyMark`, where the toolbox floats) says so; a tap on it writes again.
-  - It ends with Esc (full screen ends, and read only with it), the lock, Ctrl+Alt+R again, the ⋯ entry, and when full
-    screen ends or the home screen is shown (`onReadOnlyOfferedChanged`).
-- **The reader chrome** (no HUD: automatic in a tiny window, or chosen in Settings → Display → Controls at this size)
-  is reading too: read only with the tap fields; the corner field brings the chrome back, as before.
+    (`readingTapFields`) only show the hint and let the presses through (`inputTransparent`). In Zen a finger's tap
+    in the middle opens the dot's pill (`middleTapped`);
+  - **no lock** any more (the `readOnlyMark` of 0.7.0): the first stroke tried says so once, at the pen, for a moment
+    ("Read only — tap the dot to write"; outside Zen where to turn it off; `CanvasView::writingRefused`,
+    `readOnlyNote`).
+  - It ends with its switches and when the home screen is shown (`onReadOnlyOfferedChanged`).
+- **Read** (Ctrl+Alt+R, changeable; ⋮ → View → Read, the command bar's Read): Zen and read only in full screen (a tiny
+  window stays a window). The keys again end it (and what it turned on); Esc too.
 - **Presenting** (F5): full screen, black around the pages, page by page; writing on the slides stays possible: the
-  toolbox floats. The corner field hides and shows it ("present without controls" is presenting with it hidden). Read
-  only while presenting: the edges go to the previous and next slide, the pen does not write.
+  toolbox floats. "Present without controls" (Ctrl+F5, the Present button held) is presenting in Zen: the dot and its
+  pill bring the controls back, Ctrl+F5 hides and shows them (presenting's own corner field is gone). Read only while
+  presenting: the edges go to the previous and next slide, the pen does not write; Ctrl+Alt+R while presenting is
+  presenting without controls with read only.
 
 Kept from the reading of before, as settings rather than a pill: **up and down or sideways** and **whole pages**
 (⋮ → the view pill's page layout menu: "Scroll sideways", "Stop on whole pages"; the latter is offered while reading
@@ -245,7 +255,7 @@ shell, canvas and UI tests run with the toolbox.
 | `qt/src/app/qml/Toolbox.qml`, `ToolboxPlan.js` | the rail: head, tools, stacks, fixed tools, tail; the plan; carrying a tool; the grip |
 | `qt/src/app/qml/ToolEntryButton.qml` | one tool: its icon and a sample of its ink; lifted in hand; the hold, the carrying, the wheel |
 | `qt/src/app/qml/ToolEntryEditor.qml` | the editor (and the draft of a new tool) |
-| `Main.qml` | where the rail is (`toolboxDocked`, `toolboxFloating`, `toolboxInDock`, `toolboxEdge`), the menus (`toolEntryMenu`, `toolTypeMenu`, `toolboxMoreMenu`), the command bar's promoted entries, the format bar's undo / redo and commands, reading (`win.readOnly`, `win.reading`, `readingTapFields`, `readOnlyMark`) |
+| `Main.qml` | where the rail is (`toolboxDocked`, `toolboxFloating`, `toolboxInDock`, `toolboxEdge`), the menus (`toolEntryMenu`, `toolTypeMenu`, `toolboxMoreMenu`), the command bar's promoted entries, the format bar's undo / redo and commands, Zen and read only (`win.zen`, `win.readOnly`, `win.reading`, `readingTapFields`, `zenDot`, `zenPill`, `readOnlyNote`; [zen.md](zen.md)) |
 | `PhoneDock.qml`, `PhoneToolSheet.qml` | the dock hosts the rail; the sheet "My tools" |
 | `qt/src/canvas/ViewController.*`, `CanvasView`, `DocumentCanvasItem.snapVertically` | snapping up and down while reading |
 | `CanvasView::edgeTap`, `CanvasInput` (the taps of the mouse, the pen, a finger), `DocumentCanvasItem.edgeTapWidth` / `edgeTapped` | the tap fields of reading |

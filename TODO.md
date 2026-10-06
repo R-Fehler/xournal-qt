@@ -896,7 +896,7 @@ Blocks, one after another where they share `Main.qml` (1, then 2 and 4, then 3):
   stickers, add page, write on the page | setsquare / compass, finger draws, **record** | search, read, replay,
   present, full screen, **Zen** | tags, favourite, bookmark | settings. Full screen: the floating rail's ⋯ lists what
   is on the top bar. Settings → "Back to the first layout". The Markdown format bar scrolls the same way.
-- [ ] **4 `qt/zen`**: three independent switches: full screen (as now), **Zen** (everything around the page hidden),
+- [x] **4 `qt/zen`**: three independent switches: full screen (as now), **Zen** (everything around the page hidden),
   **read only** (anywhere, not only full screen). Read (Ctrl+Alt+R, ⋮ → View → Read) = Zen + read only (full screen
   as now, except in a tiny window); present without controls = present + Zen; a tiny window (< 360 px) turns Zen on
   automatically (leaving it there is remembered per class, as now). Zen's only mark: a small faint **dot** in the
@@ -908,6 +908,10 @@ Blocks, one after another where they share `Main.qml` (1, then 2 and 4, then 3):
   shortcut, Show controls. Gone: the reader chrome and Settings → Display → "Controls at this size", the lock mark,
   presenting's own corner field (the dot replaces it). Zen is a button of the top bar (block 3) and ⋮ → View → Zen,
   with a changeable shortcut.
+  Done 2026-10-06 ([qt/docs/zen.md](qt/docs/zen.md); Zen's keys Ctrl+Alt+Z; the command bar's `zen` slot is promoted,
+  for block 3 to place). Left: the device checks (the dot's faintness on a projector, the pen's hover near it, the
+  middle tap on a phone); the page number opens all pages (the page grid) rather than the typed "Go to page"; ⋮ → View
+  → Zen and Read only show only where ⋮ does (not in Zen itself: the dot's pill there).
 
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
@@ -971,7 +975,8 @@ Blocks, one after another where they share `Main.qml` (1, then 2 and 4, then 3):
   ignore a click on their button while they fade out. The test re-activates the window and waits for the menu.
 - [ ] The CI still repeats a failed test up to twice (`--repeat until-pass:3`). Under load (two container runs at
   once) `CitationsTest.selectedTextIsSearchedInTheDocumentTheTabsAndTheLibrary` and
-  `PhoneChromeTest.thePresentationTapField` failed once each (5 of 5 alone): harden them to wait for the state, then
+  `PhoneChromeTest.thePresentationTapField` (since qt/zen `presentingWithoutControlsHasTheZenDot`) failed once each
+  (5 of 5 alone): harden them to wait for the state, then
   drop the repeat.
 - [x] `CanvasMemoryTest.twoViewsOfOneDocumentShareTheLimit` was a real overshoot: renders a trimmed view started
   earlier landed after the trim uncounted. Fixed in `qt/two-views-memory` (2026-09-26): a trimmed view re-plans on
