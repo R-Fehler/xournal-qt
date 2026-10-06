@@ -3912,6 +3912,8 @@ folding describe what is gone: the rail scrolls now.
 - [ ] ⋮ is complete whatever the bars hold: Document (new, open, save, bookmark, favourite, …), Tools (hand, select,
       snip, mark PDF text, write, setsquare, finger, image, stickers, add a page, record), View (search, full screen,
       present, Zen, read, replay), Settings at its end; each entry does what its button does.
+- [ ] Settings → Pen → "Back to the first layout…": asked first; both bars as at a first start, your pens kept on the
+      rail.
 - [ ] Full screen (F11): the floating rail's ⋯ lists the top bar's items in their order (a group's members one by one)
       and "New document", which opens a new tab.
 - [ ] Phone folded upright (412 × 915): the app bar has the title row and under it the same top bar, scrolling; Zen is

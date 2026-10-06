@@ -1582,6 +1582,37 @@ TEST_F(ToolboxTest, theCatalogAddsToEitherBar) {
     EXPECT_TRUE(inside(entry(added), find("topBar")));
 }
 
+// Settings → "Back to the first layout": both bars as at a first start, asked first; the tools stay
+TEST_F(ToolboxTest, backToTheFirstLayout) {
+    const QString pen = nth("pen", 2);
+    tools()->moveTo(pen, "top", 0);
+    tools()->remove(tools()->idOfApp("tags"));
+    tools()->moveTo(tools()->idOfApp("search"), "rail", 0);
+    tools()->group(tools()->idOfApp("save"), tools()->idOfApp("open"));
+    const int count = tools()->tools().size();
+    auto* settingsPage = find<QObject>("settingsPage");
+    QMetaObject::invokeMethod(settingsPage, "open");
+    until([&] { return settingsPage->property("opened").toBool(); });
+    auto* button = find("resetBarsButton");
+    ASSERT_NE(button, nullptr);
+    QMetaObject::invokeMethod(button, "clicked");
+    auto* dialog = find<QObject>("resetBarsDialog");
+    until([&] { return dialog->property("opened").toBool(); });
+    ASSERT_TRUE(dialog->property("opened").toBool()) << "asked first";
+    EXPECT_TRUE(tools()->unplaced().contains("tags")) << "nothing changed yet";
+    QMetaObject::invokeMethod(dialog, "accept");
+    until([&] { return !tools()->unplaced().contains("tags"); });
+    QStringList top;
+    for (const QVariant& v: tools()->topItems()) {
+        const QVariantMap m = v.toMap();
+        top << (m.value("divider").toBool() ? QString("|") : m.value("app").toString());
+    }
+    EXPECT_EQ(top, xqt::ToolboxModel::defaultTopLayout());
+    EXPECT_EQ(tools()->tools().size(), count) << "the tools stay";
+    EXPECT_EQ(tools()->barOf(pen), "rail") << "on the rail";
+    QMetaObject::invokeMethod(settingsPage, "close");
+}
+
 // Zen is on the top bar at every size, phones too (the author, 2026-10-06: "I think zen is helpful put it into the top
 // bar")
 TEST_F(ToolboxTest, zenIsOnTheTopBarAtEverySize) {
