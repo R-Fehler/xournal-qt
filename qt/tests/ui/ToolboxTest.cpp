@@ -955,6 +955,168 @@ TEST_F(ToolboxTest, aToolHeldThenMovedIsCarriedToAnotherPlace) {
     QMetaObject::invokeMethod(menu, "close");
 }
 
+// Groups the user makes (the author, 2026-10-06: "Maybe we can let the user group tools into cycle groups themselves
+// if they like? By dragging a tool and holding long over another tool?"): a tool carried onto another and held there
+// until it shows a ring; let go: a group, which the snackbar can undo. Moving on before the ring reorders as before.
+TEST_F(ToolboxTest, aToolHeldOverAnotherUntilTheRingMakesAGroup) {
+    const QString pen1 = nth("pen"), pen3 = nth("pen", 2), hl = nth("highlighter");
+    auto carry = [&](const QPoint& from, const std::vector<QPoint>& path, int dwellMs, const QPoint& to) {
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+        wait(550);
+        QPoint at = from;
+        for (const QPoint& p: path) {
+            for (int k = 1; k <= 6; ++k) {
+                QTest::mouseMove(window, at + (p - at) * k / 6);
+                wait(15);
+            }
+            at = p;
+        }
+        wait(dwellMs);
+        for (int k = 1; k <= 4; ++k) {
+            QTest::mouseMove(window, at + (to - at) * k / 4);
+            wait(15);
+        }
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, to);
+        wait(150);
+    };
+    // Over the first pen for a moment, then on to the place before the third pen: a reorder, no group
+    const QRectF third = rectOf(entry(pen3));
+    const QPoint beforeThird(int(third.center().x()), int(third.top()) + 3);
+    carry(rectOf(entry(hl)).center().toPoint(), {rectOf(entry(pen1)).center().toPoint()}, 150, beforeThird);
+    EXPECT_EQ(tools()->groupOf(hl), "") << "moved on before the ring";
+    EXPECT_EQ(tools()->indexOf(hl) + 1, tools()->indexOf(pen3)) << "reordered as before";
+
+    // Held over the first pen until the ring shows: let go, a group in the pen's place
+    const QStringList before = arranged();
+    const QPoint overPen = rectOf(entry(pen1)).center().toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, rectOf(entry(hl)).center().toPoint());
+    wait(550);
+    for (int k = 1; k <= 8; ++k) {
+        QTest::mouseMove(window, rectOf(entry(hl)).center().toPoint() + (overPen - rectOf(entry(hl)).center().toPoint()) * k / 8);
+        wait(15);
+    }
+    until([&] { return entry(pen1)->property("ringed").toBool(); }, 2000);
+    EXPECT_TRUE(entry(pen1)->property("ringed").toBool()) << "the ring after about 0.6 s";
+    EXPECT_FALSE(shown(find("toolDropMark"))) << "no place marked: a group";
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, overPen);
+    until([&] { return !tools()->groupOf(hl).isEmpty(); });
+    const QString g = tools()->groupOf(hl);
+    ASSERT_FALSE(g.isEmpty());
+    EXPECT_EQ(tools()->groupOf(pen1), g);
+    EXPECT_EQ(tools()->indexOf(g), 0) << "in the pen's place";
+    auto* face = find("railGroup_" + g);
+    until([&] { return shown(face = find("railGroup_" + g)); });
+    ASSERT_TRUE(shown(face));
+    EXPECT_EQ(face->property("stackCount").toInt(), 2) << "dots for its two tools";
+    EXPECT_FALSE(shown(entry(pen1))) << "the pen is in the group";
+    // "Grouped · Undo"
+    auto* snackbar = find("snackbar");
+    EXPECT_TRUE(shown(snackbar));
+    EXPECT_EQ(find("snackbarText")->property("text").toString(), "Grouped");
+    auto* undo = find("snackbarAction");
+    ASSERT_TRUE(shown(undo));
+    QMetaObject::invokeMethod(undo, "clicked");
+    until([&] { return tools()->groupOf(hl).isEmpty(); });
+    EXPECT_EQ(tools()->groupOf(hl), "") << "undone";
+    until([&] { return rail().order == before; });
+    EXPECT_EQ(rail().order, before) << "as it was";
+}
+
+// A group shows the tool used last; a tap takes it; a tap while one of its tools is in hand takes the next with two or
+// three tools, and opens its list with more than three (the author's rule). The list: pick one, carry one out (it
+// leaves the group); its menu: Ungroup. App tools group too, and keep their own cycle outside a group.
+TEST_F(ToolboxTest, aGroupCyclesWithThreeAndListsWithFour) {
+    const QString pen1 = nth("pen"), pen2 = nth("pen", 1), pen3 = nth("pen", 2), hl = nth("highlighter");
+    controller->applyToolEntry(nth("eraser"));
+    QString g = tools()->group(pen2, pen1);
+    tools()->group(pen3, pen1);
+    ASSERT_EQ(tools()->members(g).size(), 3);
+    wait(200);  // (the rail made anew)
+    auto* face = find("railGroup_" + g);
+    until([&] { return shown(face = find("railGroup_" + g)); });
+    ASSERT_TRUE(shown(face));
+    // A tap: the one shown (the one carried in last); again: the next, round the group
+    click(face);
+    until([&] { return tools()->active() == pen3; });
+    EXPECT_EQ(tools()->active(), pen3);
+    EXPECT_TRUE(face->property("inHand").toBool());
+    click(face);
+    until([&] { return tools()->active() == pen1; });
+    EXPECT_EQ(tools()->active(), pen1) << "the next, from the start again";
+    EXPECT_EQ(tools()->shownOf(g), pen1) << "the group shows it";
+    click(face);
+    until([&] { return tools()->active() == pen2; });
+    EXPECT_EQ(controller->color(), QColor("#D96B00"));
+    EXPECT_FALSE(find<QObject>("toolGroupFlyout")->property("visible").toBool()) << "three: no list";
+
+    // A fourth: a tap while one of them is in hand opens the list
+    tools()->group(hl, g);
+    wait(200);
+    until([&] { return find("railGroup_" + g) && find("railGroup_" + g)->property("stackCount").toInt() == 4; });
+    face = find("railGroup_" + g);
+    EXPECT_EQ(tools()->shownOf(g), hl);
+    ASSERT_EQ(tools()->active(), pen2) << "one of its tools in hand";
+    click(face);
+    auto* flyout = find<QObject>("toolGroupFlyout");
+    until([&] { return flyout->property("visible").toBool(); });
+    ASSERT_TRUE(flyout->property("visible").toBool()) << "four: its list";
+    EXPECT_EQ(tools()->active(), pen2) << "nothing taken";
+    QQuickItem* inList = nullptr;
+    until([&] { return shown(inList = entry(pen3)); });
+    ASSERT_TRUE(shown(inList));
+    click(inList);
+    until([&] { return tools()->active() == pen3; });
+    EXPECT_EQ(controller->color(), QColor("#D6342C")) << "picked from the list";
+    until([&] { return !flyout->property("visible").toBool(); });
+
+    // Carried out of the list onto the rail: it leaves the group
+    click(face);
+    until([&] { return flyout->property("visible").toBool(); });
+    until([&] { return shown(inList = entry(pen2)); });
+    const QPoint from = rectOf(inList).center().toPoint();
+    const QRectF eraser = rectOf(find("toolEntry_" + nth("eraser")));
+    const QPoint to(int(eraser.center().x()), int(eraser.top()) + 3);
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+    wait(550);
+    for (int k = 1; k <= 10; ++k) {
+        QTest::mouseMove(window, from + (to - from) * k / 10);
+        wait(15);
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, to);
+    until([&] { return tools()->groupOf(pen2).isEmpty(); });
+    EXPECT_EQ(tools()->groupOf(pen2), "") << "carried out of the group";
+    EXPECT_EQ(tools()->members(g).size(), 3);
+    EXPECT_EQ(tools()->indexOf(pen2) + 1, tools()->indexOf(nth("eraser")));
+
+    // Its menu: Ungroup
+    wait(200);
+    auto* menu = find<QObject>("toolEntryMenu");
+    QMetaObject::invokeMethod(find("railGroup_" + g), "pressAndHold");
+    until([&] { return menu->property("visible").toBool(); });
+    EXPECT_FALSE(entryOf(menu, "toolEditItem")->property("offered").toBool()) << "a group has no editor";
+    trigger(menu, "toolUngroupItem");
+    EXPECT_EQ(tools()->kindOf(g), "");
+    until([&] { return shown(entry(pen1)); });
+    EXPECT_TRUE(shown(entry(pen1)));
+    EXPECT_TRUE(shown(entry(hl)));
+
+    // App tools: select and snip in one group; a tap cycles from one to the other
+    const QString sg = tools()->group(tools()->idOfApp("snip"), tools()->idOfApp("select"));
+    wait(200);
+    auto* appFace = find("railGroup_" + sg);
+    until([&] { return shown(appFace = find("railGroup_" + sg)); });
+    ASSERT_TRUE(shown(appFace));
+    EXPECT_FALSE(shown(find("handButton")) && inside(find("selectButton"), find("toolArea"))) << "still lent to the rail";
+    click(appFace);
+    until([&] { return !controller->snipShape().isEmpty(); });
+    EXPECT_FALSE(controller->snipShape().isEmpty()) << "the snip, shown last";
+    click(appFace);
+    until([&] { return controller->tool() == "selectRect" || controller->tool() == "selectRegion"; });
+    EXPECT_TRUE(controller->snipShape().isEmpty()) << "then select";
+    EXPECT_EQ(tools()->shownOf(sg), tools()->idOfApp("select"));
+    // Outside a group select keeps its own cycle (rectangle, lasso): see dockedAtTheRight…
+}
+
 TEST_F(ToolboxTest, theGripCarriesTheRailToAnotherEdge) {
     auto* grip = find("toolboxGrip");
     ASSERT_TRUE(shown(grip));

@@ -3831,3 +3831,19 @@ folding describe what is gone: the rail scrolls now.
       there.
 - [ ] Update from 0.7.0 with your own tools and order: the same tools in the same order, the hand, select, snip and
       mark PDF text after them; the tool in hand as before.
+
+## Groups the user makes (qt/rail-scroll, 0.8.0)
+
+- [ ] Hold the second highlighter (400 ms: it lifts), carry it onto the first pen and keep it there: after about 0.6 s
+      the pen shows a ring; let go: one button with dots for two, showing the highlighter; the snackbar says
+      "Grouped" with Undo, and Undo puts both back as they were. Carry it over the pen without stopping: no ring, it is
+      put where the line shows, as before. The same with a finger and with the pen.
+- [ ] A group of three pens: a tap takes the one it shows; tapped again, each tap takes the next (round the group).
+      Carry a fourth tool in: a tap while one of its tools is in hand opens its list beside it (nothing taken); a tap
+      in the list takes that tool and closes the list; a tap on the one in hand there opens its editor; hold one in the
+      list and carry it onto the rail: it leaves the group.
+- [ ] Hold the group: its menu has "Its tools…" (the list), Move, Add a tool here, the divider and "Ungroup" (the
+      tools back in its place, in their order).
+- [ ] Select and snip grouped (carry snip onto select): a tap takes the one shown, the next tap the other. Press S or
+      Shift+S: the group shows the one taken. Ungrouped, select again cycles rectangle ↔ lasso on its own.
+- [ ] Restart: the groups, their order and the tool each shows are as they were. The folded dock shows the same groups.

@@ -1,7 +1,7 @@
 // One of the user's tools in the toolbox (qt/docs/toolbox.md): its kind as an icon and a sample of its ink below it
 // (its color, how wide, dashed or filled), like a pen lying in a sorted box. The entry in hand is lifted towards the
-// page, as a pen picked up. A stack (a folded section) shows the entry used last of its section with dots for how many
-// it holds.
+// page, as a pen picked up. A group shows the entry used last of it with dots for how many it holds; an app item
+// (hand, select, …) shows its button's icon (the carried one, a group's face).
 // A tap picks it up (the toolbox decides what a tap on the one in hand does: its editor); a long press or a right
 // click: its menu; the mouse wheel over it: the width (the toolbox handles these through the signals).
 import QtQuick
@@ -28,6 +28,8 @@ AbstractButton {
     property bool dragging: false
     /// An app item ({id, app}: the hand, select, …): the icon of its button (it has no ink)
     property string appIcon: ""
+    /// A carried tool was held over it long enough: let go, the two are a group (qt/docs/toolbox.md, "Groups")
+    property bool ringed: false
 
     signal held(point pos)
     signal secondaryClicked(point pos)
@@ -91,6 +93,18 @@ AbstractButton {
     opacity: dragging && enabled ? 0.3 : 1
     Behavior on scale { NumberAnimation { duration: 120 } }
 
+    // The ring of a group to be
+    Rectangle {
+        objectName: "toolRing"
+        visible: button.ringed
+        anchors.fill: parent
+        anchors.margins: -2
+        z: 2
+        radius: 12
+        color: "transparent"
+        border.width: 2.5
+        border.color: Material.accentColor
+    }
     background: Rectangle {
         radius: 10
         color: button.lifted ? "#ffffff" : button.inHand ? "#e0e3f5" : (button.down ? "#e8e8e8" : "transparent")

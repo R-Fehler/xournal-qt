@@ -920,6 +920,10 @@ ApplicationWindow {
         onAddRequested: function(button) { toolTypeMenu.ask("add", "", button) }
         onMoreRequested: function(button) { toolboxMoreMenu.openMenu(undefined, button) }
         onGripMoved: function(pos) { win.toolboxEdgeTarget = win.edgeAt(pos) }
+        // (a tool carried onto another and held there: a group; the snackbar can take it back)
+        onGrouped: function(groupId, before) {
+            snackbar.show(qsTr("Grouped"), false, qsTr("Undo"), function() { app.toolbox.restore(before) })
+        }
         onGripDropped: function(pos) {
             const edge = win.edgeAt(pos)
             win.toolboxEdgeTarget = ""
@@ -1030,8 +1034,10 @@ ApplicationWindow {
         property Item button: null
         readonly property string entryId: entry && entry.id ? entry.id : ""
         readonly property var store: app.toolbox
-        /// An app item's (its button: the window's)
+        /// An app item's (its button: the window's); a group's (qt/docs/toolbox.md, "Groups"); else a tool's
         readonly property bool isApp: entry && entry.app !== undefined
+        readonly property bool isGroup: entry && entry.group === true
+        readonly property bool isTool: !isApp && !isGroup
         readonly property Item appButton: isApp ? toolArea.slots[entry.app] || null : null
         function openFor(e, b, pos) {
             entry = e
@@ -1050,9 +1056,27 @@ ApplicationWindow {
                 win.afterMenus(function() { b.pressAndHold() })
             }
         }
+        // A group: its list, and back to its tools one by one
+        AdaptiveMenuItem {
+            objectName: "toolGroupListItem"
+            offered: toolEntryMenu.isGroup
+            text: qsTr("Its tools…")
+            icon.source: app.iconUrl("xqt-tools-more")
+            onTriggered: {
+                const id = toolEntryMenu.entryId, b = toolEntryMenu.button
+                win.afterMenus(function() { toolboxPane.openGroup(id, b) })
+            }
+        }
+        AdaptiveMenuItem {
+            objectName: "toolUngroupItem"
+            offered: toolEntryMenu.isGroup
+            text: qsTr("Ungroup")
+            icon.source: app.iconUrl("xqt-column-remove")
+            onTriggered: toolEntryMenu.store.ungroup(toolEntryMenu.entryId)
+        }
         AdaptiveMenuItem {
             objectName: "toolEditItem"
-            offered: !toolEntryMenu.isApp
+            offered: toolEntryMenu.isTool
             text: qsTr("Edit…")
             icon.source: app.iconUrl("xqt-pencil")
             onTriggered: {
@@ -1076,7 +1100,7 @@ ApplicationWindow {
         }
         AdaptiveMenuItem {
             objectName: "toolReplaceItem"
-            offered: !toolEntryMenu.isApp
+            offered: toolEntryMenu.isTool
             text: qsTr("Replace with…")
             icon.source: app.iconUrl("xqt-rotate-right")
             enabled: (toolEntryMenu.store.revision, toolEntryMenu.entry.type !== "eraser" || toolEntryMenu.store.canRemove(toolEntryMenu.entryId))
@@ -1084,7 +1108,7 @@ ApplicationWindow {
         }
         AdaptiveMenuItem {
             objectName: "toolDuplicateItem"
-            offered: !toolEntryMenu.isApp
+            offered: toolEntryMenu.isTool
             text: qsTr("Duplicate")
             icon.source: app.iconUrl("xqt-copy")
             onTriggered: toolEntryMenu.store.duplicate(toolEntryMenu.entryId)
@@ -1105,6 +1129,7 @@ ApplicationWindow {
         MenuSeparator {}
         AdaptiveMenuItem {
             objectName: "toolRemoveItem"
+            offered: !toolEntryMenu.isGroup
             text: toolEntryMenu.isApp ? qsTr("Remove from the rail")
                   : (toolEntryMenu.store.revision, toolEntryMenu.store.canRemove(toolEntryMenu.entryId))
                   ? qsTr("Remove") : qsTr("Remove (the last eraser stays)")
