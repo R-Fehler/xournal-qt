@@ -121,7 +121,8 @@ TEST_F(DarkPagesUiTest, theViewMenuTurnsThePagesAndTheirPicturesDark) {
     EXPECT_FALSE(canvas->darkPages());
     auto* on = find("darkPagesOnItem");
     ASSERT_NE(on, nullptr) << "⋮ › View › Dark pages";
-    QMetaObject::invokeMethod(on, "click");
+    // (the item's signal, as in the other tests: AbstractButton.click() is Qt 6.8 and newer, and KDE neon has 6.7)
+    ASSERT_TRUE(QMetaObject::invokeMethod(on, "triggered"));
     wait(50);
     EXPECT_EQ(controller->darkPagesMode(), "on");
     EXPECT_TRUE(canvas->darkPages());
@@ -135,7 +136,7 @@ TEST_F(DarkPagesUiTest, theViewMenuTurnsThePagesAndTheirPicturesDark) {
         }
     }
     (void)anyDark;  // (the sidebar may be closed in this window size)
-    QMetaObject::invokeMethod(find("darkPagesOffItem"), "click");
+    ASSERT_TRUE(QMetaObject::invokeMethod(find("darkPagesOffItem"), "triggered"));
     wait(50);
     EXPECT_FALSE(canvas->darkPages());
     EXPECT_FALSE(controller->darkPagesShown());
@@ -155,7 +156,7 @@ TEST_F(DarkPagesUiTest, theBackgroundDialogGivesPagesAPaperColorAndTexture) {
     ASSERT_NE(black, nullptr);
     ASSERT_NE(illustration, nullptr);
     ASSERT_NE(texture, nullptr);
-    QMetaObject::invokeMethod(illustration, "click");
+    ASSERT_TRUE(QMetaObject::invokeMethod(illustration, "clicked"));
     if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
         wait(300);
         window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT") + "-background-dialog.png");
