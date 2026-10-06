@@ -1,7 +1,8 @@
 /*
- * xournal-qt: the toolbox's tools (ToolboxModel, qt/docs/toolbox.md): the defaults, entries added, changed, moved,
- * replaced and removed, dividers, the colors of roles, what "+" prefills, the most recent entry of a type, the JSON and
- * its debounced writes.
+ * xournal-qt: the toolbox's tools and the arrangement of both bars (ToolboxModel, qt/docs/toolbox.md): the defaults,
+ * entries added, changed, moved, replaced and removed, dividers, the app's items (one home each), groups, the colors of
+ * roles, what "+" prefills, the most recent entry of a type, the JSON (and its upgrade from 0.7.0) and its debounced
+ * writes.
  *
  * @license GNU GPLv2 or later
  */
@@ -25,7 +26,10 @@ QStringList typesOf(const QVariantList& l) {
     QStringList t;
     for (const QVariant& v: l) {
         const QVariantMap m = v.toMap();
-        t << (m.value("divider").toBool() ? QString("|") : m.value("type").toString());
+        t << (m.value("divider").toBool() ? QString("|")
+              : m.contains("app")         ? "@" + m.value("app").toString()
+              : m.value("group").toBool() ? "(" + typesOf(m.value("members").toList()).join(" ") + ")"
+                                          : m.value("type").toString());
     }
     return t;
 }
@@ -47,15 +51,18 @@ void waitFor(const std::function<bool()>& done, int ms = 2000) {
 
 TEST(ToolboxModel, theDefaultTools) {
     ToolboxModel m(nullptr, nullptr);
-    EXPECT_EQ(typesOf(m.entries()), QStringList({"pen", "pen", "pen", "|", "highlighter", "highlighter", "|", "eraser",
-                                                 "|", "shape", "text", "sticky", "|", "laser"}));
+    EXPECT_EQ(typesOf(m.entries()),
+              QStringList({"pen", "pen", "pen", "|", "highlighter", "highlighter", "|", "eraser", "|", "shape", "text",
+                           "sticky", "|", "laser", "|", "@hand", "@select", "@snip", "@pdfText"}))
+            << "the user's tools, then the app's tools on the rail";
     const QVariantList tools = m.tools();
     EXPECT_EQ(tools[0].toMap().value("role"), "body");
     EXPECT_EQ(tools[1].toMap().value("role"), "keyTerms");
     EXPECT_EQ(tools[2].toMap().value("role"), "warnings");
     EXPECT_EQ(tools[3].toMap().value("role"), "keyTerms");
     EXPECT_EQ(tools[4].toMap().value("role"), "definitions");
-    EXPECT_EQ(m.sections().size(), 5);
+    EXPECT_EQ(m.sections().size(), 6);
+    EXPECT_EQ(tools.size(), 10);
     EXPECT_EQ(m.active(), tools[0].toMap().value("id")) << "the first pen is in hand at the first start";
     EXPECT_EQ(m.entry(m.active()).value("width").toDouble(), 1.41);
 }
@@ -87,7 +94,8 @@ TEST(ToolboxModel, addChangeDuplicateAndRemove) {
     QSignalSpy changed(&m, &ToolboxModel::changed);
     const QString id = m.add({{"type", "pen"}, {"color", "#123456"}, {"role", ""}, {"width", 4}});
     ASSERT_FALSE(id.isEmpty());
-    EXPECT_EQ(m.indexOf(id), m.entries().size() - 1) << "at the end";
+    EXPECT_EQ(m.indexOf(id), m.indexOf(m.recentOfType("laser")) + 1) << "after the user's last tool";
+    EXPECT_EQ(m.entries().last().toMap().value("app"), "pdfText") << "the app's tools still end the rail";
     EXPECT_EQ(changed.count(), 1);
     EXPECT_TRUE(m.update(id, {{"width", 2.5}, {"fill", QVariantMap{{"on", true}}}}));
     EXPECT_EQ(m.entry(id).value("width").toDouble(), 2.5);
@@ -146,9 +154,9 @@ TEST(ToolboxModel, movingEntriesAndDividers) {
     EXPECT_TRUE(m.hasDividerAfter(ids[2]));
     m.setDividerAfter(ids[2], false);
     EXPECT_FALSE(m.hasDividerAfter(ids[2]));
-    EXPECT_EQ(m.sections().size(), 4);
-    m.setDividerAfter(ids[0], true);
     EXPECT_EQ(m.sections().size(), 5);
+    m.setDividerAfter(ids[0], true);
+    EXPECT_EQ(m.sections().size(), 6);
     EXPECT_EQ(m.sections()[0].toList().size(), 1);
     m.setDividerAfter(ids.last(), true);
     EXPECT_FALSE(m.hasDividerAfter(ids.last())) << "none at the end";
@@ -238,7 +246,8 @@ TEST(ToolboxModel, storedAsJsonAfterAPause) {
                        R"({"type":"ufo","id":"e2"},{"divider":true,"id":"d2"},{"divider":true,"id":"d3"},)"
                        R"({"type":"pen","id":"e1"}]})");
     }, nullptr);
-    EXPECT_EQ(typesOf(odd.entries()), QStringList({"pen", "|", "pen", "eraser"}));
+    EXPECT_EQ(typesOf(odd.entries()),
+              QStringList({"pen", "|", "pen", "eraser", "|", "@hand", "@select", "@snip", "@pdfText"}));
     const QStringList ids = idsOf(odd.entries());
     EXPECT_EQ(QSet<QString>(ids.begin(), ids.end()).size(), ids.size()) << "ids unique";
 }
@@ -249,6 +258,220 @@ TEST(ToolboxModel, reset) {
     m.add({{"type", "laser"}});
     m.reset();
     EXPECT_EQ(m.tools().size(), 10);
+}
+
+// --- one arrangement for both bars (qt/rail-scroll) --------------------------------------------------------------------
+
+namespace {
+QString firstOf(const ToolboxModel& m, const QString& type, int n = 0) {
+    for (const QVariant& v: m.tools()) {
+        if (v.toMap().value("type") == type && n-- == 0) {
+            return v.toMap().value("id").toString();
+        }
+    }
+    return {};
+}
+}  // namespace
+
+TEST(ToolboxModel, theTopBarHasItsFirstLayout) {
+    ToolboxModel m(nullptr, nullptr);
+    EXPECT_EQ(typesOf(m.topItems()),
+              QStringList({"@open", "@save", "@milestone", "@share", "@print", "|", "@image", "@sticker", "@addPage",
+                           "@write", "|", "@geometry", "@touchDrawing", "@record", "|", "@search", "@read", "@replay",
+                           "@present", "@fullScreen", "@zen", "|", "@tags", "@favourite", "@bookmark", "|",
+                           "@settings"}));
+    EXPECT_EQ(m.items("top"), m.topItems());
+    EXPECT_EQ(m.items("rail"), m.entries());
+    EXPECT_EQ(m.unplaced(), QStringList({"new"})) << "every other app item has its place";
+    EXPECT_EQ(m.barOf(m.idOfApp("hand")), "rail");
+    EXPECT_EQ(m.barOf(m.idOfApp("record")), "top");
+    EXPECT_EQ(m.kindOf(m.idOfApp("hand")), "app");
+    EXPECT_EQ(m.kindOf(firstOf(m, "pen")), "tool");
+    EXPECT_TRUE(ToolboxModel::isAppTool("select"));
+    EXPECT_FALSE(ToolboxModel::isAppTool("save"));
+    const QStringList ids = idsOf(m.entries()) + idsOf(m.topItems());
+    EXPECT_EQ(QSet<QString>(ids.begin(), ids.end()).size(), ids.size()) << "ids unique over both bars";
+}
+
+// 0.7.0 stored the user's entries alone (version 1): they become the rail's start, the app's tools follow them, the
+// top bar gets its first layout; the tool in hand and the order of use stay
+TEST(ToolboxModel, theToolboxOf070IsUpgraded) {
+    const QString v1 = R"({"version":1,"active":"e9","recent":["e9","e2"],"entries":[)"
+                       R"({"id":"e2","type":"pen","color":"#123456","role":"","width":2.26,"lineStyle":"dash"},)"
+                       R"({"id":"d3","divider":true},)"
+                       R"({"id":"e5","type":"eraser","variant":"whiteout","width":8.5},)"
+                       R"({"id":"e9","type":"highlighter","role":"keyTerms","color":"#ffe066","width":8.5},)"
+                       R"({"id":"e12","type":"snip","variant":"lasso"}]})";
+    QString stored = v1;
+    ToolboxModel m([&] { return stored; }, [&](const QString& json) { stored = json; });
+    EXPECT_EQ(typesOf(m.entries()), QStringList({"pen", "|", "eraser", "highlighter", "snip", "|", "@hand", "@select",
+                                                 "@snip", "@pdfText"}));
+    EXPECT_EQ(idsOf(m.entries()).mid(0, 5), QStringList({"e2", "d3", "e5", "e9", "e12"})) << "the ids stay";
+    EXPECT_EQ(m.entry("e2").value("color"), "#123456");
+    EXPECT_EQ(m.entry("e2").value("lineStyle"), "dash");
+    EXPECT_EQ(m.active(), "e9");
+    EXPECT_EQ(m.recentOfType("pen"), "e2");
+    EXPECT_EQ(typesOf(m.topItems()).first(), "@open");
+    EXPECT_EQ(m.topItems().size(), ToolboxModel(nullptr, nullptr).topItems().size());
+    // Written as version 2, read again the same
+    m.setActive("e5");
+    m.flush();
+    EXPECT_TRUE(stored.contains(R"("version":2)")) << stored.toStdString();
+    EXPECT_FALSE(stored.contains(R"("entries")"));
+    ToolboxModel again([&] { return stored; }, nullptr);
+    EXPECT_EQ(again.entries(), m.entries());
+    EXPECT_EQ(again.topItems(), m.topItems());
+    EXPECT_EQ(again.active(), "e5");
+    // Broken or unknown: the first layout
+    for (const char* json: {"{nonsense", R"({"version":2})", R"({"version":2,"rail":[{"app":"hand"}],"top":[]})",
+                            R"({"version":3,"rail":[{"type":"pen"}]})"}) {
+        ToolboxModel broken([json] { return QString(json); }, nullptr);
+        EXPECT_EQ(broken.entries(), ToolboxModel(nullptr, nullptr).entries()) << json;
+    }
+}
+
+TEST(ToolboxModel, appItemsHaveOneHomeAndGoIntoTheCatalogWhenRemoved) {
+    // Unknown names, and a second place of one, are dropped
+    ToolboxModel odd([] {
+        return QString(R"({"version":2,"rail":[{"id":"e1","type":"pen"},{"id":"a2","app":"hand"},)"
+                       R"({"id":"a3","app":"teleporter"},{"id":"a4","app":"hand"}],)"
+                       R"("top":[{"id":"a5","app":"hand"},{"id":"a6","app":"save"}]})");
+    }, nullptr);
+    EXPECT_EQ(typesOf(odd.entries()), QStringList({"pen", "eraser", "@hand"})) << "an eraser after the user's tools";
+    EXPECT_EQ(typesOf(odd.topItems()), QStringList({"@save"}));
+    EXPECT_TRUE(odd.unplaced().contains("select"));
+    EXPECT_FALSE(odd.unplaced().contains("hand"));
+
+    ToolboxModel m(nullptr, nullptr);
+    const QString hand = m.idOfApp("hand");
+    EXPECT_TRUE(m.canRemove(hand));
+    EXPECT_TRUE(m.remove(hand));
+    EXPECT_EQ(m.idOfApp("hand"), "");
+    EXPECT_TRUE(m.unplaced().contains("hand")) << "in the catalog";
+    const QString back = m.place("hand", "rail", 0);
+    EXPECT_FALSE(back.isEmpty());
+    EXPECT_EQ(m.indexOf(back), 0);
+    EXPECT_EQ(m.place("hand", "top"), "") << "placed already";
+    EXPECT_EQ(m.place("ufo", "top"), "");
+    // Carried to the other bar (one home: it leaves the rail)
+    const QString select = m.idOfApp("select");
+    EXPECT_TRUE(m.moveTo(select, "top", 0));
+    EXPECT_EQ(m.barOf(select), "top");
+    EXPECT_EQ(m.indexOf(select), 0);
+    EXPECT_FALSE(typesOf(m.entries()).contains("@select"));
+    // A divider after an app item, moved by one
+    m.setDividerAfter(select, true);
+    EXPECT_TRUE(m.hasDividerAfter(select));
+    EXPECT_TRUE(m.moveBy(m.idOfApp("snip"), -1));
+    // A tool of the user's onto the top bar and back
+    const QString pen = firstOf(m, "pen");
+    EXPECT_TRUE(m.moveTo(pen, "top", 1));
+    EXPECT_EQ(m.barOf(pen), "top");
+    EXPECT_EQ(m.tools().size(), 10) << "still one of the tools";
+    EXPECT_TRUE(m.moveTo(pen, "rail", 0));
+    EXPECT_EQ(m.indexOf(pen), 0);
+}
+
+TEST(ToolboxModel, groupsMadeCycledAndUndone) {
+    ToolboxModel m(nullptr, nullptr);
+    const QString pen1 = firstOf(m, "pen"), pen2 = firstOf(m, "pen", 1), pen3 = firstOf(m, "pen", 2);
+    const QString hl = firstOf(m, "highlighter");
+    const QString before = m.snapshot();
+    const QStringList railBefore = idsOf(m.entries());
+
+    // The highlighter carried onto the first pen: a group in the pen's place, the carried one shown
+    const QString g = m.group(hl, pen1);
+    ASSERT_FALSE(g.isEmpty());
+    EXPECT_EQ(m.kindOf(g), "group");
+    EXPECT_EQ(m.indexOf(g), 0);
+    EXPECT_EQ(idsOf(m.members(g)), QStringList({pen1, hl}));
+    EXPECT_EQ(m.shownOf(g), hl);
+    EXPECT_EQ(m.groupOf(hl), g);
+    EXPECT_EQ(m.indexOf(hl), 0) << "a member's place: its group's";
+    EXPECT_EQ(m.barOf(hl), "rail");
+    EXPECT_EQ(m.tools().size(), 10) << "the tools are all still there";
+    // Taking a member: the group shows it
+    m.setActive(pen1);
+    EXPECT_EQ(m.shownOf(g), pen1);
+    // More members (an app item too), and one carried onto a member: into that group
+    EXPECT_EQ(m.group(pen2, g), g);
+    EXPECT_EQ(m.group(m.idOfApp("select"), pen2), g);
+    EXPECT_EQ(m.members(g).size(), 4);
+    m.use(m.idOfApp("select"));
+    EXPECT_EQ(m.shownOf(g), m.idOfApp("select"));
+    // Not with itself, a divider, or between two members of one group
+    EXPECT_EQ(m.group(pen1, pen1), "");
+    EXPECT_EQ(m.group(pen1, hl), "");
+    const QString divider = idsOf(m.entries())[typesOf(m.entries()).indexOf("|")];
+    EXPECT_EQ(m.group(pen3, divider), "") << "a divider";
+    // Stored and read again
+    QString stored = m.toJson();
+    ToolboxModel again([&] { return stored; }, nullptr);
+    EXPECT_EQ(again.members(g), m.members(g));
+    EXPECT_EQ(again.shownOf(g), m.idOfApp("select"));
+
+    // Carried out of the group: a member no more, where it was let go
+    EXPECT_TRUE(m.moveTo(pen2, "rail", 1));
+    EXPECT_EQ(m.groupOf(pen2), "");
+    EXPECT_EQ(m.indexOf(pen2), 1);
+    EXPECT_EQ(m.members(g).size(), 3);
+    // Moved inside the group
+    EXPECT_TRUE(m.moveBy(hl, -1));
+    EXPECT_EQ(idsOf(m.members(g)).first(), hl);
+    // Ungrouped: the members in their order, in its place
+    EXPECT_TRUE(m.ungroup(g));
+    EXPECT_EQ(m.kindOf(g), "");
+    EXPECT_EQ(idsOf(m.entries()).mid(0, 4), QStringList({hl, pen1, m.idOfApp("select"), pen2}));
+    // A group of two that loses one is that one again
+    const QString g2 = m.group(pen3, pen2);
+    EXPECT_TRUE(m.moveTo(pen3, "rail", 0));
+    EXPECT_EQ(m.kindOf(g2), "") << "no group of one";
+    EXPECT_EQ(m.groupOf(pen2), "");
+    // A group carried onto another gives it its members
+    const QString ga = m.group(pen1, hl);
+    const QString gb = m.group(pen3, pen2);
+    EXPECT_EQ(m.group(gb, ga), ga);
+    EXPECT_EQ(m.members(ga).size(), 4);
+    EXPECT_EQ(m.kindOf(gb), "");
+
+    // Undo: the arrangement of before, as it was
+    EXPECT_TRUE(m.restore(before));
+    EXPECT_EQ(idsOf(m.entries()), railBefore);
+}
+
+TEST(ToolboxModel, aGroupRemovedTakesItsMembersButTheLastEraserStays) {
+    ToolboxModel m(nullptr, nullptr);
+    const QString eraser = firstOf(m, "eraser"), laser = firstOf(m, "laser");
+    const QString hand = m.idOfApp("hand");
+    const QString g = m.group(laser, eraser);
+    EXPECT_EQ(m.group(hand, g), g);
+    EXPECT_TRUE(m.canRemove(g));
+    const int at = m.indexOf(g);
+    EXPECT_TRUE(m.remove(g));
+    EXPECT_EQ(m.kindOf(laser), "");
+    EXPECT_TRUE(m.unplaced().contains("hand"));
+    EXPECT_EQ(m.indexOf(eraser), at) << "the only eraser stays in the group's place";
+}
+
+TEST(ToolboxModel, backToTheFirstLayoutKeepsTheUsersTools) {
+    ToolboxModel m(nullptr, nullptr);
+    const QString pen1 = firstOf(m, "pen"), laser = firstOf(m, "laser");
+    const QString mine = m.add({{"type", "pen"}, {"color", "#336699"}});
+    m.group(laser, pen1);
+    m.remove(m.idOfApp("hand"));
+    m.moveTo(m.idOfApp("save"), "rail", 0);
+    m.moveTo(mine, "top", 0);
+    m.resetLayout();
+    EXPECT_EQ(m.tools().size(), 11) << "the user's tools stay";
+    EXPECT_EQ(m.groupOf(laser), "") << "out of their groups";
+    EXPECT_EQ(m.barOf(mine), "rail");
+    EXPECT_EQ(m.entry(mine).value("color"), "#336699");
+    EXPECT_EQ(typesOf(m.entries()).mid(typesOf(m.entries()).size() - 5),
+              QStringList({"|", "@hand", "@select", "@snip", "@pdfText"}));
+    EXPECT_EQ(typesOf(m.topItems()), typesOf(ToolboxModel(nullptr, nullptr).topItems()));
+    EXPECT_EQ(m.unplaced(), QStringList({"new"}));
+    const QStringList ids = idsOf(m.entries()) + idsOf(m.topItems());
+    EXPECT_EQ(QSet<QString>(ids.begin(), ids.end()).size(), ids.size());
 }
 
 // --- taking an entry: the tool in hand gets everything it holds (AppToolbox.cpp) --------------------------------------

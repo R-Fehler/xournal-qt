@@ -1,20 +1,21 @@
 // The toolbox (qt/docs/toolbox.md): the user's own tools in a rail docked to a side of the canvas (right by default;
 // left, top or bottom by choice, per window size), like pens lying sorted in a box on the table. One element in the
-// window, in full screen and on phones.
+// window, in full screen and on phones (the dock: the same rail at the bottom edge).
 //   head   undo, redo (pinned)
-//   middle the user's tools, in sections (dividers between them); then the fixed tools (hand, select, write on the
-//          page, setsquare and curtain, mark PDF text, the finger draws: the window's own buttons, lent to the rail)
-//   tail   "+" (add a tool), ⋯ (full screen: what the tab strip and the command bar hold there) (pinned)
-// The rail uses all the room it has: every tool on its own while they fit; when they do not, sections fold into stacks
-// (ToolboxPlan.js): the fixed tools first, then the user's sections from the end; only when all are folded the middle
-// scrolls. A stack shows the entry used last of its section; a tap uses it, a tap again or a long press opens the
-// section's list. The entry in hand is always shown.
-// A tap on a tool picks it up (AppController::applyToolEntry); a tap on the one in hand opens its editor; a long press
-// or a right click its menu; the wheel over it changes its width.
+//   middle the rail's items as the arrangement has them (ToolboxModel): the user's tools, dividers, and the app's own
+//          tools (hand, select, snip, mark PDF text by default: the window's buttons, lent to the rail); it scrolls
+//   tail   "+" (add a tool), ⋯ (full screen: what the tab strip and the command bar hold there); a phone's dock: "My
+//          tools" and the page number (pinned)
+// The middle scrolls when its items do not fit (qt/rail-scroll; before, sections folded into stacks): the same order on
+// every screen, nothing folded. When it scrolls, it ends through the middle of a cell (half of the next one shows) and
+// fades at the end that has more; a tool taken by a key or elsewhere is scrolled into view; where it was scrolled to is
+// remembered per window class.
+// A tap on a tool picks it up (AppController::applyToolEntry); a tap on the one in hand opens its editor; a drag at once
+// scrolls; a long press or a right click: its menu; held, then moved: it is carried to another place; the wheel over a
+// tool changes its width, over a gap (or an app tool) it scrolls.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
-import "ToolboxPlan.js" as ToolboxPlan
 import "Popups.js" as Popups
 import "DevicePixels.js" as DevicePixels
 
@@ -28,11 +29,13 @@ Rectangle {
     property bool floating: false
     /// ⋯ at its end (full screen: present, leave full screen, search, settings)
     property bool moreShown: false
-    /// The phone's dock (qt/docs/toolbox.md, "On a phone"): undo, redo, the first tools that fit (the one in hand
-    /// always among them), "My tools" (the sheet with all of them, the fixed tools and "+") and the page number
+    /// The phone's dock (qt/docs/toolbox.md, "On a phone"): undo, redo, the same items scrolling sideways, "My tools"
+    /// (the sheet with all of them and "Add a tool") and the page number
     property bool compact: false
-    /// The buttons of the fixed tools (the window's own, lent to the rail while it is shown), in their order
-    property var fixedButtons: []
+    /// The window's buttons of the app's items by name (Main.qml's toolArea.slots): those on the rail are lent to it
+    property var appButtons: ({})
+    /// It is shown: the buttons of its app items are its own (the command bar leaves them out)
+    property bool lending: false
     /// The size of a tool's cell: a finger's target in the touch profile
     readonly property real cell: win.adaptive.touchProfile ? win.adaptive.minTarget : 44
     /// Its thickness across the edge
@@ -42,10 +45,11 @@ Rectangle {
     property real endInset: 0
     /// Where the page is, seen from a button (the entry in hand lifts towards it)
     readonly property string towardsPage: edge === "right" ? "left" : edge === "left" ? "right" : edge === "top" ? "down" : "up"
-    /// The user's tools (ToolboxModel)
+    /// The arrangement of the tools (ToolboxModel)
     readonly property var store: app.toolbox
 
     signal editRequested(var entry, Item button)
+    /// A long press or a right click on an item (a tool entry, an app item): its menu
     signal menuRequested(var entry, Item button, point pos)
     signal addRequested(Item button)
     signal moreRequested(Item button)
@@ -55,6 +59,8 @@ Rectangle {
     /// Its grip dragged: to another edge of the window (the window highlights the edge it would go to)
     signal gripMoved(point scenePos)
     signal gripDropped(point scenePos)
+    /// A tool carried onto another made a group (`before`: the arrangement to go back to, "Grouped · Undo")
+    signal grouped(string groupId, string before)
 
     color: "#ffffff"
     radius: floating ? 14 : 0
@@ -73,113 +79,240 @@ Rectangle {
     }
 
     // --- what is shown ----------------------------------------------------------------------------------------------
-    /// The user's sections ([[entry, …], …]) as the model has them now
-    readonly property var sections: (store.revision, store.sections())
-    /// The plan for the room there is (ToolboxPlan.plan)
-    property var plan: ({ folded: [], fixedFolded: false, scroll: false })
-    property var lastPlanInput: null
-    readonly property real length: vertical ? height : width
-    /// What the rail takes along its length besides the middle: its start (an inset, the grip), the head, the gaps, the
-    /// tail, the inset at its end and the middle's own margin. None of it depends on the rail's length.
-    readonly property real overhead: (vertical ? headGrid.y + headGrid.height : headGrid.x + headGrid.width) + 9 + 9
-                                     + (vertical ? tailGrid.height : tailGrid.width) + 4 + endInset + 8
-    /// The room the middle has for its cells as laid out now: the plan's length (qt/rail-fill: the plan followed the
-    /// rail's length alone, 22 px more than the middle really had, and a change of the insets at one length — the
-    /// navigation bar, the insets of a phone unfolded arriving after its new size — left the plan of before: the rail
-    /// stayed folded with the room to spare, or cut its last cells off)
-    readonly property real middleRoom: length - overhead
-    readonly property var planKey: [middleRoom, cell, sections.map(function(s) { return s.length }).join(","),
-                                    fixedButtons.length]
-    onPlanKeyChanged: Qt.callLater(relayout)
-    Component.onCompleted: { relayout(); syncItems() }
-    function planInput(room) {
-        return { length: room, cell: cell, divider: 9, head: 0, tail: 0,
-                 sections: sections.map(function(s) { return s.length }), fixed: fixedButtons.length, slack: 0 }
+    /// The app item's button (null: none, or not offered here: a text document)
+    function appButton(name) {
+        const b = appButtons[name]
+        return b && b.offered !== false ? b : null
     }
-    /// The plan anew for the room there is: on every change of it (a resize, folding or unfolding the phone, turning
-    /// it, the safe area, the keyboard, another edge). A rail that grows unfolds only with 16 px to spare, against
-    /// flicker at an edge; nothing else keeps a plan of before.
-    function relayout() {
-        const input = planInput(middleRoom)
-        let p = ToolboxPlan.plan(input)
-        const last = lastPlanInput
-        if (plan && plan.need !== undefined && last && last.sections.join() === input.sections.join()
-                && last.fixed === input.fixed && last.cell === input.cell && input.length > last.length
-                && ToolboxPlan.cells(input, p) > ToolboxPlan.cells(last, plan)) {
-            const lean = ToolboxPlan.plan(Object.assign({}, input, { slack: 16 }))
-            if (ToolboxPlan.cells(input, lean) <= ToolboxPlan.cells(last, plan) && plan.need <= input.length)
-                p = plan
-        }
-        lastPlanInput = input
-        plan = p
-        placeFixed()
-    }
-    /// Its length with nothing folded (a floating rail is no longer than that)
-    readonly property real naturalLength: ToolboxPlan.plan(planInput(1e9)).need + overhead
-    /// The items of the middle part: entries, dividers, stacks
+    /// The rail's items as the arrangement has them: {kind: "entry" | "app" | "group" | "divider", key, id, entry, name}
     readonly property var itemsNow: {
         const out = []
-        const act = store.active
-        if (compact) {
-            // As many of the user's tools as fit, in their order; the one in hand replaces the last if it is further on
-            const all = store.tools()
-            const n = Math.max(0, Math.min(all.length, Math.floor(middleRoom / cell)))
-            let shown = all.slice(0, n)
-            const inHandAt = all.findIndex(function(e) { return e.id === act })
-            if (n > 0 && inHandAt >= n) shown[n - 1] = all[inHandAt]
-            for (let j = 0; j < shown.length; ++j) out.push({ kind: "entry", key: shown[j].id, entry: shown[j] })
-            return out
-        }
-        const dividers = store.entries.filter(function(e) { return e.divider === true }).map(function(e) { return e.id })
-        for (let i = 0; i < sections.length; ++i) {
-            const s = sections[i]
-            if (i > 0) out.push({ kind: "divider", key: "d" + i, id: dividers[i - 1] || "" })
-            if (plan.folded && plan.folded[i]) {
-                const ids = s.map(function(e) { return e.id })
-                const shown = (act, store.recentAmong(ids))
-                let entry = s[0]
-                for (let j = 0; j < s.length; ++j) if (s[j].id === shown) entry = s[j]
-                out.push({ kind: "stack", key: "s" + i, entry: entry, section: s })
+        const list = (store.revision, store.entries)
+        for (let i = 0; i < list.length; ++i) {
+            const e = list[i]
+            if (e.divider === true) {
+                // (none first, none two in a row once the app items not offered here are left out)
+                if (out.length > 0 && out[out.length - 1].kind !== "divider") out.push({ kind: "divider", key: e.id, id: e.id })
+            } else if (e.app !== undefined) {
+                if (appButton(e.app)) out.push({ kind: "app", key: e.id, id: e.id, entry: e, name: e.app })
+            } else if (e.group === true) {
+                if (groupMembers(e.id).length > 0) out.push({ kind: "group", key: e.id, id: e.id, entry: e })
             } else {
-                for (let j = 0; j < s.length; ++j) out.push({ kind: "entry", key: s[j].id, entry: s[j] })
+                out.push({ kind: "entry", key: e.id, id: e.id, entry: e })
             }
         }
+        while (out.length > 0 && out[out.length - 1].kind === "divider") out.pop()
         return out
     }
 
-    /// What the rail shows: `itemsNow`, taken only when what is where changes (an entry, a stack and the one it shows, a
-    /// divider), not when a tool's color or width does. A new list makes the Repeater build every button anew, and a
-    /// popup beside one (its editor, a stack's list) lost its place: it went to the window's corner (2026-10-05). The
-    /// buttons read their entries from the store (`entryOf`).
+    /// What the rail shows: `itemsNow`, taken only when what is where changes (an entry, an app item, a divider), not
+    /// when a tool's color or width does. A new list makes the Repeater build every button anew, and a popup beside one
+    /// (its editor) lost its place: it went to the window's corner (2026-10-05). The buttons read their entries from the
+    /// store (`entryOf`).
     property var items: []
     property string itemsSignature: ""
     onItemsNowChanged: syncItems()
+    Component.onCompleted: { syncItems(); Qt.callLater(restoreScroll) }
     function syncItems() {
-        const sig = itemsNow.map(function(it) {
-            return it.kind + ":" + it.key + ":" + (it.entry ? it.entry.id : "")
-                   + (it.section ? ":" + it.section.map(function(e) { return e.id }).join(",") : "")
-        }).join("|")
+        const sig = itemsNow.map(function(it) { return it.kind + ":" + it.key }).join("|")
         if (sig === itemsSignature) return
         itemsSignature = sig
         items = itemsNow
     }
     /// An entry as the store has it now (the items keep the ids)
     function entryOf(e) { return (store.revision, e && e.id ? store.entry(e.id) : ({})) }
-    /// The button that shows an entry now: its own, or the stack that holds it (null: none)
+    /// The button that shows an item now (null: none)
     function buttonFor(id) {
         const kids = middleGrid.children
         for (let i = 0; i < kids.length; ++i) {
             const it = kids[i].entryItem
-            if (!it || !kids[i].item) continue
-            if (it.kind === "entry" && it.entry.id === id) return kids[i].item
-            if (it.kind === "stack" && it.section.some(function(e) { return e.id === id })) return kids[i].item
+            if (it && kids[i].item && (it.id === id || (it.kind === "group" && store.groupOf(id) === it.id)))
+                return kids[i].item
         }
         return null
     }
 
+    // --- groups the user makes (a tool carried onto another, held there until it shows a ring) -----------------------
+    /// A group's members that are offered here (an app item whose button the window offers)
+    function groupMembers(gid) {
+        return (store.revision, store.members(gid)).filter(function(m) { return m.app === undefined || appButton(m.app) !== null })
+    }
+    /// The member a group shows: the one used last
+    function groupShown(gid) {
+        const ms = groupMembers(gid)
+        const id = (store.revision, store.shownOf(gid))
+        for (let i = 0; i < ms.length; ++i) if (ms[i].id === id) return ms[i]
+        return ms.length > 0 ? ms[0] : ({})
+    }
+    /// A member is the tool in hand (an app item: its button is checked, and it is a tool)
+    function memberInHand(m) {
+        if (!m) return false
+        if (m.app !== undefined) {
+            const b = appButton(m.app)
+            return (app.tool, app.snip, b !== null && b.checked === true && isTool(m.app))
+        }
+        return inHand(m)
+    }
+    /// Takes a member: a tool entry with all it holds, an app item by its button's tap
+    function takeMember(m) {
+        if (!m || !m.id) return
+        if (m.app !== undefined) {
+            const b = appButton(m.app)
+            if (b) b.clicked()
+        } else {
+            app.applyToolEntry(m.id)
+        }
+        store.use(m.id)
+    }
+    /// A tap on a group: the member it shows. With one of its members in hand: the next one (two or three members), or
+    /// its list (more than three; the author: "A tap should open the group list if more than 3 tools in the group")
+    function tapGroup(gid, button) {
+        const ms = groupMembers(gid)
+        if (ms.length === 0) return
+        let at = -1
+        for (let i = 0; i < ms.length; ++i) if (memberInHand(ms[i])) at = i
+        if (at < 0) takeMember(groupShown(gid))
+        else if (ms.length <= 3) takeMember(ms[(at + 1) % ms.length])
+        else openGroup(gid, button)
+    }
+    /// The group's list beside its button: its members (a tap takes one, the one in hand: its editor; held: its menu;
+    /// held and moved: carried out of the group)
+    function openGroup(gid, button) {
+        groupFlyout.gid = gid
+        groupFlyout.owner = button
+        groupFlyout.open()
+    }
+    /// An app tool of a group taken another way (a key, the sheet): the group shows it
+    function noteAppUse() {
+        const list = store.entries
+        for (let i = 0; i < list.length; ++i) {
+            if (list[i].group !== true) continue
+            const ms = list[i].members
+            for (let j = 0; j < ms.length; ++j) if (ms[j].app !== undefined && memberInHand(ms[j])) store.use(ms[j].id)
+        }
+    }
+    /// The name of a group: "A group of 4 tools"
+    function groupName(gid) { return qsTr("A group of %n tools", "", groupMembers(gid).length) }
+
+    // --- the lengths: the middle scrolls when its items do not fit ----------------------------------------------------
+    readonly property real length: vertical ? height : width
+    /// Where the middle begins along the rail (after the grip, the head and its line)
+    readonly property real middleStart: (vertical ? headGrid.y + headGrid.height : headGrid.x + headGrid.width) + 9
+    /// What the rail takes along its length besides the middle (none of it depends on the rail's length)
+    readonly property real overhead: middleStart + 9 + (vertical ? tailGrid.height : tailGrid.width) + 4 + endInset
+    /// The room of the middle as laid out now
+    readonly property real middleRoom: length - overhead
+    /// The length the middle's items take (and a little room after the last, for the mark of a place there)
+    readonly property real contentLength: itemsLength(items) + 4
+    function itemsLength(list) {
+        let n = 0
+        for (let i = 0; i < list.length; ++i) n += list[i].kind === "divider" ? 9 : cell
+        return n
+    }
+    /// The middle's length in `room`: all of it when everything fits; else cut through the middle of a cell, so that
+    /// half of the next one shows (there is more). A room for less than a cell and a half (a phone held sideways):
+    /// all of it, a whole cell in sight before the cut.
+    function cutFor(room) {
+        if (contentLength <= room + 0.5 || room < cell * 1.5) return Math.max(0, room)
+        let at = 0, best = room
+        for (let i = 0; i < items.length; ++i) {
+            if (items[i].kind !== "divider" && at + cell / 2 <= room) best = at + cell / 2
+            at += items[i].kind === "divider" ? 9 : cell
+        }
+        return best
+    }
+    readonly property real viewLength: cutFor(middleRoom)
+    /// It scrolls: its items do not fit
+    readonly property bool scrolls: contentLength > middleRoom + 0.5
+    /// Its length with every item in sight (a floating rail is no longer than that)
+    readonly property real naturalLength: overhead + contentLength
+    /// The length it takes when it may have `available` (floating: as long as its items, or cut through a cell)
+    function lengthFor(available) {
+        return naturalLength <= available ? naturalLength : overhead + cutFor(available - overhead)
+    }
+
+    // --- scrolling -------------------------------------------------------------------------------------------------
+    /// Where the middle is scrolled to (along the rail)
+    readonly property real scrollPos: vertical ? middle.contentY : middle.contentX
+    function scrollTo(pos) {
+        const size = vertical ? middle.height : middle.width
+        const content = vertical ? middle.contentHeight : middle.contentWidth
+        const p = Math.max(0, Math.min(content - size, pos))
+        if (vertical) middle.contentY = p
+        else middle.contentX = p
+    }
+    function scrollBy(d) { scrollTo(scrollPos + d) }
+    /// Scrolls an item of the middle into sight (with half a cell beyond it, clear of the fade)
+    function reveal(item) {
+        if (!item || !scrolls) return
+        let p0 = item
+        while (p0 && p0 !== middleGrid) p0 = p0.parent
+        if (!p0) return  // (a button of the group's list)
+        const p = item.mapToItem(middleGrid, 0, 0)
+        const start = vertical ? p.y : p.x
+        const end = start + (vertical ? item.height : item.width)
+        const size = vertical ? middle.height : middle.width
+        const margin = Math.min(cell / 2, Math.max(0, (size - (end - start)) / 2))
+        if (start - margin < scrollPos) scrollTo(start - margin)
+        else if (end + margin > scrollPos + size) scrollTo(end + margin - size)
+    }
+    /// The button of the tool in hand on the rail (null: none here)
+    function inHandButton() {
+        const kids = middleGrid.children
+        for (let i = 0; i < kids.length; ++i) {
+            const it = kids[i].entryItem
+            if (!it || !kids[i].item) continue
+            if (it.kind === "entry" && inHand(entryOf(it.entry))) return kids[i].item
+            if (it.kind === "group" && groupMembers(it.id).some(memberInHand)) return kids[i].item
+            if (it.kind === "app") {
+                const b = appButton(it.name)
+                if (b && b.checked && isTool(it.name)) return kids[i].item
+            }
+        }
+        return null
+    }
+    /// An app item that is a tool in hand (not a switch or a command)
+    function isTool(name) { return ["hand", "select", "snip", "pdfText", "geometry"].indexOf(name) >= 0 }
+    function revealInHand() { reveal(inHandButton()) }
+    // A tool taken by a key, the sheet, a menu or the rail itself: in sight
+    Connections {
+        target: app
+        function onToolChanged() { Qt.callLater(box.revealInHand); Qt.callLater(box.noteAppUse) }
+        function onSnipChanged() { Qt.callLater(box.revealInHand) }
+    }
+    Connections {
+        target: box.store
+        function onActiveChanged() { Qt.callLater(box.revealInHand) }
+    }
+    // Where it was scrolled to, per window class (a rail of a desktop window and the phone's dock each their own)
+    readonly property string sizeClass: win.adaptive.layoutClass
+    onSizeClassChanged: Qt.callLater(restoreScroll)
+    // (within the contents still, and the tool in hand in sight: a window made smaller, the keyboard, the insets)
+    onViewLengthChanged: { scrollBy(0); Qt.callLater(revealInHand) }
+    /// (the tool in hand in sight still: it matters more than the place of before)
+    function restoreScroll() {
+        const v = parseFloat(win.layoutChoice("toolboxScroll"))
+        scrollTo(isNaN(v) ? 0 : v)
+        revealInHand()
+    }
+    Timer {
+        id: rememberScroll
+        interval: 600
+        onTriggered: {
+            if (middle.moving) return restart()
+            win.chooseLayout("toolboxScroll", box.scrollPos > 0.5 ? String(Math.round(box.scrollPos)) : "")
+        }
+    }
+    onScrollPosChanged: if (scrolls) rememberScroll.restart()
+
     // --- what an entry does ----------------------------------------------------------------------------------------
-    /// Its name: "Pen · Body", "Highlighter · Key terms", "Arrow", "Eraser (whiteout)", …
+    /// Its name: "Pen · Body", "Highlighter · Key terms", "Arrow", "Eraser (whiteout)", an app item's label, …
     function entryName(e) {
+        if (e && e.group === true) return groupName(e.id)
+        if (e && e.app !== undefined) {
+            const b = appButtons[e.app]
+            return b ? (b.label !== undefined && b.label !== "" ? b.label : b.name || e.app) : e.app
+        }
         if (!e || !e.type) return ""
         const role = e.role ? roleName(e.role) : ""
         const kinds = {
@@ -209,7 +342,7 @@ Rectangle {
     /// (a snip is never the active entry: it is in hand while it is armed with its shape)
     function inHand(e) {
         return (app.tool, app.drawingType, app.snip, app.settings.revision, store.revision,
-                !!e && (e.type === "snip" || store.active === e.id) && app.entryInHand(e))
+                !!e && e.type !== undefined && (e.type === "snip" || store.active === e.id) && app.entryInHand(e))
     }
     function tap(e, button) {
         if (e && e.type === "snip") cycleSnip(e)
@@ -229,25 +362,41 @@ Rectangle {
         store.update(e.id, { width: Math.round(w * 100) / 100 })
         if (inHand(e) || store.active === e.id) app.applyToolEntry(e.id)
     }
-    function openStack(item, section) {
-        stackFlyout.section = section
-        stackFlyout.owner = item
-        stackFlyout.open()
+
+    /// Held (or right-clicked): its menu; a member in the group's list: the list closes, the menu opens at the group
+    function held(e, button, pos) {
+        if (groupFlyout.opened && e.app === undefined) {
+            const owner = groupFlyout.owner
+            groupFlyout.close()
+            menuRequested(e, owner, Qt.point(owner.width / 2, owner.height / 2))
+            return
+        }
+        menuRequested(e, button, pos)
     }
 
-    // --- reordering: a tool held, then carried to another place (qt/docs/toolbox.md, "Reordering") -----------------
-    /// The entry being carried ("": none), where it would go (an index among entries and dividers; -1: nowhere, it
-    /// goes back), and the mark of that place (along the rail, in the tools' coordinates)
+    // --- carrying: an item held, then moved to another place (qt/docs/toolbox.md, "Carrying") ---------------------------
+    /// The item being carried ("": none), where it would go (an index among the rail's items; -1: nowhere, it goes
+    /// back), and the mark of that place (along the rail, in the items' coordinates)
     property string dragId: ""
     property var dragEntry: ({})
     property int dropIndex: -1
     property real dropMark: -1
     property point dragPoint
-    function indexOfItem(it) {
-        if (it.kind === "entry") return store.indexOf(it.entry.id)
-        if (it.kind === "stack") return store.indexOf(it.section[0].id)
-        if (it.kind === "divider") return store.indexOf(it.id)
-        return -1
+    /// The item the carried one is held over ("": none) and, once it was held there long enough (about 0.6 s), the one
+    /// that shows a ring: let go there, the two are a group
+    property string hoverId: ""
+    property string ringId: ""
+    Timer {
+        id: dwell
+        interval: 600
+        onTriggered: box.ringId = box.hoverId
+    }
+    function hoverOver(id) {
+        if (id === hoverId) return
+        hoverId = id
+        ringId = ""
+        if (id !== "") dwell.restart()
+        else dwell.stop()
     }
     function dragTo(e, scenePos) {
         dragId = e.id
@@ -260,26 +409,38 @@ Rectangle {
         if (away) {
             dropIndex = -1
             dropMark = -1
+            hoverOver("")
             return
         }
         // Near an end of a rail that scrolls: it scrolls along
         const m = middle.mapFromItem(null, scenePos.x, scenePos.y)
         const pos = vertical ? m.y : m.x, size = vertical ? middle.height : middle.width
-        if (middle.interactive) {
+        if (scrolls) {
             if (pos < cell / 2) scrollBy(-cell / 3)
             else if (pos > size - cell / 2) scrollBy(cell / 3)
         }
         const p = middleGrid.mapFromItem(null, scenePos.x, scenePos.y)
         const along = vertical ? p.y : p.x
-        let best = -1, mark = 0
+        // Over the middle of another item (not a divider, not itself or its own group): it may become a group
+        let over = ""
         const kids = middleGrid.children
+        for (let i = 0; i < kids.length; ++i) {
+            const k = kids[i]
+            if (!k.entryItem || !k.visible || k.entryItem.kind === "divider") continue
+            const start = vertical ? k.y : k.x
+            const extent = vertical ? k.height : k.width
+            if (along > start + extent * 0.2 && along < start + extent * 0.8) over = k.entryItem.id
+        }
+        if (over === e.id || (over !== "" && store.groupOf(e.id) === over)) over = ""
+        hoverOver(over)
+        let best = -1, mark = 0
         for (let i = 0; i < kids.length; ++i) {
             const k = kids[i]
             if (!k.entryItem || !k.visible) continue
             const start = vertical ? k.y : k.x
             const extent = vertical ? k.height : k.width
             if (along < start + extent / 2) {
-                best = indexOfItem(k.entryItem)
+                best = store.indexOf(k.entryItem.id)
                 mark = start
                 break
             }
@@ -288,48 +449,79 @@ Rectangle {
         dropIndex = best >= 0 ? best : store.entries.length
         dropMark = mark
     }
-    function scrollBy(d) {
-        if (vertical) middle.contentY = Math.max(0, Math.min(middle.contentHeight - middle.height, middle.contentY + d))
-        else middle.contentX = Math.max(0, Math.min(middle.contentWidth - middle.width, middle.contentX + d))
-    }
     function dropAt(e, scenePos) {
         dragTo(e, scenePos)
-        if (dropIndex >= 0) store.move(e.id, dropIndex)
+        if (ringId !== "") {
+            const before = store.snapshot()
+            const g = store.group(e.id, ringId)
+            if (g !== "") grouped(g, before)
+        } else if (dropIndex >= 0) {
+            store.move(e.id, dropIndex)
+        }
         endDrag()
+        groupFlyout.close()
     }
     function endDrag() {
         dragId = ""
         dropIndex = -1
         dropMark = -1
+        hoverOver("")
     }
 
-    // --- the fixed tools (the window's buttons, lent to the rail) -----------------------------------------------------
-    /// The buttons placed in the rail now (given back when they leave the list)
+    // --- the app's buttons, lent to the rail ---------------------------------------------------------------------------
+    /// The buttons of the app items on the rail while it is shown (the command bar leaves them out)
+    readonly property var fixedButtons: {
+        if (!lending) return []
+        const out = []
+        const list = (store.revision, store.entries)
+        for (let i = 0; i < list.length; ++i) {
+            const e = list[i]
+            const names = e.app !== undefined ? [e.app]
+                          : e.group === true ? e.members.filter(function(m) { return m.app !== undefined })
+                                                        .map(function(m) { return m.app }) : []
+            names.forEach(function(n) { if (appButtons[n]) out.push(appButtons[n]) })
+        }
+        return out
+    }
+    /// The buttons lent now (given back when they leave the list)
     property var placedFixed: []
-    /// How many of the fixed tools are shown on their own (the others are in the stack after them)
-    readonly property int fixedShown: plan.fixedShown === undefined ? fixedButtons.length : plan.fixedShown
-    function placeFixed() {
+    onFixedButtonsChanged: {
         for (let i = 0; i < placedFixed.length; ++i) {
             if (fixedButtons.indexOf(placedFixed[i]) < 0) release(placedFixed[i])
         }
-        for (let i = 0; i < fixedButtons.length; ++i) {
-            const b = fixedButtons[i]
-            b.parent = i < fixedShown ? fixedGrid : fixedFlyoutGrid
-            b.width = cell
-            b.height = cell
-        }
         placedFixed = fixedButtons.slice()
     }
-    /// A button given back (the toolbox is not shown): its own size again; its owner puts it where it belongs
+    /// A button given back (the toolbox is not shown, or it left the rail): its own size again; its owner (the command
+    /// bar) puts it where it belongs
     function release(b) {
+        for (let p = b.parent; p; p = p.parent) {
+            if (p === box) {
+                b.parent = bank
+                break
+            }
+        }
         b.width = Qt.binding(function() { return b.implicitWidth })
         b.height = Qt.binding(function() { return b.implicitHeight })
     }
-    /// The fixed tool in use among those in the stack (the stack shows it)
-    readonly property Item fixedInUse: {
-        for (let i = fixedShown; i < fixedButtons.length; ++i) if (fixedButtons[i].checked) return fixedButtons[i]
-        return null
+    /// Takes a button into a cell of the rail
+    function lend(b, cellItem) {
+        if (!b || !lending) return
+        b.parent = cellItem
+        b.x = 0
+        b.y = 0
+        b.width = cell
+        b.height = cell
     }
+    onLendingChanged: if (lending) Qt.callLater(lendAll)
+    /// (shown again: the cells take their buttons back from the command bar)
+    function lendAll() {
+        const kids = middleGrid.children
+        for (let i = 0; i < kids.length; ++i) {
+            if (kids[i].item && kids[i].item.lendButton) kids[i].item.lendButton()
+        }
+    }
+    // (a button that left a cell going away, until the command bar takes it)
+    Item { id: bank; visible: false }
 
     // --- the layout ---------------------------------------------------------------------------------------------------
     // The grip (a dotted cap at its start): the only place that moves the rail itself, to another edge
@@ -409,15 +601,15 @@ Rectangle {
     Flickable {
         id: middle
         objectName: "toolboxMiddle"
-        x: box.vertical ? 0 : headGrid.x + headGrid.width + 9
-        y: box.vertical ? headGrid.y + headGrid.height + 9 : 0
-        width: box.vertical ? box.width : tailGrid.x - x - 9
-        height: box.vertical ? tailGrid.y - y - 9 : box.height
-        contentWidth: middleGrid.width + (box.vertical ? 0 : 8)
-        contentHeight: middleGrid.height + (box.vertical ? 8 : 0)
+        x: box.vertical ? 0 : box.middleStart
+        y: box.vertical ? box.middleStart : 0
+        width: box.vertical ? box.width : box.viewLength
+        height: box.vertical ? box.viewLength : box.height
+        contentWidth: box.vertical ? width : box.contentLength
+        contentHeight: box.vertical ? box.contentLength : height
         flickableDirection: box.vertical ? Flickable.VerticalFlick : Flickable.HorizontalFlick
         boundsBehavior: Flickable.StopAtBounds
-        interactive: box.vertical ? contentHeight > height : contentWidth > width
+        interactive: box.scrolls
         clip: true
         Grid {
             id: middleGrid
@@ -432,33 +624,47 @@ Rectangle {
                 delegate: Loader {
                     required property var modelData
                     sourceComponent: modelData.kind === "divider" ? dividerComponent
-                                     : modelData.kind === "stack" ? stackComponent : entryComponent
+                                     : modelData.kind === "app" ? appComponent
+                                     : modelData.kind === "group" ? groupComponent : entryComponent
                     property var entryItem: modelData
                 }
             }
-            // The fixed tools, after a divider: in a row of their own, the last ones (or all) folded into one button
-            Loader { active: box.fixedButtons.length > 0 && !box.compact; visible: active; sourceComponent: dividerComponent }
-            Grid {
-                id: fixedGrid
-                objectName: "toolboxFixed"
-                columns: box.vertical ? 1 : -1
-                rows: box.vertical ? -1 : 1
-                visible: box.fixedShown > 0
+        }
+        // A sideways rail: the mouse wheel (up and down) scrolls it too
+        WheelHandler {
+            enabled: !box.vertical && box.scrolls
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: function(event) {
+                const d = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x
+                box.scrollBy(-d / 2)
             }
-            IconButton {
-                id: fixedStack
-                objectName: "toolboxFixedStack"
-                visible: box.plan.fixedFolded === true && box.fixedButtons.length > 0
-                width: box.cell; height: visible ? box.cell : 0
-                icon.width: 22; icon.height: 22
-                iconName: box.fixedInUse ? box.fixedInUse.iconName : "xqt-tools-more"
-                checked: box.fixedInUse !== null
-                label: qsTr("More tools")
-                tip: qsTr("More of the fixed tools (snip, write on the page, setsquare, mark PDF text, …)")
-                ownHold: true
-                onClicked: fixedFlyout.visible ? fixedFlyout.close() : fixedFlyout.open()
-                onPressAndHold: fixedFlyout.open()
-            }
+        }
+    }
+    // The fades at the ends that have more
+    Rectangle {
+        objectName: "toolboxFadeStart"
+        visible: box.scrolls && box.scrollPos > 0.5
+        x: middle.x
+        y: middle.y
+        width: box.vertical ? middle.width : 18
+        height: box.vertical ? 18 : middle.height
+        gradient: Gradient {
+            orientation: box.vertical ? Gradient.Vertical : Gradient.Horizontal
+            GradientStop { position: 0; color: box.color }
+            GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 0) }
+        }
+    }
+    Rectangle {
+        objectName: "toolboxFadeEnd"
+        visible: box.scrolls && box.scrollPos < box.contentLength - box.viewLength - 0.5
+        x: box.vertical ? middle.x : middle.x + middle.width - width
+        y: box.vertical ? middle.y + middle.height - height : middle.y
+        width: box.vertical ? middle.width : 18
+        height: box.vertical ? 18 : middle.height
+        gradient: Gradient {
+            orientation: box.vertical ? Gradient.Vertical : Gradient.Horizontal
+            GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 0) }
+            GradientStop { position: 1; color: box.color }
         }
     }
 
@@ -471,14 +677,17 @@ Rectangle {
         z: 10
         cell: box.cell
         entry: box.dragEntry
+        appIcon: box.dragEntry && box.dragEntry.app !== undefined && box.appButtons[box.dragEntry.app]
+                 ? box.appButtons[box.dragEntry.app].iconName : ""
         dragging: true
-        inkColor: (app.colorPalette, box.store.revision, box.dragId !== "" ? app.toolEntryColor(box.dragEntry) : "#303030")
+        inkColor: (app.colorPalette, box.store.revision, box.dragId !== "" && box.dragEntry.type !== undefined
+                   ? app.toolEntryColor(box.dragEntry) : "#303030")
         x: box.vertical ? (box.width - width) / 2 : Math.max(0, Math.min(box.width - width, box.dragPoint.x - width / 2))
         y: box.vertical ? Math.max(0, Math.min(box.height - height, box.dragPoint.y - height / 2)) : (box.height - height) / 2
     }
     Rectangle {
         objectName: "toolDropMark"
-        visible: box.dragId !== "" && box.dropIndex >= 0
+        visible: box.dragId !== "" && box.dropIndex >= 0 && box.ringId === ""
         z: 9
         color: Material.accentColor
         radius: 2
@@ -564,42 +773,158 @@ Rectangle {
             name: box.entryName(e)
             inkColor: (app.colorPalette, store.revision, app.toolEntryColor(e))
             inHand: box.inHand(e)
+            ringed: box.ringId !== "" && box.ringId === e.id
             towardsPage: box.towardsPage
-            onClicked: box.tap(e, this)
-            onHeld: function(pos) { box.menuRequested(e, this, pos) }
-            onSecondaryClicked: function(pos) { box.menuRequested(e, this, pos) }
+            /// (a member in the group's list: its taps are the list's)
+            readonly property bool inList: parent ? parent.inList === true : false
+            onClicked: {
+                if (inList) {
+                    const owner = groupFlyout.owner
+                    groupFlyout.close()
+                    if (box.inHand(e)) box.editRequested(e, owner)
+                    else box.takeMember(e)
+                    return
+                }
+                box.tap(e, this)
+                box.reveal(this)
+            }
+            onHeld: function(pos) { box.held(e, this, pos) }
+            onSecondaryClicked: function(pos) { box.held(e, this, pos) }
             onWheelStepped: function(steps) { box.stepWidth(e, steps) }
             onDragMoved: function(pos) { box.dragTo(e, pos) }
             onDropped: function(pos) { box.dropAt(e, pos) }
             onDragCanceled: box.endDrag()
         }
     }
+    // An app item: the window's own button, lent to the rail, under the rail's gestures (a tap is its tap; held: the
+    // rail's menu for it; held and moved: carried)
     Component {
-        id: stackComponent
-        ToolEntryButton {
-            readonly property var e: parent ? box.entryOf(parent.entryItem.entry) : ({})
-            readonly property var section: parent ? parent.entryItem.section.map(box.entryOf) : []
-            objectName: "toolStack_" + (e ? e.id : "")
-            reorderable: false
-            cell: box.cell
-            entry: e
-            stackCount: section.length
-            name: box.entryName(e) + " " + qsTr("(and %n more: hold)", "", section.length - 1)
-            inkColor: (app.colorPalette, store.revision, app.toolEntryColor(e))
-            inHand: box.inHand(e)
-            towardsPage: box.towardsPage
-            onClicked: box.inHand(e) ? box.openStack(this, section) : app.applyToolEntry(e.id)
-            onHeld: box.openStack(this, section)
-            onSecondaryClicked: box.openStack(this, section)
-            onWheelStepped: function(steps) { box.stepWidth(e, steps) }
+        id: appComponent
+        Item {
+            id: appCell
+            readonly property var it: parent ? parent.entryItem : null
+            readonly property string name: it ? it.name : ""
+            readonly property Item button: name !== "" ? box.appButton(name) : null
+            objectName: "railApp_" + name
+            width: box.cell
+            height: box.cell
+            /// Carried: its place stays faint; held: lifted
+            readonly property bool carried: box.dragId !== "" && it !== null && box.dragId === it.id
+            opacity: carried ? 0.3 : 1
+            scale: carryArea.armed && !carried ? 1.15 : 1
+            readonly property bool inList: parent ? parent.inList === true : false
+            Rectangle {  // (held over by a carried tool long enough: let go, a group)
+                objectName: "toolRing"
+                visible: box.ringId !== "" && appCell.it !== null && box.ringId === appCell.it.id
+                anchors.fill: parent
+                anchors.margins: -2
+                z: 2
+                radius: 12
+                color: "transparent"
+                border.width: 2.5
+                border.color: Material.accentColor
+            }
+            Behavior on scale { NumberAnimation { duration: 120 } }
+            function lendButton() { box.lend(button, appCell) }
+            onButtonChanged: lendButton()
+            Component.onCompleted: lendButton()
+            Component.onDestruction: if (button && button.parent === appCell) box.release(button)
+            MouseArea {
+                id: carryArea
+                anchors.fill: parent
+                z: 1
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                pressAndHoldInterval: 400
+                property bool armed: false
+                property bool moving: false
+                property point start
+                // (held: the rail may not take the drag for scrolling any more)
+                preventStealing: armed
+                onPressed: function(mouse) {
+                    armed = false
+                    moving = false
+                    start = Qt.point(mouse.x, mouse.y)
+                    if (appCell.button && mouse.button === Qt.LeftButton) appCell.button.down = true
+                }
+                onPressAndHold: function(mouse) {
+                    if (mouse.button === Qt.RightButton) return
+                    armed = true
+                    // (its name above the finger while held, as the window's buttons show it)
+                    if (appCell.button && appCell.button.heldLabel !== undefined) appCell.button.heldLabel = true
+                }
+                function quiet() { if (appCell.button && appCell.button.heldLabel === true) appCell.button.heldLabel = false }
+                onPositionChanged: function(mouse) {
+                    if (!armed) return
+                    if (!moving && Math.hypot(mouse.x - start.x, mouse.y - start.y) < 8) return
+                    quiet()
+                    moving = true
+                    box.dragTo(appCell.it.entry, mapToItem(null, mouse.x, mouse.y))
+                }
+                onReleased: function(mouse) {
+                    quiet()
+                    if (appCell.button) appCell.button.down = undefined
+                    if (moving) box.dropAt(appCell.it.entry, mapToItem(null, mouse.x, mouse.y))
+                    else if (armed) box.menuRequested(appCell.it.entry, appCell, Qt.point(mouse.x, mouse.y))
+                    armed = false
+                    moving = false
+                }
+                onCanceled: {
+                    quiet()
+                    if (appCell.button) appCell.button.down = undefined
+                    if (moving) box.endDrag()
+                    armed = false
+                    moving = false
+                }
+                onClicked: function(mouse) {
+                    if (mouse.button === Qt.RightButton) box.menuRequested(appCell.it.entry, appCell, Qt.point(mouse.x, mouse.y))
+                    else if (!armed && appCell.button) {
+                        appCell.button.clicked()
+                        if (appCell.inList) {
+                            box.store.use(appCell.it.id)
+                            groupFlyout.close()
+                        } else {
+                            box.reveal(appCell)
+                        }
+                    }
+                }
+            }
         }
     }
-
-    // A folded section's list: its tools, beside the stack (towards the page)
+    // A group the user made: the member used last, with dots for how many it holds (qt/docs/toolbox.md, "Groups")
+    Component {
+        id: groupComponent
+        ToolEntryButton {
+            id: face
+            readonly property string gid: parent ? parent.entryItem.id : ""
+            readonly property var members: box.groupMembers(gid)
+            readonly property var shownMember: box.groupShown(gid)
+            readonly property bool isApp: shownMember.app !== undefined
+            objectName: "railGroup_" + gid
+            cell: box.cell
+            entry: shownMember
+            appIcon: isApp && box.appButton(shownMember.app) ? box.appButton(shownMember.app).iconName : ""
+            stackCount: members.length
+            name: box.entryName(shownMember) + " " + qsTr("(a group of %n: hold for its menu)", "", members.length)
+            inkColor: (app.colorPalette, store.revision, isApp ? "#303030" : app.toolEntryColor(shownMember))
+            inHand: (app.tool, app.snip, box.memberInHand(shownMember))
+            ringed: box.ringId !== "" && box.ringId === gid
+            towardsPage: box.towardsPage
+            onClicked: { box.tapGroup(gid, this); box.reveal(this) }
+            onHeld: function(pos) { box.menuRequested(box.store.entry(gid), this, pos) }
+            onSecondaryClicked: function(pos) { box.menuRequested(box.store.entry(gid), this, pos) }
+            onWheelStepped: function(steps) { if (!isApp) box.stepWidth(shownMember, steps) }
+            // (carried as a whole: to another place, or onto another item)
+            readonly property var carriedAs: Object.assign({}, shownMember, { id: gid })
+            onDragMoved: function(pos) { box.dragTo(carriedAs, pos) }
+            onDropped: function(pos) { box.dropAt(carriedAs, pos) }
+            onDragCanceled: box.endDrag()
+        }
+    }
+    // A group's list: its members, beside the group (towards the page)
     Popup {
-        id: stackFlyout
-        objectName: "toolStackFlyout"
-        property var section: []
+        id: groupFlyout
+        objectName: "toolGroupFlyout"
+        property string gid: ""
         property Item owner: null
         parent: owner
         x: !owner ? 0 : box.edge === "right" ? -width - 8 : box.edge === "left" ? owner.width + 8 : 0
@@ -609,52 +934,26 @@ Rectangle {
         focus: true  // (Esc closes it)
         background: Rectangle { radius: 12; color: "#ffffff"; border.width: 1; border.color: "#d5d8dc" }
         Grid {
+            id: groupGrid
             columns: box.vertical ? 1 : -1
             rows: box.vertical ? -1 : 1
             Repeater {
-                model: stackFlyout.section
-                delegate: ToolEntryButton {
+                model: groupFlyout.visible && groupFlyout.gid !== "" ? box.groupMembers(groupFlyout.gid) : []
+                delegate: Loader {
                     required property var modelData
-                    objectName: "stackEntry_" + modelData.id
-                    reorderable: false
-                    cell: box.cell
-                    entry: modelData
-                    name: box.entryName(modelData)
-                    inkColor: (app.colorPalette, store.revision, app.toolEntryColor(modelData))
-                    inHand: box.inHand(modelData)
-                    towardsPage: box.towardsPage
-                    onClicked: {
-                        stackFlyout.close()
-                        if (box.inHand(modelData)) box.editRequested(modelData, stackFlyout.owner)
-                        else app.applyToolEntry(modelData.id)
-                    }
-                    onHeld: function(pos) { stackFlyout.close(); box.menuRequested(modelData, stackFlyout.owner, pos) }
-                    onSecondaryClicked: function(pos) { stackFlyout.close(); box.menuRequested(modelData, stackFlyout.owner, pos) }
+                    readonly property bool inList: true
+                    property var entryItem: modelData.app !== undefined
+                                            ? { kind: "app", key: modelData.id, id: modelData.id, entry: modelData, name: modelData.app }
+                                            : { kind: "entry", key: modelData.id, id: modelData.id, entry: modelData }
+                    sourceComponent: modelData.app !== undefined ? appComponent : entryComponent
                 }
             }
         }
-    }
-    // The fixed tools folded: their list
-    Popup {
-        id: fixedFlyout
-        objectName: "toolboxFixedFlyout"
-        parent: fixedStack
-        x: box.edge === "right" ? -width - 8 : box.edge === "left" ? fixedStack.width + 8 : 0
-        y: box.edge === "bottom" ? -height - 8 : box.edge === "top" ? fixedStack.height + 8 : 0
-        padding: 4
-        margins: 8
-        focus: true
-        background: Rectangle { radius: 12; color: "#ffffff"; border.width: 1; border.color: "#d5d8dc" }
-        Grid {
-            id: fixedFlyoutGrid
-            columns: box.vertical ? 1 : -1
-            rows: box.vertical ? -1 : 1
-        }
-        // (a tool taken in it: back to the page, unless the button opened a menu of its own)
+        // (a tool taken another way while it is open: back to the page, unless a button opened a list of its own)
         Connections {
             target: app
-            enabled: fixedFlyout.opened
-            function onToolChanged() { if (!Popups.hasOpenPopupIn(fixedFlyoutGrid)) fixedFlyout.close() }
+            enabled: groupFlyout.opened && box.dragId === ""
+            function onToolChanged() { if (!Popups.hasOpenPopupIn(groupGrid)) groupFlyout.close() }
         }
     }
 }

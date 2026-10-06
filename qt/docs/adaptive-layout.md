@@ -234,8 +234,8 @@ what does not fit goes into a "more tools" button next to ⋮, never scrolled aw
 document. `toolArea` in `Main.qml` lays the buttons out by it (they are placed, not in a Layout), and again when the
 room or the buttons change. Groups, in order: **edit** (undo and redo, only where the toolbox is not shown: a text
 document whose bar is not merged into its format bar; never in "more tools", qt/undo-redo), **tools** (the toolbox's
-fixed tools where the rail does not hold them; the emoji while writing), **insert** (image, stickers, record audio
-where the build can record and the rail does not hold it, add a page), **view** (search, full screen, present, read,
+app tools the rail does not hold: the finger draws, write on the page, the setsquare; the emoji while writing), **insert** (image, stickers, record audio
+where the build can record, add a page), **view** (search, full screen, present, read,
 replay, settings), **doc** (share, print, bookmark, favourite, tags) and **file** (new where the tab strip has no "+",
 open, save, a milestone; a `.md`: edit as notes; a text file: open externally). ⋮ and "more tools" are pinned at the
 end.
@@ -266,13 +266,13 @@ where it is meanwhile.
 ### Cycling buttons
 
 Tools that do almost the same share one button (`ToolCycleButton.qml`, the logic in `ToolGroups.qml`, `win.toolGroups`):
-the fixed tools of the toolbox, the phone's sheet "My tools", and the toolbox's snip entry.
+the app tools of the rail and the command bar, the phone's sheet "My tools", and the toolbox's snip entry.
 
 | Group | Variants (a tap goes through them) | Only in its list |
 | --- | --- | --- |
 | `select` | rectangle ↔ lasso | rectangle and lasso on all layers |
 | `geometry` | setsquare ↔ compass | the curtain and the spotlight (put out or taken away, beside the tool in hand); "Take it off the page" (also the × of the geometry pill) |
-| `snip` (qt/ui-rework) | snip a rectangle ↔ snip with the lasso (one picture to the clipboard, then the tool before; [snip.md](snip.md)); a fixed tool of the rail since qt/copy-tools | the snips' resolution (a setting) |
+| `snip` (qt/ui-rework) | snip a rectangle ↔ snip with the lasso (one picture to the clipboard, then the tool before; [snip.md](snip.md)); an app tool of the rail since qt/copy-tools | the snips' resolution (a setting) |
 | `text` (qt/copy-tools) | mark PDF text ↔ copy handwriting as text (one sweep, its words to the clipboard, then the tool before; [handwriting-search.md](handwriting-search.md)) | how PDF text is marked (the PDF text button's own list) |
 
 `ToolGroups.qml` also lists the kinds of shapes and erasers, which the toolbox's editor offers. The classic bar's
@@ -308,7 +308,7 @@ have the snipping screenshots as a cycling tool in the toolbelt"):
   eraser's kind and size (the toolbox's entries), the setsquare and the compass (their group), snapping to the grid
   (Settings).
 
-The **text box** and **writing on the page** stay two tools: writing on the page is a fixed tool of the rail switched
+The **text box** and **writing on the page** stay two tools: writing on the page is an app tool (the command bar's since 0.8.0) switched
 on and off by its button (a tap while it is on ends it); the text box is an entry of the toolbox (its font in its
 editor). The text box is always a Markdown text box; the plain text tool is no longer offered (T takes the toolbox's
 text box). Plain texts in documents are still drawn, and the text box tool still edits them as plain text (a tap on
@@ -372,7 +372,8 @@ The author's rule: only one way to do things, to reduce menu clutter. No ⋮ ent
 | Action | Its one place | Keys | With the bar put away / in the compact chrome | In the phone chrome |
 | --- | --- | --- | --- | --- |
 | Pen, highlighter, eraser, text box, sticky note, shapes, laser pointer, snip (each with its color, width, …: the editor) | the toolbox's entries | P H E T | the toolbox (docked; floating in the compact chrome) | the dock and "My tools" |
-| Hand, the finger draws, select, snip, write on the page, setsquare / compass, mark PDF text, record | the toolbox's fixed tools | A S L, Shift+S, Ctrl+Alt+M, Ctrl+Shift+R | as above | "My tools" |
+| Hand, select, snip, mark PDF text | the rail's app tools (items of its arrangement, qt/rail-scroll; removed: the command bar) | A S L, Shift+S | as above | the dock and "My tools" |
+| The finger draws, write on the page, setsquare / compass (since 0.8.0 off the rail: the top bar's, qt/top-bar) | command bar / more tools | Ctrl+Alt+M | the floating toolbox's ⋯ | "My tools" |
 | Insert image (was also ⋮ → Page) | command bar / more tools | I | | "My tools" |
 | Add a page (long press: Insert pages…) | command bar / more tools | Ctrl+N | ⋮ → Page → Insert pages… is kept (a dialog: several pages, background, size) | "My tools" (hold: Insert pages…) |
 | Search | command bar / more tools | Ctrl+F | the floating toolbox's ⋯ | "My tools" |
@@ -382,7 +383,7 @@ The author's rule: only one way to do things, to reduce menu clutter. No ⋮ ent
 | Settings (was also ⋮) | command bar / more tools | Ctrl+, | the floating toolbox's ⋯; the home screen's settings | "My tools" |
 | New | the tab strip's + (the full chrome: the bar has no New button there, since `qt/record-place`) | Ctrl+Shift+N | the keys (the compact chrome has no tab strip; the classic tool square had New until 0.8.0) | "My tools"; new documents also in the tab overview and the library |
 | Open, Save | command bar / more tools | Ctrl+O, Ctrl+S | the keys | "My tools" |
-| Record audio (hold: the play tool, the recordings) | the toolbox's fixed tools (docked and floating) | Ctrl+Shift+R | the toolbox floating | "My tools" → Insert |
+| Record audio (hold: the play tool, the recordings) | command bar / more tools (on the rail until 0.8.0) | Ctrl+Shift+R | the floating toolbox's ⋯ | "My tools" → Insert |
 | Edit as notes, Open externally (were also ⋮ → Document) | command bar / more tools (a `.md`: in the format bar or its more tools) | | | "My tools" |
 | All pages (was also ⋮ → View) | view pill (the compact pill: its page number) | Ctrl+Alt+G | the view pill stays in the compact chrome | the dock's page number |
 | Contents overview (was the tool bar) | view pill | Ctrl+Alt+O | as above | the page grid's pill (the dock's page number) |
@@ -514,7 +515,7 @@ without `parent`, `modal`, `anchors.centerIn`, `width`, `height`, `x` or `y` (th
 
 ### The toolbox of the compact chrome
 
-The floating toolbox stays inside a short window (it folds and scrolls as a short rail does), and its ⋯ menu with
+The floating toolbox stays inside a short window (it scrolls as a short rail does, qt/rail-scroll), and its ⋯ menu with
 "Present" and "Leave full screen" / "Show the tabs and the tool bar" too (`theFloatingToolboxFitsAShortWindow`). (The
 classic tool square and its popup of quick tools went in 0.8.0.)
 
@@ -614,8 +615,8 @@ screen of a phone class the app bar stays in every chrome (the way back to the d
 the title is the document behind the home screen (greyed; a tap goes back to it), no ⋮.
 
 **The tool dock** (`PhoneDock.qml`, `phoneDock`) instead of the command bar and the pills: it hosts **the toolbox**
-([toolbox.md](toolbox.md), "Where it is"): undo and redo, the user's first tools that fit (the one in hand always
-among them), **My tools** and the page number (`toolboxPageButton`: all pages; the page grid's pill has the
+([toolbox.md](toolbox.md), "Where it is"): undo and redo, the rail's items scrolling sideways (the one in hand
+scrolled into view), **My tools** and the page number (`toolboxPageButton`: all pages; the page grid's pill has the
 **contents** and the **zoom %** there, its fits as a sheet; a fit goes back to the page; no − / +, the pinch sets the
 columns). While the soft keyboard is open (the dock gone) undo and redo are at the end of the format bar above it
 (`keyboardUndoButton`, `keyboardRedoButton`). A text document (no ink tools) keeps the dock's own cells: All tools

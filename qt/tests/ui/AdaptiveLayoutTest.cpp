@@ -350,28 +350,11 @@ protected:
         return {};
     }
     QQuickItem* toolEntry(const QString& id) const { return findItem(("toolEntry_" + id).toUtf8().constData()); }
-    /// A tool of the rail: shown on it, or folded into one of its stacks (shown) (qt/docs/toolbox.md, "Short rails")
+    /// A tool of the rail: on it, in sight or scrolled out of it (it scrolls, nothing folds; qt/docs/toolbox.md, "A rail
+    /// that scrolls")
     bool onTheRail(QQuickItem* button) const {
         auto* box = named("toolbox");
-        if (!button || !box) {
-            return false;
-        }
-        if (shownInWindow(button)) {
-            return box->isAncestorOf(button);
-        }
-        std::function<bool(QQuickItem*)> stackShown = [&](QQuickItem* i) {
-            for (QQuickItem* c: i->childItems()) {
-                const QString n = c->objectName();
-                if ((n.startsWith("toolStack_") || n == "toolboxFixedStack") && shownInWindow(c)) {
-                    return true;
-                }
-                if (stackShown(c)) {
-                    return true;
-                }
-            }
-            return false;
-        };
-        return stackShown(box);
+        return button && box && button->isVisible() && box->isAncestorOf(button);
     }
     // --- the phone chrome (qt/phone-chrome) ---
     bool phoneChrome() const { return window->property("phoneChrome").toBool(); }
@@ -458,11 +441,17 @@ protected:
         ASSERT_NE(box, nullptr);
         EXPECT_TRUE(shownInWindow(box)) << at << ": the toolbox";
         EXPECT_FALSE(box->property("floating").toBool()) << at << ": docked";
-        for (const char* name: {"handButton", "touchDrawingButton", "selectButton", "textModeButton"}) {
-            EXPECT_TRUE(onTheRail(named(name))) << at << ": " << name << " on the rail or in its stack";
+        for (const char* name: {"handButton", "selectButton", "snipButton", "pdfTextButton"}) {
+            EXPECT_TRUE(onTheRail(named(name))) << at << ": " << name << " on the rail";
+        }
+        // (they left the rail, qt/rail-scroll: the command bar has them, or its "more tools")
+        for (const char* name: {"touchDrawingButton", "textModeButton"}) {
+            EXPECT_FALSE(onTheRail(named(name))) << at << ": " << name;
+            EXPECT_TRUE(named("toolArea")->isAncestorOf(named(name)) || inOverflow(named(name)))
+                    << at << ": " << name << " in the command bar";
         }
         for (const char* type: {"pen", "eraser", "text", "sticky"}) {
-            EXPECT_TRUE(onTheRail(toolEntry(entryOf(type)))) << at << ": the " << type << " on the rail or in its stack";
+            EXPECT_TRUE(onTheRail(toolEntry(entryOf(type)))) << at << ": the " << type << " on the rail";
         }
         // Undo and redo lead the toolbox, never in "more tools"; the command bar and the view pill do not repeat them
         // (qt/undo-redo)

@@ -1108,6 +1108,18 @@
   remembered). Gone: the reader chrome, "Controls at this size" with the chrome chosen per class, presenting's corner
   field ([zen.md](zen.md)).
 
+- **A rail that scrolls, one arrangement, groups, `qt/rail-scroll` (2026-10-06, for 0.8.0).** The author on 0.7.0, the
+  Fold 7 unfolded: his own tools were folded into one button while the fixed tools took the rest of the rail
+  (`ToolboxPlan` folded a user section as a whole). Folding is gone: the rail scrolls, the same order on every screen,
+  cut through the middle of a cell with a fade at the end that has more, the tool in hand scrolled into view, the place
+  remembered per window class; the phone's dock is the same rail at the bottom edge. `ToolboxModel` stores one
+  arrangement for the rail and the top bar (JSON version 2, 0.7.0's upgraded): tool entries, the app's items by name
+  (one home each), dividers and groups; the top bar's first layout is stored for `qt/top-bar`, with the API it needs.
+  Hand, select, snip and mark PDF text are items of the rail (carried, grouped, removed); write on the page, the
+  setsquare, the finger switch and record went back to the command bar (and full screen's ⋯) until the top bar takes
+  them. Groups: a tool held over another until a ring shows; a tap cycles with two or three members and opens the list
+  with more ([toolbox.md](toolbox.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

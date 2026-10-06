@@ -310,7 +310,6 @@ set(XQT_QML_FILES
     src/app/qml/StickerButton.qml
     src/app/qml/StickerPicker.qml
     src/app/qml/StickerSaveDialog.qml
-    src/app/qml/ToolboxPlan.js
     src/app/qml/LineStyles.js
     src/app/qml/Toolbox.qml
     src/app/qml/ToolEntryButton.qml

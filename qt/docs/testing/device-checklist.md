@@ -3840,3 +3840,47 @@ it) describe what is gone; check Zen's dot instead.
 - [ ] Settings → Display → Window size: no "Controls at this size" any more. An update from 0.7.0 with the reader or the
       compact chrome chosen for a size: the full chrome there; Zen in a tiny window, unless the reader had been left
       there in 0.7.0 (then not, as before).
+
+## A rail that scrolls; one arrangement for both bars (qt/rail-scroll, 0.8.0)
+
+Items above about stacks, folded sections, "the fixed tools fold into one button" or the rail "filling its room" by
+folding describe what is gone: the rail scrolls now.
+
+- [ ] Fold 7 unfolded (900 × 1000), a document: the rail at the right has every one of your tools on its own, in the
+      order of the first start; after them hand, select, snip, mark PDF text. If they do not all fit, the rail ends
+      through the middle of a tool (half of it shows) with a fade there; a swipe along the rail scrolls it, a tap takes
+      a tool, a hold lifts it. No stack, no "more tools" button on the rail.
+- [ ] Turn it (1000 × 900), fold it (the dock at the bottom: undo, redo, the same items scrolling sideways, "My
+      tools", the page number), hold it sideways (the dock a rail at the right): the same order everywhere.
+- [ ] Scroll the folded dock halfway, unfold, fold again: the dock is where it was; the unfolded rail keeps its own
+      position.
+- [ ] With a tool scrolled out of sight: press E (a keyboard), or take the tool in "My tools": the rail scrolls it into
+      view.
+- [ ] Desktop (1920 × 1080 and 1366 × 600): the mouse wheel over a gap or over hand / select scrolls the rail (when it
+      scrolls); over a pen it changes the pen's width. Undo, redo and "+" stay put while it scrolls.
+- [ ] Hold hand (or select) on the rail without moving: its menu (Options… for select's list, Move, Add a tool here,
+      the divider, "Remove from the rail"); remove it: the hand is in the command bar at the top again; "+" → "Put
+      back: Hand" brings it back to the rail. Hold and move select: it is carried like a pen.
+- [ ] Write on the page, the setsquare / compass (with curtain and spotlight in its list), the finger switch and record
+      are no longer on the rail: they are in the command bar at the top (or its "more tools" in a narrow window), and
+      in "My tools" on a phone. In full screen (F11) the floating rail's ⋯ lists them at its end: write on the page,
+      the setsquare (a tap again: the compass), the finger draws (checked while on), record audio; each works from
+      there.
+- [ ] Update from 0.7.0 with your own tools and order: the same tools in the same order, the hand, select, snip and
+      mark PDF text after them; the tool in hand as before.
+
+## Groups the user makes (qt/rail-scroll, 0.8.0)
+
+- [ ] Hold the second highlighter (400 ms: it lifts), carry it onto the first pen and keep it there: after about 0.6 s
+      the pen shows a ring; let go: one button with dots for two, showing the highlighter; the snackbar says
+      "Grouped" with Undo, and Undo puts both back as they were. Carry it over the pen without stopping: no ring, it is
+      put where the line shows, as before. The same with a finger and with the pen.
+- [ ] A group of three pens: a tap takes the one it shows; tapped again, each tap takes the next (round the group).
+      Carry a fourth tool in: a tap while one of its tools is in hand opens its list beside it (nothing taken); a tap
+      in the list takes that tool and closes the list; a tap on the one in hand there opens its editor; hold one in the
+      list and carry it onto the rail: it leaves the group.
+- [ ] Hold the group: its menu has "Its tools…" (the list), Move, Add a tool here, the divider and "Ungroup" (the
+      tools back in its place, in their order).
+- [ ] Select and snip grouped (carry snip onto select): a tap takes the one shown, the next tap the other. Press S or
+      Shift+S: the group shows the one taken. Ungrouped, select again cycles rectangle ↔ lasso on its own.
+- [ ] Restart: the groups, their order and the tool each shows are as they were. The folded dock shows the same groups.

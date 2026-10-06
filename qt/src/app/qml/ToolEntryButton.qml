@@ -1,7 +1,7 @@
 // One of the user's tools in the toolbox (qt/docs/toolbox.md): its kind as an icon and a sample of its ink below it
 // (its color, how wide, dashed or filled), like a pen lying in a sorted box. The entry in hand is lifted towards the
-// page, as a pen picked up. A stack (a folded section) shows the entry used last of its section with dots for how many
-// it holds.
+// page, as a pen picked up. A group shows the entry used last of it with dots for how many it holds; an app item
+// (hand, select, …) shows its button's icon (the carried one, a group's face).
 // A tap picks it up (the toolbox decides what a tap on the one in hand does: its editor); a long press or a right
 // click: its menu; the mouse wheel over it: the width (the toolbox handles these through the signals).
 import QtQuick
@@ -24,8 +24,12 @@ AbstractButton {
     /// Its name (tips, the held finger, accessibility)
     property string name: ""
     property real cell: 48
-    /// It is being dragged to another place (qt/docs/toolbox.md, "Reordering"): drawn lifted with a shadow
+    /// It is being dragged to another place (qt/docs/toolbox.md, "Carrying"): drawn lifted with a shadow
     property bool dragging: false
+    /// An app item ({id, app}: the hand, select, …): the icon of its button (it has no ink)
+    property string appIcon: ""
+    /// A carried tool was held over it long enough: let go, the two are a group (qt/docs/toolbox.md, "Groups")
+    property bool ringed: false
 
     signal held(point pos)
     signal secondaryClicked(point pos)
@@ -55,6 +59,7 @@ AbstractButton {
 
     /// The icon of its kind (and variant)
     function iconOf(e) {
+        if (e && e.app !== undefined) return appIcon !== "" ? appIcon : "xqt-tools-more"
         if (!e || !e.type) return "xopp-tool-pencil"
         switch (e.type) {
         case "pen": return "xopp-tool-pencil"
@@ -88,6 +93,18 @@ AbstractButton {
     opacity: dragging && enabled ? 0.3 : 1
     Behavior on scale { NumberAnimation { duration: 120 } }
 
+    // The ring of a group to be
+    Rectangle {
+        objectName: "toolRing"
+        visible: button.ringed
+        anchors.fill: parent
+        anchors.margins: -2
+        z: 2
+        radius: 12
+        color: "transparent"
+        border.width: 2.5
+        border.color: Material.accentColor
+    }
     background: Rectangle {
         radius: 10
         color: button.lifted ? "#ffffff" : button.inHand ? "#e0e3f5" : (button.down ? "#e8e8e8" : "transparent")
@@ -136,7 +153,7 @@ AbstractButton {
         Canvas {
             id: sample
             objectName: "toolSample"
-            visible: button.type !== "sticky" && button.type !== "text" && button.type !== "snip"
+            visible: ["pen", "highlighter", "shape", "eraser", "laser"].indexOf(button.type) >= 0
             anchors.horizontalCenter: parent.horizontalCenter
             y: Math.round(parent.height / 2 + 6)
             width: 28

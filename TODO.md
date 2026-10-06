@@ -874,7 +874,7 @@ Blocks, one after another where they share `Main.qml` (1, then 2 and 4, then 3):
   a `.md`'s format bar at 800 px and less scrolls a little once all is folded (undo and redo at its start; block 3's
   scrolling format bar replaces the ladder); the highlighter's opacity hint of the classic chooser is not in the
   editor.
-- [ ] **2 `qt/rail-scroll`**: one stored arrangement for both bars (`ToolboxModel` grows: the rail and the top bar,
+- [x] **2 `qt/rail-scroll`**: one stored arrangement for both bars (`ToolboxModel` grows: the rail and the top bar,
   each an ordered list of tool entries, app items by name, dividers and groups; upgraded from the toolbox JSON of
   0.7.0). The rail **scrolls** instead of folding (`ToolboxPlan` folding removed): the same order on every screen; a
   fade at the end that has more, half of the next cell showing; it scrolls to the tool in hand; its scroll position
@@ -888,6 +888,10 @@ Blocks, one after another where they share `Main.qml` (1, then 2 and 4, then 3):
   lasso), mark PDF text ↔ copy handwriting; they are items like the user's (carried, grouped, removed into the
   catalog). The phone's dock becomes the same rail at the bottom edge (scrolling sideways); "My tools" becomes the
   "+" catalog (block 3).
+  Done 2026-10-06 (write on the page, the setsquare, the finger switch and record are back in the command bar and at
+  the end of full screen's ⋯ until block 3; a removed app tool comes back by "+" → "Put back"; a hold on an app tool
+  opens the rail's menu, its own list is "Options…" there). Left for block 3: the top bar reading the stored
+  arrangement, carrying between the bars, the catalog; "Back to the first layout" in Settings (`resetLayout()` exists).
 - [ ] From qt/zen for block 3 or later: Android's Back key should leave Zen (it does not yet; only Esc); the Zen button
   is not in the phone's bar (⋮ → View only); a New document button in full screen (only Ctrl+Shift+N since
   qt/classic-removal).

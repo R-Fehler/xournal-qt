@@ -1,8 +1,8 @@
 /*
  * xournal-qt: the toolbox in the real window (qt/docs/toolbox.md): the user's own tools in a rail docked to a side of
- * the canvas (right by default), undo and redo at its head, the fixed tools lent to it; a tap picks a tool up, sections
- * fold into stacks when the rail is short, the edge is chosen per window size. (The classic tool bar was removed in
- * 0.8.0: the toolbox is the only one.)
+ * the canvas (right by default), undo and redo at its head, the app's tools (hand, select, snip, mark PDF text) lent to
+ * it as items of the same arrangement; a tap picks a tool up, the rail scrolls when it is short (the same order on every
+ * screen), the edge is chosen per window size. (The classic tool bar was removed in 0.8.0: the toolbox is the only one.)
  *
  * @license GNU GPLv2 or later
  */
@@ -207,18 +207,20 @@ protected:
         }
         return runs;
     }
-    /// What the rail shows in its middle (qt/docs/toolbox.md, "Short rails"): the cells (the user's tools, stacks, the
-    /// fixed tools and their stack) shown, how many of them lie in sight, the room of the middle along the rail and
-    /// the length its contents take
+    /// What the rail shows in its middle (qt/docs/toolbox.md, "A rail that scrolls"): its items along it ("toolEntry_e1",
+    /// "railApp_hand", "railGroup_g1", "|"), how many cells lie wholly in sight, the room of the middle, the length of
+    /// its view and of its contents, where it is scrolled to
     struct RailState {
+        QStringList order;
         int cells = 0;
         int inSight = 0;
         double room = 0;
+        double view = 0;
         double content = 0;
+        double pos = 0;
         bool scrolls = false;
-        bool anyFolded = false;
-        bool allFolded = false;
-        double nextUnfold = 1e9;
+        /// The part of the cell at the view's end that shows (0: none cut)
+        double cutShown = 0;
         QString text;
     };
     RailState rail() const {
@@ -231,84 +233,107 @@ protected:
         }
         const bool vertical = box->property("vertical").toBool();
         const QRectF sight = rectOf(middle);
-        std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
-            for (QQuickItem* c: i->childItems()) {
-                const QString n = c->objectName();
-                const bool fixed = c->parentItem() && c->parentItem()->objectName() == "toolboxFixed";
-                if ((n.startsWith("toolEntry_") || n.startsWith("toolStack_") || n == "toolboxFixedStack" || fixed) &&
-                    shown(c)) {
-                    ++s.cells;
-                    const QRectF r = rectOf(c).adjusted(1, 1, -1, -1);
-                    s.inSight += sight.contains(r) ? 1 : 0;
-                }
-                walk(c);
+        QList<QQuickItem*> kids = grid->childItems();
+        std::sort(kids.begin(), kids.end(), [&](QQuickItem* a, QQuickItem* b) {
+            return vertical ? rectOf(a).top() < rectOf(b).top() : rectOf(a).left() < rectOf(b).left();
+        });
+        for (QQuickItem* k: kids) {
+            const QList<QQuickItem*> in = k->childItems();
+            if (in.isEmpty() || !shown(k)) {
+                continue;
             }
-        };
-        walk(grid);
-        s.room = vertical ? middle->height() : middle->width();
-        s.content = vertical ? middle->property("contentHeight").toDouble() : middle->property("contentWidth").toDouble();
-        s.scrolls = middle->property("interactive").toBool();
-        const QVariantMap plan = box->property("plan").toMap();
-        const int fixed = box->property("fixedButtons").toList().size();
-        const int fixedShown = box->property("fixedShown").toInt();
-        bool all = fixedShown == 0 || fixed <= 1;
-        bool any = fixedShown < fixed;
-        // (the room the next unfolding needs: a fixed tool more on its own takes a cell; a section, all but one)
-        s.nextUnfold = fixedShown < fixed ? box->property("cell").toDouble() : 1e9;
-        const QVariantList folded = plan.value("folded").toList();
-        const QVariantList sections = box->property("sections").toList();
-        for (int i = 0; i < folded.size() && i < sections.size(); ++i) {
-            const bool f = folded[i].toBool();
-            any = any || f;
-            all = all && (f || sections[i].toList().size() <= 1);
-            if (f) {
-                s.nextUnfold = std::min(s.nextUnfold, (sections[i].toList().size() - 1) * box->property("cell").toDouble());
+            const QString n = in.first()->objectName();
+            s.order << (n.isEmpty() ? QString("|") : n);
+            if (n.isEmpty()) {
+                continue;
+            }
+            ++s.cells;
+            const QRectF r = rectOf(k);
+            const double a = vertical ? r.top() : r.left(), b = vertical ? r.bottom() : r.right();
+            const double from = vertical ? sight.top() : sight.left();
+            const double end = vertical ? sight.bottom() : sight.right();
+            s.inSight += a >= from - 0.5 && b <= end + 0.5 ? 1 : 0;
+            if (a < end - 0.5 && b > end + 0.5) {
+                s.cutShown = end - a;
             }
         }
-        s.anyFolded = any;
-        s.allFolded = all;
-        s.text = QString("%1×%2 %3%4: %5 cells, %6 in sight, room %7, content %8%9%10")
+        s.room = box->property("middleRoom").toDouble();
+        s.view = box->property("viewLength").toDouble();
+        s.content = box->property("contentLength").toDouble();
+        s.pos = box->property("scrollPos").toDouble();
+        s.scrolls = box->property("scrolls").toBool();
+        s.text = QString("%1×%2 %3%4: %5 cells, %6 in sight, room %7, view %8, content %9, at %10%11")
                          .arg(window->width())
                          .arg(window->height())
                          .arg(win("layoutClass").toString(), box->property("compact").toBool() ? " (dock)" : "")
                          .arg(s.cells)
                          .arg(s.inSight)
                          .arg(s.room)
+                         .arg(s.view)
                          .arg(s.content)
-                         .arg(s.anyFolded ? ", folded" : "", s.scrolls ? ", scrolls" : "");
+                         .arg(s.pos)
+                         .arg(s.scrolls ? ", scrolls" : "");
         return s;
     }
-    /// The rail uses the room it has: every cell it shows is in sight unless everything is folded and it scrolls;
-    /// while something is folded, the room left over is less than the smallest unfolding needs (plus the 16 px a
-    /// growing rail keeps against flicker: `grew`)
-    void expectRailFills(const char* where, bool grew = false) {
+    /// The rail's items as the arrangement has them, by the names of their buttons
+    QStringList arranged() const {
+        QStringList out;
+        for (const QVariant& v: tools()->entries()) {
+            const QVariantMap m = v.toMap();
+            out << (m.value("divider").toBool() ? QString("|")
+                    : m.contains("app")         ? "railApp_" + m.value("app").toString()
+                    : m.value("group").toBool() ? "railGroup_" + m.value("id").toString()
+                                                : "toolEntry_" + m.value("id").toString());
+        }
+        return out;
+    }
+    /// Wholly in the view of the rail's middle, along the rail (the tool in hand is lifted a little across it)
+    bool inSight(QQuickItem* item) const {
+        if (!shown(item)) {
+            return false;
+        }
+        const bool vertical = find("toolbox")->property("vertical").toBool();
+        const QRectF sight = rectOf(find("toolboxMiddle"));
+        // (the cell that holds it: not lifted, not scaled)
+        QQuickItem* cell = item;
+        while (cell->parentItem() && cell->parentItem()->objectName() != "toolboxTools") {
+            cell = cell->parentItem();
+        }
+        const QRectF r = rectOf(cell);
+        return vertical ? r.top() >= sight.top() - 0.5 && r.bottom() <= sight.bottom() + 0.5
+                        : r.left() >= sight.left() - 0.5 && r.right() <= sight.right() + 0.5;
+    }
+    void scrollRail(double pos) {
+        QMetaObject::invokeMethod(find("toolbox"), "scrollTo", Q_ARG(QVariant, pos));
+        wait(50);
+    }
+    /// The rail shows the arrangement as it is (the same order on every screen, nothing folded): all of it in sight, or
+    /// it scrolls, its view ending through the middle of a cell, a fade at the end that has more
+    void expectRail(const char* where) {
         auto* box = find("toolbox");
         ASSERT_TRUE(shown(box)) << where;
         until([&] { return rail().cells > 0; });
+        scrollRail(0);
         const RailState s = rail();
         const double cell = box->property("cell").toDouble();
         SCOPED_TRACE(std::string(where) + ": " + s.text.toStdString());
-        EXPECT_GE(s.room, cell) << "a middle at least a cell long";
-        if (box->property("compact").toBool()) {
-            // The dock: as many of the user's tools as fit, then "My tools"
-            const int all = tools()->tools().size();
-            EXPECT_GE(s.cells, std::min(all, 1));
-            EXPECT_EQ(s.inSight, s.cells) << "no tool cut off";
-            if (s.cells < all) {
-                EXPECT_LT(s.room - s.cells * cell, cell + 8.5) << "room for one more tool left empty";
-            }
-            EXPECT_TRUE(shown(find("toolboxAllButton")));
-            return;
-        }
-        if (s.scrolls) {
-            EXPECT_TRUE(s.allFolded) << "scrolls only when everything is folded";
-            EXPECT_GE(s.inSight, int(s.room / cell) - 1) << "the cells in sight fill the middle";
-        } else {
+        EXPECT_EQ(s.order, arranged()) << "the same order as arranged";
+        EXPECT_EQ(find("toolStack_" + tools()->active()), nullptr) << "nothing folded";
+        EXPECT_GE(s.view, cell / 2);
+        if (s.scrolls && s.room < cell * 1.5) {
+            EXPECT_NEAR(s.view, s.room, 0.5) << "a room for one cell: all of it";
+        } else if (!s.scrolls) {
             EXPECT_EQ(s.inSight, s.cells) << "every cell in sight";
             EXPECT_LE(s.content, s.room + 0.5);
-            if (s.anyFolded) {
-                EXPECT_LT(s.room - s.content, s.nextUnfold + (grew ? 16 : 0)) << "folded with room to spare";
-            }
+            EXPECT_FALSE(shown(find("toolboxFadeEnd")));
+        } else {
+            // (scrolls, with room for more than a cell)
+            EXPECT_GT(s.content, s.room);
+            EXPECT_LE(s.view, s.room + 0.5);
+            EXPECT_NEAR(s.cutShown, cell / 2, 1) << "half of the next cell shows";
+            EXPECT_GE(s.inSight, int(s.view / cell) - 1) << "the cells in sight fill the view";
+            EXPECT_TRUE(shown(find("toolboxFadeEnd"))) << "a fade where there is more";
+            EXPECT_FALSE(shown(find("toolboxFadeStart")));
         }
     }
     void touchProfile(const char* mode) {
@@ -333,7 +358,7 @@ protected:
 };
 }  // namespace
 
-TEST_F(ToolboxTest, dockedAtTheRightWithUndoAndRedoAndTheFixedTools) {
+TEST_F(ToolboxTest, dockedAtTheRightWithUndoAndRedoTheToolsAndTheAppTools) {
     auto* box = find("toolbox");
     ASSERT_TRUE(shown(box));
     EXPECT_EQ(win("toolboxEdge").toString(), "right");
@@ -352,27 +377,32 @@ TEST_F(ToolboxTest, dockedAtTheRightWithUndoAndRedoAndTheFixedTools) {
     EXPECT_FALSE(find("undoButton")->isVisible());
     EXPECT_FALSE(shown(find("toolUndoButton"))) << "not in the command bar either";
 
-    // The user's tools, then the fixed ones (the window's own buttons), then "+"
+    // The user's tools, then the app's tools (the window's own buttons, lent to the rail), then "+"; all in sight at
+    // 1920 × 1080
     for (const QVariant& v: tools()->tools()) {
         auto* b = entry(v.toMap().value("id").toString());
         ASSERT_TRUE(shown(b)) << v.toMap().value("type").toString().toStdString();
         EXPECT_TRUE(inside(b, box));
     }
-    // (at 1920×1080 the rail is a little short for all of them: the last ones are in one stack after the others)
-    const int fixedShown = box->property("fixedShown").toInt();
-    EXPECT_GE(fixedShown, 5) << "hand, select, snip, write, setsquare on their own";
-    const char* fixedNames[] = {"handButton", "selectButton", "snipButton", "textModeButton", "geometryButton",
-                                "pdfTextButton", "touchDrawingButton"};
-    for (int i = 0; i < 7; ++i) {
-        auto* b = find(fixedNames[i]);
-        if (i < fixedShown) {
-            ASSERT_TRUE(shown(b)) << fixedNames[i];
-            EXPECT_TRUE(inside(b, box)) << fixedNames[i];
-        } else {
-            EXPECT_FALSE(shown(b)) << fixedNames[i] << ": in the stack";
-        }
+    expectRail("1920×1080");
+    EXPECT_FALSE(rail().scrolls);
+    const char* appTools[] = {"handButton", "selectButton", "snipButton", "pdfTextButton"};
+    double last = rectOf(entry(nth("laser"))).bottom();
+    for (const char* name: appTools) {
+        auto* b = find(name);
+        ASSERT_TRUE(shown(b)) << name;
+        EXPECT_TRUE(inside(b, box)) << name;
+        EXPECT_GE(rectOf(b).top(), last - 0.5) << name << ": after the user's tools, in their order";
+        last = rectOf(b).bottom();
     }
-    EXPECT_EQ(shown(find("toolboxFixedStack")), fixedShown < 7);
+    // Write on the page, the setsquare and the finger switch left the rail: the command bar has them (qt/top-bar will
+    // place them in the top bar's own arrangement)
+    for (const char* name: {"textModeButton", "geometryButton", "touchDrawingButton"}) {
+        auto* b = find(name);
+        ASSERT_TRUE(shown(b)) << name;
+        EXPECT_FALSE(inside(b, box)) << name;
+        EXPECT_TRUE(inside(b, find("toolArea"))) << name;
+    }
     EXPECT_TRUE(shown(find("toolboxAddButton")));
     // The classic tools are gone (0.8.0): the toolbox's entries are the pens, erasers, shapes, text boxes and notes
     for (const char* name: {"penButton", "eraserButton", "shapeButton", "textButton", "stickyNoteButton",
@@ -380,6 +410,18 @@ TEST_F(ToolboxTest, dockedAtTheRightWithUndoAndRedoAndTheFixedTools) {
         EXPECT_EQ(find(name), nullptr) << name;
     }
     EXPECT_TRUE(shown(find("searchButton"))) << "the commands stay at the top";
+
+    // An app tool on the rail is its button: a tap takes it
+    click(find("railApp_hand"));
+    until([&] { return controller->tool() == "hand"; });
+    EXPECT_EQ(controller->tool(), "hand");
+    click(find("railApp_select"));
+    until([&] { return controller->tool() == "selectRect" || controller->tool() == "selectRegion"; });
+    const QString first = controller->tool();
+    click(find("railApp_select"));
+    until([&] { return controller->tool() != first; });
+    EXPECT_EQ(controller->tool(), first == "selectRect" ? "selectRegion" : "selectRect")
+            << "its own cycle: rectangle, lasso";
 
     // Undo from the rail
     controller->applyToolEntry(nth("pen"));
@@ -407,8 +449,8 @@ TEST_F(ToolboxTest, aTapPicksUpAToolAndTheOneInHandIsLifted) {
     EXPECT_TRUE(entry(eraser)->property("inHand").toBool());
     EXPECT_FALSE(entry(red)->property("inHand").toBool());
 
-    // A fixed tool: no entry in hand
-    click(find("handButton"));
+    // An app tool: no entry in hand
+    click(find("railApp_hand"));
     until([&] { return controller->tool() == "hand"; });
     EXPECT_FALSE(entry(eraser)->property("inHand").toBool());
 
@@ -456,104 +498,134 @@ TEST_F(ToolboxTest, theEdgeIsChosenPerWindowSize) {
     EXPECT_EQ(settings()->layoutChoice("desktopWide", "toolbox"), "") << "the automatic edge is not stored";
 }
 
-TEST_F(ToolboxTest, aShortRailFoldsSectionsIntoStacksAndKeepsTheOneInHand) {
+// The author on 0.7.0, a Galaxy Fold 7 unfolded: "the user defined tools on the rail are fully collapsed into a single
+// button while the system tools are expanded to the rest … scrolling the tools would be good … the same ui on wide
+// desktop or smaller screens since the tool placement and order can be the same" (qt/rail-scroll). A short rail
+// scrolls: nothing folds, the order stays, half of the next cell shows, a fade at the end that has more
+TEST_F(ToolboxTest, aShortRailScrollsAndKeepsItsOrder) {
     resize(1300, 600);
     auto* box = find("toolbox");
     ASSERT_TRUE(shown(box));
-    // Everything inside the rail; at least the fixed tools folded
-    EXPECT_TRUE(shown(find("toolboxFixedStack")));
-    EXPECT_FALSE(shown(find("handButton"))) << "in the folded fixed tools' list";
-    const QRectF r = rectOf(box);
-    EXPECT_TRUE(r.contains(rectOf(find("toolboxAddButton"))));
-    // The pens are a stack showing the pen used last; a tap takes it, a tap again opens the list
-    const QString pen1 = nth("pen"), pen3 = nth("pen", 2);
-    controller->applyToolEntry(pen3);
-    wait(100);
-    QQuickItem* stack = nullptr;
-    until([&] { return (stack = find("toolStack_" + pen3)) != nullptr; });
-    ASSERT_NE(stack, nullptr) << "the pens folded, the one in hand shown";
-    EXPECT_TRUE(r.contains(rectOf(stack).adjusted(6, 6, -6, -6)));
-    EXPECT_TRUE(stack->property("inHand").toBool());
-    click(stack);
-    auto* flyout = find<QObject>("toolStackFlyout");
-    until([&] { return flyout->property("visible").toBool(); });
-    ASSERT_TRUE(flyout->property("visible").toBool());
-    auto* first = find("stackEntry_" + pen1);
-    ASSERT_TRUE(shown(first));
-    click(first);
-    until([&] { return tools()->active() == pen1; });
-    EXPECT_EQ(controller->color(), QColor("#2B2B2B"));
-    until([&] { return !flyout->property("visible").toBool(); });
-    EXPECT_TRUE(shown(find("toolStack_" + pen1))) << "the stack shows the pen in hand now";
+    expectRail("1300×600");
+    ASSERT_TRUE(rail().scrolls);
+    EXPECT_TRUE(rectOf(box).contains(rectOf(find("toolboxAddButton")))) << "\"+\" pinned at its end";
+    EXPECT_TRUE(inSight(entry(nth("pen")))) << "the first tools in sight";
+    // Scrolled to its end: the last app tool in sight, the fade at the start
+    scrollRail(1e6);
+    EXPECT_TRUE(inSight(find("railApp_pdfText")));
+    EXPECT_TRUE(shown(find("toolboxFadeStart")));
+    EXPECT_FALSE(shown(find("toolboxFadeEnd")));
+    EXPECT_TRUE(shown(find("toolboxUndoButton"))) << "undo and redo do not scroll";
 
-    // Taller again: everything unfolds (the last fixed tools only where the rail is too short for them)
-    resize(1920, 1200);
-    EXPECT_TRUE(shown(entry(pen1)));
-    EXPECT_TRUE(shown(find("handButton")));
-    EXPECT_FALSE(shown(find("toolboxFixedStack")));
-    resize(1920, 1080);
-    EXPECT_TRUE(shown(entry(pen1)));
-    EXPECT_TRUE(shown(find("handButton")));
+    // The tool in hand, taken by a key or from elsewhere: scrolled into view
+    scrollRail(0);
+    ASSERT_FALSE(inSight(find("railApp_hand")));
+    controller->selectTool("hand");
+    until([&] { return inSight(find("railApp_hand")); });
+    EXPECT_TRUE(inSight(find("railApp_hand"))) << rail().text.toStdString();
+    QTest::keyClick(window, Qt::Key_P);
+    until([&] { return inSight(entry(nth("pen"))); });
+    EXPECT_TRUE(inSight(entry(nth("pen"))));
+    scrollRail(0);
+    const QString laser = nth("laser");
+    controller->applyToolEntry(laser);
+    until([&] { return inSight(entry(laser)); });
+    EXPECT_TRUE(inSight(entry(laser)));
+
+    // The mouse wheel: over an app tool (no width) or a gap it scrolls; over a tool, its width
+    scrollRail(1e6);
+    const double end = rail().pos;
+    const QPoint overApp = rectOf(find("railApp_hand")).center().toPoint();
+    QWheelEvent upOverApp(overApp, window->mapToGlobal(overApp), QPoint(), QPoint(0, 120), Qt::NoButton, Qt::NoModifier,
+                          Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(window, &upOverApp);
+    until([&] { return rail().pos < end - 10; });
+    EXPECT_LT(rail().pos, end - 10) << "scrolled by the wheel";
+    const QString pen = nth("pen");
+    scrollRail(0);
+    const double before = tools()->entry(pen).value("width").toDouble();
+    const QPoint overPen = rectOf(entry(pen)).center().toPoint();
+    QWheelEvent up(overPen, window->mapToGlobal(overPen), QPoint(), QPoint(0, 120), Qt::NoButton, Qt::NoModifier,
+                   Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(window, &up);
+    until([&] { return tools()->entry(pen).value("width").toDouble() > before; });
+    EXPECT_GT(tools()->entry(pen).value("width").toDouble(), before) << "its width";
+    EXPECT_NEAR(rail().pos, 0, 0.5) << "and no scrolling";
+
+    // A drag at once scrolls it, a tap takes
+    scrollRail(0);
+    const QPoint from = rectOf(entry(nth("highlighter"))).center().toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+    for (int k = 1; k <= 10; ++k) {
+        QTest::mouseMove(window, from - QPoint(0, 20 * k));
+        wait(10);
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, from - QPoint(0, 200));
+    until([&] { return rail().pos > 20; });
+    EXPECT_GT(rail().pos, 20) << "a drag scrolls";
+    EXPECT_NE(tools()->active(), nth("highlighter")) << "and takes nothing";
+    EXPECT_EQ(rail().order, arranged()) << "and moves nothing";
 }
 
-// The author on 0.6.0, a Galaxy Fold 7 unfolded: "the rail is just showing one item although there is plenty space on
-// the rail" (qt/rail-fill). Its sizes with the touch profile and an Android phone's safe area: unfolded (900 × 1000,
-// tablet portrait), turned (1000 × 900), folded (412 × 915, the dock) and folded held sideways (915 × 412)
-TEST_F(ToolboxTest, theRailFillsItsRoomAtTheFoldsSizes) {
+// The same order at every size the author uses: the Fold 7 unfolded (900 × 1000), turned (1000 × 900), folded (412 ×
+// 915, the dock) and folded held sideways (915 × 412), a desktop (1920 × 1080); with the touch profile and with and
+// without a phone's insets. Nothing folds, and the tool in hand is scrolled into view
+TEST_F(ToolboxTest, theSameOrderAtEverySizeAndTheToolInHandInView) {
     touchProfile("on");
     for (const bool insets: {false, true}) {
         safeArea(insets ? 40 : 0, 0, insets ? 24 : 0, 0);
-        // (the rail grows at 1920 × 1080: it may keep 16 px against flicker)
         for (const auto& [w, h]: std::vector<std::pair<int, int>>{{900, 1000}, {1000, 900}, {412, 915}, {915, 412},
-                                                                  {1920, 1080}, {1300, 600}}) {
+                                                                  {1920, 1080}}) {
             resize(w, h);
             const std::string at = std::to_string(w) + "x" + std::to_string(h) + (insets ? " with insets" : "");
-            expectRailFills(at.c_str(), w == 1920);
+            expectRail(at.c_str());
+            // The last of the rail and the first, taken from elsewhere: in view
+            controller->selectTool("hand");
+            until([&] { return inSight(find("railApp_pdfText")) || inSight(find("railApp_hand")); });
+            EXPECT_TRUE(inSight(find("railApp_hand"))) << at << ": " << rail().text.toStdString();
+            QTest::keyClick(window, Qt::Key_P);
+            until([&] { return inSight(entry(tools()->active())); });
+            EXPECT_TRUE(inSight(entry(tools()->active()))) << at << ": " << rail().text.toStdString();
         }
     }
-    // Unfolded with room for every tool of the first start but the last fixed ones: no stack of one's own tools
+    // The dock of the folded phone scrolls sideways; unfolded, every one of the user's tools of the first start is in
+    // sight at once (the author's report: they were folded into one button there)
+    resize(412, 915);
+    EXPECT_TRUE(rail().scrolls) << rail().text.toStdString();
+    EXPECT_TRUE(find("toolbox")->property("compact").toBool());
     resize(900, 1000);
-    EXPECT_FALSE(rail().allFolded) << rail().text.toStdString();
-    EXPECT_GE(rail().cells, 12) << rail().text.toStdString();
+    scrollRail(0);
+    for (const QVariant& v: tools()->tools()) {
+        EXPECT_TRUE(inSight(entry(v.toMap().value("id").toString()))) << rail().text.toStdString();
+    }
+    safeArea(0, 0, 0, 0);
     touchProfile("auto");
 }
 
-// What the device goes through: started folded (the dock), unfolded, turned, folded again; and the safe area changing
-// at one size (the navigation bar, a cut-out): the rail plans anew for every length
-TEST_F(ToolboxTest, theRailPlansAnewWhenThePhoneIsFoldedUnfoldedAndTurned) {
+// Where the rail was scrolled to is remembered per window class: the folded phone's dock and the unfolded rail each
+// keep their own
+TEST_F(ToolboxTest, theScrollPositionIsRememberedPerWindowClass) {
     touchProfile("on");
-    safeArea(40, 0, 24, 0);
+    controller->selectTool("text");  // (no tool of the rail in hand: that one would be scrolled into view)
     resize(412, 915);
-    expectRailFills("folded");
-    resize(900, 1000);
-    expectRailFills("unfolded");
-    const RailState unfolded = rail();
-    resize(1000, 900);
-    expectRailFills("turned");
-    resize(900, 1000);
-    expectRailFills("unfolded again", true);
-    EXPECT_EQ(rail().cells, unfolded.cells) << "the same as before";
-    resize(412, 915);
-    expectRailFills("folded again");
+    ASSERT_TRUE(rail().scrolls);
+    until([&] {  // (once the dock is laid out for its size)
+        scrollRail(100);
+        return rail().pos > 50;
+    });
+    const double folded = rail().pos;
+    EXPECT_GT(folded, 50);
+    wait(800);  // (written after a pause)
     resize(915, 412);
-    expectRailFills("folded, sideways");
-    resize(900, 1000);
-    expectRailFills("unfolded from sideways");
-    EXPECT_EQ(rail().cells, unfolded.cells);
-    // The navigation bar grows under the rail's end, and goes again: the same size, another length
-    safeArea(40, 0, 200, 0);
-    expectRailFills("a taller navigation bar");
-    safeArea(40, 0, 24, 0);
-    expectRailFills("the navigation bar as before", true);
-    EXPECT_EQ(rail().cells, unfolded.cells);
-    // Android reports the new size and the new insets one after the other (unfolding: the window grows while the
-    // insets of the moment before still hold): the rail must not stay folded for the insets of before
+    ASSERT_TRUE(rail().scrolls) << rail().text.toStdString();
+    scrollRail(0);
+    wait(800);
     resize(412, 915);
-    safeArea(40, 0, 420, 0);
-    resize(900, 1000);
-    safeArea(40, 0, 24, 0);
-    expectRailFills("unfolded, the insets after the size", true);
-    EXPECT_EQ(rail().cells, unfolded.cells) << "as many as unfolded with the insets at once";
+    until([&] { return std::abs(rail().pos - folded) < 1; });
+    EXPECT_NEAR(rail().pos, folded, 1) << "the dock as it was";
+    resize(915, 412);
+    until([&] { return rail().pos < 1; });
+    EXPECT_NEAR(rail().pos, 0, 1) << "sideways: its own";
     touchProfile("auto");
 }
 
@@ -886,6 +958,168 @@ TEST_F(ToolboxTest, aToolHeldThenMovedIsCarriedToAnotherPlace) {
     QMetaObject::invokeMethod(menu, "close");
 }
 
+// Groups the user makes (the author, 2026-10-06: "Maybe we can let the user group tools into cycle groups themselves
+// if they like? By dragging a tool and holding long over another tool?"): a tool carried onto another and held there
+// until it shows a ring; let go: a group, which the snackbar can undo. Moving on before the ring reorders as before.
+TEST_F(ToolboxTest, aToolHeldOverAnotherUntilTheRingMakesAGroup) {
+    const QString pen1 = nth("pen"), pen3 = nth("pen", 2), hl = nth("highlighter");
+    auto carry = [&](const QPoint& from, const std::vector<QPoint>& path, int dwellMs, const QPoint& to) {
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+        wait(550);
+        QPoint at = from;
+        for (const QPoint& p: path) {
+            for (int k = 1; k <= 6; ++k) {
+                QTest::mouseMove(window, at + (p - at) * k / 6);
+                wait(15);
+            }
+            at = p;
+        }
+        wait(dwellMs);
+        for (int k = 1; k <= 4; ++k) {
+            QTest::mouseMove(window, at + (to - at) * k / 4);
+            wait(15);
+        }
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, to);
+        wait(150);
+    };
+    // Over the first pen for a moment, then on to the place before the third pen: a reorder, no group
+    const QRectF third = rectOf(entry(pen3));
+    const QPoint beforeThird(int(third.center().x()), int(third.top()) + 3);
+    carry(rectOf(entry(hl)).center().toPoint(), {rectOf(entry(pen1)).center().toPoint()}, 150, beforeThird);
+    EXPECT_EQ(tools()->groupOf(hl), "") << "moved on before the ring";
+    EXPECT_EQ(tools()->indexOf(hl) + 1, tools()->indexOf(pen3)) << "reordered as before";
+
+    // Held over the first pen until the ring shows: let go, a group in the pen's place
+    const QStringList before = arranged();
+    const QPoint overPen = rectOf(entry(pen1)).center().toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, rectOf(entry(hl)).center().toPoint());
+    wait(550);
+    for (int k = 1; k <= 8; ++k) {
+        QTest::mouseMove(window, rectOf(entry(hl)).center().toPoint() + (overPen - rectOf(entry(hl)).center().toPoint()) * k / 8);
+        wait(15);
+    }
+    until([&] { return entry(pen1)->property("ringed").toBool(); }, 2000);
+    EXPECT_TRUE(entry(pen1)->property("ringed").toBool()) << "the ring after about 0.6 s";
+    EXPECT_FALSE(shown(find("toolDropMark"))) << "no place marked: a group";
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, overPen);
+    until([&] { return !tools()->groupOf(hl).isEmpty(); });
+    const QString g = tools()->groupOf(hl);
+    ASSERT_FALSE(g.isEmpty());
+    EXPECT_EQ(tools()->groupOf(pen1), g);
+    EXPECT_EQ(tools()->indexOf(g), 0) << "in the pen's place";
+    auto* face = find("railGroup_" + g);
+    until([&] { return shown(face = find("railGroup_" + g)); });
+    ASSERT_TRUE(shown(face));
+    EXPECT_EQ(face->property("stackCount").toInt(), 2) << "dots for its two tools";
+    EXPECT_FALSE(shown(entry(pen1))) << "the pen is in the group";
+    // "Grouped · Undo"
+    auto* snackbar = find("snackbar");
+    EXPECT_TRUE(shown(snackbar));
+    EXPECT_EQ(find("snackbarText")->property("text").toString(), "Grouped");
+    auto* undo = find("snackbarAction");
+    ASSERT_TRUE(shown(undo));
+    QMetaObject::invokeMethod(undo, "clicked");
+    until([&] { return tools()->groupOf(hl).isEmpty(); });
+    EXPECT_EQ(tools()->groupOf(hl), "") << "undone";
+    until([&] { return rail().order == before; });
+    EXPECT_EQ(rail().order, before) << "as it was";
+}
+
+// A group shows the tool used last; a tap takes it; a tap while one of its tools is in hand takes the next with two or
+// three tools, and opens its list with more than three (the author's rule). The list: pick one, carry one out (it
+// leaves the group); its menu: Ungroup. App tools group too, and keep their own cycle outside a group.
+TEST_F(ToolboxTest, aGroupCyclesWithThreeAndListsWithFour) {
+    const QString pen1 = nth("pen"), pen2 = nth("pen", 1), pen3 = nth("pen", 2), hl = nth("highlighter");
+    controller->applyToolEntry(nth("eraser"));
+    QString g = tools()->group(pen2, pen1);
+    tools()->group(pen3, pen1);
+    ASSERT_EQ(tools()->members(g).size(), 3);
+    wait(200);  // (the rail made anew)
+    auto* face = find("railGroup_" + g);
+    until([&] { return shown(face = find("railGroup_" + g)); });
+    ASSERT_TRUE(shown(face));
+    // A tap: the one shown (the one carried in last); again: the next, round the group
+    click(face);
+    until([&] { return tools()->active() == pen3; });
+    EXPECT_EQ(tools()->active(), pen3);
+    EXPECT_TRUE(face->property("inHand").toBool());
+    click(face);
+    until([&] { return tools()->active() == pen1; });
+    EXPECT_EQ(tools()->active(), pen1) << "the next, from the start again";
+    EXPECT_EQ(tools()->shownOf(g), pen1) << "the group shows it";
+    click(face);
+    until([&] { return tools()->active() == pen2; });
+    EXPECT_EQ(controller->color(), QColor("#D96B00"));
+    EXPECT_FALSE(find<QObject>("toolGroupFlyout")->property("visible").toBool()) << "three: no list";
+
+    // A fourth: a tap while one of them is in hand opens the list
+    tools()->group(hl, g);
+    wait(200);
+    until([&] { return find("railGroup_" + g) && find("railGroup_" + g)->property("stackCount").toInt() == 4; });
+    face = find("railGroup_" + g);
+    EXPECT_EQ(tools()->shownOf(g), hl);
+    ASSERT_EQ(tools()->active(), pen2) << "one of its tools in hand";
+    click(face);
+    auto* flyout = find<QObject>("toolGroupFlyout");
+    until([&] { return flyout->property("visible").toBool(); });
+    ASSERT_TRUE(flyout->property("visible").toBool()) << "four: its list";
+    EXPECT_EQ(tools()->active(), pen2) << "nothing taken";
+    QQuickItem* inList = nullptr;
+    until([&] { return shown(inList = entry(pen3)); });
+    ASSERT_TRUE(shown(inList));
+    click(inList);
+    until([&] { return tools()->active() == pen3; });
+    EXPECT_EQ(controller->color(), QColor("#D6342C")) << "picked from the list";
+    until([&] { return !flyout->property("visible").toBool(); });
+
+    // Carried out of the list onto the rail: it leaves the group
+    click(face);
+    until([&] { return flyout->property("visible").toBool(); });
+    until([&] { return shown(inList = entry(pen2)); });
+    const QPoint from = rectOf(inList).center().toPoint();
+    const QRectF eraser = rectOf(find("toolEntry_" + nth("eraser")));
+    const QPoint to(int(eraser.center().x()), int(eraser.top()) + 3);
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+    wait(550);
+    for (int k = 1; k <= 10; ++k) {
+        QTest::mouseMove(window, from + (to - from) * k / 10);
+        wait(15);
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, to);
+    until([&] { return tools()->groupOf(pen2).isEmpty(); });
+    EXPECT_EQ(tools()->groupOf(pen2), "") << "carried out of the group";
+    EXPECT_EQ(tools()->members(g).size(), 3);
+    EXPECT_EQ(tools()->indexOf(pen2) + 1, tools()->indexOf(nth("eraser")));
+
+    // Its menu: Ungroup
+    wait(200);
+    auto* menu = find<QObject>("toolEntryMenu");
+    QMetaObject::invokeMethod(find("railGroup_" + g), "pressAndHold");
+    until([&] { return menu->property("visible").toBool(); });
+    EXPECT_FALSE(entryOf(menu, "toolEditItem")->property("offered").toBool()) << "a group has no editor";
+    trigger(menu, "toolUngroupItem");
+    EXPECT_EQ(tools()->kindOf(g), "");
+    until([&] { return shown(entry(pen1)); });
+    EXPECT_TRUE(shown(entry(pen1)));
+    EXPECT_TRUE(shown(entry(hl)));
+
+    // App tools: select and snip in one group; a tap cycles from one to the other
+    const QString sg = tools()->group(tools()->idOfApp("snip"), tools()->idOfApp("select"));
+    wait(200);
+    auto* appFace = find("railGroup_" + sg);
+    until([&] { return shown(appFace = find("railGroup_" + sg)); });
+    ASSERT_TRUE(shown(appFace));
+    EXPECT_FALSE(shown(find("handButton")) && inside(find("selectButton"), find("toolArea"))) << "still lent to the rail";
+    click(appFace);
+    until([&] { return !controller->snipShape().isEmpty(); });
+    EXPECT_FALSE(controller->snipShape().isEmpty()) << "the snip, shown last";
+    click(appFace);
+    until([&] { return controller->tool() == "selectRect" || controller->tool() == "selectRegion"; });
+    EXPECT_TRUE(controller->snipShape().isEmpty()) << "then select";
+    EXPECT_EQ(tools()->shownOf(sg), tools()->idOfApp("select"));
+    // Outside a group select keeps its own cycle (rectangle, lasso): see dockedAtTheRight…
+}
+
 TEST_F(ToolboxTest, theGripCarriesTheRailToAnotherEdge) {
     auto* grip = find("toolboxGrip");
     ASSERT_TRUE(shown(grip));
@@ -926,8 +1160,19 @@ TEST_F(ToolboxTest, inFullScreenTheSameToolboxFloatsAndPresentingHidesIt) {
     EXPECT_TRUE(shown(entry(nth("pen"))));
     auto* more = find("toolboxMoreButton");
     ASSERT_TRUE(shown(more));
-    click(more);
     auto* menu = find<QObject>("toolboxMoreMenu");
+    // The tools that left the rail for the top bar, which full screen hides: in ⋯ (qt/rail-scroll)
+    click(more);
+    for (const char* name: {"toolboxMore_write", "toolboxMore_geometry", "toolboxMore_touchDrawing"}) {
+        until([&] { return menu->property("visible").toBool(); });
+        ASSERT_NE(entryOf(menu, name), nullptr) << name;
+        EXPECT_TRUE(entryOf(menu, name)->property("offered").toBool()) << name;
+    }
+    trigger(menu, "toolboxMore_geometry");
+    until([&] { return !controller->geometryTool().isEmpty(); });
+    EXPECT_FALSE(controller->geometryTool().isEmpty()) << "the setsquare from ⋯";
+    controller->toggleGeometryTool("");
+    click(more);
     trigger(menu, "toolboxPresentItem");
     until([&] { return controller->presenting(); });
     EXPECT_TRUE(controller->presenting());
@@ -951,7 +1196,7 @@ TEST_F(ToolboxTest, inFullScreenTheSameToolboxFloatsAndPresentingHidesIt) {
     EXPECT_FALSE(box->property("floating").toBool()) << "docked again";
 }
 
-TEST_F(ToolboxTest, onAPhoneTheDockHoldsTheFirstToolsAndTheSheetHoldsThemAll) {
+TEST_F(ToolboxTest, onAPhoneTheDockIsTheSameRailAndTheSheetHoldsThemAll) {
     resize(412, 915);
     auto* box = find("toolbox");
     until([&] { return box->property("compact").toBool(); });
@@ -963,15 +1208,19 @@ TEST_F(ToolboxTest, onAPhoneTheDockHoldsTheFirstToolsAndTheSheetHoldsThemAll) {
     EXPECT_TRUE(shown(find("toolboxAllButton")));
     EXPECT_TRUE(shown(find("toolboxPageButton")));
     EXPECT_FALSE(shown(find("toolboxAddButton"))) << "in the sheet";
-    EXPECT_FALSE(shown(find("handButton")));
     const QRectF dock = rectOf(box);
     EXPECT_GT(dock.top(), 800) << "at the bottom";
     EXPECT_LE(dock.right(), 412.5);
-    // The first tools, the one in hand among them
+    // The same items as the rail, scrolling sideways (the app tools too)
+    expectRail("the dock");
+    EXPECT_TRUE(rail().scrolls);
+    EXPECT_FALSE(box->property("vertical").toBool());
+    EXPECT_TRUE(inside(find("handButton"), box));
+    // The tool in hand is scrolled into the dock
     const QString laser = nth("laser");
     controller->applyToolEntry(laser);
-    until([&] { return shown(entry(laser)); });
-    EXPECT_TRUE(shown(entry(laser))) << "the tool in hand is always in the dock";
+    until([&] { return inSight(entry(laser)); });
+    EXPECT_TRUE(inSight(entry(laser))) << "the tool in hand in sight";
     EXPECT_TRUE(dock.contains(rectOf(entry(laser)).center()));
     // My tools: all of them, a tap takes one
     click(find("toolboxAllButton"));
@@ -1023,9 +1272,12 @@ TEST_F(ToolboxTest, theCommandBarShowsEntriesOfTheMoreMenuWhereThereIsRoom) {
     EXPECT_FALSE(shown(find("moreToolsButton"))) << "nothing in \"more tools\"";
     EXPECT_FALSE(shown(find("milestoneButton"))) << "a new document keeps no versions";
     EXPECT_TRUE(item("saveWithMessageItem")->property("offered").toBool());
-    // One place each: the rail's fixed tools are not in the bar
-    for (const char* fixed: {"handButton", "selectButton", "snipButton", "textModeButton"}) {
-        EXPECT_FALSE(inside(find(fixed), find("topTools"))) << fixed;
+    // One place each: the rail's app tools are not in the bar; those that left the rail are
+    for (const char* onRail: {"handButton", "selectButton", "snipButton", "pdfTextButton"}) {
+        EXPECT_FALSE(inside(find(onRail), find("topTools"))) << onRail;
+    }
+    for (const char* inBar: {"textModeButton", "geometryButton", "touchDrawingButton"}) {
+        EXPECT_TRUE(inside(find(inBar), find("topTools"))) << inBar;
     }
     // The ladder: the tags give way first, sharing last
     check(1366, 768);
@@ -1542,18 +1794,17 @@ protected:
 };
 }  // namespace
 
-// The record button is a fixed tool of the rail (one place: not in the command bar too), so recording is there docked,
-// floating in full screen and on a phone's sheet; the recording pill stays in sight, clear of the toolbox
-TEST_F(ToolboxAudioTest, recordingIsAFixedToolOfTheRailAndItsPillStaysInSight) {
-    resize(1920, 1200);  // (room for all the fixed tools: at 1080 the last ones are in a stack)
+// The record button left the rail (qt/rail-scroll; qt/top-bar puts it in the top bar's first layout): it is in the
+// command bar, one place, not on the rail too; the recording pill stays in sight, clear of the toolbox, docked and
+// floating (stopped there with its own stop), and a phone's sheet has it under Insert
+TEST_F(ToolboxAudioTest, recordingIsInTheCommandBarAndItsPillStaysInSight) {
     auto* box = find("toolbox");
     auto* record = find("recordButton");
     ASSERT_NE(record, nullptr);
-    until([&] { return shown(record) && inside(record, box); });
+    until([&] { return shown(record); });
     ASSERT_TRUE(shown(record));
-    EXPECT_TRUE(inside(record, find("toolboxFixed"))) << "among the fixed tools";
-    EXPECT_FALSE(inside(record, find("toolArea"))) << "not in the command bar too";
-    EXPECT_FALSE(shown(find("moreToolsButton"))) << "nothing in \"more tools\" at 1920";
+    EXPECT_FALSE(inside(record, box)) << "not on the rail";
+    EXPECT_TRUE(inside(record, find("toolArea"))) << "in the command bar";
 
     click(record);
     until([&] { return audio()->property("recording").toBool(); });
@@ -1577,19 +1828,9 @@ TEST_F(ToolboxAudioTest, recordingIsAFixedToolOfTheRailAndItsPillStaysInSight) {
     EXPECT_TRUE(shown(pill));
     EXPECT_FALSE(rectOf(pill).intersects(rectOf(box))) << "below the floating toolbox";
     EXPECT_GE(rectOf(pill).top(), rectOf(box).bottom());
-    if (box->property("plan").toMap().value("fixedFolded").toBool()) {
-        // (a short toolbox: the fixed tools in one stack, which shows the recording, a tap lists them)
-        auto* stack = find("toolboxFixedStack");
-        ASSERT_TRUE(shown(stack));
-        EXPECT_EQ(stack->property("iconName"), record->property("iconName")) << "the stack shows the recording";
-        click(stack);
-        until([&] { return shown(record); });
-    }
-    ASSERT_TRUE(shown(record)) << "in the floating toolbox";
-    click(record);  // (there: it stops)
+    click(find("recordingStop"));  // (there: the pill's own stop)
     until([&] { return !audio()->property("recording").toBool(); });
     EXPECT_FALSE(audio()->property("recording").toBool());
-    QMetaObject::invokeMethod(find<QObject>("toolboxFixedFlyout"), "close");
     window->setProperty("fullScreenMode", false);
     until([&] { return !box->property("floating").toBool(); });
 
@@ -1612,9 +1853,9 @@ TEST_F(ToolboxNoAudioTest, withoutAudioNothingOffersRecording) {
     ASSERT_NE(record, nullptr);
     EXPECT_FALSE(shown(record));
     EXPECT_FALSE(inside(record, find("toolbox")));
-    for (const char* name: {"handButton", "touchDrawingButton"}) {
-        EXPECT_TRUE(shown(find(name)) && inside(find(name), find("toolboxFixed"))) << name;
-    }
+    EXPECT_FALSE(inside(record, find("toolArea")) && shown(record)) << "not in the command bar";
+    EXPECT_TRUE(shown(find("handButton")) && inside(find("handButton"), find("toolbox")));
+    EXPECT_TRUE(shown(find("touchDrawingButton")) && inside(find("touchDrawingButton"), find("toolArea")));
     resize(412, 915);
     until([&] { return find("toolbox")->property("compact").toBool(); });
     click(find("toolboxAllButton"));
