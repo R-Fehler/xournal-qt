@@ -231,50 +231,85 @@ ApplicationWindow {
     readonly property real sourceBottomHeight: Math.round(contentItem.height
                                                           * (1 - (sourceShareLive >= 0 ? sourceShareLive : sourcePageShare)))
 
-    // The chrome: "full" (tab strip, tool bar, sidebar; in the phone classes the app bar and the tool dock), "compact"
-    // (full screen's: the tab dots, the floating toolbox, the view pill) or "reader" (no HUD; the corner mark
-    // brings it back). Separate from the window's state (windowFullScreen) and from presenting (black, page by page).
-    // Full screen (F11, fullScreenMode) is the compact chrome in a full-screen window; otherwise the chrome is what was
-    // chosen for this size class, else the automatic one: the reader in a tiny window, everywhere else "full".
-    readonly property string chromeChoice: layoutChoice("chrome")
-    /// The automatic chrome of this size class: the reader only in a tiny window (under 360 px either way: split
-    /// screen, a pop-up window); elsewhere "Read" is chosen by hand (⋮ → View)
-    readonly property string chromeAuto: adaptive.layoutClass === "tiny" ? "reader" : "full"
-    /// The chrome of this size class: chosen by hand, else the automatic one
-    readonly property string chromeSetting: ["full", "compact", "reader"].indexOf(chromeChoice) >= 0 ? chromeChoice : chromeAuto
-    readonly property string chromeMode: chromeSetting === "reader" && !app.presenting ? "reader"
-                                         : (fullScreenMode || chromeSetting === "compact") ? "compact" : "full"
-    readonly property bool fullChrome: chromeMode === "full"
-    /// Nothing over the page but the page: presenting without controls, or the reader chrome
-    readonly property bool hudHidden: cleanPage || (chromeMode === "reader" && !app.homeVisible) || (replaying && !app.homeVisible)
+    // The chrome: "full" (tab strip, command bar, the docked toolbox, sidebar; in the phone classes the app bar and the
+    // tool dock) or "compact" (full screen's: the tab dots, the floating toolbox, the view pill). Full screen (F11,
+    // fullScreenMode) is the compact chrome in a full-screen window. Apart from it: the window's state
+    // (windowFullScreen), presenting (black, page by page), Zen (nothing around the page) and read only
+    // (qt/docs/zen.md). (The reader chrome and the chrome chosen per size class are gone since 0.8.0: Zen.)
+    readonly property string chromeMode: fullScreenMode ? "compact" : "full"
+    /// The full chrome is shown (not in Zen)
+    readonly property bool fullChrome: chromeMode === "full" && !zenShown
+    /// Nothing over the page but the page: Zen (presenting without controls too), or the replay
+    readonly property bool hudHidden: zenShown || (replaying && !app.homeVisible)
     onHudHiddenChanged: if (hudHidden) phoneToolSheet.close()
-    /// Read only (qt/docs/toolbox.md, "Reading"; qt/ui-rework): a toggle of full screen and presenting (the floating
-    /// toolbox's ⋯, Ctrl+Alt+R; ⋮ → View → Read enters full screen with it). Off again
-    /// when full screen ends or the home screen is shown.
+
+    // --- Zen and read only (qt/docs/zen.md) ---------------------------------------------------------------------------
+    /// Zen turned on by hand (⋮ → View → Zen, its keys, the command bar's button, Read)
+    property bool zenByHand: false
+    /// Zen of itself: a tiny window (under 360 px either way: split screen, a pop-up window), unless it was left there
+    /// by hand (remembered for the class: layout/tiny/zen "off"; from 0.7.0, the reader chrome left there: chrome "full")
+    readonly property bool zenAuto: {
+        if (adaptive.layoutClass !== "tiny") return false
+        const z = layoutChoice("zen")
+        return z !== "off" && !(z === "" && layoutChoice("chrome") === "full")
+    }
+    /// Zen: everything around the page hidden (the toolbox, the command bar, the tab strip, the sidebar's arrow, the
+    /// pills); its only mark is the dot in the lower left corner (zenDot), whose pill brings the controls back. The
+    /// pen keeps writing. Presenting has its own: presenting without controls (presentClean).
+    readonly property bool zen: app.presenting ? presentClean : (zenByHand || zenAuto)
+    /// Zen as it shows: not on the home screen
+    readonly property bool zenShown: zen && !app.homeVisible
+    function setZen(on) {
+        if (!on) readStarted = false
+        if (app.presenting) {
+            presentClean = on
+            return
+        }
+        if (adaptive.layoutClass === "tiny") {
+            // (left by hand: remembered for tiny windows; on again: automatic again)
+            chooseLayout("chrome", "")  // (the reader chrome's choice of 0.7.0: replaced)
+            chooseLayout("zen", on ? "" : "off")
+            if (!on) zenByHand = false
+            return
+        }
+        zenByHand = on
+    }
+    /// Read only (⋮ → View → Read only, the dot's pill, the floating toolbox's ⋯): the page cannot be written on, the
+    /// pen and the fingers scroll, PDF text can still be selected and copied; the edges turn the pages. Anywhere, with
+    /// or without Zen and full screen; off again when the home screen is shown.
     property bool readOnly: false
-    /// Where read only can be on: full screen or the compact chrome, presenting (a document with pages)
+    /// Where read only can be on: a document with pages
     readonly property bool readOnlyOffered: !app.homeVisible && !textDoc && !replaying
-                                            && (chromeMode === "compact" || app.presenting)
     onReadOnlyOfferedChanged: if (!readOnlyOffered) readOnly = false
     readonly property bool readOnlyOn: readOnly && readOnlyOffered
-    /// Read only, from a window too: full screen first
+    /// Read (Ctrl+Alt+R, ⋮ → View → Read): Zen and read only, in full screen (a tiny window stays a window). The keys
+    /// again end it: read only off, and Zen and full screen where Read turned them on; Esc leaves Zen too. "Show
+    /// controls" leaves only Zen.
+    property bool readStarted: false
+    property bool readEnteredFullScreen: false
+    property bool readEnteredZen: false
     function startReading() {
-        if (!readOnlyOffered && chromeMode !== "reader") fullScreenMode = true
-        readOnly = readOnlyOffered
+        if (!readOnlyOffered) return
+        readEnteredFullScreen = !fullScreenMode && adaptive.layoutClass !== "tiny"
+        readEnteredZen = !zenShown
+        if (readEnteredFullScreen) fullScreenMode = true
+        setZen(true)
+        readOnly = true
+        readStarted = true
     }
-    function toggleReadOnly() { readOnlyOn ? (readOnly = false) : startReading() }
-    /// Reading: read only, or the reader chrome (no HUD; automatic in a tiny window). The page cannot be written on:
-    /// the pen and the fingers scroll, PDF text can still be selected, copied and looked up, no ink by accident; big
-    /// fields at the left and right edges turn the pages (readingTapFields). The tools are hidden (toolsHidden); the
-    /// lock (readOnlyMark), Esc or, in the reader chrome, the corner field bring them back.
-    readonly property bool reading: !app.homeVisible && ((chromeMode === "reader" && !app.presenting) || readOnlyOn)
-    /// The tools are put away: nothing over the page (hudHidden), or read only (the page, its number and zoom)
-    readonly property bool toolsHidden: hudHidden || readOnlyOn
+    function stopReading() {
+        readOnly = false
+        if (readEnteredZen) setZen(false)
+        if (readEnteredFullScreen && !app.presenting) fullScreenMode = false
+        readStarted = readEnteredFullScreen = readEnteredZen = false
+    }
+    function toggleReading() { readStarted && readOnlyOn ? stopReading() : startReading() }
+    /// Reading: read only is on (DocumentCanvas.readingOnly; the edges turn the pages, readingTapFields)
+    readonly property bool reading: readOnlyOn
     /// The document's timeline is replayed (qt/docs/timeline.md): the page as of a moment and the play bar at the
     /// bottom, read-only; no tools (as reading), the play bar's keys. The command bar and the phone's dock are put away
     /// meanwhile (qt/replay-polish)
     readonly property bool replaying: app.timeline.active
-    function chooseChrome(mode) { chooseLayout("chrome", mode === chromeAuto ? "" : mode) }
 
     // --- the phone chrome (qt/docs/adaptive-layout.md, "The phone chrome") -------------------------------------------
     /// A phone class (by the layout class: "Adapt the layout" off keeps the desktop layout at every size)
@@ -365,14 +400,14 @@ ApplicationWindow {
             else showNormal()
         }
     }
-    /// No command bar: in the compact or reader chrome, or when it was put away. (The phone chrome has its dock
+    /// No command bar: in the compact chrome or Zen, or when it was put away. (The phone chrome has its dock
     /// instead, and nothing to put away.)
     readonly property bool noToolbar: !fullChrome || (app.toolbarHidden && !phoneChrome)
     /// The document is a text file (a .md, a .txt): written with the keyboard, no ink tools (qt/docs/md-editor.md)
     readonly property bool textDoc: app.textDocument !== ""
     /// Undo and redo: the toolbox's head while it is shown; else they lead the command bar while it is shown (a text
-    /// document), its format bar when the bar is merged into it, the view pill while no bar is shown (the compact or
-    /// reader chrome, the bar put away), the dock in the phone chrome: one place at a time
+    /// document), its format bar when the bar is merged into it, the view pill while no bar is shown (the compact
+    /// chrome, Zen, the bar put away), the dock in the phone chrome: one place at a time
     /// (qt/docs/adaptive-layout.md, "One place for each action")
     readonly property bool undoInToolBar: !noToolbar && !toolsInFormatBar && !phoneChrome && !toolboxShown
     /// A text document: undo and redo lead its format bar (qt/docs/toolbox.md, "Text documents")
@@ -395,7 +430,7 @@ ApplicationWindow {
     readonly property bool toolboxDocked: fullChrome && !phoneLayout && !app.homeVisible && !textDoc && !replaying
     /// Floating over the page, a little off its edge: the compact chrome (full screen, presenting with the tools), on
     /// a phone too
-    readonly property bool toolboxFloating: chromeMode === "compact" && !app.homeVisible && !textDoc && !toolsHidden
+    readonly property bool toolboxFloating: chromeMode === "compact" && !app.homeVisible && !textDoc && !hudHidden
     /// In the phone's dock (at the bottom, or the rail at the right held sideways): its first tools, "My tools"
     readonly property bool toolboxInDock: dockShown && !textDoc && !replaying
     /// The toolbox is shown (docked, or floating in full screen and on phones)
@@ -412,7 +447,12 @@ ApplicationWindow {
     }
     Connections {
         target: app
-        function onHomeVisibleChanged() { if (app.homeVisible) win.fullScreenMode = false }
+        function onHomeVisibleChanged() {
+            if (!app.homeVisible) return
+            win.fullScreenMode = false
+            win.zenByHand = false
+            win.readStarted = false
+        }
         function onPresentingChanged() { if (!app.presenting) win.presentClean = false }
     }
 
@@ -451,9 +491,10 @@ ApplicationWindow {
             if (app.presenter.active) app.presenter.placeWindows(audienceWindow, win)
         }
     }
-    /// Presenting without controls (Ctrl+F5, or holding the presentation button): only the page shows, no floating
-    /// toolbox, no other overlay; the faint mark in the lower left corner (presentCornerMark) or Ctrl+F5
-    /// brings them back and hides them again. Every presentation starts as it is asked for: F5 with the controls.
+    /// Presenting without controls (Ctrl+F5, or holding the presentation button): presenting in Zen - only the page
+    /// shows, no floating toolbox, no other overlay; the Zen dot in the lower left corner (its "Show controls") or
+    /// Ctrl+F5 brings them back, Ctrl+F5 hides them again. Every presentation starts as it is asked for: F5 with the
+    /// controls (and no dot).
     property bool presentClean: false
     readonly property bool cleanPage: app.presenting && presentClean
 
@@ -969,15 +1010,22 @@ ApplicationWindow {
             icon.source: app.iconUrl("xqt-eye-off")
             onTriggered: app.presenting ? (win.presentClean = true) : win.startPresenting(true)
         }
-        // Read only: the pen does not write, the edges turn the pages (qt/docs/toolbox.md, "Reading")
+        // Read only: the pen does not write, the edges turn the pages (qt/docs/zen.md)
         AdaptiveMenuItem {
             objectName: "toolboxReadOnlyItem"
-            readonly property var keys: win.keysOf("readOnly")
-            text: keys.length > 0 ? qsTr("Read only (%1)").arg(keys[0]) : qsTr("Read only")
+            text: qsTr("Read only")
             icon.source: app.iconUrl("xqt-lock")
             checkable: true
             checked: win.readOnlyOn
-            onTriggered: win.toggleReadOnly()
+            onTriggered: win.readOnly = !win.readOnlyOn
+        }
+        // Zen: only the page and the dot (qt/docs/zen.md)
+        AdaptiveMenuItem {
+            objectName: "toolboxZenItem"
+            offered: !app.presenting  // (presenting: "Hide the tools" above)
+            text: win.withKeys(qsTr("Zen (only the page)"), "zen")
+            icon.source: app.iconUrl("xqt-zen")
+            onTriggered: win.setZen(true)
         }
         AdaptiveMenuItem {
             objectName: "toolboxSearchItem"
@@ -994,10 +1042,9 @@ ApplicationWindow {
         MenuSeparator {}
         AdaptiveMenuItem {
             objectName: "toolboxLeaveFullScreenItem"
-            text: !win.fullScreenMode ? qsTr("Show the tabs and the tool bar")
-                                      : qsTr("Leave full screen") + (app.presenting ? "" : qsTr(" (Esc)"))
+            text: qsTr("Leave full screen") + (app.presenting ? "" : qsTr(" (Esc)"))
             icon.source: app.iconUrl("xopp-fullscreen")
-            onTriggered: win.fullScreenMode ? (win.fullScreenMode = false) : win.chooseChrome("full")
+            onTriggered: win.fullScreenMode = false
         }
     }
     /// An entry's name for people ("Pen · Body", "Arrow", "Eraser (whiteout)")
@@ -1140,7 +1187,7 @@ ApplicationWindow {
         menuSheet.closed.connect(after)
     }
     // The command bar: one row at the top (qt/docs/toolbox.md, "The command bar"), placed by ToolBarPlan.js; merged
-    // into a text document's format bar; put away (the buttons kept, out of sight) in the compact and reader chrome
+    // into a text document's format bar; put away (the buttons kept, out of sight) in the compact chrome and in Zen
     // and while the bar is hidden
     Item { id: toolsAway; visible: false; anchors.fill: parent }
     Item {
@@ -1170,7 +1217,8 @@ ApplicationWindow {
             hand: handTool, touchDrawing: touchDrawingTool, select: selectTool, snip: snipTool, write: writeButton,
             geometry: geometryTool, pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, sticker: stickerTool,
             record: recordTool, addPage: addPageTool, search: searchTool,
-            fullScreen: fullScreenTool, present: presentTool, read: readTool, replay: replayTool, settings: settingsTool,
+            fullScreen: fullScreenTool, present: presentTool, read: readTool, zen: zenTool, replay: replayTool,
+            settings: settingsTool,
             new: newTool, open: openTool, save: saveTool, milestone: milestoneTool, editAsNotes: editAsNotesTool,
             openExternally: openExternallyTool,
             share: shareTool, print: printTool, bookmark: bookmarkTool, favourite: favouriteTool, tags: tagsTool
@@ -1178,7 +1226,7 @@ ApplicationWindow {
         readonly property var order: ["undo", "redo",
                                       "hand", "touchDrawing", "select", "snip", "write", "geometry", "pdfText", "emoji",
                                       "image", "sticker", "record", "addPage", "search",
-                                      "fullScreen", "present", "read", "replay", "settings", "new", "open", "save",
+                                      "fullScreen", "present", "read", "zen", "replay", "settings", "new", "open", "save",
                                       "milestone", "editAsNotes", "openExternally", "share", "print", "bookmark",
                                       "favourite", "tags"]
         /// The buttons in the bar now (an entry of ⋮ shown as a button is not in ⋮ too)
@@ -1565,12 +1613,31 @@ ApplicationWindow {
                         AdaptiveMenuItem { objectName: "curtainItem"; offered: !win.textDoc; checkable: true; checked: app.curtain === "curtain"; text: qsTr("Curtain (B)"); icon.source: app.iconUrl("xqt-curtain"); onTriggered: app.toggleCurtain("curtain") }
                         AdaptiveMenuItem { objectName: "spotlightItem"; offered: !win.textDoc; checkable: true; checked: app.curtain === "spotlight"; text: qsTr("Spotlight (Shift+B)"); icon.source: app.iconUrl("xqt-spotlight"); onTriggered: app.toggleCurtain("spotlight") }
                         AdaptiveMenuItem { objectName: "presentCleanItem"; text: qsTr("Present without controls (Ctrl+F5)"); icon.source: app.iconUrl("xopp-presentation-mode"); onTriggered: win.startPresenting(true) }
-                        // Full screen, read only: the edges turn the pages, no ink (qt/docs/toolbox.md, "Reading")
+                        // Zen: only the page and a faint dot (qt/docs/zen.md)
+                        AdaptiveMenuItem {
+                            objectName: "zenItem"
+                            offered: !toolArea.inBar("zen")
+                            checkable: true
+                            checked: win.zenShown
+                            text: win.withKeys(qsTr("Zen (only the page)"), "zen")
+                            icon.source: app.iconUrl("xqt-zen")
+                            onTriggered: win.setZen(!win.zenShown)
+                        }
+                        // Read only: the pen does not write, the edges turn the pages
+                        AdaptiveMenuItem {
+                            objectName: "readOnlyItem"
+                            offered: win.readOnlyOffered
+                            checkable: true
+                            checked: win.readOnlyOn
+                            text: qsTr("Read only")
+                            icon.source: app.iconUrl("xqt-lock")
+                            onTriggered: win.readOnly = !win.readOnlyOn
+                        }
+                        // Read: Zen and read only, in full screen
                         AdaptiveMenuItem {
                             objectName: "readItem"
                             offered: !win.textDoc && !toolArea.inBar("read")
-                            readonly property var keys: win.keysOf("readOnly")
-                            text: keys.length > 0 ? qsTr("Read (full screen, no ink; %1)").arg(keys[0]) : qsTr("Read (full screen, no ink)")
+                            text: win.withKeys(qsTr("Read (Zen, read only)"), "readOnly")
                             icon.source: app.iconUrl("xqt-book-open")
                             onTriggered: win.startReading()
                         }
@@ -2213,8 +2280,20 @@ ApplicationWindow {
             property bool promoted: true
             iconName: "xqt-book-open"
             label: qsTr("Read")
-            tip: win.withKeys(qsTr("Read: full screen, read only (the edges turn the pages)"), "readOnly")
+            tip: win.withKeys(qsTr("Read: Zen and read only, in full screen (the edges turn the pages)"), "readOnly")
             onClicked: win.startReading()
+        }
+        // Zen: only the page and a faint dot in the lower left corner (qt/docs/zen.md)
+        IconButton {
+            id: zenTool
+            objectName: "zenButton"
+            parent: toolBank
+            property bool offered: !win.phoneLayout
+            property bool promoted: true
+            iconName: "xqt-zen"
+            label: qsTr("Zen")
+            tip: win.withKeys(qsTr("Zen: only the page (the dot in the lower left corner brings the controls back)"), "zen")
+            onClicked: win.setZen(true)
         }
         IconButton {
             id: replayTool
@@ -2294,7 +2373,7 @@ ApplicationWindow {
     }
     // The page sidebar's tab (qt/docs/adaptive-layout.md, "The page sidebar"): an arrow at the left edge of the canvas
     // area opens it (beside the page where there is room, else as the drawer); at the sidebar's edge, "‹" closes it.
-    // A finger's size in the touch profile; not in the compact or reader chrome, nor while presenting, nor while the
+    // A finger's size in the touch profile; not in the compact chrome or Zen, nor while presenting, nor while the
     // tool bar is put away (unless the sidebar is open: then it closes it).
     AbstractButton {
         id: sidebarArrow
@@ -2371,9 +2450,16 @@ ApplicationWindow {
         // (a version cut out of its file, compared or shown: read-only)
         readingOnly: win.reading || win.replaying || app.viewingVersion
         snapVertically: win.reading && !app.presenting
-        // Reading: the edges turn the pages (a tap the page does not take otherwise; readingTapFields)
+        // Reading: the edges turn the pages (a tap the page does not take otherwise; readingTapFields); in Zen a
+        // finger's tap in the middle opens the dot's pill (after the double tap's time: a double tap zooms)
         edgeTapWidth: readingTapFields.visible ? readingTapFields.fieldWidth : 0
         onEdgeTapped: function(side) { readingTapFields.turn(side) }
+        onMiddleTapped: function(pos, count) {
+            if (count > 1) zenPillDelay.stop()
+            else if (win.zenShown && zenDot.visible) zenPillDelay.restart()
+        }
+        // A stroke tried while read only: said once, at the pen (qt/docs/zen.md)
+        onWritingRefused: function(pos) { if (win.readOnlyOn) readOnlyNote.tell(pos) }
 
         // Picture files dropped on Markdown being written (a .md, a text document, Markdown on a page): saved with
         // the document and linked at the cursor (qt/docs/md-images.md)
@@ -2478,7 +2564,7 @@ ApplicationWindow {
         // (bottom left: the search bar is at the top, the page and zoom pill at the bottom right; above them where it
         // would meet them in a narrow canvas)
         anchors.left: canvas.left
-        anchors.leftMargin: (presentCornerMark.visible ? 56 : 24) + win.canvasControlsLeft - canvas.x  // (presenting, reading: beside the corner mark)
+        anchors.leftMargin: (zenDot.visible ? 56 : 24) + win.canvasControlsLeft - canvas.x  // (in Zen: beside the dot)
         // (through a property of its own: a binding of y that reads the geometry itself crashes Qt 6.7)
         readonly property real clearY: win.clearOfPills(shownFileNote, win.canvasControlsBottom - 24 - height, [viewPill, navPill])
         y: clearY
@@ -2524,8 +2610,7 @@ ApplicationWindow {
     Pane {
         id: viewPill
         objectName: "viewPill"
-        // also in full screen; presenting only the page number, for a moment (presentPageIndicator); not in the
-        // reader chrome
+        // also in full screen; presenting only the page number, for a moment (presentPageIndicator); not in Zen
         visible: !pageGrid.visible && !contentsOverview.visible && !app.presenting && !win.hudHidden && !win.phoneChrome
         /// The compact pill, in a canvas under 520 px wide (a phone, a half beside the reference or the source): undo,
         /// redo (while the tool bar is not shown: win.undoInToolBar), the page number (a tap: all pages), the contents
@@ -3067,7 +3152,7 @@ ApplicationWindow {
         objectName: "navPill"
         visible: (app.canGoBack || app.canGoForward) && !pageGrid.visible && !win.hudHidden
         anchors.left: canvas.left
-        anchors.leftMargin: (presentCornerMark.visible ? 56 : 20) + win.canvasControlsLeft - canvas.x  // (presenting, reading: beside the corner mark)
+        anchors.leftMargin: (zenDot.visible ? 56 : 20) + win.canvasControlsLeft - canvas.x  // (in Zen: beside the dot)
         readonly property real clearY: win.clearOfPills(navPill, win.canvasControlsBottom - 24 - height, [viewPill])
         y: clearY
         padding: 2
@@ -4411,8 +4496,8 @@ ApplicationWindow {
     Rectangle {
         id: fullScreenTabs
         objectName: "fullScreenTabs"
-        visible: win.chromeMode === "compact" && !app.presenting && !app.homeVisible && app.tabs.count > 1
-                 && !searchBar.visible
+        visible: win.chromeMode === "compact" && !win.zenShown && !app.presenting && !app.homeVisible
+                 && app.tabs.count > 1 && !searchBar.visible
         z: 59
         // at the top, in the middle of the window (over the notes and a reference beside them alike), below the status bar
         anchors.horizontalCenter: parent.horizontalCenter
@@ -4524,7 +4609,7 @@ ApplicationWindow {
         z: 59
         anchors.horizontalCenter: parent.horizontalCenter
         y: win.controlsTop + fullScreenTabs.height + 8
-        visible: opacity > 0 && win.chromeMode === "compact"
+        visible: opacity > 0 && win.chromeMode === "compact" && !win.zenShown
         opacity: 0
         width: Math.min(tabToastText.implicitWidth + 28, parent.width - 160)
         height: 32
@@ -4591,107 +4676,176 @@ ApplicationWindow {
             function onPresentingChanged() { if (app.presenting) presentIndicator.flash(); else presentIndicator.opacity = 0 }
         }
     }
-    // Presenting: a mark in the lower left corner; a tap (click, pen, finger) hides the controls - the floating
-    // toolbox - or shows them again, as Ctrl+F5 does (qt/present-clean). While the controls show it is clearly there
-    // (a dot of the accent color in a ring; it pulses once when presenting starts), while they are hidden it is faint,
-    // barely there on a projector. Its name ("Hide the tools" / "Show the tools") on hover and while a finger is held
-    // on it (letting go then does not tap it). The target around it is a finger wide.
-    // In the reader chrome (no HUD) it is the way back to the chrome, the same field.
+    // --- Zen (qt/docs/zen.md) ----------------------------------------------------------------------------------------
+    // Zen's only mark: a small faint dot in the lower left corner of the page (10 px; faint after 2 s, clearer while the
+    // mouse or the pen is near), a finger-wide target, clear of the safe area. A tap opens its pill beside it.
+    // (Presenting with the controls has none: Ctrl+F5 or the floating toolbox's ⋯ hide them.)
     AbstractButton {
-        id: presentCornerMark
-        objectName: "presentCornerMark"
-        readonly property bool reading: !app.presenting && win.chromeMode === "reader" && !app.homeVisible
-        visible: app.presenting || reading
+        id: zenDot
+        objectName: "zenDot"
+        visible: win.zenShown && !pageGrid.visible && !contentsOverview.visible
         z: 91
-        anchors.left: canvas.left
-        anchors.bottom: canvas.bottom
-        anchors.leftMargin: win.canvasControlsLeft - canvas.x
-        anchors.bottomMargin: canvas.y + canvas.height - win.canvasControlsBottom
+        x: win.canvasControlsLeft
+        y: win.canvasControlsBottom - height
         width: 48
         height: 48
         focusPolicy: Qt.NoFocus  // (the keys stay with the page)
         hoverEnabled: true
-        /// The controls are shown: the field is clearly visible
-        readonly property bool highlighted: app.presenting && !win.presentClean
-        readonly property bool lit: hovered || markHover.hovered || pressed
-        /// Its name (hover, a finger held on it)
-        readonly property string labelText: highlighted ? qsTr("Hide the tools") : qsTr("Show the tools")
-        property bool heldLabel: false
-        property bool heldPointer: false
-        Accessible.name: labelText
-        ToolTip.visible: heldLabel || ((hovered || markHover.hovered) && !pressed)
-        ToolTip.text: labelText
-        ToolTip.delay: heldLabel ? 0 : 600
-        /// 0 → 1 → 0 once: when presenting (or reading) starts, so the field is found
-        property real pulse: 0
-        SequentialAnimation {
-            id: pulseAnimation
-            NumberAnimation { target: presentCornerMark; property: "pulse"; from: 0; to: 1; duration: 450; easing.type: Easing.OutQuad }
-            NumberAnimation { target: presentCornerMark; property: "pulse"; to: 0; duration: 650; easing.type: Easing.InQuad }
+        Accessible.name: qsTr("Show controls, read only, the page")
+        ToolTip.visible: hovered && !pressed && !zenPill.visible
+        ToolTip.text: qsTr("Show controls, read only, the page")
+        ToolTip.delay: 600
+        /// 2 s after it showed, or after the pointer went away from it: faint
+        property bool resting: false
+        /// The mouse or the pen near it (or its pill open): clearer
+        readonly property bool near: hovered || zenNear.hovered || pressed || zenPill.visible
+        function wake() {
+            resting = false
+            restTimer.restart()
         }
-        function pulseOnce() { pulseAnimation.restart() }
-        onReadingChanged: if (reading) pulseOnce()
-        Connections {
-            target: app
-            function onPresentingChanged() { if (app.presenting) presentCornerMark.pulseOnce() }
-        }
+        onVisibleChanged: if (visible) wake()
+        onNearChanged: if (!near) wake()
+        Timer { id: restTimer; interval: 2000; onTriggered: zenDot.resting = true }
         background: null
         contentItem: Item {
-            Rectangle {  // the ring (the controls are shown), wider while it pulses
-                objectName: "presentCornerRing"
-                visible: presentCornerMark.highlighted || presentCornerMark.pulse > 0
-                readonly property real size: 22 + presentCornerMark.pulse * 18
-                x: 13 - size / 2
-                y: parent.height - 13 - size / 2
-                width: size
-                height: size
-                radius: size / 2
-                color: "transparent"
-                border.width: 2
-                border.color: Material.accentColor
-                opacity: (presentCornerMark.highlighted ? 0.55 : 0) + presentCornerMark.pulse * 0.45
-            }
             Rectangle {
-                objectName: "presentCornerDot"
-                readonly property real size: presentCornerMark.highlighted ? 12 : 6
-                x: 13 - size / 2
-                y: parent.height - 13 - size / 2
-                width: size
-                height: size
-                radius: size / 2
-                // shown: the accent color; hidden: grey, as faint on a white slide as on the black around it
-                color: presentCornerMark.highlighted ? Material.accentColor : "#9e9e9e"
+                objectName: "zenDotMark"
+                width: 10
+                height: 10
+                radius: 5
+                x: 13 - width / 2
+                y: parent.height - 13 - height / 2
+                // grey with a light rim: as faint on a white page as on the dark around it
+                color: "#80868b"
                 border.width: 1
-                border.color: "#80ffffff"
-                opacity: presentCornerMark.highlighted ? 0.95
-                         : Math.max(presentCornerMark.pulse, presentCornerMark.lit ? 0.6 : 0.14)
-                Behavior on opacity { NumberAnimation { duration: 150 } }
+                border.color: "#99ffffff"
+                opacity: zenDot.near ? 0.9 : zenDot.resting ? 0.2 : 0.6
+                Behavior on opacity { NumberAnimation { duration: 250 } }
             }
         }
-        HoverHandler { id: markHover; acceptedDevices: PointerDevice.Mouse | PointerDevice.Stylus }
-        // A finger held on it shows its name; a mouse or a pen held long still taps it
-        PointHandler { id: markFinger; acceptedDevices: PointerDevice.TouchScreen }
-        onPressAndHold: {
-            if (markFinger.active) heldLabel = true
-            else heldPointer = true
+        onClicked: zenPill.opened = !zenPill.opened
+    }
+    // Where the mouse or the pen counts as near the dot (looked through by the page: it writes there as anywhere)
+    Item {
+        objectName: "zenNear"
+        readonly property bool inputTransparent: true
+        visible: zenDot.visible
+        z: 90
+        x: zenDot.x
+        y: zenDot.y + zenDot.height - height
+        width: 128
+        height: 128
+        HoverHandler { id: zenNear; acceptedDevices: PointerDevice.Mouse | PointerDevice.Stylus }
+    }
+    // While the pill is open: a tap on the page closes it (and writes nothing)
+    MouseArea {
+        objectName: "zenPillCatcher"
+        visible: zenPill.visible
+        z: 91
+        x: canvas.x
+        y: canvas.y
+        width: canvas.width
+        height: canvas.height
+        onReleased: zenPill.opened = false
+        onCanceled: zenPill.opened = false
+    }
+    /// In Zen with read only on, a finger's tap in the middle of the page opens the pill (once it is no double tap)
+    Timer { id: zenPillDelay; interval: 380; onTriggered: if (zenDot.visible) zenPill.opened = true }
+    // The dot's pill, over the page beside the dot (the page does not move): Show controls (leaves Zen), Read only,
+    // the page number (a tap: all pages, to go to one), fit the width / the whole page
+    Pane {
+        id: zenPill
+        objectName: "zenPill"
+        property bool opened: false
+        visible: opened && zenDot.visible
+        onVisibleChanged: if (!visible) opened = false
+        z: 92
+        x: Math.min(zenDot.x + zenDot.width - 6, win.canvasControlsRight - width - 8)
+        y: Math.max(win.canvasControlsTop + 8, zenDot.y + zenDot.height - height - 4)
+        padding: 4
+        Material.foreground: "#303030"
+        background: Rectangle {
+            radius: 14
+            color: "#f7fafafa"
+            border.width: 1
+            border.color: "#33000000"
         }
-        onReleased: {
-            if (heldLabel) {
-                heldLabel = false
-            } else if (heldPointer) {
-                heldPointer = false
-                switchTools()
+        ColumnLayout {
+            spacing: 0
+            ToolButton {
+                objectName: "zenShowControls"
+                Layout.fillWidth: true
+                implicitHeight: Math.max(44, win.adaptive.minTarget)
+                text: qsTr("Show controls")
+                icon.source: app.iconUrl("xqt-eye")
+                icon.width: 22
+                icon.height: 22
+                display: AbstractButton.TextBesideIcon
+                focusPolicy: Qt.NoFocus
+                onClicked: {
+                    zenPill.opened = false
+                    win.readStarted = false  // (Read broken up: read only and full screen stay)
+                    win.setZen(false)
+                }
             }
-        }
-        onCanceled: { heldLabel = false; heldPointer = false }
-        onClicked: switchTools()
-        function switchTools() {
-            if (reading) win.chooseChrome("full")
-            else win.presentClean = !win.presentClean
+            Switch {
+                id: zenReadOnly
+                objectName: "zenReadOnly"
+                visible: win.readOnlyOffered
+                Layout.fillWidth: true
+                implicitHeight: Math.max(44, win.adaptive.minTarget)
+                text: qsTr("Read only")
+                focusPolicy: Qt.NoFocus
+                checked: win.readOnlyOn
+                onToggled: {
+                    win.readOnly = checked
+                    checked = Qt.binding(function() { return win.readOnlyOn })
+                }
+            }
+            RowLayout {
+                spacing: 2
+                ToolButton {
+                    objectName: "zenPage"
+                    Layout.fillWidth: true
+                    implicitHeight: Math.max(44, win.adaptive.minTarget)
+                    text: app.pageNumber + " / " + app.pageCount
+                    font.pixelSize: 14
+                    focusPolicy: Qt.NoFocus
+                    Accessible.name: qsTr("Go to a page")
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Go to a page (all pages)")
+                    ToolTip.delay: 600
+                    onClicked: {
+                        zenPill.opened = false
+                        pageGrid.open()
+                    }
+                }
+                IconButton {
+                    objectName: "zenFitWidth"
+                    iconName: "xqt-fit-width"
+                    implicitWidth: Math.max(44, win.adaptive.minTarget)
+                    implicitHeight: implicitWidth
+                    tip: qsTr("Fit the width")
+                    onClicked: {
+                        zenPill.opened = false
+                        app.fitWidth()
+                    }
+                }
+                IconButton {
+                    objectName: "zenFitPage"
+                    iconName: "xqt-page-single"
+                    implicitWidth: Math.max(44, win.adaptive.minTarget)
+                    implicitHeight: implicitWidth
+                    tip: qsTr("The whole page")
+                    onClicked: {
+                        zenPill.opened = false
+                        app.fitPage()
+                    }
+                }
+            }
         }
     }
-    // Reading (qt/docs/toolbox.md, "Reading"; qt/ui-rework): read only in full screen or presenting, or the reader
-    // chrome. Big fields at the left and right edges (a fifth of the page's width each, at least a finger wide, its
+    // Reading (qt/docs/zen.md): read only, anywhere. Big fields at the left and right edges (a fifth of the page's width each, at least a finger wide, its
     // whole height, invisible) turn the pages: the previous or the next one (its top; presenting: the slide). A short
     // arrow at that edge says the tap was taken. The page itself finds the taps (DocumentCanvas.edgeTapWidth,
     // edgeTapped: a tap that is no link and no note), so a swipe there scrolls as anywhere; these items only show
@@ -4759,40 +4913,77 @@ ApplicationWindow {
             FieldHint { id: nextFieldHint; objectName: "readingNextHint"; next: true }
         }
     }
-    // Read only is on: a lock in the corner where the toolbox floats says so; a tap on it gives the tools back
+    // Read only: the first stroke tried says so, once until read only is turned off, at the pen; it fades
     Rectangle {
-        id: readOnlyMark
-        objectName: "readOnlyMark"
-        visible: win.readOnlyOn && !win.cleanPage && !pageGrid.visible && !contentsOverview.visible
-        z: 60
-        x: win.controlsRight - width - 8
-        y: win.controlsTop + (fullScreenTabs.visible ? fullScreenTabs.height : 0) + 8
-        width: readOnlyButton.implicitWidth + 4
-        height: width
-        radius: width / 2
-        color: "#f2fafafa"
-        border.width: 1
-        border.color: "#40000000"
-        IconButton {
-            id: readOnlyButton
-            objectName: "readOnlyButton"
+        id: readOnlyNote
+        objectName: "readOnlyNote"
+        readonly property bool inputTransparent: true
+        /// Said in this read-only time (and how often it was said, for the tests)
+        property bool told: false
+        property int toldCount: 0
+        property point at: Qt.point(0, 0)
+        visible: opacity > 0
+        opacity: 0
+        z: 93
+        x: Math.round(Math.max(win.canvasControlsLeft + 8,
+                               Math.min(canvas.x + at.x - width / 2, win.canvasControlsRight - width - 8)))
+        y: Math.round(Math.max(win.canvasControlsTop + 8,
+                               Math.min(canvas.y + at.y - height - 24, win.canvasControlsBottom - height - 8)))
+        width: Math.min(readOnlyNoteText.implicitWidth + 28, win.canvasControlsRight - win.canvasControlsLeft - 16)
+        height: readOnlyNoteText.implicitHeight + 14
+        radius: Math.min(16, height / 2)
+        color: "#e6303134"
+        Label {
+            id: readOnlyNoteText
+            objectName: "readOnlyNoteText"
+            readonly property bool inputTransparent: true
             anchors.centerIn: parent
-            iconName: "xqt-lock"
-            checked: true
-            label: qsTr("Read only")
-            tip: win.withKeys(qsTr("Read only: the pen does not write, the edges turn the pages. Tap: write again"), "readOnly")
-            onClicked: win.readOnly = false
+            width: Math.min(implicitWidth, readOnlyNote.width - 28)
+            wrapMode: Text.Wrap
+            horizontalAlignment: Text.AlignHCenter
+            text: win.zenShown ? qsTr("Read only — tap the dot to write")
+                  : win.chromeMode === "compact" ? qsTr("Read only — ⋯ → Read only to write")
+                  : qsTr("Read only — ⋮ → View → Read only to write")
+            color: "#ffffff"
+            font.pixelSize: 14
+        }
+        function tell(pos) {
+            if (told) return
+            told = true
+            ++toldCount
+            at = pos
+            noteFade.restart()
+        }
+        SequentialAnimation {
+            id: noteFade
+            NumberAnimation { target: readOnlyNote; property: "opacity"; to: 0.95; duration: 120 }
+            PauseAnimation { duration: 2400 }
+            NumberAnimation { target: readOnlyNote; property: "opacity"; to: 0; duration: 700 }
+        }
+        Connections {
+            target: win
+            function onReadOnlyOnChanged() { if (!win.readOnlyOn) readOnlyNote.told = false }
         }
     }
-    // Esc leaves reading (a selection first loses its selection); in full screen Esc leaves full screen, and read only
-    // with it
+    // Esc leaves Zen: the pill first, a selection first loses its selection; Read ends with it (read only, and the
+    // full screen it entered). Presenting: Esc ends presenting (below).
     Shortcut {
         sequence: "Escape"
-        enabled: win.reading && !app.presenting && !win.replaying && !app.hasSelection && !app.pdfTextIsSelected
-                 && !win.sidebarDrawerOpen && !app.curtainHandles && app.snip === "" && !win.fullScreenMode
-        onActivated: win.readOnlyOn ? (win.readOnly = false) : win.chooseChrome("full")
+        enabled: win.zenShown && !app.presenting && !win.replaying && !app.hasSelection && !app.noteSelected
+                 && !app.pdfTextIsSelected && !win.sidebarDrawerOpen && !app.curtainHandles && app.snip === ""
+                 && !app.todoStamp
+        onActivated: {
+            if (zenPill.visible) {
+                zenPill.opened = false
+                return
+            }
+            if (win.readStarted) win.stopReading()
+            win.setZen(false)
+        }
     }
-    Shortcut { sequences: win.keysOf("readOnly"); enabled: !app.homeVisible && !win.textDoc && !win.replaying; onActivated: win.toggleReadOnly() }
+    // Read (Zen, read only, full screen) and Zen: their keys (changeable)
+    Shortcut { sequences: win.keysOf("readOnly"); enabled: !app.homeVisible && !win.textDoc && !win.replaying; onActivated: win.toggleReading() }
+    Shortcut { sequences: win.keysOf("zen"); enabled: !app.homeVisible; onActivated: win.setZen(!win.zenShown) }
     // Digits typed while the page is at hand: go to that page (Enter)
     PageJump {
         id: pageJump
@@ -5309,7 +5500,7 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("shortcuts"); onActivated: shortcutSheet.open() }
     // (not StandardKey.FullScreen as well: it is F11 on KDE, twice the same key is ambiguous)
     Shortcut { sequences: win.keysOf("fullScreen"); enabled: !app.homeVisible; onActivated: win.fullScreenMode = !win.fullScreenMode }
-    Shortcut { sequence: "Escape"; enabled: win.fullScreenMode && !app.hasSelection && !app.presenting && !app.curtainHandles; onActivated: win.fullScreenMode = false }
+    Shortcut { sequence: "Escape"; enabled: win.fullScreenMode && !win.zenShown && !app.hasSelection && !app.presenting && !app.curtainHandles; onActivated: win.fullScreenMode = false }
     // Presenting: F5 starts and ends it, Escape ends it (full screen stays: a second Escape leaves that too)
     Shortcut {
         sequences: win.keysOf("present")

@@ -57,3 +57,6 @@ style, after Lucide's `replace`.
 `xqt-tag` is Lucide's `tag`: the library's **Tags** tab and a document's "Tags…" (qt/docs/tags.md).
 
 `xqt-moon` is Lucide's `moon`: dark pages (qt/docs/dark-pages.md).
+
+`xqt-zen` (a page with a small dot in its lower left corner: Zen, only the page and the dot; qt/docs/zen.md) is drawn
+in the same style.

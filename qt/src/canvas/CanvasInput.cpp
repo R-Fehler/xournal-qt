@@ -692,6 +692,9 @@ bool CanvasInput::actionStart(const Event& event) {
     const bool laser = toolType == TOOL_LASER_POINTER_PEN || toolType == TOOL_LASER_POINTER_HIGHLIGHTER;
     this->readOnlyPress = (view.getSession().isReadOnly() || (view.isReadingOnly() && !readingTool)) &&
                           toolType != TOOL_HAND && !laser && !snipping;  // (a snip only reads)
+    // (the window's read only: a stroke tried with a writing tool is told once, CanvasView::writingRefused)
+    this->refusedPress =
+            this->readOnlyPress && view.isReadingOnly() && !view.getSession().isReadOnly() && !view.replay();
     if (view.replay() && !snipping) {
         this->readOnlyPress = true;  // replaying (qt/docs/timeline.md): every tool scrolls, a tap goes to its moment
     }
@@ -1007,10 +1010,14 @@ bool CanvasInput::actionEnd(const Event& event) {
     }
     if (std::exchange(this->readOnlyPress, false)) {
         // A read-only document: nothing was written; a tap may be a link, else at an edge it turns the page
-        if (isClick(event) && !view.tapAt(event.viewPos)) {
+        const bool click = isClick(event);
+        if (click && !view.tapAt(event.viewPos)) {
             view.edgeTap(event.viewPos);
         } else if (view.getViewController().snapping()) {
             view.getViewController().endScroll({});  // (dragged: to rest on a page)
+        }
+        if (std::exchange(this->refusedPress, false) && !click) {
+            Q_EMIT view.writingRefused(event.viewPos);  // (a stroke tried on a page for reading only)
         }
         this->sequenceStartPage = nullptr;
         this->inputRunning = false;
@@ -1683,10 +1690,12 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
                            std::hypot(touchSessionStartPos.x() - lastTapPos.x(),
                                       touchSessionStartPos.y() - lastTapPos.y()) <= DOUBLE_TAP_PX) {
                     view.doubleTapAt(touchSessionStartPos);
+                    view.middleTap(touchSessionStartPos, 2);
                     lastTapMs = 0;
                 } else {
                     lastTapMs = now;
                     lastTapPos = touchSessionStartPos;
+                    view.middleTap(touchSessionStartPos, 1);  // (reading: the window may open its pill)
                 }
             } else {
                 QPointF v;

@@ -115,6 +115,7 @@ private:
     // pen / mouse state (upstream PenInputHandler members)
     bool deviceClassPressed = false;
     bool readOnlyPress = false;  ///< a press on a read-only document: it only scrolls (and a tap follows a link)
+    bool refusedPress = false;   ///< ... a press of a writing tool on a view for reading only (CanvasView::writingRefused)
     bool textPress = false;      ///< a press on a text file edited (CanvasView::textMode): cursor, drag selects
     bool modifier2 = false;  ///< first barrel button (upstream: button 2)
     bool modifier3 = false;  ///< second barrel button (upstream: button 3)

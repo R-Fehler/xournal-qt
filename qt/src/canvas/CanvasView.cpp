@@ -2611,6 +2611,12 @@ bool CanvasView::edgeTap(QPointF viewPos) {
     return true;
 }
 
+void CanvasView::middleTap(QPointF viewPos, int count) {
+    if (readingOnly && !replaying && edgeTapWidth > 0) {
+        Q_EMIT middleTapped(viewPos, count);
+    }
+}
+
 // --- the replay of the timeline -------------------------------------------------------------------------------------
 
 void CanvasView::rerenderDrawnPages() {

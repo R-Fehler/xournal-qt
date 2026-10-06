@@ -8161,10 +8161,10 @@ TEST_F(MainWindowTest, presentingGoesPageByPageAndBackToEditing) {
     EXPECT_FALSE(window->property("fullScreenMode").toBool()) << "the second Escape leaves full screen";
 }
 
-// qt/present-clean: Ctrl+F5 presents without controls: no floating toolbox, no page number, only a faint
-// mark in the lower left corner, a finger wide. A tap on it (finger or mouse) brings the controls back, another hides
-// them; Ctrl+F5 does the same while presenting. The keys and the pen work as ever. Escape ends it; F5 presents with
-// the controls. The mark is not there outside presenting.
+// qt/present-clean, qt/zen: Ctrl+F5 presents without controls - presenting in Zen: no floating toolbox, no page
+// number, only the Zen dot in the lower left corner, a finger wide. A tap on it (finger or mouse) opens its pill, whose
+// "Show controls" brings the controls back; Ctrl+F5 hides and shows them while presenting. The keys and the pen work as
+// ever. Escape ends it; F5 presents with the controls, and no dot.
 TEST_F(MainWindowTest, presentingWithoutControls) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
@@ -8178,12 +8178,15 @@ TEST_F(MainWindowTest, presentingWithoutControls) {
         wait(30);
     };
     auto* square = find<QQuickItem>("toolbox");  // (floating while presenting with the controls)
-    auto* mark = find<QQuickItem>("presentCornerMark");
+    auto* dot = find<QQuickItem>("zenDot");
+    auto* pill = find<QQuickItem>("zenPill");
     auto* number = find<QQuickItem>("presentPageIndicator");
     ASSERT_NE(square, nullptr);
-    ASSERT_NE(mark, nullptr);
+    ASSERT_NE(dot, nullptr);
+    ASSERT_NE(pill, nullptr);
     ASSERT_NE(number, nullptr);
-    EXPECT_FALSE(mark->isVisible()) << "no mark while editing";
+    EXPECT_EQ(findItem("presentCornerMark"), nullptr) << "presenting's own corner field is gone (the Zen dot)";
+    EXPECT_FALSE(dot->isVisible()) << "no dot while editing";
     auto clean = [&] { return window->property("presentClean").toBool(); };
 
     key(Qt::Key_F5, Qt::ControlModifier);
@@ -8191,31 +8194,31 @@ TEST_F(MainWindowTest, presentingWithoutControls) {
     ASSERT_TRUE(controller->presenting());
     wait(100);
     EXPECT_TRUE(clean());
+    EXPECT_TRUE(window->property("zen").toBool()) << "presenting in Zen";
     EXPECT_TRUE(view->isPresenting());
     EXPECT_FALSE(square->isVisible()) << "no toolbox";
     EXPECT_FALSE(number->isVisible()) << "not even the page number";
     EXPECT_FALSE(find<QQuickItem>("viewPill")->isVisible());
     EXPECT_FALSE(find<QQuickItem>("fullScreenTabs")->isVisible());
-    ASSERT_TRUE(mark->isVisible()) << "the mark in the corner";
+    ASSERT_TRUE(dot->isVisible()) << "the dot in the corner";
 
-    // In the lower left corner, a finger wide; what shows of it is a few faint pixels
-    const QRectF target = mark->mapRectToScene(QRectF(0, 0, mark->width(), mark->height()));
+    // In the lower left corner, a finger wide; what shows of it is a small dot, faint after 2 s
+    const QRectF target = dot->mapRectToScene(QRectF(0, 0, dot->width(), dot->height()));
     EXPECT_GE(target.width(), 40);
     EXPECT_GE(target.height(), 40);
     EXPECT_NEAR(target.left(), 0, 1);
     EXPECT_NEAR(target.bottom(), window->contentItem()->height(), 1);
-    auto* dot = findItem("presentCornerDot");
-    ASSERT_NE(dot, nullptr);
-    EXPECT_LE(dot->width(), 8);
-    EXPECT_LE(dot->opacity(), 0.2) << "barely there";
+    auto* mark = findItem("zenDotMark");
+    ASSERT_NE(mark, nullptr);
+    EXPECT_LE(mark->width(), 12);
+    until([&] { return mark->opacity() <= 0.21; }, 4000);
+    EXPECT_LE(mark->opacity(), 0.21) << "barely there";
     // The pointer over it: clearer
     const QPoint markCenter = target.center().toPoint();
     QTest::mouseMove(window, markCenter);
-    until([&] { return dot->opacity() > 0.4; }, 2000);
-    EXPECT_GT(dot->opacity(), 0.4);
+    until([&] { return mark->opacity() > 0.4; }, 2000);
+    EXPECT_GT(mark->opacity(), 0.4);
     QTest::mouseMove(window, canvasItem->mapToScene(QPointF(canvasItem->width() / 2, 40)).toPoint());
-    until([&] { return dot->opacity() < 0.2; }, 2000);
-    EXPECT_LE(dot->opacity(), 0.2);
 
     // The keys page, the pen writes
     key(Qt::Key_Space);
@@ -8233,24 +8236,30 @@ TEST_F(MainWindowTest, presentingWithoutControls) {
     settle();
     EXPECT_EQ(strokes(), before + 1) << "written";
 
-    // A finger taps the mark: the controls are back, still presenting
+    // A finger taps the dot: its pill; "Show controls": the controls are back, still presenting
     static QPointingDevice* finger = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
     QTest::touchEvent(window, finger).press(0, markCenter);
     QTest::touchEvent(window, finger).release(0, markCenter);
+    until([&] { return pill->isVisible(); });
+    ASSERT_TRUE(pill->isVisible()) << "the dot's pill";
+    auto* show = findItem("zenShowControls");
+    const QPoint showAt = show->mapToScene(QPointF(show->width() / 2, show->height() / 2)).toPoint();
+    QTest::touchEvent(window, finger).press(0, showAt);
+    QTest::touchEvent(window, finger).release(0, showAt);
     wait(50);
     EXPECT_FALSE(clean());
     EXPECT_TRUE(controller->presenting());
     EXPECT_TRUE(square->isVisible()) << "the toolbox is back";
-    EXPECT_TRUE(mark->isVisible()) << "the mark stays, to hide them again";
-    EXPECT_EQ(strokes(), before + 1) << "the tap did not write";
+    EXPECT_FALSE(dot->isVisible()) << "with the controls: no dot";
+    EXPECT_EQ(strokes(), before + 1) << "the taps did not write";
     key(Qt::Key_Space);
     settle();
     EXPECT_EQ(controller->pageNumber(), 3) << "the keys stay with the page";
-    // Another tap (the mouse this time): hidden again
-    click(mark);
+    // Ctrl+F5 while presenting hides and shows them
+    key(Qt::Key_F5, Qt::ControlModifier);
     EXPECT_TRUE(clean());
     EXPECT_FALSE(square->isVisible());
-    // Ctrl+F5 while presenting does the same
+    EXPECT_TRUE(dot->isVisible());
     key(Qt::Key_F5, Qt::ControlModifier);
     EXPECT_FALSE(clean());
     EXPECT_TRUE(square->isVisible());
@@ -8259,26 +8268,27 @@ TEST_F(MainWindowTest, presentingWithoutControls) {
     EXPECT_TRUE(clean());
     EXPECT_FALSE(square->isVisible());
 
-    // Escape ends presenting: full-screen editing with its tools, no mark
+    // Escape ends presenting: full-screen editing with its tools, no dot
     key(Qt::Key_Escape);
     EXPECT_FALSE(controller->presenting());
     EXPECT_FALSE(clean());
+    EXPECT_FALSE(window->property("zen").toBool()) << "presenting's Zen ends with it";
     EXPECT_TRUE(window->property("fullScreenMode").toBool());
     EXPECT_TRUE(square->isVisible());
-    EXPECT_FALSE(mark->isVisible());
+    EXPECT_FALSE(dot->isVisible());
 
-    // F5: with the controls (a clean presentation is not remembered), and the mark to hide them
+    // F5: with the controls (a clean presentation is not remembered), no dot
     key(Qt::Key_F5);
     ASSERT_TRUE(controller->presenting());
     wait(50);
     EXPECT_FALSE(clean());
     EXPECT_TRUE(square->isVisible());
-    EXPECT_TRUE(mark->isVisible());
+    EXPECT_FALSE(dot->isVisible());
     key(Qt::Key_Escape);
     key(Qt::Key_Escape);
     EXPECT_FALSE(controller->presenting());
     EXPECT_FALSE(window->property("fullScreenMode").toBool());
-    EXPECT_FALSE(mark->isVisible());
+    EXPECT_FALSE(dot->isVisible());
 }
 
 // qt/present-clean: holding the presentation button (or a right click on it, or ⋮ → "Present without controls")
@@ -8318,7 +8328,7 @@ TEST_F(MainWindowTest, presentButtonHeldPresentsWithoutControls) {
     ASSERT_TRUE(controller->presenting());
     EXPECT_TRUE(clean()) << "held: only the page";
     EXPECT_FALSE(find<QQuickItem>("toolbox")->isVisible());
-    EXPECT_TRUE(find<QQuickItem>("presentCornerMark")->isVisible());
+    EXPECT_TRUE(find<QQuickItem>("zenDot")->isVisible());
     back();
 
     // Right click

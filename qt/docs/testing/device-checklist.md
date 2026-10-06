@@ -3803,3 +3803,40 @@ phone or Settings → Pen → Tools' choice describe what is gone; check the too
 - [ ] The laser pointer while presenting: the toolbox's laser entry (among the first tools) on the floating rail; its
       editor chooses pen or highlighter. Curtain and spotlight: the setsquare button held, on the floating rail.
 - [ ] Settings → Pen → Colors: under the palette's colors its source ("From: Open Color (MIT) …" for Marker).
+
+## Zen and read only (qt/zen, 0.8.0)
+
+Items above that mention the reader chrome, Settings → Display → "Controls at this size", the lock in the corner of
+read only, or presenting's corner field (the accent dot in a ring, its pulse, "Hide the tools" / "Show the tools" on
+it) describe what is gone; check Zen's dot instead.
+
+- [ ] ⋮ → View → Zen (and Ctrl+Alt+Z with a keyboard): only the page; no toolbox, tool bar, tabs, sidebar arrow or
+      page pill. A small grey dot in the lower left corner of the page, clearly there for 2 s, then barely visible
+      (about 20 %) on a white page and on the dark around it. The mouse or the pen hovering near the corner (about 2 cm
+      around it) makes it clearer; moving away, it fades again after 2 s.
+- [ ] In Zen the pen writes as before; P, H, E and T (a keyboard cover) take the pen, highlighter, eraser and text box.
+      Writing right next to the dot works (only the dot's own finger-sized square does not draw).
+- [ ] Tap the dot with a finger (about 1 cm around it counts), the pen and the mouse: the pill opens beside it, over the
+      page; the page does not move. Its entries: Show controls (everything back), Read only (a switch), the page number
+      (all pages; pick one: there, back in Zen), fit the width, the whole page. A tap on the page closes the pill and
+      draws nothing (finger, pen, mouse). Esc closes it, Esc again leaves Zen.
+- [ ] Fold 7 folded, unfolded, and a phone with gesture navigation: the dot and its pill sit above the gesture bar and
+      clear of a cut-out held sideways; the pill fits the cover screen.
+- [ ] Split screen or Android's pop-up view (under 360 px): Zen comes by itself. Show controls: the phone chrome; make
+      the window tiny again: it stays without Zen (remembered). ⋮ → View → Zen there: automatic again.
+- [ ] ⋮ → View → Read only in a window with all tools shown: the tools stay; drag the pen over the page: it scrolls, no
+      ink, and a dark note at the pen says "Read only — ⋮ → View → Read only to write", once; a second stroke shows
+      nothing. Turn read only off and on: the note comes once again. No lock anywhere. The left and right edges turn the
+      pages; PDF text can still be selected and copied.
+- [ ] Read (Ctrl+Alt+R or ⋮ → View → Read): full screen, Zen and read only; the pen's first stroke: "Read only — tap the
+      dot to write". A finger's tap in the middle of the page opens the dot's pill; a double tap there still zooms
+      (no pill). Ctrl+Alt+R again: everything back as before; Esc does the same.
+- [ ] Present without controls (Ctrl+F5, hold Present): only the slide and the faint dot (look at it on a projector:
+      barely there); its pill's Show controls: presenting with the floating toolbox and no dot; Ctrl+F5 hides them
+      again. Present (F5): no dot at all. With two screens the dot is on the console only.
+- [ ] Settings → Shortcuts: "Zen (only the page)" on Ctrl+Alt+Z and "Read (Zen, read only, full screen)" on
+      Ctrl+Alt+R (kept if you had changed it in 0.7.0); other keys given there work. Ctrl+Alt+Z does nothing else on
+      KDE, GNOME and Windows.
+- [ ] Settings → Display → Window size: no "Controls at this size" any more. An update from 0.7.0 with the reader or the
+      compact chrome chosen for a size: the full chrome there; Zen in a tiny window, unless the reader had been left
+      there in 0.7.0 (then not, as before).
