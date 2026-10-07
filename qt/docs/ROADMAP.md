@@ -81,7 +81,7 @@
   - Markdown boxes: write Markdown on a page (or beside it) and see it formatted while typing; it flows onto the next
     pages, its headings are chapters, the search finds it where it is drawn, and it is stored as ordinary Xournal++
     text in a layer "Markdown". See [markdown-boxes.md](markdown-boxes.md).
-  - Text mode (Ctrl+Alt+E): type the page's text like in a word processor (headings, lists, per-paragraph bold / italic / size / color, markdown shortcuts), stored as Xournal++ text elements in a layer "Text" and read back; one undo step. See [text-mode.md](text-mode.md).
+  - Text mode (Ctrl+Alt+E): type the page's text like in a word processor (headings, lists, per-paragraph bold / italic / size / color, markdown shortcuts), stored as Xournal++ text elements in a layer "Text" and read back; one undo step. (Removed in 0.9.0: Markdown on the page replaced it.)
   - Downloads folder as a quick library (import warning); Copy to / Move to another library.
 - **Search with short texts** (user report: a one-letter search in a large document could crash): texts shorter than 4 characters are searched on Enter or a tap on the search icon only (document, tab overview, library). A one-letter search in a 300-page PDF (207k hits) peaked at ~1 GB: the sidebar and page grid made one QML item per hit. Thumbnails now show at most 50 marks per page, spread over it (the count badge stays exact): ~260 MB.
 - **Tab strip with many tabs:** the tabs use the whole width before they scroll, and the + button stays at the right end (the list and the spacer used to share the room).
@@ -539,9 +539,8 @@
   is gone (a stored value is ignored); the source beside the page is the writing button's menu or Ctrl+Alt+M.
 
 - **The text mode is deprecated (2026-09-26, the author).** Markdown written on the page does what it did and more:
-  the writing button writes Markdown only, its menu has no "Text mode", Ctrl+Alt+E is gone. The code
-  (`TextFlowPanel.qml`, `TextFlow.*`) and its tests stay for now, marked DEPRECATED; its text on existing pages is
-  ordinary text the text tool still edits. Also: pictures pasted into a `.md` with blanks in its name are linked
+  the writing button writes Markdown only, its menu has no "Text mode", Ctrl+Alt+E is gone (its code went in 0.9.0,
+  `qt/compat-dead`); its text on existing pages is ordinary text the text tool still edits. Also: pictures pasted into a `.md` with blanks in its name are linked
   encoded (`my%20notes.assets/…`), so they resolve.
 
 - **Links with the mouse, their address on hover, `qt/link-hover` (2026-09-26).** A mouse click (press and release

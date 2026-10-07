@@ -37,8 +37,7 @@ Every task line is read into the library index (`LibraryIndex::todos()`, `todoCh
 page (the order of `md::boxesOf`: the Markdown layer's boxes, then the sticky notes' texts), the line in the box,
 the text after the check box as written, done or open, the due date, whether it is a stamp, and where its box is
 (for a stamp: where its check box is drawn). All task lines are stored, whatever the setting, so changing the
-setting needs no new read. Entries indexed before to-dos were (no `todos` in the pack) are read once more, without
-their PDF text; plain PDFs are not (they have no Markdown of ours).
+setting needs no new read.
 
 A to-do is found again in its document by its **text and occurrence** (how many task lines of the document before
 it have the same text): page and box numbers change when pages and boxes move, the text rarely does. If it is not

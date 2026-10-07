@@ -87,9 +87,7 @@ address, and opens through the same confirmation as Scholar.
    - and, already there, the first page's text.
 
    Both are read where the index reads the PDF's text (`LibraryIndex::read`, the worker thread), from a poppler
-   instance of its own (`qt/src/session/PdfTitle.*`), and tied to the PDF's stamp like its text. **No format bump**:
-   an entry written before has no `title` key, and only its title is read, once (the PDF opened, its first page's
-   text attributes; not the document, not its text), so an existing library is not read anew. A Markdown file's
+   instance of its own (`qt/src/session/PdfTitle.*`), and tied to the PDF's stamp like its text. A Markdown file's
    title is its first heading (from the index, nothing stored).
 3. **Matching** (`LibraryIndex::findTitle`, on a worker thread): the words of the guessed title (case folded as the
    search folds them, without stop words of English and German) are compared with each candidate - the `/Title`,
@@ -179,8 +177,7 @@ address, and opens through the same confirmation as Scholar.
 As planned above, with these details:
 - The look-up menu is `LookUpMenu.qml`, opened by the magnifier of the PDF text pill and by "Look up…" of the
   context pill (both also in the reference). Our own text is the selection of a Markdown box, a text element or a
-  `.md` on the page (`CanvasView::selectedText`); the Markdown source beside the page and text-mode documents
-  (`TextFlowEditor`) have no look-up yet.
+  `.md` on the page (`CanvasView::selectedText`); the Markdown source beside the page has no look-up yet.
 - The confirmation (`WebConfirm.qml`) shows the exact, escaped address; the menu shows it decoded to be read
   (`Citations::displayUrl`).
 - The paper of a reference: `FindPaperSheet.qml`; matching on a worker thread from a snapshot of the index entries
@@ -190,7 +187,7 @@ As planned above, with these details:
 - The searches of selected text (qt/selection-search): `LookUpMenu.qml` calls `win.searchInDocument`
   (opens the search bar, sets `app.searchQuery`: the bar follows a search set from elsewhere), `win.searchOpenTabs`
   (`TabOverview.searchFor`) and `win.searchLibraryFor` (`HomeView.searchFor`). The Markdown source beside the page
-  and text-mode documents have no look-up menu, so no searches either.
+  has no look-up menu, so no searches either.
 - Tests: `CitationTest` (session: queries, addresses, every web search engine, a custom search address and its
   validation, the 200-character cut, the escaping), 15 real bibliography entries, title words and scores, arXiv
   IDs, the saved Atom answers, download names), `CitationLibraryTest` and `ArxivTest` (shell: titles in the index,

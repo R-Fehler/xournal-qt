@@ -13,6 +13,19 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
 
 ---
 
+## Refactoring round of 2026-10 ([qt/docs/review/2026-10/README.md](qt/docs/review/2026-10/README.md))
+
+### `qt/compat-dead` (wave 1)
+- [x] Compatibility with xournal-qt's own older data removed (library cache FORMAT 5, toolbox v1, classic tool bar
+  migration, 0.7.0 chrome, once-flags, text-document bookmarks, HybridPdf's files without a layer record, unscaled
+  page margins). Left: the read of packs from the other cache location (shell review §4 #15: kept, it also serves
+  read-only folders with a cache of their own; the author decides).
+- [x] The deprecated text mode removed (`TextFlow*`, `TextFlowPanel`); `PageMargins` serves the margins.
+- [x] The text tool always writes Markdown (`textMarkdown` gone); ordinary Xournal++ texts are edited as they are.
+  Left: a Markdown box written while recording is not tied to the recording (plain texts were).
+- [x] Dead code of the five reviews removed. Left: the test-only members of app-cpp §3.2(b) and the test-only counters
+  (they move with their feature blocks), making shell's file-internal functions private (shell §3).
+
 ## Order of work (2026-09-23)
 
 `qt/render-visible` and `qt/ui-polish` are merged (2026-09-24, see ROADMAP).
@@ -1054,6 +1067,10 @@ fit two pages side by side when unfolded. I would maybe put this into settings a
 - [ ] A test leaves a settings file named `non-existing-file-path` in the current folder (found by `qt/timeline`,
   2026-10-05, in its worktree root): a test writes to the working directory instead of a temporary folder. Find it
   and point it at a temporary path.
+- [ ] `PageFilesTest.aProtectedDocumentIsExtractedProtectedAndNeverAsXopp` fails about 1 in 3 runs alone (6 of 20 on
+  the base of `qt/compat-dead`, 2026-10-07, so not from it): extracting pages of the protected `locked.pdf` reads it
+  with the wrong key at times (qpdf: "/Perms field in encryption dictionary doesn't match expected value", then the
+  extraction reports an error). A race on the password of the file (PdfEncryption) or on the clean copy; find it.
 - [ ] `StickerFileTest.thePictureBehindLiesAtTheBottom` fails in the full session run and passes alone (depends on
   test order; `qt/timeline`, 2026-10-05, also on master-qt's build).
 

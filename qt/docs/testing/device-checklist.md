@@ -3276,8 +3276,6 @@ to it (not mirrored); under X11 and Wayland (KDE, GNOME) and on Windows.
       `#idea`, a `.md` with an Obsidian front matter (`tags: [project]`) and a PDF from Zotero or arXiv with keywords:
       after indexing, every one of them has its tags (the Tags tab, the cards); `C#`, `page#3`, `#1984`, `# Heading`
       and `#tags` in code blocks are none.
-- [ ] A library indexed by an older build: the documents are read once more (the indexing line counts them), plain
-      PDFs only for their keywords (quickly); the next start reads nothing.
 
 ## Tags: the search (qt/tags)
 - [ ] The library's search, Fuzzy on: `tag:course` lists the documents with `#course` and `#course/…` (also a PDF
@@ -3940,3 +3938,18 @@ folding describe what is gone: the rail scrolls now.
       (the zoom pill), but on the unfolded Fold the two pages still fit whole (it stops lower, as low as they need).
       Set 5 %: an A4 page shrinks to a stamp. A zoom below a newly raised value comes up to it at once.
 - [ ] The setting survives a restart.
+
+## No compatibility with earlier pre-releases; Markdown only (qt/compat-dead, 0.9.0)
+
+- [ ] Start with the settings and a library of 0.8.0: the app starts, the toolbox keeps its arrangement; the library
+      reads its documents once (the progress shows), then the second start reads nothing. Cards, kinds (text
+      documents, PDFs with notes), tags, to-dos and bookmarks are all there again after that first read.
+- [ ] Settings → Shortcuts: Read is Ctrl+Alt+R and works; a key chosen for it now is kept after a restart.
+- [ ] A fresh profile (no settings file): snapping to the grid is off and the pen's side buttons erase; switch
+      snapping on, restart: it stays on.
+- [ ] The text tool on an empty place makes a Markdown text box (formatted when done); on a text box of a Xournal++
+      file (open one made in Xournal++) it edits that text as it is (font and size unchanged, no Markdown formatting),
+      and the file opens in Xournal++ afterwards with the edited text.
+- [ ] T and the toolbox's text entry: always Markdown, whatever was chosen before.
+- [ ] A PDF with notes from an earlier pre-release: the first Ctrl+S is a full write (a moment longer), the next ones
+      are fast (appended).

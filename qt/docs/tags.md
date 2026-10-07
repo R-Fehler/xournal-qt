@@ -30,8 +30,7 @@ Each document's tags go into its folder's small "notes" pack (`LibraryIndex`, as
 of its text) and `pdfTags` (its PDF's keywords, kept with the PDF's stamp: a `.xopp` saved again does not read its PDF
 again; a PDF with notes, whose stamp changes with every save, has its keywords read again with qpdf, only the trailer
 and the document information). `LibraryIndex::tagged()`, `tagsOf()`, `textTagsOf()`, `hasTag()` and `tagChanges()`
-are what the views and the search use. Entries indexed before tags were (no `tags` in the pack) are read once more
-without their PDF text; a plain PDF only for its keywords.
+are what the views and the search use.
 
 ## The library
 

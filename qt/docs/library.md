@@ -65,11 +65,7 @@ the tooltip and the accessible name say it in words):
   while the index reads the PDF anyway: opening a PDF reads our marker in its catalog (qpdf reads the trailer, the
   cross-reference table, the catalog and the marker, not the pages or the embedded files), which says whether it is
   a PDF with notes, an archive PDF, and whether it carries a `name.md` (listed in the marker's `/Files`): a text
-  document. The marker is remembered per file version, so the kind costs no second read. A PDF with notes written by
-  a build before it carried `name.md` is a text document when the document it carries starts with the page's
-  Markdown text (the index has it open then).
-- Entries written before kinds were kept get only the kind read, once (the marker; no document, no text): as the
-  titles of qt/citations, without a format bump.
+  document. The marker is remembered per file version, so the kind costs no second read.
 - A PDF changed by another program keeps its last kind until the index has read it again (its stamp changed). A
   document saved in the app (into a PDF, a new text document, "Open as PDF document", a conversion) is read again by
   the index at once, and its card follows.
@@ -80,8 +76,7 @@ the tooltip and the accessible name say it in words):
   busy with other builds): before, "Only PDFs with notes" looked into each lone PDF on the UI thread, 34 ms for small
   generated PDFs and **361 ms** for copies of a 1.3 MB, 200-page manual the first time (then about 1 ms, remembered
   per file version and up to 4,096 files); now turning the filter on takes 7 ms in all (the listing and the look-ups),
-  and no PDF is looked into. Reading only the kind of an entry from before costs 0.1–1.3 ms per PDF, on the index's
-  worker.
+  and no PDF is looked into.
 - **Text and code files** (`.txt`, `.tex`, `.py`, `.cpp`, `.h`, `.json`, `.csv`, `.org`, `.rst`, `.yaml`, `.toml`,
   `.sh`, and many more, also `Makefile`, `README`, … without an extension) and **all other files** (Office files and
   the rest) are items too, each known by its whole file name (`report.docx`), when the library's "Show" filter shows
@@ -311,9 +306,8 @@ when the library is closed.
 
 **Entries that survive a copy.** Each `notes.pack` entry also keeps a content hash (BLAKE2b-256) of its own file
 (`sha`: the `.xopp`, the Markdown file, the lone PDF or image) and of the PDF it uses (`pdfSha`). They are computed in
-the background after the documents are indexed (`LibraryIndex::fillHashes`; entries of before get them once, at the
-first update after this build, which reads every indexed file once more; a document saved in the app gets its hash at
-the next update). When a document has an entry whose file has the same name and size but **another time** (a library
+the background after the documents are indexed (`LibraryIndex::fillHashes`; a document saved in the app gets its hash
+at the next update). When a document has an entry whose file has the same name and size but **another time** (a library
 copied by hand, unzipped by any app, synced by an app that does not keep times), the file's hash is computed and
 compared: the same content takes the entry over with the new stamps (`LibraryIndex::adopt`), and its handwriting
 (`InkTextStore::restamp`) and its stored preview (`PreviewCache::adopt`) follow; nothing is read again and nothing is
@@ -325,15 +319,7 @@ implementation, which is why it is not used).
 **Reading positions are not cache.** The title page and the page each document was left at (and when it was last
 read) are kept in the config folder, `~/.config/xournal-qt/libraries/<key of the library>/pages.json`, by the
 document's path in the library: renaming and moving in the app take them along, and removing the cache folders
-keeps them. The `pages.json` of a library's `.xournal_library/` from before is taken over the first time. (A library
-folder moved or renamed outside the app gets another key and starts without them.)
-
-**The layout before the packs** (until 2026-09: everything in the root's `.xournal_library/`: `index/` with one JSON
-file per document, `previews/` with one PNG per document, `pages.json`) is converted when such a library is opened,
-in the background before indexing: the entries and previews go into the packs of their folders (nothing is read
-again; entries of documents changed since are read as usual), the reading positions into the config folder. Only
-when all packs are written are `index/`, `previews/` and `pages.json` removed, nothing else. A read-only library's old
-cache in `~/.cache/xournal-qt/libraries/<key>/` is converted the same way.
+keeps them. (A library folder moved or renamed outside the app gets another key and starts without them.)
 
 **The search index** is what the library search searches. A background thread keeps it up to date, one document at
 a time:
@@ -347,15 +333,16 @@ a time:
   along;
 - moved or renamed by another program: a folder keeps its cache; a document without an entry takes over the entry
   of a file that is gone (in any folder) whose own file has the same size and time (a `.xopp`, a Markdown file, an
-  image, a text file; a PDF alone: the PDF) and either the same name or the same sample (entries written before
-  the sample only by name): nothing is read, whatever it is called now. If the PDF it uses changed, only that is
+  image, a text file; a PDF alone: the PDF) and the same sample (of those, the one with the same name first): nothing
+  is read, whatever it is called now. If the PDF it uses changed, only that is
   read again. Otherwise a renamed `.xopp` takes over the PDF text of an entry of the same PDF (same size and time),
   only the `.xopp` is read. So the order does not matter when the library looks at a folder before the app has told
   the index about a move it made (the file system watcher) — the move then finds nothing left to do;
 - a document that is moved while the index is looking at it (found on disk, then gone): its entry stays as it was,
   for the move;
 - a document that is gone: its entry is removed;
-- an older index format: everything is read once.
+- packs of another format (`LibraryIndex::FORMAT`, an earlier pre-release's cache): not read; every document is
+  read once and the packs are written over. Nothing of an older cache is converted.
 
 Unsaved changes of open documents are not in the index (it reads the files). A document saved in the app hands its
 entry over (made from the document in memory and the PDF text its search knows), so the index does not read the
