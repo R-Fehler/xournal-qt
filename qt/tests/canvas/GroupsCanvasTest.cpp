@@ -40,6 +40,7 @@
 
 #include "CanvasInput.h"
 #include "CanvasPage.h"
+#include "CanvasTime.h"
 #include "CanvasView.h"
 
 using namespace xqt;
@@ -53,6 +54,7 @@ protected:
                                            fs::path(tmp.filePath("settings.xml").toStdString()), 2);
         session = std::make_unique<DocumentSession>(*app);
         view = std::make_unique<CanvasView>(*session);
+        view->setClock(clock);
         view->getViewController().setViewSize(QSizeF(1000, 1200));
         input = std::make_unique<CanvasInput>(*view);
         processEvents();
@@ -64,14 +66,8 @@ protected:
         app.reset();
     }
 
-    void processEvents(int ms = 30) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-            app->getRenderService()->waitForIdle();
-        }
-    }
+    /// `ms` pass on the canvas's clock, the event loop and the renders run meanwhile (no real time passes)
+    void processEvents(int ms = 30) { test::passTime(clock, *app, ms); }
 
     Layer* layer(size_t page = 0) const { return session->getDocument()->getPage(page)->getSelectedLayer(); }
 
@@ -135,6 +131,7 @@ protected:
         processEvents();
     }
 
+    ManualClock clock;  ///< the canvas's time (CanvasTime.h): the tests move it on
     QTemporaryDir tmp;
     QPointingDevice mousePointer{"test mouse", 1005, QInputDevice::DeviceType::Mouse,
                                  QPointingDevice::PointerType::Generic, QInputDevice::Capability::Position, 3, 3};

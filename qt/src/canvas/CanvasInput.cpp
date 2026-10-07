@@ -5,7 +5,6 @@
 #include "PenHover.h"
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 
 #include <QGuiApplication>
@@ -60,11 +59,6 @@ constexpr guint32 MIDDLE_CLICK_MS = 500;
 /// How long a finger or the pen is held still for what can be done here
 constexpr int LONG_PRESS_MS = 500;
 
-double monotonicMs() {
-    using namespace std::chrono;
-    return duration<double, std::milli>(steady_clock::now().time_since_epoch()).count();
-}
-
 GdkModifierType toGdkModifiers(Qt::KeyboardModifiers m) {
     int s = 0;
     if (m & Qt::ShiftModifier) s |= GDK_SHIFT_MASK;
@@ -75,11 +69,11 @@ GdkModifierType toGdkModifiers(Qt::KeyboardModifiers m) {
 }
 }  // namespace
 
-CanvasInput::CanvasInput(CanvasView& view, QObject* parent): QObject(parent), view(view) {
+CanvasInput::CanvasInput(CanvasView& view, QObject* parent): QObject(parent), view(view), clock(&view.getClock()) {
     // A finger held still: the same as a right click (the window then offers paste and the rest)
     longPressTimer.setSingleShot(true);
     longPressTimer.setInterval(LONG_PRESS_MS);
-    connect(&longPressTimer, &QTimer::timeout, this, [this] {
+    connect(&longPressTimer, &ClockTimer::timeout, this, [this] {
         cancelFingerStroke();  // (held still while drawing with the finger: the dot it began is taken back)
         longPressFired = true;
         Q_EMIT this->view.contextRequested(this->view.getViewController().viewToScreen(touchSessionStartPos));
@@ -87,13 +81,21 @@ CanvasInput::CanvasInput(CanvasView& view, QObject* parent): QObject(parent), vi
     // The pen held still with the pen or highlighter: the same
     penHoldTimer.setSingleShot(true);
     penHoldTimer.setInterval(LONG_PRESS_MS);
-    connect(&penHoldTimer, &QTimer::timeout, this, [this] { penHeld(); });
+    connect(&penHoldTimer, &ClockTimer::timeout, this, [this] { penHeld(); });
     // The pen resting at the end of a stroke: hold to straighten
     straightenTimer.setSingleShot(true);
-    connect(&straightenTimer, &QTimer::timeout, this, [this] { penRested(); });
+    connect(&straightenTimer, &ClockTimer::timeout, this, [this] { penRested(); });
     wheelSnapTimer.setSingleShot(true);
     wheelSnapTimer.setInterval(180);
-    connect(&wheelSnapTimer, &QTimer::timeout, this, [this] { this->view.getViewController().endScroll({}); });
+    connect(&wheelSnapTimer, &ClockTimer::timeout, this, [this] { this->view.getViewController().endScroll({}); });
+    setClock(*clock);
+}
+
+void CanvasInput::setClock(Clock& to) {
+    clock = &to;
+    for (ClockTimer* timer: {&longPressTimer, &penHoldTimer, &straightenTimer, &wheelSnapTimer}) {
+        timer->setClock(to);
+    }
 }
 
 void CanvasInput::startPenHold(const Event& event) {
@@ -136,7 +138,7 @@ void CanvasInput::trackStraighten(const Event& event) {
         return;  // (resting: the time runs on)
     }
     straightenPos = event.viewPos;
-    straightenMovedMs = monotonicMs();
+    straightenMovedMs = nowMs();
     straightenMoved = true;
     if (!straightenTimer.isActive()) {
         straightenTimer.start(straightenHoldMs);  // (moving on restarts nothing: penRested looks at the time)
@@ -155,7 +157,7 @@ void CanvasInput::penRested() {
         !inputRunning) {
         return;
     }
-    const double still = monotonicMs() - straightenMovedMs;
+    const double still = nowMs() - straightenMovedMs;
     if (still < straightenHoldMs) {
         straightenTimer.start(std::max(1, static_cast<int>(std::ceil(straightenHoldMs - still))));
         return;  // it moved meanwhile: wait for the rest of the time from then
@@ -199,7 +201,7 @@ bool CanvasInput::tabletEvent(QTabletEvent* e, QPointF viewPos) {
         cancelFingerStroke();
         touchSessionIgnored = !touches.empty();
     }
-    lastPenEventMs = monotonicMs();
+    lastPenEventMs = nowMs();
     PenHover::instance().record(*e);
     if (penNear()) {
         lastNearMs = lastPenEventMs;
@@ -304,7 +306,7 @@ bool CanvasInput::tabletEvent(QTabletEvent* e, QPointF viewPos) {
 
 void CanvasInput::proximityEvent(bool entered) {
     proximityEverSeen = true;
-    lastPenEventMs = monotonicMs();
+    lastPenEventMs = nowMs();
     if (penNear()) {
         lastNearMs = lastPenEventMs;  // near until now (leaving) / from now on (coming)
     }
@@ -650,7 +652,7 @@ bool CanvasInput::actionStart(const Event& event) {
 
     this->sequenceStartPage = currentPage;
     this->pressViewPos = event.viewPos;
-    this->pressTimeMs = monotonicMs();
+    this->pressTimeMs = nowMs();
     this->toggleOnTap.reset();
     // The curtain over everything: a press on its handles works them; on the black nothing is written, erased or
     // followed (the hand still scrolls, and a tap shows the handles); while its handles are shown, a press on the
@@ -968,7 +970,7 @@ bool CanvasInput::isClick(const Event& release) const {
         // A click of the mouse: however long it took, as long as it did not move beyond the drag distance
         return moved <= QGuiApplication::styleHints()->startDragDistance();
     }
-    return monotonicMs() - pressTimeMs <= TAP_MAX_MS * 1.5 && moved <= TAP_SLOP_PX / 2;
+    return nowMs() - pressTimeMs <= TAP_MAX_MS * 1.5 && moved <= TAP_SLOP_PX / 2;
 }
 
 bool CanvasInput::barelyMoved(const Event& release) const {
@@ -1251,7 +1253,7 @@ bool CanvasInput::touchBlocked() const {
     int waitMs = PALM_TIMEOUT_MS;
     view.getSession().getSettings()->getCustomElement("touch").getInt("timeout", waitMs);
     const double since = proximityEverSeen ? lastNearMs : lastPenEventMs;
-    return monotonicMs() - since < waitMs;
+    return nowMs() - since < waitMs;
 }
 
 bool CanvasInput::fingerDraws() const {
@@ -1314,7 +1316,7 @@ void CanvasInput::redo() {
 
 bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
     ViewController& vc = view.getViewController();
-    const double now = monotonicMs();
+    const double now = nowMs();
 
     if (e->type() == QEvent::TouchCancel) {
         cancelFingerStroke();
@@ -1732,7 +1734,7 @@ bool CanvasInput::wheelEvent(QWheelEvent* e, QPointF viewPos) {
     // the way the fingers or the wheel go on the screen)
     const QPointF delta = vc.scrollDelta(vc.screenDeltaToView(
             !e->pixelDelta().isNull() ? QPointF(e->pixelDelta()) : QPointF(e->angleDelta()) / 120.0 * 48.0));
-    const double now = monotonicMs();
+    const double now = nowMs();
 
     switch (e->phase()) {
         case Qt::NoScrollPhase:

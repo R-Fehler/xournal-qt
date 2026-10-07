@@ -58,7 +58,8 @@ public:
     virtual Document* rasterDocument() const = 0;
     /// `background`: for a page rendered in advance (a background worker); it may use an instance of the PDF of its
     /// own, so that the visible pages do not wait for poppler (which renders one page of an instance at a time).
-    virtual PdfCache* rasterPdfCache(bool background = false) const = 0;
+    /// Any thread. The render holds the cache while it draws: the host may replace its caches meanwhile.
+    virtual std::shared_ptr<PdfCache> rasterPdfCache(bool background = false) const = 0;
     virtual RasterParams rasterParams() const = 0;
     /// Which elements are drawn (the replay of the timeline, render/ElementFilter.h; nullptr: all). Any thread.
     virtual std::shared_ptr<const render::ElementFilter> rasterFilter() const { return nullptr; }

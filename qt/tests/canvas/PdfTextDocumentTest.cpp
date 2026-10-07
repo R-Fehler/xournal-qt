@@ -36,6 +36,7 @@
 #include "session/PdfBookmarks.h"
 #include "session/TextDocument.h"
 
+#include "CanvasTime.h"
 #include "CanvasView.h"
 #include "MarkdownBookmarks.h"
 #include "MarkdownEditor.h"
@@ -114,17 +115,12 @@ protected:
         view.reset();
         session = std::make_unique<DocumentSession>(*app, std::move(doc));
         view = std::make_unique<CanvasView>(*session);
+        view->setClock(clock);
         view->getViewController().setViewSize(QSizeF(900, 1400));
         processEvents();
     }
-    void processEvents(int ms = 20) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-            app->getRenderService()->waitForIdle();
-        }
-    }
+    /// `ms` pass on the canvas's clock, the event loop and the renders run meanwhile (no real time passes)
+    void processEvents(int ms = 20) { test::passTime(clock, *app, ms); }
     void type(const std::string& s) {
         ASSERT_NE(view->getMarkdownEditor(), nullptr);
         for (const char c: s) {
@@ -141,6 +137,7 @@ protected:
         md.finish();
     }
 
+    ManualClock clock;  ///< the canvas's time (CanvasTime.h): the tests move it on
     QTemporaryDir tmp;
     std::unique_ptr<AppContext> app;
     std::unique_ptr<DocumentSession> session;

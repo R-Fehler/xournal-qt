@@ -28,6 +28,7 @@
 #include "AudienceRegion.h"
 #include "CanvasInput.h"
 #include "CanvasPage.h"
+#include "CanvasTime.h"
 #include "CanvasView.h"
 #include "CurtainLayer.h"
 #include "ViewController.h"
@@ -47,8 +48,10 @@ protected:
         session->insertNewPage(2);
         session->setCurrentPageNo(0);
         presenter = std::make_unique<CanvasView>(*session);
+        presenter->setClock(clock);
         presenter->getViewController().setViewSize(QSizeF(900, 700));
         audience = std::make_unique<CanvasView>(*session);
+        audience->setClock(clock);
         audience->getViewController().setViewSize(QSizeF(800, 600));
         input = std::make_unique<CanvasInput>(*presenter);
         processEvents();
@@ -60,14 +63,8 @@ protected:
         session.reset();
         app.reset();
     }
-    void processEvents(int ms = 30) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-            app->getRenderService()->waitForIdle();
-        }
-    }
+    /// `ms` pass on the canvas's clock, the event loop and the renders run meanwhile (no real time passes)
+    void processEvents(int ms = 30) { test::passTime(clock, *app, ms); }
     void tablet(QEvent::Type type, QPointF onPage, double pressure, Qt::MouseButton button, Qt::MouseButtons buttons) {
         const QPointF pos = presenter->pageViewRect(0).topLeft() + onPage * presenter->getViewController().zoom();
         QTabletEvent e(type, &pen, pos, pos, pressure, 0.f, 0.f, 0.f, 0.0, 0.f, Qt::NoModifier, button, buttons);
@@ -94,6 +91,7 @@ protected:
         return n;
     }
 
+    ManualClock clock;  ///< the canvas's time (CanvasTime.h): the tests move it on
     QTemporaryDir tmp;
     std::unique_ptr<AppContext> app;
     std::unique_ptr<DocumentSession> session;
@@ -218,6 +216,7 @@ TEST_F(PresenterMirror, eitherViewMayGoFirst) {
 
     // The audience's view goes first (the projector is unplugged): the presenter's writes on
     presenter = std::make_unique<CanvasView>(*session);
+    presenter->setClock(clock);
     presenter->getViewController().setViewSize(QSizeF(900, 700));
     input = std::make_unique<CanvasInput>(*presenter);
     processEvents();

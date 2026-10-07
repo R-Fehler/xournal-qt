@@ -31,7 +31,6 @@
 #include <QInputMethodEvent>
 #include <QTouchEvent>
 #include <QTemporaryDir>
-#include <QThread>
 #include <QWheelEvent>
 #include <gtest/gtest.h>
 
@@ -57,6 +56,7 @@
 
 #include "CanvasInput.h"
 #include "CanvasPage.h"
+#include "CanvasTime.h"
 #include "CanvasView.h"
 #include "GeometryToolPicture.h"
 #include "PenHover.h"
@@ -79,6 +79,7 @@ protected:
         session = std::make_unique<DocumentSession>(*app);
         session->insertNewPage(1);  // two pages
         view = std::make_unique<CanvasView>(*session);
+        view->setClock(clock);
         view->getViewController().setViewSize(QSizeF(900, 2400));
         input = std::make_unique<CanvasInput>(*view);
         app->getToolHandler()->selectTool(TOOL_PEN);
@@ -92,7 +93,10 @@ protected:
         app.reset();
     }
 
-    void processEvents(int ms = 50) {
+    /// `ms` pass on the canvas's clock, the event loop and the renders run meanwhile (no real time passes)
+    void processEvents(int ms = 50) { test::passTime(clock, *app, ms); }
+    /// `ms` of real time pass: for timers that are not the canvas's (upstream's edge panning of a selection)
+    void waitReal(int ms) {
         QElapsedTimer t;
         t.start();
         while (t.elapsed() < ms) {
@@ -152,6 +156,7 @@ protected:
         return n;
     }
 
+    ManualClock clock;  ///< the canvas's time (CanvasTime.h): the tests move it on
     QTemporaryDir tmp;
     std::unique_ptr<AppContext> app;
     std::unique_ptr<DocumentSession> session;
@@ -340,7 +345,7 @@ TEST_F(CanvasReplayTest, touchpadScrollContinuesWithMomentumAfterLift) {
 
     sendWheel(*input, touchpad, QPoint(0, -20), Qt::ScrollBegin);
     for (int i = 0; i < 8; ++i) {
-        QThread::msleep(10);
+        clock.advance(10);
         sendWheel(*input, touchpad, QPoint(0, -20), Qt::ScrollUpdate);
     }
     const double atLift = vc.visibleContentRect().top();
@@ -1241,7 +1246,7 @@ TEST_F(CanvasReplayTest, aSelectionDraggedOnANarrowPageOnlyFollowsThePointer) {
     mouse(QEvent::MouseButtonPress, grab, Qt::LeftButton, Qt::LeftButton);
     for (int i = 1; i <= 20; ++i) {
         mouse(QEvent::MouseMove, grab + QPointF(0, 5 * i), Qt::NoButton, Qt::LeftButton);
-        processEvents(40);  // the edge-pan timer ticks in between
+        waitReal(40);  // the edge-pan timer ticks in between (upstream's: real time)
         ASSERT_NE(view->getSelection(), nullptr);
         EXPECT_NEAR(view->getSelection()->getXOnView(), x, 0.5) << "no sideways jump at step " << i;
     }
@@ -1262,7 +1267,7 @@ TEST_F(CanvasReplayTest, aSelectionDraggedOnANarrowPageOnlyFollowsThePointer) {
     mouse(QEvent::MouseButtonPress, grab2, Qt::LeftButton, Qt::LeftButton);
     for (int i = 1; i <= 10; ++i) {
         mouse(QEvent::MouseMove, grab2 + QPointF(3 * i, 0), Qt::NoButton, Qt::LeftButton);
-        processEvents(40);
+        waitReal(40);
         ASSERT_NE(view->getSelection(), nullptr);
         EXPECT_NEAR(view->getSelection()->getYOnView(), y2, 0.5) << "no jump up or down at step " << i;
     }
@@ -1775,6 +1780,7 @@ TEST_F(CanvasReplayTest, aTwoColumnPageIsZoomedColumnByColumn) {
     ASSERT_TRUE(loaded.document) << loaded.error;
     session = std::make_unique<DocumentSession>(*app, std::move(loaded.document));
     view = std::make_unique<CanvasView>(*session);
+    view->setClock(clock);
     view->getViewController().setViewSize(QSizeF(900, 1200));
     input = std::make_unique<CanvasInput>(*view);
     processEvents();
@@ -1808,6 +1814,7 @@ TEST_F(CanvasReplayTest, aLongPressSelectsTheWordOfThePdfAndTheHandlesWidenIt) {
     ASSERT_TRUE(loaded.document);
     session = std::make_unique<DocumentSession>(*app, std::move(loaded.document));
     view = std::make_unique<CanvasView>(*session);
+    view->setClock(clock);
     view->getViewController().setViewSize(QSizeF(900, 1200));
     input = std::make_unique<CanvasInput>(*view);
     processEvents();
@@ -1858,6 +1865,7 @@ TEST_F(CanvasReplayTest, withSpaceForNotesPdfTextIsSelectedAndMarkedOnTheSlide) 
     a.right = 200;
     ASSERT_EQ(notespace::apply(*session, {0}, a), 1u);
     view = std::make_unique<CanvasView>(*session);
+    view->setClock(clock);
     view->getViewController().setViewSize(QSizeF(900, 1200));
     input = std::make_unique<CanvasInput>(*view);
     processEvents();
@@ -1912,6 +1920,7 @@ TEST_F(CanvasReplayTest, withSpaceForNotesPdfLinksAreWhereTheyAreDrawn) {
     a.top = 50;
     ASSERT_EQ(notespace::apply(*session, {0}, a), 1u);
     view = std::make_unique<CanvasView>(*session);
+    view->setClock(clock);
     view->getViewController().setViewSize(QSizeF(900, 1200));
     input = std::make_unique<CanvasInput>(*view);
     processEvents();
@@ -1943,6 +1952,7 @@ TEST_F(CanvasReplayTest, spaceForNotesOnAllPagesOfALongPdfIsQuickInView) {
     ASSERT_TRUE(loaded.document);
     session = std::make_unique<DocumentSession>(*app, std::move(loaded.document));
     view = std::make_unique<CanvasView>(*session);
+    view->setClock(clock);
     view->getViewController().setViewSize(QSizeF(900, 1200));
     input = std::make_unique<CanvasInput>(*view);
     processEvents();
@@ -1973,6 +1983,7 @@ TEST_F(CanvasReplayTest, pdfTextIsHighlightedByDraggingOverIt) {
     ASSERT_TRUE(loaded.document);
     session = std::make_unique<DocumentSession>(*app, std::move(loaded.document));
     view = std::make_unique<CanvasView>(*session);
+    view->setClock(clock);
     view->getViewController().setViewSize(QSizeF(900, 1200));
     input = std::make_unique<CanvasInput>(*view);
     processEvents();
@@ -2036,21 +2047,18 @@ TEST_F(CanvasReplayTest, pdfTextIsHighlightedByDraggingOverIt) {
 // --- Scrolling sideways (qt/present): the pages side by side, fit to the height; the wheel, a swipe of the finger
 // and the touchpad go from page to page when the view stops on whole pages.
 namespace {
-/// Waits until the view came to rest on a page.
-void settle(CanvasReplayTest* t, ViewController& vc, AppContext& app) {
-    QElapsedTimer clock;
-    clock.start();
-    while (vc.isAnimating() && clock.elapsed() < 2000) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+/// The time passes until the view came to rest on a page (at most 2 s).
+void settle(ManualClock& clock, ViewController& vc, AppContext& app) {
+    for (int ms = 0; vc.isAnimating() && ms < 2000; ms += 8) {
+        test::passTime(clock, app, 8);
     }
-    (void)t;
-    (void)app;
 }
 /// One finger from `from` by `by` in `steps` moves, `msPerStep` apart (a flick when fast), then lifted.
-void swipe(CanvasInput& input, const QPointingDevice& screen, QPointF from, QPointF by, int steps, int msPerStep) {
+void swipe(ManualClock& clock, CanvasInput& input, const QPointingDevice& screen, QPointF from, QPointF by, int steps,
+           int msPerStep) {
     touch(input, screen, QEvent::TouchBegin, QEventPoint::State::Pressed, from);
     for (int i = 1; i <= steps; ++i) {
-        QThread::msleep(static_cast<unsigned long>(msPerStep));
+        clock.advance(msPerStep);
         touch(input, screen, QEvent::TouchUpdate, QEventPoint::State::Updated, from + by * i / steps);
     }
     touch(input, screen, QEvent::TouchEnd, QEventPoint::State::Released, from + by);
@@ -2094,7 +2102,7 @@ TEST_F(SidewaysTest, thePagesFitTheHeightAndOnlyThoseInViewCount) {
 
     // A bigger window: fitted again, on the same page
     vc().stepPages(2);
-    settle(this, vc(), *app);
+    settle(clock, vc(), *app);
     vc().setViewSize(QSizeF(1200, 900));
     EXPECT_NEAR(vc().zoom(), layout.fitHeightZoom(900), 1e-9);
     EXPECT_EQ(vc().currentGroup(), 2u);
@@ -2108,7 +2116,7 @@ TEST_F(SidewaysTest, theWheelGoesFromPageToPage) {
     ASSERT_TRUE(vc().groupFitsView());
     wheel(QPoint(0, -120));  // one notch down
     EXPECT_TRUE(vc().isAnimating()) << "on its way";
-    settle(this, vc(), *app);
+    settle(clock, vc(), *app);
     EXPECT_EQ(vc().currentGroup(), 1u);
     EXPECT_NEAR(x(), vc().restRange(1).first, 0.5);
     processEvents();
@@ -2116,16 +2124,16 @@ TEST_F(SidewaysTest, theWheelGoesFromPageToPage) {
     // Two notches in a row: two pages on, whatever the animation did in between
     wheel(QPoint(0, -120));
     wheel(QPoint(0, -120));
-    settle(this, vc(), *app);
+    settle(clock, vc(), *app);
     EXPECT_EQ(vc().currentGroup(), 3u);
     wheel(QPoint(0, 120));  // up: back
-    settle(this, vc(), *app);
+    settle(clock, vc(), *app);
     EXPECT_EQ(vc().currentGroup(), 2u);
     // Small steps of a fine wheel add up to a notch
     for (int i = 0; i < 3; ++i) {
         wheel(QPoint(0, -40));
     }
-    settle(this, vc(), *app);
+    settle(clock, vc(), *app);
     EXPECT_EQ(vc().currentGroup(), 3u);
 }
 
@@ -2143,8 +2151,8 @@ TEST_F(SidewaysTest, aSwipeGoesOnePageOnAndASlowDragComesBack) {
     sideways(true);
     const double pageWidth = view->pageViewRect(1).left() - view->pageViewRect(0).left();
     // A gentle swipe to the left, less than half a page: the next page
-    swipe(*input, touchscreen, QPointF(600, 300), QPointF(-pageWidth * 0.3, 0), 6, 40);
-    settle(this, vc(), *app);
+    swipe(clock, *input, touchscreen, QPointF(600, 300), QPointF(-pageWidth * 0.3, 0), 6, 40);
+    settle(clock, vc(), *app);
     EXPECT_EQ(vc().currentGroup(), 1u) << "flicked on";
     EXPECT_NEAR(x(), vc().restRange(1).first, 0.5);
 
@@ -2154,30 +2162,30 @@ TEST_F(SidewaysTest, aSwipeGoesOnePageOnAndASlowDragComesBack) {
         for (int i = 1; i <= 10; ++i) {
             touch(*input, touchscreen, QEvent::TouchUpdate, QEventPoint::State::Updated, from + QPointF(by * i / 10, 0));
         }
-        QThread::msleep(80);  // (held still: no flick)
+        clock.advance(80);  // (held still: no flick)
         touch(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, from + QPointF(by, 0));
     };
     dragAndHold(QPointF(600, 300), -pageWidth * 0.33);
     EXPECT_TRUE(vc().isAnimating());
-    settle(this, vc(), *app);
+    settle(clock, vc(), *app);
     EXPECT_EQ(vc().currentGroup(), 1u) << "not far enough: it springs back";
     EXPECT_NEAR(x(), vc().restRange(1).first, 0.5);
 
     // Dragged slowly more than half a page: the page it was dragged to
     dragAndHold(QPointF(800, 300), -pageWidth * 0.7);
-    settle(this, vc(), *app);
+    settle(clock, vc(), *app);
     EXPECT_EQ(vc().currentGroup(), 2u);
     EXPECT_NEAR(x(), vc().restRange(2).first, 0.5);
 
     // A swipe to the right: back one page
-    swipe(*input, touchscreen, QPointF(300, 300), QPointF(pageWidth * 0.3, 0), 6, 40);
-    settle(this, vc(), *app);
+    swipe(clock, *input, touchscreen, QPointF(300, 300), QPointF(pageWidth * 0.3, 0), 6, 40);
+    settle(clock, vc(), *app);
     EXPECT_EQ(vc().currentGroup(), 1u);
 
     // A strong flick carries on as the momentum would, and comes to rest on a page
     const double before = x();
-    swipe(*input, touchscreen, QPointF(700, 300), QPointF(-pageWidth * 0.4, 0), 6, 6);
-    settle(this, vc(), *app);
+    swipe(clock, *input, touchscreen, QPointF(700, 300), QPointF(-pageWidth * 0.4, 0), 6, 6);
+    settle(clock, vc(), *app);
     EXPECT_GT(vc().currentGroup(), 2u) << "further than one page";
     EXPECT_NEAR(x(), vc().restRange(vc().currentGroup()).first, 0.5);
     EXPECT_GT(x(), before);
@@ -2187,12 +2195,12 @@ TEST_F(SidewaysTest, theTouchpadComesToRestOnAPage) {
     sideways(true);
     sendWheel(*input, touchpad, QPoint(-20, 0), Qt::ScrollBegin);
     for (int i = 0; i < 6; ++i) {
-        QThread::msleep(30);
+        clock.advance(30);
         sendWheel(*input, touchpad, QPoint(-20, 0), Qt::ScrollUpdate);
     }
     sendWheel(*input, touchpad, QPoint(0, 0), Qt::ScrollEnd);
     EXPECT_TRUE(vc().isAnimating()) << "the momentum carries it on to a page";
-    settle(this, vc(), *app);
+    settle(clock, vc(), *app);
     EXPECT_EQ(vc().currentGroup(), 1u);
     EXPECT_NEAR(x(), vc().restRange(1).first, 0.5);
 
@@ -2202,7 +2210,7 @@ TEST_F(SidewaysTest, theTouchpadComesToRestOnAPage) {
     sendWheel(*input, touchpad, QPoint(0, -30), Qt::ScrollUpdate);
     EXPECT_NEAR(x() - before, 30, 1);
     sendWheel(*input, touchpad, QPoint(0, 0), Qt::ScrollEnd);
-    settle(this, vc(), *app);
+    settle(clock, vc(), *app);
 }
 
 // Paging must be instant: the pages next to the one in view are drawn in advance, at the zoom of the view.
@@ -2210,15 +2218,15 @@ TEST_F(SidewaysTest, theNextAndThePreviousPageAreDrawnInAdvance) {
     sideways(true);
     view->setShown(true);
     vc().stepPages(2);
-    settle(this, vc(), *app);
+    settle(clock, vc(), *app);
     const double zoom = vc().zoom();
-    QElapsedTimer clock;
-    clock.start();
+    QElapsedTimer waited;
+    waited.start();
     auto ready = [&](size_t p) {
         const auto info = view->getPage(p)->bufferInfo();
         return info.valid && info.zoom == zoom;
     };
-    while (!(ready(1) && ready(3) && ready(4)) && clock.elapsed() < 3000) {
+    while (!(ready(1) && ready(3) && ready(4)) && waited.elapsed() < 3000) {
         processEvents(20);
     }
     EXPECT_TRUE(ready(1)) << "the page before";
@@ -2261,8 +2269,8 @@ TEST_F(SidewaysTest, presentingAPageFillsTheViewAndASwipeGoesOnePage) {
 
     // A strong flick: one page, not more
     const double pageStep = view->pageViewRect(1).left() - view->pageViewRect(0).left();
-    swipe(*input, touchscreen, QPointF(1200, 450), QPointF(-pageStep * 0.4, 0), 6, 6);
-    settle(this, vc(), *app);
+    swipe(clock, *input, touchscreen, QPointF(1200, 450), QPointF(-pageStep * 0.4, 0), 6, 6);
+    settle(clock, vc(), *app);
     EXPECT_EQ(vc().currentGroup(), 1u) << "one page per swipe";
     EXPECT_TRUE(inView(1));
     processEvents();
@@ -2270,9 +2278,9 @@ TEST_F(SidewaysTest, presentingAPageFillsTheViewAndASwipeGoesOnePage) {
 
     // The slide has another shape: it fills the screen too
     vc().stepPages(1);
-    settle(this, vc(), *app);
+    settle(clock, vc(), *app);
     vc().stepPages(1);
-    settle(this, vc(), *app);
+    settle(clock, vc(), *app);
     EXPECT_EQ(vc().currentGroup(), 3u);
     EXPECT_TRUE(fills(3));
     EXPECT_TRUE(inView(3));

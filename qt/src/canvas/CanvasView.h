@@ -45,6 +45,7 @@
 #include "control/tools/CursorSelectionType.h"
 #include "control/zoom/ZoomControl.h"
 
+#include "Clock.h"
 #include "DocumentLayout.h"
 #include "EmojiCompletion.h"
 #include "ViewController.h"
@@ -93,6 +94,10 @@ public:
     RenderService& getRenderService() const { return renderService; }
     ViewController& getViewController() { return viewController; }
     const ViewController& getViewController() const { return viewController; }
+    /// The clock the view goes by (Clock.h): its zoom and scrolling, the visibility updates, and the input made for it
+    /// afterwards. The steady clock unless a test gives it a ManualClock.
+    Clock& getClock() const { return *clock; }
+    void setClock(Clock& clock);
     const DocumentLayout& documentLayout() const { return layout; }
     /// Scrolling sideways comes to rest on whole pages (setting "snapPages" of ours, default on)
     static bool snapSetting(Settings& settings);
@@ -240,7 +245,7 @@ public:
 
     // --- RasterHost (rasterParams is called from render threads) -----------------------------------------------
     Document* rasterDocument() const override;
-    PdfCache* rasterPdfCache(bool background) const override;
+    std::shared_ptr<PdfCache> rasterPdfCache(bool background) const override;
     XojPdfPageSPtr rasterPendingPdfPage(size_t number) const override;
     RasterParams rasterParams() const override;
     /// The view's rectangle on a page (page coordinates; beside the page when it is out of view)
@@ -702,16 +707,22 @@ private:
     DocumentLayout layout;
     ZoomControl zoomControl;  ///< upstream's zoom values for reused tools (from the view controller)
     ViewController viewController;
-    /// (shared: its entries are evicted by a worker, which may still run when the view goes)
+    /// The PDF cache of the pages in view. Shared: a render takes it (rasterPdfCache) and holds it while it draws, and
+    /// a worker evicts its entries, so a replaced cache goes when the last of them is done with it. Replaced on the UI
+    /// thread under pdfCacheMutex; other threads read it under the lock (the UI thread may read it without).
     std::shared_ptr<PdfCache> pdfCache;
+    mutable std::mutex pdfCacheMutex;
     /// Evict the PDF cache but for these PDF pages, on a worker (it waits for a running PDF render)
     void evictPdfCache(std::unordered_set<size_t> keep);
-    /// For pages rendered in advance: an instance of the PDF of their own (loaded on first use, by a worker)
+    /// A replaced cache: emptied on a worker; it goes there, or with the last render that still holds it
+    static void retirePdfCache(std::shared_ptr<PdfCache> cache);
+    /// For pages rendered in advance: an instance of the PDF of their own (loaded on first use, by a worker; shared
+    /// like `pdfCache`, under backgroundPdfMutex)
     mutable std::mutex backgroundPdfMutex;
-    mutable std::unique_ptr<PdfCache> backgroundPdfCache;
+    mutable std::shared_ptr<PdfCache> backgroundPdfCache;
     mutable bool backgroundPdfLoaded = false;
-    /// Replaced PDF caches: a render may still use them (they go with the view)
-    std::vector<std::shared_ptr<PdfCache>> retiredPdfCaches;
+    /// The background cache (loaded on first use; nullptr: the PDF cannot be loaded again, the renders use `pdfCache`)
+    std::shared_ptr<PdfCache> backgroundCache() const;
     size_t pdfCachePages = 0;  ///< the pages of the PDF of `pdfCache`
     std::vector<std::unique_ptr<CanvasPage>> pages;
     bool shown = false;
@@ -728,8 +739,9 @@ private:
     /// The last plan trimmed this view (it was not the current one): it has no window of its own
     bool trimmed = false;
     int visibilityDelay = 8;
-    QElapsedTimer sinceVisibility;
-    QTimer visibilityTimer;
+    Clock* clock = &Clock::steady();
+    std::optional<double> lastVisibilityMs;  ///< when the visibility was last updated (clock)
+    ClockTimer visibilityTimer;
     /// Visibility updates so far (tests)
     quint64 visibilityCount = 0;
     std::function<QImage(size_t)> previewSource;

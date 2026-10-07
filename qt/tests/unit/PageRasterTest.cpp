@@ -39,9 +39,9 @@ namespace {
 class TestHost: public RasterHost {
 public:
     TestHost(Document* doc, Settings* settings, RasterParams params):
-            doc(doc), cache(std::make_unique<PdfCache>(doc->getPdfDocument(), settings)), params(params) {}
+            doc(doc), cache(std::make_shared<PdfCache>(doc->getPdfDocument(), settings)), params(params) {}
     Document* rasterDocument() const override { return doc; }
-    PdfCache* rasterPdfCache(bool) const override { return cache.get(); }
+    std::shared_ptr<PdfCache> rasterPdfCache(bool) const override { return cache; }
     RasterParams rasterParams() const override { return params; }
     void rasterUpdated(PageRaster*, std::optional<xoj::util::Rectangle<double>> area) override {
         ++updates;
@@ -49,7 +49,7 @@ public:
     }
 
     Document* doc;
-    std::unique_ptr<PdfCache> cache;
+    std::shared_ptr<PdfCache> cache;
     RasterParams params;
     std::atomic<int> updates{0};
     std::atomic<int> partialUpdates{0};

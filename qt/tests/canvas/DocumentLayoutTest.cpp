@@ -264,16 +264,16 @@ TEST(ViewSnapping, upAndDownWhileReadingARowOfPagesComesToRest) {
     Pages pages({a4, a4, a4, a4});
     DocumentLayout layout = pages.layout({});
     ViewController vc(&layout);
+    ManualClock clock;  // (the animations take no real time)
+    vc.setClock(clock);
     vc.setViewSize(QSizeF(800, 600));  // (fit to the width: a page is taller than the view)
     vc.setSnapping(true);
     EXPECT_FALSE(vc.snapping()) << "up and down only while reading";
     vc.setSnappingVertically(true);
     ASSERT_TRUE(vc.snapping());
     auto settle = [&] {
-        QElapsedTimer t;
-        t.start();
-        while (vc.isAnimating() && t.elapsed() < 3000) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+        for (int ms = 0; vc.isAnimating() && ms < 3000; ms += 8) {
+            clock.advance(8);
         }
     };
     const double pad = layout.padding();
