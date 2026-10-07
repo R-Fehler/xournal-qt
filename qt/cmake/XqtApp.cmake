@@ -265,6 +265,22 @@ set(XQT_QML_FILES
     src/app/qml/Snackbar.qml
     src/app/qml/SelectionMark.qml
     src/app/qml/HomeView.qml
+    # (the parts of HomeView.qml, each instantiated once there)
+    src/app/qml/HomeSelectionBar.qml
+    src/app/qml/HomeHeader.qml
+    src/app/qml/LibrarySwitch.qml
+    src/app/qml/LibraryShowMenu.qml
+    src/app/qml/LibrarySortMenu.qml
+    src/app/qml/LibraryCrumbs.qml
+    src/app/qml/LibrarySearchField.qml
+    src/app/qml/LibraryGridPage.qml
+    src/app/qml/RecentGridPage.qml
+    src/app/qml/HomeSelectionActions.qml
+    src/app/qml/MoveDragOverlay.qml
+    src/app/qml/LibraryItemMenu.qml
+    src/app/qml/LibraryDialogs.qml
+    src/app/qml/LibraryArchive.qml
+    src/app/qml/LibraryImport.qml
     src/app/qml/ShareZipDialog.qml
     src/app/qml/OpenZipDialog.qml
     src/app/qml/FolderChooser.qml
