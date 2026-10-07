@@ -73,7 +73,7 @@ Item {
     /// A narrow card (two columns on a phone): the name on up to two lines instead of cut short in the middle
     property bool twoLineName: false
     /// Fingers in use (the window's touch profile): the ⋮ as big as a finger needs
-    readonly property bool touch: typeof win !== "undefined" && win && win.adaptive ? win.adaptive.touchProfile : false
+    readonly property bool touch: win.adaptive.touchProfile
     property bool selected: false
     /// Items are being selected: the circles are shown on all cards.
     property bool selectionMode: false

@@ -22,21 +22,21 @@ Rectangle {
     // --- the layout for the window's size
     // (qt/docs/features/adaptive-layout.md, "The home screen and the tab overview")
     /// The window's layout (Main.qml's `win.adaptive`), if there is one
-    readonly property var adaptive: typeof win !== "undefined" && win ? win.adaptive : null
-    readonly property string layoutClass: adaptive ? adaptive.layoutClass : "desktopWide"
+    readonly property var adaptive: win.adaptive
+    readonly property string layoutClass: adaptive.layoutClass
     /// A phone class: the "+" floats at the bottom, the actions on a selection are a bar at the bottom
-    readonly property bool phoneLayout: adaptive !== null && adaptive.phoneLayout
+    readonly property bool phoneLayout: adaptive.phoneLayout
     /// A phone held sideways (or another short window of a phone class): one header row with the breadcrumbs in it,
     /// shorter cards
     readonly property bool shortLayout: phoneLayout && (layoutClass === "phoneShort"
-                                                        || (adaptive !== null && adaptive.orientation === "landscape"))
+                                                        || (adaptive.orientation === "landscape"))
     /// A phone held upright: the switch Library / Recent / Bookmarks in a row of its own, across the width
     readonly property bool portraitPhone: phoneLayout && !shortLayout
-    readonly property bool touch: adaptive !== null && adaptive.touchProfile
+    readonly property bool touch: adaptive.touchProfile
     /// What a finger needs (48 with the touch profile, else 40)
-    readonly property int minTarget: adaptive ? adaptive.minTarget : 40
+    readonly property int minTarget: adaptive.minTarget
     /// The part of its bottom under the navigation bar (not where the soft keyboard's room is below it)
-    readonly property real safeBottom: typeof win !== "undefined" && win && win.insets.contentBottomInset ? win.insets.contentBottomInset : 0
+    readonly property real safeBottom: win.insets.contentBottomInset
     /// Room below the last cards for the floating "+" of a phone
     readonly property real fabSpace: phoneLayout ? 72 : 0
 

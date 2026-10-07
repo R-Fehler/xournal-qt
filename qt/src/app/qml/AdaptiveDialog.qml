@@ -17,7 +17,7 @@ import QtQuick.Window
 Dialog {
     id: dlg
     // (open: Android's back key is its; Zen's Back waits, qt/top-bar)
-    onOpenedChanged: if (typeof win !== "undefined" && win && win.takeBack !== undefined) win.takeBack(opened)
+    onOpenedChanged: win.takeBack(opened)
     /// What is declared inside: the body
     default property alias body: bodyBox.data
     /// "form", "question" or "card" (above)
@@ -31,6 +31,7 @@ Dialog {
     property bool closeButton: false
 
     readonly property var win: ApplicationWindow.window
+    // (its own `win`: the window it is shown in, none while it is made or goes)
     readonly property var adaptive: win && win.adaptive ? win.adaptive : null
     /// The class the layout follows ("Adapt the layout" off: the desktop's)
     readonly property string sizeClass: adaptive ? adaptive.layoutClass : "desktopWide"

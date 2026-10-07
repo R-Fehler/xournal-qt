@@ -10,7 +10,7 @@ import QtQuick.Layouts
 
 Item {
     id: panel
-    readonly property int target: typeof win !== "undefined" && win && win.adaptive.touchProfile ? win.adaptive.minTarget : 36
+    readonly property int target: win.adaptive.touchProfile ? win.adaptive.minTarget : 36
     readonly property var model: app.versions
     signal picked()
     /// Open the dialog that gives version `id` a message (-1: the next save, "Save with a message…")

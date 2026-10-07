@@ -45,7 +45,7 @@ Pane {
         checkable: true
         focusPolicy: Qt.NoFocus  // (the keys stay with the fields)
         // (a finger's size in the touch profile, as the search button)
-        implicitWidth: typeof win !== "undefined" && win && win.adaptive.touchProfile ? win.adaptive.minTarget : 36
+        implicitWidth: win.adaptive.touchProfile ? win.adaptive.minTarget : 36
         implicitHeight: implicitWidth
         font.pixelSize: 13
         font.weight: Font.DemiBold
@@ -153,7 +153,7 @@ Pane {
                 iconName: "xqt-search"
                 tip: qsTr("Search (Enter)")
                 // (a finger's size in the touch profile: audit F14)
-                implicitWidth: typeof win !== "undefined" && win && win.adaptive.touchProfile ? win.adaptive.minTarget : 36
+                implicitWidth: win.adaptive.touchProfile ? win.adaptive.minTarget : 36
                 implicitHeight: implicitWidth
                 icon.width: 20; icon.height: 20
                 checked: bar.waitingForEnter

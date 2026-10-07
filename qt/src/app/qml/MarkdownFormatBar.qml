@@ -44,14 +44,14 @@ Rectangle {
     function act(action, arg) { bar.formatRequested(action, arg === undefined ? "" : arg) }
 
     /// The window's layout (Main.qml's win.adaptive), if there is one
-    readonly property var adaptiveLayout: typeof win !== "undefined" && win ? win.adaptive : null
+    readonly property var adaptiveLayout: win.adaptive
     /// A phone: the row scrolls, nothing goes into menus
-    readonly property bool phone: adaptiveLayout !== null && adaptiveLayout.phone
+    readonly property bool phone: adaptiveLayout.phone
     /// The row holds the commands at its end (a text document: Main.qml puts the top bar into `commandsSlot`): nothing
     /// folds, the row scrolls like the bars
     property bool holdsCommands: false
     readonly property bool scrollsAsBar: phone || holdsCommands
-    readonly property bool touch: adaptiveLayout !== null && adaptiveLayout.touchProfile
+    readonly property bool touch: adaptiveLayout.touchProfile
 
     // --- the form that fits (priority + overflow) ---
     readonly property real spacing: 2

@@ -9,7 +9,7 @@ import "Popups.js" as Popups
 Item {
     id: panel
     /// Its buttons: a finger's size in the touch profile (audit F14)
-    readonly property int target: typeof win !== "undefined" && win && win.adaptive.touchProfile ? win.adaptive.minTarget : 34
+    readonly property int target: win.adaptive.touchProfile ? win.adaptive.minTarget : 34
 
     ListView {
         id: list

@@ -17,10 +17,10 @@ Popup {
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
     // In the phone classes a bottom sheet (as the menus, AdaptiveMenu): across the bottom, with a handle to drag it
     // away, the page dimmed; the buttons as big as a finger needs (qt/docs/features/adaptive-layout.md, "Menus")
-    readonly property var adaptiveLayout: typeof win !== "undefined" && win ? win.adaptive : null
+    readonly property var adaptiveLayout: win.adaptive
     property bool asSheet: false
     readonly property int target: adaptiveLayout && adaptiveLayout.touchProfile ? adaptiveLayout.minTarget : 44
-    readonly property real safeBottom: typeof win !== "undefined" && win && win.insets.sheetBottomPadding ? win.insets.sheetBottomPadding : 0
+    readonly property real safeBottom: win.insets.sheetBottomPadding
     modal: asSheet
     dim: asSheet
     bottomPadding: asSheet ? 12 + safeBottom : 6
@@ -39,7 +39,7 @@ Popup {
     /// In the phone classes: a sheet at the bottom instead.
     function openFor(p, item, x, y) {
         page = p
-        asSheet = adaptiveLayout !== null && adaptiveLayout.phoneLayout
+        asSheet = adaptiveLayout.phoneLayout
         if (asSheet) {
             handle.offset = 0
             // (the window's sheet: inside the safe area, on the soft keyboard while it is open)
@@ -275,7 +275,6 @@ Popup {
             }
             PageAction {
                 objectName: "pageMenuSaveTemplate"
-                visible: typeof win !== "undefined" && win !== null
                 implicitHeight: menu.asSheet ? Math.max(48, menu.target) : 38
                 iconName: "xqt-file-plus"
                 tip: qsTr("Save page as template…")

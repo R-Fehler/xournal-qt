@@ -27,14 +27,13 @@ Popup {
     height: parent ? parent.height : 600
     padding: 0
     // Its controls clear of the system's bars, a cut-out and the soft keyboard (Main.qml); its color under them
-    readonly property bool inWindow: typeof win !== "undefined" && win !== null && win.insets !== undefined
     /// The buttons of a card (×, the star, the reference): a finger's size in the touch profile (audit F14)
-    readonly property bool touch: inWindow && win.adaptive.touchProfile
+    readonly property bool touch: win.adaptive.touchProfile
     readonly property int cardTarget: touch ? win.adaptive.minTarget : 40
-    topPadding: inWindow ? win.insets.top : 0
-    leftPadding: inWindow ? win.insets.left : 0
-    rightPadding: inWindow ? win.insets.right : 0
-    bottomPadding: inWindow ? Math.max(win.insets.keyboardHeight, win.insets.bottom) : 0
+    topPadding: win.insets.top
+    leftPadding: win.insets.left
+    rightPadding: win.insets.right
+    bottomPadding: Math.max(win.insets.keyboardHeight, win.insets.bottom)
     /// A card's name is being edited (Escape cancels that, it does not close the overview)
     property bool renaming: false
     closePolicy: renaming ? Popup.NoAutoClose : Popup.CloseOnEscape
@@ -128,12 +127,12 @@ Popup {
 
     // --- the layout for the window's size
     // (qt/docs/features/adaptive-layout.md, "The home screen and the tab overview")
-    readonly property var adaptive: typeof win !== "undefined" && win ? win.adaptive : null
-    readonly property bool phoneLayout: adaptive !== null && adaptive.phoneLayout
+    readonly property var adaptive: win.adaptive
+    readonly property bool phoneLayout: adaptive.phoneLayout
     readonly property bool shortLayout: phoneLayout && (adaptive.layoutClass === "phoneShort" || adaptive.orientation === "landscape")
     /// Below 600 px, and where the title, the search and the buttons do not fit side by side, the header wraps: the
     /// title and the buttons in one row, the search across the width below
-    readonly property bool narrowHeader: (adaptive !== null && adaptive.widthClass === "compact")
+    readonly property bool narrowHeader: (adaptive.widthClass === "compact")
                                          || width < overviewCount.implicitWidth + Math.min(380, width * 0.4) + 4 * 48 + 80
     /// The tallest page of the open documents (height / width): the cells follow it (asked when the overview opens
     /// and when documents come or go)

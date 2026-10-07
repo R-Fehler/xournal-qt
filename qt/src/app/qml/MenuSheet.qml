@@ -13,7 +13,7 @@ import QtQuick.Layouts
 Popup {
     id: sheet
     // (open: Android's back key is its; Zen's Back waits, qt/top-bar)
-    onOpenedChanged: if (typeof win !== "undefined" && win && win.takeBack !== undefined) win.takeBack(opened)
+    onOpenedChanged: win.takeBack(opened)
     objectName: "menuSheet"
     parent: Overlay.overlay
     modal: true
@@ -30,19 +30,18 @@ Popup {
     property var entries: []
     /// The row chosen with the arrow keys (-1: none)
     property int keyIndex: -1
-    readonly property var adaptiveLayout: typeof win !== "undefined" && win ? win.adaptive : null
-    readonly property int rowHeight: Math.max(48, adaptiveLayout ? adaptiveLayout.minTarget : 48)
+    readonly property var adaptiveLayout: win.adaptive
+    readonly property int rowHeight: Math.max(48, adaptiveLayout.minTarget)
     // (the window's safe area and the soft keyboard: Main.qml)
-    readonly property bool inWindow: typeof win !== "undefined" && win !== null && win.insets !== undefined
-    readonly property real safeTop: inWindow ? win.insets.top : 0
-    readonly property real safeLeft: inWindow ? win.insets.left : 0
-    readonly property real safeRight: inWindow ? win.insets.right : 0
+    readonly property real safeTop: win.insets.top
+    readonly property real safeLeft: win.insets.left
+    readonly property real safeRight: win.insets.right
     /// Room below its last row for the navigation bar (none while the keyboard is open: the sheet sits on the keyboard)
-    readonly property real safeBottom: inWindow && !win.insets.keyboardOpen ? win.insets.bottom : 0
+    readonly property real safeBottom: !win.insets.keyboardOpen ? win.insets.bottom : 0
     /// Its bottom edge: the window's, or the soft keyboard's top while it is open
-    readonly property real bottomEdge: parent ? (inWindow ? Math.min(parent.height, win.insets.keyboardTop) : parent.height) : 0
+    readonly property real bottomEdge: parent ? Math.min(parent.height, win.insets.keyboardTop) : 0
     /// The window left the phone classes: the menu is a menu again, so the sheet goes
-    readonly property bool phoneClass: adaptiveLayout !== null && adaptiveLayout.phoneLayout
+    readonly property bool phoneClass: adaptiveLayout.phoneLayout
     onPhoneClassChanged: if (!phoneClass && visible) close()
 
     width: parent ? Math.min(parent.width - safeLeft - safeRight, 640) : 360

@@ -431,7 +431,7 @@ Item {
                     Popup {
                         id: referencePagePopup
                         objectName: "referencePagePopup"
-                        readonly property bool asSheet: typeof win !== "undefined" && win !== null && win.layout.phoneLayout === true
+                        readonly property bool asSheet: win.layout.phoneLayout
                         parent: asSheet ? Overlay.overlay : referencePageButton
                         modal: asSheet
                         dim: asSheet

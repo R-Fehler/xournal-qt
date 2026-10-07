@@ -13,14 +13,14 @@ import QtQuick.Dialogs
 Popup {
     id: sheet
     // (open: Android's back key is its; Zen's Back waits, qt/top-bar)
-    onOpenedChanged: if (typeof win !== "undefined" && win && win.takeBack !== undefined) win.takeBack(opened)
+    onOpenedChanged: win.takeBack(opened)
     modal: true
     focus: true
     parent: Overlay.overlay
     readonly property var win: ApplicationWindow.window
-    readonly property var adaptive: win && win.adaptive ? win.adaptive : null
+    readonly property var adaptive: win.adaptive
     /// A phone: the whole screen, the sections as a list
-    readonly property bool phone: adaptive !== null && adaptive.phoneLayout
+    readonly property bool phone: adaptive.phoneLayout
     /// The rows put their label above the control
     readonly property bool narrow: width < 600
     /// On a phone: a section is shown (else the list of them)
@@ -100,7 +100,7 @@ Popup {
                 visible: sheet.phone
                 iconName: sheet.sectionShown ? "xqt-chevron-left" : "xqt-close"
                 tip: sheet.sectionShown ? qsTr("Back") : qsTr("Close")
-                implicitWidth: Math.max(48, sheet.adaptive ? sheet.adaptive.minTarget : 48)
+                implicitWidth: Math.max(48, sheet.adaptive.minTarget)
                 implicitHeight: implicitWidth
                 onClicked: sheet.sectionShown ? sheet.sectionShown = false : sheet.close()
             }
@@ -141,7 +141,7 @@ Popup {
                 required property string modelData
                 objectName: "settingsSection" + index
                 width: ListView.view.width
-                height: Math.max(56, sheet.adaptive ? sheet.adaptive.minTarget + 8 : 56)
+                height: Math.max(56, sheet.adaptive.minTarget + 8)
                 leftPadding: 24
                 text: modelData
                 font.pixelSize: 16

@@ -23,9 +23,9 @@ Menu {
     property real minimumWidth: 200
     property real maximumWidth: 420
     /// The window's layout (Main.qml's `win.adaptive`), if there is one
-    readonly property var adaptiveLayout: typeof win !== "undefined" && win ? win.adaptive : null
+    readonly property var adaptiveLayout: win.adaptive
     /// In a phone class (by the layout class: "Adapt the layout" off keeps the desktop menus) it opens as a sheet
-    readonly property bool asSheet: adaptiveLayout !== null && adaptiveLayout.phoneLayout
+    readonly property bool asSheet: adaptiveLayout.phoneLayout
     /// The widest entry offered (a binding: entries come and go, and change their text, with the document)
     readonly property real entryWidth: {
         let w = 0
@@ -35,8 +35,8 @@ Menu {
         }
         return titleShown && title !== "" ? Math.max(w, titleMetrics.advanceWidth + 32) : w
     }
-    readonly property real windowWidth: typeof win !== "undefined" && win ? win.width : 100000
-    readonly property real windowHeight: typeof win !== "undefined" && win ? win.height : 100000
+    readonly property real windowWidth: win.width
+    readonly property real windowHeight: win.height
 
     // (whole pixels: the text widths are fractional, and a row of controls (a RowLayout) puts its buttons on whole
     // pixels, so its last button stuck out of a menu a fraction of a pixel wide)
@@ -89,14 +89,13 @@ Menu {
     /// middle it is on.
     function openMenu(pos, anchor) {
         if (!anchor) anchor = control.parent
-        if (asSheet && typeof menuSheet !== "undefined" && menuSheet) {
+        if (asSheet) {
             menuSheet.show(control)
             return
         }
-        const safeTop = typeof win !== "undefined" && win && win.insets.top ? win.insets.top : 0
+        const safeTop = win.insets.top
         // (above the navigation bar, and above the soft keyboard while it is open)
-        const safeBottom = typeof win !== "undefined" && win && win.insets.bottom !== undefined
-                           ? Math.max(win.insets.bottom, win.insets.keyboardHeight) : 0
+        const safeBottom = Math.max(win.insets.bottom, win.insets.keyboardHeight)
         let top = 8 + safeTop, bottom = 8 + safeBottom
         if (anchor && anchor.height <= 96) {
             const r = anchor.mapToItem(null, 0, 0, anchor.width, anchor.height)

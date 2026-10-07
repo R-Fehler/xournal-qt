@@ -27,8 +27,8 @@ Rectangle {
     property real leftInset: 0
     property real rightInset: 0
     /// Its buttons: a finger's size in the touch profile (48), else 40 (audit F14; qt/docs/features/adaptive-layout.md)
-    readonly property bool touch: typeof win !== "undefined" && win !== null && win.adaptive.touchProfile
-    readonly property int target: typeof win !== "undefined" && win !== null ? win.adaptive.minTarget : 40
+    readonly property bool touch: win.adaptive.touchProfile
+    readonly property int target: win.adaptive.minTarget
     implicitHeight: Math.max(46, target + 6) + topInset
     color: "#dfe1e5"
 
