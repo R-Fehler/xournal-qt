@@ -11,12 +11,12 @@ import QtQuick.Layouts
 Rectangle {
     id: fullScreenTabs
     objectName: "fullScreenTabs"
-    visible: win.chromeMode === "compact" && !win.zenShown && !app.presenting && !app.homeVisible
+    visible: win.modes.chromeMode === "compact" && !win.modes.zenShown && !app.presenting && !app.homeVisible
              && app.tabs.count > 1 && !searchBar.visible
     z: 59
     // at the top, in the middle of the window (over the notes and a reference beside them alike), below the status bar
     anchors.horizontalCenter: parent.horizontalCenter
-    y: win.controlsTop
+    y: win.insets.controlsTop
     // (thin to look at; for fingers (the touch profile) taller, with arrows as wide as a finger)
     height: win.adaptive.touchProfile ? 36 : 26
     width: Math.max(120, (tabDots.visible ? tabDots.implicitWidth : tabCountLabel.implicitWidth) + 36) + 2 * arrowWidth

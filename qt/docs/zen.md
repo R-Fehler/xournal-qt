@@ -8,9 +8,9 @@ Three switches, each on its own; the window's state (full screen) is the third:
 
 | | What | How |
 | --- | --- | --- |
-| **Full screen** (`win.fullScreenMode`) | the compact chrome in a full-screen window, as before | F11, the top bar's button |
-| **Zen** (`win.zen`) | everything around the page hidden: the toolbox (docked, floating, the phone's dock), the top bar, the tab strip and the tab dots, the phone's app bar, the sidebar and its arrow, the view pill, the back / forward pill and the other pills over the page (`win.hudHidden`). The pen keeps writing | the top bar's Zen (`zenButton`, in its first layout on every screen, phones too; qt/top-bar), ⋮ → View → Zen (checkable), **Ctrl+Alt+Z** (changeable), the floating toolbox's ⋯; automatic in a tiny window |
-| **Read only** (`win.readOnly`) | the page cannot be written on (`DocumentCanvas.readingOnly`): the pen and the fingers scroll, PDF text can be selected and copied; the left and right fifths of the page turn the pages | ⋮ → View → Read only (checkable), the dot's pill, the floating toolbox's ⋯ |
+| **Full screen** (`win.modes.fullScreenMode`) | the compact chrome in a full-screen window, as before | F11, the top bar's button |
+| **Zen** (`win.modes.zen`) | everything around the page hidden: the toolbox (docked, floating, the phone's dock), the top bar, the tab strip and the tab dots, the phone's app bar, the sidebar and its arrow, the view pill, the back / forward pill and the other pills over the page (`win.modes.hudHidden`). The pen keeps writing | the top bar's Zen (`zenButton`, in its first layout on every screen, phones too; qt/top-bar), ⋮ → View → Zen (checkable), **Ctrl+Alt+Z** (changeable), the floating toolbox's ⋯; automatic in a tiny window |
+| **Read only** (`win.modes.readOnly`) | the page cannot be written on (`DocumentCanvas.readingOnly`): the pen and the fingers scroll, PDF text can be selected and copied; the left and right fifths of the page turn the pages | ⋮ → View → Read only (checkable), the dot's pill, the floating toolbox's ⋯ |
 
 Combinations:
 
@@ -18,16 +18,16 @@ Combinations:
   a window). Ctrl+Alt+R again ends it: read only off, and Zen and full screen where Read turned them on. Esc ends it and
   leaves Zen. "Show controls" leaves only Zen (read only and full screen stay).
 - **Present without controls** (Ctrl+F5, the Present button held, ⋮ → View): presenting in Zen. While presenting, Zen
-  is `win.presentClean` (not the window's own Zen, which comes back when presenting ends). Presenting with the controls
+  is `win.modes.presentClean` (not the window's own Zen, which comes back when presenting ends). Presenting with the controls
   has no dot; Ctrl+F5 and the floating toolbox's ⋯ → "Hide the tools" hide them.
-- **A tiny window** (under 360 px either way: split screen, a pop-up window): Zen is on of itself (`win.zenAuto`).
+- **A tiny window** (under 360 px either way: split screen, a pop-up window): Zen is on of itself (`win.modes.zenAuto`).
   Leaving it there is remembered for tiny windows (`layout/tiny/zen` = `off`); turning it on there again makes it
   automatic again.
 
 ## The dot
 
 Zen's only mark (`zenDot`): a 10 px grey dot with a light rim in the lower left corner of the page, clear of the safe
-area (`win.canvasControlsLeft`, `canvasControlsBottom`). It shows at about 60 % and fades to about 20 % after 2 s; the
+area (`win.layout.canvasControlsLeft`, `canvasControlsBottom`). It shows at about 60 % and fades to about 20 % after 2 s; the
 mouse or the pen near it (a 128 px square around the corner, `zenNear`, looked through by the page) or its pill open
 make it clearer (90 %). Its target is 48 px. A tap opens its **pill** (`zenPill`) over the page beside it; the page does
 not move:

@@ -35,13 +35,13 @@ Item {
             objectName: "toolboxPresentItem"
             text: app.presenting ? qsTr("Stop presenting (Esc)") : qsTr("Present") + win.keyNote("present")
             icon.source: app.iconUrl("xopp-presentation-mode")
-            onTriggered: app.presenting ? (app.presenting = false) : win.startPresenting()
+            onTriggered: app.presenting ? (app.presenting = false) : win.modes.startPresenting()
         }
         AdaptiveMenuItem {
             objectName: "toolboxPresentCleanItem"
             text: (app.presenting ? qsTr("Hide the tools") : qsTr("Present without controls")) + win.keyNote("presentClean")
             icon.source: app.iconUrl("xqt-eye-off")
-            onTriggered: app.presenting ? (win.presentClean = true) : win.startPresenting(true)
+            onTriggered: app.presenting ? (win.modes.presentClean = true) : win.modes.startPresenting(true)
         }
         // Read only: the pen does not write, the edges turn the pages (qt/docs/zen.md)
         AdaptiveMenuItem {
@@ -49,8 +49,8 @@ Item {
             text: qsTr("Read only")
             icon.source: app.iconUrl("xqt-lock")
             checkable: true
-            checked: win.readOnlyOn
-            onTriggered: win.readOnly = !win.readOnlyOn
+            checked: win.modes.readOnlyOn
+            onTriggered: win.modes.readOnly = !win.modes.readOnlyOn
         }
         // Zen: only the page and the dot (qt/docs/zen.md)
         AdaptiveMenuItem {
@@ -58,7 +58,7 @@ Item {
             offered: !app.presenting  // (presenting: "Hide the tools" above)
             text: win.withKeys(qsTr("Zen (only the page)"), "zen")
             icon.source: app.iconUrl("xqt-zen")
-            onTriggered: win.setZen(true)
+            onTriggered: win.modes.setZen(true)
         }
         AdaptiveMenuItem {
             objectName: "toolboxSearchItem"
@@ -77,7 +77,7 @@ Item {
             objectName: "toolboxLeaveFullScreenItem"
             text: qsTr("Leave full screen") + (app.presenting ? "" : qsTr(" (Esc)"))
             icon.source: app.iconUrl("xopp-fullscreen")
-            onTriggered: win.fullScreenMode = false
+            onTriggered: win.modes.fullScreenMode = false
         }
         // What the top bar holds (full screen hides it; qt/top-bar): its items in its order, the members of a group one
         // by one, without what is above already; and New (the tab strip's "+" is not shown in full screen)

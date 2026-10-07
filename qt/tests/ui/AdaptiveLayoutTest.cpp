@@ -1491,7 +1491,7 @@ TEST_F(AdaptiveLayoutTest, sidebarChoicesAreKeptPerSizeClass) {
     // Its button: a drawer over the page
     click(pages);
     EXPECT_TRUE(sidebar->isVisible());
-    EXPECT_TRUE(flag("sidebarAsDrawer"));
+    EXPECT_FALSE(window->property("layout").value<QObject*>()->property("sidebarDocked").toBool()) << "a drawer";
     EXPECT_DOUBLE_EQ(canvas->mapToScene(QPointF(0, 0)).x(), canvasX) << "over the page, not beside it";
     auto* scrim = findItem("sidebarScrim");
     ASSERT_NE(scrim, nullptr);
@@ -1525,7 +1525,7 @@ TEST_F(AdaptiveLayoutTest, sidebarChoicesAreKeptPerSizeClass) {
     click(pages);
     click(findItem("sidebarPin"));
     EXPECT_TRUE(sidebar->isVisible());
-    EXPECT_FALSE(flag("sidebarAsDrawer"));
+    EXPECT_TRUE(window->property("layout").value<QObject*>()->property("sidebarDocked").toBool()) << "beside the page";
     EXPECT_GT(canvas->mapToScene(QPointF(0, 0)).x(), canvasX) << "beside the page";
     EXPECT_EQ(choice("tabletPortrait", "sidebar"), "shown");
 
@@ -1562,7 +1562,7 @@ TEST_F(AdaptiveLayoutTest, sidebarChoicesAreKeptPerSizeClass) {
     EXPECT_EQ(sizeClass(), "tabletPortrait") << "the class is still known (Settings shows it)";
     EXPECT_EQ(adaptive->property("layoutClass").toString(), "desktopWide");
     EXPECT_TRUE(sidebar->isVisible());
-    EXPECT_FALSE(flag("sidebarAsDrawer"));
+    EXPECT_TRUE(window->property("layout").value<QObject*>()->property("sidebarDocked").toBool()) << "beside the page";
 }
 
 // A window edge dragged a little past a limit does not change the class; while a pointer is held (a stroke) nothing

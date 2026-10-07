@@ -9,10 +9,10 @@ import QtQuick.Layouts
 Pane {
     id: navPill
     objectName: "navPill"
-    visible: (app.canGoBack || app.canGoForward) && !pageGrid.visible && !win.hudHidden
+    visible: (app.canGoBack || app.canGoForward) && !pageGrid.visible && !win.modes.hudHidden
     anchors.left: canvas.left
-    anchors.leftMargin: (zenDot.visible ? 56 : 20) + win.canvasControlsLeft - canvas.x  // (in Zen: beside the dot)
-    readonly property real clearY: win.clearOfPills(navPill, win.canvasControlsBottom - 24 - height, [viewPill])
+    anchors.leftMargin: (zenDot.visible ? 56 : 20) + win.layout.canvasControlsLeft - canvas.x  // (in Zen: beside the dot)
+    readonly property real clearY: win.layout.clearOfPills(navPill, win.layout.canvasControlsBottom - 24 - height, [viewPill])
     y: clearY
     padding: 2
     Material.foreground: "#303030"

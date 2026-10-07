@@ -14,8 +14,8 @@ Pane {
     visible: opened && zenDot.visible
     onVisibleChanged: if (!visible) opened = false
     z: 92
-    x: Math.min(zenDot.x + zenDot.width - 6, win.canvasControlsRight - width - 8)
-    y: Math.max(win.canvasControlsTop + 8, zenDot.y + zenDot.height - height - 4)
+    x: Math.min(zenDot.x + zenDot.width - 6, win.layout.canvasControlsRight - width - 8)
+    y: Math.max(win.layout.canvasControlsTop + 8, zenDot.y + zenDot.height - height - 4)
     padding: 4
     Material.foreground: "#303030"
     background: Rectangle {
@@ -38,22 +38,22 @@ Pane {
             focusPolicy: Qt.NoFocus
             onClicked: {
                 zenPill.opened = false
-                win.readStarted = false  // (Read broken up: read only and full screen stay)
-                win.setZen(false)
+                win.modes.readStarted = false  // (Read broken up: read only and full screen stay)
+                win.modes.setZen(false)
             }
         }
         Switch {
             id: zenReadOnly
             objectName: "zenReadOnly"
-            visible: win.readOnlyOffered
+            visible: win.modes.readOnlyOffered
             Layout.fillWidth: true
             implicitHeight: Math.max(44, win.adaptive.minTarget)
             text: qsTr("Read only")
             focusPolicy: Qt.NoFocus
-            checked: win.readOnlyOn
+            checked: win.modes.readOnlyOn
             onToggled: {
-                win.readOnly = checked
-                checked = Qt.binding(function() { return win.readOnlyOn })
+                win.modes.readOnly = checked
+                checked = Qt.binding(function() { return win.modes.readOnlyOn })
             }
         }
         RowLayout {

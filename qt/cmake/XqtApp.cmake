@@ -205,6 +205,10 @@ endif()
 # The QML UI as a static QML module (XournalQt), used by the app and by the UI tests.
 set(XQT_QML_FILES
     src/app/qml/Main.qml
+    # (the window's state objects: win.insets, win.modes, win.layout)
+    src/app/qml/WindowInsets.qml
+    src/app/qml/ViewModes.qml
+    src/app/qml/ChromeLayout.qml
     # (the parts of the window, each instantiated once in Main.qml)
     src/app/qml/SaveFlow.qml
     src/app/qml/ShareFlow.qml

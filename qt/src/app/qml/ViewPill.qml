@@ -13,29 +13,29 @@ Pane {
     readonly property alias layoutMenu: layoutMenu
     readonly property alias fitMenu: fitMenu
     // also in full screen; presenting only the page number, for a moment (presentPageIndicator); not in Zen
-    visible: !pageGrid.visible && !contentsOverview.visible && !app.presenting && !win.hudHidden && !win.phoneChrome
+    visible: !pageGrid.visible && !contentsOverview.visible && !app.presenting && !win.modes.hudHidden && !win.layout.phoneChrome
     /// The compact pill, in a canvas under 520 px wide (a phone, a half beside the reference or the source): undo,
-    /// redo (while the tool bar is not shown: win.undoInToolBar), the page number (a tap: all pages), the contents
+    /// redo (while the tool bar is not shown: win.layout.undoInToolBar), the page number (a tap: all pages), the contents
     /// and the zoom; the page layout is in ⋮ → View then
     readonly property bool compact: canvas.width < 520
     /// Narrower than the compact pill (a very small window): no redo (Ctrl+Y) and no separators
     readonly property bool tight: canvas.width < 360
     /// The page layout button: not in a phone's portrait nor in the compact pill (it is in ⋮ → View there)
     readonly property bool layoutShown: ["phonePortrait", "tiny"].indexOf(win.adaptive.layoutClass) < 0 && !compact
-                                        && !win.phoneChrome
+                                        && !win.layout.phoneChrome
     // At the canvas's lower right corner, always inside the canvas (8 px from its edges where 28 is too much), and
     // above the reference's pill where the two would meet
     readonly property rect refPill: Qt.rect(referenceSplit.x + referenceSplit.pillRect.x,
                                             referenceSplit.y + referenceSplit.pillRect.y,
                                             referenceSplit.pillRect.width, referenceSplit.pillRect.height)
-    x: Math.max(win.canvasControlsLeft + 8, win.canvasControlsRight - width
-                - (win.canvasControlsRight - win.canvasControlsLeft - width >= 56 ? 28 : 8))
+    x: Math.max(win.layout.canvasControlsLeft + 8, win.layout.canvasControlsRight - width
+                - (win.layout.canvasControlsRight - win.layout.canvasControlsLeft - width >= 56 ? 28 : 8))
     /// (above the toolbox floating at the bottom edge where the two would meet: full screen, on a phone held
     /// upright too)
     readonly property real lowY: {
-        const y = win.canvasControlsBottom - 24 - height
+        const y = win.layout.canvasControlsBottom - 24 - height
         const t = toolboxPane
-        const meetsToolbox = win.toolboxFloating && t.edge === "bottom" && x < t.x + t.width && x + width > t.x
+        const meetsToolbox = win.layout.toolboxFloating && t.edge === "bottom" && x < t.x + t.width && x + width > t.x
         return meetsToolbox ? Math.min(y, t.y - 12 - height) : y
     }
     readonly property bool meetsReference: refPill.width > 0 && x < refPill.x + refPill.width && x + width > refPill.x
@@ -56,7 +56,7 @@ Pane {
         // Undo and redo while the tool bar is not shown (it leads with them otherwise: one place at a time)
         IconButton {
             objectName: "undoButton"
-            visible: !win.undoInToolBar && !win.toolboxShown && !win.undoInFormatBar
+            visible: !win.layout.undoInToolBar && !win.layout.toolboxShown && !win.layout.toolsInFormatBar
             iconName: "xopp-edit-undo"
             label: qsTr("Undo")
             tip: win.withKeys(qsTr("Undo"), "undo")
@@ -67,7 +67,7 @@ Pane {
         }
         IconButton {
             objectName: "redoButton"
-            visible: !win.undoInToolBar && !win.toolboxShown && !win.undoInFormatBar && !viewPill.tight
+            visible: !win.layout.undoInToolBar && !win.layout.toolboxShown && !win.layout.toolsInFormatBar && !viewPill.tight
             iconName: "xopp-edit-redo"
             label: qsTr("Redo")
             tip: win.withKeys(qsTr("Redo"), "redo")
@@ -76,7 +76,7 @@ Pane {
             enabled: app.canRedo
             onClicked: app.redo()
         }
-        ToolSeparator { visible: !win.undoInToolBar && !win.toolboxShown && !win.undoInFormatBar && !viewPill.tight }
+        ToolSeparator { visible: !win.layout.undoInToolBar && !win.layout.toolboxShown && !win.layout.toolsInFormatBar && !viewPill.tight }
         IconButton {
             objectName: "layoutButton"
             visible: viewPill.layoutShown
@@ -193,7 +193,7 @@ Pane {
                 AdaptiveMenuItem {
                     objectName: "snapPagesItem"
                     text: qsTr("Stop on whole pages")
-                    enabled: app.horizontalScrolling || win.reading  // (up and down: while reading)
+                    enabled: app.horizontalScrolling || win.modes.readOnlyOn  // (up and down: while reading)
                     checkable: true
                     checked: app.snapPages
                     onTriggered: app.snapPages = !app.snapPages

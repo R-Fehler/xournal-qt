@@ -9,8 +9,8 @@ import QtQuick.Layouts
 // keeps the end of the bar), and a slim strip while it is away. A finger gets a target of minTarget around the tab.
 Item {
     objectName: "toolbarToggle"
-    visible: !app.homeVisible && win.fullChrome && !app.toolbarHidden && !win.toolsInFormatBar && !win.phoneChrome
-             && !win.replaying
+    visible: !app.homeVisible && win.modes.fullChrome && !app.toolbarHidden && !win.layout.toolsInFormatBar && !win.layout.phoneChrome
+             && !win.modes.replaying
     z: 58
     /// The target: a finger's size in the touch profile, reaching into the pages (not over the bar's buttons)
     readonly property real grip: win.adaptive.touchProfile ? win.adaptive.minTarget : 18

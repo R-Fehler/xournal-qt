@@ -84,7 +84,7 @@ short.
 - **Entered** from ⋮ → View → **Replay the writing** (not in text files), or from the playback pill's replay button
   (the replay starts where the recording is heard and plays on). The document is replayed from the start, paused.
 - **The play bar** at the bottom of the page (`timelineBar`, below "The play bar"). ← and → go 5 s, Home and End to
-  the ends, Space plays and pauses, Esc leaves. **The tools are put away** (`win.replaying`): the toolbox (docked or
+  the ends, Space plays and pauses, Esc leaves. **The tools are put away** (`win.modes.replaying`): the toolbox (docked or
   floating), the top bar with its tab, the phone's dock, the view pill and the pills; the tab strip and a phone's
   app bar (with ⋮) stay. (Before qt/replay-polish only the toolbox was hidden: the command bar then took its tools back
   and showed the classic tool bar, the phone's dock its classic tools; `TimelineUiTest.theToolboxModeShowsNoClassicToolBarDuringOrAfterAReplay`.
@@ -148,7 +148,7 @@ understand for the first time user." `TimelineBar.qml`, placed by `Main.qml`.
   a narrow window): the slider on its own row with "Replay" before it, then the time and the buttons. The bar is as
   wide as the page's area allows (at most 960 px), centred in it, 16 px (a phone: 12) off its sides, so the slider's
   ends are well away from the screen's edges (Android's back gesture starts there), and above the bottom of the page
-  by 16 px (10) **plus the safe area** (`win.canvasControlsBottom`: above Android's navigation or gesture bar and the
+  by 16 px (10) **plus the safe area** (`win.layout.canvasControlsBottom`: above Android's navigation or gesture bar and the
   soft keyboard; clear of a cut-out at a side). The phone's dock, the view pill and the tools are put away meanwhile,
   so it meets none of them. The bar takes every press, wheel and finger on it (the page under it does not scroll);
   the gap above it is the page's (`inputTransparent`).

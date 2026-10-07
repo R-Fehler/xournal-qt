@@ -25,19 +25,19 @@ Popup {
     readonly property bool narrow: width < 600
     /// On a phone: a section is shown (else the list of them)
     property bool sectionShown: false
-    /// The window's safe area and the soft keyboard (Main.qml: win.safeInsets, win.keyboardTop)
-    readonly property bool inWindow: win !== null && win !== undefined && win.safeInsets !== undefined
+    /// The window's safe area and the soft keyboard (Main.qml: win.insets, win.insets.keyboardTop)
+    readonly property bool inWindow: win !== null && win !== undefined && win.insets !== undefined
     readonly property real keyboardTop: {
-        if (inWindow) return win.keyboardOpen ? win.keyboardTop : Infinity
+        if (inWindow) return win.insets.keyboardOpen ? win.insets.keyboardTop : Infinity
         const r = Qt.inputMethod.keyboardRectangle
         return Qt.inputMethod.visible && r.height > 0 ? r.y / (Qt.platform.os === "android" ? Screen.devicePixelRatio : 1)
                                                       : Infinity
     }
-    readonly property real safeTop: inWindow ? win.safeTop : 0
-    readonly property real safeLeft: inWindow ? win.safeLeft : 0
-    readonly property real safeRight: inWindow ? win.safeRight : 0
+    readonly property real safeTop: inWindow ? win.insets.top : 0
+    readonly property real safeLeft: inWindow ? win.insets.left : 0
+    readonly property real safeRight: inWindow ? win.insets.right : 0
     /// Above the soft keyboard while it is open, else above the navigation bar
-    readonly property real roomBottom: parent ? Math.min(parent.height - (inWindow ? win.safeBottom : 0), keyboardTop) : 700
+    readonly property real roomBottom: parent ? Math.min(parent.height - (inWindow ? win.insets.bottom : 0), keyboardTop) : 700
     readonly property real parentWidth: parent ? parent.width - safeLeft - safeRight : 900
     x: safeLeft + (phone ? 0 : Math.round((parentWidth - width) / 2))
     y: phone ? safeTop : Math.round(Math.max(safeTop + 24, ((parent ? parent.height : 700) - height) / 2))

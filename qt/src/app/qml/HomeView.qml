@@ -35,7 +35,7 @@ Rectangle {
     /// What a finger needs (48 with the touch profile, else 40)
     readonly property int minTarget: adaptive ? adaptive.minTarget : 40
     /// The part of its bottom under the navigation bar (not where the soft keyboard's room is below it)
-    readonly property real safeBottom: typeof win !== "undefined" && win && win.contentBottomInset ? win.contentBottomInset : 0
+    readonly property real safeBottom: typeof win !== "undefined" && win && win.insets.contentBottomInset ? win.insets.contentBottomInset : 0
     /// Room below the last cards for the floating "+" of a phone
     readonly property real fabSpace: phoneLayout ? 72 : 0
 

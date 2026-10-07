@@ -122,6 +122,9 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
       dots, the toasts and the read-only note sit where they did, over the page and under the home screen.
 - [ ] ⋮, the toolbox's menus and the catalog open at their buttons (a sheet on the phone); Back closes a sheet, then
       leaves Zen, as before.
+- [ ] The window's state in its own objects (`win.insets`, `win.modes`, `win.layout`, 2026-10): on the Fold, the
+      controls stay clear of the status and gesture bars and above the soft keyboard; F11, F5, Read and Zen enter and
+      leave as before, and leaving full screen goes back to maximized on KDE.
 
 ## Esc and Back (`qt/qml-split-2`)
 

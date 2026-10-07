@@ -10,11 +10,11 @@ import QtQuick.Layouts
 Item {
     id: sourceDivider
     objectName: "sourceDivider"
-    visible: win.sourcePanel !== null && win.sourceAtBottom && !app.homeVisible
-    x: win.sourcePanel ? win.sourcePanel.x : 0
-    width: win.sourcePanel ? win.sourcePanel.width : 0
+    visible: win.layout.sourcePanel !== null && win.layout.sourceAtBottom && !app.homeVisible
+    x: win.layout.sourcePanel ? win.layout.sourcePanel.x : 0
+    width: win.layout.sourcePanel ? win.layout.sourcePanel.width : 0
     height: 24
-    y: (win.sourcePanel ? win.sourcePanel.y : 0) - height / 2
+    y: (win.layout.sourcePanel ? win.layout.sourcePanel.y : 0) - height / 2
     z: 3
     Rectangle {
         objectName: "sourceDividerGrip"
@@ -42,11 +42,11 @@ Item {
         property real startTop: 0
         onActiveChanged: {
             if (active) {
-                startTop = win.sourcePanel.y
-                win.sourceShareLive = win.sourcePageShare
+                startTop = win.layout.sourcePanel.y
+                win.layout.sourceShareLive = win.layout.sourcePageShare
             } else {
-                const share = win.sourceShareLive
-                win.sourceShareLive = -1
+                const share = win.layout.sourceShareLive
+                win.layout.sourceShareLive = -1
                 const auto = win.adaptive.phone ? 0.4 : 0.5
                 win.chooseLayout("sourceSplit", Math.abs(share - auto) < 0.01 ? "" : share.toFixed(3))
             }
@@ -54,7 +54,7 @@ Item {
         onTranslationChanged: {
             if (!active) return
             const h = Math.max(1, sourceDivider.parent.height)
-            win.sourceShareLive = Math.max(0.2, Math.min(0.8, (startTop + translation.y) / h))
+            win.layout.sourceShareLive = Math.max(0.2, Math.min(0.8, (startTop + translation.y) / h))
         }
     }
 }

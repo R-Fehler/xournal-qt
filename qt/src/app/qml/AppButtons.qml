@@ -365,30 +365,30 @@ Item {
             id: fullScreenTool
             objectName: "fullScreenButton"
             parent: toolBank
-            property bool offered: !win.fullScreenMode
+            property bool offered: !win.modes.fullScreenMode
             iconName: "xopp-fullscreen"
             label: qsTr("Full screen")
             tip: qsTr("Full screen") + win.keyNote("fullScreen")
-            onClicked: win.fullScreenMode = true
+            onClicked: win.modes.fullScreenMode = true
         }
         // Present: full screen, page by page (from the current page); held or right-clicked: only the page
         IconButton {
             id: presentTool
             objectName: "presentButton"
             parent: toolBank
-            property bool offered: !win.fullScreenMode
+            property bool offered: !win.modes.fullScreenMode
             iconName: "xopp-presentation-mode"
             label: qsTr("Present")
             tip: qsTr("Present%1. Hold: its menu with \"Present without controls\"%2").arg(win.keyNote("present")).arg(win.keyNote("presentClean"))
             ownHold: true
             /// What its long press does (in its menu on a bar)
             readonly property string holdText: qsTr("Present without controls") + win.keyNote("presentClean")
-            onClicked: win.startPresenting()
-            onPressAndHold: win.startPresenting(true)
+            onClicked: win.modes.startPresenting()
+            onPressAndHold: win.modes.startPresenting(true)
             TapHandler {
                 acceptedButtons: Qt.RightButton
                 acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
-                onTapped: win.startPresenting(true)
+                onTapped: win.modes.startPresenting(true)
             }
         }
         IconButton {
@@ -504,7 +504,7 @@ Item {
             iconName: "xqt-book-open"
             label: qsTr("Read")
             tip: win.withKeys(qsTr("Read: Zen and read only, in full screen (the edges turn the pages)"), "read")
-            onClicked: win.startReading()
+            onClicked: win.modes.startReading()
         }
         // Zen: only the page and a faint dot in the lower left corner (qt/docs/zen.md)
         IconButton {
@@ -514,7 +514,7 @@ Item {
             iconName: "xqt-zen"
             label: qsTr("Zen")
             tip: win.withKeys(qsTr("Zen: only the page (the dot in the lower left corner brings the controls back)"), "zen")
-            onClicked: win.setZen(true)
+            onClicked: win.modes.setZen(true)
         }
         IconButton {
             id: replayTool

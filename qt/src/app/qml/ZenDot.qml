@@ -11,10 +11,10 @@ import QtQuick.Layouts
 AbstractButton {
     id: zenDot
     objectName: "zenDot"
-    visible: win.zenShown && !pageGrid.visible && !contentsOverview.visible
+    visible: win.modes.zenShown && !pageGrid.visible && !contentsOverview.visible
     z: 91
-    x: win.canvasControlsLeft
-    y: win.canvasControlsBottom - height
+    x: win.layout.canvasControlsLeft
+    y: win.layout.canvasControlsBottom - height
     width: 48
     height: 48
     focusPolicy: Qt.NoFocus  // (the keys stay with the page)
