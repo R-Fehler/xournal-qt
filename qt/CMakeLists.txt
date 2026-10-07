@@ -3,7 +3,7 @@
 #   cmake -S qt -B build-qt -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake_minimum_required(VERSION 3.21)
 
-project(xournal-qt VERSION 0.8.0 LANGUAGES C CXX)
+project(xournal-qt VERSION 0.9.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
