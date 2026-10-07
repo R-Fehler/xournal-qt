@@ -23,6 +23,8 @@
 #include <functional>
 #include <memory>
 
+#include "WindowContext.h"
+
 namespace xqt {
 class AudioControl;
 class CanvasView;
@@ -60,8 +62,8 @@ class TimelineControl: public QObject {
     Q_PROPERTY(int elementCount READ elementCount NOTIFY activeChanged)
 
 public:
-    TimelineControl(std::function<DocumentSession*()> session, std::function<CanvasView*()> canvas, AudioControl* audio,
-                    QObject* parent = nullptr);
+    /// One per window: it replays the window's current document (with the window's recordings: `audio`).
+    TimelineControl(const WindowContext& window, AudioControl* audio, QObject* parent = nullptr);
     ~TimelineControl() override;
 
     bool active() const { return line != nullptr; }
@@ -119,8 +121,9 @@ private:
     void syncAudio();
     void stopAudio();
 
-    std::function<DocumentSession*()> currentSession;
-    std::function<CanvasView*()> currentCanvas;
+    DocumentSession* currentSession() const { return window.session(); }
+    CanvasView* currentCanvas() const { return window.view(); }
+    WindowContext window;
     QPointer<AudioControl> audio;
     std::shared_ptr<const timeline::Timeline> line;
     QPointer<DocumentSession> session;

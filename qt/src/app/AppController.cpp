@@ -152,6 +152,7 @@ AppController::AppController(QObject* parent):
 AppController::AppController(AppServices& services, QObject* parent): QObject(parent) { setUp(services); }
 
 AppContext& AppController::context() const { return *appServices->context(); }
+WindowContext AppController::windowContext() const { return {*appServices, *tabs, *current}; }
 
 void AppController::setUp(AppServices& services) {
     appServices = &services;
@@ -2758,14 +2759,8 @@ QObject* AppController::audioObject() const { return audioControl.get(); }
 QObject* AppController::timelineObject() const { return timelineControl.get(); }
 
 void AppController::makeAudioControl() {
-    audioControl = std::make_unique<AudioControl>(
-            [this] { return session(); },
-            [](DocumentSession* s) {
-                return s && s->hasFilePath() ? QString::fromStdU16String(s->getFilePath().filename().u16string())
-                                             : QCoreApplication::translate("AudioControl", "Untitled");
-            });
-    timelineControl = std::make_unique<TimelineControl>([this] { return session(); }, [this] { return canvas(); },
-                                                        audioControl.get());
+    audioControl = std::make_unique<AudioControl>(windowContext());
+    timelineControl = std::make_unique<TimelineControl>(windowContext(), audioControl.get());
 }
 
 bool AppController::openAsReference(const QString& path) {

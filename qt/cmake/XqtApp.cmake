@@ -175,6 +175,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/BackgroundJobs.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/CurrentDocument.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/CurrentDocument.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowContext.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowContext.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTextFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppQuickNote.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp

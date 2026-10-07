@@ -48,6 +48,8 @@
 #include "session/PdfEncryption.h"
 #include "session/TextMatch.h"
 
+#include "WindowContext.h"
+
 class QQuickTextDocument;
 class QWindow;
 
@@ -1536,6 +1538,8 @@ public:
 
     /// The settings, tools and rendering, shared by all windows of the process (AppServices::context)
     xqt::AppContext& context() const;
+    /// What the window's feature objects get from it (its services, tabs and current document); made after the tabs
+    xqt::WindowContext windowContext() const;
     xqt::TabManager& tabManager() const { return *tabs; }
     /// The current tab's document and view, with their signals (what follows "the current document" connects here)
     xqt::CurrentDocument& currentDocument() const { return *current; }

@@ -31,6 +31,8 @@
 #include <QString>
 #include <QVariantList>
 
+#include "WindowContext.h"
+
 namespace xqt {
 class DocumentSession;
 namespace audio {
@@ -99,9 +101,8 @@ public:
     /// What the platform's controls ask for (the notification's buttons)
     enum class PlatformCommand { Pause = 1, Resume = 2, Stop = 3 };
 
-    /// `current`: the document of the current tab (nullptr: none); `page`: its current page; `title`: its title.
-    AudioControl(std::function<DocumentSession*()> current, std::function<QString(DocumentSession*)> title,
-                 QObject* parent = nullptr);
+    /// One per window: it records and plays for the window's current document.
+    explicit AudioControl(const WindowContext& window, QObject* parent = nullptr);
     ~AudioControl() override;
 
     bool available() const;
@@ -182,8 +183,9 @@ private:
     PlatformState told;
     bool denied = false;
     bool asking = false;
-    std::function<DocumentSession*()> current;
-    std::function<QString(DocumentSession*)> titleOf;
+    /// The document of the window's current tab (nullptr: none)
+    DocumentSession* current() const { return window.session(); }
+    WindowContext window;
     std::unique_ptr<audio::Recorder> recorder;
     std::unique_ptr<audio::Player> player;
     QPointer<DocumentSession> recordingFor;
