@@ -11,6 +11,8 @@
  */
 #pragma once
 
+#include <functional>
+#include <memory>
 #include <string>
 
 #include <QString>
@@ -18,6 +20,8 @@
 #include "filesystem.h"
 #include "DocumentFiles.h"
 #include "LibraryCache.h"
+
+class QJsonObject;
 
 namespace xqt {
 
@@ -79,7 +83,8 @@ public:
     /// needed): what is not a cache and must survive cleaning it, e.g. the reading positions.
     fs::path configDir() const;
     /// Where the library keeps its cache: in its folders or in the app's cache folder (for folders that sync clients
-    /// upload). A setting of the library, kept in its config folder; without one, defaultCacheMode().
+    /// upload). A setting of the library, kept in its config folder ("library.json", read once by this Library and
+    /// its copies, which also keep what they write there); without one, defaultCacheMode().
     CacheLocation::Mode cacheMode() const;
     void setCacheMode(CacheLocation::Mode mode) const;
     /// The library has a cache setting of its own (else it follows defaultCacheMode()).
@@ -102,7 +107,14 @@ public:
     std::string relative(const fs::path& p) const;
 
 private:
+    struct SettingsCache;
+    /// Its "library.json" (read once)
+    QJsonObject settings() const;
+    /// Change it (the other settings stay as they are), on disk and in memory
+    void changeSettings(const std::function<void(QJsonObject&)>& change) const;
+
     fs::path rootDir;
+    std::shared_ptr<SettingsCache> cache;  ///< (shared by copies: the same library)
 };
 
 }  // namespace xqt

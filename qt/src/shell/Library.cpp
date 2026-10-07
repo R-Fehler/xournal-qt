@@ -38,7 +38,7 @@ fs::path normalized(const fs::path& p) {
 }
 }  // namespace
 
-Library::Library(const fs::path& root): rootDir(normalized(root)) {}
+Library::Library(const fs::path& root): rootDir(normalized(root)), cache(std::make_shared<SettingsCache>()) {}
 
 namespace {
 #ifdef Q_OS_ANDROID
@@ -161,12 +161,29 @@ std::string Library::key() const { return hashOf(rootDir.string(), 12).toStdStri
 
 fs::path Library::configDir() const { return Util::getConfigSubfolder(fs::path("libraries") / key()); }
 
-namespace {
-QJsonObject settingsOf(const fs::path& file) {
-    QFile f(QString::fromStdString(file.string()));
-    return f.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(f.readAll()).object() : QJsonObject();
+struct Library::SettingsCache {
+    std::mutex mtx;
+    std::optional<QJsonObject> json;
+};
+
+QJsonObject Library::settings() const {
+    std::lock_guard lock(cache->mtx);
+    if (!cache->json) {
+        QFile f(QString::fromStdString((configDir() / "library.json").string()));
+        cache->json = f.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(f.readAll()).object() : QJsonObject();
+    }
+    return *cache->json;
 }
-}  // namespace
+
+void Library::changeSettings(const std::function<void(QJsonObject&)>& change) const {
+    QJsonObject json = settings();
+    json["root"] = QString::fromStdString(rootDir.string());  // (for people looking at the folder)
+    change(json);
+    fileio::writeFileAtomically(QString::fromStdString((configDir() / "library.json").string()),
+                                QJsonDocument(json).toJson());
+    std::lock_guard lock(cache->mtx);
+    cache->json = std::move(json);
+}
 
 namespace {
 #ifdef Q_OS_ANDROID
@@ -180,34 +197,24 @@ CacheLocation::Mode Library::defaultCacheMode() { return platformCacheMode; }
 void Library::setDefaultCacheMode(CacheLocation::Mode mode) { platformCacheMode = mode; }
 
 CacheLocation::Mode Library::cacheMode() const {
-    const QString mode = settingsOf(configDir() / "library.json").value("cache").toString();
+    const QString mode = settings().value("cache").toString();
     return mode == QLatin1String("app")       ? CacheLocation::Mode::AppCache
            : mode == QLatin1String("folders") ? CacheLocation::Mode::Folders
                                               : defaultCacheMode();
 }
 
 bool Library::hasCacheSetting() const {
-    return settingsOf(configDir() / "library.json").value("cache").isString();
+    return settings().value("cache").isString();
 }
-
-namespace {
-/// Change the settings of a library in its "library.json" (the others stay as they are).
-void changeSettings(const fs::path& file, const fs::path& root, const std::function<void(QJsonObject&)>& change) {
-    QJsonObject settings = settingsOf(file);
-    settings["root"] = QString::fromStdString(root.string());  // (for people looking at the folder)
-    change(settings);
-    fileio::writeFileAtomically(QString::fromStdString(file.string()), QJsonDocument(settings).toJson());
-}
-}  // namespace
 
 void Library::setCacheMode(CacheLocation::Mode mode) const {
-    changeSettings(configDir() / "library.json", rootDir, [mode](QJsonObject& settings) {
+    changeSettings([mode](QJsonObject& settings) {
         settings["cache"] = mode == CacheLocation::Mode::AppCache ? "app" : "folders";
     });
 }
 
 ShowFilter Library::showFilter() const {
-    const QJsonObject show = settingsOf(configDir() / "library.json").value("show").toObject();
+    const QJsonObject show = settings().value("show").toObject();
     ShowFilter f;
     auto read = [&](const char* key, bool& value) { value = show.value(QLatin1String(key)).toBool(value); };
     read("notes", f.notes);
@@ -222,7 +229,7 @@ ShowFilter Library::showFilter() const {
 }
 
 void Library::setShowFilter(const ShowFilter& f) const {
-    changeSettings(configDir() / "library.json", rootDir, [&f](QJsonObject& settings) {
+    changeSettings([&f](QJsonObject& settings) {
         settings["show"] = QJsonObject{{"notes", f.notes},   {"pdfs", f.pdfs}, {"onlyPdfsWithNotes", f.onlyPdfsWithNotes},
                                        {"onlyTextDocuments", f.onlyTextDocuments},
                                        {"markdown", f.markdown}, {"images", f.images}, {"text", f.text},

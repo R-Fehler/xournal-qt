@@ -1412,6 +1412,24 @@ TEST_F(LibraryTest, theCacheDefaultsToTheFoldersOnTheDesktopAndToTheAppCacheOnAn
     fs::remove(Library(root).configDir() / "library.json");
 }
 
+// The library's settings ("library.json": the cache mode, the "Show" filter) are read once per Library, not on every
+// getter (cacheInAppCache is a property QML reads); what it writes is kept too.
+TEST_F(LibraryTest, theLibrarySettingsAreReadOnce) {
+    const Library lib(root);
+    lib.setCacheMode(CacheLocation::Mode::AppCache);
+    ShowFilter f;
+    f.images = false;
+    lib.setShowFilter(f);
+    const fs::path file = lib.configDir() / "library.json";
+    ASSERT_TRUE(fs::exists(file));
+    EXPECT_EQ(Library(root).cacheMode(), CacheLocation::Mode::AppCache) << "on disk for the next one";
+    fs::remove(file);
+    EXPECT_EQ(lib.cacheMode(), CacheLocation::Mode::AppCache) << "kept, not read again";
+    EXPECT_TRUE(lib.hasCacheSetting());
+    EXPECT_FALSE(lib.showFilter().images);
+    EXPECT_FALSE(Library(root).hasCacheSetting()) << "a new one reads the file";
+}
+
 // A library with cache folders of its own (from a desktop, or from before the default) opened where the default is
 // the app cache: the folders' caches move there once, nothing is read again.
 TEST_F(LibraryTest, cacheFoldersMoveToTheAppCacheWhenThatIsTheDefault) {
