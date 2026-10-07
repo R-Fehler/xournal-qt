@@ -108,7 +108,7 @@ Popup {
         close()
         if (templates) {
             // (the window's dialog: one for the page menus, the add-page button's list and this)
-            if (typeof win !== "undefined" && win) win.openTemplateSave(app.pageNumber - 1)
+            win.actions.openTemplateSave(app.pageNumber - 1)
             return
         }
         if (!saveLoader.item.openForSelection())

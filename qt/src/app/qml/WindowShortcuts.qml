@@ -210,7 +210,7 @@ Item {
         enabled: app.tabs.count > 0  // (a property: an invokable in a binding would not be read again)
         onActivated: { pageGrid.close(); app.homeVisible = false; tabOverview.openSearch() }
     }
-    Shortcut { sequences: win.keysOf("searchLibrary"); onActivated: win.searchLibrary() }
+    Shortcut { sequences: win.keysOf("searchLibrary"); onActivated: win.actions.searchLibrary() }
     Shortcut { sequences: win.keysOf("settings"); onActivated: settingsPage.open() }
     Shortcut { sequences: win.keysOf("shortcuts"); onActivated: shortcutSheet.open() }
     // (not StandardKey.FullScreen as well: it is F11 on KDE, twice the same key is ambiguous)

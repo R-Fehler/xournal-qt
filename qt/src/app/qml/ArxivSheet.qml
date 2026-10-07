@@ -217,7 +217,7 @@ AdaptiveDialog {
                             objectName: "arxivAbs"
                             text: qsTr("Open on arxiv.org")
                             flat: true
-                            onClicked: { const u = row.modelData.absUrl; win.openWebAddress(u, text) }
+                            onClicked: { const u = row.modelData.absUrl; win.actions.openWebAddress(u, text) }
                         }
                     }
                 }

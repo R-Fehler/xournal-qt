@@ -187,7 +187,7 @@ AdaptiveDialog {
                 text: qsTr("Search in Google Scholar")
                 flat: true
                 enabled: sheet.scholarUrl !== ""
-                onClicked: { const u = sheet.scholarUrl; sheet.close(); win.openWebAddress(u, text) }
+                onClicked: { const u = sheet.scholarUrl; sheet.close(); win.actions.openWebAddress(u, text) }
             }
             Label {
                 objectName: "findPaperScholarUrl"
@@ -203,7 +203,7 @@ AdaptiveDialog {
                 text: qsTr("Search arXiv")
                 flat: true
                 enabled: sheet.arxivUrl !== ""
-                onClicked: { const t = titleField.text; sheet.close(); win.arxivSearch(t) }
+                onClicked: { const t = titleField.text; sheet.close(); win.actions.arxivSearch(t) }
             }
             Label {
                 objectName: "findPaperArxivUrl"

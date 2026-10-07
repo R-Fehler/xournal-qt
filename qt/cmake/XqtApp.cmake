@@ -236,6 +236,7 @@ set(XQT_QML_FILES
     src/app/qml/ChromeLayout.qml
     # (the parts of the window, each instantiated once in Main.qml)
     src/app/qml/SaveFlow.qml
+    src/app/qml/WindowActions.qml
     src/app/qml/ShareFlow.qml
     src/app/qml/ExportFlow.qml
     src/app/qml/ProtectionDialogs.qml

@@ -50,6 +50,9 @@ ApplicationWindow {
     /// The page sidebar, the controls' room over the canvas, the source panel, the phone chrome, the command bar and
     /// the toolbox's edge
     readonly property ChromeLayout layout: ChromeLayout { id: chromeLayout }
+    /// What the window's parts ask the window to do: the look-ups of selected text, pages as files and templates, and
+    /// the dialogs `app` asks for (WindowActions.qml)
+    readonly property WindowActions actions: WindowActions { id: windowActions }
     // The window's test and C++ API (qt/docs/review/2026-10/qml.md §1.3): main.cpp sets the safe area and the fake
     // keyboard here, the tests read and write these. The QML reads them from the state objects (win.insets.top,
     // win.modes.zen, win.layout.toolboxEdge, …).
@@ -93,16 +96,6 @@ ApplicationWindow {
         window: win
         adaptive: (app.settings.revision, app.settings.get("adaptiveLayout"))
         touchSetting: (app.settings.revision, app.settings.get("touchProfile"))
-    }
-    /// "Save page as template…" for page index `page` (qt/docs/features/templates.md; the page menus)
-    function openTemplateSave(page) { templateSaveDialog.openForPage(page) }
-    /// Pages as files (PageFiles.qml, qt/docs/features/page-files.md), from the page menus: "insert" (from a file,
-    /// after page `pages[0]`), "extract", "split", "images" (the pages, or the selection)
-    function openPageFiles(what, pages) {
-        if (what === "insert") pageFiles.chooseFile(pages.length > 0 ? pages[pages.length - 1] : app.pageNumber - 1, true)
-        else if (what === "extract") pageFiles.openExtract(pages)
-        else if (what === "split") pageFiles.openSplit(pages)
-        else if (what === "images") pageFiles.openImages(pages)
     }
     /// What was chosen by hand in this size class ("": the automatic choice): "sidebar", "zen", "toolbox"
     function layoutChoice(what) { return (app.settings.revision, app.settings.layoutChoice(adaptive.layoutClass, what)) }
@@ -166,44 +159,6 @@ ApplicationWindow {
     function requestCloseTab(index) { saveFlow.requestCloseTab(index) }
     function closeWindow() { saveFlow.closeWindow() }
     function sharePdfOf(file, toClipboard, withHistory) { shareFlow.sharePdfOf(file, toClipboard, withHistory) }
-    /// A web address chosen in the look-up menu (qt/docs/features/citations.md): asked first with the whole address,
-    /// unless that was turned off (the menu showed it)
-    function openWebAddress(url, purpose) {
-        if (url === "") return
-        if ((app.settings.revision, app.settings.get("webConfirm"))) {
-            webConfirm.ask(url, purpose)
-            return
-        }
-        if (app.citations.openWeb(url)) snackbar.show(qsTr("Opened %1 in the browser").arg(app.citations.hostOf(url)), false)
-    }
-    /// The searches of selected text (the look-up menu, qt/docs/features/citations.md): the document's search bar with
-    /// the text, run (the bar follows a search set from elsewhere); the open tabs' search in their overview; the
-    /// library's search on the home screen, in the library shown.
-    function searchInDocument(text) {
-        if (text === "") return
-        pageGrid.close()
-        tabOverview.close()
-        searchBar.openBar()
-        app.searchQuery = text
-    }
-    function searchOpenTabs(text) {
-        if (text === "") return
-        pageGrid.close()
-        app.homeVisible = false
-        tabOverview.searchFor(text)
-    }
-    function searchLibraryFor(text) {
-        if (text === "") return
-        tabOverview.close()
-        pageGrid.close()
-        app.homeVisible = true
-        Qt.callLater(function() { homeView.searchFor(text) })  // (after the home screen is shown, as searchLibrary())
-    }
-    /// "Find this paper": the library searched for the title of a bibliography entry (qt/docs/features/citations.md)
-    function findPaper(text) { findPaperSheet.openFor(text) }
-    /// arXiv: a search by title, or one paper by its ID (qt/docs/features/citations.md)
-    function arxivSearch(title) { arxivSheet.openSearch(title) }
-    function arxivPaper(id) { arxivSheet.openId(id) }
 
     onClosing: function(close) {
         if (!saveFlow.quitting && (app.modifiedTabs().length > 0 || app.anySaving)) {
@@ -1026,10 +981,6 @@ ApplicationWindow {
     WebConfirm { id: webConfirm }
     WebImageConfirm { id: webImageConfirm }
     UnusedImagesDialog { id: unusedImagesDialog }
-    Connections {
-        target: app
-        function onWebImageRequested(url, host, access) { webImageConfirm.ask(url, host, access) }
-    }
     FindPaperSheet { id: findPaperSheet }
     ArxivSheet { id: arxivSheet }
     PdfTextHandles { }
@@ -1045,33 +996,9 @@ ApplicationWindow {
             contextPill.openAt(viewPos, app.pdfTextIsSelected)
         }
     }
-    Connections {
-        target: app
-        function onChapterRequested(page) { chapterDialog.openFor(page) }
-    }
-    Connections {
-        target: app
-        function onPrintRequested(pages) { printDialog.openFor(pages) }
-    }
     BackgroundDialog { id: backgroundDialog }
     NoteSpaceDialog { id: noteSpaceDialog }
     PageSizeDialog { id: pageSizeDialog }
-    Connections {
-        target: app
-        function onPageSizeRequested(pages) { pageSizeDialog.openFor(pages) }
-    }
-    Connections {
-        target: app
-        function onNoteSpaceRequested(pages, allPages) { noteSpaceDialog.openFor(pages, allPages) }
-    }
-    Connections {
-        target: app
-        function onPageBackgroundRequested(pages) { backgroundDialog.openFor(pages) }
-    }
-    Connections {
-        target: app
-        function onInsertPagesRequested(position) { insertPagesDialog.openAt(position) }
-    }
 
     SettingsPage {
         id: settingsPage
@@ -1086,18 +1013,12 @@ ApplicationWindow {
         objectName: "tabOverview"
         onCloseRequested: function(index) { requestCloseTab(index) }
         onCloseAllRequested: app.tabs.count > 1 ? saveFlow.closeAllDialog.open() : saveFlow.closeAllTabs()
-        onLibrarySearchRequested: win.searchLibrary()
+        onLibrarySearchRequested: windowActions.searchLibrary()
     }
 
     WindowShortcuts { id: windowShortcuts; objectName: "windowShortcuts" }
     // The keys come from the shortcut settings (app.shortcuts); reading its revision keeps the bindings fresh.
     function keysOf(id) { return (app.shortcuts.revision, app.shortcuts.keys(id)) }
-    function searchLibrary() {
-        tabOverview.close()
-        pageGrid.close()
-        app.homeVisible = true
-        Qt.callLater(homeView.focusSearch)  // (after the home screen is shown: it puts the focus on its grid)
-    }
     ShortcutSheet {
         id: shortcutSheet
         onChangeRequested: { settingsPage.open(); settingsPage.showShortcuts() }
