@@ -84,6 +84,15 @@ block: full suite before merging, Qt ≤ 6.7 API, UI tests also on the Qt 6.8 bu
   With it, the docs restructure of [docs-plan.md](docs-plan.md) (moves into `features/`, `decisions/`,
   `development/`, an entry page, a README per module), postponed from wave 1 so the moves do not collide with the
   code edits of waves 2 and 3.
+  **The Xournal++ code is part of the architecture** (the author, 2026-10-07: "make sure the connections with
+  xournal++ code and the architecture includes xournal++ code"): the diagram and the overview show the upstream
+  core in `src/` (model, control/xojfile load and save, undo, the tools and handlers, view/rendering, pdf, util,
+  and what of it xournal-qt builds: the `xoj-*` libraries) as blocks of their own, linked to their folders on
+  GitHub, and every connection between the Qt frontend and that core: which xournal-qt module uses which upstream
+  part and how (direct calls, the `qt/compat` shims that stand in for GTK-dependent classes, the seams marked
+  `xournal-qt:` in upstream files listed in `qt/docs/adr/0002-upstream-seams.md`), what upstream parts are not
+  built (the GTK GUI), and the data both share (.xopp/.xoj, settings.xml). A developer must be able to see where a
+  feature lives on each side and where to change it.
 
 **Later rounds** (written down here so a fresh session can pick them up): the feature objects out of `AppController`
 (app-cpp E–N, `app.versions` first as the template), `CanvasView` steps (infra B8, B9), `CanvasInput` split (B11),
