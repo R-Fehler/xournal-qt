@@ -13,6 +13,12 @@ RowLayout {
     // (what the other parts use)
     readonly property alias searchField: searchField
     readonly property alias searchTyping: searchTyping
+    /// Typing on the grid searches: the text goes on in the field, which takes the keys
+    function type(text) {
+        searchField.forceActiveFocus()
+        searchField.text += text
+        home.typed()
+    }
     parent: home.searchOwnRow ? narrowSearchSlot : homeHeader.searchSlot
     anchors.fill: parent
     spacing: 6

@@ -234,25 +234,28 @@ Rectangle {
         libraryDialogs.transferDialog.open()
     }
     function askTrash(model, paths) {
-        home.menuModel = model
-        home.menuPaths = paths
+        home.menuTarget.model = model
+        home.menuTarget.paths = paths
         libraryDialogs.trashDialog.open()
     }
-    // Menu, rename and trash work on a row of the library or the recent list.
-    property var menuModel: null
-    property int menuRow: -1
-    property string menuName: ""
-    property string menuPath: ""
-    property bool menuFolder: false
-    /// The kind of the row ("notes", "pdf", "md", "image", "text", "other"; a folder: "")
-    property string menuKind: ""
-    /// What the menu applies to: the row, or all selected items if the row is one of them.
-    property var menuPaths: []
-    readonly property bool menuMany: menuPaths.length > 1
+    /// What the item menu, rename and trash work on: a row of the library or the recent list
+    readonly property QtObject menuTarget: QtObject {
+        property var model: null
+        property int row: -1
+        property string name: ""
+        property string path: ""
+        property bool folder: false
+        /// The kind of the row ("notes", "pdf", "md", "image", "text", "other"; a folder: "")
+        property string kind: ""
+        /// What the menu applies to: the row, or all selected items if the row is one of them.
+        property var paths: []
+        readonly property bool many: paths.length > 1
+    }
     function showMenu(model, row, name, path, isFolder, item, x, y, kind) {
-        menuModel = model; menuRow = row; menuName = name; menuPath = path; menuFolder = isFolder
-        menuKind = kind || ""
-        menuPaths = model.pathsFor(row)
+        menuTarget.model = model; menuTarget.row = row; menuTarget.name = name; menuTarget.path = path
+        menuTarget.folder = isFolder
+        menuTarget.kind = kind || ""
+        menuTarget.paths = model.pathsFor(row)
         itemMenu.openMenu(Qt.point(x, y), item)
     }
     /// At the start, after the other questions (Main.qml): the offer, once
@@ -477,7 +480,7 @@ Rectangle {
 
     TagsDialog { id: homeTagsDialog }
 
-    LibraryItemMenu { id: itemMenu }
+    LibraryItemMenu { id: itemMenu; target: home.menuTarget }
 
     LibraryDialogs { id: libraryDialogs }
 

@@ -70,7 +70,7 @@ Item {
                 app.library.goUp()
                 event.accepted = true
             } else if (event.key === Qt.Key_F2 && item) {
-                home.menuModel = app.library; home.menuRow = item.index; home.menuName = item.name
+                home.menuTarget.model = app.library; home.menuTarget.row = item.index; home.menuTarget.name = item.name
                 libraryDialogs.renameDialog.open()
                 event.accepted = true
             } else if (event.key === Qt.Key_Delete && item) {
@@ -79,9 +79,7 @@ Item {
             } else if (event.text.length === 1 && event.text.charCodeAt(0) > 32 && event.text.charCodeAt(0) !== 127
                        && !(event.modifiers & Qt.ControlModifier)) {
                 // Typing searches - visible characters only (Escape, Backspace, Delete have a text too)
-                searchGroup.searchField.forceActiveFocus()
-                searchGroup.searchField.text += event.text
-                home.typed()
+                searchGroup.type(event.text)
                 event.accepted = true
             }
         }
