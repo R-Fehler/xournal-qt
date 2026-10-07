@@ -32,6 +32,7 @@
 #include "util/Matrix.h"
 
 #include "../SearchHits.h"
+#include "CanvasTime.h"
 #include "CanvasView.h"
 #include "FindReplace.h"
 #include "MarkdownEditor.h"
@@ -89,6 +90,7 @@ protected:
         session = std::make_unique<DocumentSession>(*app, MarkdownFile::textDocument(*text));
         session->setTextFile(std::move(text), false);
         view = std::make_unique<CanvasView>(*session);
+        view->setClock(clock);
         view->getViewController().setViewSize(QSizeF(900, 1400));
         processEvents();
     }
@@ -96,17 +98,12 @@ protected:
         view.reset();
         session = std::make_unique<DocumentSession>(*app, std::move(doc));
         view = std::make_unique<CanvasView>(*session);
+        view->setClock(clock);
         view->getViewController().setViewSize(QSizeF(900, 1400));
         processEvents();
     }
-    void processEvents(int ms = 20) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-            app->getRenderService()->waitForIdle();
-        }
-    }
+    /// `ms` pass on the canvas's clock, the event loop and the renders run meanwhile (no real time passes)
+    void processEvents(int ms = 20) { test::passTime(clock, *app, ms); }
     /// A Markdown text box at (x, y) of a page with `text` (as the text tool writes one: an undo step)
     const Text* addBox(size_t page, double x, double y, const std::string& text) {
         MarkdownSession md(*session);
@@ -125,6 +122,7 @@ protected:
         return replace::replaceAll(*session, view.get(), query, with, options);
     }
 
+    ManualClock clock;  ///< the canvas's time (CanvasTime.h): the tests move it on
     QTemporaryDir tmp;
     std::unique_ptr<AppContext> app;
     std::unique_ptr<DocumentSession> session;

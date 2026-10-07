@@ -34,6 +34,7 @@
 
 #include "CanvasInput.h"
 #include "CanvasPage.h"
+#include "CanvasTime.h"
 #include "CanvasView.h"
 #include "TextEditor.h"
 #include "config-test.h"
@@ -49,6 +50,7 @@ protected:
                                            fs::path(tmp.filePath("settings.xml").toStdString()), 2);
         session = std::make_unique<DocumentSession>(*app);
         view = std::make_unique<CanvasView>(*session);
+        view->setClock(canvasTime);
         view->getViewController().setViewSize(QSizeF(900, 1400));
         input = std::make_unique<CanvasInput>(*view);
         tools()->selectTool(TOOL_PEN);
@@ -62,14 +64,8 @@ protected:
         app.reset();
     }
     ToolHandler* tools() const { return app->getToolHandler(); }
-    void processEvents(int ms = 30) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-            app->getRenderService()->waitForIdle();
-        }
-    }
+    /// `ms` pass on the canvas's clock, the event loop and the renders run meanwhile (no real time passes)
+    void processEvents(int ms = 30) { test::passTime(canvasTime, *app, ms); }
     QPointF viewPos(QPointF pagePoint) const {
         return view->pageViewRect(0).topLeft() + pagePoint * view->getViewController().zoom();
     }
@@ -97,6 +93,7 @@ protected:
     }
     fs::path path(const char* name) const { return fs::path(tmp.filePath(name).toStdString()); }
 
+    ManualClock canvasTime;  ///< the canvas's clock (CanvasTime.h): the tests move it on
     QTemporaryDir tmp;
     std::unique_ptr<AppContext> app;
     std::unique_ptr<DocumentSession> session;

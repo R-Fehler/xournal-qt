@@ -136,6 +136,8 @@ set_target_properties(xqt-session PROPERTIES AUTOMOC ON)
 
 # Canvas model: pages (port of XojPageView), layout, zoom/scroll, input (port of PenInputHandler & co.)
 add_library(xqt-canvas STATIC
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/Clock.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/Clock.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/DocumentLayout.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/DocumentLayout.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ViewController.h
@@ -292,7 +294,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PenStylesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/CanvasRotationTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/DarkPagesTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PdfCacheTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PdfCacheTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/ClockTest.cpp)
     target_link_libraries(xqt-canvas-tests PRIVATE xqt-canvas Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-canvas-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-canvas-tests PRIVATE "${TEST_CONFIG_DIR}")

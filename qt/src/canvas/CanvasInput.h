@@ -27,11 +27,11 @@
 #include <vector>
 
 #include <QObject>
-#include <QTimer>
 #include <QPointF>
 
 #include "gui/inputdevices/PositionInputData.h"
 
+#include "Clock.h"
 #include "CurtainLayer.h"
 
 class QMouseEvent;
@@ -48,7 +48,10 @@ class CanvasView;
 class CanvasInput: public QObject {
     Q_OBJECT
 public:
+    /// On the view's clock (CanvasView::getClock)
     explicit CanvasInput(CanvasView& view, QObject* parent = nullptr);
+    /// The clock of its timing: taps, long presses, flicks, palm rejection, a pen held still (Clock.h)
+    void setClock(Clock& clock);
 
     using MapToView = std::function<QPointF(QPointF scenePos)>;
     // All positions are in view (canvas item) coordinates. Return true if the event was consumed.
@@ -111,6 +114,8 @@ private:
     void redo();
 
     CanvasView& view;
+    Clock* clock;  ///< (after `view`: it comes from the view)
+    double nowMs() const { return clock->nowMs(); }
 
     // pen / mouse state (upstream PenInputHandler members)
     bool deviceClassPressed = false;
@@ -158,12 +163,12 @@ private:
     double lastTapMs = 0;
     QPointF lastTapPos;
     /// Holding one finger still shows what can be done here (like a right click)
-    QTimer longPressTimer;
+    ClockTimer longPressTimer;
     bool longPressFired = false;
     /// The same for the pen with the pen, highlighter or hand in hand: pressed and held still (it may shake a little)
     /// for the time of a long press. The dot it began is taken back, and the pen does nothing more until it is
     /// lifted. A pen that moved further first is writing: resting afterwards is not a long press.
-    QTimer penHoldTimer;
+    ClockTimer penHoldTimer;
     bool penHoldFired = false;
     QPointF penHoldPos;
     bool penHoldTool() const;
@@ -172,7 +177,7 @@ private:
     /// Hold to straighten (PenGestures.h): a stroke of the pen that rests a while before it is lifted becomes the
     /// shape recognised in it. Armed when the pen begins a freehand stroke with the setting on; the time counts
     /// from the last time the pen moved further than a hand shakes (`straightenPos`, when).
-    QTimer straightenTimer;
+    ClockTimer straightenTimer;
     bool straightenArmed = false;
     bool straightenMoved = false;  ///< the pen moved away from where it went down (resting at the press: long press)
     bool straightened = false;     ///< done: the pen's moves are ignored until it is lifted
@@ -247,7 +252,7 @@ private:
     /// Snapping to pages: wheel notches not yet turned into a page (120 each), and the pause after wheel scrolling
     /// within a zoomed-in page before it comes to rest
     double wheelPages = 0;
-    QTimer wheelSnapTimer;
+    ClockTimer wheelSnapTimer;
 };
 
 }  // namespace xqt

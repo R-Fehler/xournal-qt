@@ -15,13 +15,11 @@
 
 #include <cstddef>
 
-#include <QElapsedTimer>
 #include <QObject>
 #include <QPointF>
 #include <QRectF>
 #include <QSizeF>
-#include <QTimer>
-
+#include "Clock.h"
 #include "DocumentLayout.h"
 
 namespace xqt {
@@ -30,6 +28,9 @@ class ViewController: public QObject {
     Q_OBJECT
 public:
     explicit ViewController(const DocumentLayout* layout, QObject* parent = nullptr);
+    /// The clock of the momentum, the animations and the zoom settling (Clock.h; the steady clock by default). Stops
+    /// what runs.
+    void setClock(Clock& clock);
 
     /// Logical pixels per page point.
     double zoom() const { return z; }
@@ -318,11 +319,14 @@ private:
     double pinchStartDistance = 1.0;
     double pinchStartZoom = 1.0;
 
-    QTimer momentumTimer;
-    QElapsedTimer momentumClock;
+    Clock* clock = &Clock::steady();
+    ClockTimer momentumTimer;
+    double momentumStartMs = 0;  ///< when the momentum or the step of the animation began (clock)
+    /// Whole milliseconds since then
+    qint64 momentumElapsed() const { return static_cast<qint64>(clock->nowMs() - momentumStartMs); }
     qint64 lastMomentumMs = 0;
     QPointF velocity;
-    QTimer settleTimer;
+    ClockTimer settleTimer;
 };
 
 }  // namespace xqt

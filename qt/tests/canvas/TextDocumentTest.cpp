@@ -30,6 +30,7 @@
 #include "view/DocumentView.h"
 #include "view/background/BackgroundFlags.h"
 
+#include "CanvasTime.h"
 #include "CanvasView.h"
 #include "MarkdownBookmarks.h"
 #include "MarkdownEditor.h"
@@ -97,17 +98,12 @@ protected:
         session->setTextContinuous(continuous);
         session->setTextFile(std::move(text), false);
         view = std::make_unique<CanvasView>(*session);
+        view->setClock(clock);
         view->getViewController().setViewSize(QSizeF(900, 1400));
         processEvents();
     }
-    void processEvents(int ms = 20) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-            app->getRenderService()->waitForIdle();
-        }
-    }
+    /// `ms` pass on the canvas's clock, the event loop and the renders run meanwhile (no real time passes)
+    void processEvents(int ms = 20) { test::passTime(clock, *app, ms); }
     void key(Qt::Key k, const QString& text = {}, Qt::KeyboardModifiers mods = Qt::NoModifier) {
         ASSERT_NE(view->getMarkdownEditor(), nullptr);
         QKeyEvent e(QEvent::KeyPress, k, mods, text);
@@ -127,6 +123,7 @@ protected:
         view->getMarkdownEditor()->setCursorPosition(at);
     }
 
+    ManualClock clock;  ///< the canvas's time (CanvasTime.h): the tests move it on
     QTemporaryDir tmp;
     std::unique_ptr<AppContext> app;
     std::unique_ptr<DocumentSession> session;

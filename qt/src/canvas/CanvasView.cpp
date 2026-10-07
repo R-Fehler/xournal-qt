@@ -128,8 +128,8 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
         Q_EMIT updateRequested();
     });
     visibilityTimer.setSingleShot(true);
-    connect(&visibilityTimer, &QTimer::timeout, this, [this] {
-        sinceVisibility.restart();
+    connect(&visibilityTimer, &ClockTimer::timeout, this, [this] {
+        lastVisibilityMs = clock->nowMs();
         updateVisibility();
     });
     // (the primary view only: a second view of the document stays where its reader is)
@@ -2510,6 +2510,13 @@ void CanvasView::refreshLayout() {
     Q_EMIT pagesChanged();
 }
 
+void CanvasView::setClock(Clock& to) {
+    clock = &to;
+    viewController.setClock(to);
+    visibilityTimer.setClock(to);
+    lastVisibilityMs.reset();
+}
+
 void CanvasView::viewChanged() {
     const int EVERY_MS = visibilityDelay;  // (about one frame)
     // A jump (to a page, a fit, a new size) right away; plain scrolling and zooming send more changes than there are
@@ -2521,12 +2528,13 @@ void CanvasView::viewChanged() {
     } else if (!jumped) {
         jumpedPage.reset();  // scrolled or zoomed by hand: the most visible page is the current one again
     }
-    if (jumped || !sinceVisibility.isValid() || sinceVisibility.elapsed() >= EVERY_MS) {
-        sinceVisibility.restart();
+    const double now = clock->nowMs();
+    if (jumped || !lastVisibilityMs || now - *lastVisibilityMs >= EVERY_MS) {
+        lastVisibilityMs = now;
         visibilityTimer.stop();
         updateVisibility();
     } else if (!visibilityTimer.isActive()) {
-        visibilityTimer.start(EVERY_MS - static_cast<int>(sinceVisibility.elapsed()));
+        visibilityTimer.start(EVERY_MS - static_cast<int>(now - *lastVisibilityMs));
     }
 }
 

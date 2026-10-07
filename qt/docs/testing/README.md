@@ -15,7 +15,7 @@ working directory.
 | `markdown` | `xqt-markdown-tests` | `qt/tests/markdown` | 141 | ~5 s | the Markdown engine |
 | `audio` | `xqt-audio-tests` | `qt/tests/audio` | 21 | | Ogg Vorbis, recorder, player (fake devices) |
 | `session` | `xqt-session-tests` | `qt/tests/session` | 269 | ~26 s | `DocumentSession`, the PDF formats, file formats |
-| `canvas` | `xqt-canvas-tests` | `qt/tests/canvas` | 302 | ~144 s | views, input replay, editors, tools |
+| `canvas` | `xqt-canvas-tests` | `qt/tests/canvas` | 302 | ~65 s | views, input replay, editors, tools |
 | `hwr` | `xqt-hwr-tests` | `qt/tests/hwr` | 84 | | layout, recognisers (tiny stand-in models in `qt/tests/hwr/data`), search |
 | `quick` | `xqt-quick-tests` | `qt/tests/quick` | 64 | ~74 s | `DocumentCanvasItem`: rendering, input, fractional scales |
 | `shell` | `xqt-shell-tests` | `qt/tests/shell` | 424 | ~62 s | library, tabs, models, settings, CLI |
@@ -57,6 +57,11 @@ breaks this today (each test starts its own process and loads the whole UI); the
 - **QML items a test needs carry an `objectName`.** Find them by it, never by position or text.
 - **Wait for a state, not for time.** Prefer `QTest::qWaitFor(condition)` (inside `ASSERT_TRUE`) over a fixed
   `wait(N)`; a fixed wait is either too long or flaky under load.
+- **Canvas tests do not sleep.** The view and its input run on a `ManualClock` (`qt/src/canvas/Clock.h`; give it with
+  `view->setClock(clock)` before the `CanvasInput` is made). The fixtures' `processEvents(ms)` move it on with
+  `test::passTime` (`qt/tests/canvas/CanvasTime.h`): long presses, flicks, the momentum, the zoom settling and the page
+  animations take no real time, and the renders are waited for. Timers outside the canvas (upstream's edge panning of a
+  selection, the laser pointer's fading) still run in real time.
 - **Only Qt ≤ 6.7 API**, in tests as in the app: e.g. `AbstractButton.click()` is 6.8, so tests emit
   `clicked`/`triggered` instead. No QML property names that are JS globals (`console`, …).
 - Fixture files a test needs are written into a `QTemporaryDir` (or read from `qt/tests/<label>/` data folders);

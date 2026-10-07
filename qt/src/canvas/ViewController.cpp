@@ -16,10 +16,17 @@ constexpr double MIN_VELOCITY = 0.02;  // px/ms
 ViewController::ViewController(const DocumentLayout* layout, QObject* parent): QObject(parent), layout(layout) {
     momentumTimer.setTimerType(Qt::PreciseTimer);
     momentumTimer.setInterval(8);
-    connect(&momentumTimer, &QTimer::timeout, this, &ViewController::stepMomentum);
+    connect(&momentumTimer, &ClockTimer::timeout, this, &ViewController::stepMomentum);
     settleTimer.setSingleShot(true);
     settleTimer.setInterval(300);
-    connect(&settleTimer, &QTimer::timeout, this, &ViewController::zoomSettled);
+    connect(&settleTimer, &ClockTimer::timeout, this, &ViewController::zoomSettled);
+}
+
+void ViewController::setClock(Clock& to) {
+    stopMomentum();
+    clock = &to;
+    momentumTimer.setClock(to);
+    settleTimer.setClock(to);
 }
 
 double ViewController::minZoom() const {
@@ -432,7 +439,7 @@ void ViewController::fling(QPointF v) {
         return;
     }
     velocity = v;
-    momentumClock.start();
+    momentumStartMs = clock->nowMs();
     lastMomentumMs = 0;
     momentumTimer.start();
 }
@@ -449,7 +456,7 @@ void ViewController::stepMomentum() {
         stepAnimation();
         return;
     }
-    const qint64 now = momentumClock.elapsed();
+    const qint64 now = momentumElapsed();
     const double dt = static_cast<double>(std::max<qint64>(1, now - lastMomentumMs));
     lastMomentumMs = now;
     const double decay = std::pow(DECELERATION_PER_MS, dt);
@@ -992,12 +999,12 @@ void ViewController::animateTo(QPointF target, QPointF v0) {
     animTo = target;
     animVelocity = v;
     animating = true;
-    momentumClock.start();
+    momentumStartMs = clock->nowMs();
     momentumTimer.start();
 }
 
 void ViewController::stepAnimation() {
-    const double t = std::min(1.0, static_cast<double>(momentumClock.elapsed()) / animDuration);
+    const double t = std::min(1.0, static_cast<double>(momentumElapsed()) / animDuration);
     // Cubic Hermite: from `animFrom` with the start velocity to `animTo` at rest
     const double t2 = t * t, t3 = t2 * t;
     const double h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2;
@@ -1014,7 +1021,7 @@ void ViewController::stepAnimation() {
         animVelocity = current;
         animFrom = scrollPos;
         animDuration *= (1.0 - t);
-        momentumClock.start();
+        momentumStartMs = clock->nowMs();
     }
     clamp();
     Q_EMIT changed();

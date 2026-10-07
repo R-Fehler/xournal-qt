@@ -33,6 +33,7 @@
 #include "undo/UndoRedoHandler.h"
 
 #include "CanvasInput.h"
+#include "CanvasTime.h"
 #include "CanvasView.h"
 #include "PenGestures.h"
 #include "PenHover.h"
@@ -50,6 +51,7 @@ protected:
                                            fs::path(tmp.filePath("settings.xml").toStdString()), 2);
         session = std::make_unique<DocumentSession>(*app);
         view = std::make_unique<CanvasView>(*session);
+        view->setClock(clock);
         view->getViewController().setViewSize(QSizeF(900, 1400));
         input = std::make_unique<CanvasInput>(*view);
         tools()->selectTool(TOOL_PEN);
@@ -67,14 +69,8 @@ protected:
     ToolHandler* tools() const { return app->getToolHandler(); }
     Settings& settings() const { return *app->getSettings(); }
 
-    void processEvents(int ms = 30) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-            app->getRenderService()->waitForIdle();
-        }
-    }
+    /// `ms` pass on the canvas's clock, the event loop and the renders run meanwhile (no real time passes)
+    void processEvents(int ms = 30) { test::passTime(clock, *app, ms); }
 
     QPointF viewPos(QPointF pagePoint) const {
         const QRectF r = view->pageViewRect(0);
@@ -99,11 +95,8 @@ protected:
     }
     /// The pen rests where it is for `ms`, shaking by a pixel or so (a real pen keeps reporting).
     void rest(QPointF at, int ms) {
-        QElapsedTimer t;
-        t.start();
-        int i = 0;
-        while (t.elapsed() < ms) {
-            const double shake = (i++ % 2 ? 0.8 : -0.8) / view->getViewController().zoom();
+        for (int i = 0, rested = 0; rested < ms; ++i, rested += 20) {
+            const double shake = (i % 2 ? 0.8 : -0.8) / view->getViewController().zoom();
             tablet(QEvent::TabletMove, at + QPointF(shake, -shake), 0.5, Qt::NoButton, Qt::LeftButton);
             processEvents(20);
         }
@@ -151,6 +144,7 @@ protected:
         return out;
     }
 
+    ManualClock clock;  ///< the canvas's time (CanvasTime.h): the tests move it on
     QTemporaryDir tmp;
     std::unique_ptr<AppContext> app;
     std::unique_ptr<DocumentSession> session;

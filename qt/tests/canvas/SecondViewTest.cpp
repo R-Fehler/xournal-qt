@@ -31,6 +31,7 @@
 
 #include "CanvasInput.h"
 #include "CanvasPage.h"
+#include "CanvasTime.h"
 #include "CanvasView.h"
 #include "ScreenCalibration.h"
 #include "StickyNotes.h"
@@ -51,8 +52,10 @@ protected:
         }
         session->setCurrentPageNo(0);
         primary = std::make_unique<CanvasView>(*session);
+        primary->setClock(clock);
         primary->getViewController().setViewSize(QSizeF(800, 600));
         second = std::make_unique<CanvasView>(*session);
+        second->setClock(clock);
         second->getViewController().setViewSize(QSizeF(500, 600));
         processEvents();
     }
@@ -62,14 +65,8 @@ protected:
         session.reset();
         app.reset();
     }
-    void processEvents(int ms = 30) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-            app->getRenderService()->waitForIdle();
-        }
-    }
+    /// `ms` pass on the canvas's clock, the event loop and the renders run meanwhile (no real time passes)
+    void processEvents(int ms = 30) { test::passTime(clock, *app, ms); }
     PageRef page(size_t i) const { return session->getDocument()->getPage(i); }
     size_t elementCount(size_t i) const {
         size_t n = 0;
@@ -79,6 +76,7 @@ protected:
         return n;
     }
 
+    ManualClock clock;  ///< the canvas's time (CanvasTime.h): the tests move it on
     QTemporaryDir tmp;
     std::unique_ptr<AppContext> app;
     std::unique_ptr<DocumentSession> session;

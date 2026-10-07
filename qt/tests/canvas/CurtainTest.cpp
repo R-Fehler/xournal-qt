@@ -27,6 +27,7 @@
 #include "session/DocumentSession.h"
 
 #include "CanvasInput.h"
+#include "CanvasTime.h"
 #include "CanvasView.h"
 #include "CurtainLayer.h"
 #include "PenHover.h"
@@ -48,6 +49,7 @@ protected:
         session->insertNewPage(1);  // two pages
         session->setCurrentPageNo(0);
         view = std::make_unique<CanvasView>(*session);
+        view->setClock(clock);
         view->getViewController().setViewSize(QSizeF(900, 1400));
         input = std::make_unique<CanvasInput>(*view);
         processEvents();
@@ -58,14 +60,8 @@ protected:
         session.reset();
         app.reset();
     }
-    void processEvents(int ms = 30) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-            app->getRenderService()->waitForIdle();
-        }
-    }
+    /// `ms` pass on the canvas's clock, the event loop and the renders run meanwhile (no real time passes)
+    void processEvents(int ms = 30) { test::passTime(clock, *app, ms); }
     CurtainLayer& curtain() { return view->curtain(); }
     QPointF at(size_t page, QPointF onPage) const {
         return view->pageViewRect(page).topLeft() + onPage * view->getViewController().zoom();
@@ -113,6 +109,7 @@ protected:
     double pageHeight(size_t page) const { return session->getDocument()->getPage(page)->getHeight(); }
     double pageWidth(size_t page) const { return session->getDocument()->getPage(page)->getWidth(); }
 
+    ManualClock clock;  ///< the canvas's time (CanvasTime.h): the tests move it on
     QTemporaryDir tmp;
     std::unique_ptr<AppContext> app;
     std::unique_ptr<DocumentSession> session;

@@ -45,6 +45,7 @@
 #include "control/tools/CursorSelectionType.h"
 #include "control/zoom/ZoomControl.h"
 
+#include "Clock.h"
 #include "DocumentLayout.h"
 #include "EmojiCompletion.h"
 #include "ViewController.h"
@@ -93,6 +94,10 @@ public:
     RenderService& getRenderService() const { return renderService; }
     ViewController& getViewController() { return viewController; }
     const ViewController& getViewController() const { return viewController; }
+    /// The clock the view goes by (Clock.h): its zoom and scrolling, the visibility updates, and the input made for it
+    /// afterwards. The steady clock unless a test gives it a ManualClock.
+    Clock& getClock() const { return *clock; }
+    void setClock(Clock& clock);
     const DocumentLayout& documentLayout() const { return layout; }
     /// Scrolling sideways comes to rest on whole pages (setting "snapPages" of ours, default on)
     static bool snapSetting(Settings& settings);
@@ -734,8 +739,9 @@ private:
     /// The last plan trimmed this view (it was not the current one): it has no window of its own
     bool trimmed = false;
     int visibilityDelay = 8;
-    QElapsedTimer sinceVisibility;
-    QTimer visibilityTimer;
+    Clock* clock = &Clock::steady();
+    std::optional<double> lastVisibilityMs;  ///< when the visibility was last updated (clock)
+    ClockTimer visibilityTimer;
     /// Visibility updates so far (tests)
     quint64 visibilityCount = 0;
     std::function<QImage(size_t)> previewSource;

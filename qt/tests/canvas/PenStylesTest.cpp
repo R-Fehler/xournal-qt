@@ -44,6 +44,7 @@
 
 #include "CanvasInput.h"
 #include "CanvasPage.h"
+#include "CanvasTime.h"
 #include "CanvasView.h"
 #include "PenHover.h"
 
@@ -58,6 +59,7 @@ protected:
                                            fs::path(tmp.filePath("settings.xml").toStdString()), 2);
         session = std::make_unique<DocumentSession>(*app);
         view = std::make_unique<CanvasView>(*session);
+        view->setClock(clock);
         view->getViewController().setViewSize(QSizeF(900, 1400));
         input = std::make_unique<CanvasInput>(*view);
         tools()->selectTool(TOOL_PEN);
@@ -75,14 +77,8 @@ protected:
 
     ToolHandler* tools() const { return app->getToolHandler(); }
 
-    void processEvents(int ms = 50) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-            app->getRenderService()->waitForIdle();
-        }
-    }
+    /// `ms` pass on the canvas's clock, the event loop and the renders run meanwhile (no real time passes)
+    void processEvents(int ms = 50) { test::passTime(clock, *app, ms); }
 
     QPointF viewPos(QPointF pagePoint) const {
         return view->pageViewRect(0).topLeft() + pagePoint * view->getViewController().zoom();
@@ -144,6 +140,7 @@ protected:
         return QColor(tile.pixel(0, 0));
     }
 
+    ManualClock clock;  ///< the canvas's time (CanvasTime.h): the tests move it on
     QTemporaryDir tmp;
     std::unique_ptr<AppContext> app;
     std::unique_ptr<DocumentSession> session;

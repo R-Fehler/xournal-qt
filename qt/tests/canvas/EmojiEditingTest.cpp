@@ -25,6 +25,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
 
+#include "CanvasTime.h"
 #include "CanvasView.h"
 #include "EmojiCompletion.h"
 #include "MarkdownEditor.h"
@@ -51,6 +52,7 @@ protected:
                                            fs::path(tmp.filePath("settings.xml").toStdString()), 2);
         session = std::make_unique<DocumentSession>(*app);
         view = std::make_unique<CanvasView>(*session);
+        view->setClock(clock);
         view->getViewController().setViewSize(QSizeF(900, 1400));
         processEvents();
     }
@@ -59,14 +61,8 @@ protected:
         session.reset();
         app.reset();
     }
-    void processEvents(int ms = 30) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-            app->getRenderService()->waitForIdle();
-        }
-    }
+    /// `ms` pass on the canvas's clock, the event loop and the renders run meanwhile (no real time passes)
+    void processEvents(int ms = 30) { test::passTime(clock, *app, ms); }
 
     /// An ordinary text box (as Xournal++ writes them, not Markdown) on the page, edited and emptied first: the text
     /// tool edits such a text as it is (it makes only Markdown text boxes itself).
@@ -119,6 +115,7 @@ protected:
         return out;
     }
 
+    ManualClock clock;  ///< the canvas's time (CanvasTime.h): the tests move it on
     QTemporaryDir tmp;
     std::unique_ptr<AppContext> app;
     std::unique_ptr<DocumentSession> session;

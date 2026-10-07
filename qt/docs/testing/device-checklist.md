@@ -36,6 +36,8 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
 - [ ] Four and five fingers: all pages / all open documents, and back.
 - [ ] The touchpad: two-finger scroll and pinch go the way they go on the screen, also with the canvas turned.
 - [ ] Draw with the finger (the finger button): one finger writes, two fingers scroll and zoom.
+- [ ] A finger or the pen held still for half a second offers what can be done there, a quick tap does not; the
+      wheel and a touchpad fling come to rest on a page when snapping (the canvas's timing goes by its own clock).
 
 ## Screens and scaling
 
