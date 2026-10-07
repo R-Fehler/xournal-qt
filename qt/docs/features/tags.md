@@ -102,3 +102,10 @@ are what the views and the search use.
 - Tags of handwriting (a handwritten `#exam` read by the recogniser) are not read.
 - A `.md` file's front matter is not edited from "Tags…".
 - Untested on a device: Zotero and Acrobat showing the keywords written; the Fold 7's ▾ menu entry.
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] Tags written as PDF keywords show in Zotero and Acrobat.
+- [ ] A tag given to an open PDF with notes just before Ctrl+S: [hybrid-pdf.md](hybrid-pdf.md#on-the-device).

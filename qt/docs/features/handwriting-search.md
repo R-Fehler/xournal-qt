@@ -203,3 +203,10 @@ The sentences are the texts (`sentences-<lang>.txt`; `make_sample.py` makes the 
   revisited when the confidence drops; the user's choice per document wins. Kept in the library's cache, not in the
   `.xopp` (there is no clean place in the file: upstream would drop an unknown attribute on its next save).
 - The dataset export marks the writer's own lines `private` and noncommercial unless a licence is given.
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] The models download once with consent; the author's own notes in English and German are found by words
+      written in them, also in the library search and in other PDF viewers (the invisible text layer).

@@ -14,8 +14,8 @@ block. This page is what the integrator hands every block agent (point it here i
 - Upstream files (everything outside `qt/`) stay untouched. An unavoidable seam: tiny, marked `xournal-qt:`, listed
   in `qt/docs/decisions/0002-upstream-seams.md`.
 - One feature, one commit. A bug gets a failing test first (show it fails for the stated reason, then fix it).
-- Before each commit: the tests you ran for it pass; `qt/docs/testing/device-checklist.md` gets the manual checks a
-  device needs. Commit messages are plain prose (what was wrong / what changed / why), with the attribution lines the
+- Before each commit: the tests you ran for it pass; the manual checks a device needs go into the feature doc's
+  "On the device" (or `qt/docs/testing/device-checklist.md` when they belong to no one feature). Commit messages are plain prose (what was wrong / what changed / why), with the attribution lines the
   session asks for.
 - Never touch the author's data (`~/.config/xournalpp`, `~/.config/xournal-qt`, their documents); never write into
   `test/files`. Tests run off-screen with temporary config and cache folders.

@@ -53,3 +53,10 @@ Handwriting moves on along the line: "mmm" and "www" turn up and down, not back,
 vertical main axis and slanted, curved sweeps. No stroke of the handwriting fixture
 (`test/files/benchmark/handwritten-text.xopp`, 13 064 strokes, at most 3 turns) passes the shape test alone
 (`PenGesturesTest.noStrokeOfTheHandwritingFixtureIsAScratchOut`), and the zigzag must also cover ink.
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] Hold to straighten and scratch out (Settings → Pen) trigger with real handwriting, and never while writing
+      normally (thresholds).

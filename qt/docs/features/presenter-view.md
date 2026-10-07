@@ -142,7 +142,7 @@ presenting shows the slide in the one window.
   upright, `rotationAllowed` says no), so this is trivially so; were it turned, the part would be the bounding box of
   the presenter's view on the page (`viewOnPage`), upright, and the frame that box.
 
-## Left for the device
+## On the device
 
 The off-screen platform places windows exactly where they are asked to go; a real window system may not (see the
 device checklist): the audience's window on the projector under X11, Wayland (KDE, GNOME) and Windows, full screen
@@ -150,3 +150,7 @@ there and not on the laptop; the console moving off the projector; swap screens 
 projector unplugged and plugged in again while presenting; how smooth the ink is on the projector while it is written
 (the audience's page is composed again for every point); a 4K projector (the slide rendered at its size, memory); how
 smoothly the projector follows zooming and scrolling on the console, and a 4K projector zoomed in far.
+
+- [ ] Presenting (F5) with a projector: the console on the laptop, the slide alone on the projector (also when the
+      window was on the projector); a clicker turns pages; writing on the console shows on the projector at once;
+      the audience follows the presenter's zoom smoothly; unplugging the projector ends the second screen cleanly.

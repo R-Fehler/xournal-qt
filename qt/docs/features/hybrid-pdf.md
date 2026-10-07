@@ -797,3 +797,15 @@ Nothing platform-specific: qpdf and poppler do the work on every system. Windows
 rename as every save is (see "PDF files mode"). Android: the password dialog uses the system keyboard; whether it
 offers to remember the password (autofill) depends on the keyboard (the field is a password field).
 
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] A PDF with notes (and an archive PDF) shows its ink in Acrobat, Preview, Xodo, Drawboard, Chrome/pdf.js,
+      Firefox, Okular and Evince; after a save in one of them, the app still opens the notes (or says what changed).
+- [ ] A PDF with version history opens in other viewers as its latest version.
+- [ ] An encrypted PDF made here opens with its password in Acrobat, Preview and pdf.js; its restrictions hold.
+- [ ] A PDF with notes that keeps its versions, open in a tab: give it a tag (card menu → Tags…) and press Ctrl+S at
+      once: both are in the file; the version list shows no "other app" entry; "Save with a message" works.
+- [ ] A `.xopp` made from a big PDF with "attach the PDF": Save as into another folder while writing with the pen:
+      the pen keeps drawing; the `name.xopp.bg.pdf` next to it opens, also in Xournal++.

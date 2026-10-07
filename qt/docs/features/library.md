@@ -681,3 +681,14 @@ the bottom), `HomeHeader.qml` (the header's buttons and the slots the switch, th
 menu), and the dialogs in `LibraryDialogs.qml`, `LibraryArchive.qml` and `LibraryImport.qml`. The parts read the state
 through `home` and one another by their ids (HomeView.qml's context); an id another part uses is an alias on its file's
 root (`libraryPage.libraryGrid`, `libraryDialogs.renameDialog`).
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] Start with the settings and a library of an earlier pre-release (0.8.0): the app starts; the library reads its
+      documents once (the progress shows), the second start reads nothing; tags, to-dos and bookmarks are there after
+      that first read.
+- [ ] On the Fold (folded, unfolded, sideways) and a desktop: the home screen's header, switch, breadcrumbs, search,
+      grids, the floating "+", a card's menu and its dialogs (rename, move to, trash, import, archive); a card's menu,
+      rename and trash act on that card, also on the Recent grid.

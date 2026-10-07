@@ -15,7 +15,7 @@ is merged in). Integration branches of a working session (`claude/**`) are merge
   (`git worktree add ../xournal_qt-<block> -b qt/<block> <integration branch>`); ccache shares the compiled objects
   between worktrees ([building.md](building.md)).
 - Within a block, **one feature is one commit**. Before committing: the tests run for it pass, its device-only checks
-  are in the [device checklist](../testing/device-checklist.md), and its feature doc says how it works now. Commit
+  are in its feature doc's "On the device" (or the [device checklist](../testing/device-checklist.md)), and its feature doc says how it works now. Commit
   messages are plain prose: what was wrong, what changed, why.
 - A **bug gets a failing test first**: show that it fails for the stated reason, then fix it.
 - A **refactoring** changes structure, not behaviour: the tests that pass before pass after (except tests that only
@@ -44,7 +44,7 @@ release, building the `.deb` (block branches may be pushed for their tests).
 | a change outside `qt/` (a seam in an upstream file) | [decisions/0002-upstream-seams.md](../decisions/0002-upstream-seams.md) |
 | what a module is for and what it may depend on | `qt/src/<module>/README.md`, and the architecture's model `qt/docs/architecture/architecture.yaml` (then run `qt/scripts/architecture/generate.py`: [architecture/](../architecture/README.md)) |
 | a user-visible change | the draft of the next release notes in [release-notes/](../release-notes/) |
-| what only a real device can show | the [device checklist](../testing/device-checklist.md), short, in the area it belongs to |
+| what only a real device can show | the feature doc's section "On the device"; a check of the device, the platform or the app as a whole in the [device checklist](../testing/device-checklist.md), which links to the feature docs' checks |
 | a turning point of the project (rare) | [history/README.md](../history/README.md) |
 | everything else (measurements, the course of a block) | the commit messages |
 

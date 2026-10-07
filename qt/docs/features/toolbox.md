@@ -380,3 +380,10 @@ clear of the rail, docked and floating at the top in full screen (stopped by the
 - Carrying a divider by hand: it moves with the menu of its entries.
 - Dragging an item out of the catalog onto a bar (a tap places it at the bar's end; then carry it).
 - Carrying an item to the top bar in full screen (the top bar is hidden there; ⋯ lists its items).
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] The setsquare and the compass at 15 cm on the Surface at 200 % move and turn smoothly.
+- [ ] A fresh profile: snapping off, the pen's side buttons erase; switch snapping on, restart: it stays on.

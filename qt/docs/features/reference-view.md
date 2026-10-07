@@ -129,3 +129,12 @@ compare PDFs in general."
 - **Not built:** on a changed page, what was added and what was removed highlighted (elements matched by their
   XML and `xqt-created`; `VersionDiff` keeps a signature per element for it). The scrubber across versions
   with ▶ (on the timeline's play bar).
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] Beside the notes, a PDF whose author forbids copying (opened without its owner password): its text cannot be
+      copied from the reference's pill or with Ctrl+C; the notes' and the reference's pills act on their own side.
+- [ ] A desktop with the reference beside the notes: with the reference focused, Ctrl+G, Ctrl+X, Delete, zoom and
+      "Fit the width" act on it; with the notes focused, on the notes.

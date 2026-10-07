@@ -1,6 +1,7 @@
 # Features
 
-One doc per user-facing feature: how it works now (behaviour, settings, files, code, tests). Why the fork is built a
+One doc per user-facing feature: how it works now (behaviour, settings, files, code, tests), and at its end what only
+a device can show ("On the device", walked from the [device checklist](../testing/device-checklist.md)). Why the fork is built a
 certain way is in [decisions/](../decisions/README.md); what changed in a release is in
 [release-notes/](../release-notes/).
 

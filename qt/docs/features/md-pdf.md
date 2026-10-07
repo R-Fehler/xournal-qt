@@ -110,3 +110,10 @@ the text has a bookmark of its own (the page's).
 
 - A "text" badge on the library card.
 - Ink anchored to text (decided against for now).
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] The Markdown inside a PDF text document can be taken out with a PDF viewer's attachments
+      ([user guide](../user/markdown-from-pdf.md)).
