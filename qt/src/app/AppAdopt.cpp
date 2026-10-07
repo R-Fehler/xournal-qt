@@ -14,9 +14,9 @@
 #include <QCoreApplication>
 #include <QPointer>
 #include <QThread>
-#include <QThreadPool>
 
 #include "AppController.h"
+#include "AppServices.h"
 #include "model/Document.h"
 #include "session/AdoptAnnotations.h"
 #include "session/DocumentSession.h"
@@ -32,17 +32,6 @@ fs::path backgroundOf(DocumentSession* s) {
     return doc->getPdfFilepath();
 }
 
-/// Run at idle priority on a pool thread (the thread's priority is put back after)
-template <class F>
-void onIdleWorker(F&& f) {
-    QThreadPool::globalInstance()->start([f = std::forward<F>(f)]() mutable {
-        QThread* t = QThread::currentThread();
-        const QThread::Priority was = t->priority();
-        t->setPriority(QThread::IdlePriority);
-        f();
-        t->setPriority(was == QThread::InheritPriority ? QThread::NormalPriority : was);
-    });
-}
 }  // namespace
 
 void AppController::scanAdoptable(DocumentSession* s, bool offer) {
@@ -66,7 +55,7 @@ void AppController::scanAdoptable(DocumentSession* s, bool offer) {
     QPointer<AppController> self(this);
     QPointer<DocumentSession> session(s);
     const quint64 serial = s->serial();
-    onIdleWorker([self, session, serial, plan] {
+    appServices->jobs().start([self, session, serial, plan] {
         const adopt::Scan scan = adopt::scan(plan.pdf, plan.pdfPages);
         QMetaObject::invokeMethod(qApp, [self, session, serial, plan, scan] {
             if (!self) {
@@ -104,7 +93,7 @@ void AppController::scanAdoptable(DocumentSession* s, bool offer) {
                                                 QString::fromStdString(file.filename().string()));
             }
         });
-    });
+    }, BackgroundJobs::Priority::Idle);
 }
 
 int AppController::adoptableCount() const {
@@ -150,7 +139,7 @@ void AppController::adoptAnnotations() {
     Q_EMIT adoptableChanged();
     QPointer<AppController> self(this);
     QPointer<DocumentSession> session(s);
-    onIdleWorker([self, session, plan, title] {
+    appServices->jobs().start([self, session, plan, title] {
         auto prepared = std::make_shared<adopt::Prepared>(
                 adopt::prepare(plan.pdf, plan.pdfPages, plan.copy,
                                plan.mark < 0 ? std::nullopt : std::optional(static_cast<MergedPdf::Kind>(plan.mark))));
@@ -184,5 +173,5 @@ void AppController::adoptAnnotations() {
             self->scanAdoptable(session, false);  // (what is left: none, or those it could not convert)
             Q_EMIT self->adoptableChanged();
         });
-    });
+    }, BackgroundJobs::Priority::Idle);
 }

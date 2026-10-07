@@ -57,6 +57,7 @@ struct InkStroke;
 }
 
 namespace xqt {
+class AppServices;
 class AudioControl;
 class TimelineControl;
 class AppContext;
@@ -350,9 +351,11 @@ class AppController: public QObject {
     /// The current document (notes) has a page's Markdown text: "Export as Markdown" is offered.
     Q_PROPERTY(bool hasMarkdownText READ hasMarkdownText NOTIFY markdownOnPageChanged)
 public:
+    /// A window on its own services (made here: the tests; the app gives main()'s).
     explicit AppController(QObject* parent = nullptr);
-    /// A window of its own: the settings, tools, library and rendering of the main window, own tabs.
-    explicit AppController(AppController& mainWindow, QObject* parent = nullptr);
+    /// A window on the process's services: the main window if it is the first one made on them, else a window of
+    /// undocked documents (the main window's settings, tools, library and rendering, its own tabs).
+    explicit AppController(xqt::AppServices& services, QObject* parent = nullptr);
     ~AppController() override;
 
     QObject* tabsModel() const;
@@ -1530,15 +1533,14 @@ public:
     xqt::TabManager& tabManager() const { return *tabs; }
 
     // --- windows (undocked documents) ---
+    /// What the windows of the process share (the window factory, start maximized, the open documents of all windows)
+    xqt::AppServices& services() const { return *appServices; }
     /// The controller of the main window (this one is a window of its own if it has one).
     AppController* mainWindow() const { return primary; }
-    /// The windows of undocked documents (of the main window).
-    const std::vector<AppController*>& documentWindows() const { return windows; }
+    /// The windows of undocked documents (of the main window; none for another window).
+    std::vector<AppController*> documentWindows() const;
     bool isSecondary() const { return primary != nullptr; }
-    /// Makes the windows of undocked documents. Set once, from main().
-    static void setWindowFactory(std::function<void(AppController*)> factory);
-    /// Open windows maximized (people make them smaller with the tiling of their desktop). Set once, from main().
-    static void setStartMaximized(bool on);
+    /// Windows open maximized (AppServices::setStartMaximized)
     bool startMaximized() const;
     /// XQT_LOG_WINDOW=1: every change of a window's state, size and position, the touch and mouse presses around
     /// it, and what the app itself asks of the window, on stderr (the compositor may change a window unasked).
@@ -1697,6 +1699,12 @@ Q_SIGNALS:
     void editAnywayWarning(const QString& name);
 
 private:
+    /// The process's shared parts: main()'s, or this window's own (made without them, as the tests do). First of the
+    /// members: it goes last.
+    std::unique_ptr<xqt::AppServices> ownServices;
+    xqt::AppServices* appServices = nullptr;
+    /// The window's own parts, for either constructor
+    void setUp(xqt::AppServices& services);
     /// Dark pages: the roles' dark colors for the canvas, and darkPagesChanged when the setting (any window's) or the
     /// system's colors change (AppPaper.cpp)
     void setUpDarkPages();
@@ -1772,9 +1780,6 @@ private:
     void afterHybridSave(xqt::DocumentSession& s);
     /// The .xopp a document was saved as goes to the trash, now that its hybrid PDF `pdf` holds everything.
     void trashOldXopp(xqt::DocumentSession& s, const fs::path& xopp, const fs::path& pdf);
-    /// Tabs of this process other than `except` that have `file` open (with the window that has them).
-    std::vector<std::pair<AppController*, xqt::DocumentSession*>> tabsWithFile(const fs::path& file,
-                                                                               const xqt::DocumentSession* except) const;
     std::vector<QJSValue> whenAllSavedCalls;
     /// The text tool of the current tab (and of the reference) makes Markdown text boxes of markdownFontSize.
     void applyMarkdownText();
@@ -1860,15 +1865,9 @@ private:
     std::shared_ptr<Palette> colors;
     AppController* primary = nullptr;  ///< the main window's controller (nullptr: this is the main window)
     bool windowGone = false;           ///< its window was closed (it is on its way out)
-    std::vector<AppController*> windows;  ///< the main window: the windows of undocked documents
-    /// The handwriting search (the main window's, shared by the others; before `tabs`: goes after the documents)
-    std::unique_ptr<xqt::hwr::HandwritingSearch> ownHandwriting;
-    /// (QPointer: a second window is a child of the main one, deleted after the main one's members are gone)
-    QPointer<xqt::hwr::HandwritingSearch> handwriting;
-    /// Reads the handwriting of the rest of the library (the main window's)
-    std::unique_ptr<xqt::LibraryInkJob> libraryInk;
-    std::unique_ptr<xqt::HandwritingSettings> ownHandwritingView;
-    QPointer<xqt::HandwritingSettings> handwritingView;  ///< (as `handwriting`)
+    // The parts of `shared` this window uses most (AppServices owns them; they outlive every window)
+    xqt::hwr::HandwritingSearch* handwriting = nullptr;
+    xqt::HandwritingSettings* handwritingView = nullptr;
     /// The open documents of this window to the handwriting search
     void syncHandwriting();
     /// The handwriting read in a saved document, to the library's cache
@@ -1889,8 +1888,7 @@ private:
     std::unique_ptr<xqt::VersionsModel> versions;
     std::string nextSaveMessage;  ///< saveWithMessage(): for the save it starts
     std::unique_ptr<xqt::LayersModel> layers;
-    std::unique_ptr<xqt::ShortcutsModel> ownShortcuts;
-    xqt::ShortcutsModel* shortcuts = nullptr;  ///< the main window's
+    xqt::ShortcutsModel* shortcuts = nullptr;
     std::unique_ptr<xqt::MarkdownSession> markdown;
     xqt::DocumentSession* mdSession = nullptr;
     int mdPage = -1;
@@ -1899,35 +1897,20 @@ private:
     double mdOverflow = 0;
     /// Pages were copied after the last copy onto the clipboard (pastesNoteBeforePages)
     bool pagesCopiedLast = false;
-    std::unique_ptr<xqt::PageClipboard> ownPageClipboard;
-    xqt::PageClipboard* pageClipboard = nullptr;  ///< the main window's: pages can be pasted into any window
+    xqt::PageClipboard* pageClipboard = nullptr;  ///< pages can be pasted into any window
     std::vector<size_t> pageList(const QList<int>& pages) const;
     /// A saved document's entry for the library index, from memory (see LibraryIndex::documentSaved).
     void handOverToLibrary(xqt::DocumentSession& s);
-    // The main window owns these; the other windows use the same ones (one library and one list of recent files).
-    std::unique_ptr<xqt::SettingsModel> ownSettingsView;
     int lastTabCount = 0;  ///< tabs before the last change of their number (a document opened: handWhenOpening)
-    std::unique_ptr<xqt::LibraryModel> ownLibrary;
-    std::unique_ptr<xqt::LibraryBookmarksModel> ownLibraryBookmarks;
     xqt::LibraryBookmarksModel* libraryBookmarks = nullptr;
-    /// Tabs of all windows showing this file, also a plain PDF (its document's background)
-    std::vector<std::pair<AppController*, xqt::DocumentSession*>> tabsWithFile(const fs::path& file) const;
-    std::unique_ptr<xqt::LibraryTagsModel> ownLibraryTags;
     xqt::LibraryTagsModel* libraryTags = nullptr;
-    std::unique_ptr<xqt::LibraryTodosModel> ownLibraryTodos;
     xqt::LibraryTodosModel* libraryTodos = nullptr;
     /// Documents that are not open, loaded to tick a to-do in them and saved (gone once saved)
     std::vector<std::unique_ptr<xqt::DocumentSession>> todoSaves;
-    /// Tabs of all windows of this process whose document is `file` (its .xopp or PDF, or a text file edited)
-    std::vector<std::pair<AppController*, xqt::DocumentSession*>> tabsShowing(const fs::path& file) const;
     /// Set a to-do in an open document: one undo step (false: it is not there)
     bool setTodoIn(xqt::DocumentSession& s, const QString& rawText, int occurrence, bool done);
-    /// The to-dos setting into the view (it changes with the settings)
-    void applyTodoRules();
-    std::unique_ptr<xqt::RecentFiles> ownRecent;
     xqt::SettingsModel* settingsView = nullptr;
-    std::unique_ptr<xqt::ToolboxModel> ownToolbox;
-    xqt::ToolboxModel* toolbox = nullptr;  ///< (the main window's, shared)
+    xqt::ToolboxModel* toolbox = nullptr;
     /// The color the last entry taken gave the tool (it follows a palette switch while the tool still has it)
     QColor appliedEntryColor;
     xqt::LibraryModel* library = nullptr;

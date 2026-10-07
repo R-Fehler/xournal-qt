@@ -111,6 +111,7 @@
 #include "util/PathUtil.h"
 
 #include "AppController.h"
+#include "AppServices.h"
 #include "UiFixture.h"
 #include "MarkdownFile.h"
 #include "support/SearchHits.h"
@@ -3163,7 +3164,7 @@ TEST_F(MainWindowTest, draggingATabOffTheStripSaysWhatHappens) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     controller->newDocument();
     wait(50);
-    AppController::setWindowFactory({});  // no window is made in this test
+    controller->services().setWindowFactory({});  // no window is made in this test
     auto* list = findItem("tabList");
     ASSERT_NE(list, nullptr);
     QQuickItem* tab = itemAt(list, 0);
@@ -3196,7 +3197,7 @@ TEST_F(MainWindowTest, aTabGetsAWindowOfItsOwn) {
 
     // The windows are made like in main(): the same QML with the new controller as "app"
     std::vector<QPointer<QQuickWindow>> made;
-    AppController::setWindowFactory([this, &made](AppController* w) {
+    controller->services().setWindowFactory([this, &made](AppController* w) {
         auto* context = new QQmlContext(engine->rootContext(), w);
         context->setContextProperty("app", w);
         auto* component = new QQmlComponent(engine.get(), QStringLiteral("XournalQt"), QStringLiteral("Main"), w);
@@ -3233,7 +3234,7 @@ TEST_F(MainWindowTest, aTabGetsAWindowOfItsOwn) {
     until([&] { return controller->documentWindows().empty() && made[0].isNull(); });
     EXPECT_TRUE(controller->documentWindows().empty());
     EXPECT_TRUE(made[0].isNull()) << "the window is gone";
-    AppController::setWindowFactory({});
+    controller->services().setWindowFactory({});
 }
 
 TEST_F(MainWindowTest, fourOrFiveFingersShowThePagesOrTheDocuments) {

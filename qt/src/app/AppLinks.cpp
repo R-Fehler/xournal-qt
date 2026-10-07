@@ -16,10 +16,10 @@
 #include <QQuickTextDocument>
 #include <QTextCursor>
 #include <QTextDocument>
-#include <QThreadPool>
 #include <QVariantMap>
 
 #include "AppController.h"
+#include "AppServices.h"
 #include "CanvasView.h"
 #include "control/ScrollHandler.h"
 #include "model/Document.h"
@@ -537,7 +537,7 @@ void AppController::rewriteLinksAfter(const std::vector<std::pair<fs::path, fs::
     int updated = 0;
     std::vector<LinkRewrite::Plan> closed;
     for (auto& plan: plans) {
-        const auto open = tabsWithFile(plan.file, nullptr);
+        const auto open = appServices->openDocuments().find(plan.file);
         if (open.empty()) {
             closed.push_back(std::move(plan));
             continue;
@@ -555,7 +555,7 @@ void AppController::rewriteLinksAfter(const std::vector<std::pair<fs::path, fs::
     }
     // The others in the background (a .xopp is loaded and written again)
     QPointer<AppController> self(this);
-    QThreadPool::globalInstance()->start([self, closed = std::move(closed), updated, note]() {
+    appServices->jobs().start([self, closed = std::move(closed), updated, note]() {
         int n = updated;
         QStringList errors;
         for (const auto& plan: closed) {
@@ -581,7 +581,7 @@ void AppController::rewriteLinksAfter(const std::vector<std::pair<fs::path, fs::
                 Q_EMIT self->message(tr("Links not updated"), errors.join(QLatin1Char('\n')), false);
             }
         });
-    });
+    }, BackgroundJobs::Priority::Idle);
 }
 
 bool AppController::updateFoundLink() {

@@ -1,4 +1,5 @@
 #include "AppController.h"
+#include "AppServices.h"
 #include "AudioControl.h"
 #include "TimelineControl.h"
 
@@ -9,7 +10,6 @@
 #include <utility>
 
 #include <QPointer>
-#include <QThreadPool>
 #include <QTimer>
 #include <QDir>
 
@@ -142,43 +142,60 @@ Color toColor(const QColor& c) {
 }
 }  // namespace
 
-AppController::AppController(QObject* parent): QObject(parent) {
-    app = std::make_shared<AppContext>(AppContext::defaultResourceDir());
-    MdImageDecoder::install();  // the pictures of Markdown texts, read with Qt (qt/docs/md-images.md)
-    DocumentImages::pruneWorkFolders();  // (work folders of documents not opened for 60 days; before any opens)
-    // What protected PDFs had taken out into the cache in a process that crashed (qt/docs/hybrid-pdf.md)
-    HybridPdf::removeProtectedLeftovers([](int64_t pid) {
-        return pid == Util::getPid() || SessionRecovery::processAlive(static_cast<qint64>(pid));
-    });
-    colors = std::make_shared<Palette>(app->getResourceDir() / "palettes" / "xournal.gpl");
-    try {
-        colors->load();
-    } catch (const std::exception& e) {
-        colors->load_default();
+AppController::AppController(QObject* parent):
+        QObject(parent), ownServices(std::make_unique<AppServices>()) {
+    setUp(*ownServices);
+}
+
+AppController::AppController(AppServices& services, QObject* parent): QObject(parent) { setUp(services); }
+
+void AppController::setUp(AppServices& services) {
+    appServices = &services;
+    // The first window made on the services is the main window; the others are windows of undocked documents (the
+    // same settings, tools, library and rendering, their own documents)
+    primary = services.openDocuments().mainWindow();
+    services.openDocuments().add(this);
+    app = services.context();
+    colors = services.colors();
+    settingsView = &services.settingsView();
+    toolbox = &services.toolbox();
+    shortcuts = &services.shortcuts();
+    library = &services.library();
+    libraryBookmarks = &services.libraryBookmarks();
+    libraryTags = &services.libraryTags();
+    libraryTodos = &services.libraryTodos();
+    recent = &services.recent();
+    pageClipboard = &services.pageClipboard();  // copied pages can be pasted in any window
+    handwriting = &services.handwriting();
+    handwritingView = &services.handwritingView();
+    if (!isSecondary()) {
+        // Messages from the reused core (XojMsgBox) are shown by the QML UI (of the main window).
+        xoj::compat::setMessageSink([this](xoj::compat::MessageRequest r,
+                                           xoj::util::move_only_function<void(int)> done) {
+            const bool error = r.kind == xoj::compat::MessageKind::Error;
+            QMetaObject::invokeMethod(this, [this, title = QString::fromStdString(r.title),
+                                             text = QString::fromStdString(r.text),
+                                             error] { Q_EMIT message(title, text, error); });
+            if (done) {
+                done(r.buttons.empty() ? 0 : r.buttons.front().response);  // questions: first button until dialogs exist
+            }
+        });
     }
-    // Messages from the reused core (XojMsgBox) are shown by the QML UI.
-    xoj::compat::setMessageSink([this](xoj::compat::MessageRequest r, xoj::util::move_only_function<void(int)> done) {
-        const bool error = r.kind == xoj::compat::MessageKind::Error;
-        QMetaObject::invokeMethod(this, [this, title = QString::fromStdString(r.title),
-                                         text = QString::fromStdString(r.text),
-                                         error] { Q_EMIT message(title, text, error); });
-        if (done) {
-            done(r.buttons.empty() ? 0 : r.buttons.front().response);  // questions: first button until dialogs exist
-        }
-    });
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followSnipTool);
-    // How sharp snips are (a setting; Snip.h)
-    applySnipResolution();
+    if (!isSecondary()) {
+        applySnipResolution();  // How sharp snips are (a setting; Snip.h)
+    }
     connect(app.get(), &AppContext::settingsChanged, this, &AppController::applySnipResolution);
-    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followTodoStampTool);
+    if (!isSecondary()) {
+        connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followTodoStampTool);
+    }
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
     setUpDarkPages();
-    loadCustomWidths();
-    SettingsModel::applyPreviewMemory(*app->getSettings());
-    SettingsModel::applyCanvasMemory(*app->getSettings());
-    SettingsModel::applyFuzzyTypos(*app->getSettings());
+    if (!isSecondary()) {
+        loadCustomWidths();
+    }
 
     pages = std::make_unique<PagesModel>();
     filteredPages = std::make_unique<PageFilterModel>(*pages);
@@ -186,176 +203,41 @@ AppController::AppController(QObject* parent): QObject(parent) {
     annotations = std::make_unique<AnnotationsModel>();
     versions = std::make_unique<VersionsModel>();
     layers = std::make_unique<LayersModel>();
-    ownPageClipboard = std::make_unique<PageClipboard>();
-    pageClipboard = ownPageClipboard.get();
     // "Only pages with hits" ends with the search.
     connect(this, &AppController::searchChanged, this, [this] {
         if (searchQuery().isEmpty()) {
             filteredPages->setOnlySearchHits(false);
         }
     });
-    ownSettingsView = std::make_unique<SettingsModel>(*app);
-    settingsView = ownSettingsView.get();
-    // The toolbox's tools (qt/docs/toolbox.md): stored in the settings; without them, the first layout
-    ownToolbox = std::make_unique<ToolboxModel>(
-            [this] {
-                std::string stored;
-                app->getSettings()->getCustomElement("xournalQt").getString("toolbox", stored);
-                return QString::fromStdString(stored);
-            },
-            [this](const QString& json) {
-                app->getSettings()->getCustomElement("xournalQt").setString("toolbox", json.toStdString());
-                app->getSettings()->customSettingsChanged();
-            });
-    toolbox = ownToolbox.get();
-    // A palette chosen: the entry in hand follows with its role's color there
-    connect(this, &AppController::colorPaletteChanged, this, [this] {
-        const QVariantMap e = toolbox->entry(toolbox->active());
-        // (only while the tool still has the color the entry gave it: a color changed since stays)
-        if (!e.value("role").toString().isEmpty() && entryInHand(e) && color() == appliedEntryColor) {
-            applyToolEntry(toolbox->active());
-        }
-    });
-    ownShortcuts = std::make_unique<ShortcutsModel>(*app->getSettings());
-    shortcuts = ownShortcuts.get();
-    ownHandwriting = std::make_unique<hwr::HandwritingSearch>(*app);
-    handwriting = ownHandwriting.get();
+    if (!isSecondary()) {
+        // A palette chosen: the entry in hand follows with its role's color there
+        connect(this, &AppController::colorPaletteChanged, this, [this] {
+            const QVariantMap e = toolbox->entry(toolbox->active());
+            // (only while the tool still has the color the entry gave it: a color changed since stays)
+            if (!e.value("role").toString().isEmpty() && entryInHand(e) && color() == appliedEntryColor) {
+                applyToolEntry(toolbox->active());
+            }
+        });
+    }
     makeTabs();
-    ownLibrary = std::make_unique<LibraryModel>();
-    library = ownLibrary.get();
-    ownLibraryBookmarks = std::make_unique<LibraryBookmarksModel>(library);
-    libraryBookmarks = ownLibraryBookmarks.get();
-    ownLibraryTags = std::make_unique<LibraryTagsModel>(library);
-    libraryTags = ownLibraryTags.get();
-    ownLibraryTodos = std::make_unique<LibraryTodosModel>(library);
-    libraryTodos = ownLibraryTodos.get();
-    applyTodoRules();
-    connect(app.get(), &AppContext::settingsChanged, this, &AppController::applyTodoRules);
     connect(library, &LibraryModel::favouriteToggled, this, &AppController::favouriteChanged);
     citations = std::make_unique<Citations>(*app->getSettings(), library);
     makeAudioControl();
-    // Open documents take the PDF text the library index read before (their search has all counts at once)
-    DocumentTextIndex::setSeeder([lib = QPointer<LibraryModel>(library)](const fs::path& pdf) {
-        LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
-        return index ? index->knownPdfText(pdf) : std::map<int, QString>();
-    });
-    // ... and the handwriting it read before (opening a document reads none of it again)
-    // (and its handwriting language: the user's choice, and the language decided for these models)
-    hwr::HandwritingSearch::setSeeder([lib = QPointer<LibraryModel>(library)](const fs::path& file,
-                                                                              const QString& recognizer) {
-        hwr::HandwritingSearch::Seeded out;
-        LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
-        if (auto entry = index ? index->inkText().find(file) : nullptr) {
-            out.choice = entry->languageChoice;
-            out.decided = entry->recognizer == recognizer ? entry->language : QString();
-        }
-        if (auto doc = index ? index->inkOf(file) : nullptr; doc && doc->recognizer == recognizer) {
-            for (const auto& page: doc->pages) {
-                for (const hwr::LineRef& l: page) {
-                    if (l.result) {
-                        out.lines.emplace_back(l.hash, l.result);
-                    }
-                }
-            }
-        }
-        return out;
-    });
-    // The library's handwriting: read in the background while the search is on (and on mains power)
-    libraryInk = std::make_unique<LibraryInkJob>(handwriting->service());
-    libraryInk->setIndex(library->searchIndex());
-    libraryInk->setEnabled(handwriting->enabled());
-    connect(handwriting, &hwr::HandwritingSearch::enabledChanged, libraryInk.get(),
-            [this] { libraryInk->setEnabled(handwriting->enabled()); });
-    ownHandwritingView = std::make_unique<HandwritingSettings>(*app, *handwriting, libraryInk.get());
-    handwritingView = ownHandwritingView.get();
-    connect(library, &LibraryModel::indexChanged, libraryInk.get(), [this] {
-        libraryInk->setIndex(library->searchIndex());
-        if (!library->indexing()) {
-            libraryInk->check();  // (documents changed or came)
-        }
-    });
-    library->onFilesChanged = [this](const DocumentFiles::Result& r) { filesChanged(r); };
-    // The fuzzy search's toggle is an app-wide setting (shared by all windows through the library model)
-    {
-        bool fuzzy = false;
-        app->getSettings()->getCustomElement("xournalQt").getBool("fuzzySearch", fuzzy);
-        library->setFuzzySearch(fuzzy);
-        // (with it on, open documents make the vocabularies of their text in the background: the first fuzzy search
-        // of a long document does not make them on the UI thread)
-        DocumentTextIndex::setWordsInBackground(fuzzy);
-        connect(library, &LibraryModel::fuzzySearchChanged, this, [this] {
-            app->getSettings()->getCustomElement("xournalQt").setBool("fuzzySearch", library->fuzzySearch());
-            app->getSettings()->customSettingsChanged();
-            DocumentTextIndex::setWordsInBackground(library->fuzzySearch());
-        });
-    }
     connect(library, &LibraryModel::fuzzySearchChanged, this, &AppController::searchFuzzyChanged);
     connect(this, &AppController::searchChanged, this, &AppController::searchFuzzyChanged);
-    ownRecent = std::make_unique<RecentFiles>(RecentFiles::defaultStoreFile());
-    recent = ownRecent.get();
+    if (isSecondary()) {
+        home = false;  // it shows documents, never the home screen
+        return;
+    }
+    // Files renamed or moved in the library or the recent files: the open documents follow
+    library->onFilesChanged = [this](const DocumentFiles::Result& r) { filesChanged(r); };
     recent->onFilesChanged = [this](const DocumentFiles::Result& r) {
         library->filesMoved(r);  // a renamed library document keeps its search index entry
         filesChanged(r);
     };
-    // The Recent cards show what a PDF of the library is, as its cards do (the index knows it)
-    recent->setPdfKinds([lib = QPointer<LibraryModel>(library)](const fs::path& file) {
-        LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
-        return index ? index->pdfKind(file) : PdfKind::Unknown;
-    });
-    recent->setVersionCounts([lib = QPointer<LibraryModel>(library)](const fs::path& file) {
-        LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
-        return index ? index->versionsOf(file) : 0;
-    });
-    connect(library, &LibraryModel::indexChanged, recent, [this] {
-        if (!library->indexing()) {
-            recent->pdfKindsChanged();
-        }
-    });
     journalFile = SessionRecovery::defaultJournalFile();
     connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, &AppController::applicationStateChanged);
     applyToolEntry(toolbox->active());  // (the tool of the last time, with all its settings)
-}
-
-// A window of its own: the same settings, tools, library and rendering, but its own documents.
-AppController::AppController(AppController& mainWindow, QObject* parent): QObject(parent) {
-    primary = &mainWindow;
-    app = mainWindow.app;
-    colors = mainWindow.colors;
-    settingsView = mainWindow.settingsView;
-    toolbox = mainWindow.toolbox;
-    shortcuts = mainWindow.shortcuts;
-    library = mainWindow.library;
-    citations = std::make_unique<Citations>(*app->getSettings(), library);
-    makeAudioControl();
-    recent = mainWindow.recent;
-    pageClipboard = mainWindow.pageClipboard;  // copied pages can be pasted in any window
-    libraryBookmarks = mainWindow.libraryBookmarks;
-    libraryTodos = mainWindow.libraryTodos;
-    libraryTags = mainWindow.libraryTags;
-    handwriting = mainWindow.handwriting;
-    handwritingView = mainWindow.handwritingView;
-    connect(library, &LibraryModel::favouriteToggled, this, &AppController::favouriteChanged);
-    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
-    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followSnipTool);
-    connect(app.get(), &AppContext::settingsChanged, this, &AppController::applySnipResolution);
-    connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
-    connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
-    setUpDarkPages();
-    pages = std::make_unique<PagesModel>();
-    filteredPages = std::make_unique<PageFilterModel>(*pages);
-    outline = std::make_unique<OutlineModel>();
-    annotations = std::make_unique<AnnotationsModel>();
-    versions = std::make_unique<VersionsModel>();
-    layers = std::make_unique<LayersModel>();
-    connect(this, &AppController::searchChanged, this, [this] {
-        if (searchQuery().isEmpty()) {
-            filteredPages->setOnlySearchHits(false);
-        }
-    });
-    connect(library, &LibraryModel::fuzzySearchChanged, this, &AppController::searchFuzzyChanged);
-    connect(this, &AppController::searchChanged, this, &AppController::searchFuzzyChanged);
-    makeTabs();
-    home = false;  // it shows documents, never the home screen
 }
 
 void AppController::makeTabs() {
@@ -469,8 +351,17 @@ AppController::~AppController() {
             delete child;
         }
     }
+    // The windows of undocked documents (children of the main window) go before the main window's parts
+    if (!isSecondary()) {
+        for (AppController* w: documentWindows()) {
+            delete w;
+        }
+    }
+    appServices->openDocuments().remove(this);
     if (!isSecondary()) {
         xoj::compat::setMessageSink({});  // (the main window set it)
+        library->onFilesChanged = {};
+        recent->onFilesChanged = {};
     }
     for (auto& c: currentConnections) {
         disconnect(c);
@@ -490,9 +381,7 @@ AppController::~AppController() {
     presenter.reset();  // (the audience's view of a session)
     compareMode.reset();
     referenceMode.reset();
-    if (handwriting) {
-        handwriting->setSessions(this, {}, nullptr);
-    }
+    handwriting->setSessions(this, {}, nullptr);
     tabs.reset();
 }
 
@@ -530,13 +419,6 @@ void AppController::syncHandwriting() {
     }
     handwriting->setSessions(this, sessions, tabs->currentSession());
 }
-
-namespace {
-std::function<void(AppController*)> windowFactory;  // set by main(): makes the window for a controller
-bool windowsStartMaximized = false;                  // set by main()
-}  // namespace
-
-void AppController::setStartMaximized(bool on) { windowsStartMaximized = on; }
 
 namespace {
 bool windowLogOn() {
@@ -623,10 +505,16 @@ void AppController::logWindow(const QString& what) const {
     }
 }
 
-bool AppController::startMaximized() const { return windowsStartMaximized; }
+bool AppController::startMaximized() const { return appServices->startMaximized(); }
 
-void AppController::setWindowFactory(std::function<void(AppController*)> factory) {
-    windowFactory = std::move(factory);
+std::vector<AppController*> AppController::documentWindows() const {
+    std::vector<AppController*> list;
+    for (AppController* w: appServices->openDocuments().windows()) {
+        if (w->primary == this) {
+            list.push_back(w);
+        }
+    }
+    return list;
 }
 
 void AppController::closeAllTabs() {
@@ -644,15 +532,12 @@ void AppController::undockTab(int index) {
     if (!tab) {
         return;
     }
-    auto* window = new AppController(*main, main);
-    main->windows.push_back(window);
+    auto* window = new AppController(*appServices, main);  // (a child of the main window: it goes before the main one)
     window->tabManager().adoptTab(std::move(tab));
     if (main->recovery) {
         main->recovery->watch(window->tabManager());  // its changes survive a crash as well
     }
-    if (windowFactory) {
-        windowFactory(window);
-    }
+    appServices->makeWindow(window);
 }
 
 void AppController::dockTab(int index) {
@@ -678,16 +563,17 @@ void AppController::windowClosed() {
             primary->setHomeVisible(false);
         }
     }
-    auto& list = primary->windows;
-    list.erase(std::remove(list.begin(), list.end(), this), list.end());
+    appServices->openDocuments().remove(this);
     deleteLater();
 }
 
 void AppController::shutdown() {
-    // Saves that run are finished first (the window waited for them already; this is the last resort)
-    for (int i = 0; i < tabs->count(); ++i) {
-        tabs->session(i)->waitForSaves();
+    // Saves that run are finished first, in every window (the window waited for them already; this is the last
+    // resort), then the work off the UI thread that may still write documents (tags, to-dos, links, exports)
+    for (DocumentSession* s: appServices->openDocuments().all()) {
+        s->waitForSaves();
     }
+    appServices->jobs().waitForDone();
     // The image workers draw with Qt: they must be done before the application takes its plugins away
     PreviewProvider::shutdown();
     HitPageProvider::shutdown();
@@ -2654,7 +2540,7 @@ int AppController::autosaveAll() {
         }
     };
     autosaveTabs(*tabs);
-    for (AppController* w: windows) {
+    for (AppController* w: documentWindows()) {
         autosaveTabs(w->tabManager());
     }
     return written;
@@ -2829,7 +2715,7 @@ void AppController::receiveFiles(const QStringList& sources) {
         Q_EMIT pageActionDone(tr("Copying into the library…"), false);
     }
     QPointer<AppController> self(this);
-    QThreadPool::globalInstance()->start([self, files, folder] {
+    appServices->jobs().start([self, files, folder] {
         // The copies are made in a folder of our own first (the names other apps give are cleaned up there), then
         // moved in the way the library imports documents (a .xopp with its PDF, free names)
         QTemporaryDir staging(QDir::tempPath() + "/xqt-received-XXXXXX");
@@ -2873,7 +2759,7 @@ void AppController::receiveFiles(const QStringList& sources) {
                     }
                 },
                 Qt::QueuedConnection);
-    });
+    }, BackgroundJobs::Priority::Normal);
 }
 
 void AppController::setFingerDrawingDefault(bool on) {
@@ -3262,7 +3148,7 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
     if (choice != "keep") {
         // The .xopp open in another tab (another window of this process): closed if it has no unsaved changes; with
         // changes it stays open, and the .xopp is left alone
-        const auto others = tabsWithFile(previous, s);
+        const auto others = appServices->openDocuments().find(previous, {.except = s});
         if (std::any_of(others.begin(), others.end(),
                         [](const auto& o) { return o.second->isModified() || o.second->isSaving(); })) {
             keptBecause = tr("%1 is open with unsaved changes in another tab, so it was left as it is.")
@@ -3606,25 +3492,6 @@ QString AppController::saveFormat() const {
     return pdfOnly() ? QStringLiteral("pdf") : QStringLiteral("xopp");
 }
 
-std::vector<std::pair<AppController*, DocumentSession*>> AppController::tabsWithFile(const fs::path& file,
-                                                                                    const DocumentSession* except) const {
-    std::vector<std::pair<AppController*, DocumentSession*>> found;
-    AppController* main = primary ? primary : const_cast<AppController*>(this);
-    std::vector<AppController*> all{main};
-    all.insert(all.end(), main->windows.begin(), main->windows.end());
-    for (AppController* w: all) {
-        for (int i = 0; i < w->tabs->count(); ++i) {
-            DocumentSession* t = w->tabs->session(i);
-            std::error_code ec;
-            if (t && t != except && t->hasFilePath() &&
-                (t->getFilePath() == file || fs::equivalent(t->getFilePath(), file, ec))) {
-                found.emplace_back(w, t);
-            }
-        }
-    }
-    return found;
-}
-
 void AppController::trashOldXopp(DocumentSession& s, const fs::path& xopp, const fs::path& pdf) {
     DocumentItem item;
     item.xopp = xopp;
@@ -3829,7 +3696,7 @@ bool AppController::saveAsHybrid(const QUrl& url, const QString& oldXopp) {
 void AppController::afterHybridSave(DocumentSession& s) {
     // The clean copy of the new version, in the background: opening it again (also the library's index and preview)
     // does not have to make it (seconds for a long PDF)
-    QThreadPool::globalInstance()->start([file = s.getFilePath()] { HybridPdf::open(file); });
+    appServices->jobs().start([file = s.getFilePath()] { HybridPdf::open(file); }, BackgroundJobs::Priority::Idle);
     library->refresh();
 }
 
@@ -4058,7 +3925,7 @@ bool AppController::shareForXournal(const QUrl& folder, const QString& file) {
     }
     // A PDF from the library, not open: loaded and exported on a worker
     QPointer<AppController> self(this);
-    QThreadPool::globalInstance()->start([self, document, xopp, pdf, shared] {
+    appServices->jobs().start([self, document, xopp, pdf, shared] {
         std::string error;
         auto loaded = DocumentSession::loadFile(document);
         if (!loaded.document) {
@@ -4076,7 +3943,7 @@ bool AppController::shareForXournal(const QUrl& folder, const QString& file) {
             }
             shared(true);
         });
-    });
+    }, BackgroundJobs::Priority::Normal);
     return true;
 }
 
@@ -4156,7 +4023,7 @@ bool AppController::exportArchive(const QUrl& target, const QString& file) {
             return false;
         }
         Q_EMIT pageActionDone(tr("Writing the archive PDF…"), false);
-        QThreadPool::globalInstance()->start([self, document, out] {
+        appServices->jobs().start([self, document, out] {
             HybridPdf::Result r;
             auto loaded = DocumentSession::loadFile(document);
             if (!loaded.document) {
@@ -4169,7 +4036,7 @@ bool AppController::exportArchive(const QUrl& target, const QString& file) {
                     self->archiveDone(out, r.ok, r.error, r.pdfa, r.notPdfA, r.adjusted);
                 }
             });
-        });
+        }, BackgroundJobs::Priority::Normal);
         return true;
     }
     DocumentSession* s = session();
@@ -4232,7 +4099,7 @@ bool AppController::shareFile(const QString& path, bool toClipboard, bool withHi
         // Without its versions: a copy written anew in one piece, in the app cache (the file keeps them)
         const fs::path copy = Util::getCacheSubfolder("share") / file.filename();
         QPointer<AppController> guard(this);
-        QThreadPool::globalInstance()->start([guard, file, copy, toClipboard] {
+        appServices->jobs().start([guard, file, copy, toClipboard] {
             std::string error;
             std::error_code ec;
             fs::create_directories(copy.parent_path(), ec);
@@ -4250,14 +4117,14 @@ bool AppController::shareFile(const QString& path, bool toClipboard, bool withHi
                         guard->handOver({QString::fromStdString(copy.string())}, toClipboard);
                     },
                     Qt::QueuedConnection);
-        });
+        }, BackgroundJobs::Priority::Normal);
         return true;
     }
     if (lowerExtension(file) == ".pdf" && HybridPdf::isHybrid(file) && HybridPdf::hasEarlierRevisions(file)) {
         // A PDF with notes saved incrementally: written anew in one piece first (on a worker), so that no earlier
         // revision with deleted ink goes along
         QPointer<AppController> guard(this);
-        QThreadPool::globalInstance()->start([guard, file, path, toClipboard] {
+        appServices->jobs().start([guard, file, path, toClipboard] {
             std::string error;
             const bool ok = HybridPdf::compact(file, error);
             QMetaObject::invokeMethod(
@@ -4273,7 +4140,7 @@ bool AppController::shareFile(const QString& path, bool toClipboard, bool withHi
                         guard->handOver({path}, toClipboard);
                     },
                     Qt::QueuedConnection);
-        });
+        }, BackgroundJobs::Priority::Normal);
         return true;
     }
     return handOver({path}, toClipboard);

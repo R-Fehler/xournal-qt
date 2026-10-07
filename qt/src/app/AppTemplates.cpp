@@ -13,7 +13,6 @@
 #include <QCoreApplication>
 #include <QDate>
 #include <QPointer>
-#include <QThreadPool>
 
 #include "control/settings/PageTemplateSettings.h"
 #include "control/settings/Settings.h"
@@ -35,6 +34,7 @@
 #include "undo/UndoRedoHandler.h"
 
 #include "AppController.h"
+#include "AppServices.h"
 
 using namespace xqt;
 
@@ -137,7 +137,7 @@ bool AppController::saveTemplate(int page, const QString& name, const QString& f
     QPointer<AppController> self(this);
     const QString path = QString::fromStdString(target.string());
     const QString shown = QString::fromStdString(target.stem().string());
-    QThreadPool::globalInstance()->start([self, tpl, pdf = std::move(copied.pdf), target, path, shown]() mutable {
+    appServices->jobs().start([self, tpl, pdf = std::move(copied.pdf), target, path, shown]() mutable {
         std::string error;
         const bool ok = templates::write(std::move(tpl), pdf, target, &error);
         QMetaObject::invokeMethod(QCoreApplication::instance(), [self, ok, error, path, shown] {
@@ -156,7 +156,7 @@ bool AppController::saveTemplate(int page, const QString& name, const QString& f
             Q_EMIT self->pageActionDone(tr("Saved template “%1”").arg(shown), false);
             Q_EMIT self->templateSaved(path, QString());
         });
-    });
+    }, BackgroundJobs::Priority::Normal);
     return true;
 }
 
@@ -164,7 +164,7 @@ void AppController::readTemplate(const QString& path,
                                  std::function<void(std::shared_ptr<PageClipboard>, bool, const QString&)> then) {
     QPointer<AppController> self(this);
     const fs::path file(path.toStdString());
-    QThreadPool::globalInstance()->start([self, file, then = std::move(then)] {
+    appServices->jobs().start([self, file, then = std::move(then)] {
         std::string error;
         bool without = false;
         auto copy = std::make_shared<PageClipboard>();
@@ -186,7 +186,7 @@ void AppController::readTemplate(const QString& path,
                 then(error.empty() ? copy : nullptr, without, QString::fromStdString(error));
             }
         });
-    });
+    }, BackgroundJobs::Priority::Normal);
 }
 
 std::vector<PageRef> AppController::templatePagesFor(PageClipboard& copy, bool withoutBackground, DocumentSession& s,
