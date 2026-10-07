@@ -83,6 +83,14 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/VersionDiff.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPdf.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPdf.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridInternal.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridCommon.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPrepare.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridFullWrite.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridAppend.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridHistory.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridCache.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridOpen.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ArchivePdf.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ArchivePdf.cpp
     ${CMAKE_BINARY_DIR}/generated/SrgbIcc.cpp
