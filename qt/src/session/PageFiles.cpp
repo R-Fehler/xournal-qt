@@ -14,6 +14,7 @@
 
 #include "DocumentSession.h"
 #include "HybridPdf.h"
+#include "PageCopy.h"
 
 namespace xqt::pagefiles {
 
@@ -46,21 +47,6 @@ bool number(const std::string& s, size_t& out) {
     return true;
 }
 
-/// A copy of a page as a save copies it (DocumentSave.cpp): its layers' visibility and its background's name too
-PageRef copyOf(const PageRef& page) {
-    struct Access: XojPage {
-        using XojPage::setLayerVisible;  // (for the LayerController only)
-    };
-    constexpr auto setLayerVisible = &Access::setLayerVisible;
-    auto copy = std::make_shared<XojPage>(*page);
-    for (Layer::Index i = 0; i <= page->getLayerCount(); ++i) {  // (0: the background)
-        ((*copy).*setLayerVisible)(i, page->isLayerVisible(i));
-    }
-    if (page->backgroundHasName()) {
-        copy->setBackgroundName(page->getBackgroundName());
-    }
-    return copy;
-}
 }  // namespace
 
 std::vector<size_t> parseRange(const std::string& text, size_t count, std::string* error) {
@@ -197,7 +183,7 @@ std::unique_ptr<Document> subset(Document& doc, const std::vector<size_t>& pages
     std::vector<PageRef> copies;
     for (size_t i: pages) {
         if (i < doc.getPageCount()) {
-            copies.push_back(copyOf(doc.getPage(i)));
+            copies.push_back(deepCopyOf(doc.getPage(i)));  // (as a save copies it)
         }
     }
     copy->addPages(copies.begin(), copies.end());

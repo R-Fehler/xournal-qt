@@ -18,6 +18,7 @@
 #include <zlib.h>
 
 #include "util/Util.h"
+#include "FileIo.h"
 #include "PdfEncryption.h"
 
 namespace xqt::PdfRevisions {
@@ -728,10 +729,10 @@ bool extract(const fs::path& file, uint64_t end, const fs::path& out, std::strin
         return false;
     }
     fs::create_directories(out.parent_path(), ec);
-    const fs::path part = out.parent_path() / ("." + out.filename().string() + "." + std::to_string(Util::getPid()) + ".part");
+    fileio::AtomicFile written(out);
     {
         std::ifstream in(file, std::ios::binary);
-        std::ofstream o(part, std::ios::binary | std::ios::trunc);
+        std::ofstream o(written.temp(), std::ios::binary | std::ios::trunc);
         char buf[65536];
         uint64_t left = end;
         while (left > 0 && in && o) {
@@ -745,19 +746,11 @@ bool extract(const fs::path& file, uint64_t end, const fs::path& out, std::strin
         }
         o.flush();
         if (left != 0 || !o) {
-            o.close();
-            fs::remove(part, ec);
             error = "Could not write \"" + out.string() + "\".";
             return false;
         }
     }
-    fs::rename(part, out, ec);
-    if (ec) {
-        fs::remove(part, ec);
-        error = "Could not write \"" + out.string() + "\": " + ec.message();
-        return false;
-    }
-    return true;
+    return written.commit(error);
 }
 
 }  // namespace xqt::PdfRevisions

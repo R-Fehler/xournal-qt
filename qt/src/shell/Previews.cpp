@@ -17,6 +17,7 @@
 #include "model/Document.h"
 #include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
+#include "session/FileIo.h"
 #include "util/PathUtil.h"
 
 #include "ImageFile.h"
@@ -447,10 +448,10 @@ QImage PreviewCache::preview(const DocumentItem& item) {
             return img;
         }
         img = render(item);
-        const QString tmp = cached + ".part";  // (a reader never sees half a file)
-        if (!img.isNull() && img.save(tmp, "PNG")) {
-            QFile::remove(cached);
-            QFile::rename(tmp, cached);
+        fileio::AtomicFile file(fs::path(cached.toStdString()));  // (a reader never sees half a file)
+        if (std::string error;
+            !img.isNull() && img.save(QString::fromStdString(file.temp().string()), "PNG")) {
+            file.commit(error, fileio::Sync::None);  // (a cache)
         }
         return img;
     }

@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <string>
 
+#include "FileIo.h"
 #include "filesystem.h"
 
 namespace xqt {
@@ -37,12 +38,8 @@ public:
     static constexpr size_t MAX_EDIT_BYTES = 2 * 1024 * 1024;
 
     /// What the file on disk was when it was read or written last.
-    struct Stamp {
-        std::uintmax_t size = 0;
-        std::int64_t time = 0;  ///< modification time (ns)
-        bool operator==(const Stamp& o) const { return size == o.size && time == o.time; }
-        bool operator!=(const Stamp& o) const { return !(*this == o); }
-    };
+    using Stamp = fileio::FileStamp;
+    /// {} when it does not exist.
     static Stamp stampOf(const fs::path& file);
 
     TextFile() = default;

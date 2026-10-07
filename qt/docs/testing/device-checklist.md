@@ -122,3 +122,10 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
       dots, the toasts and the read-only note sit where they did, over the page and under the home screen.
 - [ ] ⋮, the toolbox's menus and the catalog open at their buttons (a sheet on the phone); Back closes a sheet, then
       leaves Zen, as before.
+
+## Saving and tags (`qt/session-io`)
+
+- [ ] A PDF with notes that keeps its versions, open in a tab: give it a tag (card menu → Tags…) and press Ctrl+S at
+      once: both are in the file; the version list shows no "other app" entry; "Save with a message" works.
+- [ ] A `.xopp` made from a big PDF with "attach the PDF": Save as into another folder while writing with the pen:
+      the pen keeps drawing; the `name.xopp.bg.pdf` next to it opens, also in Xournal++.

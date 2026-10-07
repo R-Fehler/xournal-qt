@@ -10,10 +10,10 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QSaveFile>
 #include <QStandardPaths>
 
 #include "DocumentFiles.h"
+#include "session/FileIo.h"
 #include "session/StickerFile.h"
 #include "Previews.h"
 
@@ -50,12 +50,8 @@ QJsonObject readJson(const fs::path& file) {
 bool writeJson(const fs::path& file, const QJsonObject& object) {
     std::error_code ec;
     fs::create_directories(file.parent_path(), ec);
-    QSaveFile f(QString::fromStdString(file.string()));
-    if (!f.open(QIODevice::WriteOnly)) {
-        return false;
-    }
-    f.write(QJsonDocument(object).toJson(QJsonDocument::Indented));
-    return f.commit();
+    return fileio::writeFileAtomically(QString::fromStdString(file.string()),
+                                       QJsonDocument(object).toJson(QJsonDocument::Indented));
 }
 
 /// The order file names one sticker by another name now (or no more: `to` empty)

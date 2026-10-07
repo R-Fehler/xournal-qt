@@ -23,19 +23,7 @@ std::string readAll(const fs::path& file, bool& ok) {
 constexpr std::string_view BOM = "\xEF\xBB\xBF";
 }  // namespace
 
-TextFile::Stamp TextFile::stampOf(const fs::path& file) {
-    Stamp s;
-    std::error_code ec;
-    s.size = fs::file_size(file, ec);
-    if (ec) {
-        return {};
-    }
-    const auto t = fs::last_write_time(file, ec);
-    if (!ec) {
-        s.time = std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
-    }
-    return s;
-}
+TextFile::Stamp TextFile::stampOf(const fs::path& file) { return fileio::fileStamp(file).value_or(Stamp{}); }
 
 bool TextFile::load(const fs::path& path, Kind kind, std::string& error) {
     file = path;

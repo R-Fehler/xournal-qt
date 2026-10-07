@@ -5,9 +5,9 @@
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
-#include <QSaveFile>
 
 #include "NetFetch.h"
+#include "session/FileIo.h"
 
 namespace xqt {
 
@@ -241,9 +241,7 @@ void ModelDownload::next() {
                 }
                 const QString local = QDir(staging).filePath(f.path);
                 QDir().mkpath(QFileInfo(local).path());
-                QSaveFile out(local);
-                if (!out.open(QIODevice::WriteOnly) || out.write(r.body) != r.body.size() || !out.flush() ||
-                    !out.commit()) {
+                if (!fileio::writeFileAtomically(local, r.body)) {
                     fail(tr("Could not write %1").arg(local));
                     return;
                 }
@@ -259,9 +257,7 @@ void ModelDownload::finish() {
     const bool ownManifest = std::any_of(m.files.begin(), m.files.end(),
                                          [](const File& f) { return f.path == QLatin1String("model.json"); });
     if (!ownManifest) {
-        QSaveFile manifest(QDir(staging).filePath(QStringLiteral("model.json")));
-        const QByteArray bytes = manifestOf(m);
-        if (!manifest.open(QIODevice::WriteOnly) || manifest.write(bytes) != bytes.size() || !manifest.commit()) {
+        if (!fileio::writeFileAtomically(QDir(staging).filePath(QStringLiteral("model.json")), manifestOf(m))) {
             fail(tr("Could not write the model's manifest"));
             return;
         }

@@ -41,6 +41,9 @@ class XojPage;
 namespace xqt::ink {
 struct PageText;
 }
+namespace xqt::IncrementalPdf {
+class Update;
+}
 
 namespace xqt::HybridPdf {
 
@@ -200,6 +203,12 @@ bool writeVersion(const fs::path& pdf, int id, const fs::path& out, std::string&
 /// Give version `id` a message (an empty one: none), or change it. Only the marker is written (appended, part of the
 /// current version: never a version of its own); it needs the file's last revision to be ours.
 bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, std::string& error);
+/// An incremental update `u` of `pdf` (opened as `q`) that begins at `start` (IncrementalPdf::Tail::size) and is not
+/// a save, such as its tags (PdfKeywords::write), keeps the file's version history: when it is a PDF with notes whose
+/// history is on and whose last revision is ours, the marker's history is written again in the update, so it is the
+/// current version's last revision and not another app's (PdfHistory::list). Nothing for other PDFs. The caller
+/// holds the file's fileio::FileWriteLock.
+void keepHistoryIn(const fs::path& pdf, QPDF& q, IncrementalPdf::Update& u, uint64_t start);
 
 /// The revision of `pdf` that `cleanCopy` (the background of a document opened from it) was made from, if the file is
 /// still that version and was not edited in another app (else an invalid revision: the next save writes it in full).

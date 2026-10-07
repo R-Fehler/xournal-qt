@@ -5,6 +5,8 @@
 #include <cstdio>
 #include <map>
 
+#include "FileIo.h"
+
 namespace xqt::InkTextLayer {
 
 std::vector<Word> wordsOf(const ink::PageText& page) {
@@ -77,14 +79,7 @@ std::string contentOf(const std::vector<Word>& words, double pageHeight, const s
 }
 
 std::string sigOf(const std::string& content) {
-    uint64_t h = 1469598103934665603ULL;
-    for (const unsigned char c: content) {
-        h ^= c;
-        h *= 1099511628211ULL;
-    }
-    char buf[17];
-    std::snprintf(buf, sizeof buf, "%016llx", static_cast<unsigned long long>(h));
-    return buf;
+    return fileio::hex16(fileio::fnv1a(content));
 }
 
 // --- the font -------------------------------------------------------------------------------------------------------

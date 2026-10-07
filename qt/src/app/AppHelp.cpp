@@ -14,11 +14,11 @@
 #include <system_error>
 
 #include <QFile>
-#include <QSaveFile>
 #include <QStandardPaths>
 
 #include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
+#include "session/FileIo.h"
 #include "shell/TabManager.h"
 
 #include "AppController.h"
@@ -38,8 +38,7 @@ bool writeResource(const QString& name, const fs::path& to) {
     }
     std::error_code ec;
     fs::create_directories(to.parent_path(), ec);
-    QSaveFile out(QString::fromStdString(to.string()));
-    return out.open(QIODevice::WriteOnly) && out.write(in.readAll()) >= 0 && out.commit();
+    return fileio::writeFileAtomically(QString::fromStdString(to.string()), in.readAll());
 }
 }  // namespace
 

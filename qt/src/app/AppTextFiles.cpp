@@ -12,13 +12,13 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include <QSaveFile>
 #include <QGuiApplication>
 
 #include "AppController.h"
 #include "control/settings/Settings.h"
 #include "model/Document.h"
 #include "CanvasView.h"
+#include "session/FileIo.h"
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
 #include "session/AppContext.h"
@@ -72,13 +72,8 @@ void accept(const fs::path& file) {
     while (list.size() > MAX_ACCEPTED) {
         list.removeFirst();
     }
-    QSaveFile f(QString::fromStdString(acceptedStore().string()));
-    if (f.open(QIODevice::WriteOnly)) {
-        f.write(QJsonDocument(QJsonArray::fromStringList(list)).toJson(QJsonDocument::Compact));
-        if (f.flush()) {  // (see LibraryCache.cpp, writeFile)
-            f.commit();
-        }
-    }
+    fileio::writeFileAtomically(QString::fromStdString(acceptedStore().string()),
+                                QJsonDocument(QJsonArray::fromStringList(list)).toJson(QJsonDocument::Compact));
 }
 /// An "other" text file (code, LaTeX, JSON, ...): not a .md, not a .txt.
 bool isOtherTextFile(const fs::path& file) {
@@ -215,8 +210,7 @@ bool AppController::createTextFile(const QString& name, const QString& extension
         return false;
     }
     const QString path = library->newTextFilePath(name, extension);
-    QSaveFile f(path);
-    if (path.isEmpty() || !f.open(QIODevice::WriteOnly) || !f.commit()) {
+    if (path.isEmpty() || !fileio::writeFileAtomically(path, QByteArray())) {
         Q_EMIT message(tr("Cannot create the file"), tr("\"%1\" cannot be written.").arg(path), true);
         return false;
     }
@@ -372,9 +366,7 @@ bool AppController::exportMarkdown(const QUrl& file) {
     size_t pictures = 0;
     text = DocumentImages::exportPictures(text, target, pictures);
     const QString path = QString::fromStdString(target.string());
-    QSaveFile out(path);
-    if (!out.open(QIODevice::WriteOnly) || out.write(text.data(), static_cast<qint64>(text.size())) < 0 ||
-        !out.commit()) {
+    if (!fileio::writeFileAtomically(path, QByteArray::fromStdString(text))) {
         Q_EMIT message(tr("Export as Markdown failed"), tr("\"%1\" cannot be written.").arg(path), true);
         return false;
     }

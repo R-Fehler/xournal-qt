@@ -10,6 +10,7 @@
  */
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -44,6 +45,8 @@ bool canHaveSpace(const XojPage& page);
 /// Draw a PDF page on its page, at the page's offset (for renders without a PdfCache: thumbnails, previews). The
 /// space around it is white.
 void renderPdf(cairo_t* cr, const XojPage& page, const XojPdfPage& pdf, bool forPrinting = false);
+/// For tests: called by renderPdf before it draws (whether a document lock is held while a PDF is drawn).
+extern std::function<void()> beforePdfDrawn;
 
 /// Amounts for the four sides: points, or (relative) fractions of the slide's width (left, right) and height (top,
 /// bottom), worked out per page.

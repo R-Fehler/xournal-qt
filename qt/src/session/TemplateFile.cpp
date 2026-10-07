@@ -12,6 +12,7 @@
 #include "util/Color.h"
 
 #include "DocumentSession.h"
+#include "FileIo.h"
 #include "StickyNote.h"
 
 namespace xqt::templates {
@@ -24,24 +25,8 @@ DocumentHandler& handler() {
 }
 
 bool writeBytes(const fs::path& target, const std::string& bytes) {
-    fs::path part = target;
-    part += ".part";
-    {
-        std::ofstream out(part, std::ios::binary | std::ios::trunc);
-        out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
-        if (!out) {
-            std::error_code ec;
-            fs::remove(part, ec);
-            return false;
-        }
-    }
-    std::error_code ec;
-    fs::rename(part, target, ec);
-    if (ec) {
-        fs::remove(part, ec);
-        return false;
-    }
-    return true;
+    std::string error;
+    return fileio::writeFileAtomically(target, bytes, error);
 }
 }  // namespace
 

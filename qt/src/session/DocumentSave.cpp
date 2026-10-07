@@ -58,10 +58,12 @@
 #include "DocumentSearch.h"
 #include "DocumentTextIndex.h"
 #include "DocumentSession.h"
+#include "FileIo.h"
 #include "audio/AudioFiles.h"
 #include "audio/DocumentAudio.h"
 #include "HybridPdf.h"
 #include "MergedPdf.h"
+#include "PageCopy.h"
 #include "PdfPageKeeper.h"
 #include "PictureSaveHandler.h"
 #include "TextFile.h"
@@ -85,32 +87,9 @@ DocumentHandler& copyHandler() {
     return handler;
 }
 
-bool hasExtension(const fs::path& p, const char* ext) {
-    auto e = p.extension().string();
-    std::transform(e.begin(), e.end(), e.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return e == ext;
-}
-
 fs::path backgroundOf(Document& doc) {
     std::shared_lock lock(doc);
     return doc.getPdfFilepath();
-}
-
-/// A deep copy of a page: its layers and elements (the copy constructor leaves out what is visible and the name of
-/// its background).
-PageRef copyOf(const PageRef& page) {
-    struct Access: XojPage {
-        using XojPage::setLayerVisible;  // (for the LayerController only)
-    };
-    constexpr auto setLayerVisible = &Access::setLayerVisible;
-    auto copy = std::make_shared<XojPage>(*page);
-    for (Layer::Index i = 0; i <= page->getLayerCount(); ++i) {  // (0: the background)
-        ((*copy).*setLayerVisible)(i, page->isLayerVisible(i));
-    }
-    if (page->backgroundHasName()) {
-        copy->setBackgroundName(page->getBackgroundName());
-    }
-    return copy;
 }
 
 /// What the writers read of a document, copied (the caller holds its read lock). Its PDF is not loaded: the writers
@@ -125,41 +104,10 @@ std::unique_ptr<Document> snapshotOf(const Document& doc) {
     std::vector<PageRef> pages;
     pages.reserve(doc.getPageCount());
     for (size_t i = 0; i < doc.getPageCount(); ++i) {
-        pages.push_back(copyOf(doc.getPage(i)));
+        pages.push_back(deepCopyOf(doc.getPage(i)));
     }
     copy->addPages(pages.begin(), pages.end());
     return copy;
-}
-
-/// Port of SaveJob::updatePreview: the 128 px preview of the first page stored in the file (any thread).
-xoj::util::CairoSurfaceSPtr previewOf(const PageRef& page, const XojPdfPageSPtr& pdf) {
-    if (!page) {
-        return {};
-    }
-    const int previewSize = 128;
-    double width = page->getWidth();
-    double height = page->getHeight();
-    const double zoom = width < height ? previewSize / height : previewSize / width;
-    width *= zoom;
-    height *= zoom;
-    xoj::util::CairoSurfaceSPtr buffer(
-            cairo_image_surface_create(CAIRO_FORMAT_ARGB32, ceil_cast<int>(width), ceil_cast<int>(height)),
-            xoj::util::adopt);
-    cairo_t* cr = cairo_create(buffer.get());
-    cairo_scale(cr, zoom, zoom);
-    xoj::view::BackgroundFlags flags = xoj::view::BACKGROUND_SHOW_ALL;
-    if (page->getBackgroundType().isPdfPage()) {
-        if (pdf) {
-            notespace::renderPdf(cr, *page, *pdf);  // (poppler draws one page of a document at a time: its own lock)
-        }
-        flags.showPDF = xoj::view::HIDE_PDF_BACKGROUND;
-    } else {
-        flags.forceBackgroundColor = xoj::view::FORCE_AT_LEAST_BACKGROUND_COLOR;
-    }
-    DocumentView view;
-    view.drawPage(page, cr, true, flags);
-    cairo_destroy(cr);
-    return buffer;
 }
 
 /// Port of SaveJob::save for a copy of the document: the file only (the document learns of it on its thread).
@@ -198,6 +146,18 @@ DocumentSession::SaveResult writeXoppFile(Document& copy, const fs::path& target
 }
 
 bool stopAt(int step) { return PdfPageKeeper::stopSaveAt && PdfPageKeeper::stopSaveAt(step); }
+
+/// The attached PDF of a .xopp ("name.xopp.bg.pdf"), as the file the document read it from (the save's worker). A
+/// failure is not the save's: the .xopp still refers to it, as upstream's save that could not write it.
+void writeAttachedPdf(const fs::path& from, const fs::path& attached) {
+    fileio::AtomicFile out(attached);
+    std::error_code ec;
+    fs::copy_file(from, out.temp(), fs::copy_options::overwrite_existing, ec);
+    std::string error = ec.message();
+    if (ec || !out.commit(error)) {
+        g_warning("Could not write the attached PDF: %s", error.c_str());
+    }
+}
 
 /// PDF files mode (DocumentMode.h): the original of a user's PDF that becomes a PDF with notes is kept once in the
 /// app cache, never next to it: "<cache>/originals/<hash of its path>/<its name>". Kept for this long.
@@ -241,6 +201,38 @@ bool keepOriginalInCache(const fs::path& pdf, const fs::path& original, std::err
     return !ec;
 }
 }  // namespace
+
+// --- the preview stored in the file -------------------------------------------------------------------------------
+
+xoj::util::CairoSurfaceSPtr DocumentSession::previewOf(const PageRef& page, const XojPdfPageSPtr& pdf) {
+    if (!page) {
+        return {};
+    }
+    const int previewSize = 128;
+    double width = page->getWidth();
+    double height = page->getHeight();
+    const double zoom = width < height ? previewSize / height : previewSize / width;
+    width *= zoom;
+    height *= zoom;
+    xoj::util::CairoSurfaceSPtr buffer(
+            cairo_image_surface_create(CAIRO_FORMAT_ARGB32, ceil_cast<int>(width), ceil_cast<int>(height)),
+            xoj::util::adopt);
+    cairo_t* cr = cairo_create(buffer.get());
+    cairo_scale(cr, zoom, zoom);
+    xoj::view::BackgroundFlags flags = xoj::view::BACKGROUND_SHOW_ALL;
+    if (page->getBackgroundType().isPdfPage()) {
+        if (pdf) {
+            notespace::renderPdf(cr, *page, *pdf);  // (poppler draws one page of a document at a time: its own lock)
+        }
+        flags.showPDF = xoj::view::HIDE_PDF_BACKGROUND;
+    } else {
+        flags.forceBackgroundColor = xoj::view::FORCE_AT_LEAST_BACKGROUND_COLOR;
+    }
+    DocumentView view;
+    view.drawPage(page, cr, true, flags);
+    cairo_destroy(cr);
+    return buffer;
+}
 
 // --- the interface -------------------------------------------------------------------------------------------------
 
@@ -440,7 +432,7 @@ void DocumentSession::beginSave() {
         }
         case SaveKind::Hybrid:
             t.target = t.request.target;
-            if (!hasExtension(t.target, ".pdf")) {
+            if (!fileio::hasExtension(t.target, ".pdf")) {
                 t.target += ".pdf";
             }
             t.hybrid = true;
@@ -452,7 +444,7 @@ void DocumentSession::beginSave() {
         case SaveKind::ExportHybrid:
         case SaveKind::ExportArchive: {
             t.target = t.request.target;
-            if (!hasExtension(t.target, ".pdf")) {
+            if (!fileio::hasExtension(t.target, ".pdf")) {
                 t.target += ".pdf";
             }
             t.hybrid = true;  // (its pages as a hybrid PDF is written from them)
@@ -611,19 +603,17 @@ void DocumentSession::takeSnapshot() {
     }
     {
         std::shared_lock lock(*doc);
+        t.attachedPdf.clear();
         if (!t.hybrid && !exporting && doc->isAttachPdf() && !doc->getPdfFilepath().empty()) {
-            // An attached PDF is written next to the document once (SaveHandler), from the loaded PDF: here
+            // An attached PDF is written next to the document once (SaveHandler): a copy of the file the document read
+            // it from, made by the worker (never here: the UI thread holds the document's lock)
             fs::path attached = doc->getFilepath();
             Util::clearExtensions(attached);
             attached += ".xopp.bg.pdf";
             std::error_code ec;
             if (!fs::exists(attached, ec)) {
-                GError* error = nullptr;
-                doc->getPdfDocument().save(attached, &error);
-                if (error) {
-                    g_warning("Could not write the attached PDF: %s", error->message);
-                    g_error_free(error);
-                }
+                t.attachedPdf = attached;
+                t.attachedPdfFrom = doc->getPdfFilepath();
             }
         }
         t.snapshot = snapshotOf(*doc);
@@ -758,6 +748,9 @@ void DocumentSession::takeSnapshot() {
                         }
                     }
                     return;
+                }
+                if (!t.attachedPdf.empty()) {
+                    writeAttachedPdf(t.attachedPdfFrom, t.attachedPdf);
                 }
                 // The .xopp. A merged PDF written under another name gets its name after the .xopp refers to that
                 // name, then the .xopp is written again (a crash at any point leaves a matching pair).

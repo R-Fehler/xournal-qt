@@ -27,6 +27,13 @@ Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is merged (2026-10-07).
     canvas and shell labels, the quick tests' input on the clock (`CanvasItemInputTest`), the rest of B10/B11.
   - [x] `qt/qml-split`: `Main.qml` split into 28 files of its parts (qml.md §1.2, files 4–23); left for wave 3: the
     window's state (files 1–3, qml B5) and the `WindowActions` facade (file 24, qml B3).
+  - [x] `qt/session-io`: `session/FileIo.h` (atomic write with fsync, `FileWriteLock`, one stamp, FNV-1a, gzip,
+    MD5, `hasExtension`) and `PageCopy.h` used by session, shell and app; bug 2 (tags vs. saves, tags keep the version
+    history) and bug 6 (attached PDF on the save's worker, file preview outside the lock, `LoadHandler::pdfPassword`
+    set once), each with failing tests first. Left: shell block 9's `readJsonObject`, caching `library.json` and moving
+    reading positions out of the cache folder (Library.cpp: with `qt/library-split`); session block 6's manual
+    `lock()/unlock()` pairs and the plain autosave on the UI thread (risk 7); `setVersionMessage` still runs qpdf on the
+    UI thread; the static `DocumentHandler` copies; markdown's and hwr's own FNV (markdown is below session).
 - [ ] **Wave 3**: `qt/qml-split-2` (HomeView, SettingsPage, the Escape/Back dispatcher, bug 4) · `qt/library-split`
   (`Library.*`, shared image-provider plumbing and shutdown, bug 5) · `qt/hybridpdf-split` (`HybridPdf.cpp`, one
   marker writer) · `qt/app-services` (`AppServices` / `OpenDocuments` / `CurrentDocument`, bug 1).

@@ -18,19 +18,13 @@
 #include "control/xojfile/XmlTags.h"
 #include "util/OutputStream.h"
 
+#include "FileIo.h"
+
 namespace xqt::versiondiff {
 
 namespace {
-constexpr uint64_t FNV_OFFSET = 1469598103934665603ULL;
-constexpr uint64_t FNV_PRIME = 1099511628211ULL;
-
-uint64_t fnv(std::string_view bytes, uint64_t h = FNV_OFFSET) {
-    for (unsigned char c: bytes) {
-        h ^= c;
-        h *= FNV_PRIME;
-    }
-    return h;
-}
+using fileio::FNV_OFFSET;
+constexpr uint64_t fnv(std::string_view bytes, uint64_t h = FNV_OFFSET) { return fileio::fnv1a(bytes, h); }
 
 uint64_t mix(uint64_t h, uint64_t v) {
     return fnv(std::string_view(reinterpret_cast<const char*>(&v), sizeof v), h);

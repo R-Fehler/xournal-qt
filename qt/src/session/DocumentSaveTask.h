@@ -28,6 +28,8 @@ namespace xqt {
 struct DocumentSession::SaveTask {
     SaveRequest request;
     fs::path target;
+    fs::path attachedPdf;      ///< a .xopp's attached PDF to write next to it (the worker), copied from:
+    fs::path attachedPdfFrom;  ///< the file the document read it from
     bool hybrid = false;
     int plans = 0;
     PdfPageKeeper::SavePlan plan;

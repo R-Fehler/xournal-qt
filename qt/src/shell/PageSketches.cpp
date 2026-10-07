@@ -15,6 +15,7 @@
 #include "render/RenderService.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "session/FileIo.h"
 #include "session/PdfEncryption.h"
 #include "util/PathUtil.h"
 
@@ -86,13 +87,10 @@ void writePage(const fs::path& file, const QImage& image) {
     // Written under a name of its own first, then put in place in one step (replacing an older one): a reader never
     // sees half a file, and two workers that store the same page at once (a plan made while its draw ran) do not
     // remove each other's file. (With one name for both, the second removed the page the first had just put there.)
-    static std::atomic<quint64> writes{0};
-    const fs::path part = file.string() + "." + std::to_string(++writes) + ".part";
-    if (image.convertToFormat(QImage::Format_RGB888).save(QString::fromStdString(part.string()), "JPG", 85)) {
-        fs::rename(part, file, ec);
-    }
-    if (fs::exists(part, ec)) {
-        fs::remove(part, ec);  // (not written whole, or not put in place)
+    fileio::AtomicFile part(file);
+    if (std::string error;
+        image.convertToFormat(QImage::Format_RGB888).save(QString::fromStdString(part.temp().string()), "JPG", 85)) {
+        part.commit(error, fileio::Sync::None);  // (a cache)
     }
 }
 

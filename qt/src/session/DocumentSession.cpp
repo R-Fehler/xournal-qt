@@ -50,9 +50,11 @@
 #include "DocumentSaveTask.h"
 #include "DocumentImages.h"
 #include "DocumentSearch.h"
+#include "FileIo.h"
 #include "HybridPdf.h"
 #include "MergedPdf.h"
 #include "PageBookmarks.h"
+#include "PageCopy.h"
 #include "TextDocument.h"
 #include "PageOrderUndoAction.h"
 #include "PdfEncryption.h"
@@ -104,11 +106,7 @@ DocumentHandler& detachedHandler() {
     return handler;
 }
 
-bool hasExtension(const fs::path& p, const char* ext) {
-    auto e = p.extension().string();
-    std::transform(e.begin(), e.end(), e.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return e == ext;
-}
+using fileio::hasExtension;
 }  // namespace
 
 namespace {
@@ -181,7 +179,7 @@ auto DocumentSession::loadFile(const fs::path& path, bool attachPdf, const std::
         return result;
     }
     // Port of Control::openXoppFile
-    LoadHandler::pdfPassword = &PdfEncryption::backgroundPassword;  // (its background PDF may be encrypted)
+    installLoadHooks();  // (its background PDF may be encrypted)
     auto load = [&]() {
         PdfEncryption::askedBackground().clear();
         LoadHandler loadHandler(&result.warnings);
@@ -1280,45 +1278,28 @@ void DocumentSession::updateModified() {
     }
 }
 
-void DocumentSession::updatePreview(Document& document) {
-    Document* doc = &document;
-    // Port of SaveJob::updatePreview: 128 px preview of the first page stored in the file.
-    const int previewSize = 128;
-    xoj::util::CairoSurfaceSPtr crBuffer;
-
-    doc->lock_shared();
-    if (doc->getPageCount() > 0) {
-        PageRef page = doc->getPage(0);
-        double width = page->getWidth();
-        double height = page->getHeight();
-        const double zoom = width < height ? previewSize / height : previewSize / width;
-        width *= zoom;
-        height *= zoom;
-
-        crBuffer.reset(cairo_image_surface_create(CAIRO_FORMAT_ARGB32, ceil_cast<int>(width), ceil_cast<int>(height)),
-                       xoj::util::adopt);
-        cairo_t* cr = cairo_create(crBuffer.get());
-        cairo_scale(cr, zoom, zoom);
-
-        xoj::view::BackgroundFlags flags = xoj::view::BACKGROUND_SHOW_ALL;
-        // No PdfCache here: render the PDF background by hand (as upstream).
-        if (page->getBackgroundType().isPdfPage()) {
-            if (XojPdfPageSPtr pdfPage = doc->getPdfPage(page->getPdfPageNr())) {
-                notespace::renderPdf(cr, *page, *pdfPage);
+void DocumentSession::updatePreview(Document& doc) {
+    // The first page copied under the read lock, drawn without it (never hold the document lock while drawing a PDF)
+    PageRef first;
+    XojPdfPageSPtr pdf;
+    {
+        std::shared_lock lock(doc);
+        if (doc.getPageCount() > 0) {
+            const PageRef page = doc.getPage(0);
+            first = deepCopyOf(page);
+            if (page->getBackgroundType().isPdfPage()) {
+                pdf = doc.getPdfPage(page->getPdfPageNr());
             }
-            flags.showPDF = xoj::view::HIDE_PDF_BACKGROUND;
-        } else {
-            flags.forceBackgroundColor = xoj::view::FORCE_AT_LEAST_BACKGROUND_COLOR;
         }
-        DocumentView view;
-        view.drawPage(page, cr, true, flags);
-        cairo_destroy(cr);
     }
-    doc->unlock_shared();
+    xoj::util::CairoSurfaceSPtr preview = previewOf(first, pdf);
+    std::unique_lock lock(doc);
+    doc.setPreview(std::move(preview));
+}
 
-    doc->lock();
-    doc->setPreview(std::move(crBuffer));
-    doc->unlock();
+void DocumentSession::installLoadHooks() {
+    static std::once_flag once;
+    std::call_once(once, [] { LoadHandler::pdfPassword = &PdfEncryption::backgroundPassword; });
 }
 
 auto DocumentSession::writeDocument(Document& doc, const fs::path& target) -> SaveResult {
@@ -1384,18 +1365,12 @@ std::vector<fs::path> DocumentSession::filesOnDisk() const {
 }
 
 std::optional<DocumentSession::DiskStamp> DocumentSession::diskStampOf(const fs::path& file) {
-    std::error_code ec;
-    const auto size = fs::file_size(file, ec);
-    if (ec) {
-        return std::nullopt;
-    }
-    const auto time = fs::last_write_time(file, ec);
-    if (ec) {
+    const auto onDisk = fileio::fileStamp(file);
+    if (!onDisk) {
         return std::nullopt;
     }
     DiskStamp stamp;
-    stamp.size = size;
-    stamp.time = std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch()).count();
+    stamp.file = *onDisk;
     // The first and the last 64 KB (the end of a PDF has its cross-reference table, of a .xopp gzip's checksum)
     QFile f(QString::fromStdString(file.string()));
     if (f.open(QIODevice::ReadOnly)) {
@@ -1435,11 +1410,11 @@ bool DocumentSession::filesChangedOnDisk() {
             }
             continue;
         }
-        if (!now || (now->size == known->second.size && now->time == known->second.time)) {
+        if (!now || now->file == known->second.file) {
             next[f] = known->second;  // (unchanged; or gone for a moment: asked again when it is back)
             continue;
         }
-        if (now->size == known->second.size && now->sample == known->second.sample) {
+        if (now->file.size == known->second.file.size && now->sample == known->second.sample) {
             next[f] = *now;  // (only touched)
             continue;
         }
@@ -1477,20 +1452,13 @@ bool DocumentSession::setVersionMessage(int id, const std::string& message, std:
         return false;
     }
     const fs::path file = getFilePath();
-    // (as HybridPdf keeps a file's version: its size and time)
-    auto stamp = [&file] {
-        std::error_code ec;
-        const auto size = fs::file_size(file, ec);
-        const auto time = fs::last_write_time(file, ec);
-        return std::to_string(size) + "-" + std::to_string(static_cast<long long>(time.time_since_epoch().count()));
-    };
-    const std::string was = stamp();
+    const std::string was = fileio::stampOf(file);  // (the stamp HybridPdf keeps of the file's version)
     if (!HybridPdf::setVersionMessage(file, id, message, error)) {
         return false;
     }
     if (hybridRevision && hybridRevisionFile == file && hybridRevision->stamp == was) {
         // (the pages are the same objects: the next save appends as before)
-        hybridRevision->stamp = stamp();
+        hybridRevision->stamp = fileio::stampOf(file);
     }
     stampFiles();  // (the app's own change, never one "by another program")
     Q_EMIT versionsChanged();

@@ -114,7 +114,7 @@ std::time_t now();
 std::string isoUtc(std::time_t t);
 std::string localDay(std::time_t t);
 std::string sha256(const std::string& data);
-/// A gzip file's content (an embedded .xopp); `ok` false when it does not read.
+/// fileio::gunzip and fileio::gzip (empty when it fails), for the callers of the history.
 std::string gunzip(const std::string& data, bool& ok);
 std::string gzip(const std::string& data);
 

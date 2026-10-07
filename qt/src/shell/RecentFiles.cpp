@@ -10,6 +10,8 @@
 
 #include "util/PathUtil.h"
 
+#include "session/FileIo.h"
+
 #include "DocumentPlaces.h"
 #include "Previews.h"
 
@@ -53,14 +55,9 @@ void RecentFiles::store(const std::vector<Entry>& entries) const {
         }
         files.append(o);
     }
-    // Written next to it and renamed (no QSaveFile: its sync to disk can stall the UI for a moment).
-    const fs::path tmp = fs::path(storeFile) += ".part";
-    QFile f(qstr(tmp));
-    if (f.open(QIODevice::WriteOnly)) {
-        f.write(QJsonDocument(QJsonObject{{"version", 1}, {"files", files}}).toJson());
-        f.close();
-        fs::rename(tmp, storeFile, ec);
-    }
+    // Whole or not at all, not synced: a sync to disk can stall the UI for a moment
+    fileio::writeFileAtomically(qstr(storeFile), QJsonDocument(QJsonObject{{"version", 1}, {"files", files}}).toJson(),
+                                fileio::Sync::None);
 }
 
 void RecentFiles::add(const fs::path& file) {

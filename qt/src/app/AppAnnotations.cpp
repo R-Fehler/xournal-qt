@@ -6,13 +6,13 @@
 #include <shared_mutex>
 
 #include <QPointer>
-#include <QSaveFile>
 #include <QUrl>
 
 #include "AppController.h"
 #include "model/Document.h"
 #include "session/DocumentMode.h"
 #include "session/DocumentSession.h"
+#include "session/FileIo.h"
 #include "shell/Annotations.h"
 #include "shell/AnnotationsModel.h"
 #include "shell/DocumentLinks.h"
@@ -79,10 +79,9 @@ void AppController::exportAnnotations(const QUrl& url) {
         const std::string text = annotations::markdown(items, input, target, &pictures);
 
         const QString file = QString::fromStdString(target.string());
-        QSaveFile out(file);
-        if (!out.open(QIODevice::WriteOnly) || out.write(text.data(), static_cast<qint64>(text.size())) < 0 ||
-            !out.commit()) {
-            Q_EMIT annotationsExported(file, out.errorString());
+        if (QString why;
+            !fileio::writeFileAtomically(file, QByteArray::fromStdString(text), fileio::Sync::Durable, &why)) {
+            Q_EMIT annotationsExported(file, why);
             return;
         }
         if (!pictures.empty()) {

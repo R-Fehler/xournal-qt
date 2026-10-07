@@ -8,6 +8,8 @@
 #include <qpdf/QPDFObjectHandle.hh>
 
 #include "ArchivePdf.h"
+#include "FileIo.h"
+#include "HybridPdf.h"
 #include "IncrementalPdf.h"
 #include "PdfEncryption.h"
 #include "Tags.h"
@@ -170,7 +172,10 @@ std::string withKeywords(const std::string& xmp, const QStringList& tags, const 
 }
 }  // namespace
 
+std::function<void()> beforeAppend;
+
 bool write(const fs::path& pdf, const QStringList& tags, std::string& error) {
+    const fileio::FileWriteLock lock(pdf);  // (a save of the same file waits, and the reverse)
     try {
         IncrementalPdf::Tail tail;
         if (!IncrementalPdf::readTail(pdf, tail, error)) {
@@ -218,7 +223,11 @@ bool write(const fs::path& pdf, const QStringList& tags, std::string& error) {
                 meta.replaceStreamData(changed, OH::newNull(), OH::newNull());
             }
         }
+        HybridPdf::keepHistoryIn(pdf, q, u, tail.size);  // (a PDF with notes: not "another app's" update)
         const std::string bytes = u.serialize(tail);
+        if (beforeAppend) {
+            beforeAppend();
+        }
         const IncrementalPdf::Result r = IncrementalPdf::append(pdf, tail, bytes);
         if (!r.ok) {
             error = r.error;

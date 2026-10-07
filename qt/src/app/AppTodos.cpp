@@ -9,7 +9,6 @@
 #include <QCoreApplication>
 #include <QMetaObject>
 #include <QFileInfo>
-#include <QSaveFile>
 #include <QPointer>
 #include <QThreadPool>
 #include <QTimer>
@@ -18,6 +17,7 @@
 #include "control/ScrollHandler.h"
 #include "control/ToolHandler.h"
 #include "model/Document.h"
+#include "session/FileIo.h"
 #include "model/Layer.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
@@ -356,9 +356,8 @@ bool AppController::exportTodos(const QUrl& target) {
     }
     const QByteArray bytes = calendar ? todocal::ics(items)
                                       : todocal::markdown(items, tr("To-dos of %1").arg(library->name())).toUtf8();
-    QSaveFile f(path);
-    if (!f.open(QIODevice::WriteOnly) || f.write(bytes) < 0 || !f.commit()) {
-        Q_EMIT message(tr("Export failed"), f.errorString(), true);
+    if (QString why; !fileio::writeFileAtomically(path, bytes, fileio::Sync::Durable, &why)) {
+        Q_EMIT message(tr("Export failed"), why, true);
         return false;
     }
     Q_EMIT pageActionDone(tr("Exported to %1").arg(QFileInfo(path).fileName()), false);

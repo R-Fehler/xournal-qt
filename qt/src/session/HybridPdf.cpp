@@ -1,4 +1,5 @@
 #include "HybridPdf.h"
+#include "FileIo.h"
 
 #include "InkText.h"
 #include "InkTextLayer.h"
@@ -117,81 +118,21 @@ struct Steps {
     std::chrono::steady_clock::time_point last;
 };
 
-std::string stampOf(const fs::path& p) {
-    std::error_code ec;
-    const auto size = fs::file_size(p, ec);
-    if (ec) {
-        return {};
-    }
-    const auto time = fs::last_write_time(p, ec);
-    return std::to_string(size) + "-" + std::to_string(static_cast<long long>(time.time_since_epoch().count()));
-}
-
-uint64_t fnv(const std::string& s) {
-    uint64_t h = 1469598103934665603ULL;
-    for (unsigned char c: s) {
-        h ^= c;
-        h *= 1099511628211ULL;
-    }
-    return h;
-}
-
-std::string hex(uint64_t v) {
-    char buf[17];
-    std::snprintf(buf, sizeof buf, "%016llx", static_cast<unsigned long long>(v));
-    return buf;
-}
-
-std::string bytesOf(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
-/// Gzipped (the .xopp of a protected document, made in memory).
-std::string gzipped(const std::string& data) {
-    z_stream z{};
-    if (deflateInit2(&z, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
-        throw std::runtime_error("Could not compress the Xournal data");
-    }
-    std::string out(deflateBound(&z, static_cast<uLong>(data.size())) + 32, '\0');
-    z.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
-    z.avail_in = static_cast<uInt>(data.size());
-    z.next_out = reinterpret_cast<Bytef*>(out.data());
-    z.avail_out = static_cast<uInt>(out.size());
-    const int rc = deflate(&z, Z_FINISH);
-    out.resize(z.total_out);
-    deflateEnd(&z);
-    if (rc != Z_STREAM_END) {
-        throw std::runtime_error("Could not compress the Xournal data");
-    }
-    return out;
-}
+using fileio::stampOf;
+uint64_t fnv(const std::string& s) { return fileio::fnv1a(s); }
+std::string hex(uint64_t v) { return fileio::hex16(v); }
+std::string bytesOf(const fs::path& p) { return fileio::readFile(p); }
 
 /// Gunzipped (also data that is not compressed: as it is).
 std::string gunzipped(const std::string& data) {
-    if (data.size() < 2 || static_cast<unsigned char>(data[0]) != 0x1f || static_cast<unsigned char>(data[1]) != 0x8b) {
+    if (!fileio::isGzip(data)) {
         return data;
     }
-    z_stream z{};
-    if (inflateInit2(&z, 15 + 32) != Z_OK) {
+    bool ok = false;
+    std::string out = fileio::gunzip(data, ok);
+    if (!ok) {
         throw std::runtime_error("Could not read the Xournal data");
     }
-    std::string out;
-    char buf[64 * 1024];
-    z.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
-    z.avail_in = static_cast<uInt>(data.size());
-    int rc = Z_OK;
-    while (rc != Z_STREAM_END) {
-        z.next_out = reinterpret_cast<Bytef*>(buf);
-        z.avail_out = sizeof buf;
-        rc = inflate(&z, Z_NO_FLUSH);
-        if (rc != Z_OK && rc != Z_STREAM_END) {
-            inflateEnd(&z);
-            throw std::runtime_error("Could not read the Xournal data");
-        }
-        out.append(buf, sizeof buf - z.avail_out);
-    }
-    inflateEnd(&z);
     return out;
 }
 
@@ -228,11 +169,7 @@ bool writeFile(const fs::path& p, const std::string& data) {
 }
 
 /// A unique temporary name next to `target` (several threads may make the same clean copy at once).
-fs::path partOf(const fs::path& target) {
-    static std::atomic<unsigned> counter{0};
-    return target.parent_path() / ("." + target.filename().string() + "." + std::to_string(Util::getPid()) + "-" +
-                                   std::to_string(++counter) + ".part");
-}
+fs::path partOf(const fs::path& target) { return fileio::tempNameFor(target); }
 
 /// How an archive PDF is written (PDF/A): never encrypted, at least PDF 1.7, streams with a forbidden filter decoded.
 struct ArchiveWrite {
@@ -242,11 +179,13 @@ struct ArchiveWrite {
     const PdfEncryption::Encryption* encryption = nullptr;
 };
 
-void writePdfTo(QPDF& pdf, const fs::path& target, ArchiveWrite archive = {}) {
-    const fs::path tmp = partOf(target);
-    std::error_code ec;
-    try {
-        QPDFWriter w(pdf, tmp.string().c_str());
+/// Written whole or not at all (fileio::AtomicFile); a file of the user's made durable, a cache entry (`sync` None)
+/// not. Throws.
+void writePdfTo(QPDF& pdf, const fs::path& target, ArchiveWrite archive = {},
+                fileio::Sync sync = fileio::Sync::Durable) {
+    fileio::AtomicFile file(target);
+    {
+        QPDFWriter w(pdf, file.temp().string().c_str());
         w.setObjectStreamMode(qpdf_o_generate);
         // The streams of the PDF as they are (decoding and compressing them again doubled the time); new streams
         // without a filter are still compressed
@@ -260,14 +199,9 @@ void writePdfTo(QPDF& pdf, const fs::path& target, ArchiveWrite archive = {}) {
             w.setNewlineBeforeEndstream(true);  // (PDF/A: an end of line before "endstream")
         }
         w.write();
-    } catch (...) {
-        fs::remove(tmp, ec);
-        throw;
     }
-    fs::rename(tmp, target, ec);
-    if (ec) {
-        fs::remove(tmp, ec);
-        throw std::runtime_error("Could not write \"" + target.string() + "\": " + ec.message());
+    if (std::string error; !file.commit(error, sync)) {
+        throw std::runtime_error(error);
     }
 }
 
@@ -752,14 +686,9 @@ std::vector<std::string> strip(QPDF& pdf, const std::set<std::string>& keep = {}
 class HashStream: public OutputStream {
 public:
     using OutputStream::write;
-    void write(const char* data, size_t len) override {
-        for (size_t i = 0; i < len; ++i) {
-            h ^= static_cast<unsigned char>(data[i]);
-            h *= 1099511628211ULL;
-        }
-    }
+    void write(const char* data, size_t len) override { h = fileio::fnv1a(std::string_view(data, len), h); }
     void close() override {}
-    uint64_t h = 1469598103934665603ULL;
+    uint64_t h = fileio::FNV_OFFSET;
 };
 
 struct XmlAccess: XmlNode {
@@ -1168,7 +1097,7 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
     if (secret) {
         StringOutputStream mem;
         h.saveTo(&mem, xopp);  // (attached background images still go next to it, into the work folder)
-        inMemory = gzipped(mem.data);
+        inMemory = fileio::gzip(mem.data);
         std::fill(mem.data.begin(), mem.data.end(), '\0');
     } else {
         h.saveTo(xopp);
@@ -2150,9 +2079,7 @@ void addDataSpec(QPDF& q, IncrementalPdf::Update& u, const std::string& name, co
     dict.replaceKey("/Subtype", QPDFObjectHandle::newName("/" + std::string(ArchivePdf::XOPP_MIME)));
     QPDFObjectHandle params = QPDFObjectHandle::newDictionary();
     params.replaceKey("/Size", QPDFObjectHandle::newInteger(static_cast<long long>(xopp.size())));
-    const QByteArray md5 = QCryptographicHash::hash(QByteArray::fromRawData(xopp.data(), static_cast<int>(xopp.size())),
-                                                    QCryptographicHash::Md5);
-    params.replaceKey("/CheckSum", QPDFObjectHandle::newString(md5.toStdString()));
+    params.replaceKey("/CheckSum", QPDFObjectHandle::newString(fileio::md5Of(xopp)));
     dict.replaceKey("/Params", params);
     QPDFObjectHandle stream = u.addStream(dict, xopp);
     QPDFObjectHandle ef = QPDFObjectHandle::newDictionary();
@@ -2786,8 +2713,7 @@ private:
             if (!ef.isDictionary()) {
                 return false;
             }
-            const QByteArray md5 = QCryptographicHash::hash(
-                    QByteArray::fromRawData(data.data(), static_cast<int>(data.size())), QCryptographicHash::Md5);
+            const std::string md5 = fileio::md5Of(data);
             if (!xopp) {
                 // An attachment whose data did not change (an attached background image, a picture): the file has it
                 // already, by its size and checksum (written by us)
@@ -2796,7 +2722,7 @@ private:
                 QPDFObjectHandle size = params.isDictionary() ? params.getKey("/Size") : QPDFObjectHandle::newNull();
                 QPDFObjectHandle sum = params.isDictionary() ? params.getKey("/CheckSum") : QPDFObjectHandle::newNull();
                 if (size.isInteger() && size.getIntValue() == static_cast<long long>(data.size()) && sum.isString() &&
-                    sum.getStringValue() == md5.toStdString() &&
+                    sum.getStringValue() == md5 &&
                     (mime.empty() || had.getDict().getKey("/Subtype").isNameAndEquals("/" + mime))) {
                     return true;
                 }
@@ -2811,7 +2737,7 @@ private:
                                                              : std::string(xopp ? ArchivePdf::XOPP_MIME : "image/png"))));
             QPDFObjectHandle params = QPDFObjectHandle::newDictionary();
             params.replaceKey("/Size", QPDFObjectHandle::newInteger(static_cast<long long>(data.size())));
-            params.replaceKey("/CheckSum", QPDFObjectHandle::newString(md5.toStdString()));
+            params.replaceKey("/CheckSum", QPDFObjectHandle::newString(md5));
             if (archive) {
                 params.replaceKey("/ModDate", QPDFObjectHandle::newString(pdfDateNow()));
             }
@@ -2857,9 +2783,7 @@ private:
             dict.replaceKey("/Subtype", QPDFObjectHandle::newName("/" + (a.mime.empty() ? std::string("image/png") : a.mime)));
             QPDFObjectHandle params = QPDFObjectHandle::newDictionary();
             params.replaceKey("/Size", QPDFObjectHandle::newInteger(static_cast<long long>(a.data.size())));
-            const QByteArray md5 = QCryptographicHash::hash(
-                    QByteArray::fromRawData(a.data.data(), static_cast<int>(a.data.size())), QCryptographicHash::Md5);
-            params.replaceKey("/CheckSum", QPDFObjectHandle::newString(md5.toStdString()));
+            params.replaceKey("/CheckSum", QPDFObjectHandle::newString(fileio::md5Of(a.data)));
             dict.replaceKey("/Params", params);
             QPDFObjectHandle stream = u.addStream(dict, a.data);
             QPDFObjectHandle ef = QPDFObjectHandle::newDictionary();
@@ -3408,7 +3332,7 @@ std::string embeddedXoppOf(QPDF& q) {
 /// The SHA-256 of a .xopp (of its XML, gunzipped).
 std::string xoppSha(const std::string& gz) {
     bool ok = false;
-    const std::string xml = PdfHistory::gunzip(gz, ok);
+    const std::string xml = fileio::gunzip(gz, ok);
     return PdfHistory::sha256(ok ? xml : gz);
 }
 
@@ -3563,7 +3487,7 @@ bool storeAsDelta(const fs::path& target, const PdfHistory::Listed& listed, std:
         gz = embeddedXoppOf(q);
     }
     bool ok = false;
-    const std::string xml = PdfHistory::gunzip(gz, ok);
+    const std::string xml = fileio::gunzip(gz, ok);
     if (!ok || PdfHistory::sha256(xml) != cur.sha) {
         return false;
     }
@@ -3573,7 +3497,7 @@ bool storeAsDelta(const fs::path& target, const PdfHistory::Listed& listed, std:
         g_warning("The delta of version %d of %s does not give it back: it stays whole", cur.id, target.string().c_str());
         return false;
     }
-    if (PdfHistory::gzip(delta).size() * 2 > gz.size()) {
+    if (fileio::gzip(delta).size() * 2 > gz.size()) {
         return false;  // (a keyframe: the delta would be more than half of it)
     }
     step("the last version's delta");
@@ -3842,7 +3766,32 @@ void keepCacheEntry(const fs::path& pdf, const std::string& was) {
 }
 }  // namespace
 
+namespace {
+/// The marker's history written again in the update `u` of `q`, which begins at `start`: the update is the current
+/// version's last revision, ours (PdfHistory::list tells our revisions from other apps' by /Start).
+void markHistoryIn(QPDF& q, IncrementalPdf::Update& u, std::vector<PdfHistory::Version> versions, uint64_t start) {
+    versions.back().end = 0;  // (the current version: as its own list says it)
+    QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
+    u.touch(marker.isIndirect() ? marker : q.getRoot());
+    HistoryMark mark{std::move(versions), start};
+    putHistory(marker, &mark,
+               [&](const std::string& data) { return u.addStream(QPDFObjectHandle::newDictionary(), data); });
+}
+}  // namespace
+
+void keepHistoryIn(const fs::path& pdf, QPDF& q, IncrementalPdf::Update& u, uint64_t start) {
+    const QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
+    if (!marker.isDictionary() || !marker.getKey("/History").isDictionary()) {
+        return;  // (not a PDF with notes, or one without history)
+    }
+    const PdfHistory::Listed listed = PdfHistory::list(pdf);
+    if (listed.on && listed.lastIsOurs && !listed.versions.empty()) {
+        markHistoryIn(q, u, listed.versions, start);
+    }
+}
+
 bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, std::string& error) {
+    const fileio::FileWriteLock lock(pdf);
     try {
         PdfHistory::Listed listed = PdfHistory::list(pdf);
         if (!listed.on || !listed.lastIsOurs || listed.versions.empty()) {
@@ -3860,7 +3809,6 @@ bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, 
             error = "There is no such version in the file.";
             return false;
         }
-        listed.versions.back().end = 0;  // (the current version: as its own list says it)
         IncrementalPdf::Tail tail;
         if (!IncrementalPdf::readTail(pdf, tail, error)) {
             return false;
@@ -3871,12 +3819,7 @@ bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, 
             q.setSuppressWarnings(true);
             PdfEncryption::openQpdf(q, pdf);
             IncrementalPdf::Update u(q);
-            QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
-            u.touch(marker.isIndirect() ? marker : q.getRoot());
-            HistoryMark mark{listed.versions, tail.size};
-            putHistory(marker, &mark, [&](const std::string& data) {
-                return u.addStream(QPDFObjectHandle::newDictionary(), data);
-            });
+            markHistoryIn(q, u, listed.versions, tail.size);
             bytes = u.serialize(tail);
         }
         const std::string was = stampOf(pdf);
@@ -3896,6 +3839,7 @@ bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, 
 
 Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, size_t pdfPageCount,
              const fs::path& xoppExport, const WriteOptions& options) {
+    const fileio::FileWriteLock lock(target);  // (its tags or a version's message are not written meanwhile)
     Result r;
     try {
         WorkDir work;
@@ -4052,18 +3996,9 @@ Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf, size
                 return r;
             }
         }
-        const fs::path tmp = partOf(xopp);
-        if (!writeFile(tmp, prep.xopp)) {
+        if (std::string error; !fileio::writeFileAtomically(xopp, prep.xopp, error)) {
             r.ok = false;
-            r.error = "Could not write \"" + xopp.string() + "\"";
-            return r;
-        }
-        std::error_code ec;
-        fs::rename(tmp, xopp, ec);
-        if (ec) {
-            fs::remove(tmp, ec);
-            r.ok = false;
-            r.error = "Could not write \"" + xopp.string() + "\": " + ec.message();
+            r.error = error;
             return r;
         }
         for (const auto& [name, data]: prep.extras) {  // attached images: "name.xopp.bg_1.png"
@@ -4220,6 +4155,7 @@ uint64_t recordingBytes(const fs::path& pdf) {
 }
 
 bool compact(const fs::path& pdf, std::string& error, const fs::path& to, bool withoutRecordings) {
+    const fileio::FileWriteLock lock(to.empty() ? pdf : to);
     try {
         const bool archive = isArchive(pdf);
         QPDF q;
@@ -4408,7 +4344,7 @@ Opened open(const fs::path& pdf) {
                 writeFile(dir / PAGES_NAME, pagesText(pages));
                 const std::vector<std::string> changed = strip(q);
                 MergedPdf::mark(q, MergedPdf::Kind::Own);  // ("Save as" .xopp puts it next to the .xopp)
-                writePdfTo(q, base);  // (encrypted as the file is)
+                writePdfTo(q, base, {}, fileio::Sync::None);  // (encrypted as the file is; a cache entry)
                 if (!secret) {
                     for (const auto& [n, data]: files) {
                         const fs::path tmp = partOf(dir / n);
@@ -4510,7 +4446,7 @@ fs::path importCopy(const fs::path& pdf, const std::vector<std::string>& keep, s
         strip(q, std::set<std::string>(keep.begin(), keep.end()));
         MergedPdf::mark(q, MergedPdf::Kind::Own);
         const fs::path target = dir / ("imported-" + hex(fnv(stamp + std::to_string(keep.size()))) + ".pdf");
-        writePdfTo(q, target);
+        writePdfTo(q, target, {}, fileio::Sync::None);  // (a cache entry)
         PdfEncryption::derive(target, pdf);
         return target;
     } catch (const std::exception& e) {
