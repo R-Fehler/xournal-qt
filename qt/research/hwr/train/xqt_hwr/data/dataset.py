@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import os
 import random
+from collections import Counter
 import re
 import sys
 from dataclasses import dataclass, field
@@ -126,20 +127,32 @@ class DatasetWriter:
 
 
 def assign_writer_splits(writers: list[str], seed: int = 1234, val: float = 0.1, test: float = 0.1) -> dict[str, str]:
-    """Splits by writer with a fixed seed (a test never sees a training writer's hand). Fewer than 3 writers: all
-    train (the caller warns)."""
-    ws = sorted(set(writers))
+    """Splits by writer with a fixed seed (a test never sees a training writer's hand). `writers` has one entry per
+    line, so test and validation get about their share of the LINES, not of the writers: groups of very different
+    sizes (fhswf's capture days: 7 to 898 lines) would otherwise make a test set of half or twice its share. Writers
+    are taken in a shuffled order; one that would overshoot a share by more than it fills is left for the next.
+    Fewer than 3 writers: all train (the caller warns)."""
+    count = Counter(writers)
+    ws = sorted(count)
     if len(ws) < 3:
         return {w: "train" for w in ws}
     rnd = random.Random(seed)
     rnd.shuffle(ws)
-    n_test = max(1, round(test * len(ws)))
-    n_val = max(1, round(val * len(ws)))
+    total = sum(count.values())
+    want = {"test": test * total, "val": val * total}
+    have = {"test": 0, "val": 0}
     out = {}
-    for i, w in enumerate(ws):
-        out[w] = "test" if i < n_test else "val" if i < n_test + n_val else "train"
+    for w in ws:
+        n = count[w]
+        out[w] = "train"
+        for split in ("test", "val"):
+            if have[split] < want[split] and (have[split] == 0 or have[split] + n - want[split] <= want[split] - have[split]):
+                out[w] = split
+                have[split] += n
+                break
+    if len(ws) - sum(1 for v in out.values() if v != "train") < 1:
+        out[ws[-1]] = "train"
     return out
-
 
 def read_info(root: str | os.PathLike) -> DatasetInfo:
     with open(Path(root) / "dataset.json", encoding="utf-8") as f:
