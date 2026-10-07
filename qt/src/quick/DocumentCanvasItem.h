@@ -34,6 +34,7 @@
 #include <QVariantList>
 #include <QVariantMap>
 
+#include "Clock.h"
 #include "HoverPointer.h"
 
 namespace xqt {
@@ -306,7 +307,7 @@ private:
     bool darkShown = false;
     std::atomic<bool> darkOnGpu{false};
     bool mouseElsewhere = false;  ///< a mouse drag that began outside the canvas (e.g. on a scroll bar)
-    QTimer hoverTimer;            ///< the mouse rests (mouseHovers)
+    xqt::ClockTimer hoverTimer;   ///< the mouse rests (mouseHovers)
     QPointF hoverScenePos;
     bool mouseOverWindow = false;  ///< hoverScenePos is where the mouse is (it did not leave the window)
     QString mathErrorText;
@@ -317,7 +318,9 @@ private:
     QVariantMap linkPending;   ///< it, to be shown when linkTimer fires
     QVariantMap linkShown;
     QPointF linkPointer;
-    QTimer linkTimer;
+    xqt::ClockTimer linkTimer;
+    /// The clock of hoverTimer and linkTimer: the view's (CanvasView::getClock), as its input's, or the steady one
+    xqt::Clock* pointerClock = &xqt::Clock::steady();
     bool linkHoverByMouse = false;
     std::optional<QPointF> linkHoverAt;  ///< where the pointer was last (to look again when the pages move under it)
     // the pointer (refreshPointer)

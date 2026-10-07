@@ -77,7 +77,9 @@ with `XQT_FAST_DEV` that halved the time of a short test.
   `view->setClock(clock)` before the `CanvasInput` is made). The fixtures' `processEvents(ms)` move it on with
   `test::passTime` (`qt/tests/canvas/CanvasTime.h`): long presses, flicks, the momentum, the zoom settling and the page
   animations take no real time, and the renders are waited for. Timers outside the canvas (upstream's edge panning of a
-  selection, the laser pointer's fading) still run in real time.
+  selection, the laser pointer's fading) still run in real time. The canvas item (`DocumentCanvasItem`) runs its
+  pointer's timers (a link's moment, the mouse resting) on the clock of its view too: `CanvasItemInputTest` moves a
+  `ManualClock` on in its `wait(ms)` (exactly `ms`, and at least as long in real time for Qt Quick's own timers).
 
 - **Wait for a state, not for time.** `until(condition)` / `waitFor(condition)` over a fixed `wait(N)`; a fixed wait is
   either too long or flaky under load. A fixed wait stays only for a duration that is the point (press and hold) or to

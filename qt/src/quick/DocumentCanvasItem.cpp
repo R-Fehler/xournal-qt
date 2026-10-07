@@ -636,7 +636,7 @@ DocumentCanvasItem::DocumentCanvasItem(QQuickItem* parent): QQuickItem(parent) {
     });
     linkTimer.setSingleShot(true);
     linkTimer.setInterval(LINK_HOVER_MS);
-    connect(&linkTimer, &QTimer::timeout, this, [this] {
+    connect(&linkTimer, &xqt::ClockTimer::timeout, this, [this] {
         if (linkId.first && !linkCovered && linkShown != linkPending) {
             linkShown = linkPending;
             Q_EMIT hoveredLinkChanged();
@@ -644,7 +644,7 @@ DocumentCanvasItem::DocumentCanvasItem(QQuickItem* parent): QQuickItem(parent) {
     });
     hoverTimer.setSingleShot(true);
     hoverTimer.setInterval(HOVER_RESTS_MS);
-    connect(&hoverTimer, &QTimer::timeout, this, [this] {
+    connect(&hoverTimer, &xqt::ClockTimer::timeout, this, [this] {
         // (only once the mouse rests: the hit test of the Markdown texts is not for every move)
         if (auto* v = canvasView.data(); v && !mouseGrab && claims(hoverScenePos)) {
             if (const auto hit = v->mathErrorAt(toView(mapFromScene(hoverScenePos)))) {
@@ -925,6 +925,12 @@ void DocumentCanvasItem::setView(QObject* object) {
     input.reset();
     canvasView = v;
     viewReplaced = true;
+    // (the pointer's timers go by the view's clock, as its input does: a test moves a ManualClock on by hand)
+    if (xqt::Clock& clock = canvasView ? canvasView->getClock() : xqt::Clock::steady(); &clock != pointerClock) {
+        pointerClock = &clock;
+        linkTimer.setClock(clock);
+        hoverTimer.setClock(clock);
+    }
     if (canvasView) {
         canvasView->setShown(true);
         canvasView->setReadingOnly(reading);
