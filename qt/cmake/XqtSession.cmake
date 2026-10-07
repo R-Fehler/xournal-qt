@@ -67,6 +67,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageBookmarks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfBookmarks.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfBookmarks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfObjectSink.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfObjectSink.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/MergedPdf.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/MergedPdf.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfEncryption.h

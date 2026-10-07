@@ -68,8 +68,8 @@ file may drop the attachment or unknown dictionaries: the ink then stays as anno
 | `HybridPdf.cpp` | `write` (incremental when it can, else in full; with version history: `writeKeeping`), `writeArchive`, `exportXopp` |
 | `HybridPrepare.cpp` | `prepare`: everything that needs the document (the `.xopp` and its hashes, cairo's drawings, links, recordings) |
 | `HybridFullWrite.cpp` | `assemble`: the file written in full (plain, PDF with notes, archive PDF) |
-| `HybridAppend.cpp` | `openExisting` and the incremental update (`appendChanges`) |
-| `HybridMarker.cpp` | what both writers write the same way, through an `ObjectSink`: the marker, the document information, the text layer of the handwriting, the embedded files |
+| `HybridAppend.cpp` | `openExisting` and the incremental update (`appendChanges`); `appendIfPossible`, the "append what changed, else write in full" step of `write` and `writeKeeping` |
+| `HybridMarker.cpp` | what both writers write the same way, through an `ObjectSink` (`PdfObjectSink.h`: a `FullSink` or an `UpdateSink`): the marker, the document information, the text layer of the handwriting, the embedded files; the outline's bookmarks (`PdfBookmarks`) and the version history (`HybridHistory.cpp`) go through it too |
 | `HybridHistory.cpp` | writing the version history (`PdfHistory.cpp` reads it) |
 | `HybridCache.cpp` | the clean copies in the app cache |
 | `HybridOpen.cpp` | reading the marker, `open`, `compact`, `importCopy` |

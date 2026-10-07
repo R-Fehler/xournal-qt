@@ -138,7 +138,7 @@ public:
         }
         placeInkText();
         step("annotations");
-        PdfBookmarks::write(q, bookmarksOf(prep, order), &u);
+        PdfBookmarks::write(q, sink, bookmarksOf(prep, order));
         embedData();
         mark(xoppExport);
         if (archive) {

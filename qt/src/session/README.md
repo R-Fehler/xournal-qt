@@ -10,7 +10,7 @@ undo, the fork's file formats and the PDF machinery. The CLI and the tests use i
 | `SessionActions`, `HeadlessViews` | the session's side of upstream's shadow interfaces (actions, views) |
 | `FileIo`, `PageCopy`, `DetachedDocument` | one atomic write with fsync, file locks, stamps and hashes; a deep copy of a page for a save; the one event handler of documents no session owns |
 | `HybridPdf` (+ `Hybrid*.cpp`) | the PDF with notes: base pages, the ink as annotations, the embedded `.xopp`, the marker |
-| `IncrementalPdf`, `PdfRevisions`, `PdfHistory`, `ByteDelta`, `VersionCache`, `VersionDiff` | incremental saves, the revisions of a file, version history, comparing versions |
+| `IncrementalPdf`, `PdfObjectSink`, `PdfRevisions`, `PdfHistory`, `ByteDelta`, `VersionCache`, `VersionDiff` | incremental saves, where a write's objects go (a file written in full or an incremental update), the revisions of a file, version history, comparing versions |
 | `ArchivePdf`, `PdfEncryption`, `MergedPdf`, `PdfPageKeeper` | PDF/A-3b; password-protected PDFs; the merged background PDF of pasted pages |
 | `PdfBookmarks`, `PdfKeywords`, `PdfTitle`, `InkTextLayer` | the outline's bookmarks, keywords as tags, the title, handwriting as invisible text |
 | `AdoptAnnotations`, `DocumentAdopt` | annotations of other apps made editable |

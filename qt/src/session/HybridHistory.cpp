@@ -239,15 +239,16 @@ bool storeAsDelta(const fs::path& target, const PdfHistory::Listed& listed, std:
     return true;
 }
 
-/// The marker's history written again in the update `u` of `q`, which begins at `start`: the update is the current
-/// version's last revision, ours (PdfHistory::list tells our revisions from other apps' by /Start).
-void markHistoryIn(QPDF& q, IncrementalPdf::Update& u, std::vector<PdfHistory::Version> versions, uint64_t start) {
+/// The marker's history written again into `q` through `sink` (an update of the file that begins at `start`): the
+/// update is the current version's last revision, ours (PdfHistory::list tells our revisions from other apps' by
+/// /Start).
+void markHistoryIn(QPDF& q, ObjectSink& sink, std::vector<PdfHistory::Version> versions, uint64_t start) {
     versions.back().end = 0;  // (the current version: as its own list says it)
     QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
-    u.touch(marker.isIndirect() ? marker : q.getRoot());
+    sink.touch(marker.isIndirect() ? marker : q.getRoot());
     HistoryMark mark{std::move(versions), start};
     putHistory(marker, &mark,
-               [&](const std::string& data) { return u.addStream(QPDFObjectHandle::newDictionary(), data); });
+               [&](const std::string& data) { return sink.addStream(QPDFObjectHandle::newDictionary(), data); });
 }
 
 }  // namespace
@@ -464,7 +465,8 @@ void keepHistoryIn(const fs::path& pdf, QPDF& q, IncrementalPdf::Update& u, uint
     }
     const PdfHistory::Listed listed = PdfHistory::list(pdf);
     if (listed.on && listed.lastIsOurs && !listed.versions.empty()) {
-        markHistoryIn(q, u, listed.versions, start);
+        UpdateSink sink(u);
+        markHistoryIn(q, sink, listed.versions, start);
     }
 }
 
@@ -497,7 +499,8 @@ bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, 
             q.setSuppressWarnings(true);
             PdfEncryption::openQpdf(q, pdf);
             IncrementalPdf::Update u(q);
-            markHistoryIn(q, u, listed.versions, tail.size);
+            UpdateSink sink(u);
+            markHistoryIn(q, sink, listed.versions, tail.size);
             bytes = u.serialize(tail);
         }
         const std::string was = stampOf(pdf);

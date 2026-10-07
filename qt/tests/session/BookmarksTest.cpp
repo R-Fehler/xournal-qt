@@ -28,6 +28,7 @@
 #include "session/IncrementalPdf.h"
 #include "session/PageBookmarks.h"
 #include "session/PdfBookmarks.h"
+#include "session/PdfObjectSink.h"
 #include "undo/UndoRedoHandler.h"
 
 #include "config-test.h"
@@ -220,7 +221,9 @@ TEST_F(BookmarksTest, theOutlineItemInFullAndIncrementalWrites) {
         QPDF q;
         q.processFile(path("book.pdf").string().c_str());
         const auto pages = QPDFPageDocumentHelper(q).getAllPages();
-        EXPECT_TRUE(PdfBookmarks::write(q, {{pages[1].getObjectHandle(), "Proof"}, {pages[3].getObjectHandle(), "Page 4"}}));
+        FullSink sink(q);
+        EXPECT_TRUE(PdfBookmarks::write(q, sink,
+                                        {{pages[1].getObjectHandle(), "Proof"}, {pages[3].getObjectHandle(), "Page 4"}}));
         QPDFWriter w(q, file.string().c_str());
         w.setObjectStreamMode(qpdf_o_generate);
         w.write();
@@ -248,7 +251,8 @@ TEST_F(BookmarksTest, theOutlineItemInFullAndIncrementalWrites) {
         for (const auto& [page, title]: marks) {
             entries.push_back({pages[static_cast<size_t>(page)].getObjectHandle(), title});
         }
-        const bool changed = PdfBookmarks::write(q, entries, &u);
+        UpdateSink sink(u);
+        const bool changed = PdfBookmarks::write(q, sink, entries);
         IncrementalPdf::Stats stats;
         const std::string bytes = u.serialize(tail, &stats);
         EXPECT_TRUE(IncrementalPdf::append(file, tail, bytes).ok);
@@ -295,7 +299,8 @@ TEST_F(BookmarksTest, aPlainPdfTakesThemFromItsOutline) {
         QPDF q;
         q.processFile(path("book.pdf").string().c_str());
         const auto pages = QPDFPageDocumentHelper(q).getAllPages();
-        PdfBookmarks::write(q, {{pages[0].getObjectHandle(), "Page 1"}, {pages[2].getObjectHandle(), "Results"}});
+        FullSink sink(q);
+        PdfBookmarks::write(q, sink, {{pages[0].getObjectHandle(), "Page 1"}, {pages[2].getObjectHandle(), "Results"}});
         QPDFWriter w(q, path("marked.pdf").string().c_str());
         w.write();
     }
