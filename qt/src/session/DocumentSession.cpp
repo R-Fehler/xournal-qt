@@ -638,6 +638,9 @@ void DocumentSession::shiftPageLinks(size_t position, int delta) {
 
 void DocumentSession::rewritePageLinks(const std::vector<int>& newPage) {
     std::vector<size_t> rewritten;
+    // The texts are looked through under a shared lock and changed under the exclusive one: the render threads read
+    // them meanwhile (only this, the UI thread, changes them, so nothing goes in between)
+    std::vector<std::pair<Text*, std::string>> changes;
     {
         std::shared_lock lock(*doc);
         for (size_t i = 0; i < doc->getPageCount(); ++i) {
@@ -650,13 +653,19 @@ void DocumentSession::rewritePageLinks(const std::vector<int>& newPage) {
                     auto* text = static_cast<Text*>(element.get());
                     std::string content = text->getText();
                     if (content.find('#') != std::string::npos && xoj::util::renumberPageLinks(content, newPage)) {
-                        text->setText(std::move(content));
+                        changes.emplace_back(text, std::move(content));
                         if (rewritten.empty() || rewritten.back() != i) {
                             rewritten.push_back(i);
                         }
                     }
                 }
             }
+        }
+    }
+    if (!changes.empty()) {
+        std::unique_lock lock(*doc);
+        for (auto& [text, content]: changes) {
+            text->setText(std::move(content));
         }
     }
     for (size_t i: rewritten) {
