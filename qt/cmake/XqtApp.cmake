@@ -460,6 +460,10 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/FractionalScaleTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CanvasRotationItemTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/DarkPagesCanvasTest.cpp)
+    # Qt 6.10 and newer import the private modules only when asked for them
+    if(Qt6_VERSION VERSION_GREATER_EQUAL 6.10)
+        find_package(Qt6 ${Qt6_VERSION} REQUIRED COMPONENTS GuiPrivate)
+    endif()
     target_link_libraries(xqt-quick-tests PRIVATE xqt-quick xqt-test-support Qt6::QuickControls2 Qt6::GuiPrivate
         Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-quick-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
