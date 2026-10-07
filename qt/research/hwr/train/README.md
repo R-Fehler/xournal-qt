@@ -105,8 +105,11 @@ datasets with their licences, the base model and the scores. Training stops at `
 | TrOCR-small, 384 × 384 | 24, gradient accumulation 2 | ~8–9 GB in bf16/fp16 with SDPA attention (estimated) | `batch_size: 16`, or `gradient_checkpointing: true` (about 3× less activation memory, ~25 % slower; then 48–64 fit) |
 | CTC, 64 px, lines up to 2048 px | 48 | ~3–5 GB (estimated) | `batch_size: 32` or `max_width: 1536` |
 
-- Precision is automatic: bf16 on GPUs that have it (Ampere or newer), otherwise fp16 with a gradient scaler
-  (Turing, for example the 2080 Ti).
+- Precision is automatic: bf16 on GPUs that have it (Ampere or newer), fp16 with a gradient scaler on Volta and
+  Turing (for example the 2080 Ti), fp32 on older GPUs. On a GTX 1080 Ti (Pascal) a matmul runs at 8.9 TFLOPS in
+  fp32, 8.4 in fp16 and 5.5 in emulated bf16 (measured).
+- PyTorch's CUDA 12.8 wheels are fine for Volta and newer. For Pascal, install from the `cu126` index instead (its
+  `sm_60` kernels run on `sm_61`): change the index URL in `requirements-gpu.txt`.
 - With N GPUs, one step sees `batch_size × grad_accum × N` lines. The learning rate is not scaled for you. With 4 or
   more GPUs, set `grad_accum: 1` for TrOCR to keep the step size the configs were written for.
 - Datasets are mixed by **weight** (`datasets:` in each config). A weight is a dataset's share of the samples,

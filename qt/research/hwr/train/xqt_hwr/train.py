@@ -55,6 +55,15 @@ def log(msg: str, rank: int = 0):
         print(msg, flush=True)
 
 
+
+def auto_precision(capability, bf16_native):
+    """The precision "auto" means on a GPU: bf16 where the GPU has it (Ampere or newer), fp16 with a gradient scaler
+    where it has tensor cores for it (Volta, Turing), else fp32. torch's is_bf16_supported() also counts emulated
+    bf16, which on a GTX 1080 Ti (Pascal) runs a matmul at 60 % of fp32's speed; fp16 there is no faster than fp32."""
+    if bf16_native:
+        return "bf16"
+    return "fp16" if tuple(capability) >= (7, 0) else "fp32"
+
 class Run:
     """The state of one training run (one per process)."""
 
@@ -205,7 +214,8 @@ class Run:
         if self.device.type != "cuda":
             prec = "fp32" if prec == "auto" else prec
         elif prec == "auto":
-            prec = "bf16" if torch.cuda.is_bf16_supported() else "fp16"
+            prec = auto_precision(torch.cuda.get_device_capability(self.device),
+                                  torch.cuda.is_bf16_supported(including_emulation=False))
         self.precision = prec
         self.amp_dtype = {"bf16": torch.bfloat16, "fp16": torch.float16}.get(prec)
         self.scaler = torch.amp.GradScaler(self.device.type, enabled=(prec == "fp16"))

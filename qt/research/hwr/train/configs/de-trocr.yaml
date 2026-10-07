@@ -28,7 +28,7 @@ train:
   max_steps: 40000
   steps_per_epoch: 2000           # how often the sampler draws anew
   num_workers: 8                  # per GPU; rendering and augmentation are CPU work
-  precision: auto                 # bf16 where supported, else fp16 with a gradient scaler
+  precision: auto                 # bf16 (Ampere+), fp16 with a gradient scaler (Volta/Turing), else fp32
   clip_grad: 1.0
   early_stopping: 8               # evaluations without better words found
   log_every: 50
