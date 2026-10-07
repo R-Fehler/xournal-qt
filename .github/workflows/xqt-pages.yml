@@ -1,0 +1,57 @@
+# xournal-qt: publish the architecture page (qt/docs/architecture/site/index.html, generated from
+# qt/docs/architecture/architecture.yaml by qt/scripts/architecture/generate.py) to GitHub Pages.
+# Pages must be enabled once by the repository's owner: Settings → Pages → Source: "GitHub Actions"
+# (qt/docs/development/ci.md, "The architecture page"). The README version of the overview works without it.
+name: xournal-qt architecture page
+
+on:
+  push:
+    branches: [master-qt]
+    paths:
+      - 'qt/docs/architecture/**'
+      - 'qt/scripts/architecture/**'
+      - '.github/workflows/xqt-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; a newer push waits for the running one instead of cancelling it halfway.
+concurrency:
+  group: xqt-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the page
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The page in the repository is the generated one (the same check as xqt-build.yml's)
+      - name: Check the page is up to date with architecture.yaml
+        run: python3 qt/scripts/architecture/generate.py --check
+
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp qt/docs/architecture/site/index.html _site/index.html
+          cp qt/docs/architecture/architecture.svg _site/architecture.svg
+          touch _site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

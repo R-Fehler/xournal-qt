@@ -1,0 +1,1789 @@
+# The architecture of xournal-qt: the single source of the overview.
+#
+# qt/scripts/architecture/generate.py reads this file and writes, next to it, architecture.svg (the diagram),
+# README.md (the overview) and site/index.html (the interactive page for GitHub Pages). Do not edit those three:
+# edit this file and run `python3 qt/scripts/architecture/generate.py`. CI runs it with --check: the generated files
+# are up to date, every path below exists, and every CMake link between the targets named here is an edge.
+#
+# A block that adds or moves a module, a target or a key class updates this file in the same commit.
+#
+# The format is a small subset of YAML (the generator uses Python's standard library only): mappings, lists, plain or
+# double-quoted scalars on one line, and folded scalars (`>-`) for longer text. A plain scalar must not contain ": " or
+# " #" and must not start with a backtick: quote it, or use `>-`. Paths are relative to the repository root; a path
+# ending in "/" is a folder.
+#
+#   layers:  the rows of the diagram, top to bottom (`side: right` is the column at the right)
+#   blocks:  id, name, layer, kind, label (the caption in the diagram), target (the CMake target), paths,
+#            responsibility (one line), key (the key classes or files: name, path, what), docs, w (relative width)
+#   edges:   from, to, kind, what (why: the README and the page show it), hide: true (not drawn in the static SVG)
+#   kinds of edges:
+#     links    a CMake target links another (what the build enforces)
+#     calls    direct use: includes and calls (an upstream class used unmodified counts here)
+#     shadows  through qt/compat: upstream code calls a shadow header, a fork class implements one, or a shadow
+#              stands in for a GTK class
+#     seam     a hook or an edit in an upstream file, marked `xournal-qt:` (ADR 0002)
+#     data     reads or writes shared files (.xopp/.xoj, settings.xml, PDFs, caches)
+#     qml      QML talks to C++: the context property `app`, registered types, image providers, list models
+#   flows:   paths through the code, step by step (block and file)
+#   tasks:   "where to change what": a task, the fork's files, upstream's files
+
+github: https://github.com/R-Fehler/xournal-qt
+branch: master-qt
+pages: https://r-fehler.github.io/xournal-qt/
+
+intro: >-
+  xournal-qt is a fork of Xournal++: upstream's C++ core in `src/` (the document model, the .xopp/.xoj files,
+  undo, the tools, the cairo renderers, PDF through poppler), compiled without GTK, under a new Qt 6 / Qt Quick
+  frontend in `qt/`. Dependencies point down: the QML UI talks to the app's C++, which uses the shell, the canvas and
+  the headless document session, which build on the Xournal++ core. Between the two sits `qt/compat`: headers with
+  upstream's names that stand in for the GTK classes upstream's code expects.
+
+  Each block below is a folder or a set of files with one job; most are one CMake target. Every edge says why it is
+  there. The diagram shows the main edges; the tables and the interactive page show all of them.
+
+core_usage: >-
+  The fork reaches upstream's code in four ways, in this order of preference. It calls it directly: the model, the
+  loader and saver, undo, the views and the PDF code are compiled unmodified into `xoj-util`, `xoj-core` and
+  `xoj-tools`, from the explicit list in `qt/cmake/XojSources.cmake` (no globbing: an upstream merge never pulls GTK
+  code in unnoticed). Where upstream's code expects its GTK application objects (`Control`, `XojPageView`, `Layout`,
+  …), the shadow headers of `qt/compat` take their place, and fork classes implement them. Where a frontend needs to
+  change what upstream does, a small hook or edit in an upstream file (a seam, marked `xournal-qt:`) lets it, and
+  ADR 0002 lists every one. And where upstream's class is GTK-bound through and through, the fork ported it
+  (`PageRaster` from `RenderJob`, `CanvasPage` from `XojPageView`, `CanvasInput` from the input handlers).
+
+layers:
+  - id: ui
+    name: Qt Quick UI (QML)
+    about: >-
+      The whole user interface, in QML: one window per `Main.qml`, its parts each in a file of its own. QML talks to
+      C++ only through the context properties `app` (an AppController) and `win`, the types registered under
+      `XournalQt.Canvas`, the image providers and the list models.
+  - id: app
+    name: App (C++ behind the UI)
+    about: >-
+      What the windows of the process share (AppServices), one window's QML API (AppController) and the program's
+      start (main.cpp). Compiled into `xqt-shell` (the C++) and `xournal-qt` (main.cpp).
+  - id: shell
+    name: Shell (library, tabs, models)
+    about: >-
+      Everything between the documents and the QML that is not a canvas: the library, the tabs, what acts on a
+      canvas, the image providers and their caches, the list and settings models. One target, `xqt-shell`.
+  - id: view
+    name: Canvas and views
+    about: >-
+      A document shown in a view (canvas), the view in the Qt Quick scene graph (quick), and handwriting search
+      (hwr), which reads the ink of the sessions.
+  - id: document
+    name: Documents, headless
+    about: >-
+      One open document without a view (session), and what it builds on: the Markdown engine, recordings, and the
+      Qt-free render workers. The CLI and the tests use these without a window.
+  - id: compat
+    name: qt/compat (the GTK stand-ins)
+    about: >-
+      Headers with upstream's names placed before upstream's include paths, so upstream's files compile without GTK
+      and without edits: shadows of the GTK application classes (implemented by the fork), a GTK type shim, and
+      GTK-free implementations of a few upstream files.
+  - id: core
+    name: Xournal++ core (src/, upstream)
+    about: >-
+      Upstream Xournal++'s C++ core, compiled unmodified (apart from the seams of ADR 0002) from the explicit list in
+      `qt/cmake/XojSources.cmake` into three static libraries: `xoj-util`, `xoj-core` and `xoj-tools`. Upstream's
+      GTK GUI is not built.
+  - id: around
+    name: Around the app
+    about: >-
+      The headless CLI, the tests, the developer tools, the vendored libraries, the platform layers and CI.
+  - id: data
+    name: Shared data
+    side: right
+    about: >-
+      The files both programs read and write. A document written by xournal-qt opens in Xournal++ and the other way
+      round; the fork's own attributes are ones Xournal++ ignores.
+
+blocks:
+  # --- Qt Quick UI ---------------------------------------------------------------------------------------------------
+  - id: qml-window
+    name: Window
+    layer: ui
+    kind: qml
+    label: Main.qml and its state
+    target: xqt-ui
+    paths: [qt/src/app/qml/]
+    responsibility: >-
+      The window (`win`): its state objects (insets, view modes, chrome layout), its keys with the one ordered
+      Esc/Back dispatcher, and the parts it instantiates.
+    key:
+      - name: Main.qml
+        path: qt/src/app/qml/Main.qml
+        what: the window; holds the state objects and instantiates the parts
+      - name: WindowInsets.qml, ViewModes.qml, ChromeLayout.qml
+        path: qt/src/app/qml/ViewModes.qml
+        what: "safe areas and keyboard (win.insets), full screen, Zen, read only, presenting (win.modes), where the chrome goes (win.layout)"
+      - name: WindowShortcuts.qml, PageKeys.qml
+        path: qt/src/app/qml/WindowShortcuts.qml
+        what: the window's shortcuts and the ordered Esc/Back dispatcher
+      - name: SaveFlow.qml, StartupFlow.qml, ExportFlow.qml
+        path: qt/src/app/qml/SaveFlow.qml
+        what: multi-step flows (save as, the first start, export)
+    docs: [qt/src/app/README.md, qt/docs/features/zen.md, qt/docs/features/adaptive-layout.md]
+  - id: qml-canvas
+    name: Canvas chrome
+    layer: ui
+    kind: qml
+    label: toolbox, tabs, pills, sidebar
+    target: xqt-ui
+    paths: [qt/src/app/qml/]
+    responsibility: >-
+      What surrounds the canvas: the tab strip, the toolbox and top bar, the pills over the page (selection, note,
+      view), the page sidebar and the page area that hosts the `DocumentCanvas` item.
+    key:
+      - name: PageArea.qml
+        path: qt/src/app/qml/PageArea.qml
+        what: the canvas area of a tab
+      - name: Toolbox.qml, ToolboxMenus.qml, AppButtons.qml
+        path: qt/src/app/qml/Toolbox.qml
+        what: the user's pens and tools, the top bar's buttons
+      - name: TabStrip.qml
+        path: qt/src/app/qml/TabStrip.qml
+        what: the tabs
+      - name: SelectionPill.qml, NotePill.qml, ViewPill.qml
+        path: qt/src/app/qml/SelectionPill.qml
+        what: the pills over the page; they act on a CanvasActions (app.edit)
+      - name: PageSidebar.qml, PageGrid.qml
+        path: qt/src/app/qml/PageSidebar.qml
+        what: page previews (image://thumbnail, image://sketch)
+      - name: ReferenceSplit.qml
+        path: qt/src/app/qml/ReferenceSplit.qml
+        what: a second document beside the first (the reference view)
+    docs: [qt/docs/features/toolbox.md, qt/docs/features/reference-view.md]
+  - id: qml-home
+    name: Home and library
+    layer: ui
+    kind: qml
+    label: HomeView and its parts
+    target: xqt-ui
+    paths: [qt/src/app/qml/]
+    responsibility: >-
+      The home screen: the library grid, recent files, bookmarks, to-dos and tags, the library's search and its file
+      operations.
+    key:
+      - name: HomeView.qml
+        path: qt/src/app/qml/HomeView.qml
+        what: the home screen; instantiates its parts once each
+      - name: LibraryGridPage.qml, RecentGridPage.qml, DocumentCard.qml
+        path: qt/src/app/qml/LibraryGridPage.qml
+        what: the grids and a document's card (image://cover)
+      - name: BookmarksView.qml, TodosView.qml, TagsView.qml
+        path: qt/src/app/qml/TodosView.qml
+        what: the library's bookmarks, to-dos and tags
+    docs: [qt/docs/features/library.md]
+  - id: qml-settings
+    name: Settings
+    layer: ui
+    kind: qml
+    label: SettingsPage, Settings*.qml
+    target: xqt-ui
+    paths: [qt/src/app/qml/]
+    responsibility: >-
+      The settings page: one section per file (pen, touch, documents, display, search, storage, shortcuts, help) and
+      the row types they are built of.
+    key:
+      - name: SettingsPage.qml
+        path: qt/src/app/qml/SettingsPage.qml
+        what: the page and its navigation
+      - name: SettingsPen.qml, SettingsDocuments.qml, …
+        path: qt/src/app/qml/SettingsPen.qml
+        what: the sections; they read and write SettingsModel
+      - name: SettingsSwitchRow.qml, SettingsSliderRow.qml
+        path: qt/src/app/qml/SettingsSwitchRow.qml
+        what: the row types
+  - id: qml-dialogs
+    name: Dialogs and sheets
+    layer: ui
+    kind: qml
+    label: adaptive dialogs, menus
+    target: xqt-ui
+    paths: [qt/src/app/qml/]
+    responsibility: >-
+      Dialogs, menus and sheets that adapt from a desktop window to a phone (a dialog on a desktop, a sheet from the
+      bottom on a phone), and the dialogs built on them.
+    key:
+      - name: AdaptiveDialog.qml
+        path: qt/src/app/qml/AdaptiveDialog.qml
+        what: a dialog or a bottom sheet, by the window's size class
+      - name: AdaptiveMenu.qml, MenuSheet.qml
+        path: qt/src/app/qml/AdaptiveMenu.qml
+        what: a menu or a sheet
+      - name: NewDocumentDialog.qml, BackgroundDialog.qml, PrintDialog.qml
+        path: qt/src/app/qml/NewDocumentDialog.qml
+        what: examples of the dialogs built on them
+      - name: Popups.js
+        path: qt/src/app/qml/Popups.js
+        what: helpers for popups
+    docs: [qt/docs/features/adaptive-layout.md]
+
+  # --- App ----------------------------------------------------------------------------------------------------------
+  - id: app-main
+    name: main and EngineSetup
+    layer: app
+    kind: app
+    label: start, engine, window
+    target: xournal-qt
+    paths: [qt/src/app/main.cpp, qt/src/app/EngineSetup.cpp]
+    responsibility: >-
+      Starts the program: the platform's setup, the AppServices, the QML engine with its image providers and the
+      context property `app`, then the main window from the QML module `XournalQt`.
+    key:
+      - name: main.cpp
+        path: qt/src/app/main.cpp
+        what: the program's start (target xournal-qt)
+      - name: EngineSetup
+        path: qt/src/app/EngineSetup.h
+        what: the engine as the app and the UI tests set it up (image providers, `app`)
+    docs: [qt/src/app/README.md]
+  - id: app-services
+    name: AppServices
+    layer: app
+    kind: app
+    label: what the windows share
+    target: xqt-shell
+    paths: [qt/src/app/AppServices.h, qt/src/app/OpenDocuments.h, qt/src/app/BackgroundJobs.h]
+    responsibility: >-
+      One per process: owns AppContext, the library and its lists, the toolbox, shortcuts, handwriting search, the
+      window factory, the open documents of every window and the background jobs quitting waits for.
+    key:
+      - name: AppServices
+        path: qt/src/app/AppServices.h
+        what: the process-wide objects and the window factory
+      - name: OpenDocuments
+        path: qt/src/app/OpenDocuments.h
+        what: "the windows; \"this file, wherever it is open\""
+      - name: BackgroundJobs
+        path: qt/src/app/BackgroundJobs.h
+        what: the app's work off the UI thread, awaited at shutdown
+    docs: [qt/docs/decisions/0003-app-services.md]
+  - id: app-controller
+    name: AppController
+    layer: app
+    kind: app
+    label: one window's QML API `app`
+    target: xqt-shell
+    paths: [qt/src/app/AppController.h, qt/src/app/AppController.cpp]
+    responsibility: >-
+      One window's QML API, the context property `app`: its tabs, the current document's properties and every
+      action the UI offers; the `App*.cpp` files beside it hold one area each.
+    w: 1.3
+    key:
+      - name: AppController
+        path: qt/src/app/AppController.h
+        what: the QML API of one window
+      - name: App*.cpp
+        path: qt/src/app/AppBookmarks.cpp
+        what: "one area each: bookmarks, tags, templates, stickers, snip, text files, …"
+      - name: AudioControl
+        path: qt/src/app/AudioControl.h
+        what: recording and playing (app.audio)
+      - name: TimelineControl
+        path: qt/src/app/TimelineControl.h
+        what: the replay of how a page was written (app.timeline)
+    docs: [qt/src/app/README.md, qt/docs/review/2026-10/app-cpp.md]
+  - id: current-document
+    name: CurrentDocument
+    layer: app
+    kind: app
+    label: the current tab, relayed
+    target: xqt-shell
+    paths: [qt/src/app/CurrentDocument.h]
+    responsibility: >-
+      The current tab's DocumentSession and CanvasView with their signals relayed in one place; a window follows a
+      tab change with one call.
+    key:
+      - name: CurrentDocument
+        path: qt/src/app/CurrentDocument.h
+        what: follow() on a tab change, announce() once set up
+    docs: [qt/docs/decisions/0003-app-services.md]
+
+  # --- Shell --------------------------------------------------------------------------------------------------------
+  - id: shell-window
+    name: Tabs and canvas actions
+    layer: shell
+    kind: qt
+    label: TabManager, CanvasActions
+    target: xqt-shell
+    paths: [qt/src/shell/]
+    responsibility: >-
+      The window's controllers: the tabs (each owns its session and view), what acts on one canvas, the reference
+      view, version comparison, the presenter console, recovery after a crash.
+    key:
+      - name: TabManager
+        path: qt/src/shell/TabManager.h
+        what: owns each tab's DocumentSession and CanvasView
+      - name: CanvasActions
+        path: qt/src/shell/CanvasActions.h
+        what: "what acts on one canvas (app.edit, app.reference.edit)"
+      - name: ReferenceMode
+        path: qt/src/shell/ReferenceMode.h
+        what: a second document beside the first
+      - name: SessionRecovery
+        path: qt/src/shell/SessionRecovery.h
+        what: emergency saves and the recovery offer (port of upstream's CrashHandler)
+      - name: PresenterConsole
+        path: qt/src/shell/PresenterConsole.h
+        what: the presenter's view and the audience window
+    docs: [qt/src/shell/README.md, qt/docs/decisions/0003-app-services.md, qt/docs/features/presenter-view.md]
+  - id: shell-library
+    name: Library
+    layer: shell
+    kind: qt
+    label: folder, index, search
+    target: xqt-shell
+    paths: [qt/src/shell/]
+    responsibility: >-
+      The library: a plain folder of documents, its index of every document's text and notes, its search, file
+      operations, sharing and archives, and the list models of the home screen.
+    key:
+      - name: Library
+        path: qt/src/shell/Library.h
+        what: the folder, its documents, file operations
+      - name: LibraryIndex
+        path: qt/src/shell/LibraryIndex.h
+        what: the text and notes of every document, and the search
+      - name: LibraryModel
+        path: qt/src/shell/LibraryModel.h
+        what: the grid and its file operations (QML list model)
+      - name: RecentFiles, LibraryBookmarks, LibraryTodos, LibraryTags
+        path: qt/src/shell/RecentFiles.h
+        what: the home screen's other lists
+      - name: LibraryInkJob
+        path: qt/src/shell/LibraryInkJob.h
+        what: reads the handwriting of the library's documents
+    docs: [qt/docs/features/library.md, qt/docs/features/tags.md, qt/docs/features/todos.md]
+  - id: shell-images
+    name: Pictures and caches
+    layer: shell
+    kind: qt
+    label: image providers, ImageMemory
+    target: xqt-shell
+    paths: [qt/src/shell/]
+    responsibility: >-
+      The QML image providers (thumbnails, sketches, covers, hit pages, snippets, annotation pictures), their caches
+      with one owner of their memory and one owner of their worker threads.
+    key:
+      - name: Thumbnails
+        path: qt/src/shell/Thumbnails.h
+        what: image://thumbnail (port of upstream's PreviewJob)
+      - name: PageSketches
+        path: qt/src/shell/PageSketches.h
+        what: image://sketch and the canvas's stand-ins
+      - name: DocumentCovers
+        path: qt/src/shell/DocumentCovers.h
+        what: image://cover, the cards of the library
+      - name: ImageMemory
+        path: qt/src/shell/ImageMemory.h
+        what: the limits of all image caches
+      - name: ImageWorkers
+        path: qt/src/shell/ImageWorkers.h
+        what: the threads of all image providers
+      - name: AsyncImage
+        path: qt/src/shell/AsyncImage.h
+        what: the shared response, LRU cache and URL encoding
+    docs: [qt/docs/architecture/image-caches.md]
+  - id: shell-models
+    name: Models and settings
+    layer: shell
+    kind: qt
+    label: list and settings models
+    target: xqt-shell
+    paths: [qt/src/shell/]
+    responsibility: >-
+      The list models of one document (pages, outline, layers, annotations, versions) and the settings-like models
+      (settings.xml's keys, shortcuts, the toolbox, palettes).
+    key:
+      - name: PagesModel
+        path: qt/src/shell/PagesModel.h
+        what: the pages of the current document
+      - name: OutlineModel, LayersModel, AnnotationsModel, VersionsModel
+        path: qt/src/shell/LayersModel.h
+        what: per-document lists of the side panels
+      - name: SettingsModel
+        path: qt/src/shell/SettingsModel.h
+        what: "upstream's settings.xml keys and the fork's (its xournalQt part)"
+      - name: ToolboxModel
+        path: qt/src/shell/ToolboxModel.h
+        what: the toolbox rail and the top bar
+      - name: ShortcutsModel
+        path: qt/src/shell/ShortcutsModel.h
+        what: the keyboard shortcuts
+    docs: [qt/docs/features/toolbox.md, qt/docs/features/color-palettes.md]
+
+  # --- Canvas and views ---------------------------------------------------------------------------------------------
+  - id: quick
+    name: quick
+    layer: view
+    kind: qt
+    label: the canvas in the scene graph
+    target: xqt-quick
+    paths: [qt/src/quick/]
+    responsibility: >-
+      The bridge between a CanvasView and the Qt Quick scene graph: page tiles as scene graph nodes, an event filter
+      that takes all canvas input, dark pages on the GPU, the window's size class.
+    key:
+      - name: DocumentCanvasItem
+        path: qt/src/quick/DocumentCanvasItem.h
+        what: the QQuickItem that shows one CanvasView (QML type DocumentCanvas)
+      - name: DarkTileMaterial
+        path: qt/src/quick/DarkTileMaterial.h
+        what: dark pages on the GPU (shaders in shaders/)
+      - name: AdaptiveLayout
+        path: qt/src/quick/AdaptiveLayout.h
+        what: the window's size class and touch profile (win.adaptive)
+      - name: TouchGestures
+        path: qt/src/quick/TouchGestures.h
+        what: four- and five-finger gestures for the window
+    docs: [qt/src/quick/README.md, qt/docs/decisions/0001-ui-host.md, qt/docs/features/dark-pages.md]
+  - id: canvas
+    name: canvas
+    layer: view
+    kind: qt
+    label: a document in a view; input, tools
+    target: xqt-canvas
+    paths: [qt/src/canvas/]
+    w: 1.6
+    responsibility: >-
+      A DocumentSession shown in a view: the visible pages and their rendering, the input on them (pen, touch,
+      mouse, palm rejection), and the tools and editors that work on a page. Qt Gui, no Qt Quick.
+    key:
+      - name: CanvasView
+        path: qt/src/canvas/CanvasView.h
+        what: "a session in a view: visible pages, rendering, selection, clipboard, links; implements the shadows XournalView and Layout"
+      - name: CanvasPage
+        path: qt/src/canvas/CanvasPage.h
+        what: one page in a view, the tools' dispatch; implements the shadow XojPageView (port of gui/PageView.cpp)
+      - name: CanvasInput
+        path: qt/src/canvas/CanvasInput.h
+        what: pen, touch, mouse; palm rejection, gestures (port of upstream's input handlers)
+      - name: DocumentLayout, ViewController
+        path: qt/src/canvas/ViewController.h
+        what: where pages lie; zoom and scroll (port of gui/Layout and ZoomControl)
+      - name: CanvasMemory
+        path: qt/src/canvas/CanvasMemory.h
+        what: the memory for rendered pages, shared by every view
+      - name: TextEditor, MarkdownEditor
+        path: qt/src/canvas/MarkdownEditor.h
+        what: typing on the page
+      - name: StickyNotes, Snip, PenGestures, GeometryToolLayer
+        path: qt/src/canvas/StickyNotes.h
+        what: the fork's tools on the page
+    docs: [qt/src/canvas/README.md, qt/docs/features/pen-gestures.md, qt/docs/features/sticky-notes.md]
+  - id: hwr
+    name: hwr
+    layer: view
+    kind: qt
+    label: handwriting search
+    target: xqt-hwr
+    paths: [qt/src/hwr/]
+    responsibility: >-
+      Reads handwriting in the background (ONNX Runtime, loaded at run time) so the search finds it; the ink is
+      never converted.
+    key:
+      - name: HandwritingSearch
+        path: qt/src/hwr/HandwritingSearch.h
+        what: the setting, the recognisers, the worker, an indexer per document
+      - name: InkLayout
+        path: qt/src/hwr/InkLayout.h
+        what: a page's ink as lines and words
+      - name: InkRecognitionService
+        path: qt/src/hwr/InkRecognitionService.h
+        what: the one worker thread at idle priority
+      - name: OrtRuntime
+        path: qt/src/hwr/OrtRuntime.h
+        what: ONNX Runtime loaded at run time
+    docs: [qt/src/hwr/README.md, qt/docs/features/handwriting-search.md]
+
+  # --- Documents --------------------------------------------------------------------------------------------------
+  - id: audio
+    name: audio
+    layer: document
+    kind: qt
+    label: recording and playing
+    target: xqt-audio
+    paths: [qt/src/audio/]
+    responsibility: >-
+      Records and plays Ogg Vorbis, compatible with Xournal++'s audio (a stroke tied to a moment of a recording).
+    key:
+      - name: Recorder, Player
+        path: qt/src/audio/Recorder.h
+        what: recording and playing
+      - name: DocumentAudio
+        path: qt/src/audio/DocumentAudio.h
+        what: a document's recordings and the elements tied to them
+      - name: OggVorbis
+        path: qt/src/audio/OggVorbis.h
+        what: Ogg Vorbis with the vendored libogg/libvorbis
+    docs: [qt/src/audio/README.md, qt/docs/features/audio.md]
+  - id: markdown
+    name: markdown
+    layer: document
+    kind: qt
+    label: Markdown engine
+    target: xqt-markdown
+    paths: [qt/src/markdown/]
+    responsibility: >-
+      Parses (md4c), lays out (Pango), paginates and draws (cairo) Markdown text, with the same text stack as
+      upstream's text elements; registers the renderer upstream's TextView asks for Markdown texts.
+    key:
+      - name: MdDocument
+        path: qt/src/markdown/MdDocument.h
+        what: a parsed text as blocks of formatted runs
+      - name: MdLayout
+        path: qt/src/markdown/MdLayout.h
+        what: laid out for a width, drawn with cairo
+      - name: MdBox
+        path: qt/src/markdown/MdBox.h
+        what: Markdown boxes on pages; sets the hooks of model/MarkdownText.h
+      - name: MdMath
+        path: qt/src/markdown/MdMath.h
+        what: formulas by MicroTeX
+    docs: [qt/src/markdown/README.md, qt/docs/features/markdown-boxes.md]
+  - id: session
+    name: session
+    layer: document
+    kind: qt
+    label: one open document, headless
+    target: xqt-session
+    paths: [qt/src/session/]
+    w: 1.6
+    responsibility: >-
+      One open document without a view: load, new, save in the background, autosave, undo, page revisions; the
+      fork's formats (the PDF with notes, incremental saves, version history), search; process-wide AppContext.
+    key:
+      - name: DocumentSession
+        path: qt/src/session/DocumentSession.h
+        what: one open document (one tab); implements the shadow Control (port of parts of upstream's Control)
+      - name: AppContext
+        path: qt/src/session/AppContext.h
+        what: "process-wide: upstream's Settings, the ToolHandler, templates, render workers, the UI-thread dispatcher"
+      - name: HeadlessViews, SessionActions
+        path: qt/src/session/HeadlessViews.h
+        what: the session's side of the shadows MainWindow, XournalView, ActionDatabase
+      - name: HybridPdf
+        path: qt/src/session/HybridPdf.h
+        what: the PDF with notes (ink as annotations, the .xopp embedded)
+      - name: FileIo
+        path: qt/src/session/FileIo.h
+        what: one atomic write with fsync, locks, stamps, hashes
+      - name: PageOrderUndoAction
+        path: qt/src/session/PageOrderUndoAction.h
+        what: an upstream-style undo action of the fork (several pages in one step)
+      - name: StickyNote, ElementGroups, ElementTimes, PageMargins
+        path: qt/src/session/StickyNote.h
+        what: the fork's features in the document model (several through seams)
+    docs: [qt/src/session/README.md, qt/docs/features/hybrid-pdf.md]
+  - id: render
+    name: render
+    layer: document
+    kind: qt
+    label: pages drawn by workers (Qt-free)
+    target: xoj-render
+    paths: [qt/src/render/]
+    responsibility: >-
+      Turns a page of upstream's model into pixels with upstream's views and cairo, on worker threads; Qt-free, so
+      the CLI and the tests use it too.
+    key:
+      - name: PageRaster
+        path: qt/src/render/PageRaster.h
+        what: the raster of one page as a view shows it (port of upstream's RenderJob)
+      - name: RenderService
+        path: qt/src/render/RenderService.h
+        what: the worker pool (port of upstream's Scheduler, several threads)
+      - name: RegionRender
+        path: qt/src/render/RegionRender.h
+        what: a picture of an area of a page
+      - name: PaperTexture
+        path: qt/src/render/PaperTexture.h
+        what: textured paper through upstream's backgroundDecorator hook
+    docs: [qt/src/render/README.md, qt/docs/features/hidpi.md]
+
+  # --- compat -------------------------------------------------------------------------------------------------------
+  - id: compat-impl
+    name: GTK-free sources
+    layer: compat
+    kind: compat
+    label: XojMsgBox, VersionInfo, DeviceId
+    paths: [qt/compat/XojMsgBox.cpp, qt/compat/VersionInfo.cpp, qt/compat/DeviceId.cpp]
+    responsibility: >-
+      GTK-free implementations of a few upstream headers, compiled into xoj-util and xoj-tools instead of
+      upstream's: message boxes through a pluggable sink (QML dialogs in the app, stderr in the CLI), the version,
+      device identity.
+    key:
+      - name: XojMsgBox
+        path: qt/compat/include/util/XojMsgBox.h
+        what: upstream's message boxes, sent to xoj::compat::MessageSink
+      - name: VersionInfo.cpp
+        path: qt/compat/VersionInfo.cpp
+        what: upstream's util/VersionInfo.h without GTK
+      - name: DeviceId.cpp
+        path: qt/compat/DeviceId.cpp
+        what: an input device's identity (a QPointingDevice address)
+    docs: [qt/docs/decisions/0002-upstream-seams.md]
+
+  - id: compat-shadows
+    name: Shadow headers
+    layer: compat
+    kind: compat
+    label: Control, PageView, Layout, …
+    paths: [qt/compat/include/]
+    w: 1.6
+    responsibility: >-
+      Headers with the path and API of upstream's GTK application classes (Control, MainWindow, XournalView,
+      XojPageView, Layout, ZoomControl, ActionDatabase, LaserPointerHandler), abstract or GTK-free: the reused
+      upstream code calls them, the fork implements them.
+    key:
+      - name: control/Control.h
+        path: qt/compat/include/control/Control.h
+        what: a per-document session; implemented by DocumentSession
+      - name: gui/PageView.h
+        path: qt/compat/include/gui/PageView.h
+        what: XojPageView as the tools see it; implemented by CanvasPage
+      - name: gui/Layout.h, gui/XournalView.h
+        path: qt/compat/include/gui/Layout.h
+        what: page geometry and the views; implemented by CanvasView
+      - name: gui/MainWindow.h
+        path: qt/compat/include/gui/MainWindow.h
+        what: the window as reused code reaches it; implemented by session/HeadlessViews
+      - name: control/zoom/ZoomControl.h
+        path: qt/compat/include/control/zoom/ZoomControl.h
+        what: zoom values for reused tools, fed by ViewController
+      - name: control/actions/ActionDatabase.h
+        path: qt/compat/include/control/actions/ActionDatabase.h
+        what: an action sink; implemented by SessionActions
+    docs: [qt/compat/README.md, qt/docs/decisions/0002-upstream-seams.md]
+  - id: compat-gtkshim
+    name: GTK shim
+    layer: compat
+    kind: compat
+    label: "<gtk/gtk.h> without GTK"
+    paths: [qt/compat/gtkshim/]
+    responsibility: >-
+      Plain GDK/GTK types with GDK 3 values and pure-cairo helpers ported from GDK 3; any real GTK call in compiled
+      upstream code is a compile error by design.
+    key:
+      - name: gdk/gdk.h
+        path: qt/compat/gtkshim/gdk/gdk.h
+        what: GdkRGBA, GdkRectangle, … and the gdk_cairo_* helpers
+      - name: gtk/gtk.h
+        path: qt/compat/gtkshim/gtk/gtk.h
+        what: GtkMessageType, GtkResponseType, opaque handles
+    docs: [qt/compat/README.md]
+  # --- Xournal++ core -----------------------------------------------------------------------------------------------
+  - id: core-tools
+    name: Tools and handlers
+    layer: core
+    kind: upstream
+    label: control/tools, view/overlays
+    target: xoj-tools
+    paths: [src/core/control/tools/, src/core/view/overlays/]
+    w: 1.25
+    responsibility: >-
+      Upstream's input handlers (pen, eraser, shapes, spline, selection, PDF text selection) and the overlays that
+      draw a stroke or a selection while it is made; compiled unmodified against the shadow headers.
+    key:
+      - name: StrokeHandler
+        path: src/core/control/tools/StrokeHandler.h
+        what: a stroke being drawn, its stabilizer, the shape recogniser
+      - name: EraseHandler
+        path: src/core/control/tools/EraseHandler.h
+        what: the eraser
+      - name: EditSelection
+        path: src/core/control/tools/EditSelection.h
+        what: a selection being moved, scaled, rotated
+      - name: Selector, PdfElemSelection
+        path: src/core/control/tools/Selector.h
+        what: selecting elements, selecting PDF text
+      - name: BaseShapeHandler, SplineHandler
+        path: src/core/control/tools/BaseShapeHandler.h
+        what: rectangles, ellipses, arrows, rulers, splines
+      - name: StrokeToolView, SelectorView
+        path: src/core/view/overlays/StrokeToolView.h
+        what: the overlays drawn while a tool works
+    docs: [qt/cmake/XojSources.cmake]
+  - id: core-model
+    name: model
+    layer: core
+    kind: upstream
+    label: Document, XojPage, Layer, Element
+    target: xoj-core
+    paths: [src/core/model/]
+    w: 1.25
+    responsibility: >-
+      The document model: a document of pages of layers of elements (strokes, texts, images, TeX images, links),
+      page backgrounds, the document lock and the listeners told of every change.
+    key:
+      - name: Document
+        path: src/core/model/Document.h
+        what: the pages, the PDF background, the lock
+      - name: XojPage
+        path: src/core/model/XojPage.h
+        what: a page, its background and layers
+      - name: Layer
+        path: src/core/model/Layer.h
+        what: a layer of elements
+      - name: Element, Stroke, Text, Image
+        path: src/core/model/Element.h
+        what: the elements
+      - name: DocumentListener, DocumentHandler
+        path: src/core/model/DocumentListener.h
+        what: change events (the session and the views listen)
+      - name: MarkdownText.h
+        path: src/core/model/MarkdownText.h
+        what: the hooks a frontend sets to draw Markdown texts (a seam of the fork)
+  - id: core-xojfile
+    name: control/xojfile
+    layer: core
+    kind: upstream
+    label: .xopp/.xoj load and save
+    target: xoj-core
+    paths: [src/core/control/xojfile/, src/core/control/xml/]
+    w: 1.15
+    responsibility: >-
+      Reading and writing Xournal++'s files: the XML parser that builds a document, the save handler that writes
+      one, gzip and attached backgrounds.
+    key:
+      - name: LoadHandler
+        path: src/core/control/xojfile/LoadHandler.h
+        what: builds a Document from a .xopp/.xoj (or from memory, a seam)
+      - name: XmlParser
+        path: src/core/control/xojfile/XmlParser.cpp
+        what: the parser; passes the fork's xqt-* attributes to the builder
+      - name: SaveHandler
+        path: src/core/control/xojfile/SaveHandler.h
+        what: writes a Document as .xopp
+      - name: XmlAttrs.h
+        path: src/core/control/xojfile/XmlAttrs.h
+        what: the attribute names (the fork's xqt-* ones too)
+  - id: core-view
+    name: view
+    layer: core
+    kind: upstream
+    label: renderers (cairo)
+    target: xoj-core
+    paths: [src/core/view/, src/core/view/background/]
+    w: 1.1
+    responsibility: >-
+      Draws pages with cairo: a document, its layers and elements, the backgrounds (ruled, graph, PDF, image); what
+      makes the fork's pixels identical to upstream's.
+    key:
+      - name: DocumentView
+        path: src/core/view/DocumentView.h
+        what: draws a page (background and layers)
+      - name: LayerView, StrokeView, TextView, ImageView
+        path: src/core/view/LayerView.h
+        what: layers and elements
+      - name: BackgroundView
+        path: src/core/view/background/BackgroundView.h
+        what: the page backgrounds; PdfBackgroundView draws a PDF page through PdfCache
+      - name: Mask
+        path: src/core/view/Mask.h
+        what: an offscreen surface (used by PageRaster)
+  - id: core-pdf
+    name: pdf
+    layer: core
+    kind: upstream
+    label: poppler, PDF export
+    target: xoj-core
+    paths: [src/core/pdf/base/, src/core/pdf/popplerapi/]
+    responsibility: >-
+      Reading PDFs through poppler-glib (pages, text, links, outline) and exporting documents as PDF (cairo or
+      qpdf backend).
+    key:
+      - name: XojPdfDocument, XojPdfPage
+        path: src/core/pdf/base/XojPdfDocument.h
+        what: a PDF and its pages, behind an interface
+      - name: PopplerGlibDocument
+        path: src/core/pdf/popplerapi/PopplerGlibDocument.h
+        what: the poppler implementation
+      - name: XojCairoPdfExport
+        path: src/core/pdf/base/XojCairoPdfExport.h
+        what: PDF export with cairo
+      - name: XojPdfExportFactory
+        path: src/core/pdf/base/XojPdfExportFactory.h
+        what: picks the export backend
+  - id: core-util
+    name: util
+    layer: core
+    row: 2
+    kind: upstream
+    label: paths, colors, streams, i18n
+    target: xoj-util
+    paths: [src/util/]
+    responsibility: >-
+      Upstream's utilities: paths (the config folder), colors, rectangles, gzip and zip streams, serializing,
+      logging, and the UI-thread dispatch (a seam the fork sets).
+    key:
+      - name: Util.h
+        path: src/util/include/util/Util.h
+        what: execInUiThread through a pluggable dispatcher (seam)
+      - name: PathUtil
+        path: src/util/PathUtil.cpp
+        what: config and cache folders (xournal-qt's own, a seam)
+      - name: Color, Rectangle, serializing/
+        path: src/util/include/util/Color.h
+        what: small types used everywhere
+  - id: core-undo
+    name: undo
+    layer: core
+    row: 2
+    kind: upstream
+    label: undo actions, UndoRedoHandler
+    target: xoj-core
+    paths: [src/core/undo/]
+    responsibility: >-
+      Upstream's undo: one action class per kind of edit and the handler that stacks them; the fork adds its own
+      actions of the same shape.
+    key:
+      - name: UndoRedoHandler
+        path: src/core/undo/UndoRedoHandler.h
+        what: the undo and redo stacks
+      - name: UndoAction
+        path: src/core/undo/UndoAction.h
+        what: the base of every action
+      - name: InsertUndoAction, DeleteUndoAction, MoveUndoAction, …
+        path: src/core/undo/InsertUndoAction.h
+        what: one per kind of edit
+  - id: core-control
+    name: control
+    layer: core
+    row: 2
+    kind: upstream
+    label: settings, tool state, layers
+    target: xoj-core
+    paths: [src/core/control/settings/, src/core/control/layer/, src/core/control/pagetype/, src/core/control/shaperecognizer/]
+    w: 1.2
+    responsibility: >-
+      The GTK-free parts of upstream's control layer: settings.xml, the tool in hand, page types, layers, the shape
+      recogniser, the PDF page cache and the image export.
+    key:
+      - name: Settings
+        path: src/core/control/settings/Settings.h
+        what: settings.xml (the fork keeps its keys in a custom part)
+      - name: ToolHandler
+        path: src/core/control/ToolHandler.h
+        what: the tool in hand, its size and color
+      - name: LayerController
+        path: src/core/control/layer/LayerController.h
+        what: layers of a page (through the shadow Control)
+      - name: PdfCache
+        path: src/core/control/PdfCache.h
+        what: rendered PDF pages for the background views
+      - name: ShapeRecognizer
+        path: src/core/control/shaperecognizer/ShapeRecognizer.h
+        what: strokes to shapes
+      - name: ImageExport, ExportHelper
+        path: src/core/control/jobs/ImageExport.h
+        what: PNG/SVG export (the CLI's and the app's)
+  - id: core-gtk
+    name: GTK GUI (not built)
+    layer: core
+    w: 1.2
+    row: 2
+    kind: unbuilt
+    label: gui/, Control, XournalMain
+    paths: [src/core/gui/, src/core/control/Control.cpp, src/exe/]
+    responsibility: >-
+      Upstream's GTK application: the main window, page views, input handlers, dialogs, Control, the jobs and the
+      plugins. Not compiled by the Qt build; qt/compat stands in for what reused code needs of it, and the fork
+      ported a few classes (ADR 0002, "Ported, not reused").
+    key:
+      - name: control/Control.cpp
+        path: src/core/control/Control.cpp
+        what: the GTK application object (shadowed by qt/compat's Control.h)
+      - name: gui/PageView.cpp
+        path: src/core/gui/PageView.cpp
+        what: XojPageView, ported to canvas/CanvasPage
+      - name: gui/inputdevices/
+        path: src/core/gui/inputdevices/
+        what: the input handlers, ported to canvas/CanvasInput
+      - name: control/jobs/RenderJob.cpp
+        path: src/core/control/jobs/RenderJob.cpp
+        what: page rendering, ported to render/PageRaster
+      - name: src/exe/
+        path: src/exe/
+        what: upstream's main()
+    docs: [qt/docs/decisions/0002-upstream-seams.md]
+
+  # --- Around the app -----------------------------------------------------------------------------------------------
+  - id: cli
+    name: CLI
+    layer: around
+    kind: tools
+    label: xournal-qt-cli
+    target: xournal-qt-cli
+    paths: [qt/cli/]
+    responsibility: >-
+      Headless export with upstream's flags (PNG, SVG, PDF, the PDF with notes); the golden tests' driver.
+    key:
+      - name: main.cpp
+        path: qt/cli/main.cpp
+        what: the CLI
+  - id: tests
+    name: Tests
+    layer: around
+    kind: tests
+    label: one binary per label
+    target: xqt-*-tests
+    paths: [qt/tests/]
+    responsibility: >-
+      One GoogleTest binary per module and label (unit session canvas markdown audio hwr quick shell ui), shared
+      helpers, the UI fixture that drives the real window off-screen, the golden tests.
+    key:
+      - name: support/TestSupport.h
+        path: qt/tests/support/TestSupport.h
+        what: waiting for a state, files, test PDFs
+      - name: ui/UiFixture.h
+        path: qt/tests/ui/UiFixture.h
+        what: the real window off-screen
+      - name: golden/run_golden.sh
+        path: qt/tests/golden/run_golden.sh
+        what: CLI output pixel-identical to upstream's
+    docs: [qt/docs/testing/README.md]
+  - id: upstream-tests
+    name: Upstream tests
+    layer: around
+    kind: tests
+    label: test/unit_tests, test/files
+    target: xoj-unit-tests
+    paths: [test/unit_tests/, test/files/]
+    responsibility: >-
+      Upstream's unit tests, run against the Qt-free core, and its fixtures (read only: tests never write into
+      test/files).
+    key:
+      - name: unit_tests/control/LoadHandlerTest.cpp
+        path: test/unit_tests/control/LoadHandlerTest.cpp
+        what: one of the upstream suites the Qt build runs
+      - name: XojTests.cmake
+        path: qt/cmake/XojTests.cmake
+        what: which upstream suites are compiled
+  - id: tools
+    name: Build and tools
+    layer: around
+    kind: tools
+    label: qt/cmake, qt/scripts, qt/tools
+    paths: [qt/cmake/, qt/scripts/, qt/tools/]
+    responsibility: >-
+      The build (which upstream sources become which library), the environment and CI scripts, the upstream merge
+      and developer tools.
+    key:
+      - name: XojSources.cmake
+        path: qt/cmake/XojSources.cmake
+        what: the allowlist of upstream sources
+      - name: XojCore.cmake
+        path: qt/cmake/XojCore.cmake
+        what: xoj-util, xoj-core, xoj-tools, xoj-render; compat before upstream's includes
+      - name: merge-upstream.sh
+        path: qt/tools/merge-upstream.sh
+        what: merging upstream Xournal++
+      - name: linux-deps.sh
+        path: qt/scripts/linux-deps.sh
+        what: the build dependencies
+    docs: [qt/docs/development/building.md]
+  - id: thirdparty
+    name: Vendored libraries
+    layer: around
+    kind: tools
+    label: md4c, MicroTeX, Ogg/Vorbis, ORT
+    paths: [qt/3rdparty/]
+    responsibility: >-
+      Libraries compiled in: md4c and MicroTeX (Markdown), libogg and libvorbis (audio), ONNX Runtime's C headers
+      (hwr), gemoji.
+    key:
+      - name: md4c/
+        path: qt/3rdparty/md4c/
+        what: the Markdown parser
+      - name: microtex/
+        path: qt/3rdparty/microtex/
+        what: formulas
+      - name: onnxruntime/
+        path: qt/3rdparty/onnxruntime/
+        what: ONNX Runtime's C API headers
+  - id: linux
+    name: Linux
+    layer: around
+    row: 2
+    kind: platform
+    label: .deb, desktop files
+    paths: [qt/packaging/, qt/cmake/XqtPackage.cmake]
+    responsibility: >-
+      Desktop files, MIME types and the .deb package; the main platform.
+    key:
+      - name: XqtPackage.cmake
+        path: qt/cmake/XqtPackage.cmake
+        what: install rules and the package
+      - name: xournal-qt.desktop
+        path: qt/packaging/xournal-qt.desktop
+        what: the desktop entry
+    docs: [qt/docs/development/releasing.md]
+  - id: android
+    name: Android
+    layer: around
+    row: 2
+    kind: platform
+    label: APK, content://
+    paths: [qt/packaging/android/, qt/cmake/XqtAndroid.cmake, qt/src/app/AndroidSetup.cpp]
+    responsibility: >-
+      The APK: the manifest and Java activity, the setup before the core starts, Android's content:// files.
+    key:
+      - name: AndroidSetup
+        path: qt/src/app/AndroidSetup.h
+        what: what the app needs on Android before the core starts
+      - name: XournalActivity.java
+        path: qt/packaging/android/src/org/xournalqt/app/XournalActivity.java
+        what: the activity
+      - name: ContentFiles
+        path: qt/src/shell/ContentFiles.h
+        what: Android's content:// URLs
+      - name: android-build.sh
+        path: qt/scripts/android-build.sh
+        what: the build
+    docs: [qt/docs/development/android.md]
+  - id: windows
+    name: Windows
+    layer: around
+    row: 2
+    kind: platform
+    label: portable zip
+    paths: [qt/src/app/WindowsSetup.cpp, qt/packaging/windows/, qt/scripts/windows-deploy.sh]
+    responsibility: >-
+      The portable zip: the setup before the core starts, Pango's fonts, the deployment.
+    key:
+      - name: WindowsSetup
+        path: qt/src/app/WindowsSetup.h
+        what: what the app needs on Windows before the core starts
+      - name: WindowsFonts
+        path: qt/src/app/WindowsFonts.h
+        what: Pango's fontconfig backend
+      - name: windows-deploy.sh
+        path: qt/scripts/windows-deploy.sh
+        what: the zip
+    docs: [qt/docs/development/windows.md]
+  - id: macos
+    name: macOS
+    layer: around
+    row: 2
+    kind: platform
+    label: unsigned .dmg
+    paths: [qt/packaging/macos/, qt/scripts/macos-deploy.sh]
+    responsibility: >-
+      The unsigned .dmg: the bundle's Info.plist and the deployment.
+    key:
+      - name: Info.plist.in
+        path: qt/packaging/macos/Info.plist.in
+        what: the bundle
+      - name: macos-deploy.sh
+        path: qt/scripts/macos-deploy.sh
+        what: the .dmg
+    docs: [qt/docs/development/macos.md]
+  - id: ci
+    name: CI
+    layer: around
+    row: 2
+    kind: ci
+    label: .github/workflows/xqt-*
+    paths: [.github/workflows/xqt-build.yml, .github/workflows/xqt-block-tests.yml, .github/workflows/xqt-pages.yml]
+    responsibility: >-
+      The fork's workflows: the doc and architecture checks, both Linux Qt versions, the block tests in shards, the
+      releases, the platform builds, this page on GitHub Pages.
+    key:
+      - name: xqt-build.yml
+        path: .github/workflows/xqt-build.yml
+        what: checks, Linux builds and the full suite
+      - name: xqt-block-tests.yml
+        path: .github/workflows/xqt-block-tests.yml
+        what: the full suite of a block branch in four shards
+      - name: xqt-release.yml
+        path: .github/workflows/xqt-release.yml
+        what: the draft release with the packages
+      - name: xqt-pages.yml
+        path: .github/workflows/xqt-pages.yml
+        what: publishes this architecture page
+    docs: [qt/docs/development/ci.md]
+
+  # --- Shared data --------------------------------------------------------------------------------------------------
+  - id: data-library
+    name: Library folder
+    layer: data
+    kind: data
+    label: documents, index, packs
+    paths: [qt/src/shell/LibraryCache.h]
+    responsibility: >-
+      A plain folder of documents (synced by any sync client) with the library's index and covers in packs.
+    key:
+      - name: LibraryCache.h
+        path: qt/src/shell/LibraryCache.h
+        what: where the index and packs live
+    docs: [qt/docs/features/library.md]
+  - id: data-cache
+    name: Caches
+    layer: data
+    kind: data
+    label: ~/.cache/xournal-qt
+    paths: [qt/docs/architecture/image-caches.md]
+    responsibility: >-
+      Pictures of pages kept on disk (stand-ins, covers outside a library), autosaves; named by page revision.
+    key:
+      - name: image-caches.md
+        path: qt/docs/architecture/image-caches.md
+        what: every image cache, its owner and its limit
+    docs: [qt/docs/architecture/image-caches.md]
+  - id: data-pdf
+    name: PDF files
+    layer: data
+    kind: data
+    label: backgrounds, PDF with notes
+    paths: [qt/src/session/HybridPdf.h]
+    responsibility: >-
+      PDFs annotated (as background) and the PDF with notes: the ink as annotations other apps show, the .xopp
+      embedded, version history inside the file.
+    key:
+      - name: HybridPdf.h
+        path: qt/src/session/HybridPdf.h
+        what: the file's layout
+    docs: [qt/docs/features/hybrid-pdf.md]
+  - id: data-xopp
+    name: .xopp / .xoj files
+    layer: data
+    kind: data
+    label: shared with Xournal++
+    paths: [src/core/control/xojfile/]
+    responsibility: >-
+      Xournal++'s documents (gzipped XML). Both programs read and write them; the fork's attributes (xqt-group,
+      xqt-created, xqt-bookmark, xqt-fill-color, notespace) are ones Xournal++ ignores.
+    key:
+      - name: SaveHandler.cpp
+        path: src/core/control/xojfile/SaveHandler.cpp
+        what: what a file holds
+      - name: test/files/
+        path: test/files/
+        what: upstream's sample files
+    docs: [qt/docs/decisions/0002-upstream-seams.md, qt/docs/features/groups.md]
+  - id: data-settings
+    name: settings.xml
+    layer: data
+    kind: data
+    label: upstream's format, own folder
+    paths: [src/core/control/settings/Settings.cpp]
+    responsibility: >-
+      Upstream's settings file, in a config folder of the fork's own (~/.config/xournal-qt); the fork's keys live in
+      its custom part `xournalQt`.
+    key:
+      - name: Settings.cpp
+        path: src/core/control/settings/Settings.cpp
+        what: reads and writes the file
+      - name: SettingsModel.cpp
+        path: qt/src/shell/SettingsModel.cpp
+        what: the keys the settings page shows
+
+edges:
+  # --- QML to C++ ---------------------------------------------------------------------------------------------------
+  - from: qml-window
+    to: app-controller
+    kind: qml
+    what: "every action and property through the context property `app` (QmlApiTest checks the names)"
+  - from: qml-canvas
+    to: app-controller
+    kind: qml
+    what: the tabs, the tools, app.edit (a CanvasActions)
+    hide: true
+  - from: qml-canvas
+    to: quick
+    kind: qml
+    what: "the DocumentCanvas item (import XournalQt.Canvas), AdaptiveLayout, TouchGestures"
+  - from: qml-canvas
+    to: shell-images
+    kind: qml
+    what: image://thumbnail and image://sketch in the sidebar and page grid
+  - from: qml-home
+    to: shell-library
+    kind: qml
+    what: the library's list models (app.library, recent files, bookmarks, to-dos, tags)
+  - from: qml-home
+    to: shell-images
+    kind: qml
+    what: image://cover, image://hitpage, image://mdsnippet
+  - from: qml-settings
+    to: shell-models
+    kind: qml
+    what: SettingsModel, ShortcutsModel, ToolboxModel
+  - from: qml-dialogs
+    to: app-controller
+    kind: qml
+    what: the dialogs' actions through `app`
+    hide: true
+  - from: qml-window
+    to: qml-canvas
+    kind: calls
+    what: Main.qml instantiates the parts
+    hide: true
+  - from: qml-window
+    to: qml-home
+    kind: calls
+    what: Main.qml instantiates the home view
+    hide: true
+
+  # --- App ----------------------------------------------------------------------------------------------------------
+  - from: app-main
+    to: qml-window
+    kind: qml
+    what: loads the QML module XournalQt and its Main
+    hide: true
+  - from: app-main
+    to: app-services
+    kind: calls
+    what: makes the services before the first window, drops them after the last
+  - from: app-main
+    to: quick
+    kind: links
+    what: "xournal-qt links xqt-quick (registers XournalQt.Canvas)"
+    hide: true
+  - from: app-main
+    to: shell-images
+    kind: calls
+    what: EngineSetup registers the image providers
+    hide: true
+  - from: app-services
+    to: app-controller
+    kind: calls
+    what: the window factory makes one AppController per window
+  - from: app-services
+    to: shell-library
+    kind: calls
+    what: owns the library, its lists and the library's ink job
+  - from: app-services
+    to: session
+    kind: calls
+    what: owns the AppContext (settings, tool, render workers)
+    hide: true
+  - from: app-services
+    to: hwr
+    kind: calls
+    what: owns the handwriting search
+    hide: true
+  - from: app-controller
+    to: current-document
+    kind: calls
+    what: follows the current tab
+  - from: app-controller
+    to: shell-window
+    kind: calls
+    what: TabManager (its tabs), CanvasActions (app.edit), ReferenceMode, PresenterConsole
+  - from: app-controller
+    to: shell-models
+    kind: calls
+    what: the per-document lists and the settings models
+    hide: true
+  - from: app-controller
+    to: audio
+    kind: calls
+    what: AudioControl records and plays (app.audio)
+    hide: true
+  - from: app-controller
+    to: core-control
+    kind: calls
+    what: "upstream's Settings (the xournalQt part) and the ToolHandler"
+    hide: true
+  - from: current-document
+    to: session
+    kind: calls
+    what: relays the current DocumentSession's signals
+    hide: true
+  - from: current-document
+    to: canvas
+    kind: calls
+    what: relays the current CanvasView's signals
+    hide: true
+
+  # --- Shell --------------------------------------------------------------------------------------------------------
+  - from: shell-window
+    to: canvas
+    kind: links
+    what: "xqt-shell links xqt-canvas: a tab owns its CanvasView, CanvasActions acts on one"
+  - from: shell-window
+    to: session
+    kind: calls
+    what: a tab owns its DocumentSession; SessionRecovery saves every tab
+    hide: true
+  - from: shell-library
+    to: hwr
+    kind: links
+    what: "xqt-shell links xqt-hwr: LibraryInkJob reads the library's handwriting"
+  - from: shell-library
+    to: session
+    kind: calls
+    what: reads documents for the index (DocumentTextIndex, Tags, the PDF formats)
+    hide: true
+  - from: shell-library
+    to: data-library
+    kind: data
+    what: the folder, its index and packs
+    hide: true
+  - from: shell-images
+    to: render
+    kind: calls
+    what: RegionRender for pictures of areas
+    hide: true
+  - from: shell-images
+    to: core-view
+    kind: calls
+    what: draws thumbnails and covers with DocumentView (as upstream's PreviewJob)
+    hide: true
+  - from: shell-images
+    to: core-pdf
+    kind: calls
+    what: draws PDF pages for covers and hit pages
+    hide: true
+  - from: shell-images
+    to: data-cache
+    kind: data
+    what: stand-ins and covers on disk, named by page revision
+    hide: true
+  - from: shell-models
+    to: session
+    kind: calls
+    what: pages, outline, layers, annotations, versions of a session
+    hide: true
+  - from: shell-models
+    to: core-control
+    kind: calls
+    what: settings.xml through upstream's Settings; layers through LayerController
+    hide: true
+  - from: shell-models
+    to: data-settings
+    kind: data
+    what: the settings page writes settings.xml
+    hide: true
+
+  # --- Canvas and views ---------------------------------------------------------------------------------------------
+  - from: quick
+    to: canvas
+    kind: links
+    what: "xqt-quick links xqt-canvas: DocumentCanvasItem shows a CanvasView and passes it all input"
+  - from: hwr
+    to: session
+    kind: links
+    what: "xqt-hwr links xqt-session: an indexer per open document reads its strokes"
+  - from: canvas
+    to: session
+    kind: links
+    what: "xqt-canvas links xqt-session: a view shows a session; edits go through its undo"
+  - from: canvas
+    to: render
+    kind: calls
+    what: PageRaster per visible page, rendered by the RenderService's workers
+  - from: canvas
+    to: core-tools
+    kind: links
+    what: "xqt-canvas links xoj-tools: CanvasPage drives StrokeHandler, EraseHandler, EditSelection, the shape handlers"
+  - from: canvas
+    to: compat-shadows
+    kind: shadows
+    what: CanvasPage implements XojPageView (gui/PageView.h); CanvasView implements XournalView and Layout; ViewController feeds ZoomControl
+  - from: canvas
+    to: core-undo
+    kind: calls
+    what: upstream's undo actions for edits made outside the tools (groups, notes, page resize)
+    hide: true
+  - from: canvas
+    to: core-model
+    kind: calls
+    what: pages, layers and elements under the document lock
+    hide: true
+  - from: canvas
+    to: core-control
+    kind: calls
+    what: ToolHandler, LayerController, the shape recogniser, the settings
+    hide: true
+
+  # --- Documents --------------------------------------------------------------------------------------------------
+  - from: session
+    to: render
+    kind: links
+    what: "xqt-session links xoj-render: render workers in AppContext, drawing for exports"
+  - from: session
+    to: markdown
+    kind: links
+    what: "xqt-session links xqt-markdown: text documents, Markdown boxes in exports"
+  - from: session
+    to: audio
+    kind: links
+    what: "xqt-session links xqt-audio: recordings tied to elements"
+  - from: session
+    to: core-xojfile
+    kind: calls
+    what: loads with LoadHandler and saves with SaveHandler (in the background, on a page copy)
+  - from: session
+    to: core-xojfile
+    kind: seam
+    what: "the fork's attributes (xqt-group, xqt-created, xqt-bookmark, xqt-audio, xqt-fill-color, notespace); a document loaded from memory (an encrypted PDF's .xopp)"
+    hide: true
+  - from: session
+    to: core-undo
+    kind: calls
+    what: one UndoRedoHandler per session, plus one for page order
+    hide: true
+  - from: session
+    to: core-model
+    kind: calls
+    what: the Document it owns; listens to its changes
+  - from: session
+    to: core-model
+    kind: seam
+    what: "Document::setDocumentHandler, setPdfPassword, DocumentOutline; NoteSpace, page bookmarks, groups and times of elements"
+    hide: true
+  - from: session
+    to: core-view
+    kind: seam
+    what: "StickyNote draws a note's layer (xoj::view::layerDrawer); PageMargins scales ruled paper (xoj::view::ruledScale)"
+  - from: session
+    to: core-util
+    kind: seam
+    what: "AppContext sets the UI-thread dispatcher (Util::setUiThreadDispatcher)"
+    hide: true
+  - from: session
+    to: core-pdf
+    kind: calls
+    what: opens PDFs and exports them (the PDF with notes builds on the cairo export)
+    hide: true
+  - from: session
+    to: core-control
+    kind: calls
+    what: Settings and ToolHandler in AppContext; LayerController; PdfCache
+    hide: true
+  - from: session
+    to: compat-shadows
+    kind: shadows
+    what: DocumentSession implements Control; HeadlessViews implement MainWindow, XournalView; SessionActions implements ActionDatabase
+  - from: session
+    to: data-xopp
+    kind: data
+    what: opens and saves documents (atomically, through FileIo)
+  - from: session
+    to: data-pdf
+    kind: data
+    what: annotates PDFs; writes the PDF with notes
+  - from: markdown
+    to: core-model
+    kind: seam
+    what: "MdBox registers xoj::markdown::renderer, sizer and layoutPainter (model/MarkdownText.h), so Text and TextView draw Markdown"
+  - from: markdown
+    to: core-view
+    kind: seam
+    what: "TextView draws a Markdown text through the registered renderer; the emoji through layoutPainter"
+    hide: true
+  - from: markdown
+    to: thirdparty
+    kind: links
+    what: md4c, MicroTeX
+    hide: true
+  - from: audio
+    to: core-model
+    kind: calls
+    what: "the ts/fn of strokes and texts, a page's voice memos; an undo action"
+  - from: audio
+    to: thirdparty
+    kind: links
+    what: libogg, libvorbis
+    hide: true
+  - from: hwr
+    to: thirdparty
+    kind: calls
+    what: ONNX Runtime's C API, loaded at run time
+    hide: true
+  - from: render
+    to: core-view
+    kind: calls
+    what: draws with DocumentView, LayerView and the background views, as upstream's RenderJob
+  - from: render
+    to: core-view
+    kind: seam
+    what: "PaperTexture wraps backgrounds (xoj::view::backgroundDecorator)"
+    hide: true
+  - from: render
+    to: core-pdf
+    kind: calls
+    what: PDF backgrounds drawn outside the document lock (PdfCache, poppler)
+  - from: render
+    to: core-model
+    kind: calls
+    what: reads pages under std::shared_lock
+    hide: true
+
+  # --- compat -------------------------------------------------------------------------------------------------------
+  - from: core-tools
+    to: compat-shadows
+    kind: shadows
+    what: "the handlers call Control, XojPageView, ZoomControl, … through the shadow headers"
+  - from: core-undo
+    to: compat-shadows
+    kind: shadows
+    what: undo actions reach the views through Control
+    hide: true
+  - from: core-control
+    to: compat-shadows
+    kind: shadows
+    what: LayerController calls Control
+    hide: true
+  - from: compat-shadows
+    to: core-gtk
+    kind: shadows
+    what: "stand in for the GTK classes Control, MainWindow, XournalView, XojPageView, Layout (not built)"
+  - from: compat-impl
+    to: core-util
+    kind: shadows
+    what: compiled into xoj-util in place of upstream's XojMsgBox.cpp and VersionInfo.cpp (DeviceId.cpp into xoj-tools)
+  - from: compat-gtkshim
+    to: core-gtk
+    kind: shadows
+    what: "<gtk/gtk.h> and <gdk/gdk.h> of every xoj-* target resolve to the shim: GDK/GTK types without GTK"
+
+  # --- Inside the core ----------------------------------------------------------------------------------------------
+  - from: core-tools
+    to: core-model
+    kind: links
+    what: "xoj-tools links xoj-core: the handlers make and change elements"
+  - from: core-tools
+    to: core-undo
+    kind: calls
+    what: every finished stroke or edit is an undo action
+    hide: true
+  - from: core-view
+    to: core-model
+    kind: calls
+    what: draws pages, layers and elements
+    hide: true
+  - from: core-view
+    to: core-pdf
+    kind: calls
+    what: PdfBackgroundView draws a PDF page through PdfCache
+    hide: true
+  - from: core-xojfile
+    to: core-model
+    kind: calls
+    what: builds and walks the Document
+    hide: true
+  - from: core-undo
+    to: core-model
+    kind: calls
+    what: changes the model
+    hide: true
+  - from: core-model
+    to: core-util
+    kind: links
+    what: "xoj-core links xoj-util"
+  - from: core-xojfile
+    to: data-xopp
+    kind: data
+    what: the format's reader and writer
+  - from: core-control
+    to: data-settings
+    kind: data
+    what: Settings reads and writes settings.xml
+  - from: core-gtk
+    to: data-xopp
+    kind: data
+    what: Xournal++ itself opens the same files
+    hide: true
+
+  # --- Around the app -----------------------------------------------------------------------------------------------
+  - from: cli
+    to: session
+    kind: links
+    what: "xournal-qt-cli links xqt-session: the PDF with notes and the archive PDF"
+    hide: true
+  - from: cli
+    to: hwr
+    kind: links
+    what: "xournal-qt-cli links xqt-hwr: handwriting as text in exports"
+    hide: true
+  - from: cli
+    to: core-xojfile
+    kind: calls
+    what: loads documents as upstream's CLI does
+    hide: true
+  - from: cli
+    to: core-pdf
+    kind: calls
+    what: PDF export with upstream's flags
+    hide: true
+  - from: cli
+    to: core-control
+    kind: calls
+    what: PNG/SVG export (ImageExport)
+    hide: true
+  - from: tests
+    to: session
+    kind: calls
+    what: one test binary per module, label per module
+    hide: true
+  - from: tests
+    to: upstream-tests
+    kind: data
+    what: the fixtures in test/files (read only)
+    hide: true
+  - from: upstream-tests
+    to: core-model
+    kind: calls
+    what: upstream's suites run against the Qt-free core
+    hide: true
+  - from: upstream-tests
+    to: render
+    kind: links
+    what: "xoj-unit-tests links xoj-render: the fork's PageRasterTest and RegionRenderTest run in the same binary"
+    hide: true
+  - from: tools
+    to: core-gtk
+    kind: calls
+    what: XojSources.cmake lists what of src/ is built (GTK parts not)
+    hide: true
+  - from: android
+    to: app-main
+    kind: calls
+    what: AndroidSetup before the core starts; the activity hosts the app
+    hide: true
+  - from: windows
+    to: app-main
+    kind: calls
+    what: WindowsSetup, WindowsFonts before the core starts
+    hide: true
+  - from: linux
+    to: app-main
+    kind: calls
+    what: installs the program with its desktop files and MIME types; the .deb
+    hide: true
+  - from: macos
+    to: app-main
+    kind: calls
+    what: the app bundle around the program
+    hide: true
+  - from: ci
+    to: linux
+    kind: calls
+    what: xqt-release.yml builds the packages; xqt-android, xqt-windows, xqt-macos the other platforms
+    hide: true
+  - from: ci
+    to: tests
+    kind: calls
+    what: builds and runs the suite (xqt-build, xqt-block-tests)
+    hide: true
+
+flows:
+  - id: tab
+    name: A document becomes a tab
+    steps:
+      - block: qml-home
+        file: qt/src/app/qml/Main.qml
+        text: The reader picks a document on the home screen; the window calls app.openPath.
+      - block: app-controller
+        file: qt/src/app/AppController.cpp
+        text: AppController::openPath shows the tab if the file is open already; otherwise it loads the file.
+      - block: session
+        file: qt/src/session/DocumentSession.cpp
+        text: DocumentSession::loadFile reads it with upstream's LoadHandler (a PDF with notes through HybridPdf).
+      - block: core-xojfile
+        file: src/core/control/xojfile/LoadHandler.cpp
+        text: LoadHandler parses the XML and builds the Document; the fork's xqt-* attributes go to the builder too.
+      - block: shell-window
+        file: qt/src/shell/TabManager.cpp
+        text: TabManager adds a tab that owns the session and a CanvasView of it.
+      - block: current-document
+        file: qt/src/app/CurrentDocument.cpp
+        text: CurrentDocument follows the new tab; the window's properties change once each.
+      - block: quick
+        file: qt/src/quick/DocumentCanvasItem.cpp
+        text: The DocumentCanvas item in PageArea.qml shows the tab's CanvasView.
+  - id: stroke
+    name: A pen stroke
+    steps:
+      - block: quick
+        file: qt/src/quick/DocumentCanvasItem.cpp
+        text: The window's event filter in DocumentCanvasItem takes the tablet event inside the canvas.
+      - block: canvas
+        file: qt/src/canvas/CanvasInput.cpp
+        text: CanvasInput tells pen from palm and gesture, filters the pressure and finds the page.
+      - block: canvas
+        file: qt/src/canvas/CanvasPage.cpp
+        text: CanvasPage (upstream's XojPageView, ported) creates the tool's input handler.
+      - block: core-tools
+        file: src/core/control/tools/StrokeHandler.cpp
+        text: Upstream's StrokeHandler builds the stroke and draws it in its overlay while the pen moves.
+      - block: core-undo
+        file: src/core/undo/InsertUndoAction.cpp
+        text: On pen up the stroke goes into the layer and an InsertUndoAction onto the session's UndoRedoHandler.
+      - block: session
+        file: qt/src/session/DocumentSession.cpp
+        text: The page's revision changes; the document is now modified, and autosave will save it.
+  - id: page
+    name: A page on screen
+    steps:
+      - block: canvas
+        file: qt/src/canvas/CanvasView.cpp
+        text: CanvasView works out the visible pages and asks for a raster of each at the current zoom.
+      - block: render
+        file: qt/src/render/RenderService.cpp
+        text: RenderService gives the PageRaster to a worker thread; a raster is never rendered by two workers at once.
+      - block: core-view
+        file: src/core/view/DocumentView.cpp
+        text: The worker draws the page with upstream's DocumentView under a shared lock of the document; the PDF background outside it.
+      - block: quick
+        file: qt/src/quick/DocumentCanvasItem.cpp
+        text: DocumentCanvasItem turns the raster into tiles of the scene graph; CanvasMemory keeps the rendered pages within the setting.
+
+tasks:
+  - task: Save a new attribute in .xopp files
+    qt: [qt/src/session/ElementTimes.h]
+    upstream: [src/core/control/xojfile/XmlAttrs.h, src/core/control/xojfile/XmlParser.cpp, src/core/control/xojfile/DocumentBuilderInterface.h, src/core/control/xojfile/LoadHandler.cpp, src/core/control/xojfile/SaveHandler.cpp]
+    note: A seam; record it in ADR 0002 (the attributes xqt-group and xqt-created are the pattern).
+  - task: Change how the pen draws or a tool behaves
+    qt: [qt/src/canvas/CanvasPage.cpp, qt/src/canvas/CanvasInput.cpp, qt/src/shell/ToolboxModel.h, qt/src/app/qml/Toolbox.qml]
+    upstream: [src/core/control/tools/StrokeHandler.cpp, src/core/control/ToolHandler.h, src/core/view/overlays/StrokeToolView.cpp]
+    note: Prefer the fork's side; an upstream tool changed is a seam.
+  - task: Palm rejection, touch gestures, zoom and scroll
+    qt: [qt/src/canvas/CanvasInput.cpp, qt/src/canvas/ViewController.h, qt/src/quick/DocumentCanvasItem.cpp, qt/src/quick/TouchGestures.h]
+    upstream: [src/core/gui/inputdevices/]
+    note: Upstream's input handlers are not built; the fork's are ports of them.
+  - task: How a page is drawn (pixels)
+    qt: [qt/src/render/PageRaster.cpp, qt/src/canvas/CanvasView.cpp, qt/src/quick/DocumentCanvasItem.cpp]
+    upstream: [src/core/view/DocumentView.cpp, src/core/view/StrokeView.cpp, src/core/view/background/]
+    note: The golden tests compare the CLI's pixels with upstream's.
+  - task: Open, save, autosave a document
+    qt: [qt/src/session/DocumentSession.cpp, qt/src/session/DocumentSaveTask.h, qt/src/session/FileIo.h]
+    upstream: [src/core/control/xojfile/LoadHandler.cpp, src/core/control/xojfile/SaveHandler.cpp]
+  - task: The PDF with notes, versions, encryption
+    qt: [qt/src/session/HybridPdf.h, qt/src/session/IncrementalPdf.h, qt/src/session/PdfEncryption.h]
+    upstream: [src/core/pdf/base/XojCairoPdfExport.cpp, src/core/model/Document.h]
+  - task: Export (PDF, PNG) and the CLI
+    qt: [qt/cli/main.cpp, qt/src/session/ArchivePdf.h]
+    upstream: [src/core/pdf/base/XojPdfExportFactory.cpp, src/core/control/jobs/ImageExport.cpp, src/core/control/ExportHelper.cpp]
+  - task: An undoable edit of the fork
+    qt: [qt/src/session/PageOrderUndoAction.h]
+    upstream: [src/core/undo/UndoAction.h, src/core/undo/UndoRedoHandler.h]
+  - task: Markdown on the page
+    qt: [qt/src/markdown/MdBox.cpp, qt/src/markdown/MdLayout.h, qt/src/canvas/MarkdownEditor.h]
+    upstream: [src/core/model/MarkdownText.h, src/core/view/TextView.cpp, src/core/model/Text.cpp]
+  - task: A new setting
+    qt: [qt/src/shell/SettingsModel.cpp, qt/src/app/qml/SettingsPage.qml]
+    upstream: [src/core/control/settings/Settings.h]
+    note: "The fork's keys go into the custom part xournalQt of settings.xml; upstream's Settings stays as it is."
+  - task: A button, menu entry or shortcut
+    qt: [qt/src/app/qml/Toolbox.qml, qt/src/app/qml/WindowShortcuts.qml, qt/src/app/AppController.h, qt/src/shell/CanvasActions.h]
+    upstream: []
+  - task: The library, its index and search
+    qt: [qt/src/shell/Library.h, qt/src/shell/LibraryIndex.h, qt/src/app/qml/HomeView.qml]
+    upstream: []
+  - task: Thumbnails and other pictures of pages
+    qt: [qt/src/shell/Thumbnails.h, qt/src/shell/PageSketches.h, qt/src/shell/ImageMemory.h]
+    upstream: [src/core/view/DocumentView.cpp]
+    note: Every cache has an owner and a limit (image-caches.md).
+  - task: Upstream code needs a GTK class or call (after an upstream merge)
+    qt: [qt/compat/include/, qt/compat/gtkshim/, qt/cmake/XojSources.cmake, qt/tools/merge-upstream.sh]
+    upstream: [src/core/]
+    note: Extend the shadow or the shim; record it in ADR 0002.
