@@ -5,22 +5,22 @@
 # MIT; about 64 MB). This script copies it from the Hugging Face cache (where the research trials put it,
 # qt/research/hwr) or downloads it, and writes the manifest the app reads ("model.json": the files with their sha256
 # and sizes, the decoder's start and end tokens). For development and for the author's machines; the app itself
-# downloads the model from Settings (once the sha256s are pinned in qt/src/hwr/ModelDownload.cpp).
+# downloads the same model from Settings (pinned in qt/src/shell/ModelDownload.cpp).
 #
 #   qt/scripts/hwr-model.sh                  # into ~/.local/share/xournal-qt/models/trocr-small-hw-int8/
 #   qt/scripts/hwr-model.sh /some/folder     # elsewhere (then: XQT_HWR_MODEL=/some/folder, or the setting)
 #   XQT_HWR_REVISION=<commit> qt/scripts/hwr-model.sh   # another revision of the repository
 #   XQT_HWR_DOWNLOAD=1 qt/scripts/hwr-model.sh          # download even when the cache has it
 #
-# It prints the sha256 of each file and the revision: the lines to pin in qt/src/hwr/ModelDownload.cpp.
+# It prints the sha256 of each file and the revision: the lines to pin in qt/src/shell/ModelDownload.cpp.
 # Needs: bash, coreutils (sha256sum, stat), curl (to download), python3 or jq (to read generation_config.json; else
 # the defaults 2/2 are used).
 set -euo pipefail
 
 REPO="Xenova/trocr-small-handwritten"
-# The revision the app was tested with. Pin it to a commit hash (the script prints the one it got): "main" follows the
-# repository, whose files may change.
-REVISION="${XQT_HWR_REVISION:-main}"
+# The revision the app pins in qt/src/shell/ModelDownload.cpp. XQT_HWR_REVISION=main fetches the newest one and
+# prints its hashes, to move the pin.
+REVISION="${XQT_HWR_REVISION:-2432e24d184b1d964d07ed04f5d9e21d31a59141}"
 NAME="trocr-small-hw-int8"
 FILES=(
     "onnx/encoder_model_quantized.onnx"
@@ -159,7 +159,7 @@ trap 'rm -rf "$work"' EXIT
 
 echo
 echo "The model is in $TARGET (revision $revision_used)."
-echo "To pin it in qt/src/hwr/ModelDownload.cpp:"
+echo "To pin it in qt/src/shell/ModelDownload.cpp:"
 echo "  revision $revision_used"
 for f in "${FILES[@]}"; do
     [ -f "$TARGET/$f" ] || continue

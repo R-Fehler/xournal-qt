@@ -186,8 +186,9 @@ The sentences are the texts (`sentences-<lang>.txt`; `make_sample.py` makes the 
   download once the search is switched on, with the address and size shown first (as the arXiv search does: opt-in,
   the address in view), into the app's data folder, checked against sha256s pinned in the app
   (`qt/src/shell/ModelDownload.cpp`), retryable and cancellable, with "Remove the model". The source is a pinned
-  revision of `huggingface.co/Xenova/trocr-small-handwritten`. **Until the revision and the sha256s are pinned** (run
-  `qt/scripts/hwr-model.sh`, which prints them), the button says the model must be installed with the script.
+  revision of `huggingface.co/Xenova/trocr-small-handwritten` (`2432e24d`, about 64 MB). A model without a pinned
+  revision and sha256s (the German one until it is published) is not downloaded: the button says why. To move to
+  another revision, `XQT_HWR_REVISION=<commit> qt/scripts/hwr-model.sh` prints the lines to pin.
 - The runtime is opened at run time (dlopen); bundling it in the packages is a later step.
 
 ### English and German

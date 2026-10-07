@@ -187,8 +187,8 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
 - [ ] The emoji button is out of reach while the soft keyboard is open on a phone.
 
 ### Handwriting
-- [ ] Pin the models' revisions and sha256s (`qt/scripts/hwr-model.sh` prints them), the German one when the training
-  publishes it (`ModelDownload.cpp`); bundle ONNX Runtime in the packages; the text layer in plain "Export as PDF".
+- [ ] Pin the German model's revision and sha256s when the training publishes it (`ModelDownload.cpp`; the English one
+  is pinned); bundle ONNX Runtime in the packages; the text layer in plain "Export as PDF".
 - [ ] The GPU training runs (`qt/research/hwr/train`), checking fhswf's writer ids and CVL's layout on the real data.
 - [ ] `qt/hwr-userdata` (later): a dataset of the user's own hand made in the app, for fine-tuning.
 

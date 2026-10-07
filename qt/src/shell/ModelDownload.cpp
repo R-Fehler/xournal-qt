@@ -13,9 +13,8 @@ namespace xqt {
 
 namespace {
 /// The models this build downloads.
-/// English: Xenova's ONNX export of TrOCR-small handwritten (MIT), int8. The revision and the sha256 of each file are
-/// pinned by the author (qt/scripts/hwr-model.sh prints them); until then nothing is downloaded, and the model comes
-/// from the script (qt/docs/features/handwriting-search.md).
+/// English: Xenova's ONNX export of TrOCR-small handwritten (MIT), int8, pinned to a revision with the size and sha256
+/// of each file (qt/scripts/hwr-model.sh prints them; the ONNX files' sha256 are also Hugging Face's LFS ids).
 /// German: the project's own CTC model (qt/research/hwr/train, FORMATS.md "kind": "ctc"), pinned when it is published;
 /// until then a folder holding one can be chosen in Settings.
 std::vector<ModelDownload::Model> builtIn() {
@@ -24,16 +23,18 @@ std::vector<ModelDownload::Model> builtIn() {
     en.language = QStringLiteral("en");
     en.kind = QStringLiteral("trocr");
     en.source = QStringLiteral("https://huggingface.co/Xenova/trocr-small-handwritten");
-    en.revision = QString();  // TODO(author): the commit hwr-model.sh printed
+    en.revision = QStringLiteral("2432e24d184b1d964d07ed04f5d9e21d31a59141");
     en.encoder = QStringLiteral("onnx/encoder_model_quantized.onnx");
     en.decoder = QStringLiteral("onnx/decoder_model_merged_quantized.onnx");
     en.tokenizer = QStringLiteral("tokenizer.json");
-    // (sizes: about 23 and 41 MB, measured in the research; the exact ones and the sha256 are pinned with the revision)
-    en.files = {{en.encoder, QString(), 23 * 1024 * 1024},
-                {en.decoder, QString(), 41 * 1024 * 1024},
-                {en.tokenizer, QString(), 1024 * 1024},
-                {QStringLiteral("generation_config.json"), QString(), 1024},
-                {QStringLiteral("preprocessor_config.json"), QString(), 1024}};
+    en.files = {
+            {en.encoder, QStringLiteral("2f29edbd925f8a49c9c7d1349895f960cf09d2efdc76fe23f957048d476e0d03"), 23082942},
+            {en.decoder, QStringLiteral("51076aa396ab5939c4668db9de901ad51765094b4c05c4c8c1f8ae2012ba1e08"), 40527613},
+            {en.tokenizer, QStringLiteral("68bcb5468c854362a615f3d2ff6a5e4091a85f4c8198993ed9a30afe0b143737"), 4494727},
+            {QStringLiteral("generation_config.json"),
+             QStringLiteral("cce308da91e0d656e07404c70d4b9c9f5839d426f679eff6fda6dcc0e727e3b6"), 185},
+            {QStringLiteral("preprocessor_config.json"),
+             QStringLiteral("70da3434c33eedb3b56caf4067851741dfeed02f67576dcc3c6407c2533bfaf0"), 465}};
     en.unpinned = QObject::tr("This version of the app does not name the model's files yet: install it with "
                               "qt/scripts/hwr-model.sh (see the handwriting search's documentation).");
     ModelDownload::Model de;

@@ -170,7 +170,7 @@ TEST_F(ModelDownloadTest, nothingIsDownloadedWithoutPinnedFiles) {
     EXPECT_TRUE(net.calls.empty());
 }
 
-// This build's catalogue: English (TrOCR, pinned by the author) and German (the project's CTC model, not published
+// This build's catalogue: English (TrOCR, pinned to a revision) and German (the project's CTC model, not published
 // yet: it cannot be downloaded, a folder can be chosen)
 TEST_F(ModelDownloadTest, theBuildKnowsAnEnglishAndAGermanModel) {
     ModelDownload::setCatalogue(nullptr);
@@ -181,6 +181,8 @@ TEST_F(ModelDownloadTest, theBuildKnowsAnEnglishAndAGermanModel) {
     EXPECT_EQ(en->name, QStringLiteral("trocr-small-hw-int8"));
     EXPECT_EQ(en->kind, QStringLiteral("trocr"));
     EXPECT_EQ(de->kind, QStringLiteral("ctc"));
+    EXPECT_TRUE(en->pinned());
+    EXPECT_EQ(en->revision.size(), 40);
     EXPECT_FALSE(de->pinned());
     EXPECT_TRUE(de->unpinned.contains(QStringLiteral("not published yet")));
     EXPECT_EQ(hwr::HandwritingSearch::defaultModelDir(QStringLiteral("de")),
