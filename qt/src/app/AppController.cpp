@@ -1,5 +1,6 @@
 #include "AppController.h"
 #include "AppServices.h"
+#include "CurrentDocument.h"
 #include "AudioControl.h"
 #include "TimelineControl.h"
 
@@ -247,6 +248,8 @@ void AppController::makeTabs() {
         policy.textCopiedText = tr("Text copied");
         edits = std::make_unique<CanvasActions>(std::move(policy));
     }
+    current = std::make_unique<CurrentDocument>();
+    connectCurrentDocument();
     tabs = std::make_unique<TabManager>(*app);
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::syncHandwriting);
@@ -363,9 +366,7 @@ AppController::~AppController() {
         library->onFilesChanged = {};
         recent->onFilesChanged = {};
     }
-    for (auto& c: currentConnections) {
-        disconnect(c);
-    }
+    disconnect(current.get(), nullptr, this, nullptr);
     disconnect(edits.get(), nullptr, this, nullptr);  // (the views go below: nothing relayed to a window on its way out)
     timelineControl.reset();  // (a replay ends: its view shows the whole document again)
     audioControl.reset();  // (a recording ends, and its document is told, before the sessions go)
@@ -720,115 +721,20 @@ void AppController::currentTabChanged() {
     if (markdown && mdSession != session()) {
         endMarkdown(true);  // another document: editing the box ends (kept)
     }
-    // Follow the signals of the current tab only.
-    for (auto& c: currentConnections) {
-        disconnect(c);
+    if (current->view() && current->view() != canvas()) {
+        current->view()->setSelectingMore(false);  // (another document: select more ends)
     }
-    currentConnections.clear();
-    if (currentCanvas && currentCanvas != canvas()) {
-        currentCanvas->setSelectingMore(false);  // (another document: select more ends)
-    }
-    currentCanvas = canvas();
+    // From now on the signals of the current tab's document and view only (connectCurrentDocument)
+    current->follow(session(), canvas());
     edits->setView(canvas());  // (its selection, notes, PDF text, Back: the pills and the keys)
-    if (DocumentSession* s = session()) {
-        currentConnections.push_back(
-                connect(s, &DocumentSession::modifiedChanged, this, &AppController::modifiedChanged));
-        currentConnections.push_back(connect(s, &DocumentSession::savingChanged, this, &AppController::savingChanged));
-        currentConnections.push_back(
-                connect(s, &DocumentSession::undoRedoStateChanged, this, &AppController::undoRedoChanged));
-        currentConnections.push_back(
-                connect(s, &DocumentSession::undoRedoStateChanged, this, &AppController::pageUndoChanged));
-        // Undoing a page change says so: the page that changed may be far from the one in view
-        currentConnections.push_back(connect(s, &DocumentSession::pageActionUndone, this,
-                                             [this](const QString& text, bool undone) {
-                                                 Q_EMIT pageActionDone(
-                                                         (undone ? tr("Undone: %1") : tr("Redone: %1")).arg(text), false);
-                                             }));
-        currentConnections.push_back(connect(s, &DocumentSession::filePathChanged, this, &AppController::titleChanged));
-        currentConnections.push_back(
-                connect(s, &DocumentSession::filePathChanged, this, &AppController::favouriteChanged));
-        currentConnections.push_back(
-                connect(s, &DocumentSession::bookmarksChanged, this, &AppController::bookmarksChanged));
-        currentConnections.push_back(
-                connect(s, &DocumentSession::currentPageChanged, this, &AppController::pageChanged));
-        currentConnections.push_back(
-                connect(s, &DocumentSession::currentPageChanged, this, &AppController::notesChanged));
-        currentConnections.push_back(
-                connect(&s->search(), &DocumentSearch::changed, this, &AppController::searchChanged));
-        currentConnections.push_back(
-                connect(&s->search(), &DocumentSearch::finished, this, &AppController::searchChanged));
-        // Annotations of other apps: looked at again when the background PDF changed (adopted, undone, saved)
-        currentConnections.push_back(connect(s, &DocumentSession::undoRedoStateChanged, this, [this, s] {
-            scanAdoptable(s, false);
-            Q_EMIT adoptableChanged();
-        }));
-    }
-    scanAdoptable(session(), false);
-    Q_EMIT adoptableChanged();
     pages->setSession(session());
     outline->setSession(session());
     annotations->setSession(session());
     versions->setSession(session());
     layers->setSession(session());
-    if (CanvasView* v = canvas()) {
-        currentConnections.push_back(connect(v, &CanvasView::pagesChanged, this, &AppController::pageChanged));
-        currentConnections.push_back(connect(v, &CanvasView::notesChanged, this, &AppController::notesChanged));
-        currentConnections.push_back(connect(v, &CanvasView::linkTapped, this, &AppController::linkTapped));
-        currentConnections.push_back(
-                connect(v, &CanvasView::markdownRequested, this, &AppController::markdownRequested));
-        currentConnections.push_back(
-                connect(v, &CanvasView::markdownBoxRequested, this, &AppController::markdownBoxRequested));
-        currentConnections.push_back(
-                connect(v, &CanvasView::contextRequested, this, &AppController::contextRequested));
-        currentConnections.push_back(
-                connect(v, &CanvasView::textEditingChanged, this, &AppController::markdownOnPageChanged));
-        currentConnections.push_back(
-                connect(v, &CanvasView::textEditingChanged, this, &AppController::markdownFormatChanged));
-        currentConnections.push_back(
-                connect(v, &CanvasView::markdownCursorChanged, this, &AppController::markdownFormatChanged));
-        // (the text being written has undo steps of its own: the undo and redo buttons follow them)
-        currentConnections.push_back(
-                connect(v, &CanvasView::markdownUndoChanged, this, &AppController::undoRedoChanged));
-        currentConnections.push_back(connect(v, &CanvasView::textEditingChanged, this, &AppController::undoRedoChanged));
-        currentConnections.push_back(connect(v, &CanvasView::geometryChanged, this, &AppController::toolChanged));
-        currentConnections.push_back(connect(v, &CanvasView::curtainChanged, this, &AppController::curtainChanged));
-        currentConnections.push_back(connect(v, &CanvasView::imageLoadRequested, this, [this](const QString& url) {
-            std::string access;
-            app->getSettings()->getCustomElement("xournalQt").getString("networkAccess", access);
-            Q_EMIT webImageRequested(url, QUrl(url).host(),
-                                     access == "on" || access == "off" ? QString::fromStdString(access)
-                                                                       : QStringLiteral("ask"));
-        }));
-        // The snip tool (AppSnip.cpp): its picture onto the clipboard; a pasted snip's link offered
-        currentConnections.push_back(connect(v, &CanvasView::snipped, this,
-                                             [this, v](const QImage& image, int page, const QRectF& area, bool capped) {
-                                                 snipped(v->getSession(), image, page, area, capped);
-                                             }));
-        currentConnections.push_back(connect(v, &CanvasView::snipLinkOffered, this, [this, v](const QString& title) {
-            snipLinkView = v;
-            Q_EMIT snipLinkOffered(title);
-        }));
-        // Copy handwriting as text (AppInkCopy.cpp): the words swept over
-        currentConnections.push_back(connect(v, &CanvasView::inkSwept, this,
-                                             [this, v](int page, const QPolygonF& path) { inkSwept(v, page, path); }));
-        currentConnections.push_back(connect(v, &CanvasView::messageRequested, this,
-                                             [this](const QString& title, const QString& text) {
-                                                 Q_EMIT message(title, text, true);
-                                             }));
+    if (canvas()) {
         applyPdfTextMode();
         applyMarkdownText();
-        currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
-                                             &AppController::zoomChanged));
-        currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoom100Changed, this,
-                                             &AppController::zoomChanged));
-        currentConnections.push_back(connect(&v->getViewController(), &ViewController::rotationChanged, this,
-                                             &AppController::canvasRotationChanged));
-        // The play tool on ink with a recording (qt/docs/audio.md)
-        currentConnections.push_back(connect(v, &CanvasView::playRequested, this, [this](const QString& name, qint64 ts) {
-            if (audioControl) {
-                audioControl->playMoment(name, ts);
-            }
-        }));
     }
     if (audioControl) {
         audioControl->currentChanged();
@@ -840,29 +746,78 @@ void AppController::currentTabChanged() {
     if (session() && session()->textFile()) {
         QTimer::singleShot(0, this, [this, s = QPointer<DocumentSession>(session())] { checkTextFile(s); });
     }
-    Q_EMIT documentChanged();
-    Q_EMIT markdownFormatChanged();
-    Q_EMIT titleChanged();
-    Q_EMIT textLayoutChanged();
-    Q_EMIT modifiedChanged();
-    Q_EMIT savingChanged();
-    Q_EMIT undoRedoChanged();
-    Q_EMIT zoomChanged();
-    Q_EMIT canvasRotationChanged();
-    Q_EMIT pageChanged();
-    Q_EMIT searchChanged();
-    Q_EMIT pageUndoChanged();
-    Q_EMIT selectionChanged();
-    Q_EMIT noteSelectionChanged();
-    Q_EMIT notesChanged();
-    Q_EMIT navigationChanged();
-    Q_EMIT pdfTextSelectionChanged();
-    Q_EMIT toolChanged();  // the setsquare / compass of that tab
-    Q_EMIT curtainChanged();  // its curtain
-    Q_EMIT titlePageChanged();
-    Q_EMIT markdownOnPageChanged();
-    Q_EMIT bookmarksChanged();
-    Q_EMIT favouriteChanged();
+    current->announce();  // (everything about the document may be different: each of its signals once)
+}
+
+void AppController::connectCurrentDocument() {
+    CurrentDocument* d = current.get();
+    // Another document: what the window shows of it
+    connect(d, &CurrentDocument::changed, this, &AppController::documentChanged);
+    connect(d, &CurrentDocument::changed, this, &AppController::textLayoutChanged);
+    connect(d, &CurrentDocument::changed, this, &AppController::titlePageChanged);
+    // The document's
+    connect(d, &CurrentDocument::modifiedChanged, this, &AppController::modifiedChanged);
+    connect(d, &CurrentDocument::savingChanged, this, &AppController::savingChanged);
+    connect(d, &CurrentDocument::undoRedoChanged, this, &AppController::undoRedoChanged);
+    connect(d, &CurrentDocument::undoRedoChanged, this, &AppController::pageUndoChanged);
+    // Annotations of other apps: looked at again when the background PDF changed (adopted, undone, saved)
+    connect(d, &CurrentDocument::undoRedoChanged, this, [this] {
+        scanAdoptable(current->session(), false);
+        Q_EMIT adoptableChanged();
+    });
+    connect(d, &CurrentDocument::fileChanged, this, &AppController::titleChanged);
+    connect(d, &CurrentDocument::fileChanged, this, &AppController::favouriteChanged);
+    connect(d, &CurrentDocument::bookmarksChanged, this, &AppController::bookmarksChanged);
+    connect(d, &CurrentDocument::pageChanged, this, &AppController::pageChanged);
+    connect(d, &CurrentDocument::pageChanged, this, &AppController::notesChanged);
+    connect(d, &CurrentDocument::searchChanged, this, &AppController::searchChanged);
+    // Undoing a page change says so: the page that changed may be far from the one in view
+    connect(d, &CurrentDocument::pageActionUndone, this, [this](const QString& text, bool undone) {
+        Q_EMIT pageActionDone((undone ? tr("Undone: %1") : tr("Redone: %1")).arg(text), false);
+    });
+    // The view's
+    connect(d, &CurrentDocument::pagesChanged, this, &AppController::pageChanged);
+    connect(d, &CurrentDocument::notesChanged, this, &AppController::notesChanged);
+    connect(d, &CurrentDocument::textEditingChanged, this, &AppController::markdownOnPageChanged);
+    connect(d, &CurrentDocument::textEditingChanged, this, &AppController::markdownFormatChanged);
+    connect(d, &CurrentDocument::markdownCursorChanged, this, &AppController::markdownFormatChanged);
+    // (the text being written has undo steps of its own: the undo and redo buttons follow them)
+    connect(d, &CurrentDocument::markdownUndoChanged, this, &AppController::undoRedoChanged);
+    connect(d, &CurrentDocument::textEditingChanged, this, &AppController::undoRedoChanged);
+    connect(d, &CurrentDocument::geometryChanged, this, &AppController::toolChanged);  // (the setsquare / compass)
+    connect(d, &CurrentDocument::curtainChanged, this, &AppController::curtainChanged);
+    connect(d, &CurrentDocument::zoomChanged, this, &AppController::zoomChanged);
+    connect(d, &CurrentDocument::rotationChanged, this, &AppController::canvasRotationChanged);
+    connect(d, &CurrentDocument::linkTapped, this, &AppController::linkTapped);
+    connect(d, &CurrentDocument::markdownRequested, this, &AppController::markdownRequested);
+    connect(d, &CurrentDocument::markdownBoxRequested, this, &AppController::markdownBoxRequested);
+    connect(d, &CurrentDocument::contextRequested, this, &AppController::contextRequested);
+    connect(d, &CurrentDocument::imageLoadRequested, this, [this](const QString& url) {
+        std::string access;
+        app->getSettings()->getCustomElement("xournalQt").getString("networkAccess", access);
+        Q_EMIT webImageRequested(url, QUrl(url).host(),
+                                 access == "on" || access == "off" ? QString::fromStdString(access)
+                                                                   : QStringLiteral("ask"));
+    });
+    // The snip tool (AppSnip.cpp): its picture onto the clipboard; a pasted snip's link offered
+    connect(d, &CurrentDocument::snipped, this, [this](const QImage& image, int page, const QRectF& area, bool capped) {
+        snipped(current->view()->getSession(), image, page, area, capped);
+    });
+    connect(d, &CurrentDocument::snipLinkOffered, this, [this](const QString& title) {
+        snipLinkView = current->view();
+        Q_EMIT snipLinkOffered(title);
+    });
+    // Copy handwriting as text (AppInkCopy.cpp): the words swept over
+    connect(d, &CurrentDocument::inkSwept, this,
+            [this](int page, const QPolygonF& path) { inkSwept(current->view(), page, path); });
+    connect(d, &CurrentDocument::messageRequested, this,
+            [this](const QString& title, const QString& text) { Q_EMIT message(title, text, true); });
+    // The play tool on ink with a recording (qt/docs/audio.md)
+    connect(d, &CurrentDocument::playRequested, this, [this](const QString& name, qint64 ts) {
+        if (audioControl) {
+            audioControl->playMoment(name, ts);
+        }
+    });
 }
 
 bool AppController::hasSelection() const { return edits->hasSelection(); }

@@ -65,6 +65,7 @@ class Citations;
 class LibraryInkJob;
 class HandwritingSettings;
 class CanvasActions;
+class CurrentDocument;
 class CanvasView;
 class LibraryArchive;
 class LibraryShare;
@@ -1531,6 +1532,8 @@ public:
 
     xqt::AppContext& context() const { return *app; }
     xqt::TabManager& tabManager() const { return *tabs; }
+    /// The current tab's document and view, with their signals (what follows "the current document" connects here)
+    xqt::CurrentDocument& currentDocument() const { return *current; }
 
     // --- windows (undocked documents) ---
     /// What the windows of the process share (the window factory, start maximized, the open documents of all windows)
@@ -1853,6 +1856,7 @@ private:
     qreal markSpacing = 1.0;
     /// Files were renamed or moved (library, recent files): open documents and the recent list follow.
     void filesChanged(const xqt::DocumentFiles::Result& result);
+    /// Another tab is the current one: the window follows its document (CurrentDocument), then tells
     void currentTabChanged();
     /// The tab list of this window (with its signals).
     void makeTabs();
@@ -1926,11 +1930,11 @@ private:
     void storeColorRoles(const QMap<QString, QString>& roles);
     /// The colors taken from a palette take their role's color in `paletteId` (where it has the role)
     void followColorPalette(const QString& paletteId);
-    std::vector<QMetaObject::Connection> currentConnections;
+    /// The current tab's document and view, their signals relayed (connectCurrentDocument: onto the window's)
+    std::unique_ptr<xqt::CurrentDocument> current;
+    void connectCurrentDocument();
     /// What acts on the current document's canvas (`edit`; follows the current tab)
     std::unique_ptr<xqt::CanvasActions> edits;
-    /// The view of the current tab (another tab: select more ends in the one before)
-    QPointer<xqt::CanvasView> currentCanvas;
 
     // --- annotations of other apps (AppAdopt.cpp) ---
     struct AdoptScan {
