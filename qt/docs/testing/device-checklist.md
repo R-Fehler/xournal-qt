@@ -115,3 +115,10 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
 - [ ] The text tool on an empty place makes a Markdown text box; on a text box of a Xournal++ file it edits that text
       as it is, and the file opens in Xournal++ afterwards with the edited text.
 - [ ] A fresh profile: snapping off, the pen's side buttons erase; switch snapping on, restart: it stays on.
+
+## The main window in parts (`Main.qml` split, 2026-10)
+
+- [ ] On the Fold (folded and unfolded) and a desktop: the Zen dot and its pill, the view pill, the full-screen tab
+      dots, the toasts and the read-only note sit where they did, over the page and under the home screen.
+- [ ] ⋮, the toolbox's menus and the catalog open at their buttons (a sheet on the phone); Back closes a sheet, then
+      leaves Zen, as before.

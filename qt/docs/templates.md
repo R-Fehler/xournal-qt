@@ -84,7 +84,7 @@ its own), as for any `.xopp` with an attached PDF.
 | `qt/src/shell/PageClipboard.*` | `copy(Document&, …)` (a document not open: the template file read on a worker), `copied(i)` (the copied page, its PDF page, the one-page PDF). |
 | `qt/src/shell/Stickers.*` | The sets of both kinds (`stickers::Kind::Templates`: `Templates/`, `templates/`, `.template-order.json`, `.xopp` only, the attached files following a `.xopp`: `companionsOf`); `StickersModel(Kind)`, `recent(n)`. |
 | `qt/src/app/AppTemplates.cpp` | `app.templates`, `templateDraft`, `saveTemplate`, `insertTemplate`, `createDocumentFromTemplate`; reading a template off the UI thread (`readTemplate`), the pages for a document (`templatePagesFor`). |
-| `StickerPicker.qml` (`mode: "templates"`, `pickOnly`), `TemplateSaveDialog.qml` | The picker, the dialog. `Main.qml`: the add-page button's list, ⋮ → Page; `PageMenu.qml`; `InsertPagesDialog.qml`, `NewDocumentDialog.qml`: "From a template". |
+| `StickerPicker.qml` (`mode: "templates"`, `pickOnly`), `TemplateSaveDialog.qml` | The picker, the dialog. `AppButtons.qml`: the add-page button's list; `MoreMenu.qml`: ⋮ → Page; `PageMenu.qml`; `InsertPagesDialog.qml`, `NewDocumentDialog.qml`: "From a template". |
 
 ## Not built
 

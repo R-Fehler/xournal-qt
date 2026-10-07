@@ -448,8 +448,8 @@ edge. The first tries cost more: five rounded rectangles up to 9 %, three rectan
   with a finger); `sticky::serializeGroup`, `deserializeGroup`, `groupPastePlace`, `UndoSteps`;
   `AppController::notesSelectedTogether` (the page sidebar's keys).
 - `qt/src/app/qml/NotePill.qml`: colours, cover, copy, cut, delete, at the note. `PageKeys.qml`: the sidebar's keys
-  with a note. The menu entries and the page pill's eye in
-  `Main.qml`; `AppController` (`insertStickyNote`, `noteSelected`, `noteColor`, `noteCovers`, `pageNotesHidden` ...).
+  with a note. The catalog's entry in `ToolboxMenus.qml` and the page pill's eye in
+  `ViewPill.qml`; `AppController` (`insertStickyNote`, `noteSelected`, `noteColor`, `noteCovers`, `pageNotesHidden` ...).
 - `LayersModel` leaves the notes out of the layer panel.
 - Tests: `StickyNoteTest` (session: the format, the round trip, upstream Xournal++ opening the file, every export,
   the clipboard format, where a paste goes, the edge and the shade of every colour in every picture and nothing of

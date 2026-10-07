@@ -203,6 +203,35 @@ endif()
 # The QML UI as a static QML module (XournalQt), used by the app and by the UI tests.
 set(XQT_QML_FILES
     src/app/qml/Main.qml
+    # (the parts of the window, each instantiated once in Main.qml)
+    src/app/qml/SaveFlow.qml
+    src/app/qml/ShareFlow.qml
+    src/app/qml/ExportFlow.qml
+    src/app/qml/ProtectionDialogs.qml
+    src/app/qml/DocumentNotices.qml
+    src/app/qml/StartupFlow.qml
+    src/app/qml/VersionMessageDialog.qml
+    src/app/qml/LinkPopup.qml
+    src/app/qml/ViewPill.qml
+    src/app/qml/ShownFileNote.qml
+    src/app/qml/NavPill.qml
+    src/app/qml/TabDragHint.qml
+    src/app/qml/SourceDivider.qml
+    src/app/qml/SidebarArrow.qml
+    src/app/qml/SidebarScrim.qml
+    src/app/qml/FullScreenTabs.qml
+    src/app/qml/TabToast.qml
+    src/app/qml/PresentPageIndicator.qml
+    src/app/qml/ZenDot.qml
+    src/app/qml/ZenPill.qml
+    src/app/qml/ReadingFields.qml
+    src/app/qml/ReadOnlyNote.qml
+    src/app/qml/ToolbarToggle.qml
+    src/app/qml/ToolbarShow.qml
+    src/app/qml/AppButtons.qml
+    src/app/qml/MoreMenu.qml
+    src/app/qml/ToolboxMenus.qml
+    src/app/qml/WindowShortcuts.qml
     src/app/qml/IconButton.qml
     src/app/qml/RecordButton.qml
     src/app/qml/RecordingPill.qml

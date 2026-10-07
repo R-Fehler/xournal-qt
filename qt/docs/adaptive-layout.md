@@ -743,7 +743,7 @@ so they are not size classes either:
 | `Main.qml` `sourceAtBottom` | the class (tablet portrait, phone portrait), or a portrait area in desktop narrow / tiny | the Markdown source below the page |
 | `Main.qml` `sourceSideWidth` | `min(600, max(min(360, area / 2), 0.38 w))` | the source beside the page |
 | `Main.qml` `drawerWidth` | 210; phone: `min(360, 0.85 w)`; phone held sideways: 260 | the sidebar as a drawer |
-| `Main.qml` `viewPill.compact`, `tight` | canvas < 520, < 360 | the compact view pill |
+| `ViewPill.qml` `compact`, `tight` | canvas < 520, < 360 | the compact view pill |
 | `ReferenceSplit.qml` `vertical` | the area h > w (16 px margin) | top and bottom |
 | `ReferenceSplit.qml` `narrow` | the reference's half < 480 | the pill: page and ⋮ |
 | `MarkdownFormatBar.qml` | the room of its row against the widths of its forms | Insert menu, block menu, scrolling |
