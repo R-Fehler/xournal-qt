@@ -231,6 +231,7 @@ set(XQT_QML_FILES
     src/app/qml/AppButtons.qml
     src/app/qml/MoreMenu.qml
     src/app/qml/ToolboxMenus.qml
+    src/app/qml/WindowShortcuts.qml
     src/app/qml/IconButton.qml
     src/app/qml/RecordButton.qml
     src/app/qml/RecordingPill.qml
