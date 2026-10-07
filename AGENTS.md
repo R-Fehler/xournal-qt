@@ -87,8 +87,9 @@ it and runs `python3 qt/scripts/architecture/generate.py`; CI checks it).
   an instance at a time (its own mutex), and the document is read under `std::shared_lock`. Never hold the document
   lock while drawing a PDF.
 - **Every page has a revision** (`DocumentSession::pageRevision`) that changes when its picture does. Thumbnails,
-  sketches, stand-ins and their files on disk are named by it; a page keeps its revision when pages before it come or
-  go.
+  sketches and stand-ins are keyed by it in memory; stand-ins stored on disk are kept per version of the file (a
+  folder named by a hash of its path and stamps) and checked against it. A page keeps its revision when pages before
+  it come or go.
 - **Memory has owners**: `CanvasMemory` for rendered pages (a setting, shared by all tabs), `ImageMemory` for the
   limits of all image caches ([image-caches.md](qt/docs/architecture/image-caches.md)), `ImageWorkers` for their
   threads. A cache without an owner and a limit is how this got slow before.
