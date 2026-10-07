@@ -1,37 +1,6 @@
 # Releasing xournal-qt
 
-## What the CI does
-
-| Workflow | When | What |
-| --- | --- | --- |
-| `.github/workflows/xqt-build.yml` | every push and pull request to `master-qt` | builds in a Debian 13 container (Qt 6.8) and runs all tests |
-| `.github/workflows/xqt-release.yml` | a tag `v1.2.3`, or started by hand | builds, tests, packages, and opens a **draft** release with the packages |
-| `.github/workflows/xqt-windows.yml` | started by hand, or a push to `qt/windows-build` | builds for Windows in MSYS2 UCRT64 and publishes a portable zip ([windows.md](windows.md)) |
-| `.github/workflows/xqt-macos.yml` | started by hand, or a push to `qt/macos-build` | builds for macOS (Apple Silicon) with Homebrew and publishes an unsigned `.dmg` ([macos.md](macos.md)) |
-
-The upstream Xournal++ workflows in the same folder stay dormant here: they only run for pull requests to `master`
-or carry `if: github.repository == 'xournalpp/xournalpp'`.
-
-Qt 6.5 or newer is needed, which the GitHub runners' own Ubuntu 24.04 does not have (6.4). Every job therefore builds
-in a container; `qt/scripts/linux-deps.sh` installs the packages (the same script works on a developer machine).
-
-### A test that fails only on GitHub
-
-Run it in the same container here: `qt/scripts/ci-container.sh` builds and tests like the CI does, in `debian`
-(Debian 13, Qt 6.8) or `neon` (Ubuntu 22.04 with KDE neon, Qt 6.7): root, C locale, the fonts the packages bring,
-the checkout mounted read-only, the build folder in `~/.cache/xqt-ci/<name>`. Docker if it runs, else podman; the
-container gets 3 CPUs and 4 GB, and on a shared machine it goes through `qt/scripts/build-slot.sh` as well.
-
-```sh
-qt/scripts/build-slot.sh qt/scripts/ci-container.sh debian build xqt-ui-tests     # about 30 min the first time
-qt/scripts/build-slot.sh qt/scripts/ci-container.sh debian test -R 'AdaptiveLayoutTest\.menus' --repeat until-fail:3
-qt/scripts/ci-container.sh debian run build/xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.*'
-qt/scripts/ci-container.sh neon shell            # look around; `clean` deletes the build folder
-```
-
-What made tests fail there and not on a desktop (2026-09-27): other fonts (other text widths, so a menu a fraction
-of a pixel narrower), and Qt 6.8, whose own file dialogs are windows of their own (off-screen the app's window does
-not get the keys back when one closes) and whose menus take a click on their button only after they have faded out.
+What the CI does on every push, the block tests and how to reproduce a CI failure: [ci.md](ci.md).
 
 ## Cutting a release
 

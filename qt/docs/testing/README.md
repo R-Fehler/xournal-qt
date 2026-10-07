@@ -37,11 +37,12 @@ build-qt/xqt-ui-tests --gtest_filter='ToolboxTest.*'          # one binary direc
 
 1. **While working**: only the labels, or `-R` filters, of what changed. Build only those test binaries. Don't
    rebuild or retest after edits to docs or QML text alone.
-2. **Before a block is merged**: the full suite once (`ctest --test-dir build-qt -j3`), and the UI tests of popups,
-   keys and window states also on Qt 6.8 (below).
+2. **Before a block is merged**: the full suite once, on GitHub (push `qt/<block>`: `xqt-block-tests.yml` runs it in
+   four shards, [ci.md](../development/ci.md)) or locally on a big machine (`ctest --test-dir build-qt -j$(nproc)`),
+   and the UI tests of popups, keys and window states also on Qt 6.8 (below).
 3. **The CI** (`.github/workflows/xqt-build.yml`) builds and runs everything on Debian 13 (Qt 6.8) and KDE neon
    (Qt 6.7) on every push of `master-qt` and `claude/**`. A test that fails only there: reproduce it in the same
-   container with `qt/scripts/ci-container.sh` ([releasing.md](../development/releasing.md)).
+   container with `qt/scripts/ci-container.sh` ([ci.md](../development/ci.md)).
 4. **The author** runs the long suites and tests by hand on the devices ([device checklist](device-checklist.md)).
 
 The routine run should stay **under a minute**: long tests go behind a label or an environment variable. The UI label
