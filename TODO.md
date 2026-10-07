@@ -24,7 +24,7 @@ All four waves are merged (2026-10-07). The architecture overview:
 - [ ] App: `WindowActions` — Main's search forwards and the Connections that only open dialogs (qml B3); a
   `WindowContext` for the feature objects; `AppController::app` → `context` (mechanical); the facade names of the
   canvas actions (`app.copySelection`, `app.zoomIn`, …) and the per-document properties move with their features
-  (app-cpp E–N); a per-path guard between background writes and a `DocumentSession` save (tags have one).
+  (app-cpp E–N).
 - [ ] QML: the 40 `typeof win` guards (qml B6); HomeView's one `DocumentGrid` with the favourites in C++, its menu
   target object and the search field's `type(text)` (qml B7); SettingsPage's section model (names written twice,
   magic indices) and its own keyboard fallback (qml B8); the cards' role `preview` → `cover` (LibraryModel's
@@ -33,10 +33,25 @@ All four waves are merged (2026-10-07). The architecture overview:
   reading positions of documents outside a library out of the cache folder (shell §6.6); `readJsonObject` (block 9);
   LibraryShare's `PdfHistory::gzip` → `fileio`; "preview" for covers and stand-ins in app/ comments and MainWindowTest
   test names; `LibraryTest.cpp` split by topic (block 12).
-- [ ] Session: `setVersionMessage` still runs qpdf on the UI thread; session block 6's manual `lock()/unlock()` pairs
-  and the plain autosave on the UI thread (risk 7); the static `DocumentHandler` copies; the "try incremental, else
-  full" block in both `write()` and `writeKeeping()` (with block 7); `PdfBookmarks::write` and `markHistoryIn` on the
-  `ObjectSink`; `HybridPdfTest.cpp` split (block 9); `HybridSaveHandler` in ADR 0002 (block 10).
+- [x] Session (`qt/session-rest`): `setVersionMessage` on the save's worker (`SaveKind::VersionMessage`); the manual
+  lock pairs; one `DetachedDocument` handler; `appendIfPossible`; `PdfBookmarks::write` and `markHistoryIn` on the
+  `ObjectSink` (`PdfObjectSink.h`); `HybridPdfTest.cpp` split; `HybridSaveHandler` in ADR 0002. Left: the plain
+  autosave on the UI thread (next item).
+- [x] App's per-path guard (`qt/session-rest`): `.xopp` and text saves, `LinkRewrite::rewriteFile` and
+  `todos::setInMarkdownFile` take `fileio::FileWriteLock` (tags already did). Nothing left (the page file and
+  template writers make new files).
+- [ ] Session: **the plain autosave still runs on the UI thread** (risk 7; `DocumentSession::autosave` builds the XML
+  under the read lock and gzips and writes it there). Not moved in `qt/session-rest`, because a worker needs: (1) a
+  synchronous path kept for `AppController::autosaveAll` when the app goes to the background (Android may kill it
+  right after; `RecoveryTest.goingToTheBackgroundWritesTheAutosaves` checks "autosaved at once"), so `autosaveChanges`
+  needs a "now"/"in the background" choice from its two callers; (2) the copy taken as a save does (`snapshotOf`
+  under the read lock, `PictureSaveHandler` on the worker, `updateDocumentInfo` back on the UI thread under the lock,
+  as `finishWrite`); (3) an order with saves: an autosave written after a Ctrl+S that started later is newer on disk
+  than the saved file but older in content, and recovery would offer it, so it is dropped in its last step when a
+  save finished since its copy; (4) the session's destructor waiting for it; (5) `undoRedo->documentAutosaved()` only
+  for a copy that is written. Also: `prepareSave` writes a missing attached `name.xopp.bg.pdf` with poppler under the
+  read lock (`SaveHandler::visitPage`); the save copies it on its worker instead (`writeAttachedPdf`), the autosave
+  should too.
 - [ ] Canvas: `renderZoom`/`renderDpr` read as one (infra §6.4); the quick tests' input on the canvas clock
   (`CanvasItemInputTest`); a ThreadSanitizer run of the canvas and shell labels.
 - [ ] Tests: the `qpdfCheck` (10), `makePdf`/`drawStroke`/`addStroke` variants and the quick tests' `wait` copies into
