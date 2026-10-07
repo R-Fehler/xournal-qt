@@ -51,96 +51,107 @@ protected:
 
     QTemporaryDir tmp;
 };
+/// The same order for Esc and Android's back key (the author, 2026-10-07: "I want a consistent android back
+/// behavior"): every step of the list is taken by either key
+class EscapeOrBackTest: public EscapeKeysTest, public ::testing::WithParamInterface<int> {
+protected:
+    void press() { key(static_cast<Qt::Key>(GetParam())); }
+};
 }  // namespace
 
 // Full screen with a selected sticky note: Esc unselects the note, the next Esc leaves full screen (both wanted the key:
 // Qt called it ambiguous and neither acted)
-TEST_F(EscapeKeysTest, fullScreenWithASelectedNote) {
+TEST_P(EscapeOrBackTest, fullScreenWithASelectedNote) {
     ASSERT_NO_FATAL_FAILURE(fullScreen());
     ASSERT_TRUE(controller->insertStickyNote());
     ASSERT_TRUE(until([&] { return controller->noteSelected(); }));
-    key(Qt::Key_Escape);
+    press();
     EXPECT_FALSE(controller->noteSelected()) << "the note first";
     EXPECT_TRUE(flag("fullScreenMode")) << "full screen stays";
-    key(Qt::Key_Escape);
+    press();
     EXPECT_FALSE(flag("fullScreenMode")) << "then full screen";
 }
 
 // Full screen with an armed snip: Esc puts the snip away first
-TEST_F(EscapeKeysTest, fullScreenWithAnArmedSnip) {
+TEST_P(EscapeOrBackTest, fullScreenWithAnArmedSnip) {
     ASSERT_NO_FATAL_FAILURE(fullScreen());
     controller->startSnip("rect");
     ASSERT_EQ(controller->snipShape(), "rect");
-    key(Qt::Key_Escape);
+    press();
     EXPECT_EQ(controller->snipShape(), "") << "the snip first";
     EXPECT_TRUE(flag("fullScreenMode"));
-    key(Qt::Key_Escape);
+    press();
     EXPECT_FALSE(flag("fullScreenMode"));
 }
 
 // Full screen with the to-do stamp armed: Esc puts the stamp away first
-TEST_F(EscapeKeysTest, fullScreenWithTheToDoStamp) {
+TEST_P(EscapeOrBackTest, fullScreenWithTheToDoStamp) {
     ASSERT_NO_FATAL_FAILURE(fullScreen());
     controller->startTodoStamp();
     ASSERT_TRUE(controller->todoStampArmed());
-    key(Qt::Key_Escape);
+    press();
     EXPECT_FALSE(controller->todoStampArmed()) << "the stamp first";
     EXPECT_TRUE(flag("fullScreenMode"));
-    key(Qt::Key_Escape);
+    press();
     EXPECT_FALSE(flag("fullScreenMode"));
 }
 
 // Full screen during the replay (its button is on the default top bar, which full screen's ⋯ lists): Esc ends the
 // replay first
-TEST_F(EscapeKeysTest, fullScreenDuringTheReplay) {
+TEST_P(EscapeOrBackTest, fullScreenDuringTheReplay) {
     ASSERT_NO_FATAL_FAILURE(fullScreen());
     QMetaObject::invokeMethod(timeline(), "start");
     ASSERT_TRUE(replaying());
-    key(Qt::Key_Escape);
+    press();
     EXPECT_FALSE(replaying()) << "the replay first";
     EXPECT_TRUE(flag("fullScreenMode"));
-    key(Qt::Key_Escape);
+    press();
     EXPECT_FALSE(flag("fullScreenMode"));
 }
 
 // Presenting with a selected note, an armed snip or the stamp: Esc puts that away first, presenting goes on; the next
 // Esc ends presenting
-TEST_F(EscapeKeysTest, presentingWithASelectionASnipOrTheStamp) {
+TEST_P(EscapeOrBackTest, presentingWithASelectionASnipOrTheStamp) {
     QMetaObject::invokeMethod(window, "startPresenting", Q_ARG(QVariant, false));
     ASSERT_TRUE(until([&] { return controller->presenting(); }));
     ASSERT_TRUE(controller->insertStickyNote());
     ASSERT_TRUE(until([&] { return controller->noteSelected(); }));
-    key(Qt::Key_Escape);
+    press();
     EXPECT_FALSE(controller->noteSelected()) << "the note first";
     EXPECT_TRUE(controller->presenting());
 
     controller->startSnip("lasso");
     ASSERT_EQ(controller->snipShape(), "lasso");
-    key(Qt::Key_Escape);
+    press();
     EXPECT_EQ(controller->snipShape(), "") << "the snip first";
     EXPECT_TRUE(controller->presenting());
 
     controller->startTodoStamp();
     ASSERT_TRUE(controller->todoStampArmed());
-    key(Qt::Key_Escape);
+    press();
     EXPECT_FALSE(controller->todoStampArmed()) << "the stamp first";
     EXPECT_TRUE(controller->presenting());
 
-    key(Qt::Key_Escape);
+    press();
     EXPECT_FALSE(controller->presenting()) << "then presenting ends";
 }
 
 // Zen in full screen: Esc leaves Zen, the next one full screen (the order: Zen before full screen)
-TEST_F(EscapeKeysTest, zenThenFullScreen) {
+TEST_P(EscapeOrBackTest, zenThenFullScreen) {
     ASSERT_NO_FATAL_FAILURE(fullScreen());
     QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, true));
     ASSERT_TRUE(until([&] { return flag("zen"); }));
-    key(Qt::Key_Escape);
+    press();
     EXPECT_FALSE(flag("zen"));
     EXPECT_TRUE(flag("fullScreenMode"));
-    key(Qt::Key_Escape);
+    press();
     EXPECT_FALSE(flag("fullScreenMode"));
 }
+
+INSTANTIATE_TEST_SUITE_P(Keys, EscapeOrBackTest, ::testing::Values(int(Qt::Key_Escape), int(Qt::Key_Back)),
+                         [](const ::testing::TestParamInfo<int>& info) {
+                             return info.param == Qt::Key_Back ? std::string("Back") : std::string("Escape");
+                         });
 
 // Recording has a key of the shortcuts (Ctrl+Shift+R): listed, and it can be changed
 TEST_F(EscapeKeysTest, recordingIsAShortcutThatCanBeChanged) {

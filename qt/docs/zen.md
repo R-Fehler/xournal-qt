@@ -72,19 +72,19 @@ to-do stamp or the replay, and presenting likewise, once ignored Esc altogether.
    window's shortcuts; Back also waits while a sheet, a dialog, the tool editor, the stickers or the emoji count
    themselves open, `win.takeBack`), and an item that claims it while it has the focus (the page jump, the page grid,
    a search field, a text being typed).
-1. The page sidebar's drawer closes (Esc, Back).
-2. The curtain's handles hide (Esc).
-3. The selection: selected elements, a sticky note or PDF text are unselected (Esc).
-4. An armed snip is put away (Esc).
-5. The armed to-do stamp is put away (Esc).
-6. The replay ends (Esc).
-7. Presenting ends; full screen stays (Esc).
-8. Zen: Esc closes the pill first, then leaves Zen; Back leaves Zen with the pill. Read ends with it (read only, and
-   the full screen it entered). Presenting without controls is Zen: Back brings the controls back (Esc, Back).
-9. Full screen ends (Esc).
+1. The page sidebar's drawer closes.
+2. The curtain's handles hide.
+3. The selection: selected elements, a sticky note or PDF text are unselected.
+4. An armed snip is put away.
+5. The armed to-do stamp is put away.
+6. The replay ends.
+7. Presenting ends; full screen stays.
+8. Zen: the pill closes first, then Zen ends. Read ends with it (read only, and the full screen it entered).
+9. Full screen ends.
 
-Back does only steps 0, 1 and 8: elsewhere it is the system's (on Android the app goes to the background).
-Tests: `EscapeKeysTest` (full screen and presenting with each of them, Zen in full screen).
+Esc and Android's back key (and gesture) take the same steps (the author: "I want a consistent android back
+behavior"). When no step is left, Back is the system's: on Android the app goes to the background.
+Tests: `EscapeOrBackTest` (each order with Esc and with Back), `ToolboxTest.backLeavesZen`.
 
 ## Gone
 

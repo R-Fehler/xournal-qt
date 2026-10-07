@@ -12,17 +12,18 @@ Item {
     //   0. what is in front takes the key itself: a popup (Qt gives a modal popup, or one that closes on Esc, the key
     //      before the window's shortcuts; Back also waits while backTakers counts an open one), and an item that
     //      claims it while it has the focus (the page jump, the page grid, a search field, a text being typed)
-    //   1. drawer       the page sidebar's drawer closes                                    Esc, Back
-    //   2. curtain      the curtain's handles hide                                          Esc
-    //   3. selection    the selected elements, sticky note or PDF text are unselected       Esc
-    //   4. snip         an armed snip is put away                                           Esc
-    //   5. stamp        the armed to-do stamp is put away                                   Esc
-    //   6. replay       the replay ends                                                     Esc
-    //   7. presenting   presenting ends (full screen stays: the next Esc leaves it)         Esc
-    //   8. zen          Esc: the Zen pill closes, else Zen ends; Back: Zen ends. Read ends    Esc, Back
-    //                   with it (read only, and the full screen it entered). Presenting
-    //                   without controls is Zen: Back brings the controls back.
-    //   9. fullScreen   full screen ends                                                    Esc
+    //   1. drawer       the page sidebar's drawer closes
+    //   2. curtain      the curtain's handles hide
+    //   3. selection    the selected elements, sticky note or PDF text are unselected
+    //   4. snip         an armed snip is put away
+    //   5. stamp        the armed to-do stamp is put away
+    //   6. replay       the replay ends
+    //   7. presenting   presenting ends (full screen stays: the next press leaves it)
+    //   8. zen          the Zen pill closes, else Zen ends; Read ends with it (read only, and the full screen it
+    //                   entered). Presenting without controls is Zen: the controls come back.
+    //   9. fullScreen   full screen ends
+    // Esc and Android's back key (and gesture) take the same steps (the author, 2026-10-07: "I want a consistent
+    // android back behavior"); when none is left, Back is the system's: the app goes to the background.
     /// Popups open that close on Android's back key (sheets, dialogs, the editor, the pickers count themselves through
     /// win.takeBack): Back waits for them (a second enabled Back shortcut would make the key ambiguous)
     property int backTakers: 0
@@ -34,7 +35,6 @@ Item {
     function stepFor(back) {
         if (back && backTakers > 0) return ""
         if (win.layout.sidebarDrawerOpen && sidebar.visible) return "drawer"
-        if (back) return win.modes.zenShown ? "zen" : ""
         if (docKeys && app.curtainHandles) return "curtain"
         if (docKeys && (app.hasSelection || app.noteSelected || app.pdfTextIsSelected)) return "selection"
         if (app.snip !== "") return "snip"
@@ -58,7 +58,7 @@ Item {
         case "replay": app.timeline.stop(); break
         case "presenting": app.presenting = false; break
         case "zen":
-            if (zenPill.visible && !back) {
+            if (zenPill.visible) {
                 zenPill.opened = false
                 break
             }

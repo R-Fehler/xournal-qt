@@ -1642,7 +1642,8 @@ TEST_F(ToolboxTest, zenIsOnTheTopBarAtEverySize) {
     }
 }
 
-// Android's back key (and gesture) leaves Zen first; Read ends with it; presenting without controls gets its controls
+// Android's back key (and gesture) takes the same steps as Esc (EscapeKeysTest): it leaves Zen; Read ends with it;
+// presenting without controls ends
 TEST_F(ToolboxTest, backLeavesZen) {
     QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, true));
     until([&] { return win("zen").toBool(); });
@@ -1650,15 +1651,18 @@ TEST_F(ToolboxTest, backLeavesZen) {
     until([&] { return !win("zen").toBool(); });
     EXPECT_FALSE(win("zen").toBool()) << "Back leaves Zen";
     EXPECT_TRUE(shown(find("topBar")));
-    // Zen with its pill open: Back leaves Zen (not only the pill)
+    // Zen with its pill open: Back closes the pill first, as Esc does; the next Back leaves Zen
     QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, true));
     until([&] { return shown(find("zenDot")); });
     click(find("zenDot"));
     until([&] { return shown(find("zenPill")); });
     QTest::keyClick(window, Qt::Key_Back);
+    until([&] { return !shown(find("zenPill")); });
+    EXPECT_FALSE(shown(find("zenPill")));
+    EXPECT_TRUE(win("zen").toBool()) << "the pill first";
+    QTest::keyClick(window, Qt::Key_Back);
     until([&] { return !win("zen").toBool(); });
     EXPECT_FALSE(win("zen").toBool());
-    EXPECT_FALSE(shown(find("zenPill")));
     // A sheet open over the page in Zen takes Back first (it is in front); the next Back leaves Zen
     QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, true));
     until([&] { return win("zen").toBool(); });
@@ -1680,17 +1684,18 @@ TEST_F(ToolboxTest, backLeavesZen) {
     until([&] { return !win("readOnlyOn").toBool(); });
     EXPECT_FALSE(win("zen").toBool());
     EXPECT_FALSE(win("fullScreenMode").toBool());
-    // Presenting without controls: Back shows them (presenting goes on)
+    // Presenting without controls: Back ends presenting, as Esc does (the order: presenting before Zen); the next
+    // Back leaves full screen
     window->showNormal();
     QMetaObject::invokeMethod(window, "startPresenting", Q_ARG(QVariant, true));
     until([&] { return controller->presenting() && win("zen").toBool(); });
     QTest::keyClick(window, Qt::Key_Back);
-    until([&] { return !win("zen").toBool(); });
-    EXPECT_TRUE(controller->presenting());
-    until([&] { return shown(find("toolbox")); });
-    EXPECT_TRUE(shown(find("toolbox"))) << "the controls";
-    controller->setPresenting(false);
-    window->setProperty("fullScreenMode", false);
+    until([&] { return !controller->presenting(); });
+    EXPECT_FALSE(controller->presenting());
+    EXPECT_FALSE(win("zen").toBool());
+    QTest::keyClick(window, Qt::Key_Back);
+    until([&] { return !win("fullScreenMode").toBool(); });
+    EXPECT_FALSE(win("fullScreenMode").toBool());
 }
 
 // Full screen hides the top bar: the floating rail's ⋯ lists what it holds (in its order, a group's members one by
