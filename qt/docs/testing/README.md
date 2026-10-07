@@ -123,4 +123,45 @@ cmake --build /home/user/build-qt68 -j3 --target xqt-ui-tests && ctest --test-di
 | `XQT_PERF=1` | the running app writes a line a second about the canvas work ([performance-logging.md](../development/performance-logging.md)) |
 | `XQT_KEEP`, `XQT_KEEP_PDF=<file>` | keep the PDFs some Markdown tests write, to look at them |
 
-`qt/tools/tsan.supp` holds the suppressions for a ThreadSanitizer build (no CI job uses it yet).
+## ThreadSanitizer
+
+The pages are drawn on several threads at once (AGENTS.md, "What the moving parts assume"), so a change to the render
+path, the PDF caches or the workers is worth a run under ThreadSanitizer. No CI job runs it. The build takes about 20
+minutes on 16 cores, the canvas and shell labels under a minute when there is nothing to report (each report makes it
+much slower). A separate build folder, with the same environment:
+
+```sh
+T=-fsanitize=thread
+cmake -S qt -B build-tsan $XQT_CMAKE_ARGS -DCMAKE_CXX_FLAGS=$T -DCMAKE_C_FLAGS=$T \
+      -DCMAKE_EXE_LINKER_FLAGS=$T -DCMAKE_SHARED_LINKER_FLAGS=$T
+cmake --build build-tsan -j16 --target xqt-canvas-tests xqt-shell-tests xournal-qt-cli  # (the CLI: the Cli tests)
+mkdir -p build-tsan/reports
+TSAN_OPTIONS="suppressions=$PWD/qt/tests/tsan.supp detect_deadlocks=0 log_path=$PWD/build-tsan/reports/tsan" \
+      ctest --test-dir build-tsan -j16 -L '^(canvas|shell)$' --timeout 900
+```
+
+- `XQT_FAST_DEV=ON` works with it (`-g1` keeps the line numbers, lld links it). The conda-forge gcc (15) ships
+  `libtsan`; an older one (gcc 11) needs `setarch $(uname -m) -R` in front of each binary on Linux 6.x and reports false
+  races on `pthread_cond_clockwait`.
+- `detect_deadlocks=0`: TSan's lock-order checker stops with an internal CHECK (more than 64 recursive locks held by
+  one thread, inside the uninstrumented libraries) and the test hangs, e.g. TextDocumentTest about 1 in 3 runs.
+- A report makes the test fail (exit code 66): `ctest` lists the tests with reports, `log_path` keeps one file per
+  process. Without `log_path` the report goes to the test's output (`--output-on-failure`, or run the binary with
+  `--gtest_filter`).
+- [`qt/tests/tsan.supp`](../../tests/tsan.supp) suppresses what TSan cannot judge, each with its reason: Qt, cairo,
+  poppler, glib and Pango are prebuilt without TSan, so their own synchronisation is invisible. Among them every
+  hand-off through a `QThreadPool` and every call queued to another thread: **pool jobs are not checked against the
+  thread that started them** (that needs a Qt built with `-sanitize thread`). The render threads (`RenderService`,
+  `std::thread` and `std::mutex`) are checked fully.
+- Some shell tests fail under TSan for reasons of their own, with no report:
+  `RecoveryTest.fatalSignalSavesModifiedDocuments` always (a death test: TSan's signal handling in the forked child);
+  at times the time limit of `PastedPdfPages.aPastedPageIsDrawnOnTheCanvasAtOnce` and the render count of
+  `Thumbnails.keptWithinTheMemoryLimit` (TSan makes the code 5 to 15 times slower); and
+  `PageFilesTest.aProtectedDocumentIsExtractedProtectedAndNeverAsXopp` as in a normal build (TODO.md, "Flaky tests").
+- A race in `qt/` code is fixed with the run that showed it (or a test that shows it), not suppressed. What is too big
+  to fix at once goes to [TODO.md](../../../TODO.md).
+
+Last run (2026-10-08, the canvas and shell labels): clean with the suppressions, after the fixes of `qt/canvas-rest`
+(a closed document window outliving the services, the laser pointer's view read after it went, the page size read
+without the lock in a render, page links rewritten and a text marked as edited under the shared lock, and the file
+name that qpdf's writer keeps).

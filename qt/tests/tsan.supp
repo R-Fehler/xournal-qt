@@ -1,0 +1,71 @@
+# ThreadSanitizer suppressions for xournal-qt test runs (how to run them: qt/docs/testing/README.md, "ThreadSanitizer").
+#
+# Only libraries that are not built with -fsanitize=thread and code that is outside the fork's reach go here, each with
+# its reason. A race in qt/ code is fixed, not suppressed; one too big to fix now is listed in TODO.md.
+#
+# TSan sees what instrumented code does and what goes through the interceptors (pthread, malloc, memcpy, ...). The
+# libraries below come prebuilt (conda-forge, the system): what they synchronise with atomics or locks of their own is
+# invisible, so it shows up as races, and so does every hand-off through them.
+
+# --- Qt (prebuilt, not instrumented) ---------------------------------------------------------------------------------
+# A job handed to a QThreadPool (ImageWorkers, BackgroundJobs, the library index, the save and merge workers, the PDF
+# cache eviction) is queued under Qt's own mutex (futex based, invisible): TSan sees no order between the thread that
+# started the job and the job. Every pool job's first touch of what it was given is reported. With this, pool jobs are
+# not checked against the threads that start them; that needs a Qt built with -sanitize thread.
+race:QThreadPoolThread::run
+race:QThreadPoolPrivate::enqueueTask
+race:QRunnable::QGenericRunnable
+# The same for calls queued to another thread (QMetaObject::invokeMethod with Qt::QueuedConnection, queued signals,
+# upstream's Util::execInUiThread through AppContext::installQtUiThreadDispatcher): posted under Qt's event queue lock.
+race:QCoreApplicationPrivate::sendPostedEvents
+race:QMetaCallEvent
+race:QMetaObject::invokeMethodImpl
+race:installQtUiThreadDispatcher
+# A QThread's start hands its object to the new thread (Qt's own thread data, its start mutex).
+race:QThread::start
+# Implicitly shared Qt data (QString, QByteArray, QList, QImage) handed between threads: its reference count and
+# its memory are managed inside Qt (QArrayData::allocate/reallocate, QWaitCondition of a pool that goes).
+race:QArrayData::allocate
+race:QArrayData::reallocateUnaligned
+race:QWaitCondition::~QWaitCondition
+# QImage's conversions and smooth scaling split the work onto Qt's internal pool (qt_qimageScale*, convert_generic).
+race:convert_generic
+race:multithread_pixels_function
+race:handleSpans
+
+# --- C libraries (prebuilt, not instrumented) ------------------------------------------------------------------------
+# Cairo's pattern and clip freelists and its FreeType font map use cairo's own atomics; the pages are drawn on several
+# render threads at once, each with cairo objects of its own (same pattern as upstream Xournal++).
+race:libcairo.so.2
+# glibc's time zone state (localtime_r, mktime, also through Qt's qMkTime) is guarded by a lock internal to glibc.
+race:tzset_internal
+# Poppler draws one page of an instance at a time under its own mutex and shares its global caches the same way.
+race:libpoppler.so
+race:libpoppler-glib.so
+# Text layout on several render threads: fontconfig, Pango and HarfBuzz synchronise internally.
+called_from_lib:libfontconfig.so.1
+called_from_lib:libpangoft2-1.0.so.0
+called_from_lib:libpango-1.0.so.0
+called_from_lib:libharfbuzz.so.0
+race:libglib-2.0.so.0
+race:libfontconfig.so.1
+race:libpangoft2-1.0.so.0
+# Lock bookkeeping inside the same uninstrumented libraries (GRWLock / GType class locks used by pango).
+mutex:libglib-2.0.so.0
+mutex:libgobject-2.0.so.0
+deadlock:libglib-2.0.so.0
+deadlock:libgobject-2.0.so.0
+
+# --- Upstream Xournal++ code (outside qt/, not changed by the fork) -------------------------------------------------
+# An element computes its size the first time it is asked (Element::getBoundingBox -> calcSize, a `mutable` cache).
+# The render threads ask under the shared document lock, so two of them, or a render and the UI thread copying the
+# page for a save (Text::clone), may compute it at once. They write the same values; the fork's seam in
+# Element::getBoundingBox sets the flag only after the size, so no thread uses half a size. A data race all the same:
+# TODO.md ("Canvas: ... the lazy element size").
+race:Element::getBoundingBox
+race:calcSize
+# Upstream's QPdfExport::overlayAndSave gives QPDFWriter a temporary file name (u8string().data()); qpdf keeps the
+# pointer and reads it when it makes the file's /ID: a read after free inside qpdf (the fork's own writers keep the
+# name alive). Reported for upstream in TODO.md.
+race:QPdfExport::overlayAndSave
+race:HybridPdfExport::createPdf

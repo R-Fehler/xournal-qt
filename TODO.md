@@ -37,8 +37,21 @@ All four waves are merged (2026-10-07). The architecture overview:
   and the plain autosave on the UI thread (risk 7); the static `DocumentHandler` copies; the "try incremental, else
   full" block in both `write()` and `writeKeeping()` (with block 7); `PdfBookmarks::write` and `markHistoryIn` on the
   `ObjectSink`; `HybridPdfTest.cpp` split (block 9); `HybridSaveHandler` in ADR 0002 (block 10).
-- [ ] Canvas: `renderZoom`/`renderDpr` read as one (infra §6.4); the quick tests' input on the canvas clock
-  (`CanvasItemInputTest`); a ThreadSanitizer run of the canvas and shell labels.
+- [x] Canvas: `renderZoom`/`renderDpr` read as one (infra §6.4); the quick tests' input on the canvas clock
+  (`CanvasItemInputTest`); a ThreadSanitizer run of the canvas and shell labels (`qt/canvas-rest`; how to run it:
+  testing/README.md, "ThreadSanitizer"). Left: the three items below.
+- [ ] Canvas: upstream's elements compute their size lazily (`Element::getBoundingBox` → `calcSize`, `mutable`) also
+  under the shared document lock: two render threads, or a render and the UI thread copying a page for a save
+  (`Text::clone`), compute it at once. Same values and the flag set last (the fork's seam), but a data race
+  (suppressed in `qt/tests/tsan.supp`). Fix: compute the size before an element is shared, or a seam that makes the
+  cache safe.
+- [ ] Tests: ThreadSanitizer does not check `QThreadPool` jobs against the thread that started them, nor calls queued
+  to another thread (Qt is prebuilt without TSan, its hand-off invisible; suppressed). A Qt built with
+  `-sanitize thread`, or `__tsan_release`/`__tsan_acquire` at the hand-off of `ImageWorkers`/`BackgroundJobs`/the
+  session's worker, would check them. Optionally a CI job (about 15 min for canvas and shell on 16 cores).
+- [ ] Upstream: `QPdfExport::overlayAndSave` gives `QPDFWriter` a temporary file name (`u8string().data()`); qpdf keeps
+  the pointer and reads it for the `/ID` (valgrind: a read after free). Offer the fix upstream (the fork's own writers
+  were fixed in `qt/canvas-rest`).
 - [ ] Tests: the `qpdfCheck` (10), `makePdf`/`drawStroke`/`addStroke` variants and the quick tests' `wait` copies into
   `qt/tests/support`; the fixed "settle" waits without an observable state (`XQT_WAIT_LOG` ranks them:
   AdaptiveLayoutTest's `resize` 150 ms and `click` 50 ms, the SetUp waits of MainWindowTest and ToolboxTest); a
@@ -90,7 +103,8 @@ All four waves are merged (2026-10-07). The architecture overview:
 - [ ] `PageFilesTest.aProtectedDocumentIsExtractedProtectedAndNeverAsXopp` fails about 1 in 3 runs alone (6 of 20 on
   the base of `qt/compat-dead`, 2026-10-07): extracting pages of the protected `locked.pdf` reads it with the wrong key
   at times (qpdf: "/Perms field in encryption dictionary doesn't match expected value"). A race on the file's password
-  (PdfEncryption) or on the clean copy; find it.
+  (PdfEncryption) or on the clean copy; find it. Not the dangling file name of `QPDFWriter` (fixed in
+  `qt/canvas-rest`): it still fails after that, and the TSan run shows no race in it.
 
 Rerun a failure alone before calling it a flake; harden a test by waiting for the state, not for time.
 
