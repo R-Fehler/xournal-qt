@@ -749,6 +749,9 @@ void DocumentSession::takeSnapshot() {
                     }
                     return;
                 }
+                // One writer of the file at a time: a background writer of the app (a link rewrite, a to-do ticked
+                // in the library) that holds it finishes first (a PDF with notes: HybridPdf::write takes it)
+                const fileio::FileWriteLock lock(t.target);
                 if (!t.attachedPdf.empty()) {
                     writeAttachedPdf(t.attachedPdfFrom, t.attachedPdf);
                 }
@@ -797,6 +800,7 @@ void DocumentSession::beginTextSave() {
     t.textBytes = text->encode(t.text);
     onWorker(
             [&t] {
+                const fileio::FileWriteLock lock(t.target);  // (one writer of the file at a time)
                 std::string error;
                 if (!TextFile::writeAtomically(t.target, t.textBytes, error)) {
                     t.result = {false, FS(_F("Could not write \"{1}\": {2}") % t.target.u8string() % error), {}};

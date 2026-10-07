@@ -5,7 +5,9 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <chrono>
 #include <fstream>
+#include <future>
 #include <memory>
 
 #include <QTemporaryDir>
@@ -18,6 +20,7 @@
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "session/FileIo.h"
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentLinks.h"
 #include "shell/LibraryIndex.h"
@@ -141,6 +144,34 @@ TEST(LinkRewrite, filesAreWrittenAgainByteForByteAndNotesThroughTheirBoxes) {
     EXPECT_EQ(LinkRewrite::rewriteFile(root / "N" / "sketch.xopp", changes, error), 1) << error;
     EXPECT_EQ(textsOf(root / "N" / "sketch.xopp"), "[\xF0\x9F\x94\x97 k, page 2](../L/K2.xopp#page=2)");
     EXPECT_EQ(LinkRewrite::rewriteFile(root / "N" / "a.md", changes, error), 0) << "nothing left to change";
+}
+
+// The links of a closed file are written again on a worker: while another writer of the app holds the file (the save of
+// a tab that opened it meanwhile: fileio::FileWriteLock), the rewrite waits, then reads the file as that one left it
+TEST(LinkRewrite, aFileIsRewrittenOneWriterAtATime) {
+    QTemporaryDir tmp;
+    const fs::path root(tmp.path().toStdString());
+    writeFile(root / "N" / "a.md", "See [k](../L/k.xopp#page=2).\n");
+    makeNotes(root / "N" / "sketch.xopp", "[k](../L/k.xopp#page=2)");
+    const std::vector<LinkRewrite::Change> changes{{"../L/k.xopp#page=2", "../L/K2.xopp#page=2", false}};
+    for (const fs::path& file: {root / "N" / "a.md", root / "N" / "sketch.xopp"}) {
+        std::future<int> rewritten;
+        std::string error;
+        {
+            const fileio::FileWriteLock lock(file);
+            rewritten = std::async(std::launch::async, [&] { return LinkRewrite::rewriteFile(file, changes, error); });
+            EXPECT_EQ(rewritten.wait_for(std::chrono::milliseconds(300)), std::future_status::timeout)
+                    << file.filename() << " was written while another writer held it";
+            if (file.extension() == ".md") {
+                writeFile(file, "See [k](../L/k.xopp#page=2).\nAnd more.\n");  // (what the other writer wrote)
+            } else {
+                makeNotes(file, "[k](../L/k.xopp#page=2) and more");
+            }
+        }
+        EXPECT_EQ(rewritten.get(), 1) << error;
+    }
+    EXPECT_EQ(readFile(root / "N" / "a.md"), "See [k](../L/K2.xopp#page=2).\nAnd more.\n");
+    EXPECT_EQ(textsOf(root / "N" / "sketch.xopp"), "[k](../L/K2.xopp#page=2) and more");
 }
 
 TEST(LinkRewrite, theIndexKnowsTheLinksOfNotesAndMarkdownFilesAndTheBacklinks) {

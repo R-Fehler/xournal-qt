@@ -264,6 +264,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/ByteDeltaTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/FileIoTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TagsWriteTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/WriteGuardTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/LockRulesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/VersionDiffTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BackgroundSaveTest.cpp

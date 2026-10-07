@@ -8,6 +8,7 @@
 #include "model/Layer.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
+#include "session/FileIo.h"
 #include "session/TextFile.h"
 
 #include "DocumentFiles.h"
@@ -115,6 +116,7 @@ QString whyNotWritable(const fs::path& file, PdfKind kind) {
 bool setInMarkdownFile(const fs::path& file, const QString& text, int occurrence, bool done, bool& found,
                        std::string& error) {
     found = false;
+    const fileio::FileWriteLock lock(file);  // (a save of the open file waits, and the reverse)
     TextFile t;
     if (!t.load(file, TextFile::Kind::Markdown, error)) {
         return false;
