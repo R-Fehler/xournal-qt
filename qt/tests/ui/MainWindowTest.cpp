@@ -1227,7 +1227,7 @@ TEST_F(MainWindowTest, holdingAPageInTheSidebarSelectsIt) {
     EXPECT_TRUE(menu->property("visible").toBool());
     EXPECT_EQ(menu->property("what").toString(), "2 pages");
     QMetaObject::invokeMethod(menu, "close");
-    wait(100);
+    ASSERT_TRUE(waitOpened(menu, false));
 
     // Done: the selection goes, a tap goes to a page again
     auto* done = find<QQuickItem>("sidebarSelectionDone");
@@ -3228,7 +3228,8 @@ TEST_F(MainWindowTest, aTabGetsAWindowOfItsOwn) {
     wait(50);
     EXPECT_EQ(controller->tabManager().count(), 2) << "the document is back in the main window";
     EXPECT_EQ(closing.count(), 1);
-    wait(100);  // the window without documents closes itself, with its controller
+    // the window without documents closes itself, with its controller
+    until([&] { return controller->documentWindows().empty() && made[0].isNull(); });
     EXPECT_TRUE(controller->documentWindows().empty());
     EXPECT_TRUE(made[0].isNull()) << "the window is gone";
     AppController::setWindowFactory({});

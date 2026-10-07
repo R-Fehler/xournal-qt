@@ -282,7 +282,7 @@ TEST_F(CopyToolsTest, withoutTheHandwritingSearchTheWindowPointsToSettings) {
     EXPECT_TRUE(settings->property("opened").toBool());
     EXPECT_EQ(find<QObject>("settingsSections")->property("currentIndex").toInt(), 5) << "Search";
     QMetaObject::invokeMethod(settings, "close");
-    wait(300);
+    ASSERT_TRUE(waitOpened(settings, false));
 
     // On, but no model: the sweep says so
     fake->setReady(false, "no model");

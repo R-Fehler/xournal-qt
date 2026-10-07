@@ -419,7 +419,8 @@ if(XQT_BUILD_TESTS)
     target_link_libraries(xqt-ui-tests PRIVATE xqt-quick xqt-shell xqt-test-support xqt-uiplugin Qt6::QuickControls2
         Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-ui-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}"
-        XQT_QML_SOURCE_DIR="${CMAKE_CURRENT_LIST_DIR}/../src/app/qml")
+        XQT_QML_SOURCE_DIR="${CMAKE_CURRENT_LIST_DIR}/../src/app/qml"
+        XQT_UI_TEST_QML_CACHE="${CMAKE_BINARY_DIR}/ui-tests-qmlcache")
     target_include_directories(xqt-ui-tests PRIVATE "${TEST_CONFIG_DIR}")
     gtest_discover_tests(xqt-ui-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS ui
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

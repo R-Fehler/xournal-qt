@@ -2297,7 +2297,7 @@ TEST_F(AdaptiveLayoutTest, formatBarFoldsIntoInsertInsteadOfScrolling) {
     checkMenuGeometry("800x600", menu, insert, true);
     EXPECT_NE(menuEntries(menu).size(), 0u);
     QMetaObject::invokeMethod(menu, "close");
-    wait(100);
+    ASSERT_TRUE(waitOpened(menu, false));
     // The heading buttons are 40 wide in the touch profile
     QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "touchProfile"), Q_ARG(QVariant, "on"));
     resize(1920, 1080);

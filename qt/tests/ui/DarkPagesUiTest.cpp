@@ -149,7 +149,7 @@ TEST_F(DarkPagesUiTest, printingDarkPaperSaysItTakesALotOfInk) {
     ASSERT_NE(warning, nullptr);
     EXPECT_FALSE(warning->isVisible()) << "white paper";
     QMetaObject::invokeMethod(print, "close");
-    wait(300);
+    ASSERT_TRUE(waitOpened(print, false));
 
     const int plain = static_cast<int>(
             controller->settingsModel()->property("pageBackgroundFormats").toStringList().indexOf("plain"));
@@ -157,5 +157,5 @@ TEST_F(DarkPagesUiTest, printingDarkPaperSaysItTakesALotOfInk) {
     openDialog(print);
     EXPECT_TRUE(warning->isVisible()) << "black paper";
     QMetaObject::invokeMethod(print, "close");
-    wait(300);
+    ASSERT_TRUE(waitOpened(print, false));
 }

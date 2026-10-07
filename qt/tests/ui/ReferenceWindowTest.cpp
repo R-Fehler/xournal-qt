@@ -470,25 +470,25 @@ TEST_F(ReferenceWindowTest, theMenusOpenAReference) {
     ASSERT_NE(entry, nullptr) << "no entry for the other tab";
     click(entry);
     EXPECT_EQ(ref().tab(), 1);
-    wait(300);  // (the menu closes)
+    until([&] { return findItem("openAsReferenceTabItem", true) == nullptr; });  // (the menu closes)
     entry = menuEntry(1);
     ASSERT_NE(entry, nullptr);
     click(entry);  // "Close the reference" now
     EXPECT_FALSE(ref().active());
-    wait(300);
+    until([&] { return findItem("openAsReferenceTabItem", true) == nullptr; });  // (the menu closes)
     // The current tab: its own document beside it (qt/self-reference)
     entry = menuEntry(0);
     ASSERT_NE(entry, nullptr);
     EXPECT_EQ(entry->property("text").toString(), "Show this document beside");
     click(entry);
     EXPECT_TRUE(ref().isSelf());
-    wait(300);
+    until([&] { return findItem("openAsReferenceTabItem", true) == nullptr; });  // (the menu closes)
     entry = menuEntry(0);
     ASSERT_NE(entry, nullptr);
     EXPECT_EQ(entry->property("text").toString(), "Close the view beside");
     click(entry);
     EXPECT_FALSE(ref().active());
-    wait(300);
+    until([&] { return findItem("openAsReferenceTabItem", true) == nullptr; });  // (the menu closes)
 
     // The tab overview: the button on the card of another document
     auto* overview = window->findChild<QObject*>("tabOverview");
