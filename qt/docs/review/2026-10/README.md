@@ -54,10 +54,10 @@ block: full suite before merging, Qt ≤ 6.7 API, UI tests also on the Qt 6.8 bu
 - `qt/compat-dead`: remove every compatibility path and the dead code listed in the five reviews (shell blocks 1, 2,
   11; session block 2; app-cpp block B; qml block B1; infra blocks B6, B7), the deprecated text mode, the screenshot
   hooks; the tests that only pin removed behaviour go with them.
-- `qt/docs-structure`: `qt/docs/README.md` as the entry point; history (ROADMAP's changelog, done TODO items, the
-  device checklist's done parts) moved under `qt/docs/history/`; feature docs under `features/`, decisions under
-  `decisions/`, development (build, tests, CI, agents) under `development/`; a README per `qt/src/<module>/`;
-  AGENTS.md and TODO.md current (infra B14, B15). No code.
+- `qt/docs-structure` (narrowed: the structure docs come after the refactoring, which changes what they describe):
+  delete obscure history (ROADMAP's changelog, done TODO items, measurement logs, superseded notes, done checklist
+  items) and keep one short `qt/docs/history/README.md` of the big decisions; AGENTS.md and TODO.md current. No doc
+  moves and no code edits; the intended docs structure goes to `docs-plan.md` for wave 4.
 
 **Wave 2**
 - `qt/qml-split`: the mechanical split of `Main.qml` by qml.md §1.2 (qml B2; one agent alone in `Main.qml`).
@@ -77,7 +77,8 @@ block: full suite before merging, Qt ≤ 6.7 API, UI tests also on the Qt 6.8 bu
   bug 1 (app-cpp C, D).
 
 **Wave 4**
-- `qt/architecture`: the architecture overview for humans: `ARCHITECTURE.md` (GitHub renders it: an SVG diagram and
+- `qt/architecture`: the docs structure of `docs-plan.md` (entry page, features/, decisions/, development/, a README
+  per module) and the architecture overview for humans: `ARCHITECTURE.md` (GitHub renders it: an SVG diagram and
   tables linking to the source on GitHub) generated from a machine-readable `qt/docs/architecture/architecture.yaml`,
   and the same as an interactive HTML page published to GitHub Pages by a workflow.
 
