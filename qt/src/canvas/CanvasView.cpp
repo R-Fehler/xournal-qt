@@ -295,8 +295,8 @@ void CanvasView::applyZoom100() {
 }
 
 void CanvasView::updateRenderParams() {
-    renderZoom = viewController.zoom();
-    renderDpr = dpr;
+    std::lock_guard lock(renderParamsMutex);
+    renderParams = RasterParams{viewController.zoom(), dpr};
 }
 
 CanvasPage* CanvasView::canvasPageOf(const XojPage* page) const {
@@ -3006,7 +3006,10 @@ void CanvasView::replacePdfCache(bool rerender) {
 
 Document* CanvasView::rasterDocument() const { return session.getDocument(); }
 
-RasterParams CanvasView::rasterParams() const { return RasterParams{renderZoom.load(), renderDpr.load()}; }
+RasterParams CanvasView::rasterParams() const {
+    std::lock_guard lock(renderParamsMutex);
+    return renderParams;
+}
 
 void CanvasView::rasterUpdated(PageRaster* raster, std::optional<xoj::util::Rectangle<double>> area) {
     for (auto& p: pages) {
