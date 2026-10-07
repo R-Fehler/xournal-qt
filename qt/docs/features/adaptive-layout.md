@@ -1,9 +1,8 @@
 # The layout for the window's size
 
 Every window of xournal-qt adapts to its size: a wide desktop window, a narrow one, a 2-in-1 or Surface held upright,
-a phone (Android now, iOS later). This page describes the foundation that block `qt/adaptive-foundation` built, and
-how the later blocks of the UI audit (2026-09-26, now in git history: [history/README.md](../history/README.md)) plug
-into it. This page has what the code does.
+a phone (Android now, iOS later). This page describes the one place that knows the size, the choices made by hand per
+size class, and what each part of the window does at each size.
 
 ## One place that knows the size: `AdaptiveLayout`
 
@@ -15,7 +14,6 @@ reads the window's size class from there instead of keeping a threshold of its o
 | `sizeClass` | `desktopWide`, `desktopNarrow`, `tabletPortrait`, `phonePortrait`, `phoneShort` or `tiny` (below) |
 | `layoutClass` | the class the layout follows: `sizeClass`, or `desktopWide` when "Adapt the layout" is off |
 | `widthClass` | `compact` (< 600), `medium` (< 840), `expanded` (< 1280), `wide` |
-| `heightClass` | `short` (< 560), `medium` (< 900), `tall` |
 | `orientation` | `portrait` (h > w) or `landscape` |
 | `phone` | one of the phone classes (phone portrait, phone short, tiny) |
 | `phoneLayout` | laid out as a phone: `phone` by the layout class (false while "Adapt the layout" is off); what the QML reads (the app bar, the dock, menus as sheets) |
@@ -23,7 +21,7 @@ reads the window's size class from there instead of keeping a threshold of its o
 | `classWidth`, `classHeight` | the size the class was taken from |
 | `held` | a pointer is held in the window (mouse button, pen, finger), or QML set `hold` |
 | `touchProfile`, `minTarget` | fingers are in use: targets of 48 px, else 40 (below) |
-| `mobilePlatform` | Android or iOS (the platform, not the size): one window, no tab dragged out into a window of its own (qt/phone-chrome; written by the tests only) |
+| `mobilePlatform` | Android or iOS (the platform, not the size): one window, no tab dragged out into a window of its own (written by the tests only) |
 
 ### The size classes
 
@@ -61,8 +59,8 @@ off) overrides it.
 
 `minTarget` is 48 with the touch profile and 40 without. It sizes the page sidebar's switch (Pages, Layers,
 Contents, Annotations), the full-screen tab bar (36 px high, arrows 48 wide), the title row and stacked buttons of
-the dialogs (below), the sidebar's arrow and the target of the tab that puts the tool bar away, and since
-qt/safe-areas-keyboard the rest of the audit's F14: the tab strip's overview, ‹ ›, + and the tabs' × (the strip grows
+the dialogs (below), the sidebar's arrow and the target of the tab that puts the top bar away, the tab strip's
+overview, ‹ ›, + and the tabs' × (the strip grows
 to 54 px with the touch profile), the tab overview's card buttons (×, the star, the reference; the star shows on every
 card with the touch profile: no hover), the layer list's eye, ⋮ and "show all", the annotations' filter and export,
 the fuzzy and names toggles of the library and the overview, and the document search's button.
@@ -74,12 +72,11 @@ is stored per class in the app's settings (the `xournalQt` part of `settings.xml
 
 | `<what>` | Values | Used by |
 | --- | --- | --- |
-| `sidebar` | `shown`, `hidden` (none: automatic) | this block |
-| `chrome` | (the chrome chosen for the class, `compact` or `reader`; not read since 0.8.0: Zen, [zen.md](zen.md)) | – |
-| `zen` | `off` in a tiny window: Zen left there by hand (none: automatic, Zen in a tiny window) | `qt/zen` ([zen.md](zen.md)) |
-| `toolbar` | (the classic tool bar's place; not read since 0.8.0) | – |
-| `sourceSplit` | the page's share of the height above the Markdown source below it, `0.2` to `0.8` (none: 0.5, a phone 0.4) | `qt/adaptive-panels` (below) |
-| `toolbox` | `left`, `right`, `top`, `bottom` (none: automatic, the right; a phone upright: the bottom) | `qt/toolbox` ([toolbox.md](toolbox.md)) |
+| `sidebar` | `shown`, `hidden` (none: automatic) | the page sidebar (below) |
+| `zen` | `off` in a tiny window: Zen left there by hand (none: automatic, Zen in a tiny window) | Zen ([zen.md](zen.md)) |
+| `sourceSplit` | the page's share of the height above the Markdown source below it, `0.2` to `0.8` (none: 0.5, a phone 0.4) | the source panel (below) |
+| `toolbox` | `left`, `right`, `top`, `bottom` (none: automatic, the right; a phone upright: the bottom) | the toolbox ([toolbox.md](toolbox.md)) |
+| `toolboxScroll`, `topBarScroll` | where the rail and the top bar were scrolled to | the toolbox |
 
 `app.settings.layoutChoice(class, what)`, `setLayoutChoice(class, what, value)` ("" or "auto" removes it),
 `hasLayoutChoices()` and `resetLayoutChoices()` (`SettingsModel`). A change counts as a settings revision, so QML
@@ -90,18 +87,16 @@ Turning a Surface to portrait gives the portrait choices, and back to landscape 
 
 **Settings → Display → Window size**: "Adapt the layout to the window size" (`adaptiveLayout`, on by default; off:
 the desktop layout at every size, the choices are those of `desktopWide`), the class the window is in now and its
-size, and "Reset the layout choices". ("Controls at this size", the chrome chosen for a class, went in 0.8.0: Zen is a
-switch of its own, [zen.md](zen.md).)
+size, and "Reset the layout choices".
 
-## The page sidebar (step 1 of the ladder)
+## The page sidebar
 
-`sidebarShown` is a binding again (it was a start value that the first toggle replaced, F5.1):
+`win.layout.sidebarShown` (`ChromeLayout.qml`) is a binding:
 
 - **docked** (beside the page) when this class chose `shown`, or nothing was chosen and `roomForSidebar`: the window
   is at least 1110 px wide (the page keeps ~900 px beside its 210 px), and the class is a desktop one. So a portrait
   tablet and a phone never get it docked automatically: a single A4 page must stay well visible;
-- otherwise hidden. The **arrow** at the left edge of the canvas area (`sidebarArrow`, since qt/adaptive-toolbar: it
-  replaces the tool bar's Pages button) then opens it as a **drawer** over the page, with the rest dimmed. Picking a
+- otherwise hidden. The **arrow** at the left edge of the canvas area (`sidebarArrow`) then opens it as a **drawer** over the page, with the rest dimmed. Picking a
   page (or a chapter, or an annotation) closes it, and so does a tap on the dimmed page. The drawer is for the
   moment: it is not remembered. The button just outside its edge (the sidebar icon) keeps it beside the page in this
   class (`shown`).
@@ -109,12 +104,12 @@ switch of its own, [zen.md](zen.md).)
   for this class where it would be shown automatically. Showing it again where there is room clears the choice.
 - The arrow: a slim tab at 40 % of the canvas's height (clear of the search bar at the top and the pills at the
   bottom), `minTarget` wide in the touch profile (24 px otherwise). Not in the compact chrome or Zen, not while
-  presenting, and not while the tool bar is put away (unless the sidebar is open: then it closes it).
+  presenting, and not while the top bar is put away (unless the sidebar is open: then it closes it).
 
-`win.layout.showSidebar(shown)` and `win.layout.dockSidebar()` are the functions; `sidebarDocked`, `sidebarAsDrawer` and
-`sidebarDrawerOpen` the state.
+`win.layout.showSidebar(shown)` and `win.layout.dockSidebar()` are the functions; `sidebarDocked`, `sidebarDrawerOpen`
+and `sidebarShown` the state.
 
-The drawer (qt/adaptive-panels):
+The drawer:
 - it **slides** in from the left and out again (180 ms, `win.layout.drawerSlide` 0 → 1), the dimmed page fades with it. Only
   a tap slides it (the arrow, the dimmed page, a page, a chapter or an annotation picked, Esc, the back key); a change
   of the size class takes it away at once;
@@ -127,7 +122,7 @@ The drawer (qt/adaptive-panels):
 
 ## The chrome, apart from the window state
 
-Four separate things (audit D5; since qt/zen, 0.8.0, Zen and read only are switches of their own, [zen.md](zen.md)):
+Four separate things (Zen and read only are switches of their own, [zen.md](zen.md)):
 
 | | What | Set by |
 | --- | --- | --- |
@@ -136,25 +131,23 @@ Four separate things (audit D5; since qt/zen, 0.8.0, Zen and read only are switc
 | `app.presenting` | black around the pages, page by page | F5 |
 | `zen` | everything around the page hidden (`hudHidden`; `fullChrome` is false): only the page and the dot in its lower left corner | ⋮ → View → Zen, Ctrl+Alt+Z, Read; automatic in a tiny window; presenting without controls |
 
-- **Full screen** (F11, `fullScreenMode`, as before) is the compact chrome in a full-screen window. Leaving it gives
-  the window back its state and ends presenting, as before.
+- **Full screen** (F11, `fullScreenMode`) is the compact chrome in a full-screen window. Leaving it gives the window
+  back its state and ends presenting.
 - **Zen** hides the HUD (`win.modes.hudHidden`: the top bar, the toolbox, the pills, the format bar) and the chrome
   around the page (`win.modes.fullChrome` false: the tab strip, the sidebar and its arrow, the phone's app bar and dock; the
   compact chrome's tab dots); the dot in the lower left corner and its pill bring it back. The pen writes on. Presenting
-  without controls (`cleanPage`) is presenting in Zen.
+  without controls (`win.modes.presentClean`) is presenting in Zen.
 - **Read only** is apart from all of these (anywhere): [zen.md](zen.md).
 - The home screen always keeps the tab strip (it is the way back to the documents); in the phone classes the app bar.
 
-Zen of itself (`win.modes.zenAuto`, since qt/zen; before, the reader chrome of qt/phone-chrome): in a **tiny** window (under
-360 px either way: split screen, Android's pop-up view), nowhere else. Leaving it there stores `off` for the tiny class;
-Zen turned on there again stores `""` (automatic again). Gone in 0.8.0: the reader chrome (`chromeMode` "reader",
-`chromeAuto`, `chromeSetting`, `chooseChrome`) and the compact chrome chosen for a class in a normal window (Settings →
-Display → "Controls at this size"): the compact chrome is full screen's.
+Zen of itself (`win.modes.zenAuto`): in a **tiny** window (under 360 px either way: split screen, Android's pop-up
+view), nowhere else. Leaving it there stores `off` for the tiny class; Zen turned on there again stores `""`
+(automatic again). The compact chrome is full screen's only.
 
-## Menus (`qt/adaptive-menus`)
+## Menus
 
 `AdaptiveMenu.qml` is the menu of the app's menus: ⋮, the library menu, the card menus of the home screen (and
-the page-with-hits menu of a card), the tab menu and the layout menu; since qt/safe-areas-keyboard also the layer menu,
+the page-with-hits menu of a card), the tab menu and the layout menu; also the layer menu,
 the annotations' filter, a bookmark's and a chapter's menu in the sidebar, the look-up menu, the table editor's cell
 menu, the toolbox's menus (a tool's menu, the kinds of tools, ⋯) (every menu of the app now). `PageMenu.qml` (the page menu of the sidebar
 and the page grid, a popup of icons) follows the same rules.
@@ -197,7 +190,7 @@ How a menu uses it:
 
 ### The ⋮ menu
 
-At most ten entries at the top, the rest one level deeper. Since qt/top-bar it is **complete**: every command is in it,
+At most ten entries at the top, the rest one level deeper. It is **complete**: every command is in it,
 whether a bar shows it or not (the bars are the user's to arrange, ⋮ is not; [toolbox.md](toolbox.md), "The top bar").
 
 | Top level | Inside |
@@ -214,18 +207,16 @@ whether a bar shows it or not (the bars are the user's to arrange, ⋮ is not; [
 | **Help ▸** | Introduction, Tutorial, Keyboard shortcuts |
 | **Settings** | |
 
-Entries that depend on the document are left out as before. "Markdown source beside the page" is in the menu of the
+Entries that depend on the document are left out where they do not apply. "Markdown source beside the page" is in the menu of the
 writing button (its long press). Entries and submenus have icons where an obvious one exists; the phone sheet shows them
 too.
 
-## The tool bar (`qt/adaptive-toolbar`)
+## The top bar
 
-**The classic tool bar was removed in 0.8.0** (qt/classic-removal; [toolbox.md](toolbox.md)), and the command bar that
-followed it, with its ladder (`ToolBarPlan.js`: buttons giving way into ⋮ and a "more tools" button as the room ran
-short), was replaced by **the top bar** (qt/top-bar): the other list of the toolbox's arrangement, in the user's order,
-which **scrolls** instead of folding, with "+" (the catalog) and ⋮ pinned at its end ([toolbox.md](toolbox.md), "The
-top bar"). The author's decisions of 2026-09-26 still hold: a single A4 page stays well visible; ⋮ pinned at the end;
-nothing scrolls away silently (the fade and the half cell at the end that has more; ⋮ is complete).
+The bar at the top is **the top bar**: the other list of the toolbox's arrangement, in the user's order, which
+**scrolls** instead of folding, with "+" (the catalog) and ⋮ pinned at its end ([toolbox.md](toolbox.md), "The top
+bar"). The author's rules: a single A4 page stays well visible; ⋮ pinned at the end; nothing scrolls away silently
+(the fade and the half cell at the end that has more; ⋮ is complete).
 
 The top bar is the same element as the rail (`Toolbox.qml`, `bar: "top"`): `topTools` holds it in the full chrome; in
 a text document it is the end of the format bar's row; in the phone chrome the app bar holds it (below). The compact
@@ -244,27 +235,26 @@ the app tools of the bars, ⋮ → Tools, and the toolbox's snip entry.
 | --- | --- | --- |
 | `select` | rectangle ↔ lasso | rectangle and lasso on all layers |
 | `geometry` | setsquare ↔ compass | the curtain and the spotlight (put out or taken away, beside the tool in hand); "Take it off the page" (also the × of the geometry pill) |
-| `snip` (qt/ui-rework) | snip a rectangle ↔ snip with the lasso (one picture to the clipboard, then the tool before; [snip.md](snip.md)); an app tool of the rail since qt/copy-tools | the snips' resolution (a setting) |
-| `text` (qt/copy-tools) | mark PDF text ↔ copy handwriting as text (one sweep, its words to the clipboard, then the tool before; [handwriting-search.md](handwriting-search.md)) | how PDF text is marked (the PDF text button's own list) |
+| `snip` | snip a rectangle ↔ snip with the lasso (one picture to the clipboard, then the tool before; [snip.md](snip.md)); an app tool of the rail | the snips' resolution (a setting) |
+| `text` | mark PDF text ↔ copy handwriting as text (one sweep, its words to the clipboard, then the tool before; [handwriting-search.md](handwriting-search.md)) | how PDF text is marked (the PDF text button's own list) |
 
-`ToolGroups.qml` also lists the kinds of shapes and erasers, which the toolbox's editor offers. The classic bar's
-groups `pen` (pen ↔ highlighter, the laser tools in its list), `eraser` and `shape` went with it in 0.8.0: the pens,
-highlighters, erasers, shapes and laser pointers are entries of the toolbox, each with its settings.
+`ToolGroups.qml` also lists the kinds of shapes and erasers, which the toolbox's editor offers: the pens, highlighters,
+erasers, shapes and laser pointers are entries of the toolbox, each with its settings.
 
-**The groups reviewed** (qt/ui-rework, the author: "think of the cycling groups we currently have and whether we can
+**The groups** (the author: "think of the cycling groups we currently have and whether we can
 have the snipping screenshots as a cycling tool in the toolbelt"):
 
 - **The snips** are a group of their own: in the toolbox an entry of the kind "Snip" ("+" or "Add a tool here…"; not
   among the first tools), whose icon is its shape (`xqt-snip-rect`, `xqt-snip-lasso`) with two dots for the two. A tap
   snips with its shape; a tap while it is armed takes the other shape, which the entry keeps; its editor (Edit… in its
   menu) chooses the shape too. A snip is never the toolbox's active entry: the tool before stays the one that comes
-  back. Among the fixed tools the snips have a button of their own since qt/copy-tools (the author: "Snip should be
-  one click away … not hidden behind the normal select tool"), after select, and left the select button's list (one
+  back. Among the fixed tools the snips have a button of their own (the author: "Snip should be
+  one click away … not hidden behind the normal select tool"), after select, not in the select button's list (one
   place each; Shift+S, Shift+L); the image button's list keeps them as well, as an insert (a picture to paste).
-- **Mark PDF text ↔ copy handwriting as text** (qt/copy-tools, the author: "make it its own tool similar to select
+- **Mark PDF text ↔ copy handwriting as text** (the author: "make it its own tool similar to select
   pdf text (could be a cycle) to not interrupt the ink annotation flow"): one button, a cycle as suggested rather than
   a fixed tool more (the rail is already full at 1080 px). A tap while one of them is in use takes the other; held:
-  both, and how PDF text is marked (which a tap again opened before). Copy handwriting is a one-shot tool like the
+  both, and how PDF text is marked. Copy handwriting is a one-shot tool like the
   snips: the tool before comes back after its sweep. Shift+T.
 - **Curtain ↔ spotlight** stay in the setsquare's list (and ⋮ → View), not a group with a button: they are not tools
   but sheets over the page whatever tool is in hand, and are put out and taken away; a cycle (curtain → spotlight →
@@ -276,14 +266,11 @@ have the snipping screenshots as a cycling tool in the toolbelt"):
 - A long press (or a right click) lists all variants with icon and name, with the group's name on top: to pick one.
 - The keys (S, L; Shift+S and Shift+L for the snips, Shift+T to copy handwriting) take a variant directly; the button
   follows and remembers it. P, H, E and T take the toolbox's entry of that kind used last.
-- The shapes menu and the eraser menu are gone. What they held besides variants: the sticky note, the shapes and the
-  eraser's kind and size (the toolbox's entries), the setsquare and the compass (their group), snapping to the grid
-  (Settings).
+- There is no shapes or eraser menu: the sticky note, the shapes and the eraser's kind and size are the toolbox's
+  entries, the setsquare and the compass their group, snapping to the grid a setting.
 
-The **text box** and **writing on the page** stay two tools: writing on the page is an app tool (the top bar's at a first start since 0.8.0) switched
-on and off by its button (a tap while it is on ends it); the text box is an entry of the toolbox (its font in its
-editor). The text box is always a Markdown text box; the plain text tool is no longer offered (T takes the toolbox's
-text box). Plain texts in documents are still drawn, and the text box tool still edits them as plain text (a tap on
+The **text box** and **writing on the page** stay two tools: writing on the page is an app tool (on the top bar at a first start) switched on and off by its button (a tap while it is on ends it); the text box is an entry of the toolbox (its font in its
+editor). The text box is always a Markdown text box; there is no plain text tool (T takes the toolbox's text box). Plain texts in documents are still drawn, and the text box tool still edits them as plain text (a tap on
 one: `CanvasView`, "an ordinary text there is edited as it is").
 
 ### Labels without hover
@@ -292,7 +279,7 @@ Every button of the bars and the pills says what it is by its icon; where an ico
 ambiguous it was replaced (below). Without hover (a finger):
 
 - a finger held on a button (`IconButton`) shows its name (`label`) above the finger while held; letting go then does
-  not press it. The mouse and the pen's hover show the tool tip as before; a mouse or a pen held long still presses
+  not press it. The mouse and the pen's hover show the tool tip; a mouse or a pen held long still presses
   the button on release;
 - a button with a long press of its own keeps it (`ownHold`): a cycling button (its list), the writing button (the
   Markdown source beside the page), the text box (the font), Mark PDF text (how it marks), Add a page (Insert
@@ -315,7 +302,7 @@ more):
 - a tap on the percentage: after the platform's double-click time (so a double tap does not flash it) a menu: Fit the
   width (Ctrl+0), Real size 100 % (Ctrl+1), Fit the height (the page's height fills the view), Fit the whole page;
 - a double click / double tap, or a long press: the whole page; a right click: the menu at once;
-- pinch, Ctrl+wheel, Ctrl+plus / minus / 0 and the middle button zoom as before.
+- pinch, Ctrl+wheel, Ctrl+plus / minus / 0 and the middle button zoom.
 
 How far out every zoom goes (pinch, wheel, Ctrl+minus, the fits, the reference's view, the presenter's screens): to
 **Settings → Display → Zoom → "Smallest zoom"** (5–50 % of the real size, 20 % unless set; `smallestZoom` in the
@@ -324,29 +311,29 @@ biggest page whole, or the widest row of pages with its gaps (two A4 pages side 
 `DocumentLayout::wholeGroupZoom`; sideways: a column or a pair). Before, it stopped at upstream's 30 %, which on the
 unfolded Fold 7 (100 % being some 2.35 px per point there) kept two A4 pages beside the rail from fitting.
 
-It never runs out of its canvas (since qt/adaptive-panels: 28 px from the canvas's right edge, 8 where that is too
+It never runs out of its canvas (28 px from the canvas's right edge, 8 where that is too
 much; beside a reference or the Markdown source it stays in its own half), and it moves up above the reference's
 pill where the two would meet. In phone portrait (and tiny) the page layout button is left out: ⋮ → View → Page
 layout… opens its menu.
 
-**The compact pill** (`viewPill.compact`, qt/adaptive-panels): in a canvas under 520 px wide (a phone upright, a half
+**The compact pill** (`viewPill.compact`): in a canvas under 520 px wide (a phone upright, a half
 beside the reference or the source): undo, redo, the contents, **the page number as a button** (a tap: all pages, the
 page grid button's place), the zoom percentage (its menu as above). No page layout button (⋮ → View → Page layout…
 is offered whenever the pill has none), no page grid button, no ‹ › of sideways scrolling (a swipe turns the page).
 Under 360 px also no redo (Ctrl+Y) and no separators.
 
-**Pills that meet** (audit F6): the view pill keeps the canvas's lower right corner; the others go above it where
+**Pills that meet**: the view pill keeps the canvas's lower right corner; the others go above it where
 they would meet it: the selection's pill (centred at the bottom; smaller where the canvas is narrower than it), the
 back / forward pill and the "shown read-only" note (lower left), the sticky note's pill; the toolbox floating at the
 bottom edge in the compact chrome (a phone upright) puts the view pill above it, and floating at a side it ends above
-the pill (`floatBottom`). (The pen pill of the compact chrome went with the classic tool bar in 0.8.0.) `win.layout.clearOfPills(item, lowY, others)`
+the pill (`floatBottom`). `win.layout.clearOfPills(item, lowY, others)`
 does it for the pills of `Main.qml`. (Qt 6.7 crashes when a binding of `y` reads the geometry of items itself through
 a function: the result goes through a property of its own, `clearY`.)
 
 ### One place for each action
 
 The author's rule: only one way to do things, to reduce menu clutter. The buttons of the app's items have one home each
-(the rail, the top bar, or neither: the catalog), arranged by the user; ⋮ has every command as well (qt/top-bar: so
+(the rail, the top bar, or neither: the catalog), arranged by the user; ⋮ has every command as well (so
 nothing can be arranged out of reach), and the view pill and the sidebar keep theirs. Where the button can be out of
 sight:
 
@@ -359,20 +346,20 @@ sight:
 | Search, full screen, present, Zen, read, replay | the top bar's at a first start | Ctrl+F, F11, F5, Ctrl+Alt+Z, Ctrl+Alt+R | the floating toolbox's ⋯ (in full screen: "Leave full screen", Esc); ⋮ → View | the top bar; ⋮ → View |
 | Present without controls | ⋮ → View (it differs from Present); Present's menu on a bar (held) | Ctrl+F5 | the floating toolbox's ⋯ | ⋮ → View |
 | Settings | the top bar's at a first start; ⋮ → Settings | Ctrl+, | the floating toolbox's ⋯; the home screen's settings | the top bar; ⋮ |
-| New | the tab strip's + where it is shown | Ctrl+Shift+N | the floating toolbox's ⋯ → New document (qt/top-bar) | the catalog can place it; ⋮ → Document; the tab overview and the library |
+| New | the tab strip's + where it is shown | Ctrl+Shift+N | the floating toolbox's ⋯ → New document | the catalog can place it; ⋮ → Document; the tab overview and the library |
 | Open, Save, share, print, a milestone, tags, favourite, bookmark | the top bar's at a first start | Ctrl+O, Ctrl+S, Ctrl+P | the floating toolbox's ⋯ | the top bar; ⋮ |
 | Edit as notes, Open externally | the top bar's end, while offered (not items of the arrangement) | | | the top bar; ⋮ → Document |
 | All pages (was also ⋮ → View) | view pill (the compact pill: its page number) | Ctrl+Alt+G | the view pill stays in the compact chrome | the dock's page number |
-| Contents overview (was the tool bar) | view pill | Ctrl+Alt+O | as above | the page grid's pill (the dock's page number) |
+| Contents overview | view pill | Ctrl+Alt+O | as above | the page grid's pill (the dock's page number) |
 | Page layout | view pill (long press: the menu); phone portrait and the compact pill: ⋮ → View → Page layout… | | | ⋮ → View → Page layout… |
 | Zoom fits | view pill's percentage | Ctrl+0, Ctrl+1 | | the page grid's pill (its zoom %); pinch |
-| The page sidebar (was the tool bar's Pages button) | the arrow at the canvas's edge / the sidebar's edge | | not in the compact chrome | the arrow (a drawer) |
+| The page sidebar | the arrow at the canvas's edge / the sidebar's edge | | not in the compact chrome | the arrow (a drawer) |
 | Hide the top bar (was also ⋮ → View) | the tab on the bar's edge | | the strip at the top edge shows it again | – (the dock stays; Zen hides everything) |
 | Toolbox position | ⋮ → View → Toolbox position; its grip dragged to an edge | | | – (the dock) |
-| Snap to the grid (was the shapes menu) | Settings | | | Settings |
+| Snap to the grid | Settings | | | Settings |
 | Plain text box (removed) | – (T and the text box make Markdown text boxes; plain texts are still edited) | | | – |
 | All open documents | the tab strip's overview button, ⋮ → View | Ctrl+Shift+E | the tab dots (compact) | the tab count of the app bar (a tap; a double tap: the document used before; a long press: the ones used lately) |
-| Undo, redo | the head of the toolbox (pinned; qt/undo-redo, before: the view pill); a text document: the start of its format bar | Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y (the tips show the keys set) | the floating toolbox; a text document in the compact chrome: the view pill | the dock; with the soft keyboard open, the end of the format bar above it |
+| Undo, redo | the head of the toolbox (pinned); a text document: the start of its format bar | Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y (the tips show the keys set) | the floating toolbox; a text document in the compact chrome: the view pill | the dock; with the soft keyboard open, the end of the format bar above it |
 
 The keys in this table are the defaults: Settings → Shortcuts changes them, and every tip and menu entry names the keys
 as they are set (`win.withKeys(text, id)`: all of an action's keys, the tips of undo and redo; `win.keyNote(id)`: its
@@ -383,7 +370,7 @@ Zen hides everything; its dot and the dot's pill bring the controls back ([zen.m
 screen, phones too), ⋮ → View → Zen, Ctrl+Alt+Z, the floating toolbox's ⋯; Android's Back leaves it. Read only: ⋮ →
 View → Read only, the dot's pill, the floating toolbox's ⋯.
 
-## Panels (`qt/adaptive-panels`)
+## Panels
 
 The author's rule stays: a single A4 page stays well visible; nothing at the side narrows the page in portrait.
 
@@ -415,7 +402,7 @@ reference's pill is its page number and a ⋮ with the rest (`referenceMoreButto
 
 ### The format bar
 
-`MarkdownFormatBar.qml`. **A text document's** bar holds its commands since qt/top-bar: undo and redo at its start, all
+`MarkdownFormatBar.qml`. **A text document's** bar holds its commands: undo and redo at its start, all
 the formatting as buttons, then the top bar itself at the end of the same row (`formatCommands`), ⋮ pinned at its end;
 nothing folds, and the row scrolls as the bars do (its view ends through the middle of a button, a fade at the end
 that has more, the wheel scrolls it; `holdsCommands`, `scrollsAsBar`). At 1366 px the formatting and the first
@@ -437,14 +424,14 @@ fading edges where there is more (`formatBarFadeLeft`, `formatBarFadeRight`); wh
 page's Markdown it docks right above the keyboard (below, "The soft keyboard"). The level buttons are 40 px wide in the touch profile (F7.4); a finger held on any button shows
 its name. The panel's own bar (beside or below the page) follows the same rules for its own width.
 
-### What the later blocks can use
+### What other parts can use
 
 `win.layout.sourceAtBottom` and `win.layout.sourceBottomHeight` (the panel's place; the keyboard shrinks the room it is taken
 from), `win.layout.drawerWidth`, `viewPill.compact`, `MarkdownFormatBar.phone` (its scrolling form, the one docked above the
 keyboard), `win.layout.clearOfPills` (for pills that float over the page). The phone chrome (below) took the drawer's width and the
 format bar as they are; its dock is a bar of its own (the page ends above it), so no pill needs to go above it.
 
-## Dialogs and sheets: `AdaptiveDialog` (qt/adaptive-dialogs)
+## Dialogs and sheets: `AdaptiveDialog`
 
 `qt/src/app/qml/AdaptiveDialog.qml` is a `Dialog` that fits every window. Every dialog and sheet of the app is one
 (Main, HomeView, Settings, the layer and annotation lists, the dialog files, and the former popup sheets: web confirm,
@@ -502,11 +489,10 @@ the tabs); each section is a file (`SettingsPen.qml` … `SettingsHelp.qml`, wit
 
 ### The toolbox of the compact chrome
 
-The floating toolbox stays inside a short window (it scrolls as a short rail does, qt/rail-scroll), and its ⋯ menu with
-"Present" and "Leave full screen" / "Show the tabs and the tool bar" too (`theFloatingToolboxFitsAShortWindow`). (The
-classic tool square and its popup of quick tools went in 0.8.0.)
+The floating toolbox stays inside a short window (it scrolls as a short rail does), and its ⋯ menu with
+"Present" and "Leave full screen" too (`theFloatingToolboxFitsAShortWindow`).
 
-## The home screen and the tab overview (qt/adaptive-home)
+## The home screen and the tab overview
 
 `HomeView.qml` reads `win.adaptive` (`layoutClass`, `orientation`, `touchProfile`, `minTarget`); the phone classes
 follow the layout class, so "Adapt the layout" off keeps the desktop home screen.
@@ -554,7 +540,7 @@ not in View: one place per action.
 not fit, the last folder comes first (up to 60 % of the room), then the library's name with what is left (elided,
 at most half; left out below 56 px), then as many folders before the last as fit; the rest is **"…"**
 (`crumbEllipsis`), which opens a menu of those folders (`crumbMenu`). A too long last name is elided at its end.
-Dragging cards onto a crumb moves them there, as before.
+Dragging cards onto a crumb moves them there.
 
 **The selection bar**: the whole row (Select all, Open, Copy to…, Move to…, Remove from list, Trash…) where it fits
 (`selectionFull` is measured while hidden); on a phone, or where it does not fit, the top bar keeps × and the count,
@@ -574,11 +560,11 @@ Select all and, on Recent, Remove from list), icons above their words, as Androi
   the count "3 / 14" is there instead) and from the tab strip's overview button.
 
 **Labels without hover**: the icon buttons of the home screen are `IconButton`s with a short `label` (New, Import,
-View, Settings, Sort, Up, …; qt/safe-areas-keyboard) that a held finger shows; the longer `tip` stays for the mouse.
+View, Settings, Sort, Up, …) that a held finger shows; the longer `tip` stays for the mouse.
 The home screen's own buttons (the switch's icons and ★, ▾, the floating "+") show their word while a finger is held
 on them.
 
-## The phone chrome (qt/phone-chrome)
+## The phone chrome
 
 The author's decisions: one place per action, clear icons without hover (a held finger shows the name), a single A4
 page well visible, and in phone portrait a **bottom tool dock**. The main target is the Galaxy Fold 7 folded (412 × 915,
@@ -595,12 +581,12 @@ upright):
 | --- | --- |
 | left | the library (`phoneHomeButton`) |
 | middle | the document's title (`phoneTitle`, elided in the middle, ● when it has changes) with small dots for the open documents under it (`phoneTabDots`; more than 12: "3 / 14"). A **swipe along the title** (`phoneTabSwipe`, 40 px): to the left the next document, to the right the previous one (round the ends); only there, the page keeps every touch and the top bar scrolls |
-| the top bar (qt/top-bar) | **the same top bar as on a larger screen** (its items in the user's order, scrolling, "+" at its end; `phoneToolsSlot`): upright (a bar narrower than 600 px) a row of its own under the title (the app bar is then 48 px + the top bar's 56 taller); held sideways in the row between the title (a quarter of the width) and the tab count. Zen is on it |
+| the top bar | **the same top bar as on a larger screen** (its items in the user's order, scrolling, "+" at its end; `phoneToolsSlot`): upright (a bar narrower than 600 px) a row of its own under the title (the app bar is then 48 px + the top bar's 56 taller); held sideways in the row between the title (a quarter of the width) and the tab count. Zen is on it |
 | held sideways | the page number (`phonePageButton`: all pages), before the tab count: the dock at the side gives its room to the tools |
 | right | the **tab count** (`phoneTabCount`, the number in a square): a tap shows all open documents (after the double-tap time, like the zoom %, so a double tap does not flash them); a **double tap** goes back to the document used before (Alt+Tab: `app.previousUsedTab()`, the order of use kept by `TabManager::usedOrder`); a **long press** lists the documents used lately, the current one first (`recentTabsMenu`, a sheet) |
 | far right | ⋮, the top bar's own (`toolEnd` goes into `phoneAppBar.moreSlot`) |
 
-New documents come from the overview ("+") and the library. Ctrl+Tab and Ctrl+Shift+Tab work as before. On the home
+New documents come from the overview ("+") and the library. Ctrl+Tab and Ctrl+Shift+Tab work. On the home
 screen of a phone class the app bar stays in every chrome (the way back to the documents): the home button is marked,
 the title is the document behind the home screen (greyed; a tap goes back to it), no ⋮.
 
@@ -612,33 +598,28 @@ scrolled into view) with **"+"** (the catalog, a sheet; `toolboxAddInline`) afte
 columns). While the soft keyboard is open (the dock gone) undo and redo are at the end of the format bar above it
 (`keyboardUndoButton`, `keyboardRedoButton`). A text document (no ink tools) keeps the dock's own cells: undo, redo
 (`dockUndoButton`, `dockRedoButton`) and the page number (`dockPageButton`); its commands are the top bar's and ⋮'s.
-(The classic dock's tool in use, color and width cells went with the classic tool bar in 0.8.0; "All tools" with "My
-tools" in qt/top-bar.)
 
 - Phone portrait: at the bottom, above the navigation bar (`win.insets.bottom`), in the window's footer: the page ends
   above it and keeps the whole width.
 - Held sideways (phone short, or a tiny window in landscape; `win.layout.dockVertical`): a **rail at the right side**, the
-  same cells from the top down, below the app bar; the page number is in the app bar then (qt/top-bar: with the
-  insets the rail had room for about one tool once undo, redo, "My tools" and the page number took theirs). A phone in
+  same cells from the top down, below the app bar; the page number is in the app bar then (the rail's room goes to
+  the tools). A phone in
   landscape lacks height, not width. The page, the Markdown source beside it and the reference end at the rail
   (`win.layout.dockRail`).
-- Full screen (the compact chrome) on a phone: the toolbox floats at its edge as on a desktop (since 0.8.0; before, the
-  classic tool square was there).
+- Full screen (the compact chrome) on a phone: the toolbox floats at its edge as on a desktop.
 
-**My tools** (the sheet of every tool, `PhoneToolSheet.qml`) is gone since qt/top-bar: the tools and commands are on
-the two bars (the same items as on a larger screen), every command is in ⋮, and "+" (the catalog, a sheet) adds a tool
+There is no sheet of every tool: the tools and commands are on the two bars (the same items as on a larger screen), every command is in ⋮, and "+" (the catalog, a sheet) adds a tool
 or puts an item that is on neither bar onto one.
 
 **Sheets**: in the phone classes a tool's editor (`toolEntryEditor`: its colors, width, …) is a sheet (its
 `asSheet`): as wide as the window (at most 640 px), at most 85 % high (the rest scrolls), above `safeBottom`, the
 handle of `MenuSheet`, Esc and the back key close it; the menus are sheets of the same form (`MenuSheet`).
 
-**Zen in a tiny window** (since qt/zen; the reader chrome before): automatic only there (`zenAuto`); everywhere else
+**Zen in a tiny window**: automatic only there (`zenAuto`); everywhere else
 chosen by hand. Only the page and the dot; the pen writes; the dot's pill shows the controls again (and in a tiny
 window stores `off` for that class). ⋮ → View → Read is Zen with read only, in full screen ([zen.md](zen.md)).
 
-**The Zen dot** (`zenDot`) replaces the corner field of presenting and of the reader (`presentCornerMark`, gone in
-0.8.0): a 48 px target in the lower left corner of the page, a 10 px grey dot faint after 2 s, clearer when the pointer
+**The Zen dot** (`zenDot`): a 48 px target in the lower left corner of the page, a 10 px grey dot faint after 2 s, clearer when the pointer
 or the pen is near; a tap opens its pill. Presenting with the controls has no dot (Ctrl+F5 hides them).
 
 **Android and iOS** (`win.adaptive.mobilePlatform`, the platform, not the size): one window. No tab is dragged out of
@@ -652,12 +633,12 @@ the top, every size; `crumbBar.needed`), unless it shows the library importing o
 once (the foundation's jump rule); the phone chrome and the tablet's layout switch cleanly, and the choices of each
 class are kept apart.
 
-The safe areas and the soft keyboard (qt/safe-areas-keyboard, below): the app bar takes `safeTop` and the side insets
+The safe areas and the soft keyboard (below): the app bar takes `safeTop` and the side insets
 at its ends, the dock `safeBottom` (at the bottom and at the rail's end) and the side insets (the rail the right one).
 While the soft keyboard is open the dock goes and, on a phone, the format bar takes its place right above the
 keyboard.
 
-## Safe areas and the soft keyboard (qt/safe-areas-keyboard)
+## Safe areas and the soft keyboard
 
 The window is drawn edge to edge on Android 15+ (and on iOS): the status bar lies over its top, the navigation or
 gesture bar over its bottom, and a camera cut-out over a side when a phone is held sideways (audit D11, D12, F15).
@@ -708,27 +689,25 @@ puts a keyboard of that height at the bottom.
 - The emoji picker's search does not take the keys when it opens as a sheet (that would open the keyboard over the
   emoji); a tap on it does.
 
-## The collapse ladder (what the later blocks build)
+## The ladder
 
-The author's decisions of 2026-09-26 on the audit's proposals:
+What changes as the window gets smaller, automatically (each step can be overruled by hand where it has a choice):
 
-| Step | When (automatic) | What changes | Block |
-| --- | --- | --- | --- |
-| 0 | desktop wide, room for the sidebar | everything as today; the tool bar grouped, ⋮ pinned (**done**; since 0.8.0 the toolbox, since qt/top-bar the scrolling top bar) | `qt/adaptive-toolbar` |
-| 1 | window < ~1110 px, or tablet portrait | the sidebar is a drawer (**done**; the slide, Esc and the phone width: qt/adaptive-panels); the Markdown source below the page in portrait, the reference top and bottom (**done**) | this block, `qt/adaptive-panels` |
-| 1b | tablet portrait (a 2-in-1 or Surface upright) | **two tool rows** of the classic bar at the top (**done**; removed in 0.8.0 with it: the toolbox's slim rail at the right leaves an A4 page well visible) | `qt/adaptive-toolbar`, `qt/classic-removal` |
-| 2 | phone portrait (w < 600) or short (h < 560) | the phone chrome in the window: the app bar (the title, tab dots, the tab count), a **bottom tool dock** in phone portrait and a rail at the side in landscape (**done**); dialogs and menus as sheets (**done**) | `qt/phone-chrome`, `qt/adaptive-menus`, `qt/adaptive-dialogs` |
-| 3 | **tiny only** (w or h < 360) | the reader chrome, automatically; everywhere else "Read" is a manual choice (**done**; since 0.8.0 Zen, [zen.md](zen.md)) | `qt/phone-chrome`, `qt/zen` |
+| Step | When | What changes |
+| --- | --- | --- |
+| 0 | desktop wide, room for the sidebar | everything shown: the sidebar docked, the toolbox docked, the top bar scrolling where it must, ⋮ pinned |
+| 1 | window < ~1110 px, or tablet portrait | the sidebar is a drawer; the Markdown source below the page in portrait, the reference top and bottom; in tablet portrait the toolbox's slim rail at the right leaves an A4 page well visible |
+| 2 | phone portrait (w < 600) or short (h < 560) | the phone chrome: the app bar (the title, tab dots, the tab count), a bottom tool dock in phone portrait and a rail at the side in landscape; dialogs and menus as sheets |
+| 3 | tiny only (w or h < 360) | Zen, automatically; everywhere else Zen and Read are chosen by hand ([zen.md](zen.md)) |
 
-## How a later block plugs in
+## Adding to it
 
 - Read the class from `win.adaptive` (`sizeClass`, `phone`, `widthClass`, …), never from `win.width`. A component's
   own width (e.g. a dialog's `availableWidth`) is still fine for its own inner layout.
 - An automatic choice is a binding: `property bool x: choice !== "" ? choice === "…" : auto`, where
   `choice = win.layoutChoice("<what>")`. A toggle by hand calls `win.chooseLayout("<what>", value)`, and stores
   `""` when the value equals the automatic one. Never assign to the bound property.
-- New `<what>` keys: plain words; document them in the table above. `toolbar` is reserved for `qt/adaptive-toolbar`
-  with the values listed there.
+- New `<what>` keys: plain words; document them in the table above.
 - Sizes of targets: `win.adaptive.touchProfile ? win.adaptive.minTarget : <the desktop size>`, or `minTarget`
   directly where 40 on the desktop is fine.
 - Hiding HUD items: add `!win.modes.hudHidden` to their `visible`; the chrome's own items test `win.modes.chromeMode`.
@@ -736,15 +715,14 @@ The author's decisions of 2026-09-26 on the audit's proposals:
 
 ### Thresholds not moved yet
 
-These still keep a width of their own. They are not like-for-like replacements of a class, and belong to the blocks
-that rework their screens:
+These keep a width of their own (not a size class):
 
 | Where | Threshold | Block |
 | --- | --- | --- |
 | `NewDocumentDialog.qml` | its body < 520 → one column (its own width: fine as it is) | – |
 | `ShortcutSheet.qml`, `AppendPages.qml` | their own widths (620, 260): fine as they are | – |
 
-The panels' own thresholds (qt/adaptive-panels) are widths of the canvas or the half they are in, not of the window,
+The panels' own thresholds are widths of the canvas or the half they are in, not of the window,
 so they are not size classes either:
 
 | Where | Threshold | What |
@@ -764,9 +742,9 @@ so they are not size classes either:
 - `AdaptiveLayoutTest.*` (label `ui`, about 15 s): the real window at 1920×1080, 1280×800, 960×1392, 412×915 and
   915×412 (class, sidebar, no control of the home screen or the document outside the window), the sidebar choices
   per class and their reset, the drawer, "Adapt the layout" off, the hysteresis and a held pointer, the touch
-  profile, and the chrome apart from the window state. What a later block fixes is listed as known in the test
-  (`knownOutside`, `expectLater`): it prints `[ KNOWN ]` with the block's name, and `[ NOW HOLDS ]` once fixed, so
-  that block makes the check strict.
+  profile, and the chrome apart from the window state. What is known not to fit yet is listed in the test
+  (`knownOutside`, `expectLater`): it prints `[ KNOWN ]`, and `[ NOW HOLDS ]` once fixed, so the check can be made
+  strict.
 - `AdaptiveLayoutTest.menusFitAtFiveSizes` (about 15 s): at the same five sizes, ⋮ (its four submenus at 1280×800),
   the page menu, the library menu and a card's menu lie inside the window, no taller than it, no entry cut off, not
   over their button; ⋮ has at most 12 entries at the top and needs no scrolling in desktop wide; in the phone classes
@@ -774,10 +752,8 @@ so they are not size classes either:
   (two levels), the back arrow, Esc a level up, a row that triggers its entry, the layout menu's columns row borrowed
   and given back, the tab menu's rename after the sheet closed.
 - `XQT_UI_ADAPTIVE=1 ./xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.allSizes*'`: the same checks (with the menus
-  and all submenus) at all 18 sizes of the audit (about 70 s), with a `[ WALK ]` line per screen (outside, hidden by
-  scrolling, small).
-- `XQT_UI_ADAPTIVE=1 ./xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.allSizes*'`: the same checks at all 18 sizes of
-  the audit (about 15 s), with a `[ WALK ]` line per screen (outside, hidden by scrolling, small).
+  and all submenus) at all 18 sizes of the UI audit (about 70 s), with a `[ WALK ]` line per screen (outside, hidden
+  by scrolling, small).
 - `AdaptiveLayoutTest.dialogsFitTheWindow` (about 5 s): eight dialogs at 1920×1080, 1024×700, 1280×500, 412×915 and
   915×412: inside the window, the confirm button too, every control of the body reachable by scrolling it to its end
   and none wider than the window, and the placement of its kind. `aPhoneSheetAndTheBackKey`: × and the confirm button
@@ -786,17 +762,15 @@ so they are not size classes either:
 - `XQT_UI_ADAPTIVE=1 ./xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.allSizesDialogs'`: the same for all 48 dialogs
   (document, library, settings) at the 18 sizes (about a minute). `XQT_UI_DIALOG_SHOTS=<folder>` saves a picture of
   each (without the dialogs' backgrounds off-screen, except full-screen sheets).
-- The top bar and the toolbox (qt/adaptive-toolbar; since 0.8.0 `checkToolBar` checks the toolbox, since qt/top-bar
-  the top bar), in the same checks at the five sizes (and all 18 with `XQT_UI_ADAPTIVE=1`): ⋮ shown and outside
+- The top bar and the toolbox (`checkToolBar`), in the same checks at the five sizes (and all 18 with `XQT_UI_ADAPTIVE=1`): ⋮ shown and outside
   anything that scrolls; the toolbox docked with undo and redo at its head; the finger switch and writing on the top
   bar; no "more tools"; the view pill inside the window; the phone chrome's dock with the toolbox, the app bar with the
   top bar and Zen on it. `theToolsFitAt720` (the top bar scrolls), `newIsTheTabStripsPlusWhereThereIsOne`,
   `sidebarArrowOpensAndCloses`, `viewPillWithContentsInsideAndClearOfTheReference` (five
-  sizes, a reference open). (`twoRowsFitAt720`, `toolBarPlaceIsChosenPerSizeClass` and
-  `colorsAndWidthsTakeTheRoomThereIs` went with the classic bar.)
+  sizes, a reference open).
   `XQT_TOOLBAR_SHOTS=<folder> ./xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.toolBarPictures'` saves pictures of
   the layouts (about 20 s).
-- The panels (qt/adaptive-panels), label `ui`: `sourcePanelBesideOrBelowThePage` (the five sizes: beside, below at
+- The panels, label `ui`: `sourcePanelBesideOrBelowThePage` (the five sizes: beside, below at
   half, below at 60 %; the page's width; the view pill inside it), `sourceDividerIsDraggedAndRememberedPerClass`,
   `referenceSplitFollowsTheAreaAndItsPillsStayApart` (the five sizes: orientation, the ratio kept, both pills inside
   their halves and apart, the narrow pill and its ⋮ sheet), `compactViewPillOnAPhone`, `sidebarDrawerKeysAndPhoneWidth`
@@ -816,7 +790,7 @@ so they are not size classes either:
   `theHomeScreensPlusAndViewMenusWork` (about 20 s) triggers every entry of "+" and View and the star at 412 × 915
   and 1024 × 700;
   `theTabOverviewOpensFromTheTabDotsOnAPhone`.
-- The phone chrome (qt/phone-chrome), `PhoneChromeTest.*` (label `ui`, about 30 s): the app bar and the dock at 412 ×
+- The phone chrome, `PhoneChromeTest.*` (label `ui`, about 30 s): the app bar and the dock at 412 ×
   915, 915 × 412 and 340 × 700 with a bottom safe area of 24 px (inside the window, above it, the rail at the side),
   the toolbox in the dock, the top bar in the app bar; a swipe on the title; the tab count's tap (after
   the double-tap time), double tap (A → B → C: back to B, and to C) and long press (the sheet of the ones used lately,
@@ -824,11 +798,11 @@ so they are not size classes either:
   the page number's grid with the contents and the zoom; Zen automatic only in a tiny window (left: remembered) and
   its pill inside it; presenting without controls with the Zen dot, with the controls none; no tab dragged out with `mobilePlatform`; no breadcrumbs at the library's
   top; the Fold 7 folded and unfolded (900 × 1000 and 960 × 1392: the top bar and the docked toolbox). In the checks at the five sizes
-  and the full walk, `checkPhoneChrome` replaces the tool bar's checks in the phone classes. `Tabs.theOrderOfUse`
+  and the full walk, `checkPhoneChrome` replaces the top bar's checks in the phone classes. `Tabs.theOrderOfUse`
   (label `shell`): the order of use.
-- Safe areas and the soft keyboard (qt/safe-areas-keyboard), `SafeAreasKeyboardTest.*` (label `ui`, about 25 s):
+- Safe areas and the soft keyboard, `SafeAreasKeyboardTest.*` (label `ui`, about 25 s):
   `controlsStayOutOfTheSafeArea` (insets of 32 at the top and 24 at the bottom, and a 40 px cut-out at the left held
-  sideways, at 412 × 915, 915 × 412 and 900 × 1000: no control of the app bar, the tab strip, the tool bar, the dock,
+  sideways, at 412 × 915, 915 × 412 and 900 × 1000: no control of the app bar, the tab strip, the top bar, the dock,
   the pills, the scroll bars, the drawer, ⋮ (sheet or menu), a dialog, the page grid's pill, the compact chrome and
   the snackbar in them; the page edge to edge), `theFormatBarDocksAboveTheKeyboardAndTheCursorStaysInView` (a fake
   keyboard of 360 px: the dock gone, the bar right above the keyboard, the cursor above it while 30 lines are typed

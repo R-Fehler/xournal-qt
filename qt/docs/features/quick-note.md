@@ -1,7 +1,7 @@
 # Quick note
 
 One action makes a note to write on at once, as Apple's Quick Note, OneNote's quick notes and Obsidian's daily notes
-do (idea A11 of [the ideas of 2026-10](../history/README.md)).
+do.
 
 ## What it makes
 
@@ -26,7 +26,7 @@ document, not saved yet.
 | Where | How |
 | --- | --- |
 | Home screen | a button beside New where the header has room for every button (`quickNoteButton`); else the first entry of "+" (`quickNoteItem` in `newMenu`), also the phone's floating "+" |
-| A document | ⋮ → Document → Quick note (`documentQuickNoteItem` in `moreDocumentMenu`), in every chrome (classic, toolbox, phone). Not at the top of ⋮ (it keeps to 10 entries there), not in the toolbox or the command bar's buttons. |
+| A document | ⋮ → Document → Quick note (`documentQuickNoteItem` in `moreDocumentMenu`), in every chrome (full, compact, phone). Not at the top of ⋮ (it keeps to 10 entries there), not in the toolbox or the command bar's buttons. |
 | Keys | **Ctrl+Alt+N** (`quickNote` in `ShortcutsModel`, listed in the shortcut sheet, changeable in Settings) |
 | Command line | `xournal-qt --quick-note` (with files: they open first). With the app running, the request goes to it through `SingleInstance` as the entry `--quick-note` after the files (never an absolute path), and the window comes to the front. |
 | Linux desktop | the right-click menu of the app's launcher or task-manager entry: the `.desktop` file's action `QuickNote` runs `xournal-qt --quick-note` |

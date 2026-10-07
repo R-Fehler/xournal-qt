@@ -1,6 +1,6 @@
-# Getting started: the introduction and the tutorial (`qt/onboarding`)
+# Getting started: the introduction and the tutorial
 
-Two things help a new user find their way (the author, 2026-10-04: "make getting started easier"):
+Two things help a new user find their way (the author: "make getting started easier"):
 
 1. **The introduction**: a few short pages at the first start that say what the app is for and end in the question
    how documents are kept.
@@ -28,7 +28,7 @@ screen on a phone, qt/docs/features/adaptive-layout.md).
   introduction not shown yet) it replaces the old question (`DocumentModeDialog`). Skip, on every page but the last,
   goes to the last page, because the choice has to be made there; Esc does nothing, and × of the phone's full-screen
   sheet goes to the last page too. Continue stores the card chosen (the recommendation, PDF files, to start with)
-  and the window goes on as before (the recovery question, then on Android where the libraries are kept).
+  and the window goes on (the recovery question, then on Android where the libraries are kept).
 - **From Help** it starts at the first page, with the way chosen now on the last page. Skip, Esc and × close it;
   Done stores another way only when another card was tapped.
 - **Once**: the setting `introSeen` (xournalQt part of `settings.xml`, `app.introSeen`) is set when it is finished
@@ -67,7 +67,7 @@ as Qt resources (`:/xqt-help/…`, `qt/cmake/XqtApp.cmake`). Help → **Tutorial
 - Each section ends with a page break (`<div style="page-break-after: always"></div>`), so each exercise starts on a
   page of its own with room below it to write. Handwriting stays where it was drawn when text above it changes (as in
   every text document); the page breaks keep that to one page.
-- Section 15, **Versions** (qt/pdf-history): turn on "Keep versions of this document" in the sidebar's History
+- Section 15, **Versions** ([hybrid-pdf.md](hybrid-pdf.md), "Version history"): turn on "Keep versions of this document" in the sidebar's History
   panel on the tutorial itself (it is a PDF with notes), save a milestone with Ctrl+Alt+S, show, restore or copy a
   version; the setting for new PDFs and Share without the versions.
 - Test: `MainWindowTest.theTutorialOpensAsACopy` (the resource is there and is Markdown with sections and
@@ -90,7 +90,7 @@ lists them all:
 **Screenshots** (and any picture):
 
 1. Take the screenshot with the system's tool (the same window size for all of them looks calmer; a window about
-   1280 px wide keeps the tool bar in one row).
+   1280 px wide keeps the top bar in one row).
 2. Save it as `qt/resources/help/tutorial.assets/<name>.png` (short lowercase names, e.g. `more-menu.png`; PNG or
    JPEG; keep it under about 300 KB, it is compiled into the program).
 3. Replace the placeholder quote with `![The ⋮ menu with Save as, Share and Export](../tutorial.assets/more-menu.png)`.

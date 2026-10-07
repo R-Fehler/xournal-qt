@@ -1,14 +1,12 @@
-# The presenter view on a second screen (qt/presenter-view)
+# The presenter view on a second screen
 
-Status: built (2026-10-05); the notes for the audience and the audience following the zoom: qt/presenter-follow
-(2026-10-05). Idea A14 of [the ideas of 2026-10](../history/README.md), chosen by the author; as in Okular and
-PowerPoint.
+As in Okular and PowerPoint.
 
 While presenting with two screens (a laptop and a projector), the audience's screen shows only the slide, full screen,
 and the laptop's screen shows the **presenter's console**: the current page large with its space for notes
 ([note-space.md](note-space.md)), the next page smaller, a clock, the time since the start, the page number, and the
 toolbox ([toolbox.md](toolbox.md)) to write on the slide: the audience sees the ink as it is written. With one screen,
-presenting is as before.
+presenting shows the slide in the one window.
 
 ## Using it
 
@@ -33,10 +31,10 @@ presenting is as before.
   - **Notes for the audience too** (a switch, off by default);
   - **The audience follows my zoom** (a switch, on by default) and **Fit**;
   - which screen the audience's is, **Swap screens**, **End**.
-- **Notes for the audience too** (qt/presenter-follow): the audience sees the whole page, the slide with its space
+- **Notes for the audience too**: the audience sees the whole page, the slide with its space
   for notes, as large as the screen allows, and the ink written there as it is written. It takes effect at once while
   presenting. Pages without space for notes look the same either way.
-- **The audience follows my zoom** (qt/presenter-follow): zoom in on the console's page (pinch, Ctrl+wheel, the zoom
+- **The audience follows my zoom**: zoom in on the console's page (pinch, Ctrl+wheel, the zoom
   pill) and scroll around (fingers, the wheel, the hand): the audience sees the same part of the page, as large as
   their screen allows. Their screen's shape differs from the console's, so they see what the presenter sees widened
   to it (never less), and at the slide's edge it stops at the edge (black beyond: not the space for notes, unless
@@ -82,8 +80,8 @@ presenting is as before.
   spotlight at the same place of the same page (page coordinates, so another zoom does not matter), without handles;
   it follows every repaint of the presenter's view and changes nothing when nothing moved.
 - **The windows**: `AudienceWindow.qml` (a `Window` of its own, not transient for the console, frameless, black) and
-  `PresenterPanel.qml` (the panel; `Main.qml` puts the canvas area left of it and `controlsRight` keeps the controls
-  over the page, the floating toolbox among them, beside it). `PresenterConsole::placeWindows` puts the windows on
+  `PresenterPanel.qml` (the panel; `Main.qml` puts the canvas area left of it and `win.insets.controlsRight` keeps the
+  controls over the page, the floating toolbox among them, beside it). `PresenterConsole::placeWindows` puts the windows on
   their screens (`QWindow::setScreen`, the screen's geometry, full screen): QML's `Window.screen` takes only the
   screens of `Qt.application.screens`.
 - **What the audience sees** (`PresenterConsole::place`, `shownRect`): the frame is the slide, or the whole page with
@@ -111,7 +109,8 @@ presenting is as before.
   handles.
 - `AudienceRegion.widenedToTheScreensShapeWithinTheSlide` (`-L canvas`): the part at the screen's shape around what
   is seen, moved into the slide at its edges, cut to it when larger, the slide's part only, nothing seen: the slide.
-- `PresenterView.*` (`xqt-ui-tests`): with one screen (the ordinary run, or the setting off) presenting is as before.
+- `PresenterView.*` (`xqt-ui-tests`): with one screen (the ordinary run, or the setting off) presenting is as on one
+  screen.
   `PresenterView.ui@2screens` runs the same tests with **two off-screen screens** (`qt/tests/ui/offscreen-two-screens.json`:
   a 1920 × 1080 laptop, the primary one, and a 1280 × 720 projector): the audience's window full screen on the
   projector with only the slide (its shape, its space for notes out of view), the console on the laptop with the page
@@ -125,8 +124,7 @@ presenting is as before.
 
 ## Decisions
 
-- **Notes for the audience: off by default.** Today's behaviour stays the default: the space for notes is the
-  presenter's. On, the audience's screen shows the whole page, not the slide plus a part of the notes.
+- **Notes for the audience: off by default.** The space for notes is the presenter's. On, the audience's screen shows the whole page, not the slide plus a part of the notes.
 - **Following the zoom: on by default.** Zooming in on the console is almost always meant for the audience (pointing at
   a detail); a presenter who wants to look at something alone switches it off.
 - **Never less than the presenter sees.** The screens' shapes differ, so the part is widened to the audience's shape,

@@ -1,7 +1,7 @@
 # Fractional scaling (125 %, 150 %, 175 %)
 
-How xournal-qt behaves when the screen is scaled by a fraction, what was checked and fixed (`qt/hidpi-fractional`,
-2026-10-04), what each platform hands the app, and how to test it. The device steps are in
+How xournal-qt behaves when the screen is scaled by a fraction, part by part, what each platform hands the app, and
+how to test it. The device steps are in
 [testing/device-checklist.md](../testing/device-checklist.md), "Screens and scaling".
 
 ## In short
@@ -24,29 +24,29 @@ How xournal-qt behaves when the screen is scaled by a fraction, what was checked
   270 pass; of the other four, three pass when run alone (state left by earlier tests in the same process) and one
   (`zoomPercentageTapDoubleTapAndHold`) depends on the window's size: there "fit the height" happens to be 100 %.
 
-## What the audit found
+## Part by part
 
-| Part | At a fractional dpr | Status |
+| Part | At a fractional dpr | Note |
 | --- | --- | --- |
 | `main.cpp` high-DPI setup | No rounding policy, no `AA_EnableHighDpiScaling` (a no-op in Qt 6), no environment variable forced. | Right as it is |
 | Canvas view dpr (`CanvasView::setDevicePixelRatio`) | The window's `effectiveDevicePixelRatio()`, unrounded; a change (another screen) renders the pages again. | Right |
 | Page rasters (`PageRaster`, upstream's `Mask`) | Cairo surfaces with a fractional device scale: `int(ceil(w * zoom) * dpr)` pixels (cairo cuts the last fraction). A big page drawn in part starts on a whole device pixel (`pixelStep`). | Right; `pageTilesAreShownPixelForPixel` compares a tile with the window's pixels at 1 to 2 |
 | Page tiles (`DocumentCanvasItem`) | The page's top left is snapped to a device pixel (`snap(r, dpr)`); tiles are `TILE` buffer pixels at `px / dpr`, so 1:1 with the screen. | Right |
-| Selection picture | Placed at the page's unsnapped position (blurred at any scale), drawn `int(w * dpr)` pixels for `w * dpr` shown, not redrawn for another screen. | **Fixed** (b81b41a) |
+| Selection picture | Placed at the page's snapped position, drawn with whole device pixels for what is shown, drawn again for another screen. | Right |
 | Setsquare / compass (`GeometryToolPicture`) | Pictures at `zoom * dpr` covering whole pixels; page and angle display snapped; dpr in the redraw key. | Right (turned tools are filtered anyway) |
 | Canvas turned by a quarter ([canvas-rotation.md](canvas-rotation.md)) | The root node's translation is put on a whole device pixel at multiples of 90°, so the turned tiles land pixel for pixel (`pageTilesAreShownPixelForPixelTurnedByAQuarter`, also at 1.25 and 1.67; the off-screen software renderer does not blend either way). Free angles are filtered. | Built that way |
-| Curtain | Handles (rect nodes) at fractional places: frames 2 or 3 pixels thick; the knob placed off-pixel and made once for the first screen. | **Fixed** (f174aff) |
+| Curtain | Handles (rect nodes) and the knob placed on whole device pixels (no frames 2 or 3 pixels thick); the knob's picture made for the screen it is on. | Right |
 | Pointer: cursor pixmaps (`HoverPointer`) | `ceil(side * dpr)` pixels with `setDevicePixelRatio(dpr)`; the cursor key includes the dpr; refreshed on `ItemDevicePixelRatioHasChanged`. | Right (`theDotCursorHasTheScreensPixels`) |
-| Pointer: the dot drawn for pens without a platform cursor | Picture squeezed into 8 logical pixels where `8 * dpr` is not whole (1.1, 1.33, 1.67). | **Fixed** (910cd42) |
-| Thumbnails, page grid, overviews, page hits, annotation pictures | QML gave `sourceSize = width * Screen.devicePixelRatio`, and Qt Quick multiplies an image provider's `sourceSize` by the dpr again: drawn at dpr² (2.25x as wide at 150 %, 4x at 200 %). | **Fixed** (27d9c1d) |
+| Pointer: the dot drawn for pens without a platform cursor | A picture of whole device pixels, shown at that size (not squeezed into 8 logical pixels where `8 * dpr` is not whole: 1.1, 1.33, 1.67). | Right |
+| Thumbnails, page grid, overviews, page hits, annotation pictures | QML gives `sourceSize` in logical pixels: Qt Quick multiplies an image provider's `sourceSize` by the dpr itself (multiplying it in QML too drew them at dpr²). | Right |
 | Sketches, stand-ins and covers (`PageSketches`, `DocumentCovers`) | Fixed widths (they are placeholders and library cards); the dpr is not in their keys, nor needs to be. | Right; library card covers (360 px) are a little soft on 2x screens (not fractional-specific) |
 | Thumbnail cache keys | The requested width (in steps of 64) is the key, and it now carries the dpr once. | Right |
 | QML icons | SVG `Image`s with a `sourceSize` in logical pixels: Qt renders SVG at `sourceSize * dpr`. | Right |
-| QML 1 px lines and square frames | Drawn without antialiasing: 1.25 or 1.5 device pixels cover 1 or 2 rows depending on the position. | **Fixed** for the app's own separators and page frames (2a32f03, `Hairline.qml`, `DevicePixels.js`) |
+| QML 1 px lines and square frames | Drawn without antialiasing, 1.25 or 1.5 device pixels would cover 1 or 2 rows depending on the position: the app's own separators and page frames are one device pixel on a whole pixel (`Hairline.qml`, `DevicePixels.js`). | Right for the app's own |
 | Qt's `ToolSeparator`, `MenuSeparator` (Material style) | Same unevenness (Qt's own style). | Left: see "Open" |
 | Rounded frames (`radius`) | Antialiased: soft at a fractional width, not uneven. | Left as they are |
 | Text | Qt Quick's default text rendering (distance fields) scales smoothly at any factor; the page's text is drawn by cairo/Pango at the device scale. | Right |
-| Menus a whole number of logical pixels wide (2026-09-27 CI fix) | A logical width; at 125 % that is not whole device pixels, but nothing depends on it (Qt Layouts place in logical pixels). | Right |
+| Menus a whole number of logical pixels wide | A logical width; at 125 % that is not whole device pixels, but nothing depends on it (Qt Layouts place in logical pixels). | Right |
 | Screen calibration (`ScreenCalibration`) | `zoom100 = ppi / dpr / 72` with the fractional dpr; Settings shows "scaled 125 %". | Right |
 
 ## Platforms
@@ -91,7 +91,7 @@ drawn pen dot is the part Android uses that other platforms do not.
 
 - **Qt's `ToolSeparator` and `MenuSeparator`** (pills, menus) are 1 logical pixel: at 125 % / 150 % some come out
   one pixel thick, some two. The app could replace their `contentItem` with a `Hairline` (about 45 places, or one
-  shared component). Left for the author to decide (see the device checklist's note).
+  shared component); a decision for the author (TODO.md, "Decisions for the author").
 - **Rounded frames** stay antialiased and slightly soft at fractional widths; snapping cannot help a curved edge.
 - **Positions inside lists and layouts** are logical: a frame at x = 10.4 logical is 13 device pixels at 125 %, so
   the content inside it (filtered images, icons) is not always on whole device pixels. Only the canvas snaps its

@@ -17,9 +17,9 @@ dialect is CommonMark with GitHub's extensions (tables, strikethrough, task list
   Its source beside the page is in the button's menu (press and hold, or right-click: "Markdown source beside the
   page"), and Ctrl+Alt+M while writing on the page opens it there too. With the text tool, a tap on it writes it
   on the page.
-- **Markdown text boxes** go anywhere on a page. Turn on "Markdown" in the text tool's font menu (hold the text
-  button, or tap it again), then tap where the text should go. A tap on a box (text tool) edits it again.
-- **A sticky note's text**: a tap with the text tool (Markdown on) on a sticky note writes the note's one Markdown
+- **Markdown text boxes** go anywhere on a page: the text tool always writes Markdown; tap where the text should go.
+  A tap on a box (text tool) edits it again.
+- **A sticky note's text**: a tap with the text tool on a sticky note writes the note's one Markdown
   text, which lies in the note's layer at its top left and is as wide as the note (it flows again when the note is
   resized); the note pill's "Text" does the same. See [sticky-notes.md](sticky-notes.md), "Notes as containers".
 
@@ -39,7 +39,7 @@ Writing:
     - Editing: Backspace and Delete, Ctrl+A / C / X / V.
     - Formatting: Ctrl+B / I / E / K (bold, italic, code, link), Ctrl+1 / 2 / 3 / 0 (headings), Tab and Shift+Tab
       (list levels). Each is one undo step; the marks go again when pressed on text that has them.
-  - The formatting bar, a row under the tool bar while Markdown is written, has these and the other tools (lists,
+  - The formatting bar, a row under the top bar while Markdown is written, has these and the other tools (lists,
     check boxes, quote, code block, formula, table editor, rule, image, page break): [md-editor.md](md-editor.md),
     "Formatting bar".
   - Ctrl+Z / Ctrl+Shift+Z and the undo and redo buttons undo and redo in the text being written; once it is done, the
@@ -124,13 +124,13 @@ Code: `qt/src/canvas/MarkdownBoxResize.*` (the handle, the drag, the undo step),
 
 **Font size.** The body text is drawn at the text's font size: the size Xournal++ shows the source in is the size it is drawn at.
 Headings, code and the rest scale from it. New Markdown text gets the Markdown size, which is 60 % of the text font
-by default (a 16 pt text font gives 10 pt). It can be set in the text tool's font menu (with "Markdown" on) and in
+by default (a 16 pt text font gives 10 pt). It can be set in the text tool's font menu and in
 the editor beside the page ("Size", which also changes the text being edited).
 
 ## Using it
-- Write on the page with the writing button in the tool bar (hold or right-click it and choose "Markdown"; after that
-  a tap writes Markdown again), with Ctrl+Alt+M, or with a tap of the text tool (Markdown on in its font menu). The
-  source editor beside the page is the writing button's "Markdown source beside the page".
+- Write on the page with the writing button (`textModeButton`, "Write on the page": a tap writes Markdown on the
+  page), with Ctrl+Alt+M, or with a tap of the text tool (the text tool always writes Markdown). The source editor
+  beside the page is the writing button's "Markdown source beside the page" (held or right-clicked).
 - The formatting bar above the source has the same tools as on the page (the table editor too), acting on the
   source, each one undo step of the source. Enter continues a list, and Enter on an empty item ends it.
 - Keys: Ctrl+B / I / E (code) / K (link), Ctrl+1-3 for headings (Ctrl+0: paragraph), Tab / Shift+Tab to indent list
@@ -229,7 +229,7 @@ text, `searchText`, `mathAt`), `CanvasView::mathErrorAt` and `DocumentCanvasItem
   Escape closes the list for that shortcode. Not after a letter, digit or colon (`10:30`, `std::`). An on-screen
   keyboard's word being typed counts. Code: `qt/src/canvas/EmojiCompletion.*` (the canvas), `MarkdownPanel.qml` and
   `qt/src/quick/EmojiNames.*` (beside the page), `EmojiSuggestions.qml` (the list).
-- **Picker**: the 🙂 button (in the tool bar while writing on the page, among the Markdown buttons beside it) opens
+- **Picker**: the 🙂 button (`emojiButton`, on the top bar while writing on the page, among the Markdown buttons) opens
   a search over names, tags and descriptions and the emoji by category; a tap puts one at the cursor.
   `EmojiPicker.qml`.
 - **One character**: the cursor, Backspace and Delete go over a whole emoji sequence (Pango's grapheme clusters,

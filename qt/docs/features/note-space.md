@@ -1,9 +1,6 @@
 # Space for notes beside slides
 
-Status: built in `qt/note-space` (2026-09-26). The design was written before the code; the sections below say what
-was built.
-
-The author (2026-09-26): "Space for notes beside slides: an option for inserting on the current page and on all pages,
+The author: "Space for notes beside slides: an option for inserting on the current page and on all pages,
 with adjustable amounts to add to the margin of choice. They can be combined, e.g. space at the bottom and on the
 left side. Make sure this is somewhat efficient and does not break the PDF structure and search."
 
@@ -18,7 +15,7 @@ each slide, which the dialog also offers.
 - The page's size includes the space: width = slide width + left + right, height = slide height + top + bottom.
 - The PDF background is drawn at `(left, top)`, at its own scale. Nothing is scaled, and the PDF is never rendered at
   another size: `PdfCache` keeps one picture per PDF page and zoom, and the page draws it at the offset.
-- Other backgrounds (plain, ruled, graph, ...) fill the whole page as before; they have no offset.
+- Other backgrounds (plain, ruled, graph, ...) fill the whole page; they have no offset.
 - The "slide" of a page is the rectangle `(left, top, width - left - right, height - top - bottom)`. For a PDF page it
   is the PDF page.
 
@@ -84,7 +81,7 @@ the crop box grows around it (by `left` on the left, `top` on the top, and so on
 `/Rotate` the sides are mapped onto the PDF's box), and the media box takes the grown crop box in. That places the
 original content at the offset without a form XObject or a `cm` operator, and everything in PDF space keeps working in
 any viewer: text search and selection, the PDF's links, other apps' annotations. Our ink annotations are placed on the
-crop box as before (`placementOf`), so they land at the right places; an archive PDF merges them there.
+crop box (`placementOf`), so they land at the right places; an archive PDF merges them there.
 
 - The page's own boxes are kept on it in a private key (`/XournalQtBoxes`). The clean copy (the background of a hybrid
   PDF we open) gets them back, so the background has the slide's own size and the embedded `.xopp` adds the space
@@ -109,8 +106,7 @@ crop box as before (`placementOf`), so they land at the right places; an archive
 - one undo step for all pages (`NoteSpaceUndoAction`: per page the old and new space and size; undo moves the
   elements back);
 - the size change is announced per page. The canvas renders again only the pages in view and those that have a
-  picture; the others are drawn when they come into view (before, every page whose size changed was queued at the
-  priority of the visible pages). A render that ran while its page changed size renders again. 300 pages: about 1 ms
+  picture; the others are drawn when they come into view (not all queued at the priority of the visible pages). A render that ran while its page changed size renders again. 300 pages: about 1 ms
   in the session, 5 ms with the document open in a view (tests below);
 - all amounts 0 restore the slide's size and the elements' places exactly; image backgrounds are left out.
 

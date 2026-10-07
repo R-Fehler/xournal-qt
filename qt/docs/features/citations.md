@@ -1,9 +1,8 @@
 # Citations and arXiv
 
-Status: **design note of `qt/citations`** (2026-09-26); built as described below ("What is built" at the end lists
-where it differs). The author (2026-09-25/26): "following citations is too hard". Reading a paper, the reader meets
-"[12]" and wants the paper behind it: is it in the library already? If not, where is it? This block makes that a few
-taps: from the selected text to the paper beside the notes.
+The author: "following citations is too hard". Reading a paper, the reader meets "[12]" and wants the paper behind it:
+is it in the library already? If not, where is it? This makes that a few taps: from the selected text to the paper
+beside the notes. ("Code" at the end names the parts.)
 
 Not now: `.bib` files (the user flow is still being thought out), Zotero.
 
@@ -14,7 +13,7 @@ box, a text element, a `.md` being written: the editor's selection). Both offer 
 
 | Action | What it does |
 | --- | --- |
-| **Search in this document** | the document's search bar with the text, run (qt/selection-search) |
+| **Search in this document** | the document's search bar with the text, run |
 | **Search in open tabs** | the tab overview, its search with the text |
 | **Search in the library** | the home screen, the library's search with the text (the library shown) |
 | **Find this paper** | the library, by title (section 2); no hit: Google Scholar and arXiv |
@@ -35,7 +34,7 @@ box, a text element, a `.md` being written: the editor's selection). Both offer 
 - The query is the selected text, whitespace collapsed, hyphenation at line ends joined ("hyphen- ation" →
   "hyphenation"), cut to 500 characters for Scholar and 1,500 for translators (URL lengths).
 
-**The menu's order** (qt/selection-search): the searches here first (document, open tabs, library), then the
+**The menu's order**: the searches here first (document, open tabs, library), then the
 paper (Find this paper, arXiv), then the web (Search the web, Scholar, Translate), with separators between them.
 The searches take the text cleaned as above and cut to its first **200 characters** at a word (`cite::QUERY_CHARS`,
 `Citations::searchQuery`); the document search, the overview's and the library's are run at once (no waiting for
@@ -172,9 +171,9 @@ address, and opens through the same confirmation as Scholar.
   arXiv search and download, the opt-in.
 - QML: `LookUpMenu.qml` (the menu of the pills), `WebConfirm.qml`, `FindPaperSheet.qml`.
 
-## What is built (`qt/citations`)
+## Code
 
-As planned above, with these details:
+The details:
 - The look-up menu is `LookUpMenu.qml`, opened by the magnifier of the PDF text pill and by "Look up…" of the
   context pill (both also in the reference). Our own text is the selection of a Markdown box, a text element or a
   `.md` on the page (`CanvasView::selectedText`); the Markdown source beside the page has no look-up yet.
@@ -184,7 +183,7 @@ As planned above, with these details:
   (`LibraryIndex::titleSearch`), so a big library does not stall the window.
 - arXiv: `ArxivSheet.qml` (with the opt-in dialog), `Citations` (search, look-up, download), `NetFetch` /
   `ArxivQueue` (`qt/src/shell/NetFetch.*`). Only the first arXiv ID of a selection is offered in the menu.
-- The searches of selected text (qt/selection-search): `LookUpMenu.qml` calls `win.searchInDocument`
+- The searches of selected text: `LookUpMenu.qml` calls `win.searchInDocument`
   (opens the search bar, sets `app.searchQuery`: the bar follows a search set from elsewhere), `win.searchOpenTabs`
   (`TabOverview.searchFor`) and `win.searchLibraryFor` (`HomeView.searchFor`). The Markdown source beside the page
   has no look-up menu, so no searches either.

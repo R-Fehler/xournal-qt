@@ -71,12 +71,8 @@ the tooltip and the accessible name say it in words):
   the index at once, and its card follows.
 - The Recent cards show the kinds of the library's PDFs too (from the same index); a PDF outside the library shows
   "PDF". The tab overview has no badges.
-- Measured (2026-09-26, `XQT_BENCH_KINDS=300 [XQT_BENCH_PDF=<pdf>] xqt-shell-tests
-  --gtest_filter='LibraryKindsTest.bench*'`, 300 PDFs in 5 folders, 113 of them with notes, the flat list, machine
-  busy with other builds): before, "Only PDFs with notes" looked into each lone PDF on the UI thread, 34 ms for small
-  generated PDFs and **361 ms** for copies of a 1.3 MB, 200-page manual the first time (then about 1 ms, remembered
-  per file version and up to 4,096 files); now turning the filter on takes 7 ms in all (the listing and the look-ups),
-  and no PDF is looked into.
+- No PDF is looked into for the "Show" filter: turning "Only PDFs with notes" on for 300 PDFs takes a few ms
+  (`XQT_BENCH_KINDS=300 [XQT_BENCH_PDF=<pdf>] xqt-shell-tests --gtest_filter='LibraryKindsTest.bench*'`).
 - **Text and code files** (`.txt`, `.tex`, `.py`, `.cpp`, `.h`, `.json`, `.csv`, `.org`, `.rst`, `.yaml`, `.toml`,
   `.sh`, and many more, also `Makefile`, `README`, … without an extension) and **all other files** (Office files and
   the rest) are items too, each known by its whole file name (`report.docx`), when the library's "Show" filter shows
@@ -104,7 +100,7 @@ the tooltip and the accessible name say it in words):
 
 ### Renaming
 
-One rename for every place it is offered (qt/rename): `DocumentFiles::rename` renames the document's files, and then
+One rename for every place it is offered: `DocumentFiles::rename` renames the document's files, and then
 the search index entry, the reading places and title page (`DocumentPlaces`), the covers, the open tabs, the recent
 list and the links to and from it follow (`LibraryModel::followMoves`, `AppController::filesChanged`,
 [links.md](links.md)). What is renamed with it:
@@ -122,7 +118,7 @@ Where:
   the line below it) a **press and hold** (finger or mouse) or a **double click** with the mouse edits the name in
   place: the name selected, a text file's extension beside it as fixed text; Enter renames, Escape or a click
   elsewhere cancels, a name that cannot be used says why (red) and stays. A click on the title still opens the card, a
-  moment later (the time a double click may take); the rest of the card works as before (a tap opens, press and
+  moment later (the time a double click may take); the rest of the card works as usual (a tap opens, press and
   hold opens the menu or drags). A folder's title renames the folder.
 - **A tab**: a **double click** with the mouse on the title of the tab that is shown edits it in place, the same way
   (the extension stays beside it). A double click on another tab only shows that tab (its first click does). The tab's
@@ -144,7 +140,7 @@ file, and its pages' image backgrounds follow.
   file's text as the page's Markdown text flowing over them (`qt/src/canvas/MarkdownFile.*`, drawn by our Markdown
   renderer), titled with the file name. It is written in on its pages, and saving writes the text back to the file
   (never a `.xopp`). A file that is not UTF-8, is over 2 MB (then its first 2 MB are shown) or cannot be written
-  opens read-only as before: a note at the bottom left of the page view says why (× closes it for this tab), and
+  opens read-only: a note at the bottom left of the page view says why (× closes it for this tab), and
   nothing writes on it. Opening it again shows its tab.
 - An **image** opens as a new document with one page that has the image as its background (upstream's image
   background), as big as the image fits into A4's long side, titled with the file name, with a note that saving
@@ -459,11 +455,10 @@ Both steps match the same text with the same matcher (`TextMatch.*`:
 case-insensitive, whitespace runs as one space - so a phrase across a line break is found -, ligatures as their
 letters, a word broken at a line end with a hyphen found whole), so the count and the marks agree.
 
-Measured on the pgf manual (1,321 pages, 2026-09-24): before, poppler searched every page on the UI thread for every
-query, 3.3–3.8 s per query and up to 57 ms per event loop pass; now the counts of a document in a library are there
-in about 10 ms, a document read for the first time has all counts after about 6 s in the background (the first hits
-after 0.1 s) with at most 0.3 ms per event loop pass, and each key typed costs about 7 ms. The index takes 6.6 MB
-for the manual's text, the kept character boxes about 4 MB, the worker's poppler instance about 8 MB.
+Nothing searches on the UI thread: on a 1,321-page manual the counts of a document in a library are there in about
+10 ms, a document read for the first time has all counts after a few seconds in the background (the first hits after
+0.1 s), and each key typed costs a few ms. The index takes about 6.6 MB for that manual's text, the kept character
+boxes about 4 MB, the worker's poppler instance about 8 MB.
 
 ## Fuzzy search
 "Fuzzy" in the library's search field (and in the tab overview's and an open document's search bar, below) turns on
@@ -579,23 +574,12 @@ and its row of pages (the extended view) lists the pages on which the expression
 there with the toggle on: the expression over the titles alone.
 
 The query is parsed once per search (`qt/src/session/FuzzyQuery.*`, fzf's port in `FuzzyMatch.*`), each text is
-scanned once per term that is not fuzzy; fuzzy terms are counted from the vocabularies. Measured on a generated library of 3,000 Markdown files in 320 folders (~12 MB of text, six
-files of ~1.7 MB) on the development machine, best of three, in several runs while other builds kept it busy (load
-5-7), so as ranges: the index search takes 18-55 ms for a plain word, 24-74 ms for the same word fuzzy, 44-133 ms
-for `kalman filter` and 77-215 ms for `(kalman | robust) !draft ^lin`; the library model adds 10-90 ms around it (it
-lists the folders again, as the plain search does). Typing waits 300 ms before it searches, as before.
-`XQT_BENCH_FUZZY=3000 xqt-shell-tests --gtest_filter='LibraryFuzzyTest.bench*'` repeats the measurement.
-
-Fuzzy words in text (2026-09-24; the benchmark's text now also has 40,000 made-up words, a quarter of it, so it has
-as many distinct words as a real library; load 2-3, so again as ranges): before, with a fuzzy term a substring, the
-index search took 24-51 ms for one word (`kalman`, `klman`, `sgnals`), 72 ms for `kalman filter`, 133 ms for
-`(kalman | robust) !draft ^lin`; now, matching words, 25-41 ms, 35-41 ms and 104 ms. The first search makes the
-vocabularies of all 3,000 documents (~10 MB of text): 320-410 ms, done in the background when the fuzzy search is
-on. In an open document (the pgf manual, 1,321 pages): matching every word for each key typed took 54-75 ms (160 ms
-for two terms); from the vocabularies 1.7-7.8 ms, the substring search 3-5 ms. Its first fuzzy search made the
-vocabularies on the UI thread, ~160 ms and 1.7 MB for 6.6 MB of text, a dictionary of 12,000 words; with the fuzzy
-search on they are made in the background beforehand (2026-09-26). `XQT_BENCH_PDF=<pdf>
-xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open document.
+scanned once per term that is not fuzzy; fuzzy terms are counted from the vocabularies of words (one per document,
+made in the background once the fuzzy search is on; an open document's too). Typing waits 300 ms before it searches.
+On a generated library of 3,000 Markdown files (~12 MB of text) a search takes tens of milliseconds, up to about
+200 ms for a long query with groups; in an open 1,321-page document a few ms per key. The benchmarks:
+`XQT_BENCH_FUZZY=3000 xqt-shell-tests --gtest_filter='LibraryFuzzyTest.bench*'` (the library) and
+`XQT_BENCH_PDF=<pdf> xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` (an open document).
 
 ## Home screen
 - It is the first tab (library icon and name). It is shown when no document is open, and closing the last tab

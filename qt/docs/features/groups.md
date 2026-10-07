@@ -1,4 +1,4 @@
-# Groups of elements (`qt/groups`)
+# Groups of elements
 
 Elements that belong together (a drawn figure, a figure and its labels, a pasted sticker) are made a **group**: a
 tap on any of them selects all of them, and they move, scale, rotate, copy and delete together. Groups are flat (an

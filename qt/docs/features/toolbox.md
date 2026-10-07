@@ -1,51 +1,32 @@
-# The toolbox (qt/toolbox)
+# The toolbox
 
-The author (2026-10-04): "it feels like just picking up a real pen from a sorted toolbox on a table … this is how
-Drawboard works … a plus button like we already have, then the user can select which type of tool should go there and
-select color and width etc. … the order of the tools should be user configurable with up/down arrows in the tool
-context menu, which also allows changing the tool at the current position or by drag and dropping … drag and drop
-only starts after pressing a while, then the user gets visual feedback that we are moving the tool and not the pill."
-And: one element in the window and in full screen; undo and redo easy to find; fewer commands hidden behind » on a
-wide screen; a reading mode without the edit tools.
+The user's own tools on a rail beside the page, and the app's tools and commands on the rail and on the top bar, in
+one arrangement the user orders, groups and carries between the two. The author: "it feels like just picking up a real
+pen from a sorted toolbox on a table … this is how Drawboard works … a plus button like we already have, then the user
+can select which type of tool should go there and select color and width etc. … the order of the tools should be user
+configurable … drag and drop only starts after pressing a while, then the user gets visual feedback that we are moving
+the tool and not the pill." And: one element in the window and in full screen; undo and redo easy to find; the same UI
+on a wide desktop and on smaller screens ("since the tool placement and order can be the same"); user tools before
+the app's; groups made by the user ("by dragging a tool and holding long over another tool").
 
-The author's decisions: a rail docked to any side of the canvas, **right by default**; the eraser is an entry; the
-tools are stored per device. Zen hides it with everything else around the page; read only and presenting are apart
-from it (below). (The classic tool bar, kept for one release, went in 0.8.0; folded sections went with the scrolling
-rail.)
-
-**One UI (0.8.0, qt/rail-scroll).** The author on 0.7.0, the Fold 7 unfolded: "the user defined tools on the rail are
-fully collapsed into a single button while the system tools are expanded to the rest. I don't like that. I want the
-user tools to have higher priority and I think scrolling the tools would be good. Maybe we can let the user group
-tools into cycle groups themselves if they like? By dragging a tool and holding long over another tool? … A scrolling
-rail would help having the same ui on wide desktop or smaller screens since the tool placement and order can be the
-same." And: "A tap should open the group list if more than 3 tools in the group." So the rail scrolls instead of
-folding (below, "A rail that scrolls"), the user makes groups (below, "Groups"), and one stored arrangement holds the
-rail and the top bar (below, "Storage"). Then (qt/top-bar): "Can we let the user move things from rail to top and vice
-versa as well? What do you think of the top toolbar to allow more customization as well, so custom order, grouping,
-dragging from and to the rail?" and "I think zen is helpful put it into the top bar." So the top bar is the other list
-of the same arrangement, scrolling as the rail does, and items are carried between the two (below, "The top bar").
-
-**The classic tool bar was removed in 0.8.0** (qt/classic-removal; the author, 2026-10-06: "let's get rid of all the
-other ui variants we have. Remove the classic toolbar to not drag dead weight as well."). Gone with it: the tool
-square of full screen and its quick tools, the pen pill, the colour strip and the widths of the bar (and their ladder
-in `ToolBarPlan.js`), the bar's places (two rows, a rail at a side, the bottom), the classic dock of a phone (the tool
-in use, the color, the width), the setting `toolbarMode` (Settings → Pen → Tools) and `XQT_TOOLBAR_MODE`. The toolbox
-is the only way the tools are arranged; a settings file that chose the classic bar gets the toolbox (below, "After an
-update").
+Decided with the author: a rail docked to any side of the canvas, **right by default**; the eraser is an entry; the
+tools are stored per device; the rail scrolls instead of folding; one stored arrangement holds the rail and the top
+bar; the toolbox is the only way the tools are arranged (the classic tool bar is gone:
+[history/README.md](../history/README.md)).
+Zen hides it with everything else around the page; read only and presenting are apart from it (below).
 
 ## Using it
 
 **My tools.** Each entry is a tool with its settings: a pen (color or palette role, width, line style, filling), a
 highlighter, a shape (line, rectangle, ellipse, arrow, double arrow, coordinate system, recognized shapes; drawn with
 the pen or the highlighter), an eraser (standard, whiteout, whole strokes; its size), a text box (its font and color),
-a sticky note (its pastel), the laser pointer (pen or highlighter), a **snip** (a rectangle or a lasso whose picture goes to the clipboard; a
-cycling tool: a tap while it is armed takes the other shape, qt/ui-rework). Dividers group them into sections.
+a sticky note (its pastel), the laser pointer (pen or highlighter), a **snip** (a rectangle or a lasso whose picture
+goes to the clipboard; a tap while it is armed takes the other shape). Dividers group them into sections.
 
 The first start: three pens (body, key terms, warnings) | two highlighters (key terms, definitions) | the eraser | a
 line, a text box, a sticky note | the laser pointer. The pens and highlighters take their colors from the **palette
 roles** ([color-palettes.md](color-palettes.md)): choosing another palette recolors them. A settings file without a
-toolbox (or with one of another version, such as 0.7.0's) gets these first tools; the first pen is in hand at the
-start.
+toolbox (or with one of another version) gets these first tools; the first pen is in hand at the start.
 
 | Gesture | What it does |
 | --- | --- |
@@ -62,33 +43,32 @@ The rail itself moves only by its **grip** (the dotted cap at its start): dragge
 highlighted, let go: the rail goes there (remembered per window size, `layout/<class>/toolbox`; also ⋮ → View →
 Toolbox position).
 
-**Head and tail.** Undo and redo lead the rail (one place: the view pill has them no more while the toolbox is shown);
+**Head and tail.** Undo and redo lead the rail (one place: the view pill does not have them while the toolbox is
+shown);
 "+" ends it. They are pinned: they do not scroll.
 
-**The app's tools** are items of the rail like the user's tools (since qt/rail-scroll): at a first start, after the
-user's tools and a divider, hand, select (rectangle ↔ lasso), **snip** (rectangle ↔ lasso, one tap away since
-qt/copy-tools; its list also holds the snips' resolution, [snip.md](snip.md)) and **mark PDF text ↔ copy handwriting
+**The app's tools** are items of the rail like the user's tools: at a first start, after the user's tools and a
+divider, hand, select (rectangle ↔ lasso), **snip** (rectangle ↔ lasso, one tap away; its list also holds the snips'
+resolution, [snip.md](snip.md)) and **mark PDF text ↔ copy handwriting
 as text** (a cycle, the "text" group; its list says how PDF text is marked;
 [handwriting-search.md](handwriting-search.md)). They are the window's own buttons, lent to a cell of the rail
 (`Toolbox.fixedButtons`, the buttons of the app items on the rail): one place each; the top bar lends its own the same
 way.
-A tap is the button's tap (select's tap while it is in use takes the other kind, as before); they are carried, grouped
+A tap is the button's tap (select's tap while it is in use takes the other kind); they are carried, grouped
 and removed like the user's tools. Held without moving (or a right click): the rail's menu for them — "Options…" (their
 own list: select's kinds on all layers, the snips' resolution, how PDF text is marked), Move, Add a tool here…, the
 divider, **Move to the top bar**, **Off the bars (into +)** (the item is "not placed" then: the catalog offers it, ⋮
 has it as always). A finger held on one shows its name above the finger while held.
 
-**Write on the page, the setsquare / compass, the finger draws and record audio left the rail** (0.8.0): the top bar's
-first layout holds them (below), in full screen the floating rail's ⋯ (it lists the top bar), and ⋮ → Tools (the
+**Write on the page, the setsquare / compass, the finger draws and record audio** are on the top bar in its first
+layout (below), in full screen the floating rail's ⋯ (it lists the top bar), and ⋮ → Tools (the
 setsquare's curtain and spotlight are ⋮ → View, B and Shift+B). Keys: Ctrl+Alt+M writes on the page, Ctrl+Shift+R
 records. The recording and playback pills sit at the top of the page, below the toolbox when it floats at the top.
 
 ## A rail that scrolls
 
 The rail shows its items in the order of the arrangement, the same on every screen (the author: "the same ui on wide
-desktop or smaller screens since the tool placement and order can be the same"). Nothing folds (0.7.0's `ToolboxPlan`
-folded a user section as a whole, so one long section was all or one button, and what its fold freed went to the fixed
-tools; it is gone with its stacks and its hysteresis). When the items do not fit, the middle **scrolls** (up and down
+desktop or smaller screens since the tool placement and order can be the same"). Nothing folds. When the items do not fit, the middle **scrolls** (up and down
 at a side, sideways at the top, the bottom and in the phone's dock):
 
 - its view ends through the middle of a cell, so half of the next one shows (`Toolbox.cutFor`: the largest cut at
@@ -104,22 +84,22 @@ at a side, sideways at the top, the bottom and in the phone's dock):
 - the floating rail (full screen) is as long as its items, or as long as the room there is, cut the same way
   (`Toolbox.lengthFor`).
 
-Measured off-screen with the touch profile and the first layout (14 cells, 5 dividers): at 1920 × 1080 everything is in
-sight; on the Fold 7 unfolded (900 × 1000) every one of the user's tools is in sight and the app tools scroll; the
-folded dock (412 × 915) and the phone held sideways scroll.
+With the touch profile and the first layout (14 cells, 5 dividers): at 1920 × 1080 everything is in sight; on the
+Fold 7 unfolded (900 × 1000) every one of the user's tools is in sight and the app tools scroll; the folded dock
+(412 × 915) and the phone held sideways scroll.
 
 ## Groups
 
 The user makes groups (the author: "by dragging a tool and holding long over another tool"): **carry** a tool (hold,
 move) onto another and keep it there; after about 0.6 s the target shows a **ring** (`toolRing`); let go: the two are
 a group in the target's place, and the snackbar says "Grouped" with **Undo** (the arrangement of before, restored
-whole). Moving on before the ring is a reorder, as before. A tool carried onto a group joins it; a group carried onto
+whole). Moving on before the ring is a reorder. A tool carried onto a group joins it; a group carried onto
 another gives it its members; a whole group can be carried to another place.
 
 A group (`railGroup_<id>`) shows **the member used last** with dots for how many it holds. A **tap** takes that member.
 A tap while one of its members is in hand takes **the next** with two or three members, and **opens its list** with
 more than three (the author's rule). A group with a command in it (on either bar) opens its list on every tap
-(qt/top-bar: nothing runs by accident). The list (`toolGroupFlyout`), beside the group towards the page: a tap picks a
+(nothing runs by accident). The list (`toolGroupFlyout`), beside the group towards the page: a tap picks a
 member (the one in hand: its editor), held: its menu, held and moved: **carried out** of the group (onto the rail: it
 leaves it). The group's menu (held, right click): "Its tools…" (the list), Move, Add a tool here…, the divider,
 **Ungroup** (the members back in its place, in their order). App tools group like the user's (select and snip in one
@@ -135,15 +115,14 @@ sheet) makes it the one its group shows.
 | --- | --- |
 | desktop, tablet (full chrome) | docked to its edge, taking its strip (`sideTools` at a side, `toolboxRow` at the top or the bottom); the right by default, also in tablet portrait (a 52 px rail leaves an A4 page well visible) |
 | full screen (the compact chrome), presenting with the tools | the same toolbox floating 8 px off its edge, rounded, as long as its tools (it ends above the view pill); ⋯ at its end: present, present without controls (presenting: hide the tools), read only, Zen, search, settings, leave full screen, then **what the top bar holds** (full screen hides it) and **New document** (below, "The top bar"). On a phone too: at the bottom upright (the view pill moves above it), at the right held sideways |
-| phone portrait | the dock at the bottom, the same rail at the bottom edge (qt/rail-scroll): undo, redo, the same items scrolling sideways (the one in hand scrolled into view) with **"+"** after them (not pinned: its room goes to the tools), the page number |
-| phone held sideways | the same as a rail at the right; the page number is in the app bar (the rail's room goes to the tools: undo, redo and the page number took most of it, with the insets about one cell was left) |
+| phone portrait | the dock at the bottom, the same rail at the bottom edge: undo, redo, the same items scrolling sideways (the one in hand scrolled into view) with **"+"** after them (not pinned: its room goes to the tools), the page number |
+| phone held sideways | the same as a rail at the right; the page number is in the app bar (the rail's room goes to the tools) |
 | a text document (`.md`) | no toolbox (no ink): undo and redo lead its format bar |
 | replaying the writing | no toolbox, and no top bar, its tab or phone dock either: the play bar only ([timeline.md](timeline.md)) |
 
 ## The top bar
 
-The bar at the top (qt/top-bar; it replaced the command bar of qt/ui-rework and its ladder into ⋮ and "more tools",
-`ToolBarPlan.js`) is **the other list of the arrangement** (`ToolboxModel.top`), drawn by the same element as the rail
+The bar at the top is **the other list of the arrangement** (`ToolboxModel.top`), drawn by the same element as the rail
 (`Toolbox.qml` with `bar: "top"`, `topBarPane`; its parts are named `topBar…`, its items `topApp_<name>`,
 `topGroup_<id>`, `toolEntry_<id>`): the user's order, dividers and groups, the same on every screen.
 
@@ -170,7 +149,7 @@ The bar at the top (qt/top-bar; it replaced the command bar of qt/ui-rework and 
   the tools.
 - In Zen and the compact chrome (full screen) it is not shown: the floating rail's ⋯ lists what it holds, in its order,
   the members of a group one by one (`toolboxMore_<name>`, `toolboxMore_<entry id>`), without what ⋯ has of its own
-  (present, Zen, search, settings), and **New document** (`toolboxNewItem`; before, only Ctrl+Shift+N reached it there).
+  (present, Zen, search, settings), and **New document** (`toolboxNewItem`).
 - Its tab at the top edge puts it away (a slim strip brings it back); the toolbox stays then.
 
 **Carrying between the bars** (one home per item: the rail, the top bar, or neither). Hold an item on either bar until
@@ -187,7 +166,7 @@ The carried item is drawn over everything (it may go from one bar to the other) 
 member carried out of a group's list goes the same ways. The item's menu has the same without carrying: **Move to the
 top bar** / **Move to the rail** (at its end) and **Off the bars (into +)**.
 
-**The catalog** ("+", `toolTypeMenu`; it replaced "Put back" and, on phones, "My tools"): a new tool of a kind (pen,
+**The catalog** ("+", `toolTypeMenu`): a new tool of a kind (pen,
 highlighter, shape, eraser, text box, sticky note, laser pointer, snip: the editor, then **Add**), then every app tool
 and command on neither bar that is offered here, by section (Tools, Insert, View, Document: `catalogSection_<name>`,
 `catalog_<name>`). A tap puts it at the end of the bar it was opened from ("+" at the rail's end: the rail; at the top
@@ -206,7 +185,7 @@ of its own under the title upright, beside the title held sideways; ⋮ stays at
 too.
 
 **A text document's format bar** (with the toolbox): undo and redo at its start, then all the formatting (nothing
-folds any more: no "Insert" menu, no heading button), then the commands: the top bar itself, at the end of the same row
+folds: no "Insert" menu, no heading button), then the commands: the top bar itself, at the end of the same row
 (`formatCommands`; its cells 40 px like the format buttons), and ⋮ pinned at the end. The row scrolls as the bars do:
 it ends through the middle of a button, fades at the end that has more, the wheel scrolls it. At 1366 px the formatting
 and the first commands are in sight; at about 1800 px and wider everything. (Markdown on a page and the editor beside
@@ -225,12 +204,10 @@ Weighed and left where they are (one place each):
 
 ## Zen, read only and presenting
 
-The author (2026-10-05): "The reader mode sucks. … we should just reuse the full screen or present mode with a read
+Three switches of their own: full screen, **Zen** and **read only**; Read is Zen and read only together
+([zen.md](zen.md) has the whole of it). The author: "we should just reuse the full screen or present mode with a read
 only / readmode toggle that allows skipping to next prev page with big touch areas on the left and right side of the
-screen." Then (2026-10-06): "the read only mode still has this big ass lock icon … The idea of the small dot chrome is
-to be invisible and produce a zen mode UI which fitted also for tiny screen document reading and referencing." So since
-qt/zen (0.8.0) there are three switches of their own: full screen, **Zen** and **read only**; Read is Zen and read only
-together ([zen.md](zen.md) has the whole of it).
+screen."
 
 - **Zen** (`win.modes.zen`): only the page and a faint dot in its lower left corner; everything around the page is hidden
   (`win.modes.hudHidden`: this toolbox, docked or floating, the top bar, the tabs, the sidebar's arrow, the pills). The
@@ -250,7 +227,7 @@ together ([zen.md](zen.md) has the whole of it).
     scrolls, and taps in a row turn page after page (no double tap there). The fields (`ReadingFields.qml`,
     `readingTapFields`) only show the hint and let the presses through (`inputTransparent`). In Zen a finger's tap
     in the middle opens the dot's pill (`middleTapped`);
-  - **no lock** any more (the `readOnlyMark` of 0.7.0): the first stroke tried says so once, at the pen, for a moment
+  - **no lock**: the first stroke tried says so once, at the pen, for a moment
     ("Read only — tap the dot to write"; outside Zen where to turn it off; `CanvasView::writingRefused`,
     `readOnlyNote`).
   - It ends with its switches and when the home screen is shown (`onReadOnlyOfferedChanged`).
@@ -258,25 +235,23 @@ together ([zen.md](zen.md) has the whole of it).
   window stays a window). The keys again end it (and what it turned on); Esc too.
 - **Presenting** (F5): full screen, black around the pages, page by page; writing on the slides stays possible: the
   toolbox floats. "Present without controls" (Ctrl+F5, the Present button held) is presenting in Zen: the dot and its
-  pill bring the controls back, Ctrl+F5 hides and shows them (presenting's own corner field is gone). Read only while
+  pill bring the controls back, Ctrl+F5 hides and shows them. Read only while
   presenting: the edges go to the previous and next slide, the pen does not write; Ctrl+Alt+R while presenting is
   presenting without controls with read only.
 
-Kept from the reading of before, as settings rather than a pill: **up and down or sideways** and **whole pages**
-(⋮ → the view pill's page layout menu: "Scroll sideways", "Stop on whole pages"; the latter is offered while reading
-too). The width or the whole page: the view pill's zoom menu. Dropped: the pill itself, its ‹ › (the edges do that)
-and its fading.
+Settings rather than a pill of their own: **up and down or sideways** and **whole pages** (⋮ → the view pill's page
+layout menu: "Scroll sideways", "Stop on whole pages"; the latter is offered while reading too). The width or the
+whole page: the view pill's zoom menu.
 
 Up and down, "whole pages" (the setting `snapPages`, as sideways) makes a drag or a fling come to rest on a row of
 pages while reading (`ViewController::setSnappingVertically`; not while presenting, which is page by page anyway): a
 row taller than the view rests anywhere within it (its top at the view's top at the latest), a fling at its end goes
-on to the next row's top, a row that fits rests in the middle. Outside reading, up and down scrolls freely as before.
+on to the next row's top, a row that fits rests in the middle. Outside reading, up and down scrolls freely.
 
 ## Popups beside the rail
 
-The editor opens beside its tool and stays there while something is chosen in it. Two things keep it there (the
-author, 2026-10-05: "when I select something on the toolbelt popup the popup moves to the upper left position of the
-window"): the rail's buttons are made anew only when what is where changes (an entry, an app item, a group,
+The editor opens beside its tool and stays there while something is chosen in it. Two things keep it there: the rail's
+buttons are made anew only when what is where changes (an entry, an app item, a group,
 a divider), not when a tool's color, width or line style does (`Toolbox.items`, `syncItems`; the buttons read their
 entry from the store); and the editor is placed when it opens (and when it or the window changes size), not bound to
 its button: a button that goes away (a tool replaced) leaves it where it is, and it takes the entry's button again
@@ -285,8 +260,7 @@ its button: a button that goes away (a tool replaced) leaves it where it is, and
 ## Line styles
 
 The samples of a line style (the editor's four buttons, its preview, the ink of a tool on the rail) are drawn by
-`LineStyles.js`. Two things of Qt's Canvas made them all solid once (the author, 2026-10-05:
-"the dashed and dotted line buttons just show a regular line"): `setLineDash()` takes only a JavaScript array, and a
+`LineStyles.js`. Two things of Qt's Canvas would make them all solid: `setLineDash()` takes only a JavaScript array, and a
 list that came through a model (a Repeater's `modelData.dashes`) is silently ignored; and, like `QPen`, it measures
 the dashes in widths of the line, not in pixels, so upstream's `[6, 3]` on a 2.6 px sample of 17 px is one dash. The
 short samples use dashes in pixels (at least two dashes or three dots fit) with butt caps; the editor's preview draws
@@ -294,8 +268,7 @@ upstream's dashes as the pen does.
 
 ## Storage
 
-`ToolboxModel` (qt/src/shell): the **arrangement of both bars** (since qt/rail-scroll; before, the user's entries
-alone) as JSON in the settings (`toolbox` in the xournalQt part, per device), written after a pause of 400 ms (a
+`ToolboxModel` (qt/src/shell): the **arrangement of both bars** as JSON in the settings (`toolbox` in the xournalQt part, per device), written after a pause of 400 ms (a
 dragged slider writes once), and when the app ends. Each bar is an ordered list of items: the user's tool entries,
 the app's items by name, dividers, and groups (an id, its members — tool entries and app items — and the member used
 last).
@@ -333,7 +306,7 @@ first layout. The last eraser cannot be removed (a group removed leaves it in it
 - **The top bar's first layout** (`defaultTopLayout`): open, save, milestone, share, print | image, stickers, add
   page, write on the page | setsquare, the finger draws, record | search, read, replay, present, full screen, Zen |
   tags, favourite, bookmark | settings. The top bar shows it (above, "The top bar").
-- **The JSON** is version 2 only: another version (also 0.7.0's version 1) gives the first layout.
+- **The JSON** is version 2 only: another version gives the first layout.
 - **What the bars use**: `items(bar)`, `moveTo(id, bar, index)` (from the other bar, out of a group: carrying, "Move to
   the top bar"), `group(id, onto)` (also across the bars), `ungroup`, `members`, `shownOf`, `use`, `remove` (an app
   item: not placed; carried away from both bars), `unplaced` (the catalog), `place(name, bar, index)` (the catalog),
@@ -343,9 +316,7 @@ first layout. The last eraser cannot be removed (a group removed leaves it in it
   its end.
 
 Settings → Pen → Tools: "Back to the first layout…" (`resetLayout()`) and "Back to the first tools…" (`reset()`: the
-tools and both bars of a first start). The setting
-`toolbarMode` and `XQT_TOOLBAR_MODE` of before 0.8.0 are not read any more (a stored `toolbarMode` stays in the file,
-unused); the shell, canvas and UI tests run with the toolbox.
+tools and both bars of a first start).
 
 ## Code
 
@@ -356,7 +327,7 @@ unused); the shell, canvas and UI tests run with the toolbox.
 | `qt/src/app/qml/Toolbox.qml` | a bar (`bar`: "rail" or "top"): head, the items (entries, app items lent to it, groups and their list), tail; scrolling (the cut, the fades, the tool in hand into view, the place per class); carrying an item within it and to the other bar (`peer`, `reach`, `dragOver`, `dropHere`, `leaveBars`), the ring of a group; the grip (the rail) |
 | `qt/src/app/qml/ToolEntryButton.qml` | one tool: its icon and a sample of its ink; lifted in hand; the hold, the carrying, the wheel; a group's face (dots), the ring |
 | `qt/src/app/qml/ToolEntryEditor.qml` | the editor (and the draft of a new tool, for either bar) |
-| `Main.qml` and its parts | `Main.qml`: where the rail is (`ChromeLayout.qml`, `win.layout`: `toolboxDocked`, `toolboxFloating`, `toolboxInDock`, `toolboxEdge`) and the top bar (`topBarPane`, `win.layout.topBarShown`), the format bar's undo / redo, Zen and read only (`ViewModes.qml`, `win.modes`: `zen`, `readOnly`, `readOnlyOn`); `AppButtons.qml`: the window's buttons of the app items (`toolArea.slots`); `MoreMenu.qml`: ⋮ (`moreMenu`, its `CommandItem`s); `ToolboxMenus.qml`: the menus (`toolEntryMenu` for tools, app items and groups, the catalog `toolTypeMenu`, `catalogRows()`, `toolboxMoreMenu` with `topBarCommands()`), "Grouped · Undo", "Removed · Undo"; `ReadingFields.qml`, `ZenDot.qml`, `ZenPill.qml`, `ReadOnlyNote.qml`; `backShortcut` in `WindowShortcuts.qml` ([zen.md](zen.md)) |
+| `Main.qml` and its parts | where the rail is (`ChromeLayout.qml`, `win.layout`: `toolboxDocked`, `toolboxFloating`, `toolboxInDock`, `toolboxEdge`) and the top bar (`topBarPane`, `win.layout.topBarShown`), the format bar's undo / redo, Zen and read only (`ViewModes.qml`, `win.modes`: `zen`, `readOnly`, `readOnlyOn`); `AppButtons.qml`: the window's buttons of the app items (`toolArea.slots`); `MoreMenu.qml`: ⋮ (`moreMenu`, its `CommandItem`s); `ToolboxMenus.qml`: the menus (`toolEntryMenu` for tools, app items and groups, the catalog `toolTypeMenu`, `catalogRows()`, `toolboxMoreMenu` with `topBarCommands()`), "Grouped · Undo", "Removed · Undo"; `ReadingFields.qml`, `ZenDot.qml`, `ZenPill.qml`, `ReadOnlyNote.qml`; `backShortcut` in `WindowShortcuts.qml` ([zen.md](zen.md)) |
 | `PhoneDock.qml`, `PhoneAppBar.qml` | the dock hosts the rail; the app bar hosts the top bar (`toolsSlot`) and, held sideways, the page number |
 | `MarkdownFormatBar.qml` | a text document's commands (`commandsSlot`, `holdsCommands`): the row scrolls as the bars do |
 | `qt/src/canvas/ViewController.*`, `CanvasView`, `DocumentCanvasItem.snapVertically` | snapping up and down while reading |
@@ -364,8 +335,7 @@ unused); the shell, canvas and UI tests run with the toolbox.
 
 ## Tests
 
-Since 0.8.0 every UI, shell and canvas test runs with the toolbox (the classic bar's tests moved to it, or went with
-it where they tested what is gone: the five widths of the bar, the pen pill, the tool square).
+Every UI, shell and canvas test runs with the toolbox.
 `ToolboxApply.aSettingsFileWithoutAToolboxGetsTheFirstTools` (`-L shell`): the first tools, the pen in hand, E and T
 taking its entries.
 `ToolboxModel.*` (`-L shell`): besides the entries, the top bar's first layout, JSON of another version giving the first
@@ -385,13 +355,13 @@ pen, a drag scrolls), `theSameOrderAtEverySizeAndTheToolInHandInView` (the Fold 
 the tool in hand in view; unfolded every one of the user's tools in sight), `theScrollPositionIsRememberedPerWindowClass`.
 Groups: `aToolHeldOverAnotherUntilTheRingMakesAGroup` (no ring: a reorder; the ring: a group, "Grouped · Undo"),
 `aGroupCyclesWithThreeAndListsWithFour` (the cycle, the list, picking, carrying out, Ungroup, select and snip grouped).
-The top bar (qt/top-bar): `theTopBarShowsTheStoredArrangementAndScrolls` (the stored order, the milestone skipped not
+The top bar: `theTopBarShowsTheStoredArrangementAndScrolls` (the stored order, the milestone skipped not
 removed, "+" and ⋮ pinned, a move in the store shown, at 1000 px the cut at half a cell, the fades, the wheel, a drag
 scrolls and runs nothing, a tap runs), `itemsAreCarriedBetweenTheRailAndTheTopBar` (a pen rail → top with the drop line
 there, search top → rail and still searching, a reorder within the top bar, onto an item: the ring and a group, away:
 into the catalog and Undo, "Move to the rail"), `aGroupOfCommandsOpensItsListOnATap` (open + save: the list, nothing
 ran; Zen in a group runs from the list; hand + select on the top bar cycle), `theCatalogAddsToEitherBar` (its sections,
-"Put back" gone, an app item to the top bar's end and to the rail's end, a new highlighter to the top bar),
+an app item to the top bar's end and to the rail's end, a new highlighter to the top bar),
 `backToTheFirstLayout` (asked, both bars as at first, the tools kept), `zenIsOnTheTopBarAtEverySize` (1920 × 1080,
 1366 × 768, 900 × 1000, 1000 × 900, 412 × 915, 915 × 412: the same order, Zen in reach and working; on a phone in the
 app bar), `backLeavesZen` (Qt::Key_Back: Zen, Zen with its pill, a sheet first then Zen, Read, presenting without

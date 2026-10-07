@@ -3,7 +3,8 @@
 Gestures of the pen while it writes, as in GoodNotes, Notability, Apple Notes and Samsung Notes. They work with the
 pen of a tablet or a 2-in-1 (not the mouse or a finger), and with the pen and the highlighter drawing freehand.
 Code: `qt/src/canvas/PenGestures.{h,cpp}` (the stroke handler and the settings), `CanvasInput` (the pen at rest),
-`CanvasPage::straightenStroke`, `qt/src/canvas/ScratchOut.{h,cpp}` (the zigzag and what it covers). Tests: `qt/tests/canvas/PenGesturesTest.cpp` (label `canvas`).
+`CanvasPage::straightenStroke`, `qt/src/canvas/ScratchOut.{h,cpp}` (the zigzag and what it covers). Tests:
+`qt/tests/canvas/PenGesturesTest.cpp` (label `canvas`).
 
 ## Hold to straighten
 

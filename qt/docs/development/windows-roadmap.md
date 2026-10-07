@@ -1,6 +1,6 @@
 # Windows: roadmap
 
-What the first Windows build (`qt/windows-build`, see [windows.md](windows.md)) leaves for later. The first build
+What the Windows build ([windows.md](windows.md)) leaves for later. The first build
 only proves that the app builds on GitHub Actions, runs from a portable folder and passes a smoke test. Items are
 observed (O) on a machine or expected (E) from the code and the research in `../cross-platform-qt-research/`.
 

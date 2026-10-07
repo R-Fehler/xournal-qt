@@ -1,7 +1,7 @@
-# Images in Markdown (`qt/md-images`)
+# Images in Markdown
 
-Status: plan agreed with the author 2026-09-26 (TODO.md, "Ideas round of 2026-09-25/26"); built as `qt/md-images`.
-Related: [markdown-boxes.md](markdown-boxes.md) (drawing, formulas as inline shapes), [md-editor.md](md-editor.md)
+Pictures in Markdown text: drawn in boxes, `.md` files and text documents, kept next to a `.md` and carried inside
+notes and PDFs. Related: [markdown-boxes.md](markdown-boxes.md) (drawing, formulas as inline shapes), [md-editor.md](md-editor.md)
 (the `.md` editor), [md-pdf.md](md-pdf.md) (PDF text documents).
 
 ## Drawing
@@ -59,7 +59,7 @@ Related: [markdown-boxes.md](markdown-boxes.md) (drawing, formulas as inline sha
   is in it stays visible.
 - Move, rename, delete (to the trash) and share take both. A rename rewrites the links in the `.md`: the prefix
   `oldname.assets/` becomes `newname.assets/` (links written as `./oldname.assets/…` and `<oldname.assets/…>` too).
-- Sync conflicts: the conflict copies of the `.md` are shown on its card as before (they link to the same
+- Sync conflicts: the conflict copies of the `.md` are shown on its card (they link to the same
   `name.assets/`); the folder is hidden and goes with the `.md` it belongs to.
 - An open `.md` renamed in the library, or from its own tab (a double click on its title, ⋮ → Document → Rename…, the
   overview of open documents: the library's rename, [library.md](library.md) "Renaming"), follows in its tab: the path,
@@ -115,7 +115,7 @@ document, each with an attribute naming the picture and its data in base64 (as a
 - Written by `PictureSaveHandler` (upstream's `SaveHandler` with the nodes added after `prepareSave`: no upstream file
   changed) wherever the fork writes a `.xopp`: save, save as, autosave (a recovered document has its pictures), and the
   library's rewrite of a moved `.xopp`. Only the pictures some Markdown text links to; a document without pictures is
-  written byte for byte as before. The document's own preview stays the first `<preview>` (thumbnails read the first).
+  written byte for byte as upstream writes it. The document's own preview stays the first `<preview>` (thumbnails read the first).
 - A PDF with notes carries the pictures of any of its Markdown (not only a text document's) as attachments.
 - **Xournal++**: 1.3.4 and its current master (built from `../xournalpp`) open such a file silently and show the
   Markdown source as text (checked with `xournalpp --create-pdf`, in a separate config folder). They ignore the contents

@@ -1,7 +1,7 @@
-# Color palettes (qt/color-palettes)
+# Color palettes
 
-The author's role-based palettes as tabs in the color chooser, next to the colors of the tool bar and "Add a color…"
-(the picker with the hex field). The spec is kept verbatim in
+Palettes of colors by role (body text, warnings, key terms, …), chosen in a tool's editor next to the colors used
+lately and "Add a color…" (the picker with the hex field). The author's spec is kept verbatim in
 [`qt/resources/palettes/palettes.json`](../../resources/palettes/palettes.json) (sources and licenses: its
 [README](../../resources/palettes/README.md)).
 
@@ -31,19 +31,16 @@ The author's role-based palettes as tabs in the color chooser, next to the color
 - **Following a palette switch**: choosing a palette (in Settings, or by taking a color from another palette's tab)
   gives every tool whose color came from a palette its role's color in the new palette. A palette that leaves the role
   out keeps the color (and the role, so it follows again later).
-- For tool presets (`qt/toolbox`): `paletteColor(palette, role, highlight)` and `followPalette(ref, palette,
+- For the toolbox's tools: `paletteColor(palette, role, highlight)` and `followPalette(ref, palette,
   highlight)` (invalid: the palette has no such role, keep the color). A preset stores `palette:role` next to its color
   and asks `followPalette` when `colorPaletteChanged` fires.
 
-## The chooser (`ColorChooser.qml`)
+## The chooser (`ToolEntryEditor.qml`)
 
-Since 0.8.0 the colors are chosen in a tool's **editor** (the toolbox, [toolbox.md](toolbox.md)): the palette (a combo
+The colors are chosen in a tool's **editor** (the toolbox, [toolbox.md](toolbox.md)): the palette (a combo
 box; app-wide, as Settings → Pen → Colors), its roles with their names (the ink, or with a highlighter the highlight
 color), the colors used lately, a hex code and the picker; a bottom sheet in the phone classes. Settings → Pen → Colors
 shows the chosen palette's colors and its credits (`source`, `colorPaletteSource`).
-
-The classic tool bar's chooser (`ColorChooser.qml`: a popup with a tab per palette, from the bar's colors and the pen
-pill of the compact chrome) was removed with the classic tool bar in 0.8.0.
 
 ## Dark pages and dark paper ([dark-pages.md](dark-pages.md))
 
@@ -62,4 +59,4 @@ pill of the compact chrome) was removed with the classic tool bar in 0.8.0.
 
 - On light paper strokes keep upstream's highlighter opacity (0.47, not the spec's 0.5): the difference is small, and
   the same file looks the same in Xournal++.
-- The tool bar's own colors do not follow a palette (they are colors, not roles).
+- A color of one's own (from the picker or the hex field) does not follow a palette (it is a color, not a role).

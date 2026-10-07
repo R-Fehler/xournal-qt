@@ -1,4 +1,4 @@
-# The curtain and the spotlight (qt/curtain)
+# The curtain and the spotlight
 
 For teaching and presenting: a black sheet over part of the page, like a sheet of paper on an overhead projector. The
 audience sees only what is not covered; the next step of a calculation, the answer of an exercise stays hidden until
@@ -11,12 +11,11 @@ canvas) but a rectangle with rounded corners, the part the class is to look at. 
 
 - **B** (Settings → Shortcuts: "Curtain"), again B takes it away (also the spotlight). **Shift+B**: the spotlight
   (again: away).
-- The setsquare button of the tool bar, held (or right-clicked): **Curtain (B)** and **Spotlight (Shift+B)** in its
+- The setsquare button (the rail, the top bar), held (or right-clicked): **Curtain (B)** and **Spotlight (Shift+B)** in its
   list. A tap on the button still goes from the setsquare to the compass: they are not tools of their own, they lie
   over the page whatever tool is in hand.
 - ⋮ → View → **Curtain (B)**, **Spotlight (Shift+B)**.
-- Full screen and presenting: the setsquare button of the floating toolbox, held (the classic tool square's
-  **Curtain** and **Spotlight** went in 0.8.0).
+- Full screen and presenting: the setsquare button of the floating toolbox, held.
 - On a phone: My tools → Setsquare, compass and curtain.
 
 The curtain comes over the lower half of the part of the page in view, down to the bottom of the page and a little

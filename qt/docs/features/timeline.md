@@ -1,10 +1,8 @@
-# The document timeline (`qt/timeline`)
+# The document timeline
 
-The author (2026-10-04): "a document timeline, which is like an audio playbar at the bottom, which replays the audio
-and replays the document editing history in read-only mode." Decided (2026-10-05, TODO.md): levels 1 and 2 of
-[idea B9](../history/README.md) as one design, on one clock: every element knows when it was made, recordings are tracks
-placed by their start. Not in this block: erasing, moving and page changes (level 3, with the version history); times
-per point.
+The author: "a document timeline, which is like an audio playbar at the bottom, which replays the audio and replays
+the document editing history in read-only mode." One design on one clock: every element knows when it was made,
+recordings are tracks placed by their start. Not recorded: erasing, moving and page changes; times per point.
 
 ## Creation times
 
@@ -28,8 +26,8 @@ per point.
   time; `Element::serialize` is unchanged, so Xournal++ pastes ours and we paste its). Cut and paste is a paste.
 - **Kept**: moving, resizing, rotating, recolouring, editing a text (the edited text is a copy of the old one), the
   pieces the eraser leaves and the shape a stroke becomes (`Stroke::applyStyleFrom`), undo and redo, duplicated and
-  pasted pages (page changes are level 3).
-- **None** (0): elements of files written before, or by Xournal++, and of text files shown as pages. They stay so.
+  pasted pages (page changes are not recorded).
+- **None** (0): elements of files written by Xournal++, and of text files shown as pages. They stay so.
 - Xournal++ looks attributes up by name and ignores this one (no message, `ElementTimesTest`); when it saves the file
   the times are gone, the elements stay.
 
@@ -86,9 +84,7 @@ short.
 - **The play bar** at the bottom of the page (`timelineBar`, below "The play bar"). ← and → go 5 s, Home and End to
   the ends, Space plays and pauses, Esc leaves. **The tools are put away** (`win.modes.replaying`): the toolbox (docked or
   floating), the top bar with its tab, the phone's dock, the view pill and the pills; the tab strip and a phone's
-  app bar (with ⋮) stay. (Before qt/replay-polish only the toolbox was hidden: the command bar then took its tools back
-  and showed the classic tool bar, the phone's dock its classic tools; `TimelineUiTest.theToolboxModeShowsNoClassicToolBarDuringOrAfterAReplay`.
-  The classic tool bar was removed in 0.8.0.)
+  app bar (with ⋮) stay (`TimelineUiTest.theToolboxModeShowsNoClassicToolBarDuringOrAfterAReplay`).
 - **Audio** plays where it overlaps, through `app.audio` (the same player as the playback pill, which is hidden
   meanwhile): at 1× only (at other speeds the replay is silent); the clock follows what is heard when they drift
   apart by more than 250 ms; a recording that ended or cannot be played is not started again until the next jump.
@@ -113,7 +109,7 @@ short.
     the overlay would hold more than 48 elements or is older than 2.5 s, when the replay goes back (a picture cannot
     be drawn smaller), when a sticky note comes (its paper is drawn by its own drawer), when playing pauses and when
     the slider is let go. A page keeps its old picture until the new one is there. Pages without a picture are drawn
-    with the filter when they come into view. The PDF background is drawn outside the document's lock as before.
+    with the filter when they come into view. The PDF background is drawn outside the document's lock.
   - The stroke being written: a copy of the stroke cut at the fraction of its length (the last point between two
     points, its pressure too), drawn by upstream's `StrokeView`.
 - Thumbnails, previews, the page sidebar and exports show the whole document (they do not use the filter).
@@ -126,9 +122,9 @@ the slider, the speed, play, the pen writes nothing, ✕ and Esc, the document t
 same undo step and page revision; a tap on ink; another tab ends it; a recording heard where it is (the fake speaker),
 the playback pill's replay button.
 
-## The play bar (`qt/replay-polish`)
+## The play bar
 
-The author's test of 0.6.0: "The replay scrollbar is hard to use on Android, or generally not easy to see and
+The author: "The replay scrollbar is hard to use on Android, or generally not easy to see and
 understand for the first time user." `TimelineBar.qml`, placed by `Main.qml`.
 
 - **What it shows**: a title, **Replay** (accent, bold), over the time **"12:04 · 3 Oct, 14:20"**: the bar's time

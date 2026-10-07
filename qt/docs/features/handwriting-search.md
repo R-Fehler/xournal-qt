@@ -29,9 +29,9 @@ What to expect:
 - Drawings, arrows, underlines and filled shapes are left out; highlighter strokes never count.
 - Search terms of several words ("dumb test") find consecutive handwritten words, also across a line end.
 
-## Copy handwriting as text (qt/copy-tools)
+## Copy handwriting as text
 
-The author (2026-10-05): "copy handwritten text but make it its own tool similar to select pdf text (could be a cycle)
+The author: "copy handwritten text but make it its own tool similar to select pdf text (could be a cycle)
 to not interrupt the ink annotation flow. Or maybe when selecting inked words with the select tool offer to copy the
 text in addition to normal copy and give the user a small popup with the text that is now in the clipboard."
 
@@ -76,7 +76,7 @@ text in addition to normal copy and give the user a small popup with the text th
 - With English and German, **both models read the handwriting** and their readings of each ink word go into one list:
   a word is found through either. Nothing is transcribed. A reading both models gave is there once, with the
   probability that one of them is right, 1 − (1 − p₁)(1 − p₂) (two models agreeing make a word surer than either
-  alone; the search's ranking and its marking of unsure words are as before). Each reading keeps the model, and so
+  alone; the search's ranking and its marking of unsure words take that probability). Each reading keeps the model, and so
   the language, that gave it.
 - The results are named by the set of models: another set (a model added, another language) reads the library again.
 
@@ -176,14 +176,13 @@ The sentences are the texts (`sentences-<lang>.txt`; `make_sample.py` makes the 
 - Tests that need the runtime or the model are skipped unless `XQT_ONNXRUNTIME` (a tiny model in
   `qt/tests/hwr/data`) or `XQT_HWR_MODEL` is set; `XQT_BENCH_HWR=1` with the model prints the time per line.
 
-## Decisions (2026-10-04)
+## Decisions
 
-- Off until switched on in Settings; no learning from the user's handwriting; English only (English and German since
-  2026-10-05, below).
+- Off until switched on in Settings; no learning from the user's handwriting; English and German (below).
 - Typo tolerance applies to handwriting even with Fuzzy off.
 - The library is read in the background only on mains power; open documents always.
 - Nothing is stored in the `.xopp`; the PDF text layer has the best reading only (no file of all readings in PDFs).
-- **The model is downloaded on demand** (the author, 2026-10-04): the app ships without it, and Settings offers the
+- **The model is downloaded on demand** (the author's choice): the app ships without it, and Settings offers the
   download once the search is switched on, with the address and size shown first (as the arXiv search does: opt-in,
   the address in view), into the app's data folder, checked against sha256s pinned in the app
   (`qt/src/shell/ModelDownload.cpp`), retryable and cancellable, with "Remove the model". The source is a pinned
@@ -191,7 +190,7 @@ The sentences are the texts (`sentences-<lang>.txt`; `make_sample.py` makes the 
   `qt/scripts/hwr-model.sh`, which prints them), the button says the model must be installed with the script.
 - The runtime is opened at run time (dlopen); bundling it in the packages is a later step.
 
-## Decisions (2026-10-05, English and German)
+### English and German
 
 - Two models from the start (the author: "for the app we start with two models"), both run, their readings merged
   for the search: one list per ink word, readings both gave combined by noisy-OR (not the maximum: two models

@@ -1,12 +1,11 @@
-# Page templates (`qt/templates`)
+# Page templates
 
-The author (2026-10-04, A12 of [the ideas of 2026-10](../history/README.md)): "Save page as template", chosen when adding
-pages; "the template should include the pdf page / background if wanted by the user so effectively it's the same as
+"Save page as template", chosen when adding pages. The author: "the template should include the pdf page / background if wanted by the user so effectively it's the same as
 copy pasting a pdf page."
 
 Built on the stickers ([stickers.md](stickers.md): the same folder model, own order, last used, picker) and on page
-copy and paste (`PageClipboard`: copied pages pasted into any tab, their PDF pages joining the document's merged PDF,
-`qt/pdf-pages`).
+copy and paste (`PageClipboard`: copied pages pasted into any tab, their PDF pages joining the document's merged
+PDF).
 
 ## Where templates are
 
@@ -53,8 +52,7 @@ A normal `.xopp` of one page that Xournal++ opens as it is (upstream's LoadHandl
 
 Adding a template's page is pasting a copy of that page: one undo step, at the current position. A PDF page joins the
 document's merged background PDF (its text stays searchable and selectable; in a `.xopp` it is saved next to it, in a
-PDF with notes inside it), exactly as for a page copied from another tab ([PageClipboard](../../src/shell/PageClipboard.h),
-`qt/pdf-pages`). Added several times, the PDF page is added to the merged PDF once.
+PDF with notes inside it), exactly as for a page copied from another tab ([PageClipboard](../../src/shell/PageClipboard.h)). Added several times, the PDF page is added to the merged PDF once.
 
 - **The add-page button's list** (press and hold, or right-click): "Background, size, several pages…" (the Insert pages
   dialog), the five templates used last (a tap adds that page after the current one), "From a template…" (the

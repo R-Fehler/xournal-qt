@@ -1,8 +1,6 @@
 # Annotations as Markdown
 
-Status: **stage 1 built in `qt/annotations-md`** (an experiment, 2026-09-26); every piece of handwriting listed, with
-the page under it in its picture, in `qt/annotations-context` (2026-09-26). The author's goal (2026-09-25): collect a
-document's highlights and notes as Markdown, with links back to their places.
+A document's highlights and notes, listed in a panel and collected as Markdown, with links back to their places.
 
 ## The Annotations panel
 
@@ -16,7 +14,7 @@ document's annotations by page, top to bottom:
 | Text / Markdown | Text boxes and Markdown boxes with their text. The panel shows a Markdown box formatted. |
 | Handwriting | Every piece of ink, as a small picture of it on its page: the pen's strokes (drawn by hand, with the ruler, as shapes or through the stroke recogniser: all pen strokes), on any visible layer, and highlighter strokes over no text (neither PDF text nor a text box). A stroke joins the piece written just before it when it is within 18 pt (about 6 mm); pieces that overlap are one; a dot or short mark (under 4 pt) joins the nearest piece within 36 pt, else it is listed by itself. Ink on PDF text (an underline, a circle, a strike through, a word written over the slide) is listed with that text: `on “Kalman gain”`. Not listed: the whiteout eraser's strokes (they hide ink), hidden layers. |
 | Link | A link marker: a Markdown box that is only `[title](../target)` ([links.md](links.md)). |
-| Note | Sticky notes: another block builds them and plugs in with `annotations::setNoteSource` (a function called for each page read, under the document's read lock). The filter shows "Notes" only when there are any. |
+| Note | Sticky notes ([sticky-notes.md](sticky-notes.md)): their Markdown text as the caption, else their other texts, else "(handwriting)"; what is on a note is not listed again as a box or ink of the page. The filter shows "Notes" only when there are any. |
 
 - While the PDF has annotations of other apps that can be made editable (ink, highlights, text boxes, shapes, notes,
   stamps), a line at the top says how many and from which app, with **Make editable**
@@ -41,9 +39,8 @@ comes back to where it began (a circle, a box drawn around something). Pieces of
 not a whole word are left out (a note written across a line crosses a letter here and there); the rest is widened to
 whole words, and cut at 300 characters. Handwriting in the margin has no caption.
 
-Before 2026-09-26 ink mostly over PDF text lines was left out as "a mark, not a note". On slides people write on the
-slide, so whole notes vanished (the author's report: a page listed its Markdown box and not its ink). Now nothing is
-left out; the caption tells what an underline or circle marks. Dots and short marks (under 4 pt) were dropped too.
+No ink is left out as "a mark, not a note": on slides people write on the slide, so whole notes would vanish. The
+caption tells what an underline or circle marks.
 
 ### The page under the ink
 
@@ -59,7 +56,7 @@ How it stays cheap:
   more (the UI test counts them).
 - The part is drawn with a cairo clip: poppler draws only what falls into it. The picture is as wide as the panel's
   row (in device pixels; at most 4 px per point), asked with one width per row (the row's, which does not change while
-  it is laid out; the image's own width did, and each width was a picture).
+  it is laid out).
 - The pictures drawn last are kept (24 MB, the least recently used go first), by the page's revision and the width:
   scrolling back shows them at once, an edited page's pictures are not asked for again.
 - Not reused: the thumbnails and sketches (they have the ink in them, which would show twice, blurred, and they are
@@ -107,11 +104,10 @@ The download button of the panel writes a `.md`:
 - Each item ends with a link to its page in the app's link format ([links.md](links.md)): `#page=N`, plus
   `pdfpage=N` for a page showing a PDF page, else the page's text fingerprint (`text=`), so the link finds the page
   after pages were inserted before it. Plain text is escaped (`*`, `_`, `[`, `$`, a `#` or `1.` at a line's start).
-- **Handwriting: a page link with "(handwriting)", not a picture.** Our Markdown editor and Markdown boxes do not draw
-  images yet ([markdown-boxes.md](markdown-boxes.md), "Not yet"), so a picture would show as its alt text there.
-  The picture export is built and tested: `XQT_ANNOTATION_PICTURES=1` writes each piece as
-  `<name>.assets/p<page>-<n>.png` (Typora's folder convention, the same crop as the panel's, with the page under
-  the ink) and links it as `![Handwriting, page N](../…)`. Turn it on by default once the editor draws images.
+- **Handwriting: a page link with "(handwriting)", not a picture**, by default. The picture export is built and
+  tested: `XQT_ANNOTATION_PICTURES=1` writes each piece as `<name>.assets/p<page>-<n>.png` (Typora's folder
+  convention, the same crop as the panel's, with the page under the ink) and links it as
+  `![Handwriting, page N](../…)`. Markdown draws images ([md-images.md](md-images.md)), so it can become the default.
 - Handwriting on PDF text ends with the text, quoted: `- [p. 1](../…) (handwriting) on “Kalman gain”`, or
   `- ![Handwriting, page 1](../…) on “Kalman gain” ([p. 1](../…))` with pictures.
 
@@ -124,7 +120,7 @@ The download button of the panel writes a `.md`:
 
 After the export the snackbar offers to open the file.
 
-## Stage 2: keep it updated (not built)
+## Keeping it updated (a design, not built)
 
 The idea: write the generated part between two markers and, on the next export, replace only that part, keeping what
 the user wrote around it.
@@ -155,7 +151,7 @@ Questions for the tutorial.
 - **PDF files mode**: only for a file the user picked once in the save dialog (remembered per document in the
   library's index, not next to the file).
 
-### My view
+### Why sections, not items
 
 Section-level replacement is worth building: it is small (a parser for two comment lines, a hash, the splice), it
 fits how people use such files (a summary above, questions below), and the hash guard makes it safe. I would not go
@@ -167,8 +163,9 @@ each save should stay opt-in: a file that changes by itself surprises people who
 
 ## Not yet
 
-- Handwriting as pictures by default (needs images in the Markdown editor).
-- Recognised handwriting text (no handwriting recognition in the app).
+- Handwriting as pictures by default (`XQT_ANNOTATION_PICTURES`).
+- The recognised words of handwriting ([handwriting-search.md](handwriting-search.md)) as its text in the list and
+  the export.
 - Links to the exact place on a page (the link format has pages, chapters and headings; the panel jumps to the place,
   the Markdown links to the page).
 - The strokes' times: upstream strokes carry no time of writing, so "written close in time" is the order in which

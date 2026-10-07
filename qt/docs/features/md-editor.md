@@ -12,14 +12,14 @@ into a `.md`. Plain text files (`.txt`) are edited the same way, as plain text (
   Ctrl+1 / 2 / 3 / 0, Tab / Shift+Tab, …). **Enter** in a paragraph is a line break of the same paragraph (two
   spaces at the line's end, as Markdown needs: a single newline shows as a space), and Enter at once again, on the
   empty line, makes it a new paragraph; Shift+Enter starts a paragraph at once. One rule on every device, as note
-  apps do it (a phone's keyboard has no Shift+Enter; decided 2026-09-27). After a heading, a code fence, a table or
-  a formula block Enter starts the next block as before. Formulas (`$…$`, `$$…$$`) are drawn, and the block with the cursor
+  apps do it (a phone's keyboard has no Shift+Enter). After a heading, a code fence, a table or a formula block Enter
+  starts the next block. Formulas (`$…$`, `$$…$$`) are drawn, and the block with the cursor
   shows their source ([markdown-boxes.md](markdown-boxes.md), "Math"). So are images (`![](../name.assets/…)`,
   [md-images.md](md-images.md)).
 - **Whatever the tool**, the pen and the mouse put the cursor where they press, and a drag selects. A finger
   scrolls; a tap with a finger puts the cursor there too. Ctrl + click (and a finger tap) on a link follows it.
 - Typing without a cursor starts writing at the top of the page in view.
-- The tool bar has no ink tools for a text file (pen, eraser, shapes, colors, sizes, add page); page operations
+- The toolbox and the top bar have no ink tools for a text file (pen, eraser, shapes, colors, sizes, add page); page operations
   (insert, delete, move, paste pages, backgrounds, images, chapters) do nothing: the pages are the text's.
 - The formatting bar (below) is shown for a `.md`; a `.txt` has none.
 - Backspace right after the mark of an empty list item or quote line (`- `, `1. `, `- [ ] `, `> `) removes the
@@ -32,7 +32,7 @@ into a `.md`. Plain text files (`.txt`) are edited the same way, as plain text (
   changes, not copies of the text, so a long file stays cheap.
 
 ## Formatting bar
-A row under the tool bar, shown while Markdown is written: in a `.md` (all the time), for Markdown written on a page
+A row under the top bar, shown while Markdown is written: in a `.md` (all the time), for Markdown written on a page
 of a `.xopp` (the page's text and Markdown text boxes), and above the source beside the page. It is for writing
 without knowing Markdown's marks, grouped as in Typora, Obsidian and Zettlr:
 - **¶, H1, H2, H3** (four buttons): paragraph, heading 1, 2, 3 (Ctrl+0 / 1 / 2 / 3). The button of the level of the line with
@@ -58,7 +58,7 @@ without knowing Markdown's marks, grouped as in Typora, Obsidian and Zettlr:
   the cursor's line (and the fences before it), not from the whole parse.
 - Every tool is one undo step, as are the keys; they are the same operations (`md::format`). The tools do not take
   the keyboard focus: the text keeps it (and the on-screen keyboard stays).
-- **Where the room is short** (qt/adaptive-panels; [adaptive-layout.md](adaptive-layout.md), "The format bar"): on a
+- **Where the room is short** ([adaptive-layout.md](adaptive-layout.md), "The format bar"): on a
   desktop or a tablet the bar takes the richest form that fits, never scrolling: first the blocks go into an
   **Insert** menu ("+ Insert": code block ▸ languages, table, formula block, image, rule, page break), then "Insert"
   loses its word (a "+"), then ¶/H1/H2/H3 become one button with the level at the cursor and a menu. The marks and
@@ -90,7 +90,7 @@ Code: `qt/src/markdown/MdFormat.*` (the tools as changes of the text, the state 
 `qml/MarkdownTableEditor.qml`.
 
 ## New Markdown file, new text file
-The library's new button (the file with a plus) opens a menu: **New document…** (notes, as before), **New
+The library's new button (the file with a plus) opens a menu: **New document…** (notes), **New
 Markdown file…** and **New text file…**. The last two ask for a name and make an empty `name.md` / `name.txt` in the
 current folder (a name that is taken becomes "name (2)"; a `.md` also avoids the name of a `.xopp` or PDF there),
 open it and put the cursor in it.
@@ -125,7 +125,7 @@ between lines (or within a line longer than a page). `md::join` takes the marker
 the last line break takes room only while the cursor is on it.
 
 ## Other text files (code, LaTeX, JSON, …)
-They open read-only, as before (one code block, highlighted by its extension), with a note that offers **Edit
+They open read-only (one code block, highlighted by its extension), with a note that offers **Edit
 anyway** (also in ⋮ → Document). The first time for a file it warns: "This file is edited as plain text; the app does
 not know its format…" (OK / Cancel). OK edits it as plain text (as a `.txt`, in the same tab), and the file opens for
 editing from then on without asking; the accepted files are listed in the config folder
@@ -186,19 +186,19 @@ step, the current hit to its match by where both are drawn: `md::sourceRects`), 
   (`~/.cache/xournal-qt/autosaves/<pid>-<n>.autosave.text`, `….emergency.text`), never next to the file. After a
   crash the tab is offered for recovery like any document; recovered, it is the file with the text it had
   (modified). Saving removes the autosave.
-- A file that cannot be edited opens read-only, as before, with a note saying why: not UTF-8, bigger than 2 MB, or
+- A file that cannot be edited opens read-only, with a note saying why: not UTF-8, bigger than 2 MB, or
   a file that cannot be written.
 
 ## Open externally
 Every file the app does not keep as a `.xopp` or PDF (a `.md`, a `.txt`, another text file, an image being written
-on) has **Open externally**: a button in the tool bar (an arrow out of a box), an entry in ⋮ → Document, and "Open
+on) has **Open externally**: a button in the top bar (an arrow out of a box), an entry in ⋮ → Document, and "Open
 externally" in the library card's menu (Markdown, text and other files, images; a `.xopp` that annotates an image hands
 over the image). It hands the file to the app the system has for it (`SystemApps`: `xdg-open` on Linux). A text file
 with unsaved changes asks first: **Save and open**, **Open without saving** or Cancel. When the other app changed
 the file, the tab reads it again (below) as soon as the window is looked at again.
 
 ## Edit as notes
-A `.md` has **Edit as notes** (a button in the tool bar, a notebook with a pen, and ⋮ → Document): it makes a new
+A `.md` has **Edit as notes** (a button in the top bar, a notebook with a pen, and ⋮ → Document): it makes a new
 document of notes from the text as it is now, in a new tab next to the `.md`: the same A4 pages with the text as the
 page's Markdown text flowing over them (a Markdown box per page, drawn formatted; the text tool edits it as in any
 `.xopp`), and the pen writes on top of it. The `.md` stays as it is; ink never goes into a `.md`. The new tab is

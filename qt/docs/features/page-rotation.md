@@ -1,6 +1,6 @@
 # Rotating pages
 
-The author (ideas round of 2026-10-04): "rotate all pages / selected pages / current page by 90 degree left or right."
+All pages, the selected pages or the current page turned by 90° to the left or the right.
 
 ## Where
 - The page menu (sidebar and page grid: ⋮, right click, and the sidebar's selection bar): two icons beside
@@ -30,8 +30,8 @@ Every command is one undo step (Ctrl+Z in the sidebar or grid, the canvas's undo
   from that same state. Turned pages get a new revision, so the canvas, the thumbnails and the previews are drawn again.
 
 ## PDF pages
-A PDF page turns in a copy of it (`pagerotate::PdfPages::InPdf`, in every document; the author decided this for
-`.xopp` files on 2026-10-04). The copy, with its `/Rotate` changed, goes into the document's merged PDF in the cache
+A PDF page turns in a copy of it (`pagerotate::PdfPages::InPdf`, in every document, `.xopp` files included). The
+copy, with its `/Rotate` changed, goes into the document's merged PDF in the cache
 (the way a pasted PDF page does, `PdfPageKeeper`), and the page shows it. The PDF the document annotates is never
 changed.
 - **A `.xopp`:** saving puts the merged PDF next to it as the hidden `.name.pages.pdf` (as for pasted pages,

@@ -1,6 +1,6 @@
-# Favourites and bookmarks (`qt/bookmarks`)
+# Favourites and bookmarks
 
-Decided with the author (2026-09-26): **favourites** (stars) for documents and **bookmarks** for pages. They are
+**Favourites** (stars) for documents and **bookmarks** for pages. They are
 stored differently on purpose:
 
 | | Favourite (★) | Bookmark (ribbon) |
@@ -32,7 +32,7 @@ The key is the document's PDF when it has one (a PDF keeps its star when its `.x
 - The open document: ⋮ → "Add to favourites" / "Remove from favourites".
 - The overview of open documents: the star beside the close button (starred ones always, others under the mouse).
 - Library home: the **Favourites** star in the header's switch, between Recent and Bookmarks (a toggle, not a page;
-  its word shows where the header has room for all words, else the star alone with a tip; qt/adaptive-home,
+  its word shows where the header has room for all words, else the star alone with a tip;
   [adaptive-layout.md](adaptive-layout.md)). With it on, the grid lists the
   starred documents of the **whole library** without folders (like the flat list), combined with the "Show" filter and
   the search. The Bookmarks view follows it too. The chip is not remembered across starts.
@@ -84,8 +84,8 @@ dictionary's `/Count` follows).
 - Bookmarks changed in another PDF app are not read back while the file carries our data (the embedded document
   wins, and the next save writes the item again).
 
-### Markdown (`qt/md-bookmarks`)
-Decided with the author (2026-09-26). In a Markdown text a bookmark is an **HTML comment on a line of its own, right
+### Markdown
+In a Markdown text a bookmark is an **HTML comment on a line of its own, right
 before the block it marks** (a paragraph, a heading, a list, a table, a code block):
 
 ```markdown
@@ -177,8 +177,7 @@ do. The library search also matches a page's bookmark label (plain and fuzzy sea
   and the Favourites chip. It is made only while shown, from the index.
 - The snackbar after adding or removing one offers Undo.
 
-### Not in this block
-- Markdown documents: done in `qt/md-bookmarks` (above).
+### Not built
 - Plain text files (`.txt`, other text files edited as text): no bookmarks.
 - Upstream's plain PDF export (`XojCairoPdfExport`) writes the PDF's outline as it was read, with our item as it was
   when the document was opened; it does not write the current bookmarks.

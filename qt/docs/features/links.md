@@ -1,8 +1,8 @@
-# Links between documents: design draft
+# Links between documents
 
-Status: **design agreed 2026-09-24** (the author: "the link plan is sound"); **built in `qt/links`** (see "What is built" at the end for what was built and where it differs). Goal (the author's words): link to
-another document, optionally to a page or a chapter; if it is a chapter, keep its page as a fallback for when the
-name changes. When the link is followed, choose between a new tab and reference view.
+The goal (the author's words): link to another document, optionally to a page or a chapter; if it is a chapter, keep
+its page as a fallback for when the name changes. When the link is followed, choose between a new tab and reference
+view. The first sections are the model; "In detail" names the code and the exact rules.
 
 ## What a link is
 
@@ -18,9 +18,9 @@ A link is written as one URI that other programs also understand as far as they 
 - **The path is relative to the document that holds the link**, like Markdown and HTML links. A library, or any
   folder, moved or synced as a whole keeps working, including on another machine or under another user name.
 - **`#page=N`** (1-based) is the PDF "open parameters" form. Acrobat, pdf.js and most viewers follow it for PDFs.
-- **`#chapter=…&page=N`**: the chapter's title, with its page as the fallback, as the author asked.
-  - Chapters are the document's headings: the PDF outline, Markdown headings, and bold headings of 24, 18 or 15 pt (the "Contents"
-    sidebar already lists them).
+- **`#chapter=…&page=N`**: the chapter's title, with its page as the fallback.
+  - Chapters are the document's headings: the PDF outline, Markdown headings, and bold headings of 24, 18 or 15 pt
+    (the "Contents" sidebar lists them).
   - When following a link, the chapter is looked up by title, then by title ignoring case and punctuation. If it is
     not found, the saved page is used, with a note: "Chapter 'Prediction step' not found, opened page 12".
 - **`#heading=…&line=N`** for `.md` files: the heading's slug, like Obsidian and GitHub anchors, with its line as
@@ -55,13 +55,12 @@ Written as `#page=12&pdfpage=7`. Viewers that know only `page=` still get close.
   current page (⋮ menu). The clipboard then holds the link, as a URI and as Markdown.
 - **Pasting** it into a Markdown box inserts `[title](../link)`. Pasting it on the page with nothing selected creates
   a link marker. Pasting it with a selection ("link this") attaches it to the selection as a marker next to it.
-- **Dragging** a library card, a page from the sidebar or grid, or a chapter onto the page does the same.
 
 ## Following a link
 
 - A tap on a link (finger, mouse, or the pen with the hand or select tool; the pen keeps writing otherwise, as with
-  PDF links today; for the mouse see "Links with the mouse" at the end) shows a small popup: **"Open in a new tab" · "Open as reference" · "Open here"** (the last
-  replaces the current view, with Back to return). "Remember my choice" makes it the default, which can be changed
+  PDF links; for the mouse see "Links with the mouse" at the end) shows a small popup: **"Open in a new tab" · "Open
+  as reference" · "Open here"** (the last replaces the current view, with Back to return). "Remember my choice" makes it the default, which can be changed
   in Settings → Documents.
 - Back and forward (Alt+Left/Right, the ← → pill) work across documents.
 - An open document is switched to, not opened twice.
@@ -73,14 +72,13 @@ Written as `#page=12&pdfpage=7`. Viewers that know only `page=` still get close.
   (backlinks), and their links are rewritten, in the background with a note ("Updated 3 links"). For `.xopp` files
   that are open, the change goes through the document with undo.
 - **Moves outside the app:** following a link whose path is gone looks for the target in the library index by file
-  name, then by the PDF's `/ID` (for PDFs and hybrid PDFs), then by the page fingerprint. If found, the link opens
-  and offers "Update the link". If not, it asks to locate the file.
+  name, then by the page fingerprint. If found, the link opens and offers "Update the link". If not, it asks to
+  locate the file.
 - **Backlinks** come for free from the same index: a small "Linked from" list for the current document (sidebar or ⋮
   menu), useful for notes that reference each other.
 
-## Decided (2026-09-24)
+## Decisions
 
-The author accepted the plan with its proposals:
 1. **Links on ink and images get a small visible marker** (a chain icon next to the object); the object itself
    does not become tappable.
 2. **Links in other files are rewritten automatically** after a rename or move in the app, with a note ("Updated
@@ -88,23 +86,14 @@ The author accepted the plan with its proposals:
 3. **A tap asks** (new tab, reference view, here) with "Remember my choice"; the default can be changed in
    Settings → Documents.
 
-## Build plan (`qt/links`, after the running blocks)
-
-1. The link format: a parser and writer, and resolution with the fallbacks (chapter, then page, then fingerprint);
-   unit tests.
-2. Following links: in Markdown boxes and `.md` files, the popup, back and forward, reference view.
-3. Making links: "Copy link" everywhere, pasting into Markdown and markers, drag and drop.
-4. The library: outgoing links in the index, backlinks, rewriting on rename and move, the fallback search.
-5. The hybrid PDF: `GoToR` link annotations.
-
-## What is built (`qt/links`)
+## In detail
 
 ### 1. The link format (`qt/src/session/DocumentLink.*`, tests `DocumentLinkTest`)
 - `links::parse` reads a Markdown link target: a path (or a `file://` URL) of a file the app opens as a document
   (`.xopp`, `.xoj`, `.pdf`, `.md`, `.txt`, images, `.tex`, …). Web and mail addresses, other schemes, other files
   (`/home/x.sh`: a tap never opens anything else on the computer), upstream's `#Page:12` and a bare `#anchor` are
-  not links to documents (so `example.org/page` stays a web address). A path of `<…>` and percent-escapes (`%20`) are read as Markdown writes
-  them. A target without a path but with a place (`#page=5`, `#chapter=…`) points into the same document.
+  not links to documents (so `example.org/page` stays a web address). A path of `<…>` and percent-escapes (`%20`)
+  are read as Markdown writes them. A target without a path but with a place (`#page=5`, `#chapter=…`) points into the same document.
 - The fragment: `chapter=`, `heading=`, `page=`, `pdfpage=`, `line=`, and **`text=`**, the page's fingerprint (its
   first five words, normalised, at most 48 characters), written only for a page that shows no PDF page. Unknown keys
   (`zoom=`, …) are left out. A plain fragment is a heading of a `.md` (`note.md#blade-design`), else a chapter.
@@ -123,7 +112,7 @@ The author accepted the plan with its proposals:
   "Heading "…" not found, opened line 40".
 
 ### 2. Following links (`qt/src/app/AppLinks.cpp`, `qt/src/shell/DocumentLinks.*`, tests `DocumentLinksTest` in `-L ui`)
-- A tap on a link in a Markdown box or a `.md` (as before: a finger, the mouse or the pen with the hand or a select
+- A tap on a link in a Markdown box or a `.md` (a finger, the mouse or the pen with the hand or a select
   tool; Ctrl + click in a `.md`) that leads to another document shows the popup with the document's name and the
   place ("kalman.xopp, chapter "Prediction step""), **Open in a new tab**, **Open as reference**, **Open here** and
   **Remember my choice**. Remembered, a tap opens the document at once; Settings → Documents → Links → "A link to
@@ -158,7 +147,7 @@ The author accepted the plan with its proposals:
   link with the target's absolute path), Markdown `[kalman, page 4](/abs/Lectures/kalman.xopp#page=4&text=…)` as
   text for other apps, and an HTML link to the `file://` URI for rich text editors. (Not a `text/uri-list`: a file
   manager would take that as a file to paste.) Titles: "kalman, page 4", "kalman, Prediction step", "kalman".
-  A document without a file yet copies "#Page:12", upstream's link within it, as before.
+  A document without a file yet copies "#Page:12", upstream's link within it.
 - **Pasting** into Markdown being written on the page, into a `.md`, or beside the page (the panel) inserts
   `[title](../link)` with the path relative to that document (a new document without a file: the absolute path).
 - **Pasting on a page** (Ctrl+V, the paste of the context pill) makes a **link marker**: a small Markdown text box in
@@ -173,8 +162,7 @@ The author accepted the plan with its proposals:
 ### 4. The library: links in the index, backlinks, rewriting, the search for a moved file
 (`qt/src/shell/LinkRewrite.*`, `DocumentLinks::backlinks` / `findMoved`, `AppLinks.cpp`; tests `LinkRewrite.*` in
 `-L shell`, `DocumentLinksTest` in `-L ui`)
-- **Outgoing links in the index**: besides a Markdown file's links (as before), a `.xopp`'s entry in `notes.pack`
-  now has the links and wiki links of its Markdown boxes and link markers (`links`, `wikiLinks`).
+- **Outgoing links in the index**: besides a Markdown file's links, a `.xopp`'s entry in `notes.pack` has the links and wiki links of its Markdown boxes and link markers (`links`, `wikiLinks`).
   `LibraryIndex::linkSources` lists them.
 - **Backlinks**: ⋮ → Document → **Linked from…** lists the documents of the library whose links lead to the current one
   (a link to any of its files: the PDF of a `.xopp` counts; a wiki link by its name); a tap opens one.
@@ -197,9 +185,8 @@ The author accepted the plan with its proposals:
   document was moved … Update the link to point there?"**; Yes rewrites the link in the document it was followed
   from (through it, with undo). Not found: **"Document not found … Locate it?"**, a file dialog, and the link is
   written anew to the chosen file and followed.
-  - **Deviation:** the PDF's `/ID` is not used. A link does not carry it (the format has no key for it), so there
-    is nothing to compare; the name and the page's text cover the cases seen so far. A `pdfid=` key could be added
-    to the fragment later.
+  - The PDF's `/ID` is not used: a link does not carry it (the format has no key for it); the name and the page's
+    text cover the cases seen so far. A `pdfid=` key could be added to the fragment (TODO.md).
 
 ### 5. The hybrid PDF (`HybridPrepare.cpp`: `linkFor`; `HybridFullWrite.cpp`: `annotateLinks`; `md::linkBoxes`; test `HybridPdfTest.linksOf…`)
 - Saving a PDF with notes writes each link of the Markdown boxes and link markers as a `/Link` annotation over the
@@ -216,9 +203,9 @@ The author accepted the plan with its proposals:
 - Not handled: a base PDF page that is rotated or has a crop box moved from the origin gets the link boxes offset
   by the crop box only (the ink uses the full placement matrix).
 
-## Links with the mouse, and their address on hover (`qt/link-hover`)
+## Links with the mouse, and their address on hover
 
-The author (2026-09-26): links should be clickable with the mouse on the desktop, not only with a finger, and hovering
+Links should be clickable with the mouse on the desktop, not only with a finger, and hovering
 a link with the mouse or the pen should show where it leads, at the bottom like a browser, without getting in the
 way when the pointer only passes over it.
 
@@ -240,11 +227,11 @@ way when the pointer only passes over it.
   - **the text tool, the image tool, vertical space and the others that place something:** no, the click does what
     the tool does; Ctrl + click follows;
   - **text being written** (the Markdown box or page with the cursor, a text box being edited, a `.md` or `.txt`
-    file): a plain click puts the cursor there, as in editors; **Ctrl + click follows**, as before;
+    file): a plain click puts the cursor there, as in editors; **Ctrl + click follows**;
   - **Ctrl + click follows with every tool.**
   - A document shown only for reading (a `.md` shown, the reference): every tool follows.
   - With a selection out (elements, a sticky note, PDF text), the click ends it and follows nothing, as a tap does.
-- The pen keeps writing with the drawing tools (a tap of the pen on a link is a dot, as before): only the mouse
+- The pen keeps writing with the drawing tools (a tap of the pen on a link is a dot): only the mouse
   waits for the click.
 - The links under the mouse come from what each page keeps (`CanvasPage::linkSpots`): looked for once (the PDF's
   link annotations through poppler, the texts' web addresses, the Markdown layouts' link boxes) and forgotten on

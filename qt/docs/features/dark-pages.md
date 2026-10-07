@@ -1,9 +1,8 @@
-# Dark pages and page colors (qt/dark-pages)
+# Dark pages and page colors
 
-The author (round of 2026-10-05 evening): dark mode for pages, inverted on the GPU with pictures kept, ink and
-highlighter shown as their dark equivalents (palette roles) and readable in both; curated page colors (black, grey,
-illustration paper, textured paper) for `.xopp` and PDFs, with a printing warning for dark pages. Idea A5 of
-[the ideas of 2026-10](../history/README.md).
+Dark mode for pages, inverted on the GPU with pictures kept, ink and highlighter shown as their dark equivalents
+(palette roles) and readable in both; curated page colors (black, grey, illustration paper, textured paper) for
+`.xopp` and PDFs, with a printing warning for dark pages.
 
 Two things that look alike and are not:
 
@@ -94,7 +93,7 @@ black (#161616, not pure black: ink has room to be darker), and a switch **Textu
   (hashed noise, no random numbers): a page prints the same every time. In a PDF the grain is one small image mask.
 - Page types are compared without these keys (`paper::baseConfig`): a graph page on black paper is still "Graph".
 - **PDF pages** (a PDF's own pages) have no paper of their own: the dialog's paper applies to the pages that get a
-  generated background; a PDF page that is given a pattern loses its PDF page, as before. Space for notes around a
+  generated background; a PDF page that is given a pattern loses its PDF page. Space for notes around a
   slide stays white.
 - New pages copy the paper of the page they follow (upstream's "copy the current page"); the settings' paper is the
   one of new documents and of Insert pages without a page to follow.

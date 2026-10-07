@@ -1,11 +1,11 @@
-# Audio recordings (`qt/audio`)
+# Audio recordings
 
-The author (2026-10-04): "audio recordings either associated with a page or even per stroke, keep it close to
+The author: "audio recordings either associated with a page or even per stroke, keep it close to
 upstream xournal++ audio compatibility. add the audio files as PDF attachments, like the xopp or md files, with the
 page number in the filetitle so it's easy to recover/use even with archived PDFs when xournal stops existing in 30
 years."
 
-Decided by the author (2026-10-04, TODO.md): Qt audio (`QAudioSource`/`QAudioSink`) with a bundled Ogg Vorbis
+Decided with the author: Qt audio (`QAudioSource`/`QAudioSink`) with a bundled Ogg Vorbis
 codec, mono at about 64 kbit/s; `.xopp` recordings in the app's audio folder with bare names, as upstream; voice
 memos per page with the `xqt-audio` page attribute; flat attachment names with page numbers in PDFs with notes,
 renamed when pages move; no visible speaker annotation for other PDF apps; "Export for Xournal++" copies the
@@ -45,7 +45,7 @@ pulls mono float samples at the file's rate) behind small interfaces. Three back
   by hand in tests. `XQT_FAKE_AUDIO=1` makes the app use them (UI tests; trying the UI in a build without Qt
   Multimedia).
 - **None**: a build without Qt Multimedia does not offer recording (the record button is hidden), but recordings in
-  documents are kept, saved and exported as before.
+  documents are kept, saved and exported.
 
 Both run on the UI thread: mono 48 kHz is little data, and encoding 10 ms costs well under a millisecond.
 
@@ -137,10 +137,10 @@ copies it and writes absolute names; Save as `.xopp` puts it into the app's audi
 ## In the app
 
 `qt/src/app/AudioControl.*` (the QML object `app.audio`), `RecordButton.qml`, `RecordingPill.qml`,
-`PlaybackPill.qml`, `RecordingsDialog.qml`. The QML is self-contained so `qt/toolbox` can place the button wherever
-its toolbox wants it.
+`PlaybackPill.qml`, `RecordingsDialog.qml`. The QML is self-contained so the toolbox can place the button wherever
+the user puts it.
 
-- **Where the button is**: an app item of the arrangement (`record`; qt/top-bar): on the top bar in its first layout,
+- **Where the button is**: an app item of the arrangement (`record`): on the top bar in its first layout,
   wherever the user carries it (the rail, a group, off the bars: the catalog), in ⋮ → Tools, and in full screen the
   floating toolbox's ⋯ (it lists the top bar). Offered only when recording is available (a build with Qt Multimedia, or
   `XQT_FAKE_AUDIO=1`) and not in a text file; without it no bar, ⋮ or the catalog has a record button, and
@@ -158,11 +158,11 @@ its toolbox wants it.
   ink starts **2 s earlier** (Settings → Documents → Audio recordings, 0–10 s), so the words before the ink are heard.
   The playback pill: 5 s back and forward, play/pause, a slider with a tick at every moment ink was written, the time,
   ×. Playing stops when another tab comes in front.
-- Not built yet: upstream's fading of ink without a recording while the play tool is chosen
-  (`PageRaster::rasterMarkAudioStrokes`), a speaker chip on pages and thumbnails, "Play from here" in the selection pill,
+- Not built yet: upstream's fading of ink without a recording while the play tool is chosen (upstream's
+  `DocumentView::setMarkAudioStroke`), a speaker chip on pages and thumbnails, "Play from here" in the selection pill,
   a field for Xournal++'s audio folder in the settings (`audio::setExtraFolders` is there).
 
-Tests: `AudioUiTest` (label `ui`, fake devices with their timers): record from the tool bar's button, the pill, a
+Tests: `AudioUiTest` (label `ui`, fake devices with their timers): record from the record button, the pill, a
 stroke tied to the recording and the page's memo, stop, the play tool on the stroke, the playback pill's pause and ×;
 the list of recordings from the button's menu, removing one and undo; a recording belongs to its tab (another tab's
 ink is not tied, closing the tab ends it); `NoAudioUiTest` (`audio::useNoDevices`, as a build without Qt Multimedia):
@@ -170,7 +170,7 @@ no record button anywhere (the bars, ⋮, the catalog), Ctrl+Shift+R does nothin
 
 ## Platforms
 
-Recording is offered on Linux, Windows, macOS and Android (`qt/audio-platforms`, 2026-10-05). Qt Multimedia is
+Recording is offered on Linux, Windows, macOS and Android. Qt Multimedia is
 LGPLv3/GPL like the other Qt modules, so no licence is in the way.
 
 ### Qt Multimedia without its media plugins

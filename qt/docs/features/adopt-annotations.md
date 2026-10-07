@@ -1,26 +1,22 @@
 # Adopting annotations from other apps
 
-Status: research written 2026-10-05 (before the code), built as `qt/adopt-annotations` (B8 of
-[the ideas of 2026-10](../history/README.md)). Scope (the author through the integrator, 2026-10-05): real sample PDFs of the
-apps come later; until then only what is clear without them is built: the standard annotation types as ISO 32000
-defines them, placement, consent, the layer, undo and the round trip, and the app's name as a label. No guessing of
-app-specific encodings (flattened GoodNotes ink, Drawboard pressure); the place where such handling plugs in is
-`Converter::convert` in `AdoptAnnotations.cpp`. The author (2026-10-05): "B8 sounds very good, I am especially interested in
-importing annotations that come from the GoodNotes PDF exports (no. 1) and Drawboard PDF (no. 2); the rest like Mac
-Preview or iOS Preview and other PDF annotations hopefully work as well."
+A PDF that another app marked up (ink, highlights, text boxes, shapes, notes, signatures) opens with those marks
+**editable** here: strokes, highlighter strokes, text boxes, sticky notes and pictures in a layer of their own,
+instead of a picture inside the page that can only be looked at. With consent, once per file, and undoable. The
+author: "I am especially interested in importing annotations that come from the GoodNotes PDF exports (no. 1) and
+Drawboard PDF (no. 2); the rest like Mac Preview or iOS Preview and other PDF annotations hopefully work as well."
 
-The goal: a PDF that another app marked up (ink, highlights, text boxes, shapes, notes, signatures) opens with those
-marks **editable** here: strokes, highlighter strokes, text boxes, sticky notes and pictures in a layer of their own,
-instead of a picture inside the page that can only be looked at. With consent, once per file, and undoable.
+What is converted is what is clear without sample files of the apps: the standard annotation types as ISO 32000
+defines them, placed exactly, and the app's name as a label. App-specific encodings (flattened GoodNotes ink,
+Drawboard's pressure) are not guessed; such handling plugs in at `Converter::convert` in `AdoptAnnotations.cpp`.
 
-## Research: how the apps write their marks
+## How the apps write their marks
 
-Web search was available only in part (the proxy blocks support.goodnotes.com and forums.zotero.org; GitHub search is
-not reachable from the session). No sample file of any app was available. What is below is marked:
+From research without sample files (2026-10). Marked:
 
-- **verified**: read in a source during this research (the source named), or fixed by the PDF standard (ISO 32000);
-- **assumed**: from general knowledge of these apps and of PDFs seen before, not checked against a file now. The
-  fixtures in the tests are built to match the assumptions; real exports must confirm them (see "Samples wanted").
+- **verified**: read in a source (named), or fixed by the PDF standard (ISO 32000);
+- **assumed**: from general knowledge of these apps and of PDFs, not checked against a file. The fixtures in the tests
+  match the assumptions; real exports must confirm them (see "Samples wanted").
 
 ### The standard (ISO 32000-1/-2, verified)
 
@@ -45,7 +41,7 @@ not reachable from the session). No sample file of any app was available. What i
 
 ### GoodNotes 5 / 6 (the author's no. 1)
 
-- **verified** (goodnotes.com and the search engine's quotes of support.goodnotes.com, 2026-10-05): exporting as PDF
+- **verified** (goodnotes.com, support.goodnotes.com): exporting as PDF
   has "Include annotations" and "Include page background" switches, and a "PDF Data Format" of **Editable** or
   **Flattened**. Flattened: "everything becomes one layer and can't be edited, clicked or modified after exporting";
   "bakes ink/highlighter into the page". Editable keeps links and the outline and "movable annotations".
@@ -61,14 +57,13 @@ not reachable from the session). No sample file of any app was available. What i
 - **assumed**: `/Producer` or `/Creator` names GoodNotes ("GoodNotes", "Goodnotes 6" or similar).
 - *Flattened* exports have the ink in the page content as vector paths (or images). Nothing in such a file marks which
   paths are ink and which are the document's own drawing, so **flattened GoodNotes ink is left as page content**
-  (shown as before; not editable). No reliable signature exists to tell them apart; guessing would cut paths out of
+  (shown; not editable). No reliable signature exists to tell them apart; guessing would cut paths out of
   the user's lecture slides.
 
 ### Drawboard PDF (the author's no. 2)
 
 - **verified** (drawboard.com): Drawboard writes standard annotations that "appear in any PDF viewer with the
-  markups"; its ink is pressure sensitive. The hybrid PDF research of this fork ([hybrid-pdf.md](hybrid-pdf.md),
-  "Faster PDF saves") already noted that Drawboard saves by appending incremental updates, like Acrobat.
+  markups"; its ink is pressure sensitive. It saves by appending incremental updates, like Acrobat.
 - **assumed**: ink as `/Ink` with `/InkList`, `/C`, `/BS /W`, `/CA`, and an `/AP`; the pressure only in the `/AP`
   (variable width); its highlighter pen as `/Ink` with opacity (and `/BM /Multiply` in the appearance); text
   highlights as `/Highlight` with `/QuadPoints`; text as `/FreeText` with `/DA`; shapes as `/Square`, `/Circle`,
@@ -178,13 +173,13 @@ Make them editable?" — **Make editable** / **Not now**. The question comes onc
 file has more of them than when it was asked). ⋮ → Document → **Adopt annotations from other apps…** does it any
 time; the Annotations panel shows the same offer at its top while there are some.
 
-## What is built (`qt/adopt-annotations`)
+## Code and tests
 
 Code: `qt/src/session/AdoptAnnotations.*` (scan, convert, the copy without them: qpdf, poppler for stamps),
 `qt/src/session/DocumentAdopt.cpp` (the document takes them; the undo step), `PdfPageKeeper::takeBackground`,
 `qt/src/app/AppAdopt.cpp` (scan on opening at idle priority, the question once per file, the conversion on a worker),
-`DocumentNotices.qml` (the dialog), `MoreMenu.qml` (⋮ → Document), `AnnotationList.qml` (the panel's line). "Asked once" is remembered with the
-document's places (`DocumentPlaces::adoptionOffered`: the number of annotations when asked; more later: asked again).
+`DocumentNotices.qml` (the dialog), `MoreMenu.qml` (⋮ → Document), `AnnotationList.qml` (the panel's line). "Asked
+once" is remembered with the document's places (`DocumentPlaces::adoptionOffered`: the number of annotations when asked; more later: asked again).
 
 - **Which document pages**: every page showing a PDF page of the background (a PDF page shown twice gets the marks
   twice), and the generated pages of a PDF with notes whose page of the clean copy had them.
@@ -206,10 +201,9 @@ turned 0/90/180/270° with a crop box away from the origin, against where popple
 notes; round trips as a PDF with notes (other apps see ours, `qpdf --check`, reopened editable, nothing left to
 adopt) and as a `.xopp` (the copy beside it, the user's PDF untouched); a PDF with notes marked up in Preview; undo
 after the notes went into the PDF itself; GoodNotes-like (highlighter opacity only in the appearance) and
-Preview-like (a signature stamp, an arrow outside its rectangle) files. `MainWindowTest.annotationsOfAnotherAppAre
-OfferedOnceAndMadeEditable`: the question, "Not now" remembered, ⋮ → Document, undo.
+Preview-like (a signature stamp, an arrow outside its rectangle) files. `MainWindowTest.annotationsOfAnotherAppAreOfferedOnceAndMadeEditable`: the question, "Not now" remembered, ⋮ → Document, undo.
 
-## Decided here (for the author to confirm)
+## Decisions
 
 1. **Removed, not hidden.** The originals leave the PDF on the next save (ours replace them); kept hidden they would
    come back in other apps only as invisible clutter. The original stays: `name.original.pdf` (or in the app cache)

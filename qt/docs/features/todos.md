@@ -1,8 +1,8 @@
-# To-dos (`qt/todos`)
+# To-dos
 
-Decided by the author (2026-10-04): a library-wide list of to-dos from the Markdown task lines of the documents,
+A library-wide list of to-dos from the Markdown task lines of the documents,
 grouped and filtered; a check-box stamp for handwritten to-dos; "Add to calendar" as a one-way hand-off. No scripting.
-In the author's words: *"Add a way to sort todos by document source or somehow group them and filter them. … Calendar
+The author: *"Add a way to sort todos by document source or somehow group them and filter them. … Calendar
 is cool. Maybe add the setting to only query checkboxes with todo: in the markdown line or something like that to not
 flood the todo list with all per default."*
 
@@ -79,10 +79,10 @@ another tool, ends it without a stamp. Placing it is an undo step (two when the 
 - It is an ordinary Markdown task: a tap on its check box ticks it; Xournal++ shows `- [ ]` as text.
 - "Is a stamp" is not stored in the file: a box whose whole text is one task without text is one
   (`md::tasks::isStamp`). So a stamp a user typed by hand is one too, and it counts whatever the marker setting.
-- In the list it shows **the handwriting beside it** as a picture: the region renderer of `qt/snip`
+- In the list it shows **the handwriting beside it** as a picture: the snip's region renderer
   (`qt/src/render/RegionRender`) draws the area from its check box to the page's right side (96 % of its width),
   4.5 check boxes high, through `image://hitpage/…/<page>/area/x,y,w,h` (the hit-page provider's kept documents).
-- When handwriting search has read that line (`qt/docs/features/handwriting-search.md`), its words are the to-do's text
+- When handwriting search has read that line ([handwriting-search.md](handwriting-search.md)), its words are the to-do's text
   (filterable, exported); else the picture alone.
 
 ## Calendar (one way)
@@ -110,7 +110,7 @@ Nothing comes back: no sync, no reminders, no account access (decided by the aut
 | What | Where |
 | --- | --- |
 | Task lines, due dates, stamps | `qt/src/markdown/MdTasks.*` |
-| The index | `qt/src/shell/Library.*` (`Todo`, `todos()`, `todoChanges()`) |
+| The index | `qt/src/shell/LibraryIndex.h`, `LibraryIndexQueries.cpp` (`Todo`, `todos()`, `todoChanges()`) |
 | The setting, finding a to-do again, writing a closed `.md` | `qt/src/shell/Todos.*` |
 | The view's model | `qt/src/shell/LibraryTodos.*` |
 | Ticking, opening, the stamp, the calendar (window side) | `qt/src/app/AppTodos.cpp` |

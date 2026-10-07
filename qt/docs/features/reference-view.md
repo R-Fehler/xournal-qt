@@ -1,7 +1,6 @@
 # The reference view
 
-A second document beside the one being written in, in the same tab (`qt/reference-view`, `qt/reference-popout`,
-`qt/self-reference`, `qt/version-compare`). Code: `ReferenceMode` (the controller behind `app.reference`), `TabManager`
+A second document beside the one being written in, in the same tab. Code: `ReferenceMode` (the controller behind `app.reference`), `TabManager`
 (which tab shows what beside it), `ReferenceSplit.qml` (the split, the divider, the pill), `ScrollLock` (both sides
 scrolled together), `VersionCompare` and `VersionDiff` (comparing versions). Tests: `ReferenceModeTest` (`-L shell`),
 `ReferenceWindowTest` and `VersionHistoryTest` (`-L ui`), `SecondViewTest` and `ScrollLockTest` (`-L canvas`),
@@ -11,20 +10,20 @@ scrolled together), `VersionCompare` and `VersionDiff` (comparing versions). Tes
 
 - Opened with "Open as reference" (the tab strip's menu of another tab, the book on a card of the tab overview,
   a library card, a link's popup). The reference is another open tab; each tab has at most one.
-- For reading by default: tools scroll there, selections can be copied but not moved. A PDF whose author does
-  not allow copying its text (opened without its owner password) refuses it there as on the notes. The pen button of its pill
-  lets the tool in hand write there too (per tab; off for every new reference).
+- For reading by default: tools scroll there, selections can be copied but not moved. A PDF whose author does not
+  allow copying its text (opened without its owner password) refuses it there as on the notes. The pen button of its
+  pill lets the tool in hand write there too (per tab; off for every new reference).
 - The pill: page number (go to a page), the page grid, scroll both sides together (see below), edit, copy, fit width,
-  swap sides, swap roles (the reference becomes the notes), "Show as a tab", close. Keys act on the side tapped last. In a narrow half (under 480 px: a
-  phone, a small window) the pill is the page number and a ⋮ that holds the rest (`referenceMenu`; a sheet on a
+  swap sides, swap roles (the reference becomes the notes), "Show as a tab", close. Keys act on the side tapped last.
+  In a narrow half (under 480 px: a phone, a small window) the pill is the page number and a ⋮ that holds the rest (`referenceMenu`; a sheet on a
   phone), so it stays small.
-- **Side by side or top and bottom** (qt/adaptive-panels): side by side where the canvas area is landscape, top and
+- **Side by side or top and bottom**: side by side where the canvas area is landscape, top and
   bottom where it is portrait (h > w: a tablet or a phone held upright), with 16 px of margin around square so a
   window dragged across does not flicker. "Swap sides" puts the reference at the bottom (top) then. The divider is
   dragged the same way across, and keeps its ratio (the notes' share) when the orientation flips. The notes' view
   pill and the reference's pill each stay inside their half, so they never meet.
 
-## The same document beside itself (`qt/self-reference`)
+## The same document beside itself
 
 For cross-referencing within one large document: the tab's own document shows in a second view beside it.
 
@@ -43,11 +42,11 @@ For cross-referencing within one large document: the tab's own document shows in
   or deleted elsewhere it stays on the page its reader was on.
 - **Read-only by default**, with the pill's pen button, as for another document. Undo in either side undoes the
   last change of the document.
-- **Selecting works as on the notes** (qt/touch-multiselect): the selection's pill for elements and for notes
+- **Selecting works as on the notes**: the selection's pill for elements and for notes
   selected together (with the count and "Select more"), the note's pill at a selected note (`NotePill` with
   `target: app.reference.edit`; colours, cover, text, image, cut and delete while the view is written in, copy and
-  deselect for reading only), Ctrl + click and "Select more" to add and take away (qt/docs/features/sticky-notes.md, "Select
-  more"). Each view has its own selection and its own select more.
+  deselect for reading only), Ctrl + click and "Select more" to add and take away ([sticky-notes.md](sticky-notes.md),
+  "Select more"). Each view has its own selection and its own select more.
 - **One set of canvas actions for both sides.** What the pills and keys do on a canvas (selection, groups, notes, PDF
   text, the clipboard, page, zoom, Back) is `CanvasActions` (`shell/CanvasActions.h`): `app.edit` for the notes and
   `app.reference.edit` for the reference, the same code with a policy (the reference changes nothing unless it is
@@ -65,9 +64,9 @@ For cross-referencing within one large document: the tab's own document shows in
 - The reference's page grid shows the same pages; a tap there moves the reference, not the notes.
 - Links tapped in the second view that lead into the document go there in the reference.
 
-## Scrolling both sides together, and comparing (`qt/version-compare`)
+## Scrolling both sides together, and comparing
 
-The author (2026-10-05): "Implement comparing two versions using the reference view but add a locked scroll toggle so
+The author: "Implement comparing two versions using the reference view but add a locked scroll toggle so
 both canvases are scrolled at the same time. Make this generic so we can use that toggle in the reference view to
 compare PDFs in general."
 
@@ -87,8 +86,8 @@ compare PDFs in general."
   the notes' place within the page (the page offset stays); the zooms stay as they are.
 - **Zoom:** relative to the width that fits each half (`fitWidthZoom` of the page in view): the two keep the ratio
   they had when it was switched on. Two halves that both fit the width keep doing so, a pinch on one side zooms the
-  other as much, Fit width on one fits both. (Keeping the zooms independent was the other choice; with pages of other
-  sizes it made the lines of the two drift apart at once.)
+  other as much, Fit width on one fits both. (Independent zooms would make the lines of pages of other sizes drift
+  apart at once.)
 - **No loops, no extra work:** while one view moves the other, the other's signals are not followed, and a view
   already where it should be is not moved; the other side renders what scrolling it needs, nothing more. A view whose
   size changed (the divider, the window, the halves flipping between side by side and top and bottom) follows the
@@ -108,11 +107,11 @@ compare PDFs in general."
 - **What changed** (`VersionDiff`, in `session/`): each page is signed from what it holds, without drawing it: its
   size, its background (kind, PDF page, colour without its alpha, image file) and every element of every layer as the
   `.xopp` holds it (upstream's writer: a stroke drawn now and the same stroke read back from a saved version give the
-  same text, where their numbers in memory differ in the last bits). The two lists are aligned (the equal pages at both ends, then the longest common run), so an inserted or
-  removed page marks only itself, and a page that only moved is no change; between two equal pages the changed pages
+  same text, where their numbers in memory differ in the last bits). The two lists are aligned (the equal pages at
+  both ends, then the longest common run), so an inserted or removed page marks only itself, and a page that only moved is no change; between two equal pages the changed pages
   of each side are paired in order, the rest are added or removed.
 - Signed from the loaded documents rather than from the per-layer sigs in the marker (`/Layers`): "now" has unsaved
-  changes the marker does not know, the marker's sigs include the app's version (a version saved by an older build
+  changes the marker does not know, the marker's sigs include the app's version (a version saved by another build
   would differ everywhere), and the same code compares any two documents. The pages are signed on the GUI thread a
   few milliseconds at a time and kept by page revision (`VersionCompare`, its owner; only the pages of the two
   documents), so writing on "now" during a comparison signs only the page written on again (a moment after writing

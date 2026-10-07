@@ -1,7 +1,7 @@
-# Text documents as PDF (`qt/md-pdf`)
+# Text documents as PDF
 
-Status: design agreed with the author 2026-09-25/26 (TODO.md, "Ideas round of 2026-09-25/26", "Markdown inside the
-PDF with notes"); built as `qt/md-pdf`. Its pictures (`name.assets/…`): `qt/md-images`, [md-images.md](md-images.md).
+A text written in Markdown, kept as a PDF with notes: the pages show the typeset text, the embedded document keeps it
+editable, and the pen writes on top. Its pictures (`name.assets/…`): [md-images.md](md-images.md).
 The user guide for getting the Markdown out again is [user/markdown-from-pdf.md](../user/markdown-from-pdf.md).
 
 ## One model
@@ -14,7 +14,7 @@ The user guide for getting the Markdown out again is [user/markdown-from-pdf.md]
   (a hybrid PDF, [hybrid-pdf.md](hybrid-pdf.md)). The pages show the typeset text; the embedded `document.xopp`
   keeps it editable. Nothing marks such a file apart from that: **a notes document whose page 1 starts the page's
   Markdown text is a text document** (`TextDocument::isTextDocument`). "Edit as notes" of a `.md` makes one too.
-- **Ink stays where it was drawn** when the text reflows (the author, 2026-09-26): there is no anchoring. Whoever
+- **Ink stays where it was drawn** when the text reflows (the author's decision): there is no anchoring. Whoever
   writes on a text page and then changes the text above it moves the ink themselves (select and move it, or insert
   a page). This is documented, not engineered around.
 - The page break `<div style="page-break-after: always"></div>` ends a page of the flow, as in the `.md` editor
@@ -27,8 +27,7 @@ The user guide for getting the Markdown out again is [user/markdown-from-pdf.md]
   "PDF files" → `pdf`, "Xournal++ files" → `md`. Settings → Documents: **New text documents: PDF document /
   Markdown file** (`DocumentMode::newTextDocuments`).
 - The library's new menu: **New text document…** (the setting says which; the name dialog shows `.pdf` or `.md`)
-  and **New text file…** (`.txt`, as before). With the setting on `md` the entry reads "New Markdown file…" as
-  before.
+  and **New text file…** (`.txt`). With the setting on `md` the entry reads "New Markdown file…".
 - A PDF text document is made in the current folder as `name.pdf` (a free name, as New document), saved at once as a
   PDF with notes, opened, and the cursor is put into its text.
 - **Mixing works:** existing `.md` files are never converted unasked (they open in the `.md` editor, whatever the
@@ -77,7 +76,7 @@ the text has a bookmark of its own (the page's).
 ## Editing a PDF text document
 
 - It opens in the notes model: the flow is the page's Markdown text written on the page (WYSIWYG), the pen writes
-  ink on top, and the formatting bar (`qt/md-toolbar`) is shown as for a `.md`.
+  ink on top, and the formatting bar is shown as for a `.md`.
 - **Typing goes into the flow without a click:** a key typed while nothing is being written starts writing the
   flow at the end of what the page in view holds of it (as the writing button starts it; on the flow's last page at
   the very end of the text, and when the page in view is after the flow, there too). The formatting bar's tools do

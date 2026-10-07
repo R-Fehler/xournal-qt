@@ -1,6 +1,6 @@
-# Stickers: reusable content per library (`qt/stickers`)
+# Stickers: reusable content per library
 
-The author (2026-10-04): "a library could store a set of copy-pastable items that work as stickers or templates,
+The author: "a library could store a set of copy-pastable items that work as stickers or templates,
 similar to GoodNotes stickers … select things (all kinds of items on the page, including ink, optionally with a pixel
 screenshot of the PDF canvas background), and save that into the template/sticker library. this would be stored in
 the library directory but we expose an option to export/copy them to other libraries of xournal-qt. per default they
@@ -10,7 +10,7 @@ up with the renderings of these stickers and once we select a sticker it's being
 directly pasted into the current page and selected so the user can move and scale it … saved or stored as xopp files
 so they can be shared and exported/imported and viewed."
 
-Decided by the author (2026-10-04): a visible `Stickers/` folder per library (a fixed English name, with
+Decided with the author: a visible `Stickers/` folder per library (a fixed English name, with
 subfolders), an app-wide set in the app's data folder, the own order in a hidden file inside each sticker folder (so
 it syncs), pasted at the original size (made smaller only to fit the page), selected after pasting, also copied to the
 clipboard when saved. A pasted sticker is a group ([groups.md](groups.md)): a tap on any part selects all of it.
@@ -38,7 +38,7 @@ A normal `.xopp` that Xournal++ opens (upstream's LoadHandler reads it without a
 - the content moved so its top left is at (6, 6): ink, shapes, images and LaTeX in `Layer 1`; Markdown text boxes in
   the page's `Markdown` layer (at the bottom, as the app keeps it); whole sticky notes as their layers on top;
 - with "With the PDF behind it": a picture of the background behind the content (the PDF page, a background image,
-  the paper and its ruling; never the ink: `region::Request::layers = false` of `qt/snip`'s renderer) as an image in
+  the paper and its ruling; never the ink: `region::Request::layers = false` of the snip's renderer) as an image in
   a layer of its own at the bottom, `Sticker picture`. At least 200 dpi (`region::MIN_DPI`), at most about 4
   megapixels (`region::MAX_PIXELS`). A selection made with the lasso cuts the picture to the lasso's shape
   (transparent outside it); a rectangle, a tap or a selection moved since: the rectangle around the content;
@@ -61,8 +61,8 @@ A normal `.xopp` that Xournal++ opens (upstream's LoadHandler reads it without a
 
 ## Using a sticker
 
-- **The sticker button** (the tool bar's insert group, next to the image button; in the phone's "All tools" sheet
-  under "Insert") opens the **picker**: a popup beside the button, a bottom sheet on a phone.
+- **The sticker button** (an item of the top bar, next to the image button, or wherever the user put it; in the
+  phone's "All tools" sheet under "Insert") opens the **picker**: a popup beside the button, a bottom sheet on a phone.
 - **The picker:** "This library" / "All libraries" (the app-wide set), the folders of that set as chips ("All", then
   each folder), a search (the name and the folder), the order ("Last used", "Own order", "Name", "Date added"), and the
   grid of previews (three columns on a phone) with the names under them. "+ Save selection" while something is

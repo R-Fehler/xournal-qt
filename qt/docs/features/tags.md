@@ -1,7 +1,6 @@
-# Tags (`qt/tags`)
+# Tags
 
-Chosen by the author (2026-10-04, idea A13 of [the ideas of 2026-10](../history/README.md), as in Apple Notes, Obsidian and
-Zotero): `#tag` in typed text and Markdown, keywords of PDFs; indexed per folder; a Tags tab in the library like
+As in Apple Notes, Obsidian and Zotero: `#tag` in typed text and Markdown, keywords of PDFs; indexed per folder; a Tags tab in the library like
 Favourites; `tag:` in the search; tags on the cards.
 
 ## What a tag is
@@ -90,7 +89,7 @@ are what the views and the search use.
 | --- | --- |
 | What a tag is, Markdown and front matter, queries | `qt/src/session/Tags.*` |
 | A PDF's keywords: read and write | `qt/src/session/PdfKeywords.*` |
-| The index | `qt/src/shell/Library.*` (`Tagged`, `tagged()`, `tagsOf()`, `hasTag()`, `tagChanges()`) |
+| The index | `qt/src/shell/LibraryIndex.h`, `LibraryIndexQueries.cpp`, `LibraryIndexRead.cpp` (`Tagged`, `tagged()`, `tagsOf()`, `hasTag()`, `tagChanges()`) |
 | `tag:` in the fuzzy syntax | `qt/src/session/FuzzyQuery.*`, the help `FuzzyHelp.qml` |
 | The tag filter, the cards' tags | `qt/src/shell/LibraryModel.*` (`tagFilter`, `TagsRole`) |
 | The Tags tab | `qt/src/shell/LibraryTags.*`, `qt/src/app/qml/TagsView.qml` (in `HomeView.qml`) |

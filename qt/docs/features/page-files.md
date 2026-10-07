@@ -1,9 +1,9 @@
-# Pages as files (`qt/page-files`)
+# Pages as files
 
-The author (2026-10-05): "A6-A8 sound good" (ideas-2026-10.md: insert pages from a PDF file, extract or split selected
-pages, export pages as PNG), and later: "once exported put it into the system clipboard so the png can easily get
-pasted somewhere. Copy pasting high res pages (dpi higher than the native screen, which is what the system screenshot
-tool produces) into the clipboard is the power move here."
+Pages to and from files: insert pages from a PDF or another document, extract or split pages into new documents,
+export pages as pictures, and copy a page as a picture. The author: "once exported put it into the system clipboard
+so the png can easily get pasted somewhere. Copy pasting high res pages (dpi higher than the native screen, which is
+what the system screenshot tool produces) into the clipboard is the power move here."
 
 Code: `qt/src/session/PageFiles.*` (ranges, split plans, a new document of some pages, picture names; Qt-free), the
 window's part `qt/src/app/AppPageFiles.cpp`, the dialogs `qt/src/app/qml/PageFiles.qml`; `RegionRender`'s `paper`
@@ -22,7 +22,7 @@ option; the CLI's `--png-dir`. Tests: `PageFilesTest` and `PageFilesRanges` (she
 
 The page menu acts on the selection when the page pressed is selected, else on that page (as all its entries).
 
-## Inserting pages from a file (A6)
+## Inserting pages from a file
 
 - The file: a PDF, a PDF with notes, or a `.xopp`/`.xoj`. It is read on a worker (`DocumentSession::loadFile`, as
   opening it would) and kept while the dialog is open (`AppController::pageFile`, one at a time, let go when the
@@ -38,7 +38,7 @@ The page menu acts on the selection when the page pressed is selected, else on t
   (the provider reads files without passwords), its pages are ticked by number. Inserted into a document that is not
   protected, its pages are no longer protected there, as pasting pages from a protected tab (decided).
 
-## Extract and split (A7)
+## Extract and split
 
 - **Extract**: the pages (the selection, else the page) become a new document named "lecture (pages 2-3)" (editable)
   next to the document (else in the library's current folder, else the last folder opened), opened in a tab. As a
@@ -56,7 +56,7 @@ The page menu acts on the selection when the page pressed is selected, else on t
   `encryptionForSave`), and it opens in its tab without asking. A `.xopp` is refused (it cannot be encrypted), as Save
   as `.xopp` is.
 
-## Pages as pictures (A8)
+## Pages as pictures
 
 - **Export pages as pictures…**: this page, the selected pages, or all; the resolution (72–600 dpi or the screen's;
   the remembered one, 300 at first); PNG or JPEG; "Transparent background" (PNG): no paper colour and no ruling
@@ -67,8 +67,8 @@ The page menu acts on the selection when the page pressed is selected, else on t
   600 dpi gets less). The DPI is written into the files.
 - **One page exported** is also put on the clipboard (several pages: the clipboard is left alone, decided).
 - **Copy page as image** (Ctrl+Shift+C): the page (of a selection, the first) as a PNG on the clipboard at the
-  resolution of Settings → Documents → "Pictures copied to the clipboard" → Pages (300 dpi at first; also changed by the export dialog), on
-  white paper, with its DPI in the PNG so that apps paste it at the page's size. At most 32 megapixels (an A4 page at
+  resolution of Settings → Documents → "Pictures copied to the clipboard" → Pages (300 dpi at first; also changed by
+  the export dialog), on white paper, with its DPI in the PNG so that apps paste it at the page's size. At most 32 megapixels (an A4 page at
   600 dpi is 35): then less, and the toast says so. Toast: "Page 3 copied as an image (2480×3509)".
 - Always the normal colours: dark pages are a way of showing pages, never of exporting them.
 - **A protected document** is not exported as pictures (they cannot keep its password; the dialog says why). Copying
