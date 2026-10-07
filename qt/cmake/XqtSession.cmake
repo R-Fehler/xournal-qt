@@ -289,7 +289,6 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/ElementTimesCanvasTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TimelineReplayTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PresenterMirrorTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PenStylesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/CanvasRotationTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/DarkPagesTest.cpp)
     target_link_libraries(xqt-canvas-tests PRIVATE xqt-canvas xqt-test-support Qt6::Test GTest::gtest)

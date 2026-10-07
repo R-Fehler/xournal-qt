@@ -5,6 +5,7 @@
  * @license GNU GPLv2 or later
  */
 #include <atomic>
+#include <cctype>
 #include <cmath>
 #include <chrono>
 #include <condition_variable>
@@ -12,6 +13,7 @@
 #include <thread>
 #include <cstring>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <glib.h>
@@ -116,6 +118,19 @@ Loaded load(const char8_t* relative) {
 
 class PageRasterTest: public ::testing::TestWithParam<std::tuple<const char8_t*, double, double>> {};
 
+/// A case's name: the fixture, the zoom and the dpi ("old_zoom150_dpi100"). gtest would print the char8_t* as an
+/// address: a name that changed with every link, and that two cases shared.
+static std::string pageRasterName(const ::testing::TestParamInfo<PageRasterTest::ParamType>& info) {
+    const auto [file, zoom, dpi] = info.param;
+    std::string name = fs::path(file).stem().string();
+    for (char& c: name) {
+        if (!std::isalnum(static_cast<unsigned char>(c))) {
+            c = '_';
+        }
+    }
+    return name + "_zoom" + std::to_string(std::lround(zoom * 100)) + "_dpi" + std::to_string(std::lround(dpi * 100));
+}
+
 TEST_P(PageRasterTest, fullRenderMatchesUpstreamRenderJob) {
     const auto [file, zoom, dpi] = GetParam();
     Settings settings(fs::path{});
@@ -148,7 +163,8 @@ INSTANTIATE_TEST_SUITE_P(Fixtures, PageRasterTest,
                                            std::make_tuple(u8"load/text-fileversion-5.xopp", 1.3, 1.0),
                                            std::make_tuple(u8"load/image-fileversion-5.xopp", 2.0, 1.0),
                                            std::make_tuple(u8"packaged_xopp/pdfBackground/old.xopp", 1.5, 1.0),
-                                           std::make_tuple(u8"packaged_xopp/pdfBackground/old.xopp", 1.0, 1.25)));
+                                           std::make_tuple(u8"packaged_xopp/pdfBackground/old.xopp", 1.0, 1.25)),
+                         pageRasterName);
 
 // Space for notes (qt/docs/note-space.md): the canvas draws the PDF at the page's offset, as every export does
 TEST(PageRaster, aPageWithSpaceForNotesMatchesUpstreamsDrawing) {

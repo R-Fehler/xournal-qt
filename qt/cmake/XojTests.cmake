@@ -67,7 +67,12 @@ include(GoogleTest)
 # Some upstream suites write to fixed paths in the temp directory (e.g. /tmp/xournalpp-test-units.xopp): they must
 # not run in parallel with each other (ctest -j). The rest runs freely.
 set(XOJ_UNIT_TMPFILE_SUITES "ControlLoadHandler.*:SettingsTest.*:Metadata.*")
+# A folder of their own to run in: upstream's SettingsTest writes a settings file "non-existing-file-path" into the
+# working directory. NO_PRETTY_VALUES: a parameterized case is named by its name generator (PageRasterTest), not by
+# its value printed (a char8_t* printed as an address).
+set(XOJ_UNIT_CWD "${CMAKE_BINARY_DIR}/unit-cwd")
+file(MAKE_DIRECTORY "${XOJ_UNIT_CWD}")
 gtest_discover_tests(xoj-unit-tests DISCOVERY_TIMEOUT 30 TEST_FILTER "${XOJ_UNIT_TMPFILE_SUITES}"
-    PROPERTIES LABELS unit RESOURCE_LOCK xoj-unit-tmpfiles)
+    WORKING_DIRECTORY "${XOJ_UNIT_CWD}" NO_PRETTY_VALUES PROPERTIES LABELS unit RESOURCE_LOCK xoj-unit-tmpfiles)
 gtest_discover_tests(xoj-unit-tests DISCOVERY_TIMEOUT 30 TEST_FILTER "-${XOJ_UNIT_TMPFILE_SUITES}"
-    PROPERTIES LABELS unit)
+    WORKING_DIRECTORY "${XOJ_UNIT_CWD}" NO_PRETTY_VALUES PROPERTIES LABELS unit)

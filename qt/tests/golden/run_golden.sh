@@ -8,6 +8,10 @@
 #
 # The fixtures are copied to the output directory first, so the tests never modify the source tree.
 #
+# Parts (GOLDEN_PARTS, default "upstream roundtrip"): "upstream" are 1. and 2. (they need upstream's binary),
+# "roundtrip" is 3. (only the fork's CLI: it runs everywhere, also in CI). ctest has one test per part:
+# golden-roundtrip always runs; golden-quick (the comparison with upstream) is skipped without upstream's binary.
+#
 # Modes (GOLDEN_MODE):
 #   quick (default)  a few representative fixtures (strokes, text, images, PDF background, layers) at 72 dpi.
 #                    Meant for routine runs; takes a few seconds.
@@ -25,7 +29,8 @@
 #   GOLDEN_TOLERANCE    per-channel tolerance vs upstream          (default: 0)
 #   GOLDEN_RT_TOLERANCE per-channel tolerance for the round trip   (default: 1)
 #   GOLDEN_JOBS         parallel jobs                              (default: nproc)
-# Exit code: 0 all passed, 1 failures, 77 skipped (no upstream binary).
+#   GOLDEN_PARTS        upstream and/or roundtrip                  (default: both)
+# Exit code: 0 all passed, 1 failures, 77 skipped (the upstream part without upstream's binary).
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -52,8 +57,13 @@ QUICK_FIXTURES=(
 TOL="${GOLDEN_TOLERANCE:-0}"
 RT_TOL="${GOLDEN_RT_TOLERANCE:-1}"
 JOBS="${GOLDEN_JOBS:-$(nproc)}"
+PARTS="${GOLDEN_PARTS:-upstream roundtrip}"
+UPSTREAM=0
+ROUNDTRIP=0
+[[ " $PARTS " == *" upstream "* ]] && UPSTREAM=1
+[[ " $PARTS " == *" roundtrip "* ]] && ROUNDTRIP=1
 
-if [[ ! -x "$UP_BIN" ]]; then
+if [[ $UPSTREAM == 1 && ! -x "$UP_BIN" ]]; then
     echo "SKIP: upstream xournalpp binary not found at $UP_BIN (set XOJ_UPSTREAM_BIN)"
     exit 77
 fi
@@ -107,7 +117,7 @@ run_case() {
     local dpi up qt rc_up rc_qt rt
 
     # 1. PNG export
-    for dpi in $DPIS; do
+    [[ $UPSTREAM == 1 ]] && for dpi in $DPIS; do
         up="$case_dir/png$dpi-upstream" qt="$case_dir/png$dpi-qt"
         mkdir -p "$up" "$qt"
         "$UP_BIN" "$f" --create-img="$up/page.png" --export-png-dpi="$dpi" >"$up.log" 2>&1
@@ -122,7 +132,7 @@ run_case() {
     done
 
     # 2. PDF export (rasterized at 72 dpi)
-    if [[ $HAVE_PDFTOPPM == 1 ]]; then
+    if [[ $UPSTREAM == 1 && $HAVE_PDFTOPPM == 1 ]]; then
         up="$case_dir/pdf-upstream" qt="$case_dir/pdf-qt"
         mkdir -p "$up" "$qt"
         "$UP_BIN" "$f" --create-pdf="$up/out.pdf" >"$up.log" 2>&1
@@ -139,6 +149,7 @@ run_case() {
     fi
 
     # 3. Round trip through the fork's save path
+    [[ $ROUNDTRIP == 1 ]] || return 0
     rt="$case_dir/roundtrip"
     mkdir -p "$rt"
     if "$QT_CLI" "$f" --dump >"$rt/original.dump" 2>/dev/null; then
@@ -166,7 +177,7 @@ else
         files+=("$FIXTURES/$rel")
     done
 fi
-echo "Golden tests ($MODE): ${#files[@]} fixtures, DPIs [$DPIS], $JOBS jobs, upstream: $UP_BIN"
+echo "Golden tests ($MODE, $PARTS): ${#files[@]} fixtures, DPIs [$DPIS], $JOBS jobs, upstream: $UP_BIN"
 
 for f in "${files[@]}"; do
     while [[ $(jobs -rp | wc -l) -ge $JOBS ]]; do
