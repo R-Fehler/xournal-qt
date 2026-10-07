@@ -75,6 +75,9 @@ block: full suite before merging, Qt ≤ 6.7 API, UI tests also on the Qt 6.8 bu
 - `qt/architecture`: the architecture overview for humans: `ARCHITECTURE.md` (GitHub renders it: an SVG diagram and
   tables linking to the source on GitHub) generated from a machine-readable `qt/docs/architecture/architecture.yaml`,
   and the same as an interactive HTML page published to GitHub Pages by a workflow.
+  With it, the docs restructure of [docs-plan.md](docs-plan.md) (moves into `features/`, `decisions/`,
+  `development/`, an entry page, a README per module), postponed from wave 1 so the moves do not collide with the
+  code edits of waves 2 and 3.
 
 **Later rounds** (written down here so a fresh session can pick them up): the feature objects out of `AppController`
 (app-cpp E–N, `app.versions` first as the template), `CanvasView` steps (infra B8, B9), `CanvasInput` split (B11),
