@@ -32,11 +32,14 @@
   clipboard, page, zoom, Back), with a policy (the reference changes nothing unless it is written in; read-only
   documents and a text file's pages are checked for both) and hooks for the window's ways (choosing a tool, finishing
   the Markdown being written). `app.edit` and `app.reference.edit`; the pills take one as their target.
-  `AppController` keeps the names its shortcuts call and routes them to the side with the keys (`keyActions`).
+  `app.keyTarget` is the one of the side with the keys (the reference while it has the focus).
 
 ## Consequences
 - Adding a per-document property to the window: a getter and one connection to a `CurrentDocument` signal.
-- The feature objects split off `AppController` later (review 2026-10, app-cpp blocks E–N) get the services and the
-  current document instead of reaching into the controller.
-- `AppController` still carries the facade names the QML calls (`app.copySelection`, `app.zoomIn`, …); they move with
-  their features.
+- The feature objects split off `AppController` (review 2026-10, app-cpp blocks E–N) get a **`WindowContext`**
+  (`src/app/WindowContext.h`: the services, the window's tabs and its current document) instead of reaching into the
+  controller; `AudioControl` and `TimelineControl` do already.
+- The QML calls the canvas actions on `app.edit` and `app.keyTarget`. `AppController` still carries the names with
+  rules of their own (`app.copySelection`, `app.pasteElements`, `app.selectAllOnPage`, Back and Forward across
+  documents) and the per-document properties (`app.pageNumber`, `app.zoomPercent`, …); they move with their
+  features.

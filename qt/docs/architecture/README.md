@@ -51,6 +51,7 @@ The window (`win`): its state objects (insets, view modes, chrome layout), its k
 | --- | --- |
 | [`Main.qml`](../../src/app/qml/Main.qml) | the window; holds the state objects and instantiates the parts |
 | [`WindowInsets.qml, ViewModes.qml, ChromeLayout.qml`](../../src/app/qml/ViewModes.qml) | safe areas and keyboard (win.insets), full screen, Zen, read only, presenting (win.modes), where the chrome goes (win.layout) |
+| [`WindowActions.qml`](../../src/app/qml/WindowActions.qml) | what the parts ask the window to do (win.actions): look-ups, pages as files, the dialogs app asks for |
 | [`WindowShortcuts.qml, PageKeys.qml`](../../src/app/qml/WindowShortcuts.qml) | the window's shortcuts and the ordered Esc/Back dispatcher |
 | [`SaveFlow.qml, StartupFlow.qml, ExportFlow.qml`](../../src/app/qml/SaveFlow.qml) | multi-step flows (save as, the first start, export) |
 
@@ -102,7 +103,7 @@ The home screen: the library grid, recent files, bookmarks, to-dos and tags, the
 | Key class or file | What |
 | --- | --- |
 | [`HomeView.qml`](../../src/app/qml/HomeView.qml) | the home screen; instantiates its parts once each |
-| [`LibraryGridPage.qml, RecentGridPage.qml, DocumentCard.qml`](../../src/app/qml/LibraryGridPage.qml) | the grids and a document's card (image://cover) |
+| [`DocumentGrid.qml, DocumentCard.qml`](../../src/app/qml/DocumentGrid.qml) | the library's and Recent's grid (LibraryGridPage, RecentGridPage) and a document's card (image://cover) |
 | [`BookmarksView.qml, TodosView.qml, TagsView.qml`](../../src/app/qml/TodosView.qml) | the library's bookmarks, to-dos and tags |
 
 Depends on:
@@ -226,6 +227,7 @@ One window's QML API, the context property `app`: its tabs, the current document
 | [`App*.cpp`](../../src/app/AppBookmarks.cpp) | one area each: bookmarks, tags, templates, stickers, snip, text files, … |
 | [`AudioControl`](../../src/app/AudioControl.h) | recording and playing (app.audio) |
 | [`TimelineControl`](../../src/app/TimelineControl.h) | the replay of how a page was written (app.timeline) |
+| [`WindowContext`](../../src/app/WindowContext.h) | what a window's feature objects get from it (services, tabs, current document) |
 
 Depends on:
 

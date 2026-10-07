@@ -50,8 +50,9 @@ For cross-referencing within one large document: the tab's own document shows in
 - **One set of canvas actions for both sides.** What the pills and keys do on a canvas (selection, groups, notes, PDF
   text, the clipboard, page, zoom, Back) is `CanvasActions` (`shell/CanvasActions.h`): `app.edit` for the notes and
   `app.reference.edit` for the reference, the same code with a policy (the reference changes nothing unless it is
-  written in). `AppController` keeps the names the window's shortcuts call (`app.copySelection`, `app.zoomIn`, …) and
-  routes them to the side with the keys (`keyActions`). `QmlApiTest` checks that every name a pill reads exists there.
+  written in). The keys act on `app.keyTarget`, the side with the focus (group, cut, delete, zoom, the fits);
+  `AppController` keeps the few names with rules of their own (`app.copySelection`, `app.pasteElements`, Back across
+  documents) and routes them itself. `QmlApiTest` checks that every name a pill reads exists there.
 - **Memory.** Both views register with `CanvasMemory` like any view: the limit is shared, not doubled; the view used
   last gets the larger part, the other one keeps its visible pages. Previews and thumbnails are per document, so
   they are shared too.

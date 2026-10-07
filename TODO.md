@@ -21,14 +21,24 @@ All four waves are merged (2026-10-07). The architecture overview:
 `qt/scripts/architecture/generate.py` (`--check` runs in CI).
 
 ### What the merged blocks left (checked against the code, 2026-10-07)
-- [ ] App: `WindowActions` — Main's search forwards and the Connections that only open dialogs (qml B3); a
-  `WindowContext` for the feature objects; `AppController::app` → `context` (mechanical); the facade names of the
-  canvas actions (`app.copySelection`, `app.zoomIn`, …) and the per-document properties move with their features
-  (app-cpp E–N); a per-path guard between background writes and a `DocumentSession` save (tags have one).
-- [ ] QML: the 40 `typeof win` guards (qml B6); HomeView's one `DocumentGrid` with the favourites in C++, its menu
-  target object and the search field's `type(text)` (qml B7); SettingsPage's section model (names written twice,
-  magic indices) and its own keyboard fallback (qml B8); the cards' role `preview` → `cover` (LibraryModel's
-  `CoverRole` is still named "preview" for QML).
+- [x] App (`qt/app-window`): `WindowActions` (`win.actions`: Main's look-up, pages-as-files and template forwards, one
+  Connections for the seven dialog openers); `WindowContext` (AudioControl, TimelineControl take it);
+  `AppController::app` → `context()` (the member is gone: `context()` already existed for the tests); the canvas
+  actions' pass-through names → `app.edit`, the key-routed ones (group, ungroup, cut, delete, zoom, fit width) →
+  `app.keyTarget`. Left: below.
+- [ ] App: a per-path guard between background writes and a `DocumentSession` save (tags have one).
+- [ ] App: the canvas names with rules of their own still on `app`: `copySelection` (the reference's own copy),
+  `pasteElements` (a text file's fixed pages, the reference only when written in), `selectAllOnPage`,
+  `clearSelection`, `navigateBack/Forward` and `canGoBack/Forward` (across documents: AppLinks), `goToPage`
+  (test-only), and the per-document properties (`pageNumber`, `pageCount`, `zoomPercent`, …): with their feature
+  objects (app-cpp E–N, which get a `WindowContext`). MoreMenu/AppButtons/ToolboxMenus still name dialog ids (qml B3:
+  `actions.*` for them).
+- [x] QML (`qt/app-window`): the `typeof win` / `typeof menuSheet` guards (AdaptiveDialog keeps a null check: its own
+  `win` is `ApplicationWindow.window`); HomeView's one `DocumentGrid`, its `menuTarget` object, the search part's
+  `type(text)`; SettingsPage's section list (`showSection(key)`) and the window's keyboard; the cards' role `cover`
+  (LibraryModel and RecentFiles: the name only). Left: below.
+- [ ] Shell: the favourite as a role of `RecentFiles` (the Recent grid still asks `app.isFavouriteFile` with
+  HomeView's `favouriteRevision` counter); `Stickers`' `CoverRole` is still "preview" for the sticker picker.
 - [ ] Shell: the session registry out of `ThumbnailProvider` (only TabManager registers; shell §6.2, block 4 step 3);
   reading positions of documents outside a library out of the cache folder (shell §6.6); `readJsonObject` (block 9);
   LibraryShare's `PdfHistory::gzip` → `fileio`; "preview" for covers and stand-ins in app/ comments and MainWindowTest

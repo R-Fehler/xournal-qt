@@ -120,6 +120,9 @@ blocks:
       - name: WindowInsets.qml, ViewModes.qml, ChromeLayout.qml
         path: qt/src/app/qml/ViewModes.qml
         what: "safe areas and keyboard (win.insets), full screen, Zen, read only, presenting (win.modes), where the chrome goes (win.layout)"
+      - name: WindowActions.qml
+        path: qt/src/app/qml/WindowActions.qml
+        what: "what the parts ask the window to do (win.actions): look-ups, pages as files, the dialogs app asks for"
       - name: WindowShortcuts.qml, PageKeys.qml
         path: qt/src/app/qml/WindowShortcuts.qml
         what: the window's shortcuts and the ordered Esc/Back dispatcher
@@ -171,9 +174,9 @@ blocks:
       - name: HomeView.qml
         path: qt/src/app/qml/HomeView.qml
         what: the home screen; instantiates its parts once each
-      - name: LibraryGridPage.qml, RecentGridPage.qml, DocumentCard.qml
-        path: qt/src/app/qml/LibraryGridPage.qml
-        what: the grids and a document's card (image://cover)
+      - name: DocumentGrid.qml, DocumentCard.qml
+        path: qt/src/app/qml/DocumentGrid.qml
+        what: the library's and Recent's grid (LibraryGridPage, RecentGridPage) and a document's card (image://cover)
       - name: BookmarksView.qml, TodosView.qml, TagsView.qml
         path: qt/src/app/qml/TodosView.qml
         what: the library's bookmarks, to-dos and tags
@@ -287,6 +290,9 @@ blocks:
       - name: TimelineControl
         path: qt/src/app/TimelineControl.h
         what: the replay of how a page was written (app.timeline)
+      - name: WindowContext
+        path: qt/src/app/WindowContext.h
+        what: what a window's feature objects get from it (services, tabs, current document)
     docs: [qt/src/app/README.md, qt/docs/review/2026-10/app-cpp.md]
   - id: current-document
     name: CurrentDocument

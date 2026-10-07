@@ -155,3 +155,11 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
       with it; again with unsaved changes in the second window (they come back as recovered tabs next start).
 - [ ] Beside the notes, a PDF whose author forbids copying (opened without its owner password): its text cannot be
       copied from the reference's pill or with Ctrl+C; the notes' and the reference's pills act on their own side.
+
+## The window's actions and the home grids (`qt/app-window`)
+
+- [ ] On the Fold: the menus are sheets on the phone and menus unfolded (AdaptiveMenu, the page menu, the stickers),
+      Settings stays above the soft keyboard while a field in it has the keys; a card's menu, rename and trash act on
+      the card (also on the Recent grid).
+- [ ] A desktop with the reference beside the notes: with the reference focused, Ctrl+G, Ctrl+X, Delete, zoom and
+      "Fit the width" act on it; with the notes focused, on the notes.
