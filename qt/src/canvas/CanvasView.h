@@ -568,9 +568,9 @@ public:
     bool addTodoStamp(size_t pNr, QPointF onPage);
     /// A tap on the check box of a task in a Markdown text (page coordinates): it is switched, one undo step.
     bool toggleMarkdownCheckBox(CanvasPage& page, double x, double y);
-    /// New texts of the text tool: Markdown text boxes of this size, or ordinary texts. `inPanel`: Markdown text
-    /// boxes are edited in the editor beside the page (markdownBoxRequested), else on the page (their source).
-    void setMarkdownText(bool markdown, double size, bool inPanel);
+    /// New texts of the text tool: Markdown text boxes of this size (an ordinary text already on the page is edited
+    /// as it is). `inPanel`: they are edited in the editor beside the page (markdownBoxRequested), else on the page.
+    void setMarkdownText(double size, bool inPanel);
 
     // --- selections of Markdown texts ------------------------------------------------------------------------------
     // Markdown texts are in the page's layer "Markdown", which is not the selected layer (the pen writes into
@@ -782,7 +782,6 @@ private:
     QPointF selectionDragFrom;
     const XojPageView* selectionDragPage = nullptr;
     void endMarkdownSelection();
-    bool markdownText = false;       ///< the text tool makes Markdown text boxes
     double markdownTextSize = 10;    ///< of this font size
     bool markdownInPanel = false;    ///< Markdown text boxes are edited beside the page (tests; normally on the page)
     GeometryToolLayer geometry{*this};

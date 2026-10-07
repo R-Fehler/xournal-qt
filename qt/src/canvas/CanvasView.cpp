@@ -2207,7 +2207,7 @@ void CanvasView::startText(CanvasPage& page, double x, double y) {
         }
     }
     const bool onPageText = !onNote && markdownBoxAt(page, x, y);
-    if (onPageText || onBox || (markdownText && !onText)) {  // (an ordinary text there is edited as it is)
+    if (onPageText || onBox || !onText) {  // (an ordinary text there is edited as it is)
         if (markdownInPanel) {
             if (onPageText) {
                 Q_EMIT markdownRequested(static_cast<int>(*idx));
@@ -2220,7 +2220,6 @@ void CanvasView::startText(CanvasPage& page, double x, double y) {
         return;
     }
     TextEditor::NewText how;
-    how.markdown = markdownText;
     how.markdownSize = markdownTextSize;
     textEditor = std::make_unique<TextEditor>(session, page, x, y, how);
     page.addOverlayView(textEditor->createView());
@@ -2367,8 +2366,7 @@ void CanvasView::startMarkdown(size_t pageNo, bool pageText, double x, double y)
     Q_EMIT updateRequested();
 }
 
-void CanvasView::setMarkdownText(bool markdown, double size, bool inPanel) {
-    markdownText = markdown;
+void CanvasView::setMarkdownText(double size, bool inPanel) {
     markdownTextSize = size;
     markdownInPanel = inPanel;
 }

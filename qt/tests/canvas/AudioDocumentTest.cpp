@@ -149,26 +149,6 @@ TEST_F(AudioDocumentTest, penStrokesWhileRecordingAreTiedToIt) {
     EXPECT_EQ(audio::audioOf(elements()[1])->getTimestamp(), 5678u);
 }
 
-TEST_F(AudioDocumentTest, aNewTextWhileRecordingIsTiedToIt) {
-    session->setRecording(NAME, [this] { return clock; });
-    clock = 4200;
-    view->setMarkdownText(false, 10, false);
-    view->startText(*view->getPage(0), 100, 100);
-    ASSERT_NE(view->getTextEditor(), nullptr);
-    QKeyEvent k(QEvent::KeyPress, Qt::Key_A, Qt::NoModifier, "a");
-    bool finish = false;
-    view->getTextEditor()->keyPressed(&k, finish);
-    clock = 9000;  // (the moment the box was opened counts)
-    view->endTextEditing();
-    const auto e = elements();
-    ASSERT_EQ(e.size(), 1u);
-    ASSERT_EQ(e[0]->getType(), ELEMENT_TEXT);
-    const auto* a = audio::audioOf(e[0]);
-    ASSERT_NE(a, nullptr);
-    EXPECT_EQ(audio::nameOf(*a), NAME);
-    EXPECT_EQ(a->getTimestamp(), 4200u);
-}
-
 // A recording is a voice memo of the page it started on (one undo step); removing a recording takes it from the
 // strokes and the memos in one undo step, which brings both back
 TEST_F(AudioDocumentTest, voiceMemosAndRemovingARecording) {

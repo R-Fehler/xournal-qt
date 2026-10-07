@@ -510,7 +510,6 @@ TEST(ToolboxApply, anEntryGivesTheToolAllItsSettings) {
     m->update(text, {{"font", QVariantMap{{"size", 17}}}});
     ASSERT_TRUE(c.applyToolEntry(text));
     EXPECT_EQ(c.tool(), "text");
-    EXPECT_TRUE(c.textMarkdown());
     EXPECT_DOUBLE_EQ(c.markdownFontSize(), 17);
 
     ASSERT_TRUE(c.applyToolEntry(nth(m, "laser")));

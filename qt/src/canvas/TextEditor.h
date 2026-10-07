@@ -44,11 +44,9 @@ namespace xqt {
 class CanvasPage;
 class DocumentSession;
 
-/// How the text tool makes a new text.
+/// How the text tool makes a new text: always a Markdown text (a text box in the page's layer "Markdown", drawn
+/// formatted when not being edited), with this font size, as wide as there is room up to the right margin.
 struct NewTextOptions {
-    /// A Markdown text (a text box in the page's layer "Markdown", drawn formatted when not being edited): with
-    /// this font size, as wide as there is room up to the right margin.
-    bool markdown = false;
     double markdownSize = 10;
 };
 

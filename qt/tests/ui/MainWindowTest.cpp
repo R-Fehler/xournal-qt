@@ -781,6 +781,22 @@ bool waitFor(const std::function<bool()>& done, int ms = 3000) {
     }
     return done();
 }
+/// An ordinary text (as Xournal++ writes them, not Markdown) on a page of the current document, in its selected layer
+void addXournalText(AppController& c, size_t pageNo, double x, double y, const std::string& text) {
+    Document* doc = c.tabManager().currentSession()->getDocument();
+    auto t = std::make_unique<Text>();
+    t->setText(text);
+    t->setFont(XojFont("Sans", 12));
+    t->setColor(Color(0, 0, 0));
+    t->move(x, y);
+    PageRef page;
+    {
+        std::unique_lock lock(*doc);
+        page = doc->getPage(pageNo);
+        page->getSelectedLayer()->addElement(std::move(t));
+    }
+    page->firePageChanged();
+}
 }  // namespace
 
 TEST_F(MainWindowTest, searchBarFindsAndSteps) {
@@ -6323,11 +6339,10 @@ TEST_F(MainWindowTest, markdownFormulasAndTheErrorOfOneOnHover) {
     EXPECT_FALSE(tip->property("visible").toBool());
 }
 
-// Markdown text boxes: the text tool with "Markdown" places them anywhere; edited on the page (the source is shown
-// while editing), drawn formatted.
+// Markdown text boxes: the text tool places them anywhere; edited on the page (the source is shown while editing),
+// drawn formatted. An ordinary text (Xournal++'s) is edited as it is.
 TEST_F(MainWindowTest, markdownTextBoxesAnywhereWithTheTextTool) {
     controller->setMarkdownInPanel(false);  // (written on the page)
-    controller->setTextMarkdown(true);
     controller->setMarkdownFontSize(10);
     controller->selectTool("text");
     auto* canvasItem = find<QQuickItem>("canvas");
@@ -6371,27 +6386,35 @@ TEST_F(MainWindowTest, markdownTextBoxesAnywhereWithTheTextTool) {
     EXPECT_EQ(requested.count(), 0);
     key(Qt::Key_Escape);
 
-    // Markdown off: ordinary texts again
-    controller->setTextMarkdown(false);
-    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(200, 500));
+    // An ordinary text of Xournal++: a tap edits it as it is (not as Markdown), and it stays one
+    addXournalText(*controller, 0, 200, 500, "plain");
+    wait(50);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(204, 505));
     wait(50);
     ASSERT_NE(view->getTextEditor(), nullptr) << "an ordinary text box";
     EXPECT_FALSE(view->getTextEditor()->isMarkdown());
-    type("plain");
+    key(Qt::Key_End);
+    type(" text");
     key(Qt::Key_Escape);
-    EXPECT_EQ(layer->getElements().size(), 1u);
+    EXPECT_EQ(layer->getElements().size(), 1u) << "nothing went into the Markdown layer";
     bool plain = false;
     for (const auto& e: page->getSelectedLayer()->getElements()) {
-        plain = plain || (e->getType() == ELEMENT_TEXT && static_cast<const Text*>(e.get())->getText() == "plain");
+        plain = plain || (e->getType() == ELEMENT_TEXT && static_cast<const Text*>(e.get())->getText() == "plain text" &&
+                          !static_cast<const Text*>(e.get())->isMarkdown());
     }
     EXPECT_TRUE(plain);
+    // Elsewhere: a Markdown text box again
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(200, 650));
+    wait(50);
+    EXPECT_NE(view->getMarkdownEditor(), nullptr);
+    EXPECT_EQ(view->getTextEditor(), nullptr);
+    key(Qt::Key_Escape);
 }
 
 // A Markdown text box written on a page: the undo and redo buttons go through the text being written as Ctrl+Z and
 // Ctrl+Shift+Z do (they ended the edit and undid all of it at once); once it is done, the whole edit is one step.
 TEST_F(MainWindowTest, theUndoAndRedoButtonsFollowAMarkdownBoxBeingWritten) {
     controller->setMarkdownInPanel(false);  // (written on the page)
-    controller->setTextMarkdown(true);
     controller->selectTool("text");
     auto* canvasItem = find<QQuickItem>("canvas");
     auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
@@ -6448,7 +6471,6 @@ TEST_F(MainWindowTest, theUndoAndRedoButtonsFollowAMarkdownBoxBeingWritten) {
 // "Markdown", which is the selected layer only while they are selected.
 TEST_F(MainWindowTest, markdownTextBoxesAreSelectedAndMoved) {
     controller->setMarkdownInPanel(false);  // (written on the page)
-    controller->setTextMarkdown(true);
     controller->setMarkdownFontSize(10);
     controller->selectTool("text");
     auto* canvasItem = find<QQuickItem>("canvas");
@@ -6536,7 +6558,6 @@ TEST_F(MainWindowTest, markdownTextBoxesAreSelectedAndMoved) {
 // Markdown text boxes written beside the page: the page shows them formatted while typing.
 TEST_F(MainWindowTest, markdownTextBoxesAreWrittenBesideThePage) {
     controller->setMarkdownInPanel(true);
-    controller->setTextMarkdown(true);
     controller->setMarkdownFontSize(10);
     controller->selectTool("text");
     auto* panel = find<QQuickItem>("markdownPanel");
@@ -6654,7 +6675,6 @@ TEST_F(MainWindowTest, markdownFlowsOntoNewPages) {
 // Markdown written on the page, as in Typora: formatted while typing, the block with the cursor shows its Markdown.
 TEST_F(MainWindowTest, markdownIsWrittenOnThePage) {
     controller->setMarkdownInPanel(false);
-    controller->setTextMarkdown(true);
     controller->setMarkdownFontSize(10);
     controller->selectTool("text");
     auto* canvasItem = find<QQuickItem>("canvas");
@@ -6760,7 +6780,6 @@ TEST_F(MainWindowTest, markdownWrittenOnThePageFlowsOntoPages) {
 // A tap on a task's check box switches it: with the hand tool (or a finger), and while writing on the page.
 TEST_F(MainWindowTest, markdownCheckBoxesAreTapped) {
     controller->setMarkdownInPanel(false);
-    controller->setTextMarkdown(true);
     controller->setMarkdownFontSize(10);
     controller->selectTool("text");
     auto* canvasItem = find<QQuickItem>("canvas");
@@ -7791,20 +7810,23 @@ TEST_F(MainWindowTest, typingAPageNumberJumpsToThePage) {
     EXPECT_EQ(find<QQuickItem>("searchField")->property("text").toString(), "12");
     key(Qt::Key_Escape);
 
-    // So does a text on the page
-    controller->setTextMarkdown(false);  // (an ordinary text box, whatever a test before chose)
+    // So does a text on the page (an ordinary one, of Xournal++)
+    addXournalText(*controller, static_cast<size_t>(controller->pageNumber() - 1), 60, 60, "x");
     controller->selectTool("text");
     auto* canvasItem = find<QQuickItem>("canvas");
     auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
     ASSERT_NE(view, nullptr);
+    wait(50);
     const QRectF page = view->pageViewRect(controller->pageNumber() - 1);
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
-                      canvasItem->mapToScene(page.topLeft() + QPointF(60, 60)).toPoint());
+                      canvasItem->mapToScene(page.topLeft() + QPointF(62, 65) * view->getViewController().zoom())
+                              .toPoint());
     wait(50);
     ASSERT_NE(view->getTextEditor(), nullptr);
+    key(Qt::Key_End);
     type("42");
     EXPECT_FALSE(jump->isVisible());
-    EXPECT_EQ(view->getTextEditor()->text(), "42");
+    EXPECT_EQ(view->getTextEditor()->text(), "x42");
     key(Qt::Key_Escape);
     controller->selectTool("pen");
 
@@ -9492,16 +9514,17 @@ TEST_F(HomeScreenMarkdownTest, removeUnusedImagesListsThemFirst) {
     xqt::SystemApps::setInstance(nullptr);
 }
 
-// Emoji on the page: ":smi" typed in a text box shows the suggestions below the cursor, a tap takes one; the emoji
-// button (shown while writing) opens the picker, whose search finds by name and puts the emoji at the cursor.
+// Emoji on the page: ":smi" typed in a text box (an ordinary one, of Xournal++) shows the suggestions below the cursor,
+// a tap takes one; the emoji button (shown while writing) opens the picker, whose search finds by name and puts the
+// emoji at the cursor.
 TEST_F(MainWindowTest, emojiSuggestionsAndPickerWhileWritingOnThePage) {
     const QString smiley = QString::fromUtf8("\xf0\x9f\x98\x83");
     const QString party = QString::fromUtf8("\xf0\x9f\x8e\x89");
     window->resize(1280, 1200);  // (room below the cursor for the list, beside the toolbox's rail)
     wait(100);
     controller->setMarkdownInPanel(false);
-    controller->setTextMarkdown(false);
     controller->selectTool("text");
+    addXournalText(*controller, 0, 150, 293, "Hi");
     auto* canvasItem = find<QQuickItem>("canvas");
     auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
     ASSERT_NE(view, nullptr);
@@ -9510,7 +9533,7 @@ TEST_F(MainWindowTest, emojiSuggestionsAndPickerWhileWritingOnThePage) {
     auto* button = findItem("emojiButton");
     ASSERT_NE(button, nullptr);
     EXPECT_FALSE(button->isVisible()) << "only while writing";
-    const QPointF at = view->pageViewRect(0).topLeft() + QPointF(150, 300) * view->getViewController().zoom();
+    const QPointF at = view->pageViewRect(0).topLeft() + QPointF(152, 300) * view->getViewController().zoom();
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, canvasItem->mapToScene(at).toPoint());
     wait(50);
     ASSERT_NE(view->getTextEditor(), nullptr);
@@ -9518,7 +9541,8 @@ TEST_F(MainWindowTest, emojiSuggestionsAndPickerWhileWritingOnThePage) {
 
     auto* list = findItem("emojiSuggestions");
     ASSERT_NE(list, nullptr);
-    type("Hi :s");
+    key(Qt::Key_End);
+    type(" :s");
     EXPECT_FALSE(list->isVisible());
     type("mi");
     until([&] { return list->isVisible(); });
@@ -9566,7 +9590,6 @@ TEST_F(MainWindowTest, emojiInTheMarkdownEditorBesideThePage) {
     const QString flag = QString::fromUtf8("\xf0\x9f\x87\xa9\xf0\x9f\x87\xaa");
     const QString party = QString::fromUtf8("\xf0\x9f\x8e\x89");
     controller->setMarkdownInPanel(true);
-    controller->setTextMarkdown(true);
     controller->selectTool("text");
     auto* panel = find<QQuickItem>("markdownPanel");
     auto* area = find<QQuickItem>("markdownArea");
@@ -9644,7 +9667,6 @@ TEST_F(MainWindowTest, emojiAreInTheExportedPdfInColour) {
                 .toPoint();
     };
     // A Markdown box: "Hi :smile: 🇩🇪" (the shortcode shown as 😄)
-    controller->setTextMarkdown(true);
     controller->setMarkdownFontSize(14);
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(120, 150));
     wait(50);
@@ -9653,12 +9675,14 @@ TEST_F(MainWindowTest, emojiAreInTheExportedPdfInColour) {
     QGuiApplication::clipboard()->setText(flag);
     key(Qt::Key_V, Qt::ControlModifier);
     key(Qt::Key_Escape);
-    // A text box: "Hey 👩‍💻"
-    controller->setTextMarkdown(false);
-    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(120, 300));
+    // A text box (an ordinary one, of Xournal++): "Hey 👩‍💻"
+    addXournalText(*controller, 0, 120, 293, "Hey");
+    wait(50);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(123, 300));
     wait(50);
     ASSERT_NE(view->getTextEditor(), nullptr);
-    type("Hey ");
+    key(Qt::Key_End);
+    type(" ");
     QGuiApplication::clipboard()->setText(coder);
     key(Qt::Key_V, Qt::ControlModifier);
     key(Qt::Key_Escape);

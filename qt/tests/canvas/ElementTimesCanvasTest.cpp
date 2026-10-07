@@ -36,6 +36,7 @@
 #include "CanvasPage.h"
 #include "CanvasView.h"
 #include "StickyNotes.h"
+#include "MdBox.h"
 #include "TextEditor.h"
 
 using namespace xqt;
@@ -187,26 +188,31 @@ TEST_F(ElementTimesCanvasTest, pastedElementsAreNew) {
     EXPECT_EQ(times(), (std::vector<int64_t>{T0, T0 + 1000, T0 + 70000, T0 + 70000}));
 }
 
-// A text gets the time its box opened; an image the time it was inserted; a sticky note (its paper) when it was put
-// on the page
+// A text (a Markdown text box) gets the time it was begun (its first letter); an image the time it was inserted; a
+// sticky note (its paper) when it was put on the page
 TEST_F(ElementTimesCanvasTest, textsImagesAndNotes) {
     clock = T0 + 100;
-    view->setMarkdownText(false, 10, false);
+    view->setMarkdownText(10, false);
     view->startText(*view->getPage(0), 100, 100);
-    ASSERT_NE(view->getTextEditor(), nullptr);
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
     clock = T0 + 4000;
     QKeyEvent k(QEvent::KeyPress, Qt::Key_A, Qt::NoModifier, "a");
     bool finish = false;
-    view->getTextEditor()->keyPressed(&k, finish);
+    view->textKeyPressed(&k, finish);
+    clock = T0 + 6000;
+    view->textKeyPressed(&k, finish);
     view->endTextEditing();
     tools()->selectTool(TOOL_PEN);
     clock = T0 + 8000;
     ASSERT_TRUE(view->insertImage(png(40, 20), std::nullopt, std::nullopt, nullptr));
     view->clearSelection();
     const auto t = times();
-    ASSERT_EQ(t.size(), 2u);
-    EXPECT_EQ(t[0], T0 + 100) << "when the box opened, not when it was written in";
-    EXPECT_EQ(t[1], T0 + 8000);
+    ASSERT_EQ(t.size(), 1u);
+    EXPECT_EQ(t[0], T0 + 8000);
+    const Layer* mdLayer = md::markdownLayer(session->getDocument()->getPage(0));
+    ASSERT_NE(mdLayer, nullptr);
+    ASSERT_EQ(mdLayer->getElementsView().size(), 1u);
+    EXPECT_EQ(mdLayer->getElementsView().front()->getCreated(), T0 + 4000) << "when it was begun, not written on";
 
     clock = T0 + 12000;
     ASSERT_TRUE(view->notes().insert(std::nullopt));

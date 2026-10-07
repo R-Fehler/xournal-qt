@@ -460,6 +460,48 @@ TEST(Pages, typicalAspectFollowsTheDocument) {
     EXPECT_NEAR(m.typicalAspect(), 900.0 / 1600.0, 0.001);
 }
 
+// An ordinary text of a Xournal++ file (not Markdown: the text tool of xournal-qt always writes Markdown) is read as it
+// is and drawn at its place, in its font and color.
+TEST(Pages, anOrdinaryXournalppTextIsReadAndDrawn) {
+    AppController c;
+    c.newDocument();
+    ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));  // (upstream's: "p1" in green, 36 pt, at 100, 100)
+    DocumentSession* s = c.tabManager().currentSession();
+    const Text* text = nullptr;
+    const auto* page = s->getDocument()->getPage(0).get();
+    {
+        std::shared_lock lock(*s->getDocument());
+        for (const Layer* layer: page->getLayersView()) {
+            for (const Element* e: layer->getElementsView()) {
+                if (e->getType() == ELEMENT_TEXT) {
+                    text = static_cast<const Text*>(e);
+                }
+            }
+        }
+    }
+    ASSERT_NE(text, nullptr);
+    EXPECT_EQ(text->getText(), "p1");
+    EXPECT_FALSE(text->isMarkdown());
+    EXPECT_DOUBLE_EQ(text->getFontSize(), 36);
+    const double scale = 600 / page->getWidth();
+    const QImage img = ThumbnailProvider::render(*s, 0, 600);
+    ASSERT_FALSE(img.isNull());
+    const auto greenIn = [&](const QRectF& r) {  // (page points)
+        int n = 0;
+        for (int y = static_cast<int>(r.top() * scale); y < static_cast<int>(r.bottom() * scale); ++y) {
+            for (int x = static_cast<int>(r.left() * scale); x < static_cast<int>(r.right() * scale); ++x) {
+                const QColor px = img.pixelColor(x, y);
+                n += px.green() > 90 && px.red() < 80 && px.blue() < 80;
+            }
+        }
+        return n;
+    };
+    const auto& b = text->getBoundingBox();
+    const QRectF box(b.x, b.y, b.width, b.height);
+    EXPECT_GT(greenIn(box), 20) << "drawn in its box";
+    EXPECT_EQ(greenIn(box.translated(0, 2 * box.height())), 0) << "and nowhere below it";
+}
+
 // Text renders the same from several threads at once (thumbnails and the page renderer run in parallel).
 TEST(Pages, concurrentTextRenderingIsComplete) {
     // Reference: rendered one after the other, from a separately loaded copy.

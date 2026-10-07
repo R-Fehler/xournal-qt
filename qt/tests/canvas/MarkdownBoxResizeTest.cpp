@@ -55,7 +55,7 @@ protected:
         view = std::make_unique<CanvasView>(*session);
         view->getViewController().setViewSize(QSizeF(900, 1400));
         input = std::make_unique<CanvasInput>(*view);
-        view->setMarkdownText(true, 10, false);  // (the text tool writes Markdown text boxes, on the page)
+        view->setMarkdownText(10, false);  // (the text tool writes Markdown text boxes, on the page)
         app->getToolHandler()->selectTool(TOOL_TEXT);
         processEvents();
     }

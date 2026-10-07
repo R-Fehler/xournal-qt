@@ -17,6 +17,9 @@
 #include <gtest/gtest.h>
 
 #include "model/Document.h"
+#include "model/Font.h"
+#include "model/Layer.h"
+#include "model/Text.h"
 #include "model/XojPage.h"
 #include "render/RenderService.h"
 #include "session/AppContext.h"
@@ -65,11 +68,24 @@ protected:
         }
     }
 
-    /// An ordinary text box (the text tool, not Markdown).
+    /// An ordinary text box (as Xournal++ writes them, not Markdown) on the page, edited and emptied first: the text
+    /// tool edits such a text as it is (it makes only Markdown text boxes itself).
     TextEditor& startTextBox() {
-        view->setMarkdownText(false, 10, false);
-        view->startText(*view->getPage(0), 100, 100);
+        auto t = std::make_unique<Text>();
+        t->setText("x");
+        t->setFont(XojFont("Sans", 12));
+        t->move(100, 100);
+        {
+            Document* doc = session->getDocument();
+            std::unique_lock lock(*doc);
+            doc->getPage(0)->getSelectedLayer()->addElement(std::move(t));
+        }
+        view->setMarkdownText(10, false);
+        view->startText(*view->getPage(0), 102, 105);
         EXPECT_NE(view->getTextEditor(), nullptr);
+        key(Qt::Key_End);
+        key(Qt::Key_Backspace);
+        EXPECT_TRUE(view->getTextEditor()->text().isEmpty());
         return *view->getTextEditor();
     }
     /// The page's Markdown text, written on the page.

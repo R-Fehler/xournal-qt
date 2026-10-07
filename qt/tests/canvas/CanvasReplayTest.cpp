@@ -1636,8 +1636,18 @@ void pressKey(xqt::TextEditor& editor, int key, Qt::KeyboardModifiers m = Qt::No
     bool finish = false;
     editor.keyPressed(&e, finish);
 }
+/// Typed into the text the view is writing (a Markdown text: MarkdownEditor)
+void typeIntoView(xqt::CanvasView& view, const QString& text) {
+    for (QChar c: text) {
+        QKeyEvent e(QEvent::KeyPress, c.toUpper().unicode(), Qt::NoModifier, QString(c));
+        bool finish = false;
+        view.textKeyPressed(&e, finish);
+    }
+}
 }  // namespace
 
+// The text tool edits an ordinary text (as Xournal++ writes them; the text tool itself makes Markdown text boxes) as
+// it is: typed and input-method text, one undo step per edit, emptied it goes.
 TEST_F(CanvasReplayTest, textToolWritesAndEditsText) {
     view->getViewController().setViewSize(QSizeF(1000, 1200));
     processEvents();
@@ -1653,23 +1663,35 @@ TEST_F(CanvasReplayTest, textToolWritesAndEditsText) {
                                                       : dynamic_cast<const Text*>(layer->getElementsView().front());
     };
 
-    tap(QPointF(100, 100));
+    {
+        auto t = std::make_unique<Text>();
+        t->setText("Hello\nWorld");
+        t->setFont(XojFont("Sans", 12));
+        t->move(100, 100);
+        std::unique_lock lock(*session->getDocument());
+        session->getDocument()->getPage(0)->getSelectedLayer()->addElement(std::move(t));
+    }
+    ASSERT_NE(onlyText(), nullptr);
+    const auto box = onlyText()->getBoundingBox();
+    tap(QPointF(box.x + 5, box.y + 5));
     ASSERT_NE(view->getTextEditor(), nullptr);
-    typeInto(*view->getTextEditor(), "Hello\nWorld");
+    EXPECT_FALSE(view->getTextEditor()->isMarkdown());
+    pressKey(*view->getTextEditor(), Qt::Key_End, Qt::ControlModifier);
     QInputMethodEvent im;  // an accented letter from the on-screen keyboard / a dead key
     im.setCommitString(QString::fromUtf8(" é"));
     view->getTextEditor()->inputMethodEvent(&im);
     view->endTextEditing();
     ASSERT_NE(onlyText(), nullptr);
     EXPECT_EQ(onlyText()->getText(), "Hello\nWorld é");
+    EXPECT_FALSE(onlyText()->isMarkdown()) << "it stays an ordinary text";
 
     session->getUndoRedoHandler()->undo();
-    EXPECT_EQ(onlyText(), nullptr);
+    EXPECT_EQ(onlyText()->getText(), "Hello\nWorld");
     session->getUndoRedoHandler()->redo();
     ASSERT_NE(onlyText(), nullptr);
+    EXPECT_EQ(onlyText()->getText(), "Hello\nWorld é");
 
     // Edit: tap on the text, go to the end, add.
-    const auto box = onlyText()->getBoundingBox();
     tap(QPointF(box.x + 5, box.y + 5));
     ASSERT_NE(view->getTextEditor(), nullptr);
     EXPECT_TRUE(onlyText()->isInEditing()) << "the original is hidden while editing";
@@ -2439,8 +2461,8 @@ TEST_F(CanvasReplayTest, thePenWritesOnAStickyNoteAndTheInkStaysOnIt) {
     tablet(QEvent::TabletPress, textAt, 0.5, Qt::LeftButton, Qt::LeftButton);
     tablet(QEvent::TabletRelease, textAt, 0.0, Qt::LeftButton, Qt::NoButton);
     processEvents();
-    ASSERT_NE(view->getTextEditor(), nullptr);
-    typeInto(*view->getTextEditor(), "Answer");
+    ASSERT_NE(view->getMarkdownEditor(), nullptr) << "the note's Markdown text";
+    typeIntoView(*view, "Answer");
     view->endTextEditing();
     processEvents();
     ASSERT_EQ(note->getElementsView().size(), 3u) << "the text is on the note";
@@ -3031,7 +3053,7 @@ TEST_F(CanvasReplayTest, aStickyNoteHoldsOneMarkdownTextThatFlowsInItsWidth) {
     const PageRef page = doc->getPage(0);
 
     // A tap with the text tool (Markdown on) anywhere on the note: the note's text, at its top left, as wide as it
-    view->setMarkdownText(true, 10, false);
+    view->setMarkdownText(10, false);
     app->getToolHandler()->selectTool(TOOL_TEXT);
     const QPointF tap = viewPos(0, QPointF(look.rect.x + 120, look.rect.y + 100));
     tablet(QEvent::TabletPress, tap, 0.5, Qt::LeftButton, Qt::LeftButton);

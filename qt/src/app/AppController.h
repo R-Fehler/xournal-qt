@@ -196,8 +196,6 @@ class AppController: public QObject {
     /// Font of the text tool (upstream's settings font)
     Q_PROPERTY(QString fontFamily READ fontFamily WRITE setFontFamily NOTIFY fontChanged)
     Q_PROPERTY(double fontSize READ fontSize WRITE setFontSize NOTIFY fontChanged)
-    /// The text tool makes Markdown text boxes (drawn formatted) instead of ordinary texts
-    Q_PROPERTY(bool textMarkdown READ textMarkdown WRITE setTextMarkdown NOTIFY fontChanged)
     /// Dark pages (qt/docs/dark-pages.md): "off", "on", or "system" (dark while the system's colors are dark); the
     /// setting darkPages, for every window. Only what is shown: the documents do not change.
     Q_PROPERTY(QString darkPagesMode READ darkPagesMode WRITE setDarkPagesMode NOTIFY darkPagesChanged)
@@ -514,7 +512,6 @@ public:
     /// The text font's family (the text tool's font without its style)
     QString textFontFamily() const;
     bool markdownActive() const;
-    bool textMarkdown() const;
     QString darkPagesMode() const;
     void setDarkPagesMode(const QString& mode);
     bool darkPagesShown() const;
@@ -523,7 +520,6 @@ public:
     /// The pages printed (`range` as printDocument takes it) have dark paper (a page color, not a PDF page): printing
     /// them takes a lot of ink, the print dialog says so
     Q_INVOKABLE bool printUsesDarkPaper(const QString& range) const;
-    void setTextMarkdown(bool markdown);
     double markdownFontSize() const;
     void setMarkdownFontSize(double size);
     double markdownBoxSize() const;
@@ -1857,7 +1853,7 @@ private:
     std::vector<std::pair<AppController*, xqt::DocumentSession*>> tabsWithFile(const fs::path& file,
                                                                                const xqt::DocumentSession* except) const;
     std::vector<QJSValue> whenAllSavedCalls;
-    /// The text tool of the current tab makes Markdown text or not (textMarkdown, markdownFontSize).
+    /// The text tool of the current tab (and of the reference) makes Markdown text boxes of markdownFontSize.
     void applyMarkdownText();
     // --- the snip tool (AppSnip.cpp) ---
     /// A view of `s` drew a snip's picture: onto the clipboard, the tool used before back

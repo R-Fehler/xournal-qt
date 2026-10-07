@@ -1896,21 +1896,6 @@ QColor AppController::paperColor() const {
 
 double AppController::highlighterOpacity() const { return ColorPalettes::highlighterOpacity(paperColor()); }
 
-bool AppController::textMarkdown() const {
-    bool on = false;
-    app->getSettings()->getCustomElement(CUSTOM).getBool("textMarkdown", on);
-    return on;
-}
-
-void AppController::setTextMarkdown(bool on) {
-    if (on != textMarkdown()) {
-        app->getSettings()->getCustomElement(CUSTOM).setBool("textMarkdown", on);
-        app->getSettings()->customSettingsChanged();
-        applyMarkdownText();
-        Q_EMIT fontChanged();
-    }
-}
-
 double AppController::markdownFontSize() const {
     double size = 0;
     app->getSettings()->getCustomElement(CUSTOM).getDouble("markdownFontSize", size);
@@ -1957,7 +1942,7 @@ void AppController::applyMarkdownText() {
     // (the notes, and the reference beside them: it may be written in)
     for (CanvasView* v: {canvas(), referenceMode ? referenceMode->canvas() : nullptr}) {
         if (v) {
-            v->setMarkdownText(textMarkdown(), markdownFontSize(), markdownInPanel());
+            v->setMarkdownText(markdownFontSize(), markdownInPanel());
         }
     }
 }

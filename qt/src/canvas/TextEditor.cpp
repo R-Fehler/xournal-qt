@@ -80,7 +80,7 @@ TextEditor::TextEditor(DocumentSession& session, CanvasPage& page, double x, dou
             markdown = true;
         } else {
             layer = pageRef->getSelectedLayer();
-            markdown = how.markdown || md::isMarkdownLayer(*layer);
+            markdown = md::isMarkdownLayer(*layer);  // (an ordinary text, e.g. of Xournal++, stays one)
             for (auto&& e: layer->getElements()) {
                 if (e->getType() == ELEMENT_TEXT && e->hasBoundingBoxContaining(x, y)) {
                     existing = dynamic_cast<Text*>(e.get());
@@ -97,28 +97,22 @@ TextEditor::TextEditor(DocumentSession& session, CanvasPage& page, double x, dou
         }
     }
     if (!existing) {
-        ToolHandler* h = session.getToolHandler();
+        // A new text: a Markdown text box, its own size, and as wide as there is room (up to the right margin)
+        markdown = true;
         textElement = std::make_unique<Text>();
-        textElement->setColor(h->getColor());
-        textElement->setFont(session.getSettings()->getFont());
-        if (markdown) {
-            // A Markdown text box: its own size, and as wide as there is room (up to the right margin)
-            textElement->setFont(XojFont(session.getSettings()->getFont().getName(), how.markdownSize));
-            double right = PageMargins::FULL;
-            {
-                std::shared_lock lock(*session.getDocument());
-                right = PageMargins::of(pageRef).right;
-            }
-            textElement->setWrap(std::max(100.0, pageRef->getWidth() - right - x));
-        } else {
-            textElement->setAlignment(h->getTextAlignment());
-            textElement->setJustify(h->getTextJustify());
+        textElement->setColor(session.getToolHandler()->getColor());
+        textElement->setFont(XojFont(session.getSettings()->getFont().getName(), how.markdownSize));
+        double right = PageMargins::FULL;
+        {
+            std::shared_lock lock(*session.getDocument());
+            right = PageMargins::of(pageRef).right;
         }
+        textElement->setWrap(std::max(100.0, pageRef->getWidth() - right - x));
         textElement->setTransformation(
                 xoj::util::Matrix::TRANSLATION(x, y - textElement->getBoundingBox().height / 2));
         session.stampAudio(*textElement);  // (a recording runs: as upstream's TextEditor, qt/docs/audio.md)
         timeline::stampNew(*textElement);  // (when its box opened: qt/docs/timeline.md)
-        if (markdown && !md::isMarkdownLayer(*layer)) {
+        if (!md::isMarkdownLayer(*layer)) {
             useMarkdownLayer();
         }
     } else {

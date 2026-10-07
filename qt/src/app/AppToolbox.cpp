@@ -144,7 +144,6 @@ bool AppController::applyToolEntry(const QString& id) {
             th->setSize(static_cast<ToolSize>(best));
         }
     } else if (type == "text") {
-        setTextMarkdown(true);  // (the toolbox's text box is a Markdown text box)
         th->selectTool(TOOL_TEXT);
         takeColor(TOOL_TEXT);
         const QVariantMap font = e.value("font").toMap();
@@ -170,9 +169,6 @@ void AppController::takeToolOfType(const QString& type) {
     const QString id = toolbox ? toolbox->recentOfType(type) : QString();
     if (!id.isEmpty() && applyToolEntry(id)) {
         return;
-    }
-    if (type == "text") {
-        setTextMarkdown(true);
     }
     selectTool(type);
 }
