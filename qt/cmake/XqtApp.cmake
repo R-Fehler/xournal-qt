@@ -558,7 +558,13 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/FavouritesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TodosTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TagsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryTestSupport.h
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibrarySearchTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryCoversTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryPlacesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryIndexTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryPacksTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFilesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryArchiveTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryShareTest.cpp
