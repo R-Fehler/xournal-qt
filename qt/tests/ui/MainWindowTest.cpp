@@ -55,6 +55,7 @@
 #include <qpdf/QPDFPageObjectHelper.hh>
 #include <qpdf/QPDFWriter.hh>
 
+#include "shell/CanvasActions.h"
 #include "control/settings/PageTemplateSettings.h"
 #include "control/settings/Settings.h"
 #include "model/Document.h"
@@ -110,6 +111,7 @@
 #include "util/PathUtil.h"
 
 #include "AppController.h"
+#include "AppServices.h"
 #include "UiFixture.h"
 #include "MarkdownFile.h"
 #include "support/SearchHits.h"
@@ -3162,7 +3164,7 @@ TEST_F(MainWindowTest, draggingATabOffTheStripSaysWhatHappens) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     controller->newDocument();
     wait(50);
-    AppController::setWindowFactory({});  // no window is made in this test
+    controller->services().setWindowFactory({});  // no window is made in this test
     auto* list = findItem("tabList");
     ASSERT_NE(list, nullptr);
     QQuickItem* tab = itemAt(list, 0);
@@ -3195,7 +3197,7 @@ TEST_F(MainWindowTest, aTabGetsAWindowOfItsOwn) {
 
     // The windows are made like in main(): the same QML with the new controller as "app"
     std::vector<QPointer<QQuickWindow>> made;
-    AppController::setWindowFactory([this, &made](AppController* w) {
+    controller->services().setWindowFactory([this, &made](AppController* w) {
         auto* context = new QQmlContext(engine->rootContext(), w);
         context->setContextProperty("app", w);
         auto* component = new QQmlComponent(engine.get(), QStringLiteral("XournalQt"), QStringLiteral("Main"), w);
@@ -3232,7 +3234,7 @@ TEST_F(MainWindowTest, aTabGetsAWindowOfItsOwn) {
     until([&] { return controller->documentWindows().empty() && made[0].isNull(); });
     EXPECT_TRUE(controller->documentWindows().empty());
     EXPECT_TRUE(made[0].isNull()) << "the window is gone";
-    AppController::setWindowFactory({});
+    controller->services().setWindowFactory({});
 }
 
 TEST_F(MainWindowTest, fourOrFiveFingersShowThePagesOrTheDocuments) {
@@ -4521,10 +4523,10 @@ TEST_F(MainWindowTest, theStickyNoteButtonPlacesANoteWithItsPill) {
     until([&] { return pill->isVisible(); });
     EXPECT_TRUE(pill->isVisible());
     click(findItem("noteColor2"));
-    EXPECT_EQ(controller->noteColor(), controller->stickyNoteColors()[2].value<QColor>());
+    EXPECT_EQ(controller->edit().noteColor(), controller->stickyNoteColors()[2].value<QColor>());
     auto* cover = find<QQuickItem>("noteCoverButton");
     click(cover);
-    EXPECT_TRUE(controller->noteCovers());
+    EXPECT_TRUE(controller->edit().noteCovers());
     EXPECT_TRUE(cover->property("checked").toBool());
     if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
         nextFrame();
@@ -4803,7 +4805,7 @@ TEST_F(MainWindowTest, thePillsOfASelectionOfferSelectMoreAndCountWhatIsSelected
 
     // On: highlighted, the count (one)
     click(noteMore);
-    EXPECT_TRUE(controller->selectingMore());
+    EXPECT_TRUE(controller->edit().selectingMore());
     EXPECT_TRUE(noteMore->property("checked").toBool());
     EXPECT_TRUE(findItem("noteCount")->isVisible());
     EXPECT_EQ(findItem("noteCount")->property("text").toString(), "1");
@@ -4823,7 +4825,7 @@ TEST_F(MainWindowTest, thePillsOfASelectionOfferSelectMoreAndCountWhatIsSelected
 
     // Tapped again: off (the selection stays)
     click(more);
-    EXPECT_FALSE(controller->selectingMore());
+    EXPECT_FALSE(controller->edit().selectingMore());
     EXPECT_FALSE(more->property("checked").toBool());
     EXPECT_TRUE(selectionPill->isVisible());
     EXPECT_EQ(count->property("text").toString(), "2");
@@ -4833,7 +4835,7 @@ TEST_F(MainWindowTest, thePillsOfASelectionOfferSelectMoreAndCountWhatIsSelected
     // Another tool: it ends; a tool that is no select tool ends the selection too
     controller->selectTool("selectRect");
     wait(20);
-    EXPECT_FALSE(controller->selectingMore());
+    EXPECT_FALSE(controller->edit().selectingMore());
     EXPECT_FALSE(more->property("checked").toBool());
     controller->selectTool("pen");
     until([&] { return !selectionPill->isVisible(); });
@@ -4879,7 +4881,7 @@ TEST_F(MainWindowTest, theSelectionsPillGroupsAndUngroups) {
     click(group);
     until([&] { return ungroup->isVisible(); });
     EXPECT_FALSE(group->isVisible()) << "one group: Ungroup in its place";
-    EXPECT_TRUE(controller->canUngroup());
+    EXPECT_TRUE(controller->edit().canUngroup());
     EXPECT_NE(strokes[0]->getGroup(), 0u);
     EXPECT_EQ(strokes[0]->getGroup(), strokes[2]->getGroup());
 
@@ -5110,7 +5112,7 @@ TEST_F(MainWindowTest, theCanvasKeepsItsInputWhilePdfTextIsSelected) {
     // Copying ends the selection as well, and the canvas draws again afterwards (it used to be frozen)
     ASSERT_TRUE(controller->selectPdfTextAt(onWord.x(), onWord.y()));
     until([&] { return handles->isVisible(); });
-    EXPECT_TRUE(controller->copyPdfText());
+    EXPECT_TRUE(controller->edit().copyPdfText());
     EXPECT_FALSE(controller->pdfTextIsSelected());
     until([&] { return !handles->isVisible(); });
     EXPECT_FALSE(handles->isVisible()) << "nothing is selected: the knobs are gone";
@@ -5149,13 +5151,13 @@ TEST_F(MainWindowTest, theSelectedPdfTextTakesItsHandlesAndActionsAlong) {
     ASSERT_TRUE(bar->isVisible());
     EXPECT_FALSE(bar->property("away").toBool()) << "the text is in view";
     const double barY = bar->y();
-    const double textY = controller->pdfSelectionBox().y();
+    const double textY = controller->edit().pdfSelectionBox().y();
 
     // Scrolling moves the text under the pill, so the pill goes along (a little, the word stays in view)
     const double pan = std::max(10.0, std::min(40.0, textY - 20));
     view->getViewController().panBy(QPointF(0, -pan));
     until([&] { return std::abs(bar->y() - (barY - pan)) <= 3; }, 5000);
-    EXPECT_NEAR(controller->pdfSelectionBox().y(), textY - pan, 2);
+    EXPECT_NEAR(controller->edit().pdfSelectionBox().y(), textY - pan, 2);
     EXPECT_NEAR(bar->y(), barY - pan, 3) << "the actions stay at the text";
     EXPECT_FALSE(bar->property("away").toBool()) << "still in view";
 
@@ -5179,7 +5181,7 @@ TEST_F(MainWindowTest, theSelectedPdfTextTakesItsHandlesAndActionsAlong) {
     click(back);
     until([&] { return !bar->property("away").toBool(); }, 5000);
     EXPECT_FALSE(bar->property("away").toBool());
-    const QRectF box = controller->pdfSelectionBox();
+    const QRectF box = controller->edit().pdfSelectionBox();
     EXPECT_GE(box.y(), 0);
     EXPECT_LE(box.y(), canvasItem->height());
     EXPECT_TRUE(controller->pdfTextIsSelected()) << "and it is still the same selection";
@@ -5241,14 +5243,14 @@ TEST_F(MainWindowTest, aLongPressOnPdfTextAlsoOffersPaste) {
 
     // Nothing to paste: not offered
     QGuiApplication::clipboard()->clear();
-    ASSERT_FALSE(controller->canPaste());
+    ASSERT_FALSE(controller->edit().canPaste());
     QTest::touchEvent(window, finger).press(1, onWordInWindow);
     wait(800);
     QTest::touchEvent(window, finger).release(1, onWordInWindow);
     until([&] { return bar->isVisible(); });
     ASSERT_TRUE(bar->isVisible());
     EXPECT_FALSE(paste->isVisible()) << "an empty clipboard: no paste";
-    controller->clearPdfTextSelection();
+    controller->edit().clearPdfTextSelection();
     until([&] { return !bar->isVisible(); });
 
     // A text selected by dragging over it with the text tool (not a long press): no paste either, there is no place
@@ -5257,7 +5259,7 @@ TEST_F(MainWindowTest, aLongPressOnPdfTextAlsoOffersPaste) {
     ASSERT_TRUE(controller->selectPdfTextAt(onWord.x(), onWord.y()));
     until([&] { return bar->isVisible(); });
     EXPECT_FALSE(paste->isVisible());
-    controller->clearPdfTextSelection();
+    controller->edit().clearPdfTextSelection();
     until([&] { return !bar->isVisible(); });
 
     // The pen held still on the word, with the pen in hand: the same, and the dot it began does not stay
@@ -5279,7 +5281,7 @@ TEST_F(MainWindowTest, aLongPressOnPdfTextAlsoOffersPaste) {
     ASSERT_TRUE(controller->pdfTextIsSelected()) << "the pen held on the word selects it";
     EXPECT_TRUE(paste->isVisible()) << "and paste is offered";
     EXPECT_EQ(elements(), withPasted) << "no dot left by the pen";
-    controller->clearPdfTextSelection();
+    controller->edit().clearPdfTextSelection();
     wait(50);
     xqt::PenHover::instance().reset();
 }

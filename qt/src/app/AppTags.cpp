@@ -10,9 +10,9 @@
 
 #include <QFileInfo>
 #include <QPointer>
-#include <QThreadPool>
 
 #include "AppController.h"
+#include "AppServices.h"
 #include "model/Document.h"
 #include "session/DocumentSession.h"
 #include "session/PdfKeywords.h"
@@ -48,32 +48,6 @@ QString AppController::currentDocumentPath() const {
     }
     std::shared_lock lock(*s->getDocument());
     return QString::fromStdString(s->getDocument()->getPdfFilepath().string());  // (a plain PDF)
-}
-
-std::vector<std::pair<AppController*, DocumentSession*>> AppController::tabsWithFile(const fs::path& file) const {
-    auto found = tabsShowing(file);
-    // (a plain PDF open in a tab: its document has no file of its own, the PDF is its background)
-    AppController* main = primary ? primary : const_cast<AppController*>(this);
-    std::vector<AppController*> all{main};
-    all.insert(all.end(), main->windows.begin(), main->windows.end());
-    std::error_code ec;
-    for (AppController* w: all) {
-        for (int i = 0; i < w->tabs->count(); ++i) {
-            DocumentSession* t = w->tabs->session(i);
-            if (!t || t->hasFilePath() || t->textFile()) {
-                continue;
-            }
-            fs::path pdf;
-            {
-                std::shared_lock lock(*t->getDocument());
-                pdf = t->getDocument()->getPdfFilepath();
-            }
-            if (!pdf.empty() && fs::equivalent(pdf, file, ec)) {
-                found.emplace_back(w, t);
-            }
-        }
-    }
-    return found;
 }
 
 QVariantMap AppController::documentTags(const QString& path) const {
@@ -113,7 +87,7 @@ bool AppController::setDocumentTags(const QString& path, const QStringList& want
         }
     }
     // Open in a tab with changes: those are saved first (else the tab's next save would write over the keywords)
-    for (const auto& [w, s]: tabsWithFile(file)) {
+    for (const auto& [w, s]: appServices->openDocuments().find(file, {.textFiles = true, .plainPdf = true})) {
         if (s->isModified() || s->isSaving()) {
             Q_EMIT message(title, tr("%1 has unsaved changes: save it first, then give it tags.")
                                           .arg(QString::fromStdString(file.filename().string())),
@@ -122,7 +96,7 @@ bool AppController::setDocumentTags(const QString& path, const QStringList& want
         }
     }
     QPointer<AppController> self(this);
-    QThreadPool::globalInstance()->start([self, file, list, title] {
+    appServices->jobs().start([self, file, list, title] {
         std::string error;
         const bool ok = pdfkeywords::write(file, list, error);
         QMetaObject::invokeMethod(qApp, [self, ok, error, file, title] {
@@ -134,13 +108,13 @@ bool AppController::setDocumentTags(const QString& path, const QStringList& want
                 return;
             }
             // Tabs showing it read it again (as after a change by another app), the library reads its keywords
-            for (const auto& [w, s]: self->tabsWithFile(file)) {
+            for (const auto& [w, s]: self->appServices->openDocuments().find(file, {.textFiles = true, .plainPdf = true})) {
                 if (!s->isModified()) {
                     w->reloadDocument(s);
                 }
             }
             self->library->refresh();
         });
-    });
+    }, BackgroundJobs::Priority::Idle);
     return true;
 }

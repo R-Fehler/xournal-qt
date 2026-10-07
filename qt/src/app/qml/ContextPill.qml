@@ -1,7 +1,7 @@
 // What can be done here: appears where a finger was held down or the right mouse button was pressed, and stays
 // inside the window. Paste puts the clipboard at that very place; with something selected it also copies, cuts or
 // deletes it. On selected PDF text only copying and marking make sense, so the rest is not offered. One per canvas:
-// the notes (target app), the reference beside them (target app.reference); on a canvas for reading only: copy,
+// the notes (target app.edit), the reference beside them (target app.reference.edit); on a canvas for reading only: copy,
 // select all, go to a page, fit width - nothing that changes it. Selected text (PDF text or the text being written)
 // can be looked up (qt/docs/citations.md).
 import QtQuick
@@ -15,7 +15,7 @@ Popup {
     objectName: named("contextPill")
     /// The DocumentCanvas it is asked for on, and what acts on it
     property Item canvasItem: canvas
-    property var target: app
+    property var target: app.edit
     property string namePrefix: ""
     function named(n) { return namePrefix === "" ? n : namePrefix + n.charAt(0).toUpperCase() + n.slice(1) }
     /// "Image…": the window asks for the file (for the notes: its image dialog)
@@ -35,7 +35,7 @@ Popup {
     property bool pasteAvailable: false
     readonly property bool reading: canvasItem.readingOnly
     /// Something to copy, cut or delete: selected elements, or a selected sticky note (the notes' canvas)
-    readonly property bool selected: target.hasSelection || (target === app && app.noteSelected)
+    readonly property bool selected: target.hasSelection || (target === app.edit && app.noteSelected)
 
     function openAt(viewPos, pdfText) {
         at = viewPos

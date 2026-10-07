@@ -43,6 +43,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/TabManager.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ReferenceMode.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ReferenceMode.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/CanvasActions.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/CanvasActions.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PresenterConsole.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PresenterConsole.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.h
@@ -165,6 +167,14 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/NetFetch.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppServices.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppServices.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/OpenDocuments.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/OpenDocuments.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/BackgroundJobs.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/BackgroundJobs.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/CurrentDocument.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/CurrentDocument.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTextFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppQuickNote.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp
@@ -531,6 +541,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LinkRewriteTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/AnnotationsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ReferenceModeTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/AppServicesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PagesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SettingsModelTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ColorPalettesTest.cpp

@@ -30,7 +30,6 @@
 #include <QPainter>
 #include <QPointer>
 #include <QStandardPaths>
-#include <QThreadPool>
 
 #include "control/settings/Settings.h"
 #include "model/Document.h"
@@ -51,6 +50,7 @@
 #include "shell/TabManager.h"
 
 #include "AppController.h"
+#include "AppServices.h"
 
 using namespace xqt;
 
@@ -114,7 +114,7 @@ bool AppController::readPageFile(const QUrl& url, const QString& password) {
     const quint64 request = ++pageFileReads;
     QPointer<AppController> self(this);
     const fs::path file(path.toStdString());
-    QThreadPool::globalInstance()->start([self, file, request, pw = password.toStdString()]() mutable {
+    appServices->jobs().start([self, file, request, pw = password.toStdString()]() mutable {
         auto source = std::make_shared<PageFileSource>();
         source->file = file;
         source->loaded = DocumentSession::loadFile(file, false, pw);
@@ -156,7 +156,7 @@ bool AppController::readPageFile(const QUrl& url, const QString& password) {
             }
             Q_EMIT self->pageFileRead(info);
         });
-    });
+    }, BackgroundJobs::Priority::Normal);
     return true;
 }
 
@@ -208,7 +208,7 @@ bool AppController::insertPagesFromFile(const QString& range, const QList<int>& 
     }
     QPointer<AppController> self(this);
     QPointer<DocumentSession> target(s);
-    QThreadPool::globalInstance()->start([self, target, source, pages, position] {
+    appServices->jobs().start([self, target, source, pages, position] {
         // Copied as copied pages are: the PDF pages as a PDF in memory (with the file's password while it is held)
         auto copy = std::make_shared<PageClipboard>();
         copy->copy(*source->loaded.document, pages);
@@ -245,7 +245,7 @@ bool AppController::insertPagesFromFile(const QString& range, const QList<int>& 
                                         true);
             Q_EMIT self->pagesFromFileInserted(n, QString());
         });
-    });
+    }, BackgroundJobs::Priority::Normal);
     return true;
 }
 
@@ -314,7 +314,7 @@ void AppController::writePageFiles(DocumentSession& s, std::vector<std::pair<fs:
     // (a protected document: encrypted with its password, also pages without a PDF page)
     const PdfEncryption::Encryption encryption = s.encryptionForSave();
     QPointer<AppController> self(this);
-    QThreadPool::globalInstance()->start([self, jobs = std::move(jobs), pdfPages, encryption, then = std::move(then)] {
+    appServices->jobs().start([self, jobs = std::move(jobs), pdfPages, encryption, then = std::move(then)] {
         QStringList written;
         QString error;
         for (const Job& job: jobs) {
@@ -330,7 +330,7 @@ void AppController::writePageFiles(DocumentSession& s, std::vector<std::pair<fs:
                 then(written, error);
             }
         });
-    });
+    }, BackgroundJobs::Priority::Normal);
 }
 
 bool AppController::extractPages(const QList<int>& list, const QString& name, bool asPdf, bool remove) {
@@ -674,7 +674,7 @@ bool AppController::copyPagesAsImage(const QList<int>& list) {
     const int dpi = pageImageDpi();
     const int count = static_cast<int>(indices.size());
     QPointer<AppController> self(this);
-    QThreadPool::globalInstance()->start([self, pictures, dpi, count] {
+    appServices->jobs().start([self, pictures, dpi, count] {
         bool capped = false;
         const QImage image = drawPage(pictures, 0, dpi, true, false, MAX_CLIPBOARD_PIXELS, &capped);
         const QByteArray png = image.isNull() ? QByteArray() : pngOf(image);
@@ -691,7 +691,7 @@ bool AppController::copyPagesAsImage(const QList<int>& list) {
             }
             self->putPageImage(image, png, page, dpi, count, capped);
         });
-    });
+    }, BackgroundJobs::Priority::Normal);
     return true;
 }
 
@@ -726,7 +726,7 @@ bool AppController::exportPageImages(const QList<int>& list, const QUrl& folderU
     }
     const bool paper = !(transparent && !jpeg);
     QPointer<AppController> self(this);
-    QThreadPool::globalInstance()->start([self, pictures, names, folder, dpi, paper, jpeg] {
+    appServices->jobs().start([self, pictures, names, folder, dpi, paper, jpeg] {
         QStringList written;
         QString error;
         QImage single;  // (one page: also on the clipboard)
@@ -783,6 +783,6 @@ bool AppController::exportPageImages(const QList<int>& list, const QUrl& folderU
             }
             Q_EMIT self->pageImagesExported(written, error);
         });
-    });
+    }, BackgroundJobs::Priority::Normal);
     return true;
 }

@@ -3,9 +3,9 @@
  * (src/app/EngineSetup.h): a renamed or removed AppController member does not fail when the QML is compiled or
  * loaded, it reads `undefined` at run time (or throws when called) where the user meets it. This test reads every
  * .qml and .js file of the UI and checks `app.<a>` against AppController's meta-object (properties, methods,
- * signals) and `app.<a>.<b>` against the meta-object of the object `app.<a>` holds (the sub-objects: app.library,
- * app.reference, …). It also checks the interface the pills read from their `target` (AppController or, in the
- * reference view, ReferenceMode): both must have every name.
+ * signals), `app.<a>.<b>` against the meta-object of the object `app.<a>` holds (the sub-objects: app.library,
+ * app.reference, …) and `app.<a>.<b>.<c>` likewise (app.reference.edit.…). It also checks the interface the pills
+ * read from their `target` (CanvasActions: app.edit, or app.reference.edit in the reference view).
  *
  * @license GNU GPLv2 or later
  */
@@ -25,7 +25,7 @@
 #include <QMetaProperty>
 #include <gtest/gtest.h>
 
-#include "shell/ReferenceMode.h"
+#include "shell/CanvasActions.h"
 
 #include "AppController.h"
 
@@ -160,20 +160,22 @@ struct Use {
     int line = 0;
     std::string first;   ///< app.<first>
     std::string second;  ///< app.<first>.<second> ("" when there is none)
+    std::string third;   ///< app.<first>.<second>.<third> ("" when there is none)
 };
 
 int lineOf(const std::string& text, size_t pos) {
     return 1 + static_cast<int>(std::count(text.begin(), text.begin() + static_cast<std::ptrdiff_t>(pos), '\n'));
 }
 
-/// Every `app.a` and `app.a.b` in the code (not `x.app.a`: a member called app of something else).
+/// Every `app.a`, `app.a.b` and `app.a.b.c` in the code (not `x.app.a`: a member called app of something else).
 std::vector<Use> appUses(const std::string& file, const std::string& source) {
     const std::string code = codeOnly(source);
-    static const std::regex use(R"((^|[^\w.$])app\s*\.\s*([A-Za-z_$][\w$]*)(\s*\.\s*([A-Za-z_$][\w$]*))?)");
+    static const std::regex use(R"((^|[^\w.$])app\s*\.\s*([A-Za-z_$][\w$]*)(\s*\.\s*([A-Za-z_$][\w$]*))?)"
+                                R"((\s*\.\s*([A-Za-z_$][\w$]*))?)");
     std::vector<Use> uses;
     for (auto it = std::sregex_iterator(code.begin(), code.end(), use); it != std::sregex_iterator(); ++it) {
         const auto& m = *it;
-        uses.push_back({file, lineOf(code, static_cast<size_t>(m.position(2))), m[2].str(), m[4].str()});
+        uses.push_back({file, lineOf(code, static_cast<size_t>(m.position(2))), m[2].str(), m[4].str(), m[6].str()});
     }
     return uses;
 }
@@ -227,9 +229,16 @@ bool has(const QMetaObject* mo, const std::string& name) {
     return false;
 }
 
-/// The meta-object of what `app.<name>` holds when it is an object (the live one: most are declared as QObject*).
-const QMetaObject* objectBehind(QObject* app, const std::string& name) {
-    const QMetaObject* mo = app->metaObject();
+/// The meta-object of what `<object>.<name>` holds when it is an object (the live one: most are declared as
+/// QObject*); `live`: that object, when there is one.
+const QMetaObject* objectBehind(QObject* object, const std::string& name, QObject** live = nullptr) {
+    if (live) {
+        *live = nullptr;
+    }
+    if (!object) {
+        return nullptr;
+    }
+    const QMetaObject* mo = object->metaObject();
     const int p = mo->indexOfProperty(name.c_str());
     if (p < 0) {
         return nullptr;
@@ -238,7 +247,10 @@ const QMetaObject* objectBehind(QObject* app, const std::string& name) {
     if (!(prop.metaType().flags() & QMetaType::PointerToQObject)) {
         return nullptr;
     }
-    if (QObject* o = prop.read(app).value<QObject*>()) {
+    if (QObject* o = prop.read(object).value<QObject*>()) {
+        if (live) {
+            *live = o;
+        }
         return o->metaObject();
     }
     return prop.metaType().metaObject();
@@ -280,6 +292,9 @@ TEST(QmlApiTest, theCheckerFindsUsesAndIgnoresCommentsAndStrings) {
         found.push_back(u.first + (u.second.empty() ? "" : "." + u.second) + "@" + std::to_string(u.line));
     }
     EXPECT_EQ(found, (std::vector<std::string>{"inATemplate.part@8", "someMethod@9", "library.count@9"}));
+    const auto deep = appUses("x.qml", "onClicked: app.reference.edit.fitWidth()\n");
+    ASSERT_EQ(deep.size(), 1u);
+    EXPECT_EQ(deep[0].first + "." + deep[0].second + "." + deep[0].third, "reference.edit.fitWidth");
 
     AppController controller;
     EXPECT_TRUE(has(controller.metaObject(), "openPath"));
@@ -306,12 +321,19 @@ TEST(QmlApiTest, everyNameTheQmlUsesOnAppExists) {
             if (u.second.empty()) {
                 continue;
             }
-            const QMetaObject* sub = objectBehind(&controller, u.first);
+            QObject* live = nullptr;
+            const QMetaObject* sub = objectBehind(&controller, u.first, &live);
             if (!sub) {
                 continue;  // (a value, a list or a map: its members are JavaScript's, not ours)
             }
             if (!has(sub, u.second) && !dynamicSecond().count(u.first + "." + u.second)) {
                 missing.insert("app." + u.first + "." + u.second + " (" + where(u) + ", on " + sub->className() + ")");
+                continue;
+            }
+            const QMetaObject* subSub = u.third.empty() ? nullptr : objectBehind(live, u.second);
+            if (subSub && !has(subSub, u.third)) {
+                missing.insert("app." + u.first + "." + u.second + "." + u.third + " (" + where(u) + ", on " +
+                               subSub->className() + ")");
             }
         }
     }
@@ -323,9 +345,18 @@ TEST(QmlApiTest, everyNameTheQmlUsesOnAppExists) {
     EXPECT_TRUE(missing.empty()) << "names the QML uses on app that C++ does not have:" << list;
 }
 
-// The pills (selection, note, PDF text, context menu, PDF text handles) work on their `target`: the document's
-// AppController or, in the reference view, its ReferenceMode. Both must have every name a pill reads.
+// The pills (selection, note, PDF text, context menu, PDF text handles) work on their `target`: what acts on a canvas
+// (CanvasActions: the document's app.edit or, in the reference view, app.reference.edit). It has every name a pill
+// reads, and both targets are one.
 TEST(QmlApiTest, thePillsFindTheirInterfaceOnBothTargets) {
+    {
+        AppController controller;
+        EXPECT_STREQ(objectBehind(&controller, "edit")->className(), "xqt::CanvasActions");
+        QObject* reference = nullptr;
+        objectBehind(&controller, "reference", &reference);
+        ASSERT_NE(reference, nullptr);
+        EXPECT_STREQ(objectBehind(reference, "edit")->className(), "xqt::CanvasActions");
+    }
     const std::vector<std::string> pills{"ContextPill.qml", "NotePill.qml", "PdfTextHandles.qml", "PdfTextPill.qml",
                                          "SelectionPill.qml"};
     std::set<std::string> missing;
@@ -336,11 +367,8 @@ TEST(QmlApiTest, thePillsFindTheirInterfaceOnBothTargets) {
         }
         for (const Use& u: targetUses(f.string(), readAll(f))) {
             ++checked;
-            if (!has(&AppController::staticMetaObject, u.first)) {
-                missing.insert("AppController." + u.first + " (" + where(u) + ")");
-            }
-            if (!has(&xqt::ReferenceMode::staticMetaObject, u.first)) {
-                missing.insert("ReferenceMode." + u.first + " (" + where(u) + ")");
+            if (!has(&xqt::CanvasActions::staticMetaObject, u.first)) {
+                missing.insert("CanvasActions." + u.first + " (" + where(u) + ")");
             }
         }
     }
@@ -349,5 +377,5 @@ TEST(QmlApiTest, thePillsFindTheirInterfaceOnBothTargets) {
     for (const auto& m: missing) {
         list += "\n  " + m;
     }
-    EXPECT_TRUE(missing.empty()) << "names a pill reads from its target that one of the targets does not have:" << list;
+    EXPECT_TRUE(missing.empty()) << "names a pill reads from its target that CanvasActions does not have:" << list;
 }

@@ -1,4 +1,4 @@
-// Selected PDF text of a canvas (the notes: target app, or the reference beside them: target app.reference): mark
+// Selected PDF text of a canvas (the notes: target app.edit, or the reference beside them: target app.reference.edit): mark
 // or copy it. The pill sits at the text and goes along with it while scrolling; once the text is out of sight it
 // waits at the top edge of the canvas and offers the way back to it. A canvas for reading only: copy only.
 import QtQuick
@@ -11,7 +11,7 @@ Pane {
     id: pill
     /// The DocumentCanvas the text is on (a sibling of this pill) and what acts on it
     property Item canvasItem
-    property var target: app
+    property var target: app.edit
     property bool hidden: false
     property string namePrefix: ""
     function named(n) { return namePrefix === "" ? n : namePrefix + n.charAt(0).toUpperCase() + n.slice(1) }

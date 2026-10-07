@@ -66,6 +66,14 @@ Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is merged (2026-10-07).
     C++, the menu target object and the search field's `type(text)`; B8's section model (the names are written twice,
     the indices are magic) and SettingsPage's own keyboard fallback; the `typeof win` guards (B6); whether Back should
     also do the rest of Esc's list (see the block's report).
+
+  - [x] `qt/app-services`: bug 1 (the reference copied text of PDFs that forbid it; failing test first),
+    `CanvasActions` (`app.edit`, `app.reference.edit`; the pills' target), `AppServices` with `OpenDocuments` and
+    `BackgroundJobs` (one constructor; quitting waits for the jobs), `CurrentDocument` (the relay of
+    `currentTabChanged`); ADR 0003. Left: `AppController::app` not renamed to `context`; the facade names of the
+    canvas actions (`app.copySelection`, `app.zoomIn`, …) and the per-document properties stay on `AppController`
+    until their features move (E–N); no per-path guard between background writes and a `DocumentSession` save (tags
+    have theirs since `qt/session-io`); `WindowContext` for the feature objects not made yet.
 - [ ] **Wave 4**: `qt/architecture`: an architecture overview generated from `qt/docs/architecture/architecture.yaml`
   (an SVG diagram and tables linking to the source on GitHub, and an interactive page on GitHub Pages), together
   with the docs restructure planned in [docs-plan.md](qt/docs/review/2026-10/docs-plan.md) (an entry page, feature

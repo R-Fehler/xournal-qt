@@ -21,6 +21,7 @@
 #include "model/XojPage.h"
 
 #include "AppController.h"
+#include "AppServices.h"
 #include "MdBox.h"
 #include "MdImages.h"
 #include "session/AppContext.h"
@@ -93,32 +94,26 @@ bool AppController::loadWebImage(const QString& address) {
 
 void AppController::relayoutPictures(const std::string& link) {
     // Every open document (all windows): its Markdown texts that show this picture are laid out again and drawn
-    AppController* main = primary ? primary : this;
-    std::vector<AppController*> all{main};
-    all.insert(all.end(), main->windows.begin(), main->windows.end());
-    for (AppController* w: all) {
-        for (int i = 0; i < w->tabs->count(); ++i) {
-            DocumentSession* s = w->tabs->session(i);
-            Document* doc = s ? s->getDocument() : nullptr;
-            if (!doc) {
-                continue;
-            }
-            for (size_t p = 0; p < doc->getPageCount(); ++p) {
-                const PageRef page = doc->getPage(p);
-                bool shows = false;
-                {
-                    std::unique_lock lock(*doc);
-                    for (Text* text: md::boxesOf(*page)) {  // (the Markdown layer's and the sticky notes' texts)
-                        if (text->getText().find(link) != std::string::npos) {
-                            text->setText(text->getText());  // (its size again: the picture's)
-                            shows = true;
-                        }
+    for (DocumentSession* s: appServices->openDocuments().all()) {
+        Document* doc = s->getDocument();
+        if (!doc) {
+            continue;
+        }
+        for (size_t p = 0; p < doc->getPageCount(); ++p) {
+            const PageRef page = doc->getPage(p);
+            bool shows = false;
+            {
+                std::unique_lock lock(*doc);
+                for (Text* text: md::boxesOf(*page)) {  // (the Markdown layer's and the sticky notes' texts)
+                    if (text->getText().find(link) != std::string::npos) {
+                        text->setText(text->getText());  // (its size again: the picture's)
+                        shows = true;
                     }
                 }
-                if (shows) {
-                    page->firePageChanged();
-                    s->firePageChanged(p);
-                }
+            }
+            if (shows) {
+                page->firePageChanged();
+                s->firePageChanged(p);
             }
         }
     }

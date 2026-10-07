@@ -1,6 +1,6 @@
 // The two knobs at the ends of selected PDF text: drag one and the selection follows, as on a phone. They appear
 // after a long press (or a right click) on text and while the "mark PDF text" tool has something selected. Laid over
-// the canvas they belong to (the notes: target app; the reference beside them: target app.reference).
+// the canvas they belong to (the notes: target app.edit; the reference beside them: target app.reference.edit).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -10,7 +10,7 @@ Item {
     objectName: namePrefix === "" ? "pdfTextHandles" : namePrefix + "PdfTextHandles"
     /// The DocumentCanvas (a sibling of this item) and what acts on its text
     property Item canvasItem: canvas
-    property var target: app
+    property var target: app.edit
     property string namePrefix: ""
     anchors.fill: canvasItem
     visible: target.pdfTextIsSelected && !app.homeVisible  // (not over the library, which is above the canvas)

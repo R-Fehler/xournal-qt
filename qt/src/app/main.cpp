@@ -34,6 +34,7 @@
 #endif
 
 #include "AppController.h"
+#include "AppServices.h"
 #include "AudioControl.h"
 #include "EngineSetup.h"
 #include "audio/AudioDevice.h"
@@ -231,7 +232,10 @@ int main(int argc, char* argv[]) {
         return std::make_shared<xqt::hwr::TrocrRecognizer>(dir);
     });
 #endif
-    AppController controller;
+    // What the windows share (settings, tools, library, the background jobs): made before the first window, gone
+    // after the last one
+    xqt::AppServices services;
+    AppController controller(services);
 #ifdef Q_OS_ANDROID
     // The libraries' home: the phone's Documents/Xournal_Libraries once they were moved there (with "All files
     // access"), else the app's own folder (qt/docs/android.md)
@@ -278,9 +282,9 @@ int main(int argc, char* argv[]) {
 
     QQmlApplicationEngine engine;
     xqt::setUpEngine(engine, &controller);  // (the image providers and `app`: the UI tests' fixture uses it too)
-    AppController::setStartMaximized(true);
+    services.setStartMaximized(true);
     // Undocked documents get a window of their own: the same QML, with their own controller as "app".
-    AppController::setWindowFactory([&engine](AppController* window) {
+    services.setWindowFactory([&engine](AppController* window) {
         auto* context = new QQmlContext(engine.rootContext(), window);
         context->setContextProperty("app", window);
         auto* component = new QQmlComponent(&engine, QStringLiteral("XournalQt"), QStringLiteral("Main"), window);

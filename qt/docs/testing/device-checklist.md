@@ -148,3 +148,10 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
       once: both are in the file; the version list shows no "other app" entry; "Save with a message" works.
 - [ ] A `.xopp` made from a big PDF with "attach the PDF": Save as into another folder while writing with the pen:
       the pen keeps drawing; the `name.xopp.bg.pdf` next to it opens, also in Xournal++.
+
+## Windows and the reference (`qt/app-services`)
+
+- [ ] Drag a tab off the strip into a window of its own, quit from the main window: no crash, the other window goes
+      with it; again with unsaved changes in the second window (they come back as recovered tabs next start).
+- [ ] Beside the notes, a PDF whose author forbids copying (opened without its owner password): its text cannot be
+      copied from the reference's pill or with Ctrl+C; the notes' and the reference's pills act on their own side.

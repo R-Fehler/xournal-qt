@@ -1,4 +1,6 @@
 #include "AppController.h"
+#include "AppServices.h"
+#include "CurrentDocument.h"
 #include "AudioControl.h"
 #include "TimelineControl.h"
 
@@ -9,7 +11,6 @@
 #include <utility>
 
 #include <QPointer>
-#include <QThreadPool>
 #include <QTimer>
 #include <QDir>
 
@@ -130,6 +131,7 @@
 #include "shell/SystemApps.h"
 #include "shell/PresenterConsole.h"
 #include "shell/ReferenceMode.h"
+#include "shell/CanvasActions.h"
 #include "shell/Citations.h"
 #include "shell/TabManager.h"
 
@@ -142,44 +144,60 @@ Color toColor(const QColor& c) {
 }
 }  // namespace
 
-AppController::AppController(QObject* parent): QObject(parent) {
-    app = std::make_shared<AppContext>(AppContext::defaultResourceDir());
-    MdImageDecoder::install();  // the pictures of Markdown texts, read with Qt (qt/docs/md-images.md)
-    DocumentImages::pruneWorkFolders();  // (work folders of documents not opened for 60 days; before any opens)
-    // What protected PDFs had taken out into the cache in a process that crashed (qt/docs/hybrid-pdf.md)
-    HybridPdf::removeProtectedLeftovers([](int64_t pid) {
-        return pid == Util::getPid() || SessionRecovery::processAlive(static_cast<qint64>(pid));
-    });
-    colors = std::make_shared<Palette>(app->getResourceDir() / "palettes" / "xournal.gpl");
-    try {
-        colors->load();
-    } catch (const std::exception& e) {
-        colors->load_default();
+AppController::AppController(QObject* parent):
+        QObject(parent), ownServices(std::make_unique<AppServices>()) {
+    setUp(*ownServices);
+}
+
+AppController::AppController(AppServices& services, QObject* parent): QObject(parent) { setUp(services); }
+
+void AppController::setUp(AppServices& services) {
+    appServices = &services;
+    // The first window made on the services is the main window; the others are windows of undocked documents (the
+    // same settings, tools, library and rendering, their own documents)
+    primary = services.openDocuments().mainWindow();
+    services.openDocuments().add(this);
+    app = services.context();
+    colors = services.colors();
+    settingsView = &services.settingsView();
+    toolbox = &services.toolbox();
+    shortcuts = &services.shortcuts();
+    library = &services.library();
+    libraryBookmarks = &services.libraryBookmarks();
+    libraryTags = &services.libraryTags();
+    libraryTodos = &services.libraryTodos();
+    recent = &services.recent();
+    pageClipboard = &services.pageClipboard();  // copied pages can be pasted in any window
+    handwriting = &services.handwriting();
+    handwritingView = &services.handwritingView();
+    if (!isSecondary()) {
+        // Messages from the reused core (XojMsgBox) are shown by the QML UI (of the main window).
+        xoj::compat::setMessageSink([this](xoj::compat::MessageRequest r,
+                                           xoj::util::move_only_function<void(int)> done) {
+            const bool error = r.kind == xoj::compat::MessageKind::Error;
+            QMetaObject::invokeMethod(this, [this, title = QString::fromStdString(r.title),
+                                             text = QString::fromStdString(r.text),
+                                             error] { Q_EMIT message(title, text, error); });
+            if (done) {
+                done(r.buttons.empty() ? 0 : r.buttons.front().response);  // questions: first button until dialogs exist
+            }
+        });
     }
-    // Messages from the reused core (XojMsgBox) are shown by the QML UI.
-    xoj::compat::setMessageSink([this](xoj::compat::MessageRequest r, xoj::util::move_only_function<void(int)> done) {
-        const bool error = r.kind == xoj::compat::MessageKind::Error;
-        QMetaObject::invokeMethod(this, [this, title = QString::fromStdString(r.title),
-                                         text = QString::fromStdString(r.text),
-                                         error] { Q_EMIT message(title, text, error); });
-        if (done) {
-            done(r.buttons.empty() ? 0 : r.buttons.front().response);  // questions: first button until dialogs exist
-        }
-    });
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
-    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::selectMoreChanged);  // (available)
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followSnipTool);
-    // How sharp snips are (a setting; Snip.h)
-    applySnipResolution();
+    if (!isSecondary()) {
+        applySnipResolution();  // How sharp snips are (a setting; Snip.h)
+    }
     connect(app.get(), &AppContext::settingsChanged, this, &AppController::applySnipResolution);
-    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followTodoStampTool);
+    if (!isSecondary()) {
+        connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followTodoStampTool);
+    }
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
     setUpDarkPages();
-    loadCustomWidths();
-    SettingsModel::applyPreviewMemory(*app->getSettings());
-    SettingsModel::applyCanvasMemory(*app->getSettings());
-    SettingsModel::applyFuzzyTypos(*app->getSettings());
+    if (!isSecondary()) {
+        loadCustomWidths();
+    }
 
     pages = std::make_unique<PagesModel>();
     filteredPages = std::make_unique<PageFilterModel>(*pages);
@@ -187,180 +205,52 @@ AppController::AppController(QObject* parent): QObject(parent) {
     annotations = std::make_unique<AnnotationsModel>();
     versions = std::make_unique<VersionsModel>();
     layers = std::make_unique<LayersModel>();
-    ownPageClipboard = std::make_unique<PageClipboard>();
-    pageClipboard = ownPageClipboard.get();
     // "Only pages with hits" ends with the search.
     connect(this, &AppController::searchChanged, this, [this] {
         if (searchQuery().isEmpty()) {
             filteredPages->setOnlySearchHits(false);
         }
     });
-    ownSettingsView = std::make_unique<SettingsModel>(*app);
-    settingsView = ownSettingsView.get();
-    // The toolbox's tools (qt/docs/toolbox.md): stored in the settings; without them, the first layout
-    ownToolbox = std::make_unique<ToolboxModel>(
-            [this] {
-                std::string stored;
-                app->getSettings()->getCustomElement("xournalQt").getString("toolbox", stored);
-                return QString::fromStdString(stored);
-            },
-            [this](const QString& json) {
-                app->getSettings()->getCustomElement("xournalQt").setString("toolbox", json.toStdString());
-                app->getSettings()->customSettingsChanged();
-            });
-    toolbox = ownToolbox.get();
-    // A palette chosen: the entry in hand follows with its role's color there
-    connect(this, &AppController::colorPaletteChanged, this, [this] {
-        const QVariantMap e = toolbox->entry(toolbox->active());
-        // (only while the tool still has the color the entry gave it: a color changed since stays)
-        if (!e.value("role").toString().isEmpty() && entryInHand(e) && color() == appliedEntryColor) {
-            applyToolEntry(toolbox->active());
-        }
-    });
-    ownShortcuts = std::make_unique<ShortcutsModel>(*app->getSettings());
-    shortcuts = ownShortcuts.get();
-    ownHandwriting = std::make_unique<hwr::HandwritingSearch>(*app);
-    handwriting = ownHandwriting.get();
+    if (!isSecondary()) {
+        // A palette chosen: the entry in hand follows with its role's color there
+        connect(this, &AppController::colorPaletteChanged, this, [this] {
+            const QVariantMap e = toolbox->entry(toolbox->active());
+            // (only while the tool still has the color the entry gave it: a color changed since stays)
+            if (!e.value("role").toString().isEmpty() && entryInHand(e) && color() == appliedEntryColor) {
+                applyToolEntry(toolbox->active());
+            }
+        });
+    }
     makeTabs();
-    ownLibrary = std::make_unique<LibraryModel>();
-    library = ownLibrary.get();
-    ownLibraryBookmarks = std::make_unique<LibraryBookmarksModel>(library);
-    libraryBookmarks = ownLibraryBookmarks.get();
-    ownLibraryTags = std::make_unique<LibraryTagsModel>(library);
-    libraryTags = ownLibraryTags.get();
-    ownLibraryTodos = std::make_unique<LibraryTodosModel>(library);
-    libraryTodos = ownLibraryTodos.get();
-    applyTodoRules();
-    connect(app.get(), &AppContext::settingsChanged, this, &AppController::applyTodoRules);
     connect(library, &LibraryModel::favouriteToggled, this, &AppController::favouriteChanged);
     citations = std::make_unique<Citations>(*app->getSettings(), library);
     makeAudioControl();
-    // Open documents take the PDF text the library index read before (their search has all counts at once)
-    DocumentTextIndex::setSeeder([lib = QPointer<LibraryModel>(library)](const fs::path& pdf) {
-        LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
-        return index ? index->knownPdfText(pdf) : std::map<int, QString>();
-    });
-    // ... and the handwriting it read before (opening a document reads none of it again)
-    // (and its handwriting language: the user's choice, and the language decided for these models)
-    hwr::HandwritingSearch::setSeeder([lib = QPointer<LibraryModel>(library)](const fs::path& file,
-                                                                              const QString& recognizer) {
-        hwr::HandwritingSearch::Seeded out;
-        LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
-        if (auto entry = index ? index->inkText().find(file) : nullptr) {
-            out.choice = entry->languageChoice;
-            out.decided = entry->recognizer == recognizer ? entry->language : QString();
-        }
-        if (auto doc = index ? index->inkOf(file) : nullptr; doc && doc->recognizer == recognizer) {
-            for (const auto& page: doc->pages) {
-                for (const hwr::LineRef& l: page) {
-                    if (l.result) {
-                        out.lines.emplace_back(l.hash, l.result);
-                    }
-                }
-            }
-        }
-        return out;
-    });
-    // The library's handwriting: read in the background while the search is on (and on mains power)
-    libraryInk = std::make_unique<LibraryInkJob>(handwriting->service());
-    libraryInk->setIndex(library->searchIndex());
-    libraryInk->setEnabled(handwriting->enabled());
-    connect(handwriting, &hwr::HandwritingSearch::enabledChanged, libraryInk.get(),
-            [this] { libraryInk->setEnabled(handwriting->enabled()); });
-    ownHandwritingView = std::make_unique<HandwritingSettings>(*app, *handwriting, libraryInk.get());
-    handwritingView = ownHandwritingView.get();
-    connect(library, &LibraryModel::indexChanged, libraryInk.get(), [this] {
-        libraryInk->setIndex(library->searchIndex());
-        if (!library->indexing()) {
-            libraryInk->check();  // (documents changed or came)
-        }
-    });
-    library->onFilesChanged = [this](const DocumentFiles::Result& r) { filesChanged(r); };
-    // The fuzzy search's toggle is an app-wide setting (shared by all windows through the library model)
-    {
-        bool fuzzy = false;
-        app->getSettings()->getCustomElement("xournalQt").getBool("fuzzySearch", fuzzy);
-        library->setFuzzySearch(fuzzy);
-        // (with it on, open documents make the vocabularies of their text in the background: the first fuzzy search
-        // of a long document does not make them on the UI thread)
-        DocumentTextIndex::setWordsInBackground(fuzzy);
-        connect(library, &LibraryModel::fuzzySearchChanged, this, [this] {
-            app->getSettings()->getCustomElement("xournalQt").setBool("fuzzySearch", library->fuzzySearch());
-            app->getSettings()->customSettingsChanged();
-            DocumentTextIndex::setWordsInBackground(library->fuzzySearch());
-        });
-    }
     connect(library, &LibraryModel::fuzzySearchChanged, this, &AppController::searchFuzzyChanged);
     connect(this, &AppController::searchChanged, this, &AppController::searchFuzzyChanged);
-    ownRecent = std::make_unique<RecentFiles>(RecentFiles::defaultStoreFile());
-    recent = ownRecent.get();
+    if (isSecondary()) {
+        home = false;  // it shows documents, never the home screen
+        return;
+    }
+    // Files renamed or moved in the library or the recent files: the open documents follow
+    library->onFilesChanged = [this](const DocumentFiles::Result& r) { filesChanged(r); };
     recent->onFilesChanged = [this](const DocumentFiles::Result& r) {
         library->filesMoved(r);  // a renamed library document keeps its search index entry
         filesChanged(r);
     };
-    // The Recent cards show what a PDF of the library is, as its cards do (the index knows it)
-    recent->setPdfKinds([lib = QPointer<LibraryModel>(library)](const fs::path& file) {
-        LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
-        return index ? index->pdfKind(file) : PdfKind::Unknown;
-    });
-    recent->setVersionCounts([lib = QPointer<LibraryModel>(library)](const fs::path& file) {
-        LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
-        return index ? index->versionsOf(file) : 0;
-    });
-    connect(library, &LibraryModel::indexChanged, recent, [this] {
-        if (!library->indexing()) {
-            recent->pdfKindsChanged();
-        }
-    });
     journalFile = SessionRecovery::defaultJournalFile();
     connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, &AppController::applicationStateChanged);
     applyToolEntry(toolbox->active());  // (the tool of the last time, with all its settings)
 }
 
-// A window of its own: the same settings, tools, library and rendering, but its own documents.
-AppController::AppController(AppController& mainWindow, QObject* parent): QObject(parent) {
-    primary = &mainWindow;
-    app = mainWindow.app;
-    colors = mainWindow.colors;
-    settingsView = mainWindow.settingsView;
-    toolbox = mainWindow.toolbox;
-    shortcuts = mainWindow.shortcuts;
-    library = mainWindow.library;
-    citations = std::make_unique<Citations>(*app->getSettings(), library);
-    makeAudioControl();
-    recent = mainWindow.recent;
-    pageClipboard = mainWindow.pageClipboard;  // copied pages can be pasted in any window
-    libraryBookmarks = mainWindow.libraryBookmarks;
-    libraryTodos = mainWindow.libraryTodos;
-    libraryTags = mainWindow.libraryTags;
-    handwriting = mainWindow.handwriting;
-    handwritingView = mainWindow.handwritingView;
-    connect(library, &LibraryModel::favouriteToggled, this, &AppController::favouriteChanged);
-    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
-    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::selectMoreChanged);  // (available)
-    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followSnipTool);
-    connect(app.get(), &AppContext::settingsChanged, this, &AppController::applySnipResolution);
-    connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
-    connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
-    setUpDarkPages();
-    pages = std::make_unique<PagesModel>();
-    filteredPages = std::make_unique<PageFilterModel>(*pages);
-    outline = std::make_unique<OutlineModel>();
-    annotations = std::make_unique<AnnotationsModel>();
-    versions = std::make_unique<VersionsModel>();
-    layers = std::make_unique<LayersModel>();
-    connect(this, &AppController::searchChanged, this, [this] {
-        if (searchQuery().isEmpty()) {
-            filteredPages->setOnlySearchHits(false);
-        }
-    });
-    connect(library, &LibraryModel::fuzzySearchChanged, this, &AppController::searchFuzzyChanged);
-    connect(this, &AppController::searchChanged, this, &AppController::searchFuzzyChanged);
-    makeTabs();
-    home = false;  // it shows documents, never the home screen
-}
-
 void AppController::makeTabs() {
+    // What acts on the current document's canvas: the pills of the notes, and the keys while the notes have them
+    {
+        CanvasActions::Policy policy;
+        policy.textCopiedText = tr("Text copied");
+        edits = std::make_unique<CanvasActions>(std::move(policy));
+    }
+    current = std::make_unique<CurrentDocument>();
+    connectCurrentDocument();
     tabs = std::make_unique<TabManager>(*app);
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::syncHandwriting);
@@ -378,6 +268,22 @@ void AppController::makeTabs() {
     connect(referenceMode.get(), &ReferenceMode::copied, this, [this](const QString& what) {
         Q_EMIT pageActionDone(what, false);
     });
+    // The two canvases' actions (the notes', the reference's) choose tools, write notes' text and report as the window
+    // does
+    for (CanvasActions* a: {edits.get(), &referenceMode->actions()}) {
+        a->policy().selectTool = [this](ToolType type) { selectTool(QString::fromUtf8(toolTypeToString(type).data(), static_cast<qsizetype>(toolTypeToString(type).size()))); };
+        a->policy().beforeWritingNote = [this] { endMarkdown(true); };  // (the Markdown beside the page is done first)
+        connect(a, &CanvasActions::noteTextStarted, this, &AppController::markdownOnPageChanged);
+        connect(a, &CanvasActions::message, this, &AppController::message);
+        // (something copied onto the clipboard: it is pasted before copied pages, pastesNoteBeforePages)
+        connect(a, &CanvasActions::copied, this, [this] { pagesCopiedLast = false; });
+        connect(this, &AppController::pdfTextModeChanged, a, &CanvasActions::pdfTextModeChanged);
+    }
+    connect(edits.get(), &CanvasActions::notice, this, [this](const QString& text) { Q_EMIT pageActionDone(text, false); });
+    connect(edits.get(), &CanvasActions::selectionChanged, this, &AppController::selectionChanged);
+    connect(edits.get(), &CanvasActions::noteSelectionChanged, this, &AppController::noteSelectionChanged);
+    connect(edits.get(), &CanvasActions::pdfTextSelectionChanged, this, &AppController::pdfTextSelectionChanged);
+    connect(edits.get(), &CanvasActions::navigationChanged, this, &AppController::navigationChanged);
     // The reference written in: its text tool makes Markdown text as the notes' does, edited in the same panel
     connect(referenceMode.get(), &ReferenceMode::changed, this, &AppController::applyMarkdownText);
     connect(referenceMode.get(), &ReferenceMode::markdownRequested, this, &AppController::markdownRequested);
@@ -441,12 +347,28 @@ void AppController::makeTabs() {
 }
 
 AppController::~AppController() {
+    // The window the window factory made for this controller (its child) goes first: its bindings read this controller,
+    // whose parts go below
+    const QObjectList kids = children();  // (a copy: deleting one changes the list)
+    for (QObject* child: kids) {
+        if (child->isWindowType()) {
+            delete child;
+        }
+    }
+    // The windows of undocked documents (children of the main window) go before the main window's parts
+    if (!isSecondary()) {
+        for (AppController* w: documentWindows()) {
+            delete w;
+        }
+    }
+    appServices->openDocuments().remove(this);
     if (!isSecondary()) {
         xoj::compat::setMessageSink({});  // (the main window set it)
+        library->onFilesChanged = {};
+        recent->onFilesChanged = {};
     }
-    for (auto& c: currentConnections) {
-        disconnect(c);
-    }
+    disconnect(current.get(), nullptr, this, nullptr);
+    disconnect(edits.get(), nullptr, this, nullptr);  // (the views go below: nothing relayed to a window on its way out)
     timelineControl.reset();  // (a replay ends: its view shows the whole document again)
     audioControl.reset();  // (a recording ends, and its document is told, before the sessions go)
     pages->setSession(nullptr);
@@ -461,9 +383,7 @@ AppController::~AppController() {
     presenter.reset();  // (the audience's view of a session)
     compareMode.reset();
     referenceMode.reset();
-    if (handwriting) {
-        handwriting->setSessions(this, {}, nullptr);
-    }
+    handwriting->setSessions(this, {}, nullptr);
     tabs.reset();
 }
 
@@ -501,13 +421,6 @@ void AppController::syncHandwriting() {
     }
     handwriting->setSessions(this, sessions, tabs->currentSession());
 }
-
-namespace {
-std::function<void(AppController*)> windowFactory;  // set by main(): makes the window for a controller
-bool windowsStartMaximized = false;                  // set by main()
-}  // namespace
-
-void AppController::setStartMaximized(bool on) { windowsStartMaximized = on; }
 
 namespace {
 bool windowLogOn() {
@@ -594,10 +507,16 @@ void AppController::logWindow(const QString& what) const {
     }
 }
 
-bool AppController::startMaximized() const { return windowsStartMaximized; }
+bool AppController::startMaximized() const { return appServices->startMaximized(); }
 
-void AppController::setWindowFactory(std::function<void(AppController*)> factory) {
-    windowFactory = std::move(factory);
+std::vector<AppController*> AppController::documentWindows() const {
+    std::vector<AppController*> list;
+    for (AppController* w: appServices->openDocuments().windows()) {
+        if (w->primary == this) {
+            list.push_back(w);
+        }
+    }
+    return list;
 }
 
 void AppController::closeAllTabs() {
@@ -615,15 +534,12 @@ void AppController::undockTab(int index) {
     if (!tab) {
         return;
     }
-    auto* window = new AppController(*main, main);
-    main->windows.push_back(window);
+    auto* window = new AppController(*appServices, main);  // (a child of the main window: it goes before the main one)
     window->tabManager().adoptTab(std::move(tab));
     if (main->recovery) {
         main->recovery->watch(window->tabManager());  // its changes survive a crash as well
     }
-    if (windowFactory) {
-        windowFactory(window);
-    }
+    appServices->makeWindow(window);
 }
 
 void AppController::dockTab(int index) {
@@ -649,16 +565,17 @@ void AppController::windowClosed() {
             primary->setHomeVisible(false);
         }
     }
-    auto& list = primary->windows;
-    list.erase(std::remove(list.begin(), list.end(), this), list.end());
+    appServices->openDocuments().remove(this);
     deleteLater();
 }
 
 void AppController::shutdown() {
-    // Saves that run are finished first (the window waited for them already; this is the last resort)
-    for (int i = 0; i < tabs->count(); ++i) {
-        tabs->session(i)->waitForSaves();
+    // Saves that run are finished first, in every window (the window waited for them already; this is the last
+    // resort), then the work off the UI thread that may still write documents (tags, to-dos, links, exports)
+    for (DocumentSession* s: appServices->openDocuments().all()) {
+        s->waitForSaves();
     }
+    appServices->jobs().waitForDone();
     // The image workers draw with Qt: they must be done before the application takes its plugins away
     ImageWorkers::shutdown();
     DocumentCovers::flush();  // (the covers not written yet)
@@ -804,130 +721,20 @@ void AppController::currentTabChanged() {
     if (markdown && mdSession != session()) {
         endMarkdown(true);  // another document: editing the box ends (kept)
     }
-    // Follow the signals of the current tab only.
-    for (auto& c: currentConnections) {
-        disconnect(c);
+    if (current->view() && current->view() != canvas()) {
+        current->view()->setSelectingMore(false);  // (another document: select more ends)
     }
-    currentConnections.clear();
-    if (currentCanvas && currentCanvas != canvas()) {
-        currentCanvas->setSelectingMore(false);  // (another document: select more ends)
-    }
-    currentCanvas = canvas();
-    if (DocumentSession* s = session()) {
-        currentConnections.push_back(
-                connect(s, &DocumentSession::modifiedChanged, this, &AppController::modifiedChanged));
-        currentConnections.push_back(connect(s, &DocumentSession::savingChanged, this, &AppController::savingChanged));
-        currentConnections.push_back(
-                connect(s, &DocumentSession::undoRedoStateChanged, this, &AppController::undoRedoChanged));
-        currentConnections.push_back(
-                connect(s, &DocumentSession::undoRedoStateChanged, this, &AppController::pageUndoChanged));
-        // Undoing a page change says so: the page that changed may be far from the one in view
-        currentConnections.push_back(connect(s, &DocumentSession::pageActionUndone, this,
-                                             [this](const QString& text, bool undone) {
-                                                 Q_EMIT pageActionDone(
-                                                         (undone ? tr("Undone: %1") : tr("Redone: %1")).arg(text), false);
-                                             }));
-        currentConnections.push_back(connect(s, &DocumentSession::filePathChanged, this, &AppController::titleChanged));
-        currentConnections.push_back(
-                connect(s, &DocumentSession::filePathChanged, this, &AppController::favouriteChanged));
-        currentConnections.push_back(
-                connect(s, &DocumentSession::bookmarksChanged, this, &AppController::bookmarksChanged));
-        currentConnections.push_back(
-                connect(s, &DocumentSession::currentPageChanged, this, &AppController::pageChanged));
-        currentConnections.push_back(
-                connect(s, &DocumentSession::currentPageChanged, this, &AppController::notesChanged));
-        currentConnections.push_back(
-                connect(&s->search(), &DocumentSearch::changed, this, &AppController::searchChanged));
-        currentConnections.push_back(
-                connect(&s->search(), &DocumentSearch::finished, this, &AppController::searchChanged));
-        // Annotations of other apps: looked at again when the background PDF changed (adopted, undone, saved)
-        currentConnections.push_back(connect(s, &DocumentSession::undoRedoStateChanged, this, [this, s] {
-            scanAdoptable(s, false);
-            Q_EMIT adoptableChanged();
-        }));
-    }
-    scanAdoptable(session(), false);
-    Q_EMIT adoptableChanged();
+    // From now on the signals of the current tab's document and view only (connectCurrentDocument)
+    current->follow(session(), canvas());
+    edits->setView(canvas());  // (its selection, notes, PDF text, Back: the pills and the keys)
     pages->setSession(session());
     outline->setSession(session());
     annotations->setSession(session());
     versions->setSession(session());
     layers->setSession(session());
-    if (CanvasView* v = canvas()) {
-        currentConnections.push_back(connect(v, &CanvasView::pagesChanged, this, &AppController::pageChanged));
-        currentConnections.push_back(connect(v, &CanvasView::selectionChanged, this, &AppController::selectionChanged));
-        currentConnections.push_back(
-                connect(v, &CanvasView::noteSelectionChanged, this, &AppController::noteSelectionChanged));
-        currentConnections.push_back(connect(v, &CanvasView::selectMoreChanged, this, &AppController::selectMoreChanged));
-        currentConnections.push_back(connect(v, &CanvasView::selectionChanged, this, &AppController::selectMoreChanged));
-        currentConnections.push_back(
-                connect(v, &CanvasView::noteSelectionChanged, this, &AppController::selectMoreChanged));
-        currentConnections.push_back(connect(v, &CanvasView::notesChanged, this, &AppController::notesChanged));
-        currentConnections.push_back(connect(v, &CanvasView::linkTapped, this, &AppController::linkTapped));
-        currentConnections.push_back(
-                connect(v, &CanvasView::markdownRequested, this, &AppController::markdownRequested));
-        currentConnections.push_back(
-                connect(v, &CanvasView::markdownBoxRequested, this, &AppController::markdownBoxRequested));
-        currentConnections.push_back(
-                connect(v, &CanvasView::contextRequested, this, &AppController::contextRequested));
-        currentConnections.push_back(
-                connect(v, &CanvasView::navigationChanged, this, &AppController::navigationChanged));
-        currentConnections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &AppController::pdfTextSelected));
-        currentConnections.push_back(
-                connect(v, &CanvasView::textEditingChanged, this, &AppController::markdownOnPageChanged));
-        currentConnections.push_back(
-                connect(v, &CanvasView::textEditingChanged, this, &AppController::markdownFormatChanged));
-        currentConnections.push_back(
-                connect(v, &CanvasView::markdownCursorChanged, this, &AppController::markdownFormatChanged));
-        // (the text being written has undo steps of its own: the undo and redo buttons follow them)
-        currentConnections.push_back(
-                connect(v, &CanvasView::markdownUndoChanged, this, &AppController::undoRedoChanged));
-        currentConnections.push_back(connect(v, &CanvasView::textEditingChanged, this, &AppController::undoRedoChanged));
-        currentConnections.push_back(connect(v, &CanvasView::geometryChanged, this, &AppController::toolChanged));
-        currentConnections.push_back(connect(v, &CanvasView::curtainChanged, this, &AppController::curtainChanged));
-        currentConnections.push_back(connect(v, &CanvasView::imageLoadRequested, this, [this](const QString& url) {
-            std::string access;
-            app->getSettings()->getCustomElement("xournalQt").getString("networkAccess", access);
-            Q_EMIT webImageRequested(url, QUrl(url).host(),
-                                     access == "on" || access == "off" ? QString::fromStdString(access)
-                                                                       : QStringLiteral("ask"));
-        }));
-        // The snip tool (AppSnip.cpp): its picture onto the clipboard; a pasted snip's link offered
-        currentConnections.push_back(connect(v, &CanvasView::snipped, this,
-                                             [this, v](const QImage& image, int page, const QRectF& area, bool capped) {
-                                                 snipped(v->getSession(), image, page, area, capped);
-                                             }));
-        currentConnections.push_back(connect(v, &CanvasView::snipLinkOffered, this, [this, v](const QString& title) {
-            snipLinkView = v;
-            Q_EMIT snipLinkOffered(title);
-        }));
-        // Copy handwriting as text (AppInkCopy.cpp): the words swept over
-        currentConnections.push_back(connect(v, &CanvasView::inkSwept, this,
-                                             [this, v](int page, const QPolygonF& path) { inkSwept(v, page, path); }));
-        currentConnections.push_back(connect(v, &CanvasView::messageRequested, this,
-                                             [this](const QString& title, const QString& text) {
-                                                 Q_EMIT message(title, text, true);
-                                             }));
-        // Whoever changes the selection (a press on the page, copying, marking, a page change): the knobs and the
-        // pill follow it.
-        currentConnections.push_back(
-                connect(v, &CanvasView::pdfTextSelected, this, &AppController::pdfTextSelectionChanged));
-        currentConnections.push_back(
-                connect(v, &CanvasView::pdfTextSelectionCleared, this, &AppController::pdfTextSelectionChanged));
+    if (canvas()) {
         applyPdfTextMode();
         applyMarkdownText();
-        currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
-                                             &AppController::zoomChanged));
-        currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoom100Changed, this,
-                                             &AppController::zoomChanged));
-        currentConnections.push_back(connect(&v->getViewController(), &ViewController::rotationChanged, this,
-                                             &AppController::canvasRotationChanged));
-        // The play tool on ink with a recording (qt/docs/audio.md)
-        currentConnections.push_back(connect(v, &CanvasView::playRequested, this, [this](const QString& name, qint64 ts) {
-            if (audioControl) {
-                audioControl->playMoment(name, ts);
-            }
-        }));
     }
     if (audioControl) {
         audioControl->currentChanged();
@@ -939,140 +746,113 @@ void AppController::currentTabChanged() {
     if (session() && session()->textFile()) {
         QTimer::singleShot(0, this, [this, s = QPointer<DocumentSession>(session())] { checkTextFile(s); });
     }
-    Q_EMIT documentChanged();
-    Q_EMIT markdownFormatChanged();
-    Q_EMIT titleChanged();
-    Q_EMIT textLayoutChanged();
-    Q_EMIT modifiedChanged();
-    Q_EMIT savingChanged();
-    Q_EMIT undoRedoChanged();
-    Q_EMIT zoomChanged();
-    Q_EMIT canvasRotationChanged();
-    Q_EMIT pageChanged();
-    Q_EMIT searchChanged();
-    Q_EMIT pageUndoChanged();
-    Q_EMIT selectionChanged();
-    Q_EMIT noteSelectionChanged();
-    Q_EMIT selectMoreChanged();
-    Q_EMIT notesChanged();
-    Q_EMIT navigationChanged();
-    Q_EMIT pdfTextSelectionChanged();
-    Q_EMIT toolChanged();  // the setsquare / compass of that tab
-    Q_EMIT curtainChanged();  // its curtain
-    Q_EMIT titlePageChanged();
-    Q_EMIT markdownOnPageChanged();
-    Q_EMIT bookmarksChanged();
-    Q_EMIT favouriteChanged();
+    current->announce();  // (everything about the document may be different: each of its signals once)
 }
 
-bool AppController::hasSelection() const {
-    // (elements, or several sticky notes with elements: the selection's pill; a single note has its own)
-    return canvas() && (canvas()->getSelection() || canvas()->mixed().active());
+void AppController::connectCurrentDocument() {
+    CurrentDocument* d = current.get();
+    // Another document: what the window shows of it
+    connect(d, &CurrentDocument::changed, this, &AppController::documentChanged);
+    connect(d, &CurrentDocument::changed, this, &AppController::textLayoutChanged);
+    connect(d, &CurrentDocument::changed, this, &AppController::titlePageChanged);
+    // The document's
+    connect(d, &CurrentDocument::modifiedChanged, this, &AppController::modifiedChanged);
+    connect(d, &CurrentDocument::savingChanged, this, &AppController::savingChanged);
+    connect(d, &CurrentDocument::undoRedoChanged, this, &AppController::undoRedoChanged);
+    connect(d, &CurrentDocument::undoRedoChanged, this, &AppController::pageUndoChanged);
+    // Annotations of other apps: looked at again when the background PDF changed (adopted, undone, saved)
+    connect(d, &CurrentDocument::undoRedoChanged, this, [this] {
+        scanAdoptable(current->session(), false);
+        Q_EMIT adoptableChanged();
+    });
+    connect(d, &CurrentDocument::fileChanged, this, &AppController::titleChanged);
+    connect(d, &CurrentDocument::fileChanged, this, &AppController::favouriteChanged);
+    connect(d, &CurrentDocument::bookmarksChanged, this, &AppController::bookmarksChanged);
+    connect(d, &CurrentDocument::pageChanged, this, &AppController::pageChanged);
+    connect(d, &CurrentDocument::pageChanged, this, &AppController::notesChanged);
+    connect(d, &CurrentDocument::searchChanged, this, &AppController::searchChanged);
+    // Undoing a page change says so: the page that changed may be far from the one in view
+    connect(d, &CurrentDocument::pageActionUndone, this, [this](const QString& text, bool undone) {
+        Q_EMIT pageActionDone((undone ? tr("Undone: %1") : tr("Redone: %1")).arg(text), false);
+    });
+    // The view's
+    connect(d, &CurrentDocument::pagesChanged, this, &AppController::pageChanged);
+    connect(d, &CurrentDocument::notesChanged, this, &AppController::notesChanged);
+    connect(d, &CurrentDocument::textEditingChanged, this, &AppController::markdownOnPageChanged);
+    connect(d, &CurrentDocument::textEditingChanged, this, &AppController::markdownFormatChanged);
+    connect(d, &CurrentDocument::markdownCursorChanged, this, &AppController::markdownFormatChanged);
+    // (the text being written has undo steps of its own: the undo and redo buttons follow them)
+    connect(d, &CurrentDocument::markdownUndoChanged, this, &AppController::undoRedoChanged);
+    connect(d, &CurrentDocument::textEditingChanged, this, &AppController::undoRedoChanged);
+    connect(d, &CurrentDocument::geometryChanged, this, &AppController::toolChanged);  // (the setsquare / compass)
+    connect(d, &CurrentDocument::curtainChanged, this, &AppController::curtainChanged);
+    connect(d, &CurrentDocument::zoomChanged, this, &AppController::zoomChanged);
+    connect(d, &CurrentDocument::rotationChanged, this, &AppController::canvasRotationChanged);
+    connect(d, &CurrentDocument::linkTapped, this, &AppController::linkTapped);
+    connect(d, &CurrentDocument::markdownRequested, this, &AppController::markdownRequested);
+    connect(d, &CurrentDocument::markdownBoxRequested, this, &AppController::markdownBoxRequested);
+    connect(d, &CurrentDocument::contextRequested, this, &AppController::contextRequested);
+    connect(d, &CurrentDocument::imageLoadRequested, this, [this](const QString& url) {
+        std::string access;
+        app->getSettings()->getCustomElement("xournalQt").getString("networkAccess", access);
+        Q_EMIT webImageRequested(url, QUrl(url).host(),
+                                 access == "on" || access == "off" ? QString::fromStdString(access)
+                                                                   : QStringLiteral("ask"));
+    });
+    // The snip tool (AppSnip.cpp): its picture onto the clipboard; a pasted snip's link offered
+    connect(d, &CurrentDocument::snipped, this, [this](const QImage& image, int page, const QRectF& area, bool capped) {
+        snipped(current->view()->getSession(), image, page, area, capped);
+    });
+    connect(d, &CurrentDocument::snipLinkOffered, this, [this](const QString& title) {
+        snipLinkView = current->view();
+        Q_EMIT snipLinkOffered(title);
+    });
+    // Copy handwriting as text (AppInkCopy.cpp): the words swept over
+    connect(d, &CurrentDocument::inkSwept, this,
+            [this](int page, const QPolygonF& path) { inkSwept(current->view(), page, path); });
+    connect(d, &CurrentDocument::messageRequested, this,
+            [this](const QString& title, const QString& text) { Q_EMIT message(title, text, true); });
+    // The play tool on ink with a recording (qt/docs/audio.md)
+    connect(d, &CurrentDocument::playRequested, this, [this](const QString& name, qint64 ts) {
+        if (audioControl) {
+            audioControl->playMoment(name, ts);
+        }
+    });
 }
-bool AppController::selectMoreOffered() const { return canvas() && canvas()->offersSelectMore(); }
-bool AppController::selectMoreAvailable() const { return canvas() && canvas()->canSelectMore(); }
-bool AppController::selectingMore() const { return canvas() && canvas()->selectingMore(); }
-void AppController::setSelectingMore(bool on) {
-    if (canvas()) {
-        canvas()->setSelectingMore(on);
-    }
+
+bool AppController::hasSelection() const { return edits->hasSelection(); }
+QObject* AppController::editObject() const { return edits.get(); }
+CanvasActions* AppController::keyActions() const {
+    return referenceMode->focused() ? &referenceMode->actions() : edits.get();
 }
-int AppController::selectedCount() const { return canvas() ? canvas()->selectedCount() : 0; }
-bool AppController::canGroup() const { return canvas() && canvas()->groupState().canGroup; }
-bool AppController::canUngroup() const { return canvas() && canvas()->groupState().canUngroup; }
-bool AppController::groupSelection() {
-    if (CanvasView* r = editedReference()) {
-        return r->groupSelection();
-    }
-    return canvas() && !referenceMode->focused() && canvas()->groupSelection();
-}
-bool AppController::ungroupSelection() {
-    if (CanvasView* r = editedReference()) {
-        return r->ungroupSelection();
-    }
-    return canvas() && !referenceMode->focused() && canvas()->ungroupSelection();
-}
+// (the reference with the keys refuses what changes it unless it is written in: CanvasActions::readingOnly)
+bool AppController::groupSelection() { return keyActions()->groupSelection(); }
+bool AppController::ungroupSelection() { return keyActions()->ungroupSelection(); }
 bool AppController::copySelection() {
-    if (referenceMode->focused() && (referenceMode->hasSelection() ||
-                                     (referenceMode->canvas() && referenceMode->canvas()->notes().hasSelection()))) {
-        return copied(referenceMode->copy());  // (the keys are for the reference while it has the focus)
+    if (referenceMode->focused() && (referenceMode->hasSelection() || referenceMode->actions().noteSelected())) {
+        return referenceMode->copy();  // (the keys are for the reference while it has the focus)
     }
-    return copied(canvas() && canvas()->copySelection());  // (also a selected sticky note)
-}
-bool AppController::copied(bool ok) {
-    if (ok) {
-        pagesCopiedLast = false;
-    }
-    return ok;
+    return edits->copySelection();  // (also a selected sticky note)
 }
 CanvasView* AppController::editedReference() const {
     return referenceMode->focused() && referenceMode->editing() ? referenceMode->canvas() : nullptr;
 }
 bool AppController::cutSelection() {
-    if (CanvasView* r = editedReference()) {
-        return copied(r->cutSelection());
-    }
-    if (referenceMode->focused()) {
-        return false;  // (the keys are with a reference for reading: nothing is cut, neither there nor in the notes)
-    }
-    return copied(canvas() && canvas()->cutSelection());
+    // (the keys with a reference for reading: nothing is cut, neither there nor in the notes)
+    return keyActions()->cutSelection();
 }
 bool AppController::pasteElements() {
     if (textPagesFixed()) {
         return false;  // (a text file: its pages are its text)
     }
-    if (CanvasView* r = editedReference()) {
-        return !r->getSession().isReadOnly() && r->pasteElements();
-    }
-    return canvas() && !session()->isReadOnly() && canvas()->pasteElements();
+    // (with a reference for reading: into the notes)
+    return editedReference() ? referenceMode->actions().pasteElements() : edits->pasteElements();
 }
-bool AppController::pasteAt(qreal x, qreal y) {
-    if (textPagesFixed()) {
-        return false;  // (a text file: its pages are its text)
-    }
-    // (x, y: the canvas item's; the canvas may be turned)
-    return canvas() && !session()->isReadOnly() &&
-           canvas()->pasteElements(canvas()->getViewController().screenToView(QPointF(x, y)));
-}
-bool AppController::canPaste() const {
-    const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
-    return mime && (mime->hasImage() || mime->hasText() || mime->hasFormat("application/xournal") ||
-                    StickyNotes::clipboardHasNote() || MixedSelection::clipboardHas());
-}
-void AppController::deleteSelection() {
-    if (CanvasView* r = editedReference()) {
-        r->deleteSelection();
-    } else if (canvas() && !referenceMode->focused()) {
-        canvas()->deleteSelection();
-    }
-}
+void AppController::deleteSelection() { keyActions()->deleteSelection(); }
 void AppController::selectAllOnPage() {
-    if (CanvasView* target = editedReference() ? editedReference() : canvas()) {
-        if (app->getToolHandler()->getToolType() != TOOL_SELECT_RECT &&
-            app->getToolHandler()->getToolType() != TOOL_SELECT_REGION) {
-            selectTool("selectRegion");  // so that the selection can be moved right away
-        }
-        target->selectAllOnPage();
-    }
+    (editedReference() ? referenceMode->actions() : *edits).selectAllOnPage();
 }
-bool AppController::insertImage(const QUrl& url) {
-    if (textPagesFixed()) {
-        return false;  // (a text file: its pages are its text)
-    }
-    QFile f(ContentFiles::sourceOf(url));  // (Android's picker: a content:// URI, which Qt reads too)
-    if (!canvas() || !f.open(QIODevice::ReadOnly)) {
-        return false;
-    }
-    if (app->getToolHandler()->getToolType() != TOOL_SELECT_RECT &&
-        app->getToolHandler()->getToolType() != TOOL_SELECT_REGION) {
-        selectTool("selectRect");  // so that the image can be moved and resized right away
-    }
-    if (!canvas()->insertImage(f.readAll())) {
-        Q_EMIT message(tr("Insert image"), tr("\"%1\" is not an image that can be read.").arg(url.fileName()), true);
-        return false;
-    }
-    return true;
-}
+bool AppController::insertImage(const QUrl& url) { return edits->insertImage(url); }
 
 void AppController::clearSelection() {
     if (canvas()) {
@@ -2715,7 +2495,7 @@ int AppController::autosaveAll() {
         }
     };
     autosaveTabs(*tabs);
-    for (AppController* w: windows) {
+    for (AppController* w: documentWindows()) {
         autosaveTabs(w->tabManager());
     }
     return written;
@@ -2890,7 +2670,7 @@ void AppController::receiveFiles(const QStringList& sources) {
         Q_EMIT pageActionDone(tr("Copying into the library…"), false);
     }
     QPointer<AppController> self(this);
-    QThreadPool::globalInstance()->start([self, files, folder] {
+    appServices->jobs().start([self, files, folder] {
         // The copies are made in a folder of our own first (the names other apps give are cleaned up there), then
         // moved in the way the library imports documents (a .xopp with its PDF, free names)
         QTemporaryDir staging(QDir::tempPath() + "/xqt-received-XXXXXX");
@@ -2934,7 +2714,7 @@ void AppController::receiveFiles(const QStringList& sources) {
                     }
                 },
                 Qt::QueuedConnection);
-    });
+    }, BackgroundJobs::Priority::Normal);
 }
 
 void AppController::setFingerDrawingDefault(bool on) {
@@ -3323,7 +3103,7 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
     if (choice != "keep") {
         // The .xopp open in another tab (another window of this process): closed if it has no unsaved changes; with
         // changes it stays open, and the .xopp is left alone
-        const auto others = tabsWithFile(previous, s);
+        const auto others = appServices->openDocuments().find(previous, {.except = s});
         if (std::any_of(others.begin(), others.end(),
                         [](const auto& o) { return o.second->isModified() || o.second->isSaving(); })) {
             keptBecause = tr("%1 is open with unsaved changes in another tab, so it was left as it is.")
@@ -3667,25 +3447,6 @@ QString AppController::saveFormat() const {
     return pdfOnly() ? QStringLiteral("pdf") : QStringLiteral("xopp");
 }
 
-std::vector<std::pair<AppController*, DocumentSession*>> AppController::tabsWithFile(const fs::path& file,
-                                                                                    const DocumentSession* except) const {
-    std::vector<std::pair<AppController*, DocumentSession*>> found;
-    AppController* main = primary ? primary : const_cast<AppController*>(this);
-    std::vector<AppController*> all{main};
-    all.insert(all.end(), main->windows.begin(), main->windows.end());
-    for (AppController* w: all) {
-        for (int i = 0; i < w->tabs->count(); ++i) {
-            DocumentSession* t = w->tabs->session(i);
-            std::error_code ec;
-            if (t && t != except && t->hasFilePath() &&
-                (t->getFilePath() == file || fs::equivalent(t->getFilePath(), file, ec))) {
-                found.emplace_back(w, t);
-            }
-        }
-    }
-    return found;
-}
-
 void AppController::trashOldXopp(DocumentSession& s, const fs::path& xopp, const fs::path& pdf) {
     DocumentItem item;
     item.xopp = xopp;
@@ -3890,7 +3651,7 @@ bool AppController::saveAsHybrid(const QUrl& url, const QString& oldXopp) {
 void AppController::afterHybridSave(DocumentSession& s) {
     // The clean copy of the new version, in the background: opening it again (also the library's index and preview)
     // does not have to make it (seconds for a long PDF)
-    QThreadPool::globalInstance()->start([file = s.getFilePath()] { HybridPdf::open(file); });
+    appServices->jobs().start([file = s.getFilePath()] { HybridPdf::open(file); }, BackgroundJobs::Priority::Idle);
     library->refresh();
 }
 
@@ -4119,7 +3880,7 @@ bool AppController::shareForXournal(const QUrl& folder, const QString& file) {
     }
     // A PDF from the library, not open: loaded and exported on a worker
     QPointer<AppController> self(this);
-    QThreadPool::globalInstance()->start([self, document, xopp, pdf, shared] {
+    appServices->jobs().start([self, document, xopp, pdf, shared] {
         std::string error;
         auto loaded = DocumentSession::loadFile(document);
         if (!loaded.document) {
@@ -4137,7 +3898,7 @@ bool AppController::shareForXournal(const QUrl& folder, const QString& file) {
             }
             shared(true);
         });
-    });
+    }, BackgroundJobs::Priority::Normal);
     return true;
 }
 
@@ -4217,7 +3978,7 @@ bool AppController::exportArchive(const QUrl& target, const QString& file) {
             return false;
         }
         Q_EMIT pageActionDone(tr("Writing the archive PDF…"), false);
-        QThreadPool::globalInstance()->start([self, document, out] {
+        appServices->jobs().start([self, document, out] {
             HybridPdf::Result r;
             auto loaded = DocumentSession::loadFile(document);
             if (!loaded.document) {
@@ -4230,7 +3991,7 @@ bool AppController::exportArchive(const QUrl& target, const QString& file) {
                     self->archiveDone(out, r.ok, r.error, r.pdfa, r.notPdfA, r.adjusted);
                 }
             });
-        });
+        }, BackgroundJobs::Priority::Normal);
         return true;
     }
     DocumentSession* s = session();
@@ -4293,7 +4054,7 @@ bool AppController::shareFile(const QString& path, bool toClipboard, bool withHi
         // Without its versions: a copy written anew in one piece, in the app cache (the file keeps them)
         const fs::path copy = Util::getCacheSubfolder("share") / file.filename();
         QPointer<AppController> guard(this);
-        QThreadPool::globalInstance()->start([guard, file, copy, toClipboard] {
+        appServices->jobs().start([guard, file, copy, toClipboard] {
             std::string error;
             std::error_code ec;
             fs::create_directories(copy.parent_path(), ec);
@@ -4311,14 +4072,14 @@ bool AppController::shareFile(const QString& path, bool toClipboard, bool withHi
                         guard->handOver({QString::fromStdString(copy.string())}, toClipboard);
                     },
                     Qt::QueuedConnection);
-        });
+        }, BackgroundJobs::Priority::Normal);
         return true;
     }
     if (lowerExtension(file) == ".pdf" && HybridPdf::isHybrid(file) && HybridPdf::hasEarlierRevisions(file)) {
         // A PDF with notes saved incrementally: written anew in one piece first (on a worker), so that no earlier
         // revision with deleted ink goes along
         QPointer<AppController> guard(this);
-        QThreadPool::globalInstance()->start([guard, file, path, toClipboard] {
+        appServices->jobs().start([guard, file, path, toClipboard] {
             std::string error;
             const bool ok = HybridPdf::compact(file, error);
             QMetaObject::invokeMethod(
@@ -4334,7 +4095,7 @@ bool AppController::shareFile(const QString& path, bool toClipboard, bool withHi
                         guard->handOver({path}, toClipboard);
                     },
                     Qt::QueuedConnection);
-        });
+        }, BackgroundJobs::Priority::Normal);
         return true;
     }
     return handOver({path}, toClipboard);
@@ -4464,58 +4225,10 @@ QVariantList AppController::stickyNoteColors() const {
     }
     return colors;
 }
-bool AppController::noteSelected() const { return canvas() && canvas()->notes().hasSelection(); }
+bool AppController::noteSelected() const { return edits->noteSelected(); }
 bool AppController::notesSelectedTogether() const { return canvas() && canvas()->mixed().active(); }
-QColor AppController::noteColor() const {
-    if (const auto look = canvas() ? canvas()->notes().selectedLook() : std::nullopt) {
-        return QColor(look->color.red, look->color.green, look->color.blue);
-    }
-    return {};
-}
-void AppController::setNoteColor(const QColor& color) {
-    if (canvas()) {
-        canvas()->notes().setColor(Color(static_cast<uint8_t>(color.red()), static_cast<uint8_t>(color.green()),
-                                         static_cast<uint8_t>(color.blue())));
-    }
-}
-bool AppController::noteCovers() const {
-    const auto look = canvas() ? canvas()->notes().selectedLook() : std::nullopt;
-    return look && look->cover;
-}
-void AppController::setNoteCovers(bool covers) {
-    if (canvas()) {
-        canvas()->notes().setCover(covers);
-    }
-}
-QRectF AppController::noteBox() const {
-    return canvas() ? canvas()->getViewController().viewToScreen(canvas()->notes().selectedViewBox()) : QRectF();
-}
-void AppController::deleteStickyNote() {
-    if (canvas()) {
-        canvas()->notes().deleteSelected();
-    }
-}
-bool AppController::writeNoteText() {
-    if (!canvas() || textPagesFixed() || session()->isReadOnly()) {
-        return false;
-    }
-    endMarkdown(true);  // (the Markdown written beside the page is done first)
-    const bool writing = canvas()->writeNoteText();
-    Q_EMIT markdownOnPageChanged();
-    return writing;
-}
-bool AppController::copyStickyNote() {
-    if (canvas() && canvas()->mixed().active()) {
-        return copied(canvas()->mixed().copy());
-    }
-    return copied(canvas() && canvas()->notes().copySelected());
-}
-bool AppController::cutStickyNote() {
-    if (canvas() && !textPagesFixed() && canvas()->mixed().active()) {
-        return copied(canvas()->mixed().cut());
-    }
-    return copied(canvas() && !textPagesFixed() && canvas()->notes().cutSelected());
-}
+bool AppController::copyStickyNote() { return edits->copyStickyNote(); }
+bool AppController::cutStickyNote() { return edits->cutStickyNote(); }
 bool AppController::pastesNoteBeforePages() const {
     return (StickyNotes::clipboardHasNote() || MixedSelection::clipboardHas()) &&
            (noteSelected() || notesSelectedTogether() || pageClipboard->isEmpty() || !pagesCopiedLast);
@@ -4659,14 +4372,7 @@ void AppController::setSize(int s) {
     Q_EMIT toolChanged();
 }
 
-void AppController::fitWidth() {
-    if (referenceMode->focused()) {
-        referenceMode->fitWidth();  // (the page in view there)
-    } else if (canvas() && session()) {
-        canvas()->resetRotation();
-        canvas()->getViewController().fitWidth(session()->getCurrentPageNo());
-    }
-}
+void AppController::fitWidth() { keyActions()->fitWidth(); }  // (the reference's page in view while it has the keys)
 
 double AppController::canvasRotation() const { return canvas() ? canvas()->getViewController().rotation() : 0.0; }
 
@@ -4718,14 +4424,7 @@ bool AppController::currentPageDiffers() const {
     return page->getWidth() != other->getWidth() || page->getHeight() != other->getHeight();
 }
 
-void AppController::zoomIn() {
-    if (referenceMode->focused()) {
-        referenceMode->zoomIn();
-    } else if (canvas()) {
-        auto& vc = canvas()->getViewController();
-        vc.zoomBy(1.2, QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
-    }
-}
+void AppController::zoomIn() { keyActions()->zoomIn(); }
 
 void AppController::setZoomPercent(int percent) {
     if (canvas() && percent > 0 && zoomPercent() > 0) {
@@ -4735,23 +4434,9 @@ void AppController::setZoomPercent(int percent) {
     }
 }
 
-void AppController::zoomToRealSize() {
-    if (referenceMode->focused()) {
-        referenceMode->zoomToRealSize();
-    } else if (canvas()) {
-        auto& vc = canvas()->getViewController();
-        vc.setZoom(vc.zoom100(), QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
-    }
-}
+void AppController::zoomToRealSize() { keyActions()->zoomToRealSize(); }
 
-void AppController::zoomOut() {
-    if (referenceMode->focused()) {
-        referenceMode->zoomOut();
-    } else if (canvas()) {
-        auto& vc = canvas()->getViewController();
-        vc.zoomBy(1 / 1.2, QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
-    }
-}
+void AppController::zoomOut() { keyActions()->zoomOut(); }
 
 void AppController::addPageAfterCurrent() {
     if (textPagesFixed()) {
@@ -4794,7 +4479,6 @@ void AppController::setPdfTextMode(const QString& mode) {
     }
 }
 
-bool AppController::markPdfText(const QString& mode) { return canvas() && canvas()->markPdfText(pdfModeFrom(mode)); }
 QStringList AppController::shownDocumentFiles() const {
     QStringList files;
     if (DocumentSession* s = tabs ? tabs->currentSession() : nullptr; s && !s->documentFile().empty()) {
@@ -4806,26 +4490,7 @@ QStringList AppController::shownDocumentFiles() const {
     return files;
 }
 
-QString AppController::selectedText() const { return canvas() ? canvas()->selectedText() : QString(); }
 
-bool AppController::copyPdfText() {
-    if (session() && !session()->allowsCopying()) {
-        // A PDF whose owner does not allow copying its text (opened without its owner password): honoured
-        Q_EMIT pageActionDone(tr("The author of this PDF does not allow copying its text"), false);
-        return false;
-    }
-    const bool ok = canvas() && canvas()->copyPdfText();
-    if (ok) {
-        canvas()->clearPdfTextSelection();
-        Q_EMIT pageActionDone(tr("Text copied"), false);
-    }
-    return ok;
-}
-void AppController::clearPdfTextSelection() {
-    if (canvas()) {
-        canvas()->clearPdfTextSelection();
-    }
-}
 
 void AppController::jumpToPage(int index) {
     if (canvas() && index >= 0) {
@@ -4838,20 +4503,20 @@ void AppController::jumpToPlace(int index, const QRectF& rect) {
     }
 }
 // (across documents: AppLinks.cpp)
-bool AppController::canGoBack() const { return (canvas() && canvas()->canGoBack()) || backJump(); }
-bool AppController::canGoForward() const { return (canvas() && canvas()->canGoForward()) || forwardJump(); }
+bool AppController::canGoBack() const { return edits->canGoBack() || backJump(); }
+bool AppController::canGoForward() const { return edits->canGoForward() || forwardJump(); }
 void AppController::navigateBack() {
     if (referenceMode->focused()) {
-        referenceMode->navigateBack();
-    } else if (!navigateDocuments(true) && canvas()) {
-        canvas()->navigateBack();
+        referenceMode->actions().navigateBack();
+    } else if (!navigateDocuments(true)) {
+        edits->navigateBack();
     }
 }
 void AppController::navigateForward() {
     if (referenceMode->focused()) {
-        referenceMode->navigateForward();
-    } else if (!navigateDocuments(false) && canvas()) {
-        canvas()->navigateForward();
+        referenceMode->actions().navigateForward();
+    } else if (!navigateDocuments(false)) {
+        edits->navigateForward();
     }
 }
 void AppController::clearNavigation() {
@@ -5380,43 +5045,9 @@ bool AppController::addChapter(int page, const QString& title, int level) {
 
 // (Copy link to other places: AppLinks.cpp)
 
-bool AppController::pdfTextIsSelected() const { return canvas() && canvas()->hasPdfTextSelection(); }
-
-bool AppController::selectPdfTextAt(qreal x, qreal y) {
-    if (!canvas()) {
-        return false;
-    }
-    // The same word again: its whole line (like a phone widens the selection)
-    const QPointF where = canvas()->getViewController().screenToView(QPointF(x, y));
-    const bool again = canvas()->hasPdfTextSelection() && canvas()->pdfSelectionEnds().adjusted(-8, -8, 8, 8).contains(where);
-    const bool selected = canvas()->selectPdfTextAt(where, again);
-    Q_EMIT pdfTextSelectionChanged();
-    return selected;
-}
-
-bool AppController::dragPdfSelection(qreal x, qreal y, bool startEnd) {
-    const bool changed =
-            canvas() && canvas()->dragPdfSelection(canvas()->getViewController().screenToView(QPointF(x, y)), startEnd);
-    if (changed) {
-        Q_EMIT pdfTextSelectionChanged();
-    }
-    return changed;
-}
-
-// (on the screen: the canvas item's coordinates, the canvas may be turned)
-QRectF AppController::pdfSelectionEnds() const {
-    return canvas() ? canvas()->getViewController().viewToScreenEnds(canvas()->pdfSelectionEnds()) : QRectF();
-}
-
-QRectF AppController::pdfSelectionBox() const {
-    return canvas() ? canvas()->getViewController().viewToScreen(canvas()->pdfSelectionBox()) : QRectF();
-}
-
-void AppController::showPdfSelection() {
-    if (canvas()) {
-        canvas()->scrollToPdfSelection();
-    }
-}
+bool AppController::pdfTextIsSelected() const { return edits->pdfTextIsSelected(); }
+// (x, y: the canvas item's; the same word again: its whole line)
+bool AppController::selectPdfTextAt(qreal x, qreal y) { return edits->selectPdfTextAt(x, y); }
 
 bool AppController::hasPdfBackground() const {
     return session() && !session()->getDocument()->getPdfFilepath().empty();

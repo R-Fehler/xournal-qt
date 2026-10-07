@@ -11,7 +11,8 @@ scrolled together), `VersionCompare` and `VersionDiff` (comparing versions). Tes
 
 - Opened with "Open as reference" (the tab strip's menu of another tab, the book on a card of the tab overview,
   a library card, a link's popup). The reference is another open tab; each tab has at most one.
-- For reading by default: tools scroll there, selections can be copied but not moved. The pen button of its pill
+- For reading by default: tools scroll there, selections can be copied but not moved. A PDF whose author does
+  not allow copying its text (opened without its owner password) refuses it there as on the notes. The pen button of its pill
   lets the tool in hand write there too (per tab; off for every new reference).
 - The pill: page number (go to a page), the page grid, scroll both sides together (see below), edit, copy, fit width,
   swap sides, swap roles (the reference becomes the notes), "Show as a tab", close. Keys act on the side tapped last. In a narrow half (under 480 px: a
@@ -44,9 +45,14 @@ For cross-referencing within one large document: the tab's own document shows in
   last change of the document.
 - **Selecting works as on the notes** (qt/touch-multiselect): the selection's pill for elements and for notes
   selected together (with the count and "Select more"), the note's pill at a selected note (`NotePill` with
-  `target: app.reference`; colours, cover, text, image, cut and delete while the view is written in, copy and
+  `target: app.reference.edit`; colours, cover, text, image, cut and delete while the view is written in, copy and
   deselect for reading only), Ctrl + click and "Select more" to add and take away (qt/docs/sticky-notes.md, "Select
   more"). Each view has its own selection and its own select more.
+- **One set of canvas actions for both sides.** What the pills and keys do on a canvas (selection, groups, notes, PDF
+  text, the clipboard, page, zoom, Back) is `CanvasActions` (`shell/CanvasActions.h`): `app.edit` for the notes and
+  `app.reference.edit` for the reference, the same code with a policy (the reference changes nothing unless it is
+  written in). `AppController` keeps the names the window's shortcuts call (`app.copySelection`, `app.zoomIn`, …) and
+  routes them to the side with the keys (`keyActions`). `QmlApiTest` checks that every name a pill reads exists there.
 - **Memory.** Both views register with `CanvasMemory` like any view: the limit is shared, not doubled; the view used
   last gets the larger part, the other one keeps its visible pages. Previews and thumbnails are per document, so
   they are shared too.

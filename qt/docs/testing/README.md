@@ -83,8 +83,8 @@ with `XQT_FAST_DEV` that halved the time of a short test.
   show that something does *not* happen; `XQT_WAIT_LOG=<file>` makes every fixed wait of the UI fixture append
   `<file>:<line> <ms>` to that file, to find where a run waits.
 - **The names the QML uses on `app`** are checked against the C++ meta-objects by `QmlApiTest` (`ctest -R QmlApi`):
-  a renamed `AppController` member, or one of a sub-object (`app.library.x`), or a name a pill reads from its
-  `target` missing on `ReferenceMode`, fails there instead of reading `undefined` at run time. A name reached on
+  a renamed `AppController` member, or one of a sub-object (`app.library.x`, `app.reference.edit.x`), or a name a
+  pill reads from its `target` missing on `CanvasActions`, fails there instead of reading `undefined` at run time. A name reached on
   purpose without a C++ member goes into its allowlist with the reason.
 - **Only Qt ≤ 6.7 API**, in tests as in the app: e.g. `AbstractButton.click()` is 6.8, so tests emit
   `clicked`/`triggered` instead. No QML property names that are JS globals (`console`, …).

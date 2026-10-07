@@ -112,7 +112,7 @@ Item {
             view: split.active ? app.reference.view : null
         }
 
-        // The same scroll bars, knobs and pills as the notes have, for the reference (app.reference acts on it; for
+        // The same scroll bars, knobs and pills as the notes have, for the reference (app.reference.edit acts on it; for
         // reading only they offer copying, nothing that changes it)
         LinkStatusLine {
             canvasItem: referenceCanvas
@@ -127,21 +127,21 @@ Item {
         }
         PdfTextHandles {
             canvasItem: referenceCanvas
-            target: app.reference
+            target: app.reference.edit
             namePrefix: "reference"
         }
         PdfTextPill {
             id: referencePdfTextPill
             objectName: "referencePdfTextBar"
             canvasItem: referenceCanvas
-            target: app.reference
+            target: app.reference.edit
             namePrefix: "reference"
             hidden: referenceGrid.visible
         }
         SelectionPill {
             objectName: "referenceSelectionBar"
             canvasItem: referenceCanvas
-            target: app.reference
+            target: app.reference.edit
             namePrefix: "reference"
             hidden: referenceGrid.visible
             bottomMargin: 84  // (above the reference's own pill)
@@ -150,7 +150,7 @@ Item {
         NotePill {
             objectName: "referenceNotePill"
             canvasItem: referenceCanvas
-            target: app.reference
+            target: app.reference.edit
             namePrefix: "reference"
             hidden: referenceGrid.visible
             onImageRequested: referenceImageDialog.open()
@@ -158,7 +158,7 @@ Item {
         ContextPill {
             id: referenceContextPill
             canvasItem: referenceCanvas
-            target: app.reference
+            target: app.reference.edit
             namePrefix: "reference"
             onImageRequested: referenceImageDialog.open()
             onGoToPageRequested: split.openPagePopup()
@@ -167,18 +167,18 @@ Item {
             id: referenceImageDialog
             title: qsTr("Insert image")
             nameFilters: [qsTr("Images (*.png *.jpg *.jpeg *.gif *.bmp *.webp *.svg)"), qsTr("All files (*)")]
-            onAccepted: app.reference.insertImage(selectedFile)
+            onAccepted: app.reference.edit.insertImage(selectedFile)
         }
         // A long press or right click on the reference: on PDF text the word is selected (its pill offers paste
         // too), elsewhere what can be done there - as on the notes
         Connections {
             target: app.reference
             function onContextRequested(viewPos) {
-                if (app.reference.selectPdfTextAt(viewPos.x, viewPos.y)) {
+                if (app.reference.edit.selectPdfTextAt(viewPos.x, viewPos.y)) {
                     referencePdfTextPill.offerPaste(viewPos)
                     return
                 }
-                referenceContextPill.openAt(viewPos, app.reference.pdfTextIsSelected)
+                referenceContextPill.openAt(viewPos, app.reference.edit.pdfTextIsSelected)
             }
         }
 
@@ -232,7 +232,7 @@ Item {
             visible: app.reference.pagesShown && split.active
             color: "#eef0f3"
             onVisibleChanged: if (visible) Qt.callLater(function() {
-                referenceGridView.positionViewAtIndex(Math.max(0, app.reference.pageNumber - 1), GridView.Center)
+                referenceGridView.positionViewAtIndex(Math.max(0, app.reference.edit.pageNumber - 1), GridView.Center)
             })
             GridView {
                 id: referenceGridView
@@ -296,7 +296,7 @@ Item {
                     }
                     TapHandler {
                         onTapped: {
-                            app.reference.goToPage(refCell.pageIndex)
+                            app.reference.edit.goToPage(refCell.pageIndex)
                             app.reference.pagesShown = false
                         }
                     }
@@ -420,7 +420,7 @@ Item {
                 ToolButton {
                     id: referencePageButton
                     objectName: "referencePageButton"
-                    text: app.reference.pageNumber + " / " + app.reference.pageCount
+                    text: app.reference.edit.pageNumber + " / " + app.reference.edit.pageCount
                     focusPolicy: Qt.NoFocus
                     implicitHeight: 40
                     onClicked: { referencePill.focusReference(); referencePagePopup.open() }
@@ -466,14 +466,14 @@ Item {
                                 objectName: "referencePageField"
                                 implicitWidth: 72
                                 inputMethodHints: Qt.ImhDigitsOnly
-                                validator: IntValidator { bottom: 1; top: Math.max(1, app.reference.pageCount) }
-                                placeholderText: app.reference.pageNumber
+                                validator: IntValidator { bottom: 1; top: Math.max(1, app.reference.edit.pageCount) }
+                                placeholderText: app.reference.edit.pageNumber
                                 onAccepted: {
-                                    app.reference.goToPage(parseInt(text) - 1)
+                                    app.reference.edit.goToPage(parseInt(text) - 1)
                                     referencePagePopup.close()
                                 }
                             }
-                            Label { text: "/ " + app.reference.pageCount; color: "#6b6f75" }
+                            Label { text: "/ " + app.reference.edit.pageCount; color: "#6b6f75" }
                         }
                     }
                 }
@@ -535,7 +535,7 @@ Item {
                     implicitWidth: 40; implicitHeight: 40
                     icon.width: 22; icon.height: 22
                     focusPolicy: Qt.NoFocus
-                    onClicked: { referencePill.focusReference(); app.reference.fitWidth() }
+                    onClicked: { referencePill.focusReference(); app.reference.edit.fitWidth() }
                 }
                 IconButton {
                     objectName: "referenceSwapSidesButton"
@@ -631,7 +631,7 @@ Item {
                             objectName: "referenceFitWidthItem"
                             text: qsTr("Fit the width")
                             icon.source: app.iconUrl("xqt-fit-width")
-                            onTriggered: app.reference.fitWidth()
+                            onTriggered: app.reference.edit.fitWidth()
                         }
                         AdaptiveMenuItem {
                             objectName: "referenceSwapSidesItem"

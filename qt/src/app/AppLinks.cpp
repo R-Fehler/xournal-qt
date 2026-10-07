@@ -16,10 +16,10 @@
 #include <QQuickTextDocument>
 #include <QTextCursor>
 #include <QTextDocument>
-#include <QThreadPool>
 #include <QVariantMap>
 
 #include "AppController.h"
+#include "AppServices.h"
 #include "CanvasView.h"
 #include "control/ScrollHandler.h"
 #include "model/Document.h"
@@ -28,6 +28,7 @@
 #include "shell/DocumentLinks.h"
 #include "shell/LibraryIndex.h"
 #include "shell/LibraryModel.h"
+#include "shell/CanvasActions.h"
 #include "shell/ReferenceMode.h"
 #include "shell/DocumentFiles.h"
 #include "shell/LinkRewrite.h"
@@ -201,7 +202,7 @@ bool AppController::followDocumentLinkFrom(const QString& uri, const QString& ho
         const int ref = tabs->referenceOf(tabs->currentIndex());
         if (DocumentSession* shown = ref >= 0 ? tabs->session(ref) : nullptr) {
             const links::Place place = DocumentLinks::placeIn(*shown, *link);
-            referenceMode->goToPage(place.page);
+            referenceMode->actions().goToPage(place.page);
             if (!place.note.isEmpty()) {
                 Q_EMIT pageActionDone(place.note, false);
             }
@@ -536,7 +537,7 @@ void AppController::rewriteLinksAfter(const std::vector<std::pair<fs::path, fs::
     int updated = 0;
     std::vector<LinkRewrite::Plan> closed;
     for (auto& plan: plans) {
-        const auto open = tabsWithFile(plan.file, nullptr);
+        const auto open = appServices->openDocuments().find(plan.file);
         if (open.empty()) {
             closed.push_back(std::move(plan));
             continue;
@@ -554,7 +555,7 @@ void AppController::rewriteLinksAfter(const std::vector<std::pair<fs::path, fs::
     }
     // The others in the background (a .xopp is loaded and written again)
     QPointer<AppController> self(this);
-    QThreadPool::globalInstance()->start([self, closed = std::move(closed), updated, note]() {
+    appServices->jobs().start([self, closed = std::move(closed), updated, note]() {
         int n = updated;
         QStringList errors;
         for (const auto& plan: closed) {
@@ -580,7 +581,7 @@ void AppController::rewriteLinksAfter(const std::vector<std::pair<fs::path, fs::
                 Q_EMIT self->message(tr("Links not updated"), errors.join(QLatin1Char('\n')), false);
             }
         });
-    });
+    }, BackgroundJobs::Priority::Idle);
 }
 
 bool AppController::updateFoundLink() {

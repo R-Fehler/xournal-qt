@@ -33,6 +33,7 @@
 #include "undo/UndoRedoHandler.h"
 
 #include "AppController.h"
+#include "CurrentDocument.h"
 #include "CanvasMemory.h"
 #include "CanvasPage.h"
 #include "CanvasView.h"
@@ -504,4 +505,37 @@ TEST(Tabs, benchClosingABigPdf) {
         }
         qDeleteAll(responses);
     }
+}
+
+// The current document (CurrentDocument): it follows the current tab, relays the signals of that tab's document and
+// view only, and says once that another document is current; the window's properties follow it
+TEST(Tabs, theCurrentDocumentFollowsTheCurrentTabAndRelaysItsSignalsOnly) {
+    AppController c;
+    c.newDocument();
+    c.newDocument();
+    ASSERT_EQ(c.tabManager().count(), 2);
+    ASSERT_EQ(c.currentTab(), 1);
+    CurrentDocument& d = c.currentDocument();
+    EXPECT_EQ(d.session(), c.tabManager().session(1));
+    EXPECT_EQ(d.view(), c.tabManager().view(1));
+
+    QSignalSpy changed(&d, &CurrentDocument::changed);
+    QSignalSpy modified(&d, &CurrentDocument::modifiedChanged);
+    QSignalSpy windowModified(&c, &AppController::modifiedChanged);
+    QSignalSpy windowTitle(&c, &AppController::titleChanged);
+    c.setCurrentTab(0);
+    EXPECT_EQ(changed.count(), 1);
+    EXPECT_EQ(d.session(), c.tabManager().session(0));
+    EXPECT_EQ(d.view(), c.tabManager().view(0));
+    EXPECT_GE(windowModified.count(), 1) << "another document: the window's properties are read again";
+    EXPECT_GE(windowTitle.count(), 1);
+
+    modified.clear();
+    windowModified.clear();
+    c.tabManager().session(1)->insertNewPage(1);  // (the other tab)
+    EXPECT_EQ(modified.count(), 0) << "not the current document";
+    EXPECT_EQ(windowModified.count(), 0);
+    c.tabManager().session(0)->insertNewPage(1);
+    EXPECT_GE(modified.count(), 1);
+    EXPECT_GE(windowModified.count(), 1);
 }

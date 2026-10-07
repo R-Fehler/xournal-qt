@@ -10,10 +10,10 @@
 #include <QMetaObject>
 #include <QFileInfo>
 #include <QPointer>
-#include <QThreadPool>
 #include <QTimer>
 
 #include "AppController.h"
+#include "AppServices.h"
 #include "control/ScrollHandler.h"
 #include "control/ToolHandler.h"
 #include "model/Document.h"
@@ -44,37 +44,9 @@ using namespace xqt;
 
 namespace {
 fs::path pathOf(const QString& s) { return fs::path(s.toStdString()); }
-
-bool sameFile(const fs::path& a, const fs::path& b) {
-    std::error_code ec;
-    return !a.empty() && (a == b || fs::equivalent(a, b, ec));
-}
 }  // namespace
 
 QObject* AppController::libraryTodosModel() const { return libraryTodos; }
-
-void AppController::applyTodoRules() {
-    if (ownLibraryTodos) {
-        ownLibraryTodos->setRules(todos::Rules::of(*app->getSettings()));
-    }
-}
-
-std::vector<std::pair<AppController*, DocumentSession*>> AppController::tabsShowing(const fs::path& file) const {
-    std::vector<std::pair<AppController*, DocumentSession*>> found;
-    AppController* main = primary ? primary : const_cast<AppController*>(this);
-    std::vector<AppController*> all{main};
-    all.insert(all.end(), main->windows.begin(), main->windows.end());
-    for (AppController* w: all) {
-        for (int i = 0; i < w->tabs->count(); ++i) {
-            DocumentSession* t = w->tabs->session(i);
-            if (t && (sameFile(t->hasFilePath() ? t->getFilePath() : fs::path(), file) ||
-                      (t->textFile() && sameFile(t->textFile()->path(), file)))) {
-                found.emplace_back(w, t);
-            }
-        }
-    }
-    return found;
-}
 
 bool AppController::setTodoIn(DocumentSession& s, const QString& rawText, int occurrence, bool done) {
     Document* doc = s.getDocument();
@@ -123,7 +95,7 @@ bool AppController::setTodoDone(const QString& path, const QString& rawText, int
     const fs::path file = pathOf(path);
     const QString title = tr("To-do not changed");
     // Open in a tab: there, one undo step
-    if (const auto open = tabsShowing(file); !open.empty()) {
+    if (const auto open = appServices->openDocuments().find(file, {.textFiles = true}); !open.empty()) {
         auto [window, s] = open.front();
         if (s->isReadOnly()) {
             Q_EMIT message(title, tr("%1 is open read-only.").arg(QString::fromStdString(file.filename().string())),
@@ -155,7 +127,7 @@ bool AppController::setTodoDone(const QString& path, const QString& rawText, int
     };
     if (DocumentFiles::isMarkdownFile(file)) {
         // A Markdown file: through its text, in the background
-        QThreadPool::globalInstance()->start([self, file, rawText, occurrence, done, failed] {
+        appServices->jobs().start([self, file, rawText, occurrence, done, failed] {
             bool found = false;
             std::string error;
             const bool ok = todos::setInMarkdownFile(file, rawText, occurrence, done, found, error);
@@ -171,11 +143,11 @@ bool AppController::setTodoDone(const QString& path, const QString& rawText, int
                     self->library->refresh();  // (its index entry is read again)
                 }
             });
-        });
+        }, BackgroundJobs::Priority::Idle);
         return true;
     }
     // A .xopp or a PDF with notes: loaded in the background, then changed and saved as the app saves documents
-    QThreadPool::globalInstance()->start([self, file, rawText, occurrence, done, failed] {
+    appServices->jobs().start([self, file, rawText, occurrence, done, failed] {
         auto loaded = std::make_shared<DocumentSession::LoadResult>(DocumentSession::loadFile(file));
         QMetaObject::invokeMethod(qApp, [self, file, rawText, occurrence, done, failed, loaded] {
             if (!self) {
@@ -192,7 +164,7 @@ bool AppController::setTodoDone(const QString& path, const QString& rawText, int
                 return;
             }
             // (opened meanwhile: there)
-            if (const auto open = self->tabsShowing(file); !open.empty()) {
+            if (const auto open = self->appServices->openDocuments().find(file, {.textFiles = true}); !open.empty()) {
                 if (!open.front().first->setTodoIn(*open.front().second, rawText, occurrence, done)) {
                     failed(tr("The to-do is no longer in the document as the list has it."));
                 }
@@ -228,7 +200,7 @@ bool AppController::setTodoDone(const QString& path, const QString& rawText, int
                 failed(tr("%1 could not be saved.").arg(QString::fromStdString(file.filename().string())));
             }
         });
-    });
+    }, BackgroundJobs::Priority::Idle);
     return true;
 }
 
