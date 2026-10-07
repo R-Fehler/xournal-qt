@@ -425,9 +425,10 @@ void DocumentSession::beginSave() {
             audio::adoptExtracted(names, before);
             // Like Control::saveImpl(saveAs=true): the document takes the new path before saving (the location of an
             // attached background PDF is derived from it).
-            doc->lock();
-            doc->setFilepath(t.target);
-            doc->unlock();
+            {
+                std::unique_lock lock(*doc);
+                doc->setFilepath(t.target);
+            }
             break;
         }
         case SaveKind::Hybrid:
@@ -825,20 +826,21 @@ void DocumentSession::finishWrite() {
         return finishSave(t.result);
     }
     const bool ok = t.result.ok;
-    doc->lock();
-    if (t.handler) {
-        t.handler->updateDocumentInfo(doc.get());
+    {
+        std::unique_lock lock(*doc);
+        if (t.handler) {
+            t.handler->updateDocumentInfo(doc.get());
+        }
+        if (ok && doc->getFilepath() == t.pathWhenTaken) {  // (unless it was moved in the library meanwhile)
+            doc->setFilepath(t.target);
+        }
+        if (ok && t.preview) {
+            doc->setPreview(t.preview);
+        }
+        if (t.xoppWritten && !t.createBackup) {
+            doc->setCreateBackupOnSave(true);
+        }
     }
-    if (ok && doc->getFilepath() == t.pathWhenTaken) {  // (unless it was moved in the library meanwhile)
-        doc->setFilepath(t.target);
-    }
-    if (ok && t.preview) {
-        doc->setPreview(t.preview);
-    }
-    if (t.xoppWritten && !t.createBackup) {
-        doc->setCreateBackupOnSave(true);
-    }
-    doc->unlock();
     if (!t.hybrid) {
         if (t.commitTried) {
             pdfPages->commitApplied(t.staged, t.committed);
