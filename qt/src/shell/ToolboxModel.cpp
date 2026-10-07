@@ -18,8 +18,6 @@ namespace xqt {
 
 namespace {
 constexpr int VERSION = 2;
-/// The JSON of 0.7.0: the user's entries alone (upgraded on reading)
-constexpr int VERSION_1 = 1;
 constexpr double MIN_WIDTH = 0.1;
 constexpr double MAX_WIDTH = 150;
 /// A pause before a change is written (a slider dragged writes once)
@@ -820,18 +818,6 @@ QString ToolboxModel::recentOfType(const QString& type) const {
     return {};
 }
 
-QString ToolboxModel::recentAmong(const QStringList& ids) const {
-    if (ids.contains(activeId)) {
-        return activeId;
-    }
-    for (const QString& id: recent) {
-        if (ids.contains(id)) {
-            return id;
-        }
-    }
-    return ids.value(0);
-}
-
 void ToolboxModel::reset() {
     railList = defaultEntries();
     topList.clear();
@@ -1067,9 +1053,7 @@ bool ToolboxModel::fromJson(const QString& json) {
         return false;
     }
     const QJsonObject root = doc.object();
-    const int version = root.value("version").toInt();
-    const char* railKey = version == VERSION_1 ? "entries" : "rail";
-    if ((version != VERSION && version != VERSION_1) || !root.value(railKey).isArray()) {
+    if (root.value("version").toInt() != VERSION || !root.value("rail").isArray()) {
         return false;
     }
     auto read = [](const QJsonArray& a) {
@@ -1081,8 +1065,8 @@ bool ToolboxModel::fromJson(const QString& json) {
         }
         return l;
     };
-    QVariantList rail = read(root.value(railKey).toArray());
-    QVariantList top = read(root.value("top").toArray());
+    const QVariantList rail = read(root.value("rail").toArray());
+    const QVariantList top = read(root.value("top").toArray());
     auto hasTool = [](const QVariantList& l) {
         return std::any_of(l.begin(), l.end(), [](const QVariant& v) {
             if (isGroup(v)) {
@@ -1094,17 +1078,6 @@ bool ToolboxModel::fromJson(const QString& json) {
     };
     if (!hasTool(rail) && !hasTool(top)) {
         return false;  // (no tools at all: the first layout instead)
-    }
-    if (version == VERSION_1) {
-        // 0.7.0: the user's entries alone. The app's tools follow them on the rail (they were the rail's fixed tools,
-        // the ones that stay on it), the top bar gets its first layout; the ids after every one there is
-        int n = 0;
-        for (const QVariant& v: rail) {
-            n = std::max(n, idOf(v).mid(1).toInt());
-        }
-        rail.append(divider(QString("d%1").arg(++n)));
-        rail.append(layoutOf(defaultRailApps(), n));
-        top = layoutOf(defaultTopLayout(), n);
     }
     railList = rail;
     topList = top;

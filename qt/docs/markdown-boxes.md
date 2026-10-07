@@ -48,8 +48,8 @@ Writing:
   - Ctrl+Alt+M opens the same text beside the page.
 - **Beside the page** (the writing button's menu: "Markdown source beside the page", or Ctrl+Alt+M while writing on
   the page, which takes the box or text being written along): the source in an editor beside the page, and the page
-  shows it formatted while typing. The text tool always writes on the page, as in a `.md`; the font menu's switch
-  that sent it beside the page is gone (2026-09-26), and a value an earlier version stored is not read.
+  shows it formatted while typing. The text tool always writes Markdown on the page, as in a `.md`; an ordinary text
+  box (of a Xournal++ file) is edited as it is.
 
 ## Tables
 Columns are as wide as a browser makes them (VS Code's preview, GitHub: CSS's automatic table layout). A table whose

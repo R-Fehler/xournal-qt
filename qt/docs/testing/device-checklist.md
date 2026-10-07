@@ -105,3 +105,11 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
 
 - [ ] The models download once with consent; the author's own notes in English and German are found by words
       written in them, also in the library search and in other PDF viewers (the invisible text layer).
+
+## No compatibility with earlier pre-releases; Markdown only (0.9.0)
+
+- [ ] Start with the settings and a library of 0.8.0: the app starts; the library reads its documents once (the
+      progress shows), the second start reads nothing; tags, to-dos and bookmarks are there after that first read.
+- [ ] The text tool on an empty place makes a Markdown text box; on a text box of a Xournal++ file it edits that text
+      as it is, and the file opens in Xournal++ afterwards with the edited text.
+- [ ] A fresh profile: snapping off, the pen's side buttons erase; switch snapping on, restart: it stays on.

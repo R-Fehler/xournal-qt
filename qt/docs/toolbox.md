@@ -43,10 +43,8 @@ cycling tool: a tap while it is armed takes the other shape, qt/ui-rework). Divi
 
 The first start: three pens (body, key terms, warnings) | two highlighters (key terms, definitions) | the eraser | a
 line, a text box, a sticky note | the laser pointer. The pens and highlighters take their colors from the **palette
-roles** ([color-palettes.md](color-palettes.md)): choosing another palette recolors them. **After an update** from
-the classic tool bar (a settings file without a toolbox, whatever its `toolbarMode` says: `classic`, `toolbox` or
-nothing; `AppController::migratedToolbox`) the first pen has the pen's color and width of before, the highlighter its
-width, the eraser its kind, the text box the font, the shape the one used last; the first pen is in hand at the
+roles** ([color-palettes.md](color-palettes.md)): choosing another palette recolors them. A settings file without a
+toolbox (or with one of another version, such as 0.7.0's) gets these first tools; the first pen is in hand at the
 start.
 
 | Gesture | What it does |
@@ -335,8 +333,7 @@ first layout. The last eraser cannot be removed (a group removed leaves it in it
 - **The top bar's first layout** (`defaultTopLayout`): open, save, milestone, share, print | image, stickers, add
   page, write on the page | setsquare, the finger draws, record | search, read, replay, present, full screen, Zen |
   tags, favourite, bookmark | settings. The top bar shows it (above, "The top bar").
-- **The upgrade from 0.7.0** (version 1, `"entries"`): its entries start the rail (the ids, the tool in hand and the
-  order of use stay), a divider and hand, select, snip, mark PDF text follow; the top bar gets its first layout.
+- **The JSON** is version 2 only: another version (also 0.7.0's version 1) gives the first layout.
 - **What the bars use**: `items(bar)`, `moveTo(id, bar, index)` (from the other bar, out of a group: carrying, "Move to
   the top bar"), `group(id, onto)` (also across the bars), `ungroup`, `members`, `shownOf`, `use`, `remove` (an app
   item: not placed; carried away from both bars), `unplaced` (the catalog), `place(name, bar, index)` (the catalog),
@@ -354,8 +351,8 @@ unused); the shell, canvas and UI tests run with the toolbox.
 
 | Where | What |
 | --- | --- |
-| `qt/src/shell/ToolboxModel.*` | the arrangement: the rail and the top bar (tool entries, app items, dividers, groups), the active entry and the order of use; JSON (version 2, the upgrade of 1); add, update, replace, duplicate, remove, move (also between bars and out of groups), dividers, groups, the app items' homes, prefill, the most recent of a type, the first layout |
-| `qt/src/app/AppToolbox.cpp` | `applyToolEntry`, `entryInHand`, `toolEntryColor`, `takeToolOfType`, `migratedToolbox` |
+| `qt/src/shell/ToolboxModel.*` | the arrangement: the rail and the top bar (tool entries, app items, dividers, groups), the active entry and the order of use; JSON (version 2); add, update, replace, duplicate, remove, move (also between bars and out of groups), dividers, groups, the app items' homes, prefill, the most recent of a type, the first layout |
+| `qt/src/app/AppToolbox.cpp` | `applyToolEntry`, `entryInHand`, `toolEntryColor`, `takeToolOfType` |
 | `qt/src/app/qml/Toolbox.qml` | a bar (`bar`: "rail" or "top"): head, the items (entries, app items lent to it, groups and their list), tail; scrolling (the cut, the fades, the tool in hand into view, the place per class); carrying an item within it and to the other bar (`peer`, `reach`, `dragOver`, `dropHere`, `leaveBars`), the ring of a group; the grip (the rail) |
 | `qt/src/app/qml/ToolEntryButton.qml` | one tool: its icon and a sample of its ink; lifted in hand; the hold, the carrying, the wheel; a group's face (dots), the ring |
 | `qt/src/app/qml/ToolEntryEditor.qml` | the editor (and the draft of a new tool, for either bar) |
@@ -369,10 +366,10 @@ unused); the shell, canvas and UI tests run with the toolbox.
 
 Since 0.8.0 every UI, shell and canvas test runs with the toolbox (the classic bar's tests moved to it, or went with
 it where they tested what is gone: the five widths of the bar, the pen pill, the tool square).
-`ToolboxApply.aSettingsFileOfTheClassicToolBarGetsTheToolboxWithTheToolsOfBefore` (`-L shell`): a settings file of
-0.7.0 with `toolbarMode` `classic` (or nothing) and no toolbox gets the first tools with the pen, the eraser and the text
-box of before, the pen in hand, E and T taking its entries.
-`ToolboxModel.*` (`-L shell`): besides the entries, the top bar's first layout, the upgrade of 0.7.0's JSON, one home
+`ToolboxApply.aSettingsFileWithoutAToolboxGetsTheFirstTools` (`-L shell`): the first tools, the pen in hand, E and T
+taking its entries.
+`ToolboxModel.*` (`-L shell`): besides the entries, the top bar's first layout, JSON of another version giving the first
+layout, one home
 per app item (removed: not placed, put back), groups (made, the member shown, carried out, a group of one dissolved,
 merged, ungrouped, undone by a snapshot), a group removed, `resetLayout`.
 `CopyToolsTest.*` (`-L ui`): the snip button among the app tools of the rail, not in the select list, the text tools'

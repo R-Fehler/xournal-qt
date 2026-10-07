@@ -1,5 +1,4 @@
 #include "DocumentCanvasItem.h"
-#include "TextFlowEditor.h"
 #include "EmojiNames.h"
 #include "AdaptiveLayout.h"
 #include "TouchGestures.h"
@@ -615,7 +614,6 @@ private:
 
 void xqt::registerQuickTypes() {
     qmlRegisterType<DocumentCanvasItem>("XournalQt.Canvas", 1, 0, "DocumentCanvas");
-    qmlRegisterType<TextFlowEditor>("XournalQt.Canvas", 1, 0, "TextFlowEditor");
     qmlRegisterType<TouchGestures>("XournalQt.Canvas", 1, 0, "TouchGestures");
     qmlRegisterType<AdaptiveLayout>("XournalQt.Canvas", 1, 0, "AdaptiveLayout");
     qmlRegisterSingletonType<EmojiNames>("XournalQt.Canvas", 1, 0, "Emoji",

@@ -4,7 +4,7 @@
  * - Implements upstream's toolkit-neutral view interfaces (xoj::view::Repaintable, LegacyRedrawable, PageListener),
  *   so upstream input handlers (StrokeHandler, EraseHandler) and their overlay views work unmodified.
  * - The input dispatch (onButtonPressEvent / onMotionNotifyEvent / onButtonReleaseEvent / onSequenceCancelEvent)
- *   is a port of XojPageView for the tools supported so far (pen, highlighter, eraser incl. whiteout).
+ *   is a port of XojPageView for the tools of the canvas (the pens, the eraser, shapes, selections, text, …).
  * - Rendering: a PageRaster (CPU buffer, see render/PageRaster.h) plus overlay views, composited per tile for display.
  *
  * @license GNU GPLv2 or later

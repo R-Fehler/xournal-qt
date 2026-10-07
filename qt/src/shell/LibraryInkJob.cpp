@@ -169,7 +169,6 @@ void LibraryInkJob::next() {
 
 void LibraryInkJob::loaded(std::shared_ptr<Current> doc) {
     if (!doc->doc || !index) {
-        ++docsDone;
         current.reset();
         QTimer::singleShot(0, this, &LibraryInkJob::next);
         return;
@@ -247,7 +246,6 @@ void LibraryInkJob::finish() {
         doc.pages = std::move(c.lines);
         index->inkText().put(c.file, std::move(doc));
     }
-    ++docsDone;
     current.reset();
     Q_EMIT progress();
     QTimer::singleShot(0, this, &LibraryInkJob::next);

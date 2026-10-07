@@ -39,27 +39,24 @@ AppContext::AppContext(fs::path resourceDir, fs::path settingsFile, int renderTh
     if (settingsFile.empty()) {
         settingsFile = Util::getConfigFile(SETTINGS_XML_FILE);
     }
+    std::error_code ec;
+    const bool firstStart = !fs::exists(settingsFile, ec);
     settings = std::make_unique<Settings>(std::move(settingsFile));
     settings->load();
     pageTypes = std::make_unique<PageTypeHandler>(&searchPath);
     // No GAction database in the Qt build: tool state changes are reported through ToolListener.
     toolHandler = std::make_unique<ToolHandler>(this, nullptr, settings.get());
     toolHandler->loadSettings();
-    // The side buttons of the pen erase (upstream leaves them unused). Once: the settings screen can change it.
-    if (bool set = false; !settings->getCustomElement("xournalQt").getBool("stylusButtonsSet", set) || !set) {
+    if (firstStart) {
+        // Defaults of our own on a new settings file (the settings screen and the shapes menu change them): the side
+        // buttons of the pen erase (upstream leaves them unused), snapping to the grid is off (upstream: on; here it
+        // made moved selections jump)
         for (const Button b: {Button::BUTTON_STYLUS_ONE, Button::BUTTON_STYLUS_TWO}) {
             if (settings->getButtonConfig(static_cast<unsigned int>(b))->getAction() == TOOL_NONE) {
                 settings->getButtonConfig(static_cast<unsigned int>(b))->setAction(TOOL_ERASER);
             }
         }
-        settings->getCustomElement("xournalQt").setBool("stylusButtonsSet", true);
-        settings->customSettingsChanged();
-    }
-    // Snapping to the grid is off (upstream: on; here it made moved selections jump). Once: the shapes menu and the
-    // settings switch it.
-    if (bool set = false; !settings->getCustomElement("xournalQt").getBool("snapGridSet", set) || !set) {
         settings->setSnapGrid(false);
-        settings->getCustomElement("xournalQt").setBool("snapGridSet", true);
         settings->customSettingsChanged();
     }
     initButtonTools();
@@ -120,7 +117,7 @@ void AppContext::installQtUiThreadDispatcher() {
 }
 
 void AppContext::toolColorChanged() { Q_EMIT toolPropertiesChanged(); }
-void AppContext::changeColorOfSelection() { Q_EMIT selectionColorChangeRequested(); }
+void AppContext::changeColorOfSelection() {}  // (a selection is recolored by the canvas that holds it)
 void AppContext::toolSizeChanged() { Q_EMIT toolPropertiesChanged(); }
 void AppContext::toolFillChanged() { Q_EMIT toolPropertiesChanged(); }
 void AppContext::toolLineStyleChanged() { Q_EMIT toolPropertiesChanged(); }

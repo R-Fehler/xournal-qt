@@ -142,8 +142,6 @@ Q_SIGNALS:
     void pdfPagesFailed(const QString& error);
     /// A tab got another reference, or lost it (its reference was closed or moved to another window).
     void referencesChanged();
-    /// Another tab was used, or one went (usedOrder)
-    void usedOrderChanged();
 
 private:
     /// The tab reports to this list (and stops reporting to the one it came from).

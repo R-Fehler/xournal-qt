@@ -47,7 +47,7 @@ constexpr int PALM_TIMEOUT_MS = 0;
 /// Up to which height the pen counts as near ("touch" / "nearHeight", percent of what the pen can tell; 100: as far
 /// as it is noticed at all)
 constexpr int NEAR_HEIGHT_PERCENT = 100;
-/// Pens that report proximity: touch works again this soon after the pen left.
+/// A tap is at most this long.
 constexpr double TAP_MAX_MS = 250.0;
 constexpr double DOUBLE_TAP_MS = 350.0;    ///< the second tap comes this soon after the first
 constexpr double DOUBLE_TAP_PX = 60.0;     ///< ... and this close to it

@@ -40,18 +40,13 @@
 namespace xqt::annotations {
 
 namespace {
-std::mutex noteMutex;
 void stickyNotesOf(const XojPage& page, std::vector<Item>& notes);
-NoteSource& noteSource() {
-    static NoteSource source = stickyNotesOf;
-    return source;
-}
 
 QRectF rectOf(const xoj::util::Rectangle<double>& r) { return QRectF(r.x, r.y, r.width, r.height); }
 
 uint32_t rgbOf(Color c);
 
-/// The sticky notes of a page (qt/docs/sticky-notes.md), the NoteSource used unless another is set: a note's texts
+/// The sticky notes of a page (qt/docs/sticky-notes.md): a note's texts
 /// as its text (its Markdown text first, as shown), "(handwriting)" for a note with ink only.
 void stickyNotesOf(const XojPage& page, std::vector<Item>& notes) {
     for (const Layer* layer: page.getLayersView()) {
@@ -433,11 +428,6 @@ QString nameOf(Kind kind) {
     return {};
 }
 
-void setNoteSource(NoteSource source) {
-    std::lock_guard lock(noteMutex);
-    noteSource() = std::move(source);
-}
-
 PageContent read(const XojPage& page) {
     PageContent c;
     c.width = page.getWidth();
@@ -448,7 +438,7 @@ PageContent read(const XojPage& page) {
     }
     for (const Layer* layer: page.getLayersView()) {
         if (!layer->isVisible() || sticky::isNote(*layer)) {
-            continue;  // (what is on a sticky note is the note's: listed as the note, NoteSource)
+            continue;  // (what is on a sticky note is the note's: listed as the note, stickyNotesOf)
         }
         for (const Element* e: layer->getElementsView()) {
             if (e->getType() == ELEMENT_TEXT) {
@@ -467,10 +457,7 @@ PageContent read(const XojPage& page) {
             }
         }
     }
-    std::lock_guard lock(noteMutex);
-    if (noteSource()) {
-        noteSource()(page, c.notes);
-    }
+    stickyNotesOf(page, c.notes);
     return c;
 }
 

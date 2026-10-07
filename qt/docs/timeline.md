@@ -20,8 +20,8 @@ per point.
   to read.
 - **Where it is set** (fork code only, upstream's tools are unchanged): a stroke when the pen touches (pen,
   highlighter, every shape, whiteout; `CanvasPage`), a text when its box opens (`TextEditor`; as upstream stamps
-  `ts`), a Markdown text box when it is begun (`MarkdownSession`), the page's own text when it is begun (it is laid
-  out anew on every change and keeps that time, `TextFlow`), an inserted image or snip, marks over PDF text, marks of
+  `ts`), a Markdown text box (also the page's own text) when it is begun (its first change, `MarkdownSession`), an
+  inserted image or snip, marks over PDF text, marks of
   the geometry tools, link markers, chapters, to-do stamps, sticky notes (`StickyNotes::place`), the elements of a
   page made from a template.
 - **New, not copied**: pasted elements and stickers get the time they were pasted (upstream's clipboard data has no

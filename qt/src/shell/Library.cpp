@@ -35,7 +35,6 @@
 #include "session/FuzzyQuery.h"
 #include "session/HybridPdf.h"
 #include "session/PdfTitle.h"
-#include "session/TextDocument.h"
 #include "session/TextMatch.h"
 #include "session/Vocabulary.h"
 #include "util/PathUtil.h"
@@ -269,22 +268,7 @@ void Library::setShowFilter(const ShowFilter& f) const {
     });
 }
 
-fs::path Library::placesFile() const {
-    const fs::path file = configDir() / "pages.json";
-    std::error_code ec;
-    if (!fs::exists(file, ec)) {
-        // Kept in the library's cache folder before (lost when it was removed): taken over, once. The old file
-        // goes when the old cache is converted.
-        for (const fs::path& old: {rootDir / DocumentFiles::META_DIR / "pages.json",
-                                   CacheLocation(rootDir).appCacheDir() / "pages.json"}) {
-            if (fs::exists(old, ec)) {
-                fs::copy_file(old, file, ec);
-                break;
-            }
-        }
-    }
-    return file;
-}
+fs::path Library::placesFile() const { return configDir() / "pages.json"; }
 
 bool Library::contains(const fs::path& p) const { return DocumentFiles::remap(p, rootDir, "/") != p; }
 
@@ -359,21 +343,19 @@ QString ownStamp(const DocumentItem& item) {
 bool isPdfFile(const fs::path& p) {
     return QString::fromStdString(p.extension().string()).compare(QLatin1String(".pdf"), Qt::CaseInsensitive) == 0;
 }
-/// What a PDF is (qt/docs/library.md, "Kinds of PDFs"): by its marker (HybridPdf::markerOf: read when it was opened
-/// and remembered, so no second read). A text document is a PDF with notes that carries its "name.md", or - read by
-/// a build before it carried one - whose document (`doc`, locked by the caller; nullptr: not read) starts with the
-/// page's Markdown text.
 /// How many versions it keeps (version history: the marker's /History, read with the kind; 0: none).
 int versionsOfPdf(const fs::path& pdf) {
     const HybridPdf::Marker m = HybridPdf::markerOf(pdf);
     return m.history ? std::max(1, m.versions) : 0;
 }
-PdfKind kindOfPdf(const fs::path& pdf, Document* doc) {
+/// What a PDF is (qt/docs/library.md, "Kinds of PDFs"): by its marker (HybridPdf::markerOf: read when it was opened
+/// and remembered, so no second read). A text document is a PDF with notes that carries its "name.md".
+PdfKind kindOfPdf(const fs::path& pdf) {
     const HybridPdf::Marker m = HybridPdf::markerOf(pdf);
     if (!m.hybrid) {
         return PdfKind::Plain;
     }
-    const bool text = m.markdown || (doc && TextDocument::isTextDocument(*doc));
+    const bool text = m.markdown;
     return m.archive ? (text ? PdfKind::ArchiveText : PdfKind::Archive) : (text ? PdfKind::Text : PdfKind::Notes);
 }
 /// The kind of an entry: what it read ("xopp" also for .xoj, "pdf", "md", "image", "text").
@@ -485,18 +467,8 @@ bool LibraryIndex::Entry::showsPdfPages() const {
 
 bool LibraryIndex::Entry::isPdf() const { return isPdfFile(file); }
 
-bool LibraryIndex::Entry::pdfKindMissing() const { return pdfKind == PdfKind::Unknown && isPdf(); }
-
-bool LibraryIndex::Entry::onlyMetaMissing(const DocumentItem& item) const {
-    // (a plain PDF without tags read: only its keywords are; other documents are read again for theirs)
-    const bool onlyKeywords = !tagsRead && pdfKind == PdfKind::Plain;
-    return (!titleRead || pdfKindMissing() || onlyKeywords) && file == item.main() && xoppStamp == ownStamp(item) &&
-           pdfStamp == fileStamp(pdf) && linksRead && todosRead && (tagsRead || onlyKeywords);
-}
-
 bool LibraryIndex::Entry::upToDate(const DocumentItem& item) const {
-    return file == item.main() && xoppStamp == ownStamp(item) && pdfStamp == fileStamp(pdf) && linksRead &&
-           todosRead && tagsRead && titleRead && !pdfKindMissing();
+    return file == item.main() && xoppStamp == ownStamp(item) && pdfStamp == fileStamp(pdf);
 }
 
 QStringList LibraryIndex::Entry::tags() const {
@@ -534,7 +506,7 @@ QCborMap LibraryIndex::notesOf(const Entry& e) const {
     if (!e.pdfSha.isEmpty()) {
         notes.insert(QStringLiteral("pdfSha"), e.pdfSha);
     }
-    if (e.showsPdfPages() && e.titleRead) {
+    if (e.showsPdfPages()) {
         notes.insert(QStringLiteral("title"), e.title);
         notes.insert(QStringLiteral("heading"), e.heading);
     }
@@ -659,7 +631,6 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
             e->blockLevel.push_back(0);
         }
     } else if (e->kind != QLatin1String("image")) {
-        e->linksRead = notes.contains(QStringLiteral("links")) || e->kind != QLatin1String("xopp");
         for (const auto& l: notes.value(QStringLiteral("links")).toArray()) {
             e->links << l.toString();
         }
@@ -667,7 +638,7 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
             e->wikiLinks << l.toString();
         }
     }
-    // Its bookmarks (added 2026-09 with qt/bookmarks: an entry without them had none)
+    // Its bookmarks
     const QCborMap marks = notes.value(QStringLiteral("bookmarks")).toMap();
     for (auto it = marks.cbegin(); it != marks.cend(); ++it) {
         // (a Markdown file has no pages in the index: its bookmarks' pages are those it is laid out on)
@@ -676,13 +647,11 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
             e->bookmarks[static_cast<int>(page)] = it.value().toString();
         }
     }
-    // What its PDF is (added 2026-09: an entry without it gets only that read, from the PDF's marker)
+    // What its PDF is
     e->pdfKind = e->isPdf() ? pdfKindNamed(notes.value(QStringLiteral("pdfKind")).toString()) : PdfKind::Unknown;
     e->versions = e->isPdf() ? static_cast<int>(notes.value(QStringLiteral("versions")).toInteger(0)) : 0;
     e->locked = e->isPdf() && notes.value(QStringLiteral("locked")).toBool();
-    // Its to-dos (added 2026-10 with qt/todos: an entry without them is read again once; a plain PDF has none)
-    e->todosRead = notes.contains(QStringLiteral("todos")) || e->kind == QLatin1String("image") ||
-                   e->kind == QLatin1String("text") || e->pdfKind == PdfKind::Plain;
+    // Its to-dos
     for (const auto& v: notes.value(QStringLiteral("todos")).toArray()) {
         const QCborMap m = v.toMap();
         Todo t;
@@ -702,9 +671,7 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
             e->todos.push_back(std::move(t));
         }
     }
-    // Its tags (added 2026-10 with qt/tags: an entry without them is read again once; a plain PDF: only its keywords)
-    e->tagsRead = notes.contains(QStringLiteral("tags")) || e->kind == QLatin1String("image") ||
-                  e->kind == QLatin1String("text");
+    // Its tags
     for (const auto& v: notes.value(QStringLiteral("tags")).toArray()) {
         e->textTags << v.toString();
     }
@@ -712,12 +679,9 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
         e->pdfTags << v.toString();
     }
     if (e->showsPdfPages()) {
-        // Its PDF's title (added 2026-09: an entry without it is read once more, without its PDF text)
-        e->titleRead = notes.contains(QStringLiteral("title"));
+        // Its PDF's title
         e->title = notes.value(QStringLiteral("title")).toString();
         e->heading = notes.value(QStringLiteral("heading")).toString();
-    }
-    if (e->showsPdfPages()) {
         const QCborMap t = text.toMap();
         if (t.value(QStringLiteral("stamp")).toString() == e->pdfStamp && !e->pdfStamp.isEmpty()) {
             const QCborMap pages = t.value(QStringLiteral("pages")).toMap();
@@ -893,80 +857,6 @@ void LibraryIndex::removeEmptyMirrors(fs::path dir) const {
     }
 }
 
-// --- the layout before the packs
-
-bool LibraryIndex::hasOldLayout(const fs::path& dir) {
-    std::error_code ec;
-    return !dir.empty() && (fs::is_directory(dir / "index", ec) || fs::is_directory(dir / "previews", ec) ||
-                            fs::exists(dir / "pages.json", ec));
-}
-
-void LibraryIndex::convertOldLayout(const fs::path& dir) {
-    pool->start([this, dir] { convert(dir); });
-}
-
-void LibraryIndex::convert(const fs::path& dir) {
-    // The index: "index/<hash>.json" per document, format 3, paths relative to the library
-    std::map<fs::path, std::vector<EntryPtr>> byFolder;
-    std::error_code ec;
-    for (auto it = fs::directory_iterator(dir / "index", ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
-        if (it->path().extension() != ".json") {
-            continue;
-        }
-        QFile f(qstr(it->path()));
-        if (!f.open(QIODevice::ReadOnly)) {
-            continue;
-        }
-        const QJsonObject json = QJsonDocument::fromJson(f.readAll()).object();
-        const fs::path rel = toPath(json["file"].toString());
-        if (json["format"].toInt() != 3 || rel.empty() || rel.is_absolute()) {
-            continue;  // (another format: read again, as it would have been)
-        }
-        const fs::path file = (rootDir / rel).lexically_normal();
-        if (std::error_code fec; !fs::exists(file, fec) || !where.contains(file)) {
-            continue;
-        }
-        auto e = std::make_shared<Entry>();
-        e->file = file;
-        const std::string ext = file.extension().string();
-        e->kind = ext == ".xopp" || ext == ".xoj" ? QStringLiteral("xopp") : QStringLiteral("pdf");
-        e->name = json["name"].toString();
-        e->xoppStamp = json["xoppStamp"].toString();
-        const fs::path pdf = toPath(json["pdf"].toString());
-        e->pdf = pdf.empty() || pdf.is_absolute() ? pdf : (rootDir / pdf).lexically_normal();
-        e->pdfStamp = json["pdfStamp"].toString();
-        const QJsonObject pdfText = json["pdfText"].toObject();
-        for (auto t = pdfText.begin(); t != pdfText.end(); ++t) {
-            e->pdfText[t.key().toInt()] = t.value().toString();
-        }
-        for (const auto& page: json["pages"].toArray()) {
-            const QJsonObject o = page.toObject();
-            e->pdfPage.push_back(o["pdf"].toInt(-1));
-            e->elementText << o["text"].toString();
-            e->aspects.push_back(o["aspect"].toDouble());
-        }
-        e->titleRead = !e->showsPdfPages();
-        byFolder[file.parent_path()].push_back(std::move(e));
-    }
-    for (const auto& [folder, entries]: byFolder) {
-        load(folder);
-        std::lock_guard lock(mtx);
-        for (const auto& e: entries) {
-            if (!find(e->file)) {  // (packs written since win)
-                put(e);
-            }
-        }
-    }
-    // The previews: "previews/<hash>.png", named by the document's path and files
-    PreviewCache::convertOldFiles(dir / "previews", DocumentFiles::scanRecursive(rootDir));
-    // Written: the old files go (only those)
-    const bool written = writeChanged();
-    if (PreviewCache::flush() && written) {
-        Packs::removeOldLayout(dir);
-        ++conversions;
-    }
-}
-
 // --- reading documents
 
 std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item, const EntryPtr& previous) {
@@ -1051,14 +941,8 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
     }
     ++docsRead;
     if (e->isPdf()) {
-        // What it is: its marker was read to open it (remembered: not read again); a text document is also seen in
-        // the document it carries
-        Document* carried = loaded.hybrid ? loaded.document.get() : nullptr;
-        std::shared_lock<Document> lock;
-        if (carried) {
-            lock = std::shared_lock<Document>(*carried);
-        }
-        e->pdfKind = kindOfPdf(e->file, carried);
+        // What it is: its marker was read to open it (remembered: not read again)
+        e->pdfKind = kindOfPdf(e->file);
         e->versions = versionsOfPdf(e->file);
     }
     if (!loaded.document) {
@@ -1090,12 +974,11 @@ int firstPdfPage(const std::vector<int>& pdfPage) {
 }  // namespace
 
 void LibraryIndex::fillTitle(Entry& e, const EntryPtr& donor) {
-    e.titleRead = true;
     const int page = firstPdfPage(e.pdfPage);
     if (page < 0 || e.pdf.empty()) {
         return;
     }
-    if (donor && donor->titleRead && donor->pdf == e.pdf && donor->pdfStamp == e.pdfStamp &&
+    if (donor && donor->pdf == e.pdf && donor->pdfStamp == e.pdfStamp &&
         firstPdfPage(donor->pdfPage) == page) {
         e.title = donor->title;
         e.heading = donor->heading;
@@ -1178,8 +1061,6 @@ bool LibraryIndex::fillPages(Entry& e, Document& doc, const EntryPtr& donor, boo
         }
     }
     numberTodos(e);
-    e.todosRead = true;
-    e.tagsRead = true;  // (the keywords of its PDF: fillPdfTags)
     return true;
 }
 
@@ -1188,7 +1069,7 @@ void LibraryIndex::fillPdfTags(Entry& e, const EntryPtr& donor) {
     if (e.pdf.empty()) {
         return;
     }
-    if (donor && donor->tagsRead && donor->pdf == e.pdf && donor->pdfStamp == e.pdfStamp && !e.pdfStamp.isEmpty()) {
+    if (donor && donor->pdf == e.pdf && donor->pdfStamp == e.pdfStamp && !e.pdfStamp.isEmpty()) {
         e.pdfTags = donor->pdfTags;
         return;
     }
@@ -1248,7 +1129,7 @@ bool LibraryIndex::documentProtected(const fs::path& file) {
     e->sample = contentSample(item.main());
     e->locked = true;
     if (e->isPdf()) {
-        e->pdfKind = kindOfPdf(e->file, nullptr);  // (what it is: not read again for it)
+        e->pdfKind = kindOfPdf(e->file);  // (what it is: not read again for it)
     }
     std::lock_guard lock(mtx);
     auto f = folders.find(item.main().parent_path());
@@ -1296,13 +1177,14 @@ bool LibraryIndex::documentSaved(const fs::path& file, Document& doc, const std:
     }
     // The keywords of its PDF: as before when it did not change (else read now: only its trailer and information)
     fillPdfTags(*e, previous);
-    // The title of its PDF as before (else the next update reads it)
-    e->titleRead = !e->showsPdfPages();
-    if (previous && previous->titleRead && previous->pdf == e->pdf && previous->pdfStamp == e->pdfStamp &&
-        firstPdfPage(previous->pdfPage) == firstPdfPage(e->pdfPage)) {
+    // The title of its PDF as before (else the next update reads the document)
+    if (e->showsPdfPages()) {
+        if (!previous || previous->pdf != e->pdf || previous->pdfStamp != e->pdfStamp ||
+            firstPdfPage(previous->pdfPage) != firstPdfPage(e->pdfPage)) {
+            return false;
+        }
         e->title = previous->title;
         e->heading = previous->heading;
-        e->titleRead = true;
     }
     lock.unlock();
     std::lock_guard entriesLock(mtx);
@@ -1348,22 +1230,21 @@ LibraryIndex::EntryPtr LibraryIndex::movedHere(const DocumentItem& item, std::mu
     if (key.isEmpty()) {
         return nullptr;
     }
-    // The same size and time: the same file if it has the same name, or the same content (two different files can
-    // have the same size and time; entries without a sample are only found by their name)
+    // The same size and time and the same content (two different files can have the same size and time), the one
+    // with the same name first
     const auto [from, to] = orphans.equal_range(key);
     auto match = to;
     QString sample;
     for (auto it = from; it != to; ++it) {
         const EntryPtr& old = it->second;
         const bool sameName = old->file.filename() == file.filename();
-        if (!old->sample.isEmpty()) {
-            if (sample.isEmpty()) {
-                sample = contentSample(file);
-            }
-            if (old->sample != sample) {
-                continue;
-            }
-        } else if (!sameName) {
+        if (old->sample.isEmpty()) {
+            continue;
+        }
+        if (sample.isEmpty()) {
+            sample = contentSample(file);
+        }
+        if (old->sample != sample) {
             continue;
         }
         if (match == to || sameName) {
@@ -1475,26 +1356,6 @@ void LibraryIndex::run(std::vector<DocumentItem> items, quint64 gen) {
                 std::lock_guard lock(mtx);
                 put(current);
             }
-        } else if (current && current->onlyMetaMissing(item)) {
-            // An entry from before titles and kinds were kept: only its PDF's title is read (PdfTitle.h), and what
-            // the PDF is (its marker: qpdf reads the trailer, the catalog and the marker), not the document
-            auto completed = std::make_shared<Entry>(*current);
-            if (!completed->titleRead) {
-                fillTitle(*completed, nullptr);
-                ++titleReads;
-            }
-            if (completed->pdfKindMissing()) {
-                completed->pdfKind = kindOfPdf(completed->file, nullptr);
-                completed->versions = versionsOfPdf(completed->file);
-                ++kindReads;
-            }
-            if (!completed->tagsRead) {
-                fillPdfTags(*completed, nullptr);  // (a plain PDF: its keywords are its tags)
-                completed->tagsRead = true;
-                ++keywordReads;
-            }
-            std::lock_guard lock(mtx);
-            put(std::move(completed));
         } else if (auto fresh = read(item, current)) {
             std::error_code ec;
             if (fs::exists(file, ec)) {

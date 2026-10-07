@@ -13,8 +13,7 @@
  * hand is AppController's (AppToolbox.cpp). Stored as JSON in the settings (`toolbox` in the xournalQt part), per
  * device; a change is written after a short pause (dragging a width slider writes once).
  *
- * The JSON (version 2; version 1 of 0.7.0 had the user's entries alone, as "entries", and is upgraded: its entries
- * become the rail's start, the app tools follow them, the top bar gets its first layout):
+ * The JSON (version 2; another version gives the first layout):
  *   {"version":2,"active":"e3","recent":["e3","e1"],
  *    "rail":[
  *     {"id":"e1","type":"pen","color":"#2b2b2b","role":"body","width":1.41,"lineStyle":"plain",
@@ -54,9 +53,7 @@ namespace xqt {
 class ToolboxModel final: public QObject {
     Q_OBJECT
     /// The rail's items in their order: [{id, type, …} | {id, app} | {id, divider: true} | {id, group: true, members,
-    /// last}] (the name of before: the rail was all there was)
-    Q_PROPERTY(QVariantList entries READ entries NOTIFY changed)
-    /// The same: the rail's items
+    /// last}]
     Q_PROPERTY(QVariantList rail READ entries NOTIFY changed)
     /// The top bar's items (the same kinds)
     Q_PROPERTY(QVariantList top READ topItems NOTIFY changed)
@@ -181,8 +178,6 @@ public:
     Q_INVOKABLE QVariantMap prefill(const QString& type) const;
     /// The entry of this type used most recently ("": none of that type); "pen" also finds a shape on the pen
     Q_INVOKABLE QString recentOfType(const QString& type) const;
-    /// Of these entries, the one used most recently (none used: the first)
-    Q_INVOKABLE QString recentAmong(const QStringList& ids) const;
     /// Back to the first tools and the first layout of both bars
     Q_INVOKABLE void reset();
     /// Back to the first layout of both bars; the user's tools stay (on the rail, in their order, out of their groups)

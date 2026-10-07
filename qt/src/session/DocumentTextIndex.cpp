@@ -37,7 +37,8 @@ DocumentTextIndex::Seeder& seeder() {
     static DocumentTextIndex::Seeder s;
     return s;
 }
-int startDelayMs = 2000;
+/// How long after opening the missing PDF text is read (a search starts it at once)
+constexpr int START_DELAY_MS = 2000;
 /// The vocabularies of PDF text are made in the background (setWordsInBackground)
 bool wordsInBackground = false;
 /// The indexes there are (UI thread)
@@ -429,7 +430,6 @@ void DocumentTextIndex::Worker::drain(const std::shared_ptr<Worker>& w) {
 // --- the index -------------------------------------------------------------------------------------------------
 
 void DocumentTextIndex::setSeeder(Seeder s) { seeder() = std::move(s); }
-void DocumentTextIndex::setStartDelay(int ms) { startDelayMs = ms; }
 
 void DocumentTextIndex::setWordsInBackground(bool on) {
     wordsInBackground = on;
@@ -446,7 +446,7 @@ DocumentTextIndex::DocumentTextIndex(DocumentSession& session): session(session)
     registerListener(&session);
     startTimer.setSingleShot(true);
     connect(&startTimer, &QTimer::timeout, this, &DocumentTextIndex::start);
-    startTimer.start(startDelayMs);
+    startTimer.start(START_DELAY_MS);
     // Edited pages are read again once the edits pause
     dirtyTimer.setSingleShot(true);
     dirtyTimer.setInterval(300);

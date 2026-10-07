@@ -138,8 +138,7 @@ public:
     /// folder, next to the cache mode.
     ShowFilter showFilter() const;
     void setShowFilter(const ShowFilter& filter) const;
-    /// The reading positions (DocumentPlaces) of its documents. The ones kept in the library's
-    /// ".xournal_library/pages.json" before are taken over the first time.
+    /// The reading positions (DocumentPlaces) of its documents: "pages.json" in its config folder.
     fs::path placesFile() const;
     /// The file or folder is in the library.
     bool contains(const fs::path& p) const;
@@ -190,15 +189,6 @@ public:
     /// Stop: forget what is not written yet, and write or index nothing any more (its cache is being removed).
     void discard();
 
-    /// The cache folder has files of the layout before the packs ("index/", "previews/", "pages.json").
-    static bool hasOldLayout(const fs::path& dir);
-    /// Convert them, in the background before the next update: the index entries (one JSON file per document)
-    /// and the previews (PNG files) go into the packs of the documents' folders, nothing is read again. Once the
-    /// packs are written, the old files are removed ("index/", "previews/", "pages.json" - which the library
-    /// took over into the config folder when it was opened -, nothing else).
-    void convertOldLayout(const fs::path& dir);
-    /// Old caches converted so far (tests).
-    int oldLayoutsConverted() const { return conversions.load(); }
     /// How long writes wait for more changes (tests; default: WriteScheduler's).
     void setWriteDelays(int quietMs, int maxDelayMs);
     const CacheLocation& location() const { return where; }
@@ -206,12 +196,6 @@ public:
     int documentsRead() const { return docsRead.load(); }
     int pdfPagesRead() const { return pdfRead.load(); }
     int packsWritten() const { return packWrites.load(); }
-    /// PDF titles read for entries that had none (PdfTitle.h; tests).
-    int titlesRead() const { return titleReads.load(); }
-    /// Kinds of PDFs read for entries that had none (only their marker; tests).
-    int pdfKindsRead() const { return kindReads.load(); }
-    /// Keywords of plain PDFs read for entries that had no tags (only their keywords; tests).
-    int keywordsRead() const { return keywordReads.load(); }
     /// Called on the worker for each document of an update once it was found on disk, before its entry is looked at
     /// (tests: a move that lands just then). Set it while the index is idle.
     void setCheckHook(std::function<void(const fs::path&)> hook) { checkHook = std::move(hook); }
@@ -394,8 +378,9 @@ public:
     TitleSearch titleSearch(const QString& title, const QString& entry, int typos, double minScore = 0.5,
                             size_t max = 20, const std::set<fs::path>& exclude = {}) const;
 
-    /// Format of the stored entries (packs of another one are read anew).
-    static constexpr int FORMAT = 4;
+    /// Format of the stored entries: packs of another format are not read; their documents are read anew and the
+    /// packs written over.
+    static constexpr int FORMAT = 5;
     /// Text files up to this size are indexed with their text, bigger ones by name only.
     static constexpr qint64 TEXT_LIMIT = 1024 * 1024;
     /// The packs of a folder's cache
@@ -416,8 +401,8 @@ private:
         QString xoppStamp;               ///< of the .xopp, the Markdown file, the image alone ("": a PDF alone)
         fs::path pdf;                    ///< the PDF it uses (next to it, elsewhere, attached; "": none)
         QString pdfStamp;
-        QString sample;                  ///< a hash of the start and end of its main file ("": not known, entries
-                                         ///< of older versions): tells two files with the same size and time apart
+        QString sample;                  ///< a hash of the start and end of its main file ("": it could not be
+                                         ///< read): tells two files with the same size and time apart
         /// Content hashes (contentHash) of its own file (the one of `xoppStamp`) and of its PDF ("": not computed
         /// yet; filled in the background after the documents are indexed): an entry whose files have another time
         /// but the same size and content is taken over instead of reading them again (adopt).
@@ -432,31 +417,21 @@ private:
         QStringList links;               ///< link targets (for backlinks)
         QStringList wikiLinks;           ///< [[wiki link]] targets
         /// Its bookmarks (qt/docs/bookmarks.md): page -> label ("": the automatic one). Stored in "notes" when there
-        /// are any; entries of older versions have none (their files had none: a file changed since is read again).
+        /// are any.
         std::map<int, QString> bookmarks;
-        /// The links of its Markdown boxes were read (notes indexed before links were: read again once, without
-        /// their PDF text)
-        bool linksRead = true;
         /// Its to-dos (task lines of its Markdown, qt/docs/todos.md), without their file. Stored in "notes".
         std::vector<Todo> todos;
-        /// They were read (entries of documents indexed before to-dos were: read again once, without their PDF text)
-        bool todosRead = true;
         /// Its tags (qt/docs/tags.md): of its text (`#tag`), and the keywords of its PDF (kept with the PDF's stamp).
         /// Stored in "notes".
         QStringList textTags, pdfTags;
-        /// They were read (entries of documents indexed before tags were: read again once, without their PDF text; a
-        /// plain PDF: only its keywords)
-        bool tagsRead = true;
         /// Both, each once
         QStringList tags() const;
         /// Its PDF's title (PdfTitle.h): the /Title if it looks like one, and the largest text of the first page it
         /// shows. Kept with its PDF's stamp in "notes".
         QString title;
         QString heading;
-        /// They were read (entries of PDFs indexed before titles were: only the title is read, once)
-        bool titleRead = true;
-        /// Its main file is a PDF: what it is (plain, with notes, a text document, an archive PDF). Unknown in entries
-        /// of PDFs indexed before kinds were kept: then only the kind is read, once (from the PDF's marker).
+        /// Its main file is a PDF: what it is (plain, with notes, a text document, an archive PDF). Unknown for other
+        /// documents.
         PdfKind pdfKind = PdfKind::Unknown;
         /// A PDF with notes that keeps its versions (version history, PdfHistory.h): how many, read with its kind
         /// from the marker's /History (never the list itself); 0: it keeps none. Stored in "notes".
@@ -465,13 +440,10 @@ private:
         /// in "notes".
         bool locked = false;
         bool isPdf() const;
-        bool pdfKindMissing() const;
         int pageCount() const { return static_cast<int>(elementText.size()); }
         bool showsPdfPages() const;
         /// Nothing changed since it was read.
         bool upToDate(const DocumentItem& item) const;
-        /// Nothing changed, but its PDF's title or kind was never read (an entry from before they were kept).
-        bool onlyMetaMissing(const DocumentItem& item) const;
     };
     using EntryPtr = std::shared_ptr<const Entry>;
     /// The vocabularies of an entry: per passage (a Markdown or text file), else per page (Vocabulary.h).
@@ -511,7 +483,7 @@ private:
     void erase(const fs::path& file);
     /// An entry of a file that is gone whose files have the same size and time as this document's, taken over under
     /// its path (moved or renamed by another program, or by the app before the index was told): one with the same
-    /// name, else one with the same sample (without a sample: only by name). Orphans by kind and stamp.
+    /// sample, the one with the same name first. Orphans by kind and stamp.
     EntryPtr movedHere(const DocumentItem& item, std::multimap<QString, EntryPtr>& orphans, bool& collected);
     /// The entry with the stamps of the files as they are now, if they differ from its stamps only in time (same
     /// size, same content hash): its handwriting and preview follow. Null when it cannot be taken over (the lock is
@@ -523,7 +495,6 @@ private:
     bool writeChanged();
     /// Remove `dir` and its parents while they are empty folders in the library's folder in the app cache.
     void removeEmptyMirrors(fs::path dir) const;
-    void convert(const fs::path& dir);
     QCborMap notesOf(const Entry& e) const;
     /// The task lines of a Markdown text into `e`'s to-dos: of a box (`text`) on page `page`, or of a Markdown file
     /// (page and box -1, no text)
@@ -559,8 +530,7 @@ private:
     std::atomic<bool> running{false};
     std::atomic<bool> discarded{false};
     std::atomic<int> doneCount{0}, totalCount{0};
-    std::atomic<int> docsRead{0}, pdfRead{0}, packWrites{0}, conversions{0}, handedOver{0}, titleReads{0},
-            kindReads{0}, keywordReads{0}, adoptions{0}, hashCount{0};
+    std::atomic<int> docsRead{0}, pdfRead{0}, packWrites{0}, handedOver{0}, adoptions{0}, hashCount{0};
     std::function<void(const fs::path&)> checkHook;
 };
 

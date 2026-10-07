@@ -24,7 +24,7 @@
 #include "CanvasView.h"
 #include "MarkdownEditor.h"
 #include "MdBox.h"
-#include "TextFlow.h"
+#include "session/PageMargins.h"
 
 namespace xqt {
 
@@ -86,8 +86,8 @@ MarkdownBoxResize::~MarkdownBoxResize() = default;
 
 bool MarkdownBoxResize::isPageText(const PageRef& page, const Text& text) {
     const auto& at = text.getTransformation().shift;
-    const double left = TextFlow::styleFor(page, TextFlow::Style{}).leftMargin;
-    return std::abs(at.x - left) < 0.5 && std::abs(at.y - TextFlow::MARGIN) < 0.5;
+    const double left = PageMargins::of(page).left;
+    return std::abs(at.x - left) < 0.5 && std::abs(at.y - PageMargins::FULL) < 0.5;
 }
 
 const Text* MarkdownBoxResize::selectedBox() const {

@@ -38,7 +38,6 @@ struct VorbisWriter::State {
     int rate = 0;
     int64_t samples = 0;
     int64_t pagedAt = 0;  ///< samples given when a page was last written
-    uint64_t bytes = 0;
     bool failed = false;
     std::string error;
 
@@ -49,7 +48,6 @@ struct VorbisWriter::State {
             error = "Could not write the recording (disk full?)";
             return false;
         }
-        bytes += static_cast<uint64_t>(og.header_len + og.body_len);
         return true;
     }
 
@@ -198,8 +196,6 @@ bool VorbisWriter::close() {
 int VorbisWriter::sampleRate() const { return s ? s->rate : 0; }
 
 int64_t VorbisWriter::samplesWritten() const { return s ? s->samples : 0; }
-
-uint64_t VorbisWriter::bytesWritten() const { return s ? s->bytes : 0; }
 
 const std::string& VorbisWriter::error() const {
     static const std::string none;

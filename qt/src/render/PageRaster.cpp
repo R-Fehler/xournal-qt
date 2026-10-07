@@ -210,7 +210,6 @@ void PageRaster::renderToBuffer(cairo_t* cr, const RasterParams&, bool backgroun
     PdfCache* pdfCache = host->rasterPdfCache(background);
 
     DocumentView localView;
-    localView.setMarkAudioStroke(host->rasterMarkAudioStrokes());
     localView.setPdfCache(pdfCache);
     xoj::view::BackgroundFlags flags = xoj::view::BACKGROUND_SHOW_ALL;
 

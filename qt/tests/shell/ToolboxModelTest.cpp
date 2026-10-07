@@ -1,8 +1,7 @@
 /*
  * xournal-qt: the toolbox's tools and the arrangement of both bars (ToolboxModel, qt/docs/toolbox.md): the defaults,
  * entries added, changed, moved, replaced and removed, dividers, the app's items (one home each), groups, the colors of
- * roles, what "+" prefills, the most recent entry of a type, the JSON (and its upgrade from 0.7.0) and its debounced
- * writes.
+ * roles, what "+" prefills, the most recent entry of a type, the JSON and its debounced writes.
  *
  * @license GNU GPLv2 or later
  */
@@ -242,12 +241,12 @@ TEST(ToolboxModel, storedAsJsonAfterAPause) {
     EXPECT_EQ(future.tools().size(), 10);
     // Without an eraser: one is added; unknown tools are left out; dividers tidied
     ToolboxModel odd([] {
-        return QString(R"({"version":1,"entries":[{"divider":true,"id":"d1"},{"type":"pen","id":"e1"},)"
+        return QString(R"({"version":2,"rail":[{"divider":true,"id":"d1"},{"type":"pen","id":"e1"},)"
                        R"({"type":"ufo","id":"e2"},{"divider":true,"id":"d2"},{"divider":true,"id":"d3"},)"
                        R"({"type":"pen","id":"e1"}]})");
     }, nullptr);
     EXPECT_EQ(typesOf(odd.entries()),
-              QStringList({"pen", "|", "pen", "eraser", "|", "@hand", "@select", "@snip", "@pdfText"}));
+              QStringList({"pen", "|", "pen", "eraser"}));
     const QStringList ids = idsOf(odd.entries());
     EXPECT_EQ(QSet<QString>(ids.begin(), ids.end()).size(), ids.size()) << "ids unique";
 }
@@ -293,38 +292,10 @@ TEST(ToolboxModel, theTopBarHasItsFirstLayout) {
     EXPECT_EQ(QSet<QString>(ids.begin(), ids.end()).size(), ids.size()) << "ids unique over both bars";
 }
 
-// 0.7.0 stored the user's entries alone (version 1): they become the rail's start, the app's tools follow them, the
-// top bar gets its first layout; the tool in hand and the order of use stay
-TEST(ToolboxModel, theToolboxOf070IsUpgraded) {
-    const QString v1 = R"({"version":1,"active":"e9","recent":["e9","e2"],"entries":[)"
-                       R"({"id":"e2","type":"pen","color":"#123456","role":"","width":2.26,"lineStyle":"dash"},)"
-                       R"({"id":"d3","divider":true},)"
-                       R"({"id":"e5","type":"eraser","variant":"whiteout","width":8.5},)"
-                       R"({"id":"e9","type":"highlighter","role":"keyTerms","color":"#ffe066","width":8.5},)"
-                       R"({"id":"e12","type":"snip","variant":"lasso"}]})";
-    QString stored = v1;
-    ToolboxModel m([&] { return stored; }, [&](const QString& json) { stored = json; });
-    EXPECT_EQ(typesOf(m.entries()), QStringList({"pen", "|", "eraser", "highlighter", "snip", "|", "@hand", "@select",
-                                                 "@snip", "@pdfText"}));
-    EXPECT_EQ(idsOf(m.entries()).mid(0, 5), QStringList({"e2", "d3", "e5", "e9", "e12"})) << "the ids stay";
-    EXPECT_EQ(m.entry("e2").value("color"), "#123456");
-    EXPECT_EQ(m.entry("e2").value("lineStyle"), "dash");
-    EXPECT_EQ(m.active(), "e9");
-    EXPECT_EQ(m.recentOfType("pen"), "e2");
-    EXPECT_EQ(typesOf(m.topItems()).first(), "@open");
-    EXPECT_EQ(m.topItems().size(), ToolboxModel(nullptr, nullptr).topItems().size());
-    // Written as version 2, read again the same
-    m.setActive("e5");
-    m.flush();
-    EXPECT_TRUE(stored.contains(R"("version":2)")) << stored.toStdString();
-    EXPECT_FALSE(stored.contains(R"("entries")"));
-    ToolboxModel again([&] { return stored; }, nullptr);
-    EXPECT_EQ(again.entries(), m.entries());
-    EXPECT_EQ(again.topItems(), m.topItems());
-    EXPECT_EQ(again.active(), "e5");
-    // Broken or unknown: the first layout
+// JSON that is broken, without tools, or of another version: the first layout
+TEST(ToolboxModel, unknownJsonGivesTheFirstLayout) {
     for (const char* json: {"{nonsense", R"({"version":2})", R"({"version":2,"rail":[{"app":"hand"}],"top":[]})",
-                            R"({"version":3,"rail":[{"type":"pen"}]})"}) {
+                            R"({"version":3,"rail":[{"type":"pen"}]})", R"({"version":1,"entries":[{"type":"pen"}]})"}) {
         ToolboxModel broken([json] { return QString(json); }, nullptr);
         EXPECT_EQ(broken.entries(), ToolboxModel(nullptr, nullptr).entries()) << json;
     }
@@ -539,7 +510,6 @@ TEST(ToolboxApply, anEntryGivesTheToolAllItsSettings) {
     m->update(text, {{"font", QVariantMap{{"size", 17}}}});
     ASSERT_TRUE(c.applyToolEntry(text));
     EXPECT_EQ(c.tool(), "text");
-    EXPECT_TRUE(c.textMarkdown());
     EXPECT_DOUBLE_EQ(c.markdownFontSize(), 17);
 
     ASSERT_TRUE(c.applyToolEntry(nth(m, "laser")));
@@ -615,68 +585,27 @@ TEST(ToolboxApply, aSnipEntryArmsTheSnipAndTheToolBeforeStaysTheActiveEntry) {
     c.shutdown();
 }
 
-TEST(ToolboxApply, theFirstToolsComeFromTheToolsOfBefore) {
-    AppController c;
-    c.selectTool("pen");
-    c.setColor(QColor("#336699"));
-    c.setCustomWidth(2.26);
-    qobject_cast<SettingsModel*>(c.settingsModel())->set("eraserMode", "deleteStroke");
-    ToolboxModel fromBefore([&c] { return c.migratedToolbox(); }, nullptr);
-    const QVariantMap pen = fromBefore.tools()[0].toMap();
-    EXPECT_EQ(pen.value("color"), "#336699");
-    EXPECT_EQ(pen.value("role"), "") << "a color of one's own";
-    EXPECT_DOUBLE_EQ(pen.value("width").toDouble(), 2.26);
-    EXPECT_EQ(fromBefore.entry(fromBefore.recentOfType("eraser")).value("variant"), "deleteStroke");
-    EXPECT_EQ(fromBefore.tools().size(), 10);
-    qobject_cast<SettingsModel*>(c.settingsModel())->set("eraserMode", "default");
-    c.shutdown();
-}
-
-// 0.8.0 removed the classic tool bar: a settings file of before (toolbarMode "classic", or nothing, and no toolbox yet)
-// gets the toolbox, whose first tools carry the pen's color and width, the eraser's kind and the text box's font of
-// before; the tool in hand at the start is the toolbox's, and the keys take its entries
-TEST(ToolboxApply, aSettingsFileOfTheClassicToolBarGetsTheToolboxWithTheToolsOfBefore) {
-    for (const char* mode: {"classic", ""}) {
-        {
-            AppController before;
-            before.toolboxModel()->flush();
-            before.selectTool("pen");
-            before.setColor(QColor("#336699"));
-            before.setCustomWidth(2.26);
-            before.setMarkdownFontSize(17);
-            qobject_cast<SettingsModel*>(before.settingsModel())->set("eraserMode", "deleteStroke");
-            Settings* s = before.context().getSettings();
-            before.shutdown();
-            // (what 0.7.0 wrote with the classic tool bar: its mode, no toolbox)
-            s->getCustomElement("xournalQt").setString("toolbarMode", mode);
-            s->getCustomElement("xournalQt").setString("toolbox", "");
-            s->save();
-        }
-        AppController after;
-        ToolboxModel* m = after.toolboxModel();
-        const QVariantMap pen = m->entry(nth(m, "pen"));
-        EXPECT_EQ(pen.value("color"), "#336699") << mode;
-        EXPECT_EQ(pen.value("role"), "") << mode;
-        EXPECT_DOUBLE_EQ(pen.value("width").toDouble(), 2.26) << mode;
-        EXPECT_EQ(m->entry(nth(m, "eraser")).value("variant"), "deleteStroke") << mode;
-        EXPECT_DOUBLE_EQ(m->entry(nth(m, "text")).value("font").toMap().value("size").toDouble(), 17) << mode;
-        EXPECT_EQ(m->tools().size(), 10) << mode << ": the first tools";
-        // The pen in hand is the toolbox's first pen
-        EXPECT_EQ(m->active(), nth(m, "pen")) << mode;
-        EXPECT_EQ(after.tool(), "pen") << mode;
-        EXPECT_EQ(after.color(), QColor("#336699")) << mode;
-        EXPECT_DOUBLE_EQ(after.customWidth(), 2.26) << mode;
-        // E and T: the toolbox's eraser and text box
-        after.takeToolOfType("eraser");
-        EXPECT_EQ(after.tool(), "eraser") << mode;
-        EXPECT_EQ(m->active(), nth(m, "eraser")) << mode;
-        EXPECT_EQ(qobject_cast<SettingsModel*>(after.settingsModel())->get("eraserMode"), "deleteStroke") << mode;
-        after.takeToolOfType("text");
-        EXPECT_EQ(after.tool(), "text") << mode;
-        EXPECT_DOUBLE_EQ(after.markdownFontSize(), 17) << mode;
-        // (the next tests of this run start from the first tools)
-        qobject_cast<SettingsModel*>(after.settingsModel())->set("eraserMode", "default");
-        m->reset();
-        after.shutdown();
+// A settings file without a toolbox (a first start) gets the first tools; the tool in hand at the start is the
+// toolbox's first pen, and the keys take its entries
+TEST(ToolboxApply, aSettingsFileWithoutAToolboxGetsTheFirstTools) {
+    {
+        AppController before;
+        Settings* s = before.context().getSettings();
+        before.shutdown();
+        s->getCustomElement("xournalQt").setString("toolbox", "");
+        s->save();
     }
+    AppController after;
+    ToolboxModel* m = after.toolboxModel();
+    EXPECT_EQ(m->entries(), ToolboxModel(nullptr, nullptr).entries());
+    EXPECT_EQ(m->tools().size(), 10);
+    EXPECT_EQ(m->active(), nth(m, "pen"));
+    EXPECT_EQ(after.tool(), "pen");
+    // E and T: the toolbox's eraser and text box
+    after.takeToolOfType("eraser");
+    EXPECT_EQ(after.tool(), "eraser");
+    EXPECT_EQ(m->active(), nth(m, "eraser"));
+    after.takeToolOfType("text");
+    EXPECT_EQ(after.tool(), "text");
+    after.shutdown();
 }

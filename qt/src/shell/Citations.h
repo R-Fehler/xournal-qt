@@ -42,8 +42,6 @@ class Citations final: public QObject {
     Q_PROPERTY(bool arxivWaiting READ arxivWaiting NOTIFY arxivChanged)
     /// What happened last: an error, or "" (the UI says what runs)
     Q_PROPERTY(QString arxivError READ arxivError NOTIFY arxivChanged)
-    /// The file the last download went to (or was there already); "" before
-    Q_PROPERTY(QString downloadedPath READ downloadedPath NOTIFY arxivChanged)
 public:
     /// `library`: the window's library (its index, its folders; may be null in tests).
     Citations(Settings& settings, LibraryModel* library, QObject* parent = nullptr);
@@ -117,14 +115,13 @@ public:
     bool arxivBusy() const { return busy > 0 || arxivWaiting(); }
     bool arxivWaiting() const;
     QString arxivError() const { return error; }
+    /// The file the last download went to (or was there already); "" before
     QString downloadedPath() const { return downloaded; }
 
 Q_SIGNALS:
     void arxivChanged();
     /// A paper was saved into the library (or was there already).
     void paperDownloaded(const QString& path);
-    /// A web address was opened (tests; the note).
-    void webOpened(const QString& url);
     void papersChanged();
 
 private:

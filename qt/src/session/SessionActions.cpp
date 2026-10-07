@@ -16,8 +16,6 @@ void SessionActions::enableAction(Action a, bool enable) {
 
 bool SessionActions::isActionEnabled(Action a) const { return enabled[static_cast<size_t>(a)]; }
 
-auto SessionActions::getActionState(Action a) const -> const State& { return states[static_cast<size_t>(a)]; }
-
 void SessionActions::setActionStateImpl(Action a, State state) {
     auto& s = states[static_cast<size_t>(a)];
     if (s != state) {

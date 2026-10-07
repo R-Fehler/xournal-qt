@@ -67,7 +67,6 @@ QString nameOf(SizeClass c) {
 
 namespace {
 constexpr std::array<double, 3> WIDTH_STEPS{600, 840, 1280};
-constexpr std::array<double, 2> HEIGHT_STEPS{560, 900};
 
 template <size_t N>
 int stepOf(double v, const std::array<double, N>& limits) {
@@ -158,12 +157,6 @@ QString AdaptiveLayout::widthClass() const {
     return names[static_cast<size_t>(widthStep)];
 }
 
-QString AdaptiveLayout::heightClass() const {
-    static const std::array<QString, 3> names{QStringLiteral("short"), QStringLiteral("medium"),
-                                              QStringLiteral("tall")};
-    return names[static_cast<size_t>(heightStep)];
-}
-
 bool AdaptiveLayout::phone() const {
     return current == SizeClass::PhonePortrait || current == SizeClass::PhoneShort || current == SizeClass::Tiny;
 }
@@ -221,7 +214,6 @@ void AdaptiveLayout::update() {
     const bool smooth = known && std::abs(w - width) <= 2 * hyst && std::abs(h - height) <= 2 * hyst;
     const SizeClass c = smooth ? adaptive::classAfter(current, w, h) : adaptive::classOf(w, h);
     const int ws = stepAfter(widthStep, w, WIDTH_STEPS, smooth);
-    const int hs = stepAfter(heightStep, h, HEIGHT_STEPS, smooth);
     const bool p = !smooth ? h > w : (portrait ? h + hyst > w : h > w + hyst);
     const bool room = !smooth ? w >= adaptive::SIDEBAR_ROOM_PX
                               : (sidebarRoom ? w + hyst >= adaptive::SIDEBAR_ROOM_PX
@@ -231,7 +223,6 @@ void AdaptiveLayout::update() {
     height = h;
     current = c;
     widthStep = ws;
-    heightStep = hs;
     portrait = p;
     sidebarRoom = room;
     Q_EMIT changed();

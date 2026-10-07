@@ -90,18 +90,13 @@ void remove(const fs::path& dir, const QString& pack);
 
 /// A pack file of a cache folder (also the files of big entries, and QSaveFile's temporary files).
 bool isOurs(const QString& fileName);
-/// A file or folder of the layout before the packs: "index/", "previews/", "pages.json" (at the library's root).
-bool isOldLayout(const QString& fileName);
-/// Remove the cache folder if nothing but packs are in it (e.g. its last document is gone; the old layout keeps
-/// it: it may not be converted yet). Returns whether it is gone.
+/// Remove the cache folder if nothing but packs are in it (e.g. its last document is gone). Returns whether it is
+/// gone.
 bool removeIfOnlyOurs(const fs::path& dir);
-/// Remove our files (packs and the old layout) from the cache folder, and the folder if nothing else is left.
-/// Returns the bytes removed.
+/// Remove our files (packs) from the cache folder, and the folder if nothing else is left. Returns the bytes removed.
 qint64 removeOurs(const fs::path& dir);
-/// Bytes of our files (packs and the old layout) in a cache folder; `files` counts them.
+/// Bytes of our files (packs) in a cache folder; `files` counts them.
 qint64 sizeOf(const fs::path& dir, int* files = nullptr);
-/// Remove the files of the old layout ("index/*.json", "previews/*.png", "pages.json"), nothing else.
-void removeOldLayout(const fs::path& dir);
 
 }  // namespace Packs
 

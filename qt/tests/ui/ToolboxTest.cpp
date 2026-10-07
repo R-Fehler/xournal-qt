@@ -2,7 +2,7 @@
  * xournal-qt: the toolbox in the real window (qt/docs/toolbox.md): the user's own tools in a rail docked to a side of
  * the canvas (right by default), undo and redo at its head, the app's tools (hand, select, snip, mark PDF text) lent to
  * it as items of the same arrangement; a tap picks a tool up, the rail scrolls when it is short (the same order on every
- * screen), the edge is chosen per window size. (The classic tool bar was removed in 0.8.0: the toolbox is the only one.)
+ * screen), the edge is chosen per window size.
  *
  * @license GNU GPLv2 or later
  */
@@ -363,7 +363,6 @@ protected:
         const double cell = box->property("cell").toDouble();
         SCOPED_TRACE(std::string(where) + ": " + s.text.toStdString());
         EXPECT_EQ(s.order, arranged()) << "the same order as arranged";
-        EXPECT_EQ(find("toolStack_" + tools()->active()), nullptr) << "nothing folded";
         EXPECT_GE(s.view, cell / 2);
         if (s.scrolls && s.room < cell * 1.5) {
             EXPECT_NEAR(s.view, s.room, 0.5) << "a room for one cell: all of it";
@@ -448,11 +447,6 @@ TEST_F(ToolboxTest, dockedAtTheRightWithUndoAndRedoTheToolsAndTheAppTools) {
         EXPECT_TRUE(inside(b, find("topBar"))) << name;
     }
     EXPECT_TRUE(shown(find("toolboxAddButton")));
-    // The classic tools are gone (0.8.0): the toolbox's entries are the pens, erasers, shapes, text boxes and notes
-    for (const char* name: {"penButton", "eraserButton", "shapeButton", "textButton", "stickyNoteButton",
-                            "colorStrip", "widthStrip"}) {
-        EXPECT_EQ(find(name), nullptr) << name;
-    }
     EXPECT_TRUE(shown(find("searchButton"))) << "the commands stay at the top";
 
     // An app tool on the rail is its button: a tap takes it
@@ -1259,8 +1253,6 @@ TEST_F(ToolboxTest, inFullScreenTheSameToolboxFloatsAndPresentingHidesIt) {
     });
     ASSERT_TRUE(shown(box));
     EXPECT_TRUE(box->property("floating").toBool());
-    EXPECT_EQ(find("quickToolSquare"), nullptr) << "the classic tool square is gone";
-    EXPECT_EQ(find("penPill"), nullptr);
     EXPECT_FALSE(shown(find("topTools")));
     const QRectF r = rectOf(box);
     EXPECT_NEAR(r.right(), window->width() - 8, 2) << "8 px off the right edge";
@@ -1316,7 +1308,6 @@ TEST_F(ToolboxTest, onAPhoneTheDockIsTheSameRailWithPlusAtItsEnd) {
     EXPECT_FALSE(shown(find("dockColorSlot")));
     EXPECT_TRUE(shown(find("toolboxUndoButton")));
     EXPECT_TRUE(shown(find("toolboxPageButton")));
-    EXPECT_EQ(find("toolboxAllButton"), nullptr) << "\"My tools\" is gone: the catalog (qt/top-bar)";
     EXPECT_FALSE(shown(find("toolboxAddButton"))) << "not pinned: its room goes to the tools";
     const QRectF dock = rectOf(box);
     EXPECT_GT(dock.top(), 800) << "at the bottom";
@@ -1606,7 +1597,6 @@ TEST_F(ToolboxTest, theCatalogAddsToEitherBar) {
         EXPECT_TRUE(entryOf(catalog, name)->property("offered").toBool()) << name;
     }
     EXPECT_EQ(entryOf(catalog, "catalog_open"), nullptr) << "on a bar: not offered";
-    EXPECT_EQ(entryOf(catalog, "toolPlace_hand"), nullptr) << "\"Put back\" is gone";
     trigger(catalog, "catalog_tags");
     const QString tags = tools()->idOfApp("tags");
     ASSERT_FALSE(tags.isEmpty());
@@ -1961,8 +1951,6 @@ protected:
         EXPECT_TRUE(canvas->property("readingOnly").toBool());
         EXPECT_FALSE(shown(find("toolbox"))) << "no tools";
         EXPECT_FALSE(shown(find("viewPill"))) << "no view pill";
-        EXPECT_EQ(find("readingPill"), nullptr) << "the reading pill is gone";
-        EXPECT_EQ(find("readOnlyMark"), nullptr) << "no lock (0.8.0)";
         EXPECT_TRUE(shown(find("zenDot"))) << "the dot";
         // The fields: a fifth of the width at each edge, the page's whole height
         auto* next = find("readingNextField");
@@ -2094,7 +2082,6 @@ TEST_F(ReadingTest, readOnlyIsASwitchOfItsOwn) {
     EXPECT_FALSE(zen()) << "not Zen";
     EXPECT_TRUE(shown(box)) << "the tools stay";
     EXPECT_TRUE(item->property("checked").toBool());
-    EXPECT_EQ(find("readOnlyMark"), nullptr) << "no lock";
     EXPECT_TRUE(shown(find("readingNextField"))) << "the edges turn the pages";
     const size_t before = ink();
     stroke();
@@ -2232,7 +2219,7 @@ TEST_F(ReadingTest, zenHidesEverythingButThePageAndTheDot) {
                 shortcuts->data(shortcuts->index(r, 0), keysRole).toString();
     }
     EXPECT_EQ(byId.value("zen"), "Ctrl+Alt+Z");
-    EXPECT_EQ(byId.value("readOnly"), "Ctrl+Alt+R");
+    EXPECT_EQ(byId.value("read"), "Ctrl+Alt+R");
 }
 
 // The dot's pill (qt/docs/zen.md): beside the dot over the page (the page does not move); Show controls, Read only, the

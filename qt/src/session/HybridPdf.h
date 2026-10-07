@@ -200,9 +200,6 @@ bool writeVersion(const fs::path& pdf, int id, const fs::path& out, std::string&
 /// Give version `id` a message (an empty one: none), or change it. Only the marker is written (appended, part of the
 /// current version: never a version of its own); it needs the file's last revision to be ours.
 bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, std::string& error);
-/// The file changed in a way that keeps its clean copy (only the marker): the cache entry of the version `was` serves
-/// the version it is now.
-void keepCacheEntry(const fs::path& pdf, const std::string& was);
 
 /// The revision of `pdf` that `cleanCopy` (the background of a document opened from it) was made from, if the file is
 /// still that version and was not edited in another app (else an invalid revision: the next save writes it in full).

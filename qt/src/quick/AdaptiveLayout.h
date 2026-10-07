@@ -59,10 +59,9 @@ class AdaptiveLayout: public QObject {  // (not final: QML derives from it)
     /// The class the layout follows: sizeClass, or desktopWide when adapting is off. The choices made by hand are kept
     /// per layoutClass.
     Q_PROPERTY(QString layoutClass READ layoutClass NOTIFY changed)
-    /// Width: "compact" (< 600), "medium" (< 840), "expanded" (< 1280), "wide"; height: "short" (< 560), "medium"
-    /// (< 900), "tall"; "portrait" (h > w) or "landscape". Each with the same hysteresis.
+    /// Width: "compact" (< 600), "medium" (< 840), "expanded" (< 1280), "wide"; "portrait" (h > w) or "landscape".
+    /// Each with the same hysteresis.
     Q_PROPERTY(QString widthClass READ widthClass NOTIFY changed)
-    Q_PROPERTY(QString heightClass READ heightClass NOTIFY changed)
     Q_PROPERTY(QString orientation READ orientation NOTIFY changed)
     /// A phone class (phonePortrait, phoneShort, tiny): the compact layouts
     Q_PROPERTY(bool phone READ phone NOTIFY changed)
@@ -92,7 +91,6 @@ public:
     QString sizeClass() const { return adaptive::nameOf(current); }
     QString layoutClass() const { return adapting ? sizeClass() : adaptive::nameOf(SizeClass::DesktopWide); }
     QString widthClass() const;
-    QString heightClass() const;
     QString orientation() const { return portrait ? QStringLiteral("portrait") : QStringLiteral("landscape"); }
     bool phone() const;
     bool roomForSidebar() const;
@@ -137,7 +135,6 @@ private:
     bool known = false;  ///< a size was taken (the first one is taken without hysteresis)
     SizeClass current = SizeClass::DesktopWide;
     int widthStep = 3;   ///< 0 compact, 1 medium, 2 expanded, 3 wide
-    int heightStep = 2;  ///< 0 short, 1 medium, 2 tall
     bool portrait = false;
     bool sidebarRoom = true;
     double width = 0;

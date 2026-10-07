@@ -70,7 +70,6 @@ public:
     quint64 serial() const { return number; }
     /// Pictures drawn so far (tests, XQT_PERF)
     int bodiesDrawn() const { return bodies; }
-    int displaysDrawn() const { return displays; }
 
 private:
     class Surface;
@@ -84,7 +83,6 @@ private:
     std::unique_ptr<xoj::view::GeometryToolView> bodyView;
     std::unique_ptr<xoj::view::GeometryToolView> displayView;
     int bodies = 0;
-    int displays = 0;
 };
 
 }  // namespace xqt

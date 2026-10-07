@@ -174,7 +174,6 @@ public:
     bool rotationAllowed() const;
     /// Shown where it may be turned (the canvas item: the reference beside the notes may not). Not: upright again.
     void setRotatable(bool on);
-    bool isRotatable() const { return rotatable; }
     /// Turn the canvas by `degrees` (a step: from a free angle to the next multiple), about the middle. False: not
     /// allowed here.
     bool rotateCanvasBy(double degrees);
@@ -276,8 +275,8 @@ public:
     /// Put the selection on the clipboard (upstream's "application/xournal" data, and the text of text elements).
     bool copySelection();
     bool cutSelection();
-    /// Paste elements from the clipboard as a new selection in the middle of the visible part of the current page.
-    /// Paste what is in the clipboard. `viewPos`: where it goes (else the middle of the visible page).
+    /// Paste the elements in the clipboard as a new selection. `viewPos`: where it goes (else the middle of the visible
+    /// part of the current page).
     bool pasteElements(std::optional<QPointF> viewPos = std::nullopt);
     /// Text from the clipboard as a text element.
     bool pasteText(const QString& content, std::optional<QPointF> viewPos = std::nullopt);
@@ -303,8 +302,6 @@ public:
     /// a lasso; `rectangle`: its bounds, else cut to its shape) is drawn off the UI thread, then `snipped`. False:
     /// nothing of the page in it, or a snip is still being drawn.
     bool snip(CanvasPage& page, const std::vector<xoj::util::Point<double>>& outline, bool rectangle);
-    /// A snip is being drawn
-    bool snipBusy() const;
     /// The tool "Copy handwriting as text" (Snip.h, snip::Purpose::InkText) swept over a page: its path (page
     /// coordinates; `tapped`: a tap, its first point) goes to the app (inkSwept), which reads the words there. False:
     /// not a page of this view.
@@ -407,8 +404,6 @@ public:
     void setPdfTextMode(PdfTextMode mode) { pdfTextMode = mode; }
     /// Color of highlights (none: the highlighter's color, as upstream)
     void setPdfHighlightColor(std::optional<Color> c) { pdfHighlightColor = c; }
-    PdfTextMode getPdfTextMode() const { return pdfTextMode; }
-    /// Input of the PDF text tools on a page (page coordinates, points).
     /// Select the word of the PDF under this point (or its whole line), as a long press does on a phone.
     /// Returns false when there is no PDF text there.
     bool selectPdfTextAt(QPointF viewPos, bool wholeLine);
@@ -568,9 +563,9 @@ public:
     bool addTodoStamp(size_t pNr, QPointF onPage);
     /// A tap on the check box of a task in a Markdown text (page coordinates): it is switched, one undo step.
     bool toggleMarkdownCheckBox(CanvasPage& page, double x, double y);
-    /// New texts of the text tool: Markdown text boxes of this size, or ordinary texts. `inPanel`: Markdown text
-    /// boxes are edited in the editor beside the page (markdownBoxRequested), else on the page (their source).
-    void setMarkdownText(bool markdown, double size, bool inPanel);
+    /// New texts of the text tool: Markdown text boxes of this size (an ordinary text already on the page is edited
+    /// as it is). `inPanel`: they are edited in the editor beside the page (markdownBoxRequested), else on the page.
+    void setMarkdownText(double size, bool inPanel);
 
     // --- selections of Markdown texts ------------------------------------------------------------------------------
     // Markdown texts are in the page's layer "Markdown", which is not the selected layer (the pen writes into
@@ -671,6 +666,8 @@ Q_SIGNALS:
     void snipLinkOffered(const QString& title);
 
 private:
+    /// A snip is being drawn
+    bool snipBusy() const;
     void rebuildPages();
     /// Drop the queued renders of all pages and wait for the running ones (the pages go)
     void cancelRenders();
@@ -782,7 +779,6 @@ private:
     QPointF selectionDragFrom;
     const XojPageView* selectionDragPage = nullptr;
     void endMarkdownSelection();
-    bool markdownText = false;       ///< the text tool makes Markdown text boxes
     double markdownTextSize = 10;    ///< of this font size
     bool markdownInPanel = false;    ///< Markdown text boxes are edited beside the page (tests; normally on the page)
     GeometryToolLayer geometry{*this};

@@ -70,7 +70,7 @@ ApplicationWindow {
     readonly property real contentBottomInset: Math.max(0, contentItem.y + contentItem.height - (height - safeBottom))
     /// A bottom sheet of the phone classes (the overlay's coordinates): as wide as the safe area (at most 640 px) and
     /// centred in it, resting on the soft keyboard while it is open, else on the window's edge with room for the
-    /// navigation bar below its content (MenuSheet, BottomSheet, the page menu, the palette and the widths)
+    /// navigation bar below its content (MenuSheet, the page menu, the palette and the widths)
     readonly property real sheetWidth: Math.min(width - safeLeft - safeRight, 640)
     readonly property real sheetX: safeLeft + Math.round((width - safeLeft - safeRight - sheetWidth) / 2)
     readonly property real sheetBottom: keyboardTop
@@ -102,7 +102,6 @@ ApplicationWindow {
         adaptive: (app.settings.revision, app.settings.get("adaptiveLayout"))
         touchSetting: (app.settings.revision, app.settings.get("touchProfile"))
     }
-    /// What was chosen by hand in this size class ("": the automatic choice): "sidebar", "chrome", "toolbox"
     /// "Save page as template…" for page index `page` (qt/docs/templates.md; the page menus)
     function openTemplateSave(page) { templateSaveDialog.openForPage(page) }
     /// Pages as files (PageFiles.qml, qt/docs/page-files.md), from the page menus: "insert" (from a file, after page
@@ -113,6 +112,7 @@ ApplicationWindow {
         else if (what === "split") pageFiles.openSplit(pages)
         else if (what === "images") pageFiles.openImages(pages)
     }
+    /// What was chosen by hand in this size class ("": the automatic choice): "sidebar", "zen", "toolbox"
     function layoutChoice(what) { return (app.settings.revision, app.settings.layoutChoice(adaptive.layoutClass, what)) }
     function chooseLayout(what, value) { app.settings.setLayoutChoice(adaptive.layoutClass, what, value) }
     /// The bottom sheet that the menus (AdaptiveMenu) become in the phone classes, one for the window
@@ -154,13 +154,13 @@ ApplicationWindow {
     /// the phone is held sideways (a page's thumbnail stays shorter than the window)
     readonly property real drawerWidth: !adaptive.phone ? 210
                                         : layoutClass === "phoneShort" ? 260 : Math.min(360, Math.round(width * 0.85))
-    /// The Pages button: hides the sidebar (remembered for this size class), or shows it again - beside the page where
-    /// there is room, else as a drawer (for the moment, not remembered)
     /// The sidebar's History panel (version history)
     function showHistory() {
         sidebar.mode = "history"
         showSidebar(true)
     }
+    /// The Pages button: hides the sidebar (remembered for this size class), or shows it again - beside the page where
+    /// there is room, else as a drawer (for the moment, not remembered)
     function showSidebar(shown) {
         if (shown) {
             if (sidebarDocked) return
@@ -201,10 +201,10 @@ ApplicationWindow {
         return y
     }
 
-    // --- the source panels: the Markdown source (and the deprecated text flow) beside or below the page ------------
+    // --- the source panel: the Markdown source beside or below the page --------------------------------------------
     // (qt/docs/adaptive-layout.md, "Panels")
     /// The panel open now, or null
-    readonly property Item sourcePanel: markdownPanel.visible ? markdownPanel : textFlowPanel.visible ? textFlowPanel : null
+    readonly property Item sourcePanel: markdownPanel.visible ? markdownPanel : null
     /// Below the page (the page above, its source below, a divider between them) in a portrait tablet or phone, and in
     /// any portrait window too narrow for a panel beside the page; else beside it, at the right (a desktop, narrow or
     /// wide, a phone held sideways). "Adapt the layout" off: beside it, as before.
@@ -234,7 +234,7 @@ ApplicationWindow {
     // tool dock) or "compact" (full screen's: the tab dots, the floating toolbox, the view pill). Full screen (F11,
     // fullScreenMode) is the compact chrome in a full-screen window. Apart from it: the window's state
     // (windowFullScreen), presenting (black, page by page), Zen (nothing around the page) and read only
-    // (qt/docs/zen.md). (The reader chrome and the chrome chosen per size class are gone since 0.8.0: Zen.)
+    // (qt/docs/zen.md).
     readonly property string chromeMode: fullScreenMode ? "compact" : "full"
     /// The full chrome is shown (not in Zen)
     readonly property bool fullChrome: chromeMode === "full" && !zenShown
@@ -245,12 +245,8 @@ ApplicationWindow {
     /// Zen turned on by hand (⋮ → View → Zen, its keys, the command bar's button, Read)
     property bool zenByHand: false
     /// Zen of itself: a tiny window (under 360 px either way: split screen, a pop-up window), unless it was left there
-    /// by hand (remembered for the class: layout/tiny/zen "off"; from 0.7.0, the reader chrome left there: chrome "full")
-    readonly property bool zenAuto: {
-        if (adaptive.layoutClass !== "tiny") return false
-        const z = layoutChoice("zen")
-        return z !== "off" && !(z === "" && layoutChoice("chrome") === "full")
-    }
+    /// by hand (remembered for the class: layout/tiny/zen "off")
+    readonly property bool zenAuto: adaptive.layoutClass === "tiny" && layoutChoice("zen") !== "off"
     /// Zen: everything around the page hidden (the toolbox, the command bar, the tab strip, the sidebar's arrow, the
     /// pills); its only mark is the dot in the lower left corner (zenDot), whose pill brings the controls back. The
     /// pen keeps writing. Presenting has its own: presenting without controls (presentClean).
@@ -265,7 +261,6 @@ ApplicationWindow {
         }
         if (adaptive.layoutClass === "tiny") {
             // (left by hand: remembered for tiny windows; on again: automatic again)
-            chooseLayout("chrome", "")  // (the reader chrome's choice of 0.7.0: replaced)
             chooseLayout("zen", on ? "" : "off")
             if (!on) zenByHand = false
             return
@@ -326,8 +321,7 @@ ApplicationWindow {
     readonly property bool dockRail: dockShown && dockVertical
 
     // --- the command bar (qt/docs/toolbox.md, "The command bar") -----------------------------------------------------
-    // One row at the top: the commands (the tools are in the toolbox). The classic tool bar of before, with its places
-    // (two rows, a rail at a side, the bottom), was removed in 0.8.0.
+    // One row at the top: the commands (the tools are in the toolbox).
     /// A text document's command bar is merged into its format bar: one row, ⋮ at its end (F7.2)
     readonly property bool toolsInFormatBar: textDoc && formatBar.shown && fullChrome && !app.toolbarHidden && !phoneChrome
     /// The cycling buttons' groups (ToolGroups.qml): the fixed tools of the toolbox (select, snip, setsquare, text)
@@ -494,7 +488,6 @@ ApplicationWindow {
     /// Ctrl+F5 brings them back, Ctrl+F5 hides them again. Every presentation starts as it is asked for: F5 with the
     /// controls (and no dot).
     property bool presentClean: false
-    readonly property bool cleanPage: app.presenting && presentClean
 
     function withSavedChanges(action) {
         if (!app.modified) {
@@ -1224,7 +1217,6 @@ ApplicationWindow {
         MenuSeparator {}
         AdaptiveMenuItem {
             objectName: "toolRemoveItem"
-            offered: true
             text: toolEntryMenu.isGroup ? qsTr("Remove the group") : toolEntryMenu.isApp ? qsTr("Off the bars (into +)")
                   : (toolEntryMenu.store.revision, toolEntryMenu.store.canRemove(toolEntryMenu.entryId))
                   ? qsTr("Remove") : qsTr("Remove (the last eraser stays)")
@@ -1378,8 +1370,6 @@ ApplicationWindow {
         objectName: "toolArea"
         visible: false
         Material.foreground: "#303030"
-        /// Where the popups of the buttons open: below the bar
-        readonly property string popupSide: "top"
         /// The buttons by their names (the app items' names of ToolboxModel, and the buttons of the moment)
         readonly property var slots: ({
             hand: handTool, touchDrawing: touchDrawingTool, select: selectTool, snip: snipTool, write: writeButton,
@@ -1675,7 +1665,7 @@ ApplicationWindow {
                         AdaptiveMenuItem {
                             objectName: "readItem"
                             offered: !win.textDoc
-                            text: win.withKeys(qsTr("Read (Zen, read only)"), "readOnly")
+                            text: win.withKeys(qsTr("Read (Zen, read only)"), "read")
                             icon.source: app.iconUrl("xqt-book-open")
                             onTriggered: win.startReading()
                         }
@@ -1815,23 +1805,19 @@ ApplicationWindow {
         // shape
         ToolCycleButton { id: snipTool; objectName: "snipButton"; parent: toolBank; group: "snip"; property bool offered: !win.textDoc }
         // Writing on the page with the keyboard: Markdown, formatted while typing (hold: its source beside the page).
-        // DEPRECATED (2026-09-26): the text mode (TextFlowPanel, TextFlow) is no longer offered here; its code stays
-        // for now (qt/docs/text-mode.md).
         IconButton {
             id: writeButton
             objectName: "textModeButton"
             parent: toolBank
             property bool offered: !win.textDoc
-            property bool markdownMode: true  // (always; kept for the tests and QML that read it)
             iconName: "xqt-page-text"
             label: qsTr("Write on the page")
             tip: qsTr("Write on the page: Markdown, shown formatted (Ctrl+Alt+M). Hold: its source beside the page")
-            checked: textFlowPanel.visible || markdownPanel.visible || app.markdownOnPage
+            checked: markdownPanel.visible || app.markdownOnPage
             ownHold: true
             readonly property string holdText: qsTr("Markdown source beside the page…")
             onClicked: {
-                if (textFlowPanel.visible) textFlowPanel.close(true)
-                else if (markdownPanel.visible) markdownPanel.close(true)
+                if (markdownPanel.visible) markdownPanel.close(true)
                 else if (app.markdownOnPage) app.endMarkdownOnPage()
                 else app.writeMarkdownOnPage()  // (formatted while typing, on the page)
             }
@@ -1850,9 +1836,7 @@ ApplicationWindow {
                     objectName: "markdownItem"
                     text: qsTr("Markdown (shown formatted, on the page)")
                     icon.source: app.iconUrl("xqt-page-text")
-                    checkable: true
-                    checked: writeButton.markdownMode
-                    onTriggered: { writeButton.markdownMode = true; app.writeMarkdownOnPage() }
+                    onTriggered: app.writeMarkdownOnPage()
                 }
                 AdaptiveMenuItem {
                     objectName: "markdownSourceItem"
@@ -1865,10 +1849,6 @@ ApplicationWindow {
                         else markdownPanel.openBox(onPage.page, onPage.x, onPage.y)
                     }
                 }
-            }
-            Connections {
-                target: markdownPanel
-                function onVisibleChanged() { if (markdownPanel.visible) writeButton.markdownMode = true }
             }
         }
         ToolCycleButton { id: geometryTool; objectName: "geometryButton"; parent: toolBank; group: "geometry"; property bool offered: !win.textDoc }
@@ -1977,8 +1957,7 @@ ApplicationWindow {
             EmojiPicker {
                 id: canvasEmojiPicker
                 owner: emojiButton
-                ownerX: toolArea.popupSide === "left" ? emojiButton.width : toolArea.popupSide === "right" ? -width : 0
-                ownerY: toolArea.popupSide === "bottom" ? -height : toolArea.popupSide === "top" ? emojiButton.height : 0
+                ownerY: emojiButton.height
                 onPicked: function(emoji) { close(); canvas.insertText(emoji) }
             }
         }
@@ -2037,7 +2016,6 @@ ApplicationWindow {
             id: stickerTool
             parent: toolBank
             property bool offered: !win.textDoc
-            popupSide: toolArea.popupSide
         }
         // Recording (qt/docs/audio.md): self-contained, the tool bar only places it
         RecordButton { id: recordTool; parent: toolBank }
@@ -2259,7 +2237,7 @@ ApplicationWindow {
             property bool offered: !win.textDoc
             iconName: "xqt-book-open"
             label: qsTr("Read")
-            tip: win.withKeys(qsTr("Read: Zen and read only, in full screen (the edges turn the pages)"), "readOnly")
+            tip: win.withKeys(qsTr("Read: Zen and read only, in full screen (the edges turn the pages)"), "read")
             onClicked: win.startReading()
         }
         // Zen: only the page and a faint dot in the lower left corner (qt/docs/zen.md)
@@ -2880,8 +2858,6 @@ ApplicationWindow {
                 implicitWidth: Math.max(48, implicitContentWidth + 16)
                 implicitHeight: 40
                 focusPolicy: Qt.NoFocus
-                /// A tap waits for a second one before the menu opens
-                property bool menuPending: false
                 function fitWhole() {
                     menuTimer.stop()
                     app.fitPage()
@@ -2974,16 +2950,6 @@ ApplicationWindow {
             }
         }
     }
-    // Text mode (deprecated): beside the pages (right), or below them in portrait; the canvas makes room
-    TextFlowPanel {
-        id: textFlowPanel
-        atBottom: win.sourceAtBottom
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: win.toolboxBottom
-        anchors.right: win.dockRail ? phoneDock.left : win.sideEdge === "right" ? sideTools.left : parent.right
-        width: !visible ? 0 : atBottom ? referenceSplit.width : win.sourceSideWidth
-        height: atBottom ? win.sourceBottomHeight : parent.height - win.toolboxTop - win.toolboxBottom
-    }
     // Markdown box, or the Markdown of a page: the same place
     MarkdownPanel {
         id: markdownPanel
@@ -3055,12 +3021,10 @@ ApplicationWindow {
         target: app
         // The text tool tapped a Markdown box
         function onMarkdownRequested(page) {
-            if (textFlowPanel.visible) textFlowPanel.close(true)
             if (!markdownPanel.visible || app.markdownPage !== page || !app.markdownIsPageText) markdownPanel.open(page)
         }
         // A Markdown text box (or a place for a new one)
         function onMarkdownBoxRequested(page, x, y) {
-            if (textFlowPanel.visible) textFlowPanel.close(true)
             markdownPanel.openBox(page, x, y)
         }
     }
@@ -4969,7 +4933,7 @@ ApplicationWindow {
         }
     }
     // Read (Zen, read only, full screen) and Zen: their keys (changeable)
-    Shortcut { sequences: win.keysOf("readOnly"); enabled: !app.homeVisible && !win.textDoc && !win.replaying; onActivated: win.toggleReading() }
+    Shortcut { sequences: win.keysOf("read"); enabled: !app.homeVisible && !win.textDoc && !win.replaying; onActivated: win.toggleReading() }
     Shortcut { sequences: win.keysOf("zen"); enabled: !app.homeVisible; onActivated: win.setZen(!win.zenShown) }
     // Digits typed while the page is at hand: go to that page (Enter)
     PageJump {
@@ -5359,7 +5323,7 @@ ApplicationWindow {
     }
 
     // Document shortcuts do nothing while the home screen is shown.
-    readonly property bool docKeys: !app.homeVisible && !app.textFlowActive && !app.markdownActive && !replaying
+    readonly property bool docKeys: !app.homeVisible && !app.markdownActive && !replaying
     // The keys come from the shortcut settings (app.shortcuts); reading its revision keeps the bindings fresh.
     function keysOf(id) { return (app.shortcuts.revision, app.shortcuts.keys(id)) }
     Shortcut { sequences: win.keysOf("undo"); enabled: docKeys; onActivated: app.undo() }
@@ -5507,14 +5471,13 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("forward"); enabled: docKeys; onActivated: app.navigateForward() }
     Shortcut { sequences: win.keysOf("pageGrid"); enabled: docKeys; onActivated: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
     Shortcut { sequences: win.keysOf("contents"); enabled: docKeys; onActivated: contentsOverview.visible ? contentsOverview.close() : contentsOverview.open() }
-    // (DEPRECATED: the text mode's Ctrl+Alt+E is gone with it; TextFlowPanel stays, not offered)
     Shortcut {
         // Markdown on the page (formatted while typing); pressed again while writing there: its source beside the
         // page
         sequences: win.keysOf("markdownMode"); enabled: !app.homeVisible
         onActivated: {
             if (markdownPanel.visible) { markdownPanel.close(true); return }
-            if (!app.markdownOnPage) { writeButton.markdownMode = true; app.writeMarkdownOnPage(); return }
+            if (!app.markdownOnPage) { app.writeMarkdownOnPage(); return }
             const onPage = app.takeMarkdownFromPage()
             if (onPage.page === undefined) markdownPanel.open()
             else if (onPage.pageText) markdownPanel.open(onPage.page)

@@ -498,8 +498,8 @@ means reading most of the file (seconds). An incremental save reads only what it
   metadata of an archive PDF). Attached background images (`document.xopp.bg_N.png`) and other attachments whose
   size and MD5 checksum are what the file has are not written again (`qt/pdf-history`). A removed page is only taken out of the page tree (its objects stay, so undo can
   bring it back cheaply; the next full write drops it).
-- Files of earlier versions (no record, no sigs) are appended to as well: the first save reads the pages with our
-  notes and redraws all layers; it writes the record, so the next saves are fast.
+- A file whose marker has no record of our layers (an earlier pre-release's) is written in full once; that write
+  makes the record, so the next saves append.
 
 ### When the whole file is written anew (compaction)
 
@@ -550,7 +550,7 @@ changed is appended; eight saves in a row with every kind of change — strokes,
 added, deleted, a background changed, a text, a page shown twice — each checked with `qpdf --check`, drawn by
 poppler like a full write of the same document, and opened as the same document; pages pasted from another PDF;
 the compaction rules; exports and shared files without earlier revisions; the clean copy kept; another app's
-appended revision; a file of an earlier version; an archive PDF staying PDF/A). UI: sharing compacts
+appended revision; a file without the layer record written in full once; an archive PDF staying PDF/A). UI: sharing compacts
 (`sharingThePdfWithNotes`, `shareFromALibraryCard`).
 
 Measurements (2026-09-24, the 2-in-1, files on its SSD, load 1–5 from other builds; `XQT_BENCH_HYBRID=<pdf>` runs
@@ -581,7 +581,7 @@ changed page, serialising and the copy with `fsync` under 0.01 s each, the clean
 An appended save: opening the file for the update 0.08 s, the `.xopp` (the whole document, gzipped) and the new
 drawing 0.1–0.15 s, the changed page 0.01 s, the copy, update and `fsync` 0.01–0.04 s, the clean copy's cache entry
 0.02–0.06 s. The appended bytes are mostly the embedded `.xopp` (about 20 KB here), which is always written whole.
-The first save of a file written by an earlier version reads the pages with notes once (0.7 s here). At 25% growth
+At 25% growth
 the file is written in full again: here after about 110 such saves.
 
 Validation of the files after several incremental saves (`XQT_INCREMENTAL_SAMPLES=<folder>` writes them, with a full

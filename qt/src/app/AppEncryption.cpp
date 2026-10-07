@@ -57,16 +57,6 @@ bool AppController::canProtect() const {
     return isPdf(file) && !HybridPdf::isArchive(file);
 }
 
-bool AppController::printAllowed() const {
-    DocumentSession* s = session();
-    return !s || s->allowsPrinting();
-}
-
-bool AppController::copyAllowed() const {
-    DocumentSession* s = session();
-    return !s || s->allowsCopying();
-}
-
 void AppController::askPassword(PendingPassword pending) {
     pendingPasswords.push_back(std::move(pending));
     if (pendingPasswords.size() == 1) {

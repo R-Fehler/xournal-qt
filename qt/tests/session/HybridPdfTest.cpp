@@ -2166,9 +2166,9 @@ TEST_F(IncrementalSaveTest, benchOneSave) {
     }
 }
 
-// A file written by an earlier version (no record of our layers in its marker, no drawing keys): the first Ctrl+S
-// reads the pages with our notes and appends; the next ones use the record it wrote
-TEST_F(IncrementalSaveTest, aFileOfAnEarlierVersionIsAppendedTo) {
+// A marker without the record of our layers (an earlier pre-release's file): the first Ctrl+S writes the file in full,
+// the next ones append with the record it wrote
+TEST_F(IncrementalSaveTest, aFileWithoutTheLayerRecordIsWrittenInFullOnce) {
     const fs::path out = path("notes.pdf");
     savedLecture(out).reset();
     editWithQpdf(out, [](QPDF& q) {
@@ -2194,10 +2194,10 @@ TEST_F(IncrementalSaveTest, aFileOfAnEarlierVersionIsAppendedTo) {
         drawOn(s, 2, 500 + 40 * n);
         const auto r = s.save();
         ASSERT_TRUE(r.ok) << r.error;
-        EXPECT_TRUE(r.incremental) << "save " << n + 1;
+        EXPECT_EQ(r.incremental, n > 0) << "save " << n + 1;
         int code = -1;
         EXPECT_EQ((qpdfCheck(out, code), code), 0);
-        expectSamePages(out, writtenInFull(s, "full.pdf"), 4, "a file of an earlier version, save " + std::to_string(n + 1));
+        expectSamePages(out, writtenInFull(s, "full.pdf"), 4, "a file without the record, save " + std::to_string(n + 1));
         auto again = DocumentSession::loadFile(out);
         ASSERT_TRUE(again.document);
         EXPECT_TRUE(again.hybridChanged.empty());

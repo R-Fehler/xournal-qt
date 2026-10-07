@@ -27,7 +27,6 @@
 #include "MarkdownFile.h"
 #include "MdBox.h"
 #include "MdPaginate.h"
-#include "TextFlow.h"
 
 namespace xqt {
 
@@ -87,10 +86,10 @@ std::string pageTextOf(const PageRef& page) {
 
 /// Where the page's text goes on a page: its box (width) and how high it may go (a continuous page: no end).
 md::Frame frameOf(const PageRef& page, bool continuous = false) {
-    const TextFlow::Style m = TextFlow::styleFor(page, TextFlow::Style{});
-    return {std::max(50.0, page->getWidth() - m.leftMargin - m.rightMargin),
+    const PageMargins::Margins m = PageMargins::of(page);
+    return {std::max(50.0, page->getWidth() - m.left - m.right),
             continuous ? MarkdownFile::CONTINUOUS_FRAME
-                       : std::max(50.0, page->getHeight() - m.topMargin - m.bottomMargin)};
+                       : std::max(50.0, page->getHeight() - m.top - m.bottom)};
 }
 }  // namespace
 
@@ -178,14 +177,14 @@ MarkdownSession::Page MarkdownSession::pageOf(const PageRef& page, double x, dou
         p.layer = md::markdownLayer(page);
         p.selectedBefore = page->getSelectedLayerId();
         if (p.layer) {
-            // (the page's text: at the margins, or where older text of a small page is, PageMargins::pageBox)
+            // (the page's text: at the margins, PageMargins::pageBox)
             p.box = pageText ? PageMargins::pageBox(*p.layer, page)
                     : wanted ? (p.layer->indexOf(wanted) != Element::InvalidIndex ? const_cast<Text*>(wanted) : nullptr)
                              : (p.layer->isVisible() ? md::boxAt(*p.layer, x, y) : nullptr);
         }
         if (p.box) {
             p.original = p.box->cloneText();
-            if (!pageText) {  // (the page's text stays at the margins: older text of a small page moves there)
+            if (!pageText) {  // (the page's text stays at the margins)
                 p.x = p.box->getTransformation().shift.x;
                 p.y = p.box->getTransformation().shift.y;
             }
@@ -232,7 +231,7 @@ std::string MarkdownSession::start(size_t pageNo, const md::Style& s, bool isPag
             p.y = y - style.size * 0.75;
             std::shared_lock lock(*doc);
             style.width =
-                    std::max(100.0, page->getWidth() - TextFlow::styleFor(page, TextFlow::Style{}).rightMargin - p.x);
+                    std::max(100.0, page->getWidth() - PageMargins::of(page).right - p.x);
         }
         last = p.box ? p.box->getText() : std::string();
         chain.push_back(std::move(p));
@@ -254,12 +253,12 @@ std::string MarkdownSession::start(size_t pageNo, const md::Style& s, bool isPag
     }
     std::vector<std::string> slices;
     for (const PageRef& p: pages) {
-        TextFlow::Style m;
+        PageMargins::Margins m;
         {
             std::shared_lock lock(*doc);
-            m = TextFlow::styleFor(p, TextFlow::Style{});
+            m = PageMargins::of(p);
         }
-        chain.push_back(pageOf(p, m.leftMargin, m.topMargin));
+        chain.push_back(pageOf(p, m.left, m.top));
         slices.push_back(chain.back().box ? chain.back().box->getText() : std::string());
     }
     if (chain.front().box) {
@@ -375,12 +374,12 @@ double MarkdownSession::distribute(const std::string& source) {
     // More pages: added after the text's last page
     while (chain.size() < pages.slices.size()) {
         const PageRef page = addPageAfter(chain.back().page);
-        TextFlow::Style m;
+        PageMargins::Margins m;
         {
             std::shared_lock lock(*doc);
-            m = TextFlow::styleFor(page, TextFlow::Style{});
+            m = PageMargins::of(page);
         }
-        Page p = pageOf(page, m.leftMargin, m.topMargin);
+        Page p = pageOf(page, m.left, m.top);
         p.createdPage = true;
         chain.push_back(std::move(p));
     }
@@ -434,7 +433,7 @@ double MarkdownSession::overflow(const Page& p) const {
     }
     const auto rect = md::boxRect(*p.box);
     return std::max(0.0, rect.y + rect.height -
-                                 (p.page->getHeight() - TextFlow::styleFor(p.page, TextFlow::Style{}).bottomMargin));
+                                 (p.page->getHeight() - PageMargins::of(p.page).bottom));
 }
 
 double MarkdownSession::update(const std::string& source) {
@@ -494,9 +493,9 @@ double MarkdownSession::reflow() {
     {
         std::shared_lock lock(*session.getDocument());
         for (Page& p: chain) {
-            const TextFlow::Style m = TextFlow::styleFor(p.page, TextFlow::Style{});
-            p.x = m.leftMargin;
-            p.y = m.topMargin;
+            const PageMargins::Margins m = PageMargins::of(p.page);
+            p.x = m.left;
+            p.y = m.top;
         }
     }
     split = {};  // (other widths: all pages again)

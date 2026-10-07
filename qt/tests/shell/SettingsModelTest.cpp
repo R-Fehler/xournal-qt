@@ -307,21 +307,13 @@ TEST_F(SettingsModelTest, snappingToTheGridIsOffUnlessChosen) {
     Settings* s = app->getSettings();
     EXPECT_FALSE(s->isSnapGrid()) << "a new setup";
 
-    // Settings saved by an earlier version: snapping on, and not yet turned off once
-    const std::string file = tmp.filePath("old.xml").toStdString();
-    {
-        Settings old{fs::path(file)};
-        old.load();
-        old.setSnapGrid(true);
-        old.save();
-    }
-    auto earlier = std::make_unique<AppContext>(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(file), 1);
-    EXPECT_FALSE(earlier->getSettings()->isSnapGrid()) << "turned off once";
-
-    // Switched on again by choice: stays on
-    earlier->getSettings()->setSnapGrid(true);
-    earlier->getSettings()->save();
-    earlier.reset();
+    // Switched on by choice: stays on
+    const std::string file = tmp.filePath("chosen.xml").toStdString();
+    auto first = std::make_unique<AppContext>(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(file), 1);
+    EXPECT_FALSE(first->getSettings()->isSnapGrid()) << "a new settings file";
+    first->getSettings()->setSnapGrid(true);
+    first->getSettings()->save();
+    first.reset();
     auto later = std::make_unique<AppContext>(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(file), 1);
     EXPECT_TRUE(later->getSettings()->isSnapGrid()) << "a choice is kept";
 }

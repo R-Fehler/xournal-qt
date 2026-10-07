@@ -19,7 +19,7 @@ A link is written as one URI that other programs also understand as far as they 
   folder, moved or synced as a whole keeps working, including on another machine or under another user name.
 - **`#page=N`** (1-based) is the PDF "open parameters" form. Acrobat, pdf.js and most viewers follow it for PDFs.
 - **`#chapter=…&page=N`**: the chapter's title, with its page as the fallback, as the author asked.
-  - Chapters are the document's headings: the PDF outline, Markdown headings, and text-mode headings (the "Contents"
+  - Chapters are the document's headings: the PDF outline, Markdown headings, and bold headings of 24, 18 or 15 pt (the "Contents"
     sidebar already lists them).
   - When following a link, the chapter is looked up by title, then by title ignoring case and punctuation. If it is
     not found, the saved page is used, with a note: "Chapter 'Prediction step' not found, opened page 12".
@@ -174,9 +174,7 @@ The author accepted the plan with its proposals:
 (`qt/src/shell/LinkRewrite.*`, `DocumentLinks::backlinks` / `findMoved`, `AppLinks.cpp`; tests `LinkRewrite.*` in
 `-L shell`, `DocumentLinksTest` in `-L ui`)
 - **Outgoing links in the index**: besides a Markdown file's links (as before), a `.xopp`'s entry in `notes.pack`
-  now has the links and wiki links of its Markdown boxes and link markers (`links`, `wikiLinks`). An entry of notes
-  written before has no `links` key: its `.xopp` is read once more (only the `.xopp`: its PDF text is kept), no
-  format change. Entries converted from the layout before the packs learn their links when the `.xopp` is saved.
+  now has the links and wiki links of its Markdown boxes and link markers (`links`, `wikiLinks`).
   `LibraryIndex::linkSources` lists them.
 - **Backlinks**: ⋮ → Document → **Linked from…** lists the documents of the library whose links lead to the current one
   (a link to any of its files: the PDF of a `.xopp` counts; a wiki link by its name); a tap opens one.

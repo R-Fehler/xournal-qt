@@ -116,8 +116,6 @@ QString TimelineControl::positionText() const { return clockText(at) + QStringLi
 
 QString TimelineControl::elapsedText() const { return line ? clockText(at) : QString(); }
 
-QString TimelineControl::durationText() const { return line ? clockText(duration()) : QString(); }
-
 QString TimelineControl::momentText() const {
     if (!line) {
         return {};

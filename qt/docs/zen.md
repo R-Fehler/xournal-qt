@@ -21,8 +21,8 @@ Combinations:
   is `win.presentClean` (not the window's own Zen, which comes back when presenting ends). Presenting with the controls
   has no dot; Ctrl+F5 and the floating toolbox's ⋯ → "Hide the tools" hide them.
 - **A tiny window** (under 360 px either way: split screen, a pop-up window): Zen is on of itself (`win.zenAuto`).
-  Leaving it there is remembered for tiny windows (`layout/tiny/zen` = `off`, as the reader chrome's choice was);
-  turning it on there again makes it automatic again.
+  Leaving it there is remembered for tiny windows (`layout/tiny/zen` = `off`); turning it on there again makes it
+  automatic again.
 
 ## The dot
 
@@ -63,9 +63,8 @@ Read ends with its keys again or Esc. Showing the home screen ends Zen by hand, 
 
 ## Gone
 
-The reader chrome (`chromeMode` "reader", its automatic switch in a tiny window, `chromeAuto`, `chromeSetting`,
-`chooseChrome`), the chrome chosen per size class (Settings → Display → "Controls at this size", `layout/<class>/chrome`,
-no longer read; the compact chrome is full screen's only), presenting's own corner field (`presentCornerMark`: the Zen
+The reader chrome of 0.7.0 and the chrome chosen per size class (Settings → Display → "Controls at this size"; its
+`layout/<class>/chrome` is not read: the compact chrome is full screen's only), presenting's own corner field (`presentCornerMark`: the Zen
 dot replaces it while presenting without controls) and the lock mark.
 
 Tests: `ToolboxTest.backLeavesZen`, `ToolboxTest.zenIsOnTheTopBarAtEverySize`, `ReadingTest` (ToolboxTest.cpp: Read, read only on its own, Zen hides all but the page and the dot, the pill and

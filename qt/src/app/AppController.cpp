@@ -112,7 +112,6 @@
 #include "MdPassages.h"
 #include "session/FuzzyQuery.h"
 #include "session/TextMatch.h"
-#include "TextFlow.h"
 #include "session/ArchivePdf.h"
 #include "session/HybridPdf.h"
 #include "session/MergedPdf.h"
@@ -197,12 +196,12 @@ AppController::AppController(QObject* parent): QObject(parent) {
     });
     ownSettingsView = std::make_unique<SettingsModel>(*app);
     settingsView = ownSettingsView.get();
-    // The toolbox's tools (qt/docs/toolbox.md): stored in the settings; the first time made from the tools of before
+    // The toolbox's tools (qt/docs/toolbox.md): stored in the settings; without them, the first layout
     ownToolbox = std::make_unique<ToolboxModel>(
             [this] {
                 std::string stored;
                 app->getSettings()->getCustomElement("xournalQt").getString("toolbox", stored);
-                return stored.empty() ? migratedToolbox() : QString::fromStdString(stored);
+                return QString::fromStdString(stored);
             },
             [this](const QString& json) {
                 app->getSettings()->getCustomElement("xournalQt").setString("toolbox", json.toStdString());
@@ -447,7 +446,6 @@ AppController::~AppController() {
     for (auto& c: currentConnections) {
         disconnect(c);
     }
-    flow.reset();  // (before the sessions)
     timelineControl.reset();  // (a replay ends: its view shows the whole document again)
     audioControl.reset();  // (a recording ends, and its document is told, before the sessions go)
     pages->setSession(nullptr);
@@ -679,68 +677,13 @@ DocumentSession* AppController::session() const { return tabs->currentSession();
 bool AppController::textPagesFixed() const { return session() && session()->textFile() && !session()->hasFilePath(); }
 CanvasView* AppController::canvas() const { return tabs->currentView(); }
 
-bool AppController::textFlowActive() const { return flow && flow->active(); }
-
-QString AppController::textFlowFamily() const {
+QString AppController::textFontFamily() const {
     QString family = QString::fromStdString(app->getSettings()->getFont().getName());
     // (a font name may have a style, e.g. "Sans Bold": the family only)
     for (const char* style: {" Bold", " Italic", " Regular"}) {
         family.remove(QLatin1String(style));
     }
     return family.trimmed().isEmpty() ? QStringLiteral("Sans") : family.trimmed();
-}
-
-QVariantList AppController::beginTextFlow() {
-    endTextFlow(true);
-    endMarkdown(true);
-    if (!session()) {
-        return {};
-    }
-    flowSession = session();
-    flow = std::make_unique<TextFlowSession>(*flowSession);
-    TextFlow::Style style;
-    style.family = textFlowFamily().toStdString();
-    style.bodySize = app->getSettings()->getFont().getSize();
-    flowPage = static_cast<int>(flowSession->getCurrentPageNo());
-    QVariantList list;
-    for (const auto& b: flow->begin(static_cast<size_t>(flowPage), style)) {
-        list.append(TextFlow::toVariant(b));
-    }
-    flowOverflow = 0;
-    Q_EMIT textFlowChanged();
-    return list;
-}
-
-void AppController::updateTextFlow(const QVariantList& blocks) {
-    if (!textFlowActive()) {
-        return;
-    }
-    std::vector<TextBlock> list;
-    for (const QVariant& v: blocks) {
-        list.push_back(TextFlow::fromVariant(v.toMap()));
-    }
-    const double overflow = flow->update(list);
-    if (overflow != flowOverflow) {
-        flowOverflow = overflow;
-        Q_EMIT textFlowChanged();
-    }
-}
-
-void AppController::endTextFlow(bool keep) {
-    if (!flow) {
-        return;
-    }
-    if (keep) {
-        flow->finish();
-    } else {
-        flow->cancel();
-    }
-    flow.reset();
-    flowSession = nullptr;
-    flowPage = -1;
-    flowOverflow = 0;
-    Q_EMIT textFlowChanged();
-    Q_EMIT undoRedoChanged();
 }
 
 bool AppController::markdownActive() const { return markdown && markdown->active(); }
@@ -762,7 +705,6 @@ bool AppController::writeMarkdownOnPage() {
         return false;
     }
     endMarkdown(true);
-    endTextFlow(true);
     const size_t page = std::min(s->getCurrentPageNo(), s->getDocument()->getPageCount() - 1);
     double w = 0;
     double h = 0;
@@ -797,7 +739,6 @@ QVariantMap AppController::takeMarkdownFromPage() {
 
 QString AppController::startMarkdown(int page, std::optional<QPointF> at) {
     endMarkdown(true);
-    endTextFlow(true);
     // The document with the keys: the reference while it is written in, else the notes
     DocumentSession* target = editedReference() ? &editedReference()->getSession() : session();
     if (!target || target->isReadOnly() || target->textFile()) {
@@ -806,11 +747,11 @@ QString AppController::startMarkdown(int page, std::optional<QPointF> at) {
     mdSession = target;
     markdown = std::make_unique<MarkdownSession>(*mdSession);
     md::Style style;
-    style.family = textFlowFamily().toStdString();
+    style.family = textFontFamily().toStdString();
     style.size = markdownFontSize();
     style.color = app->getToolHandler()->getColor();
     if (!at) {
-        style.color = Color(0, 0, 0);  // (the page's text: black, as the text mode)
+        style.color = Color(0, 0, 0);  // (the page's text: black)
     }
     mdPage = page >= 0 ? page : static_cast<int>(mdSession->getCurrentPageNo());
     const QString source = QString::fromStdString(
@@ -860,9 +801,6 @@ void AppController::endMarkdown(bool keep) {
 }
 
 void AppController::currentTabChanged() {
-    if (flow && flowSession != session()) {
-        endTextFlow(true);  // another document: the text mode ends (kept)
-    }
     if (markdown && mdSession != session()) {
         endMarkdown(true);  // another document: editing the box ends (kept)
     }
@@ -970,8 +908,6 @@ void AppController::currentTabChanged() {
                                              [this](const QString& title, const QString& text) {
                                                  Q_EMIT message(title, text, true);
                                              }));
-        currentConnections.push_back(
-                connect(v, &CanvasView::pdfTextSelectionCleared, this, &AppController::pdfTextSelectionCleared));
         // Whoever changes the selection (a press on the page, copying, marking, a page change): the knobs and the
         // pill follow it.
         currentConnections.push_back(
@@ -1719,12 +1655,6 @@ void AppController::setFillColor(const QColor& c) {
     Q_EMIT toolChanged();
 }
 
-bool AppController::hasFill() const {
-    return app->getToolHandler()->hasCapability(TOOL_CAP_FILL, SelectedTool::active);
-}
-
-bool AppController::hasFillColor() const { return penfill::hasOwnColor(app->getToolHandler()->getToolType()); }
-
 QColor AppController::color() const { return toQColor(app->getToolHandler()->getColor()); }
 int AppController::size() const {
     ToolHandler* th = app->getToolHandler();
@@ -1810,31 +1740,6 @@ QVariantList AppController::palette() const {
         list.append(toQColor(colors->getColorAt(i).getColor()));
     }
     return list;
-}
-
-QVariantList AppController::defaultToolbarColors() const {
-    // Upstream's palette (black, green, light blue, light green, blue, gray, red, magenta, orange, yellow), not white
-    QVariantList list;
-    for (const QVariant& c: palette()) {
-        if (c.value<QColor>() != QColor(Qt::white)) {
-            list.append(c);
-        }
-    }
-    return list;
-}
-
-QVariantList AppController::toolbarColors() const {
-    std::string stored;
-    QVariantList list;
-    if (app->getSettings()->getCustomElement(CUSTOM).getString("toolbarColors", stored)) {
-        for (const QString& c: QString::fromStdString(stored).split(',', Qt::SkipEmptyParts)) {
-            if (const QColor color(c.trimmed()); color.isValid()) {
-                list.append(color);
-            }
-        }
-        return list;
-    }
-    return defaultToolbarColors();
 }
 
 QVariantList AppController::colorPalettes() const { return ColorPalettes::builtIn().toVariant(); }
@@ -1983,21 +1888,6 @@ QColor AppController::paperColor() const {
 
 double AppController::highlighterOpacity() const { return ColorPalettes::highlighterOpacity(paperColor()); }
 
-bool AppController::textMarkdown() const {
-    bool on = false;
-    app->getSettings()->getCustomElement(CUSTOM).getBool("textMarkdown", on);
-    return on;
-}
-
-void AppController::setTextMarkdown(bool on) {
-    if (on != textMarkdown()) {
-        app->getSettings()->getCustomElement(CUSTOM).setBool("textMarkdown", on);
-        app->getSettings()->customSettingsChanged();
-        applyMarkdownText();
-        Q_EMIT fontChanged();
-    }
-}
-
 double AppController::markdownFontSize() const {
     double size = 0;
     app->getSettings()->getCustomElement(CUSTOM).getDouble("markdownFontSize", size);
@@ -2044,7 +1934,7 @@ void AppController::applyMarkdownText() {
     // (the notes, and the reference beside them: it may be written in)
     for (CanvasView* v: {canvas(), referenceMode ? referenceMode->canvas() : nullptr}) {
         if (v) {
-            v->setMarkdownText(textMarkdown(), markdownFontSize(), markdownInPanel());
+            v->setMarkdownText(markdownFontSize(), markdownInPanel());
         }
     }
 }
@@ -3127,9 +3017,6 @@ bool AppController::compareConflict(const QString& document, const QString& copy
 }
 
 void AppController::closeTab(int index) {
-    if (flow && flowSession == tabs->session(index)) {
-        endTextFlow(true);
-    }
     if (markdown && mdSession == tabs->session(index)) {
         endMarkdown(true);
     }
@@ -3837,14 +3724,6 @@ void AppController::trashOldXopp(DocumentSession& s, const fs::path& xopp, const
     Q_EMIT pageActionDone(tr("%1 moved to the trash: the PDF holds everything now").arg(name), false);
 }
 
-void AppController::exportXoppInBackground(const QUrl& url) {
-    fs::path xopp(url.toLocalFile().toStdString());
-    if (xopp.extension() != ".xopp") {
-        xopp += ".xopp";
-    }
-    startSave(SaveWay::ExportXopp, xopp, {});
-}
-
 bool AppController::save() {
     bool ok = false;
     return startSave(SaveWay::Save, {}, [&ok](bool r) { ok = r; }) && (waitForSave(), ok);
@@ -4013,15 +3892,6 @@ void AppController::afterHybridSave(DocumentSession& s) {
     // does not have to make it (seconds for a long PDF)
     QThreadPool::globalInstance()->start([file = s.getFilePath()] { HybridPdf::open(file); });
     library->refresh();
-}
-
-QUrl AppController::suggestedXoppExport() const {
-    if (!session() || !session()->hasFilePath()) {
-        return {};
-    }
-    fs::path xopp = session()->getFilePath();
-    xopp.replace_extension(".xopp");
-    return QUrl::fromLocalFile(QString::fromStdString(xopp.string()));
 }
 
 bool AppController::exportXopp(const QUrl& url) {
@@ -4320,8 +4190,6 @@ QStringList toStringList(const std::vector<std::string>& v) {
 
 void AppController::archiveDone(const fs::path& target, bool ok, const std::string& error, bool pdfa,
                                 const std::vector<std::string>& notPdfA, const std::vector<std::string>& adjusted) {
-    archiveRunning = std::max(0, archiveRunning - 1);
-    Q_EMIT archiveExportsChanged();
     if (!ok) {
         Q_EMIT message(tr("Export failed"), QString::fromStdString(error), true);
         return;
@@ -4348,8 +4216,6 @@ bool AppController::exportArchive(const QUrl& target, const QString& file) {
             Q_EMIT message(tr("Export failed"), tr("The archive PDF cannot be written over the document itself."), true);
             return false;
         }
-        ++archiveRunning;
-        Q_EMIT archiveExportsChanged();
         Q_EMIT pageActionDone(tr("Writing the archive PDF…"), false);
         QThreadPool::globalInstance()->start([self, document, out] {
             HybridPdf::Result r;
@@ -4379,8 +4245,6 @@ bool AppController::exportArchive(const QUrl& target, const QString& file) {
             self->archiveDone(out, r.ok, r.error, r.pdfa, r.notPdfA, r.adjusted);
         }
     };
-    ++archiveRunning;
-    Q_EMIT archiveExportsChanged();
     s->saveInBackground(std::move(request));
     Q_EMIT pageActionDone(tr("Writing the archive PDF…"), false);
     return true;
@@ -5368,16 +5232,6 @@ void AppController::movePageUp(int index) {
     if (session()) {
         goToPage(index);
         session()->movePageTowardsBeginning();
-    }
-}
-
-void AppController::movePageDown(int index) {
-    if (textPagesFixed()) {
-        return;  // (a text file: its pages are its text)
-    }
-    if (session()) {
-        goToPage(index);
-        session()->movePageTowardsEnd();
     }
 }
 

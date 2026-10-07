@@ -66,8 +66,6 @@ class VersionCompare final: public QObject {
     Q_PROPERTY(int changeCount READ changeCount NOTIFY changed)
     /// "3 pages changed, 1 added" ("No page changed")
     Q_PROPERTY(QString summary READ summary NOTIFY changed)
-    /// The change shown last (1-based; 0: none yet)
-    Q_PROPERTY(int currentChange READ currentChange NOTIFY positionChanged)
 public:
     VersionCompare(TabManager& tabs, ReferenceMode& reference, QObject* parent = nullptr);
     ~VersionCompare() override;
@@ -91,6 +89,7 @@ public:
     QString newerTitle() const { return newerName; }
     int changeCount() const { return static_cast<int>(result.changes.size()); }
     QString summary() const;
+    /// The change shown last (1-based; 0: none yet)
     int currentChange() const { return current + 1; }
     const versiondiff::Result& changes() const { return result; }
     DocumentSession* newerSession() const;

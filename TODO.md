@@ -17,7 +17,7 @@ Open work only. The goals behind it are in [VISION.md](VISION.md); how the app w
 ## The refactoring of 2026-10
 
 The plan, the five reviews and the reasons: [qt/docs/review/2026-10/README.md](qt/docs/review/2026-10/README.md).
-Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is being merged.
+Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is merged (2026-10-07).
 
 - [ ] **Wave 2**: `qt/qml-split` (split `Main.qml`, qml.md §1.2) · `qt/test-support` (one UI fixture and shared test
   helpers, fewer fixed waits, the QML-API test) · `qt/session-io` (`FileIo` helpers; bugs 2 and 6) ·
@@ -40,6 +40,8 @@ Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is being merged.
   typed (B13); list `README.md` (the fork's top half) in `adr/0002-upstream-seams.md`.
 
 ## Decisions for the author
+- [ ] Reading library cache packs from the other cache location (shell review §4 #15) stays: it also serves read-only
+  folders with a cache of their own. Remove it?
 
 - [?] **PDF engine**: MuPDF (AGPL) or stay on poppler? A branch `qt/mupdf` (not merged) had MuPDF behind
   `-DXQT_WITH_MUPDF=ON`: faster at 1× (2× on text, 4.5× on scans) and with threads, not faster at 4×, about twice the
@@ -64,6 +66,10 @@ Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is being merged.
   build folder (infra B3).
 
 ## Flaky tests
+- [ ] `PageFilesTest.aProtectedDocumentIsExtractedProtectedAndNeverAsXopp` fails about 1 in 3 runs alone (6 of 20 on
+  the base of `qt/compat-dead`, 2026-10-07): extracting pages of the protected `locked.pdf` reads it with the wrong key
+  at times (qpdf: "/Perms field in encryption dictionary doesn't match expected value"). A race on the file's password
+  (PdfEncryption) or on the clean copy; find it.
 
 Rerun a failure alone before calling it a flake; harden a test by waiting for the state, not for time.
 
@@ -120,6 +126,8 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
 - [ ] Favourites: remember the chip across starts; a star in the tab overview for annotated PDFs without a path.
 
 ### Markdown and text
+- [ ] A Markdown box written while recording is not tied to the recording (plain new texts were; since 0.9.0 the text
+  tool always writes Markdown).
 - [ ] **Vaults** (Obsidian, Zettlr, foam), decided 2026-09-24: detect a `.obsidian/` folder and use its attachment
   folder; files with Obsidian-only syntax ask once before editing; resolve `[[wikilinks]]` by file name; backlinks
   later.

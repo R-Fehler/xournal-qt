@@ -651,30 +651,6 @@ bool PreviewCache::flush() {
     return writeChanged();
 }
 
-int PreviewCache::convertOldFiles(const fs::path& dir, const std::vector<DocumentItem>& items) {
-    std::error_code ec;
-    if (!fs::is_directory(dir, ec)) {
-        return 0;
-    }
-    int count = 0;
-    for (const auto& item: items) {
-        const fs::path png = dir / (pngName(item).toStdString() + ".png");
-        if (!inLibrary(item) || !fs::exists(png, ec) || !ensureLoaded(item.folder(), true)) {
-            continue;
-        }
-        const QString stamp = stampOf(item);
-        if (!lookup(item, stamp).isEmpty()) {
-            continue;  // (made since)
-        }
-        QFile f(QString::fromStdString(png.string()));
-        if (f.open(QIODevice::ReadOnly)) {
-            store(item, stamp, f.readAll());
-            ++count;
-        }
-    }
-    return count;
-}
-
 void PreviewCache::discard() {
     auto& s = state();
     writer().waitForDone();

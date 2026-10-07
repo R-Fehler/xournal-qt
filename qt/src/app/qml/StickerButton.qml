@@ -8,8 +8,6 @@ import QtQuick.Controls
 IconButton {
     id: button
     objectName: "stickerButton"
-    /// The side of the bar it is on ("top", "bottom", "left", "right"): the picker opens away from it
-    property string popupSide: "top"
     readonly property alias picker: stickerPicker
     iconName: "xqt-sticker"
     label: qsTr("Stickers")
@@ -27,7 +25,6 @@ IconButton {
     StickerPicker {
         id: stickerPicker
         owner: button
-        ownerX: button.popupSide === "left" ? button.width : button.popupSide === "right" ? -width : 0
-        ownerY: button.popupSide === "bottom" ? -height : button.popupSide === "top" ? button.height : 0
+        ownerY: button.height  // (below it: the bars it is on are at the top)
     }
 }

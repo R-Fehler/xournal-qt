@@ -31,8 +31,6 @@ constexpr uint32_t API_VERSION = 16;
 
 /// The runtime's API (loaded once); nullptr and `why` if it cannot be loaded.
 const OrtApi* api(QString* why = nullptr);
-/// Where it was loaded from, or where it was looked for.
-QString libraryPath();
 
 struct Tensor {
     enum class Type { Float, Int64, Bool };

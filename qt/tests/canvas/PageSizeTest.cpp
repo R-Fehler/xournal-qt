@@ -45,7 +45,6 @@
 #include "MdBox.h"
 #include "MdPaginate.h"
 #include "PageResize.h"
-#include "TextFlow.h"
 
 using namespace xqt;
 
@@ -328,30 +327,6 @@ TEST_F(PageSizeTest, thePageTextOfALinedA7StartsAfterTheScaledLine) {
     ASSERT_NE(box, nullptr);
     EXPECT_NEAR(box->getTransformation().shift.x, 46, 1e-9) << "after the line at 36";
     EXPECT_NEAR(box->getWrap(), A7_W - 46 - m.right, 1e-9);
-
-    // Older text: after the line at 1 inch
-    auto older = std::make_unique<DocumentSession>(*app);
-    const PageRef old = older->getDocument()->getPage(0);
-    old->setSize(A7_W, A7_H);
-    old->setBackgroundType(PageType(PageTypeFormat::Lined));
-    auto* layer = new Layer();
-    layer->setName(std::string(xoj::markdown::LAYER_NAME));
-    old->getLayers().insert(old->getLayers().begin(), layer);
-    auto t = std::make_unique<Text>();
-    t->setText("older text");
-    t->setWrap(A7_W - 82 - m.right);
-    t->setTransformation(xoj::util::Matrix::TRANSLATION(82, m.top));
-    const Text* oldBox = t.get();
-    layer->addElement(std::move(t));
-    EXPECT_EQ(TextDocument::pageBoxOf(old), oldBox) << "still the page's text";
-    MarkdownSession edit2(*older);
-    EXPECT_EQ(edit2.begin(0, md::Style{}), "older text");
-    edit2.update("older text, edited");
-    edit2.finish();
-    const Text* moved = TextDocument::pageBoxOf(old);
-    ASSERT_NE(moved, nullptr);
-    EXPECT_EQ(moved->getText(), "older text, edited");
-    EXPECT_NEAR(moved->getTransformation().shift.x, 46, 1e-9);
 }
 
 // --- changing the size of pages --------------------------------------------------------------------------------------
@@ -488,7 +463,7 @@ TEST_F(PageSizeTest, thePagesTextFlowsAnewOnTheNewSize) {
     EXPECT_EQ(pageCount(), a4Pages) << "one step: the cards added go";
     EXPECT_TRUE(sizeIs(0, A4_W, A4_H));
     EXPECT_EQ(pageTextFrom(0), before);
-    EXPECT_NEAR(TextDocument::pageBoxOf(page(0))->getWrap(), A4_W - PageMargins::of(page(0)).left - TextFlow::MARGIN,
+    EXPECT_NEAR(TextDocument::pageBoxOf(page(0))->getWrap(), A4_W - PageMargins::of(page(0)).left - PageMargins::FULL,
                 1e-5);
     undo->redo();
     EXPECT_EQ(pageCount(), cards);
@@ -502,7 +477,7 @@ TEST_F(PageSizeTest, thePagesTextFlowsAnewOnTheNewSize) {
     ASSERT_EQ(pagesize::apply(*session, allCards, A4_W, A4_H), cards);
     EXPECT_EQ(pageCount(), a4Pages);
     EXPECT_EQ(pageTextFrom(0), before);
-    EXPECT_NEAR(TextDocument::pageBoxOf(page(0))->getTransformation().shift.y, TextFlow::MARGIN, 1e-9);
+    EXPECT_NEAR(TextDocument::pageBoxOf(page(0))->getTransformation().shift.y, PageMargins::FULL, 1e-9);
     undo->undo();
     EXPECT_EQ(pageCount(), cards) << "the cards come back";
     EXPECT_EQ(pageTextFrom(0), before);

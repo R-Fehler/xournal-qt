@@ -49,7 +49,7 @@ including the background save's copy of the pages). A duplicated or pasted page 
 
 - `DocumentSession::setBookmark(page, label | nullopt)`: set, rename, remove; **one undo step** each
   (`PageBookmarks::BookmarkUndoAction`, "Add / Rename / Remove bookmark"); `bookmarksChanged()`.
-- A new bookmark's label: the page's first heading (`DocumentChapters`: `# `-texts, text-mode headings, Markdown box
+- A new bookmark's label: the page's first heading (`DocumentChapters`: `# `-texts, bold headings of 24, 18 or 15 pt, Markdown box
   headings), else the entry of the PDF's own table of contents that goes to its PDF page, else the automatic label.
   Typing "Page N" or nothing in the rename dialog makes it automatic again.
 
@@ -121,13 +121,9 @@ would not.
 - **Which pages:** the pages of the text that starts on page 1 (`TextDocument::hasTextBookmarks`): a `.md` (and the
   `.md` with its `.assets` folder), a PDF text document ([md-pdf.md](md-pdf.md)), and so also a `.xopp` whose page 1
   starts the page's Markdown text (a text document by the same rule). Other pages keep the page attribute: a page of
-  notes after the text, Markdown text boxes, a `.xopp` whose text starts on a later page. A page attribute written
-  by the `qt/bookmarks` build on a page of such a text **becomes a comment** when the document is opened
-  (`TextDocument::migrateBookmarks`, before the pages are read from the text): before the first block that starts on
-  its page, as "Bookmark this page" puts it, with its label ("" stays automatic), written into that page's box as it
-  is (a comment takes no room, so nothing is laid out again). A page that has a comment already keeps only that. The
-  document is not marked modified; the comment is written with the next save. (Saving still writes each page's
-  bookmark as the page attribute too, as a mirror of the comment; on opening, the comment wins.)
+  notes after the text, Markdown text boxes, a `.xopp` whose text starts on a later page. On the pages of such a text
+  the page attribute is only a mirror of the comments: saving writes each page's bookmark as the attribute too, and
+  on opening the comments decide (`TextDocument::syncBookmarks`).
 - **Bookmark this page** (page menu, ⋮) on such a page is an **edit of the text** (`MarkdownBookmarks::edit`,
   `qt/src/canvas`): `<!-- xqt:bookmark -->` is inserted before the **first block that starts on the page** (a page
   that begins inside a block: the first block after it; comments are skipped). **Decision:** a page that is all
@@ -162,8 +158,7 @@ would not.
 ### Library cache
 `LibraryIndex` reads a document's bookmarks with its pages (`fillPages`, also for a document saved in the app) into
 its entry, and keeps them in the folder's **"notes" pack** (`"bookmarks": {page: label}`, only when there are any).
-Entries of older versions have no key: their files had no bookmarks (a file changed since is read again), so no
-document is read again for this. `LibraryIndex::bookmarks()` lists them all; `bookmarkChanges()` changes when they
+`LibraryIndex::bookmarks()` lists them all; `bookmarkChanges()` changes when they
 do. The library search also matches a page's bookmark label (plain and fuzzy search; not the automatic "Page N").
 
 ### Where it shows

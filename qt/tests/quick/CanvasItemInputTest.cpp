@@ -452,7 +452,7 @@ TEST_F(CanvasItemInputTest, theHoveringPenShowsALinksTargetToo) {
 // resize cursor, which stays while it is dragged; the drag sets the width.
 TEST_F(CanvasItemInputTest, theMouseOverAMarkdownBoxHandleShowsTheResizeCursor) {
     app->getToolHandler()->selectTool(TOOL_TEXT);
-    view->setMarkdownText(true, 10, false);
+    view->setMarkdownText(10, false);
     view->startMarkdown(0, false, 100, 150);
     MarkdownEditor* editor = view->getMarkdownEditor();
     ASSERT_NE(editor, nullptr);

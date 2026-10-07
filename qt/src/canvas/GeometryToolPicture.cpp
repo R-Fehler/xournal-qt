@@ -191,7 +191,6 @@ auto GeometryToolPicture::display(double height, double rotation, double scale) 
                     placed(DISPLAY_AT - turned, rotation));
     const QRectF around(DISPLAY_AT - QPointF(DISPLAY_HALF, DISPLAY_HALF), QSizeF(2 * DISPLAY_HALF, 2 * DISPLAY_HALF));
     auto [image, rect] = draw(*displayView, around, scale);
-    ++displays;
     Perf::add(Perf::GeometryDisplays);
     return {std::move(image), rect.translated(-DISPLAY_AT), scale, height};
 }

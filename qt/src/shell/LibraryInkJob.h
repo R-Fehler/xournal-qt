@@ -58,7 +58,6 @@ public:
     static void setPowerSource(std::function<bool()> source);
 
     bool running() const { return current != nullptr || !waiting.empty(); }
-    int documentsDone() const { return docsDone; }
     int documentsLeft() const { return static_cast<int>(waiting.size()) + (current ? 1 : 0); }
     int pagesRead() const { return pagesDone; }
 
@@ -82,7 +81,6 @@ private:
     std::shared_ptr<Current> current;
     std::unique_ptr<QThreadPool> loader;
     QTimer power;
-    int docsDone = 0;
     int pagesDone = 0;
     quint64 generation = 0;
 };

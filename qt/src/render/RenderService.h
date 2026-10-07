@@ -62,8 +62,6 @@ public:
     /// Block until the queue is empty and no job is running (tests, shutdown, export).
     void waitForIdle();
 
-    int threadCount() const { return static_cast<int>(workers.size()); }
-
 private:
     void workerLoop(bool background);
     /// Tell visiblePagesBusy() whether this service has visible work (under mtx)

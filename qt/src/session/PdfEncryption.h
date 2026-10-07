@@ -7,7 +7,7 @@
  * - The passwords of the files open in this process, in memory only (never in settings, recent files, logs or crash
  *   reports): the files of open documents and the files made from them in the app cache (the clean copy of a PDF
  *   with notes, a merged PDF of pasted pages, a version cut out of the file, an autosave), each encrypted with the
- *   same key. Only code that works for an open document opens files through it (openQpdf, loadPoppler); the
+ *   same key. Only code that works for an open document opens files through it (openQpdf); the
  *   library, previews of cards, tags and the search index read files without a password, so they never hold the
  *   content of a protected PDF.
  * - Appending to an encrypted file (IncrementalPdf): the file's key and how strings and streams are encrypted.
@@ -123,8 +123,6 @@ void openQpdf(QPDF& q, const fs::path& file);
 void openQpdf(QPDF& q, const std::shared_ptr<InputSource>& source, const fs::path& file);
 /// Whether qpdf failed because the password was missing or wrong.
 bool isPasswordError(const std::exception& e);
-/// Load `file` into a poppler document with the password known for it.
-bool loadPoppler(XojPdfDocument& pdf, const fs::path& file);
 
 // --- Appending to an encrypted file (IncrementalPdf) ---------------------------------------------------------
 

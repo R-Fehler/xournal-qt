@@ -244,40 +244,6 @@ TEST(Todos, theIndexReadsTheToDos) {
     EXPECT_NE(again.todoChanges(), before);
 }
 
-// Entries of documents indexed before to-dos were have none stored: they are read once more (without their PDF text)
-TEST(Todos, entriesFromBeforeAreReadAgainOnce) {
-    QTemporaryDir tmp;
-    const fs::path root = fs::path(tmp.path().toStdString()) / "Library";
-    writeFile(root / "plan.md", "- [ ] todo: one\n");
-    {
-        LibraryIndex index(root);
-        index.update(DocumentFiles::scanRecursive(root));
-        index.waitForDone();
-        index.flush();
-    }
-    // The pack as an older build wrote it: no "todos"
-    {
-        CacheLocation where(root);
-        auto notes = Packs::read(where.dirOf(root), LibraryIndex::NOTES_PACK, LibraryIndex::FORMAT);
-        ASSERT_TRUE(notes);
-        QCborMap entry = notes->value(QStringLiteral("plan.md")).toMap();
-        ASSERT_TRUE(entry.contains(QStringLiteral("todos")));
-        entry.remove(QStringLiteral("todos"));
-        notes->insert(QStringLiteral("plan.md"), entry);
-        ASSERT_TRUE(Packs::write(where.dirOf(root), LibraryIndex::NOTES_PACK, LibraryIndex::FORMAT, *notes, true));
-    }
-    LibraryIndex again(root);
-    again.update(DocumentFiles::scanRecursive(root));
-    again.waitForDone();
-    EXPECT_EQ(again.documentsRead(), 1);
-    ASSERT_EQ(again.todos().size(), 1u);
-    again.flush();
-    LibraryIndex third(root);
-    third.update(DocumentFiles::scanRecursive(root));
-    third.waitForDone();
-    EXPECT_EQ(third.documentsRead(), 0) << "once";
-}
-
 // The To-dos view: grouped by document with counts, sorted by due date (done ones last), filtered by state, due date,
 // text and the library's current folder; the setting decides which lines are listed
 TEST(Todos, theViewGroupsSortsAndFilters) {

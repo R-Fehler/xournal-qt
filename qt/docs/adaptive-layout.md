@@ -620,10 +620,9 @@ tools" in qt/top-bar.)
 the two bars (the same items as on a larger screen), every command is in ⋮, and "+" (the catalog, a sheet) adds a tool
 or puts an item that is on neither bar onto one.
 
-**Sheets**: `BottomSheet.qml` is the sheet of the phone classes that is not a menu: as wide as the window (at most
-640 px), at most 85 % high (the rest scrolls), above `safeBottom`, the handle of `MenuSheet`, Esc and the back key
-close it. A tool's editor (`toolEntryEditor`: its colors, width, …) is a sheet of the same form in the phone classes
-(its `asSheet`); the menus were already (`MenuSheet`).
+**Sheets**: in the phone classes a tool's editor (`toolEntryEditor`: its colors, width, …) is a sheet (its
+`asSheet`): as wide as the window (at most 640 px), at most 85 % high (the rest scrolls), above `safeBottom`, the
+handle of `MenuSheet`, Esc and the back key close it; the menus are sheets of the same form (`MenuSheet`).
 
 **Zen in a tiny window** (since qt/zen; the reader chrome before): automatic only there (`zenAuto`); everywhere else
 chosen by hand. Only the page and the dot; the pen writes; the dot's pill shows the controls again (and in a tiny
@@ -675,7 +674,7 @@ bottom inset (0 where a footer took it: the dock, the keyboard's room).
 
 Bottom sheets take their place from `win.sheetWidth`, `sheetX`, `sheetBottom` (the keyboard's top while it is open,
 else the window's bottom) and `sheetBottomPadding` (the room for the navigation bar under their last row);
-`MenuSheet` and `BottomSheet` compute the same.
+`MenuSheet` and the editor's sheet compute the same.
 
 ### The soft keyboard
 

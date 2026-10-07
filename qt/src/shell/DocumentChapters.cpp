@@ -29,7 +29,7 @@ bool markedHeading(const std::string& text, int& level, std::string& title) {
     return !title.empty();
 }
 
-/// A heading written in the text mode: bold and one of its sizes.
+/// A heading set in a text box: bold and one of the heading sizes.
 bool styledHeading(const Text* text, int& level) {
     const std::string& font = text->getFontName();
     if (font.find("Bold") == std::string::npos) {

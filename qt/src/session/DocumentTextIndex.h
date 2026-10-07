@@ -117,8 +117,6 @@ public:
     /// number (0-based), as far as it is known for the file as it is now.
     using Seeder = std::function<std::map<int, QString>(const fs::path& pdf)>;
     static void setSeeder(Seeder seeder);
-    /// How long after opening the missing PDF text is read (default 2 s; a search starts it at once).
-    static void setStartDelay(int ms);
 
     /// Read the missing PDF text now (a search started). Idempotent.
     void start();
@@ -130,8 +128,6 @@ public:
     size_t pageCount() const { return pages.size(); }
     /// The text of every page is known (the PDF text of all pages that show one).
     bool complete() const { return unknownPages == 0; }
-    /// Pages whose PDF text is not known yet.
-    size_t pagesMissing() const { return unknownPages; }
     /// The text of a page is known.
     bool known(size_t page) const;
     /// Hits of a query (TextMatch::prepare) on a page, in the text known so far.

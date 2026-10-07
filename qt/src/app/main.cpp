@@ -349,76 +349,9 @@ int main(int argc, char* argv[]) {
     });
 #endif
 
-    // Developer aid: XQT_SCREENSHOT=file.png renders the window after a moment, saves it and quits.
-    // XQT_SCREENSHOT_POPUP=<objectName> opens that popup first (e.g. settingsPage, tabOverview).
+    // XQT_SCREENSHOT=file.png renders the window after a moment (XQT_SCREENSHOT_DELAY_MS, default 1.5 s), saves it
+    // and quits (the CI's smoke tests of the Windows and macOS packages, qt/scripts/*-smoke.sh).
     if (const auto shot = qEnvironmentVariable("XQT_SCREENSHOT"); !shot.isEmpty()) {
-        // XQT_SCREENSHOT_ACTION=<method> calls an AppController method without arguments (e.g. selectAllOnPage),
-        // "<method>:<number>" one with a number (e.g. undockTab:0).
-        if (const auto action = qEnvironmentVariable("XQT_SCREENSHOT_ACTION"); !action.isEmpty()) {
-            QTimer::singleShot(400, &controller, [&controller, action] {
-                const QString name = action.section(':', 0, 0);
-                if (action.contains(':')) {
-                    QMetaObject::invokeMethod(&controller, name.toLatin1().constData(),
-                                              Q_ARG(int, action.section(':', 1).toInt()));
-                } else {
-                    QMetaObject::invokeMethod(&controller, name.toLatin1().constData());
-                }
-            });
-        }
-        // XQT_SCREENSHOT_SELECT=1,3,4 selects pages (sidebar, page grid), or library items on the home screen.
-        if (const auto sel = qEnvironmentVariable("XQT_SCREENSHOT_SELECT"); !sel.isEmpty()) {
-            QTimer::singleShot(200, &controller, [&controller, sel] {
-                QList<int> pages;
-                for (const QString& p: sel.split(',')) {
-                    pages << p.toInt();
-                }
-                if (controller.homeVisible()) {  // library items
-                    for (int row: pages) {
-                        QMetaObject::invokeMethod(controller.libraryModel(), "toggleSelected", Q_ARG(int, row));
-                    }
-                    return;
-                }
-                QMetaObject::invokeMethod(controller.pagesModel(), "selectPages", Q_ARG(QList<int>, pages));
-            });
-        }
-        // XQT_SCREENSHOT_SEARCH=<text> searches all tabs (and shows the hits of the current one).
-        if (const auto query = qEnvironmentVariable("XQT_SCREENSHOT_SEARCH"); !query.isEmpty()) {
-            QTimer::singleShot(200, &controller, [&controller, query] {
-                if (controller.homeVisible()) {
-                    controller.libraryModel()->setProperty("searchQuery", query);  // the library search
-                    return;
-                }
-                controller.searchAllTabs(query);
-                controller.openSearchResult(controller.currentTab());
-            });
-        }
-        // XQT_SCREENSHOT_SET=<objectName>.<property>=<value> sets a property of a QML item (e.g. homeView.extended=true).
-        if (const auto set = qEnvironmentVariable("XQT_SCREENSHOT_SET"); !set.isEmpty()) {
-            QTimer::singleShot(100, [&engine, &controller, set] {
-                const QString target = set.section('=', 0, 0);
-                const QString name = target.section('.', 0, 0);
-                // "app.<property>": the controller, "window.<property>": the window
-                QObject* o = name == "app" ? &controller : nullptr;
-                if (auto* w = engine.rootObjects().value(0); w && !o) {
-                    o = name == "window" ? w : w->findChild<QObject*>(name);
-                }
-                if (o) {
-                    o->setProperty(target.section('.', 1).toLatin1().constData(), set.section('=', 1));
-                }
-            });
-        }
-        if (const auto popup = qEnvironmentVariable("XQT_SCREENSHOT_POPUP"); !popup.isEmpty()) {
-            QTimer::singleShot(300, [&engine, popup] {
-                if (auto* w = engine.rootObjects().value(0)) {
-                    if (QObject* p = w->findChild<QObject*>(popup)) {
-                        QMetaObject::invokeMethod(p, "open");
-                    }
-                    if (QObject* field = w->findChild<QObject*>("overviewSearchField")) {
-                        field->setProperty("text", qEnvironmentVariable("XQT_SCREENSHOT_SEARCH"));
-                    }
-                }
-            });
-        }
         QTimer::singleShot(qEnvironmentVariableIntValue("XQT_SCREENSHOT_DELAY_MS") > 0
                                    ? qEnvironmentVariableIntValue("XQT_SCREENSHOT_DELAY_MS")
                                    : 1500,

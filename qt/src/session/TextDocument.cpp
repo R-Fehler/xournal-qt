@@ -112,52 +112,6 @@ std::vector<std::pair<PageRef, std::optional<std::string>>> bookmarkChanges(Docu
     return changes;
 }
 
-size_t migrateBookmarks(Document& doc) {
-    size_t end = 0;
-    if (!hasTextBookmarks(doc, &end)) {
-        return 0;
-    }
-    std::vector<std::pair<size_t, std::string>> attributes;
-    for (size_t i = 0; i < end; ++i) {
-        if (const auto& b = doc.getPage(i)->getBookmark()) {
-            attributes.emplace_back(i, *b);
-        }
-    }
-    size_t added = 0;
-    for (const auto& [page, label]: attributes) {
-        const Text* own = pageBoxOf(doc.getPage(page));
-        if (!own || md::bookmarks::ofPage(own->getText())) {
-            continue;  // (the page has a comment already: it is the bookmark)
-        }
-        std::vector<md::Part> parts;
-        const std::string text = flowText(doc, 0, nullptr, &parts);
-        if (page >= parts.size()) {
-            continue;
-        }
-        const auto e = md::bookmarks::add(text, parts[page].begin, parts[page].end, label);
-        if (!e) {
-            continue;  // (the block it would mark has one: on an earlier page)
-        }
-        // The page whose slice holds that place (a block that starts where a page begins: that page)
-        size_t at = 0;
-        for (size_t i = 0; i < parts.size(); ++i) {
-            if (parts[i].begin <= e->from) {
-                at = i;
-            }
-        }
-        Text* box = pageBoxOf(doc.getPage(at));
-        if (!box) {
-            continue;
-        }
-        std::string slice = box->getText();
-        const size_t local = std::min(slice.size(), parts[at].prefix + (e->from - parts[at].begin));
-        slice.insert(local, e->with);
-        box->setText(slice);
-        ++added;
-    }
-    return added;
-}
-
 bool syncBookmarks(Document& doc) {
     const auto changes = bookmarkChanges(doc);
     for (const auto& [page, label]: changes) {

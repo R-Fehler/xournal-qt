@@ -133,7 +133,7 @@ public:
     Q_INVOKABLE bool insertText(const QString& text);
     /// The cursor of the text being written scrolled into view, if it is out of it (also by itself when the canvas
     /// becomes shorter while text is written: the soft keyboard came). False if nothing is being written.
-    Q_INVOKABLE bool showTextCursor();
+    bool showTextCursor();
     QRectF mathErrorRect() const { return mathErrorArea; }
 
     qreal contentWidth() const;

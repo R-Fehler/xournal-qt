@@ -9,9 +9,6 @@
 #include <algorithm>
 #include <cmath>
 
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
 
 #include "control/ToolHandler.h"
 #include "control/settings/Settings.h"
@@ -32,72 +29,9 @@ Color toColorKeeping(const QColor& c, uint8_t alpha) {
     color.alpha = alpha;
     return color;
 }
-QColor toQColor(Color c) { return QColor(c.red, c.green, c.blue); }
-
-/// The tool's width now (its own width while that is chosen, else its size's)
-double widthOf(ToolHandler& th, ToolType type) {
-    const Tool& t = th.getTool(type);
-    if (th.isCustomThicknessActive(type) && th.getCustomThickness(type) > 0) {
-        return th.getCustomThickness(type);
-    }
-    const double* sizes = th.getToolThickness(type);
-    return sizes ? sizes[std::clamp(static_cast<int>(t.getSize()), 0, 4)] : 0;
-}
 }  // namespace
 
 QObject* AppController::toolboxObject() const { return toolbox; }
-
-QString AppController::migratedToolbox() const {
-    // The tools of before: the pen's color and width, the highlighter's, the eraser's kind and width, the font, the
-    // shape last used (only what differs from a first start is carried over)
-    ToolHandler* th = app->getToolHandler();
-    QVariantList entries = ToolboxModel::defaultEntries();
-    const QMap<QString, QString> roles = colorRoles();
-    std::string variants;
-    app->getSettings()->getCustomElement("xournalQt").getString("toolVariants", variants);
-    QString shape;
-    for (const QString& part: QString::fromStdString(variants).split(';', Qt::SkipEmptyParts)) {
-        if (part.startsWith("shape=")) {
-            shape = part.mid(6);
-        }
-    }
-    bool firstPen = true;
-    bool firstHighlighter = true;
-    for (QVariant& v: entries) {
-        QVariantMap e = v.toMap();
-        const QString type = e.value("type").toString();
-        if (type == "pen" && firstPen) {
-            firstPen = false;
-            e["width"] = widthOf(*th, TOOL_PEN);
-            const ColorRef ref = ColorRef::parse(roles.value("pen"));
-            if (ref.valid()) {
-                e["role"] = ref.role;
-            } else if (const QColor c = toQColor(th->getTool(TOOL_PEN).getColor()); c != QColor(Qt::black)) {
-                e["color"] = c.name();  // (a color of one's own: no role)
-                e["role"] = QString();
-            }
-        } else if (type == "highlighter" && firstHighlighter) {
-            firstHighlighter = false;
-            e["width"] = widthOf(*th, TOOL_HIGHLIGHTER);
-            const ColorRef ref = ColorRef::parse(roles.value("highlighter"));
-            if (ref.valid()) {
-                e["role"] = ref.role;
-            }
-        } else if (type == "eraser") {
-            e["variant"] = QString::fromUtf8(eraserTypeToString(th->getEraserType()).data());
-            e["width"] = widthOf(*th, TOOL_ERASER);
-        } else if (type == "text") {
-            e["font"] = QVariantMap{{"family", fontFamily()}, {"size", markdownFontSize()}};
-        } else if (type == "shape" && !shape.isEmpty()) {
-            e["variant"] = shape;
-        }
-        v = ToolboxModel::normalized(e);
-    }
-    QJsonObject root;
-    root["version"] = 1;
-    root["entries"] = QJsonArray::fromVariantList(entries);
-    return QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Compact));
-}
 
 QColor AppController::toolEntryColor(const QVariantMap& entry) const {
     return ToolboxModel::colorIn(entry, colorPalette());
@@ -210,7 +144,6 @@ bool AppController::applyToolEntry(const QString& id) {
             th->setSize(static_cast<ToolSize>(best));
         }
     } else if (type == "text") {
-        setTextMarkdown(true);  // (the toolbox's text box is a Markdown text box)
         th->selectTool(TOOL_TEXT);
         takeColor(TOOL_TEXT);
         const QVariantMap font = e.value("font").toMap();
@@ -236,9 +169,6 @@ void AppController::takeToolOfType(const QString& type) {
     const QString id = toolbox ? toolbox->recentOfType(type) : QString();
     if (!id.isEmpty() && applyToolEntry(id)) {
         return;
-    }
-    if (type == "text") {
-        setTextMarkdown(true);
     }
     selectTool(type);
 }

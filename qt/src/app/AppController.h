@@ -84,7 +84,6 @@ class LayersModel;
 class ShortcutsModel;
 class OutlineModel;
 class AnnotationsModel;
-class TextFlowSession;
 class MarkdownSession;
 class MarkdownEditor;
 class PageClipboard;
@@ -180,9 +179,6 @@ class AppController: public QObject {
     Q_PROPERTY(bool protectedDocument READ protectedDocument NOTIFY titleChanged)
     /// Its password can be set, changed or removed here: its file is a PDF (not an archive PDF).
     Q_PROPERTY(bool canProtect READ canProtect NOTIFY titleChanged)
-    /// Its PDF allows printing / copying its text (one opened without its owner password may not).
-    Q_PROPERTY(bool printAllowed READ printAllowed NOTIFY titleChanged)
-    Q_PROPERTY(bool copyAllowed READ copyAllowed NOTIFY titleChanged)
     // --- annotations of other apps made editable (AppAdopt.cpp; qt/docs/adopt-annotations.md)
     /// How many annotations of other apps the current document's PDF has that can be made editable (0: none, or not
     /// looked at yet), and the app that made them (empty: not known).
@@ -194,11 +190,7 @@ class AppController: public QObject {
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY undoRedoChanged)
     Q_PROPERTY(QString tool READ tool NOTIFY toolChanged)
     Q_PROPERTY(QColor color READ color NOTIFY toolChanged)
-    /// Font of the text tool (upstream's settings font)
-    Q_PROPERTY(QString fontFamily READ fontFamily WRITE setFontFamily NOTIFY fontChanged)
     Q_PROPERTY(double fontSize READ fontSize WRITE setFontSize NOTIFY fontChanged)
-    /// The text tool makes Markdown text boxes (drawn formatted) instead of ordinary texts
-    Q_PROPERTY(bool textMarkdown READ textMarkdown WRITE setTextMarkdown NOTIFY fontChanged)
     /// Dark pages (qt/docs/dark-pages.md): "off", "on", or "system" (dark while the system's colors are dark); the
     /// setting darkPages, for every window. Only what is shown: the documents do not change.
     Q_PROPERTY(QString darkPagesMode READ darkPagesMode WRITE setDarkPagesMode NOTIFY darkPagesChanged)
@@ -227,17 +219,11 @@ class AppController: public QObject {
     Q_PROPERTY(int fillAlpha READ fillAlpha WRITE setFillAlpha NOTIFY toolChanged)
     /// The color of the filling; transparent: the stroke's color (only the pen has another, PenFill.h)
     Q_PROPERTY(QColor fillColor READ fillColor WRITE setFillColor NOTIFY toolChanged)
-    /// The tool in hand can fill (TOOL_CAP_FILL), and with a color of its own
-    Q_PROPERTY(bool hasFill READ hasFill NOTIFY toolChanged)
-    Q_PROPERTY(bool hasFillColor READ hasFillColor NOTIFY toolChanged)
     /// 0 = very fine ... 4 = very thick (upstream ToolSize), 5 = the tool's own width (customWidth)
     Q_PROPERTY(int size READ size NOTIFY toolChanged)
     /// The adjustable width of the tool (points; 0: the tool has no sizes). Setting it selects it (size 5).
     Q_PROPERTY(double customWidth READ customWidth WRITE setCustomWidth NOTIFY toolChanged)
     Q_PROPERTY(QVariantList palette READ palette CONSTANT)
-    /// The colors of the deprecated text mode's color row (TextFlowPanel): the first colors of the palette, with orange
-    /// (or the colors the classic tool bar of before 0.8.0 kept in the setting "toolbarColors")
-    Q_PROPERTY(QVariantList toolbarColors READ toolbarColors CONSTANT)
     /// Color of PDF text highlights, one of three presets
     Q_PROPERTY(QColor pdfHighlightColor READ pdfHighlightColor WRITE setPdfHighlightColor NOTIFY pdfTextModeChanged)
     Q_PROPERTY(QVariantList pdfHighlightColors READ pdfHighlightColors CONSTANT)
@@ -248,10 +234,6 @@ class AppController: public QObject {
     Q_PROPERTY(QString colorPalette READ colorPalette WRITE setColorPalette NOTIFY colorPaletteChanged)
     /// The role of the color in hand when it was taken from a palette: "marker:warnings" (else "")
     Q_PROPERTY(QString colorRole READ colorRole NOTIFY toolChanged)
-    /// The text mode edits the typed text of a page (textFlowPage, 0-based); how far it goes below the page (points)
-    Q_PROPERTY(bool textFlowActive READ textFlowActive NOTIFY textFlowChanged)
-    Q_PROPERTY(int textFlowPage READ textFlowPage NOTIFY textFlowChanged)
-    Q_PROPERTY(double textFlowOverflow READ textFlowOverflow NOTIFY textFlowChanged)
     /// A Markdown box is being edited (markdownPage, 0-based); how far it goes below the page (points)
     Q_PROPERTY(bool markdownActive READ markdownActive NOTIFY markdownChanged)
     /// Markdown is being written on the page itself (formatted while typing), not in the panel beside it.
@@ -471,16 +453,11 @@ public:
     void setFillAlpha(int alpha);
     QColor fillColor() const;
     void setFillColor(const QColor& c);
-    bool hasFill() const;
-    bool hasFillColor() const;
     int size() const;
     QVariantList palette() const;
-    QVariantList toolbarColors() const;
     /// The tools' own widths and which are chosen (settings "customWidths": "pen=8.5*,highlighter=42.5,...")
     void loadCustomWidths();
     void storeCustomWidths();
-    /// Upstream's palette without white
-    QVariantList defaultToolbarColors() const;
     QColor pdfHighlightColor() const;
     void setPdfHighlightColor(const QColor& color);
     QVariantList pdfHighlightColors() const;
@@ -510,9 +487,6 @@ public:
     // --- the toolbox (qt/docs/toolbox.md; AppToolbox.cpp) ---
     QObject* toolboxObject() const;
     xqt::ToolboxModel* toolboxModel() const { return toolbox; }
-    /// The toolbox's first tools, made from the tool settings of before (the pen's color and width, the eraser's
-    /// kind, the font, the shape last used), as JSON
-    QString migratedToolbox() const;
     /// Takes the toolbox's entry `id`: its tool with all its settings (color, width, line style, filling, eraser kind,
     /// font, …), and it becomes the active entry. A sticky note entry puts a note in its color on the page instead.
     Q_INVOKABLE bool applyToolEntry(const QString& id);
@@ -525,19 +499,9 @@ public:
     Q_INVOKABLE void takeToolOfType(const QString& type);
     bool toolbarHidden() const;
     void setToolbarHidden(bool hidden);
-    bool textFlowActive() const;
-    int textFlowPage() const { return flowPage; }
-    double textFlowOverflow() const { return flowOverflow; }
-    /// Text mode: start on the current page; returns its blocks (TextFlow::toVariant) for the editor.
-    Q_INVOKABLE QVariantList beginTextFlow();
-    /// The blocks as typed: the page follows.
-    Q_INVOKABLE void updateTextFlow(const QVariantList& blocks);
-    /// Done (keep: one undo step) or cancel.
-    Q_INVOKABLE void endTextFlow(bool keep);
-    /// The text font (text tool) for the editor.
-    Q_INVOKABLE QString textFlowFamily() const;
+    /// The text font's family (the text tool's font without its style)
+    QString textFontFamily() const;
     bool markdownActive() const;
-    bool textMarkdown() const;
     QString darkPagesMode() const;
     void setDarkPagesMode(const QString& mode);
     bool darkPagesShown() const;
@@ -546,7 +510,6 @@ public:
     /// The pages printed (`range` as printDocument takes it) have dark paper (a page color, not a PDF page): printing
     /// them takes a lot of ink, the print dialog says so
     Q_INVOKABLE bool printUsesDarkPaper(const QString& range) const;
-    void setTextMarkdown(bool markdown);
     double markdownFontSize() const;
     void setMarkdownFontSize(double size);
     double markdownBoxSize() const;
@@ -868,7 +831,7 @@ public:
     /// Name a page's bookmark ("" or "Page N": the automatic label). One undo step.
     Q_INVOKABLE bool renameBookmark(int page, const QString& label);
     /// What a new bookmark of the page is called ("": the automatic label).
-    Q_INVOKABLE QString defaultBookmarkLabel(int page) const;
+    QString defaultBookmarkLabel(int page) const;
     bool favourite() const;
     void setFavourite(bool on);
     bool canFavourite() const;
@@ -891,7 +854,7 @@ public:
     /// (why not, for the dialog) }
     Q_INVOKABLE QVariantMap documentTags(const QString& path) const;
     /// Give a PDF these tags as its keywords (an incremental update, in the background; tabs showing it read it again).
-    /// Refused with a message when a tab has unsaved changes of it. documentTagsWritten when done.
+    /// Refused with a message when a tab has unsaved changes of it.
     Q_INVOKABLE bool setDocumentTags(const QString& path, const QStringList& tags);
 
     /// The library's To-dos view (LibraryTodosModel)
@@ -934,7 +897,7 @@ public:
     Q_INVOKABLE bool openFile(const QUrl& url);
     Q_INVOKABLE bool openPath(const QString& path);
     /// Open several files (e.g. from the command line or another instance).
-    Q_INVOKABLE void openPaths(const QStringList& paths);
+    void openPaths(const QStringList& paths);
     /// Open what the home screen lists: documents and text files as tabs, other files with the system app.
     Q_INVOKABLE void openListed(const QStringList& paths);
     /// Open a file with the app the system has for it (SystemApps.h).
@@ -1087,7 +1050,6 @@ public:
     /// Save as: the type the dialog starts on, "pdf" (PDF with notes) or "xopp". A hybrid PDF stays a PDF, a .xopp a
     /// .xopp; other documents (new ones, annotated PDFs, images) take the mode's: "pdf" in PDF files mode.
     Q_INVOKABLE QString saveFormat() const;
-    Q_INVOKABLE void exportXoppInBackground(const QUrl& url);
     /// The same, waiting until the file is written (tests): whether that worked.
     Q_INVOKABLE bool save();
     Q_INVOKABLE bool saveAs(const QUrl& url);
@@ -1095,8 +1057,6 @@ public:
     bool isHybrid() const;
     bool protectedDocument() const;
     bool canProtect() const;
-    bool printAllowed() const;
-    bool copyAllowed() const;
     /// The PDF waiting for its password (passwordNeeded): opened with this one. False: not opened (a wrong one asks
     /// again, passwordNeeded with `wrong`).
     Q_INVOKABLE bool openWithPassword(const QString& password);
@@ -1129,8 +1089,6 @@ public:
     Q_INVOKABLE QUrl fileForFormat(const QUrl& file, bool pdf) const;
     /// Save writes without asking: the document has a file, or it is an annotated PDF and the notes go into it.
     Q_INVOKABLE bool savesWithoutDialog() const;
-    /// "Export as .xopp for Xournal++…": "name.xopp" next to the hybrid PDF.
-    Q_INVOKABLE QUrl suggestedXoppExport() const;
     Q_INVOKABLE bool exportXopp(const QUrl& url);
     // --- Share (qt/docs/hybrid-pdf.md) ---
     /// What "Share → PDF with notes" does with the current document: "share" (its file as it is: a hybrid PDF without
@@ -1172,9 +1130,6 @@ public:
     /// included; it keeps its file and state), or from `file`, loaded on a worker without opening a tab. Then
     /// archiveExported, or a message if it failed.
     Q_INVOKABLE bool exportArchive(const QUrl& target, const QString& file = QString());
-    /// Archive exports running (their dialog shows it).
-    Q_PROPERTY(int archiveExports READ archiveExports NOTIFY archiveExportsChanged)
-    int archiveExports() const { return archiveRunning; }
     /// "Export library as archive…" (LibraryArchive: running, done, total, current; finished(summary)).
     Q_PROPERTY(QObject* libraryArchive READ libraryArchiveObject CONSTANT)
     QObject* libraryArchiveObject() const;
@@ -1374,7 +1329,6 @@ public:
     Q_INVOKABLE void duplicatePage(int index);
     Q_INVOKABLE void deletePage(int index);
     Q_INVOKABLE void movePageUp(int index);
-    Q_INVOKABLE void movePageDown(int index);
 
     // --- tools (shared by all tabs) ---
     /// "pen", "highlighter", "eraser", "hand"
@@ -1484,9 +1438,6 @@ public:
     Q_INVOKABLE bool copyPagesAsImage(const QList<int>& pages);
     /// Put the setsquare ("setsquare") or the compass ("compass") on the page, or take it away again.
     Q_INVOKABLE void toggleGeometryTool(const QString& which);
-    /// For the screenshot hook (it calls methods without arguments)
-    Q_INVOKABLE void toggleSetsquare() { toggleGeometryTool("setsquare"); }
-    Q_INVOKABLE void toggleCompass() { toggleGeometryTool("compass"); }
     /// The curtain over part of the page, or the spotlight (all black but a rectangle; qt/docs/curtain.md; this tab's,
     /// only on the screen): "curtain" / "spotlight" puts it out (instead of the other one; the same again takes it
     /// away), "" takes it away.
@@ -1615,7 +1566,7 @@ public:
     /// After linkTargetMissing: the file the link means, chosen by the reader. The link is written anew, then followed.
     Q_INVOKABLE bool relinkTo(const QUrl& file);
     /// Call before quitting: writes settings.
-    Q_INVOKABLE void shutdown();
+    void shutdown();
 
     xqt::AppContext& context() const { return *app; }
     xqt::TabManager& tabManager() const { return *tabs; }
@@ -1667,8 +1618,6 @@ Q_SIGNALS:
     void notesChanged();
     /// Messages from the core (XojMsgBox) and file errors, shown by QML.
     void message(const QString& title, const QString& text, bool error);
-    /// A document's tags were written (setDocumentTags)
-    void documentTagsWritten(const QString& path);
     /// This folder can be a library only with "All files access": the window explains why it is asked for, then
     /// calls requestStorageAccess.
     void storageAccessNeeded(const QString& folder);
@@ -1706,8 +1655,6 @@ Q_SIGNALS:
     void stickerSaved(const QString& path, const QString& error);
     /// A sticker was pasted (or `error`)
     void stickerPasted(const QString& path, const QString& error);
-    /// A sticker file is being written or read
-    void stickerBusyChanged();
 
     void todoStampChanged();
     /// A template was written (`path`); or (`error` not empty) it could not be
@@ -1734,7 +1681,6 @@ Q_SIGNALS:
     void pdfTextModeChanged();
     /// PDF text was selected (select mode); rect in canvas coordinates.
     void pdfTextSelected(QRectF rect);
-    void pdfTextSelectionCleared();
     /// Something was selected or unselected: `pdfTextIsSelected` and the ends of the selection are different now.
     void pdfTextSelectionChanged();
     void titlePageChanged();
@@ -1758,7 +1704,6 @@ Q_SIGNALS:
     void printRequested(const QList<int>& pages);
     void chapterRequested(int page);
     void toolbarHiddenChanged();
-    void textFlowChanged();
     void markdownChanged();
     void markdownOnPageChanged();
     void markdownFormatChanged();
@@ -1778,9 +1723,6 @@ Q_SIGNALS:
     /// A zip was opened (the app started with it, the file dialog, a drop): the window asks where in the library it
     /// goes ("Open in library…").
     void zipOpened(const QString& path);
-    /// A zip was unpacked into the library: its new folder (relative), shown now.
-    void zipUnpacked(const QString& folder, int files, const QStringList& skipped);
-    void archiveExportsChanged();
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
     void adoptableChanged();
@@ -1844,7 +1786,6 @@ private:
     /// Hand files to the system (share), or put them on the clipboard.
     bool handOver(const QStringList& files, bool toClipboard);
     fs::path lastShareFolder;
-    int archiveRunning = 0;
     std::unique_ptr<xqt::LibraryArchive> libraryArchiveTask;
     std::unique_ptr<xqt::LibraryShare> libraryShareTask;
     std::unique_ptr<xqt::LibraryUnzip> libraryUnzipTask;
@@ -1881,7 +1822,7 @@ private:
     std::vector<std::pair<AppController*, xqt::DocumentSession*>> tabsWithFile(const fs::path& file,
                                                                                const xqt::DocumentSession* except) const;
     std::vector<QJSValue> whenAllSavedCalls;
-    /// The text tool of the current tab makes Markdown text or not (textMarkdown, markdownFontSize).
+    /// The text tool of the current tab (and of the reference) makes Markdown text boxes of markdownFontSize.
     void applyMarkdownText();
     // --- the snip tool (AppSnip.cpp) ---
     /// A view of `s` drew a snip's picture: onto the clipboard, the tool used before back
@@ -1996,10 +1937,6 @@ private:
     std::unique_ptr<xqt::LayersModel> layers;
     std::unique_ptr<xqt::ShortcutsModel> ownShortcuts;
     xqt::ShortcutsModel* shortcuts = nullptr;  ///< the main window's
-    std::unique_ptr<xqt::TextFlowSession> flow;
-    xqt::DocumentSession* flowSession = nullptr;
-    int flowPage = -1;
-    double flowOverflow = 0;
     std::unique_ptr<xqt::MarkdownSession> markdown;
     xqt::DocumentSession* mdSession = nullptr;
     int mdPage = -1;

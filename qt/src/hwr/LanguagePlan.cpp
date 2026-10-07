@@ -44,11 +44,6 @@ QString LanguagePlan::decided() const {
     return language;
 }
 
-int LanguagePlan::probed() const {
-    std::lock_guard lock(mtx);
-    return counts.empty() ? 0 : *std::max_element(counts.begin(), counts.end());
-}
-
 uint32_t LanguagePlan::membersOf(const QString& l, const std::vector<QStringList>& models) const {
     uint32_t bits = 0;
     for (size_t i = 0; i < models.size() && i < 32; ++i) {

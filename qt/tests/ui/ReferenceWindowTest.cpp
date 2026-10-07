@@ -1050,7 +1050,6 @@ TEST_F(ReferenceWindowTest, markdownIsWrittenInTheReferenceWhenItIsWrittenIn) {
 
     // Written in: the text tool opens its Markdown text beside the page
     ref().setEditing(true);
-    controller->setTextMarkdown(true);
     controller->setMarkdownInPanel(true);
     controller->selectTool("text");
     QSignalSpy asked(controller.get(), &AppController::markdownBoxRequested);
@@ -1063,7 +1062,6 @@ TEST_F(ReferenceWindowTest, markdownIsWrittenInTheReferenceWhenItIsWrittenIn) {
     controller->updateMarkdown("in the reference");
     controller->endMarkdown(true);
     EXPECT_TRUE(book->isModified()) << "the Markdown text did not go into the reference";
-    controller->setTextMarkdown(false);
 }
 
 TEST_F(ReferenceWindowTest, ctrlSSavesTheReferenceWhenItIsWrittenIn) {
