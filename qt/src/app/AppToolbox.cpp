@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the toolbox of the window (qt/toolbox, qt/docs/toolbox.md): taking one of the user's own tools
+ * xournal-qt: the toolbox of the window (qt/toolbox, qt/docs/features/toolbox.md): taking one of the user's own tools
  * (ToolboxModel) gives the tool in hand everything that entry holds: the tool, its drawing type (a shape), the color
  * (its palette role's in the chosen palette, else its own), the width, the line style and the filling, the eraser's
  * kind, the font of a text box. A sticky note entry puts a note of its color on the page.
@@ -76,8 +76,8 @@ bool AppController::applyToolEntry(const QString& id) {
     if (type == "sticky") {
         return insertStickyNote(QColor(e.value("color").toString()));
     }
-    // A snip (qt/docs/snip.md): one picture of a rectangle or a lasso, then the tool in hand before comes back; it is
-    // never the entry in hand for long, so the active entry stays the one it gives back to
+    // A snip (qt/docs/features/snip.md): one picture of a rectangle or a lasso, then the tool in hand before comes
+    // back; it is never the entry in hand for long, so the active entry stays the one it gives back to
     if (type == "snip") {
         startSnip(e.value("variant").toString());
         return true;

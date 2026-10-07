@@ -307,7 +307,7 @@ Rectangle {
                     color: "#9334e6"
                 }
                 HitBadge { count: entry.searchHitCount; anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 4 }
-                // A bookmarked page: the ribbon (qt/docs/bookmarks.md)
+                // A bookmarked page: the ribbon (qt/docs/features/bookmarks.md)
                 Image {
                     objectName: "sidebarRibbon"
                     visible: entry.bookmark !== ""

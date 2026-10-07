@@ -1,6 +1,6 @@
 /*
- * xournal-qt: bookmarks on pages (qt/docs/bookmarks.md): the .xopp page attribute (and that upstream Xournal++ still
- * opens such a file without a message), one undo step per change, bookmarks following their pages, and the PDF
+ * xournal-qt: bookmarks on pages (qt/docs/features/bookmarks.md): the .xopp page attribute (and that upstream Xournal++
+ * still opens such a file without a message), one undo step per change, bookmarks following their pages, and the PDF
  * outline item "Bookmarks" (written in full and as incremental updates, the document's own outline kept).
  *
  * @license GNU GPLv2 or later

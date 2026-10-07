@@ -1,7 +1,7 @@
-// "Find this paper" (qt/docs/citations.md): a bibliography entry (selected text) is looked for in the library by its
-// title, not by file names (arXiv papers are named by numbers). The guessed title can be corrected; each hit opens
-// beside the notes (the reference), in a tab, or copies a link to paste onto the citation. Not in the library: Google
-// Scholar and arXiv, with their addresses shown.
+// "Find this paper" (qt/docs/features/citations.md): a bibliography entry (selected text) is looked for in the library
+// by its title, not by file names (arXiv papers are named by numbers). The guessed title can be corrected; each hit
+// opens beside the notes (the reference), in a tab, or copies a link to paste onto the citation. Not in the library:
+// Google Scholar and arXiv, with their addresses shown.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

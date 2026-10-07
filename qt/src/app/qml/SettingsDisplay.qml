@@ -191,7 +191,7 @@ ScrollView {
                        + "until it does.")
         }
 
-        // The layout for the window's size (qt/docs/adaptive-layout.md)
+        // The layout for the window's size (qt/docs/features/adaptive-layout.md)
         SettingsSectionTitle { text: qsTr("Window size") }
         SettingsSwitchRow {
             objectName: "adaptiveLayoutSwitch"

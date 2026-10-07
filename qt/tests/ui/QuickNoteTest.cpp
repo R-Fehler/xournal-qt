@@ -1,6 +1,6 @@
 /*
- * xournal-qt: Quick note in the real window (qt/docs/quick-note.md): the home screen's button (a wide window) or its
- * entry in "+" (narrower), Ctrl+Alt+N and ⋮ make a new note in the library's Inbox and show it; with the setting
+ * xournal-qt: Quick note in the real window (qt/docs/features/quick-note.md): the home screen's button (a wide window)
+ * or its entry in "+" (narrower), Ctrl+Alt+N and ⋮ make a new note in the library's Inbox and show it; with the setting
  * "daily" a line "- HH:MM " goes into today's Markdown note, opened with the cursor at its end.
  *
  * @license GNU GPLv2 or later

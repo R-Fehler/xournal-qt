@@ -1,7 +1,7 @@
 /*
- * xournal-qt: the link format between documents (qt/docs/links.md): parsing, writing, relative paths, and where a
- * link leads (chapter by title, then normalised title, then the saved page; the PDF page; the page's fingerprint;
- * a .md heading by its slug, then its line).
+ * xournal-qt: the link format between documents (qt/docs/features/links.md): parsing, writing, relative paths, and
+ * where a link leads (chapter by title, then normalised title, then the saved page; the PDF page; the page's
+ * fingerprint; a .md heading by its slug, then its line).
  *
  * @license GNU GPLv2 or later
  */

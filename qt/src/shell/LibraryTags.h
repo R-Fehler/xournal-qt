@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the "Tags" view of the library home (qt/docs/tags.md): the tags of the library's documents with how many
- * documents have each, nested tags folded under their parent (#course holds #course/math).
+ * xournal-qt: the "Tags" view of the library home (qt/docs/features/tags.md): the tags of the library's documents with
+ * how many documents have each, nested tags folded under their parent (#course holds #course/math).
  *
  * It comes from the library's index (LibraryIndex::tagged: read into each folder's "notes" pack), so no document is
  * opened. It follows the library's "Show" filter and its Favourites filter, and, with folderOnly, the library's current

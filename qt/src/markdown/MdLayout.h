@@ -71,7 +71,7 @@ struct MathSpan {
 /// A picture (![alt](path)) in the text of an item: bytes [start, start + length) of its Pango layout's text. One
 /// that is drawn is one character, U+FFFC, with a shape as big as the picture; one that is not (a missing file, a
 /// web picture not loaded) is its alt text and path, and a web picture has a "Load image" button, bytes
-/// [buttonStart, buttonEnd) (qt/docs/md-images.md).
+/// [buttonStart, buttonEnd) (qt/docs/features/md-images.md).
 struct ImageSpan {
     int start = 0;
     int length = 0;

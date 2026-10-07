@@ -527,7 +527,7 @@ public:
             add({rel, copy, file, mtimeOf(file), false});
         }
         if (p.options.recordings) {
-            // Next to it in "name.audio/", where the app finds them by name (qt/docs/audio.md)
+            // Next to it in "name.audio/", where the app finds them by name (qt/docs/features/audio.md)
             const std::string audioFolder = relOf(audio::exportFolderOf(file));
             for (const fs::path& a: recordings) {
                 const std::string r = join(audioFolder, u8(a.filename()));
@@ -904,7 +904,8 @@ private:
     std::map<std::string, FolderPacks> byFolder;
 };
 
-/// A file in the "name.audio" folder next to "name.xopp" (where recordings are found by name, qt/docs/audio.md)
+/// A file in the "name.audio" folder next to "name.xopp" (where recordings are found by name,
+/// qt/docs/features/audio.md)
 bool isRecordingOfNotes(const fs::path& file) {
     const fs::path folder = file.parent_path();
     if (lower(folder.extension().string()) != ".audio") {

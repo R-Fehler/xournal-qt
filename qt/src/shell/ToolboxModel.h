@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the arrangement of the tools (qt/docs/toolbox.md): the user's own tools ("my tools"), each a tool with its
+ * xournal-qt: the arrangement of the tools (qt/docs/features/toolbox.md): the user's own tools ("my tools"), each a tool with its
  * settings, like pens taken from a sorted toolbox on a table (Drawboard), and where everything sits on the two bars:
  * the rail (the toolbox beside the page) and the top bar. A pen in the body color, a red pen, a yellow highlighter, a
  * dashed arrow, a whiteout eraser, a text box in a font, a sticky note in a color, the laser pointer, a snip (a picture

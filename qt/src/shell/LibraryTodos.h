@@ -1,8 +1,8 @@
 /*
- * xournal-qt: the "To-dos" view of the library home (qt/docs/todos.md): the to-dos of all documents of the library,
- * grouped by document (the default), by folder, or not at all; sorted by due date, document, or when the document was
- * last changed; filtered by state (open, done, all), due date (overdue, today, this week, no date), a text and the
- * library's current folder.
+ * xournal-qt: the "To-dos" view of the library home (qt/docs/features/todos.md): the to-dos of all documents of the
+ * library, grouped by document (the default), by folder, or not at all; sorted by due date, document, or when the
+ * document was last changed; filtered by state (open, done, all), due date (overdue, today, this week, no date), a text
+ * and the library's current folder.
  *
  * It comes from the library's index (LibraryIndex::todos: read into each folder's "notes" pack when a document is
  * indexed), so no document is opened to list them; which task lines are to-dos is the setting (todos::Rules). It also

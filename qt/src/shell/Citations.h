@@ -1,5 +1,5 @@
 /*
- * xournal-qt: citations, the QML side (`app.citations`, qt/docs/citations.md).
+ * xournal-qt: citations, the QML side (`app.citations`, qt/docs/features/citations.md).
  *
  * Selected text (PDF text, or the text being written) can be looked up: the web search engine of Settings, Google
  * Scholar and a translator in the browser (and searched here: the QML takes `searchQuery`, its first 200 characters). Every web address is shown before it is opened (the menu shows it; a confirmation shows it whole unless

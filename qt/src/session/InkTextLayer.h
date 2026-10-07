@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the recognised handwriting as invisible text in the PDFs the app writes (qt/docs/handwriting-search.md),
- * so other PDF viewers find the words too.
+ * xournal-qt: the recognised handwriting as invisible text in the PDFs the app writes
+ * (qt/docs/features/handwriting-search.md), so other PDF viewers find the words too.
  *
  * A PDF with notes (hybrid) or an archive PDF gets, per page with recognised handwriting, one content stream before
  * the page's own content: "q <placement> cm BT 3 Tr ... ET Q", the best reading of each word as text in render mode 3

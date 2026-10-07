@@ -1,6 +1,6 @@
 /*
  * xournal-qt: the bridge to the app's activity on Android (qt/packaging/android/src/org/xournalqt/app/
- * XournalActivity.java, see qt/docs/android.md).
+ * XournalActivity.java, see qt/docs/development/android.md).
  *
  * @license GNU GPLv2 or later
  */
@@ -24,9 +24,9 @@ void watchIncomingFiles(std::function<void(const QStringList&)> receive);
 bool hasStylus();
 
 /// A recording runs, paused or ended: the foreground service that keeps the microphone in the background, with its
-/// notification (qt/docs/audio.md, "Android"): the time (`recordedMs` now; its clock runs on while not paused), the
-/// document's `title`, and Pause/Resume and Stop. `labels`: the notification's texts, translated (recording, paused,
-/// pause, resume, stop).
+/// notification (qt/docs/features/audio.md, "Android"): the time (`recordedMs` now; its clock runs on while not
+/// paused), the document's `title`, and Pause/Resume and Stop. `labels`: the notification's texts, translated
+/// (recording, paused, pause, resume, stop).
 void setRecording(bool on, bool paused, qint64 recordedMs, const QString& title, const QStringList& labels);
 
 /// The notification's buttons: `command` gets 1 (pause), 2 (resume) or 3 (stop), on the UI thread

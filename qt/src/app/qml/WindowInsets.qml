@@ -1,6 +1,6 @@
-// xournal-qt: the window's insets (Main.qml's state, `win.insets`; qt/docs/adaptive-layout.md, "Safe areas" and
-// "The soft keyboard"): the safe area, where the controls over the pages may go, the bottom sheets of the phone classes
-// and the soft keyboard. The window's root keeps safeTop/Right/Bottom/Left, fakeKeyboardHeight, keyboardTop and
+// xournal-qt: the window's insets (Main.qml's state, `win.insets`; qt/docs/features/adaptive-layout.md, "Safe areas"
+// and "The soft keyboard"): the safe area, where the controls over the pages may go, the bottom sheets of the phone
+// classes and the soft keyboard. The window's root keeps safeTop/Right/Bottom/Left, fakeKeyboardHeight, keyboardTop and
 // keyboardHeight as aliases: main.cpp and the tests set and read them there.
 import QtQuick
 import QtQuick.Window

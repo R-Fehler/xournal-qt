@@ -1,7 +1,7 @@
 /*
  * Xournal++
  *
- * xournal-qt: space for notes around a page's content (qt/docs/note-space.md).
+ * xournal-qt: space for notes around a page's content (qt/docs/features/note-space.md).
  *
  * A page with note space is larger than its "slide" by these amounts (points). Its PDF background is drawn at
  * (left, top), at its own scale; other backgrounds fill the whole page. Saved as the page attribute

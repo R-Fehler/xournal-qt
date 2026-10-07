@@ -1,7 +1,7 @@
 /*
- * xournal-qt: Quick note (qt/docs/quick-note.md): a new note in the library's "Inbox" named by the date and time, in
- * the format of new documents, opened in a tab with the pen in hand; and `xournal-qt --quick-note` handed to the
- * window that runs already (SingleInstance).
+ * xournal-qt: Quick note (qt/docs/features/quick-note.md): a new note in the library's "Inbox" named by the date and
+ * time, in the format of new documents, opened in a tab with the pen in hand; and `xournal-qt --quick-note` handed to
+ * the window that runs already (SingleInstance).
  *
  * @license GNU GPLv2 or later
  */

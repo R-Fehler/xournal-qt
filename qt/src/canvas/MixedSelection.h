@@ -1,6 +1,6 @@
 /*
  * xournal-qt: a selection of several sticky notes, or of notes together with elements of the page
- * (qt/docs/sticky-notes.md, "Several notes at once").
+ * (qt/docs/features/sticky-notes.md, "Several notes at once").
  *
  * One per view. It holds whole notes (their layers) and elements of the page's own layers, all on one page, where they
  * are: nothing is taken out of its layer while it is selected (unlike upstream's EditSelection, which takes elements
@@ -85,7 +85,7 @@ public:
     bool paste(size_t page);
     /// Notes and elements (sticky::serializeGroup) onto a page, in their layout, centred at `centre` (page
     /// coordinates) and kept inside the page, made smaller only when they are larger than the page (a sticker:
-    /// qt/docs/stickers.md). Selected; one undo step named `what`.
+    /// qt/docs/features/stickers.md). Selected; one undo step named `what`.
     bool pasteAt(size_t page, const std::string& bytes, QPointF centre, const char* what);
 
     /// Something changed (undo, a layer went, a page went): what is no longer where it was leaves the selection

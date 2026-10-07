@@ -1,6 +1,6 @@
 /*
- * xournal-qt: version history inside a PDF with notes (PdfHistory.h, qt/docs/hybrid-pdf.md "Version history"): one
- * version per day plus milestones, the day's version replaced by later saves that day, never compacted while on (a
+ * xournal-qt: version history inside a PDF with notes (PdfHistory.h, qt/docs/features/hybrid-pdf.md "Version history"):
+ * one version per day plus milestones, the day's version replaced by later saves that day, never compacted while on (a
  * fallback appends the whole document), version 0 as received, another app's revision never cut away; every version
  * opens as the document saved then.
  *
@@ -568,7 +568,7 @@ TEST_F(PdfHistoryTest, everyThirtiethVersionIsWhole) {
 }
 
 // XQT_BENCH_HISTORY=1: a written lecture (20 pages, 300 strokes each), ten days with 20 more strokes a day: what each
-// day's version adds to the file, with and without the deltas (qt/docs/hybrid-pdf.md, "Version history")
+// day's version adds to the file, with and without the deltas (qt/docs/features/hybrid-pdf.md, "Version history")
 TEST_F(PdfHistoryTest, benchTenDaysOfALecture) {
     if (!std::getenv("XQT_BENCH_HISTORY")) {
         GTEST_SKIP() << "XQT_BENCH_HISTORY=1 runs it";

@@ -67,8 +67,8 @@ struct DocumentItem {
     }
 };
 
-/// What a PDF that is a document's file is, by what it carries (qt/docs/library.md, "Kinds of PDFs"): the library
-/// index keeps it per PDF (LibraryIndex::pdfKind), so the cards and the "Show" filter never look into a PDF.
+/// What a PDF that is a document's file is, by what it carries (qt/docs/features/library.md, "Kinds of PDFs"): the
+/// library index keeps it per PDF (LibraryIndex::pdfKind), so the cards and the "Show" filter never look into a PDF.
 enum class PdfKind {
     Unknown,      ///< not indexed (yet), or not a PDF
     Plain,        ///< a PDF (without our marker)
@@ -175,7 +175,7 @@ std::string uniqueName(const fs::path& folder, const std::string& stem);
 bool validName(const std::string& name);
 
 /// Rename a document: the .xopp and its PDF (or image) together. A text or other file: `newName` is its whole file
-/// name. Every rename in the app goes through here (the library, the recent list, a tab, qt/docs/library.md
+/// name. Every rename in the app goes through here (the library, the recent list, a tab, qt/docs/features/library.md
 /// "Renaming"); what follows it (index, reading places, open tabs, links) is the caller's (Result::moved).
 Result rename(const DocumentItem& item, const std::string& newName);
 /// Why a document cannot get `newName`, as rename() checks it (the name fields show it while the name is typed).

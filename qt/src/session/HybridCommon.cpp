@@ -306,7 +306,7 @@ std::vector<std::string> strip(QPDF& pdf, const std::set<std::string>& keep) {
                 }
             }
         }
-        for (const auto& [name, source]: audioListOf(marker)) {  // (the recordings: qt/docs/audio.md)
+        for (const auto& [name, source]: audioListOf(marker)) {  // (the recordings: qt/docs/features/audio.md)
             files.insert(name);
         }
     }

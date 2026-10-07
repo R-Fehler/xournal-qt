@@ -21,7 +21,7 @@ if ! git merge --no-ff --no-edit "$REF"; then
 Merge has conflicts. Resolution rules (see FORK.md):
   - never delete upstream files (keep "theirs" for files the Qt build does not compile)
   - for seams tagged "xournal-qt:", re-apply the seam on top of the upstream change
-  - update qt/docs/adr/0002-upstream-seams.md if a seam changed
+  - update qt/docs/decisions/0002-upstream-seams.md if a seam changed
 Then: git commit && re-run this script with the tests only (SKIP_MERGE=1 is not implemented; just build + ctest).
 MSG
     exit 2

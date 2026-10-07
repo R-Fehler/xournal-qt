@@ -1,14 +1,14 @@
 /*
- * xournal-qt: the handwriting search of the app (qt/docs/handwriting-search.md): the setting, the recogniser and its
- * model, the worker, and an indexer per open document.
+ * xournal-qt: the handwriting search of the app (qt/docs/features/handwriting-search.md): the setting, the recogniser
+ * and its model, the worker, and an indexer per open document.
  *
  * Off until switched on in Settings ("handwritingSearch" in the xournalQt part of the settings). While on, every open
  * document gets an InkTextIndexer (the one in front first), all sharing one InkRecognitionService. Off again: the
  * indexers go and the open documents forget their recognised words (the library's results stay on disk).
  *
- * The models (qt/docs/handwriting-search.md, "Languages and models"): the setting "handwritingLanguages" says which
- * languages are read ("en", "de" or "en+de", the default); each language has a slot (slots(): English, German) whose
- * model is a folder with a manifest (model.json, ModelInfo.h): the folder chosen in Settings for it
+ * The models (qt/docs/features/handwriting-search.md, "Languages and models"): the setting "handwritingLanguages" says
+ * which languages are read ("en", "de" or "en+de", the default); each language has a slot (slots(): English, German)
+ * whose model is a folder with a manifest (model.json, ModelInfo.h): the folder chosen in Settings for it
  * ("handwritingModel", "handwritingModelDe"), else its environment variable (XQT_HWR_MODEL, XQT_HWR_MODEL_DE), else
  * the app's own in its data folder, "~/.local/share/xournal-qt/models/<slot's name>/" (where qt/scripts/hwr-model.sh
  * and the download in Settings put it). Without a model there, any model in the app's models folder that reads the

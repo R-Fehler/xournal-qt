@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the pen's gestures (qt/docs/pen-gestures.md), replayed as Qt tablet events through the canvas:
+ * xournal-qt: the pen's gestures (qt/docs/features/pen-gestures.md), replayed as Qt tablet events through the canvas:
  * hold to straighten (a stroke held still before the pen is lifted becomes the shape upstream's ShapeRecognizer sees
  * in it) and scratch out to erase (a quick zigzag over ink deletes it; never a stroke of the handwriting fixture).
  *

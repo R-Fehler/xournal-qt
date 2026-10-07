@@ -1,5 +1,5 @@
 /*
- * xournal-qt: ONNX Runtime, loaded when it is needed (qt/docs/handwriting-search.md).
+ * xournal-qt: ONNX Runtime, loaded when it is needed (qt/docs/features/handwriting-search.md).
  *
  * The app is built without linking ONNX Runtime: only its C API's headers are vendored (qt/3rdparty/onnxruntime). The
  * library is opened (dlopen) the first time the handwriting search wants a model: XQT_ONNXRUNTIME (a path), else next

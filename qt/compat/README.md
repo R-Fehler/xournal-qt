@@ -6,4 +6,4 @@ These headers come **before** the upstream include directories in the Qt build (
 - `include/`: shadow headers with the same path and API as an upstream header, but a GTK-free implementation. Example: `util/XojMsgBox.h`.
 - `*.cpp`: implementations of shadow headers, or GTK-free implementations of upstream headers (`VersionInfo.cpp`).
 
-When upstream code in the allowlist starts calling a GTK function or a new method of a shadowed class, the Qt build fails to compile. Extend the shim or shadow header, and record the change in [ADR-0002](../docs/adr/0002-upstream-seams.md).
+When upstream code in the allowlist starts calling a GTK function or a new method of a shadowed class, the Qt build fails to compile. Extend the shim or shadow header, and record the change in [ADR-0002](../docs/decisions/0002-upstream-seams.md).

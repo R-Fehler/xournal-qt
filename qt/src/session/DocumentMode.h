@@ -1,6 +1,6 @@
 /*
- * xournal-qt: how documents are kept (qt/docs/hybrid-pdf.md, "PDF-only mode"). Asked at the first start, changed in
- * Settings → Documents:
+ * xournal-qt: how documents are kept (qt/docs/features/hybrid-pdf.md, "PDF-only mode"). Asked at the first start,
+ * changed in Settings → Documents:
  * - Xournal++ files ("xopp"): .xopp notes next to their PDFs, as Xournal++ keeps them (the behaviour before the
  *   question existed);
  * - PDF files ("pdf"): every document is one PDF with notes (a hybrid PDF). New documents are "name.pdf", notes on a
@@ -33,15 +33,15 @@ bool shouldAsk(Settings& settings);
 /// Store the choice (saved at once).
 void store(Settings& settings, Mode mode);
 
-/// What a new text document is (qt/docs/md-pdf.md): a PDF text document ("name.pdf", a PDF with notes whose page 1
-/// starts the page's Markdown text) or a Markdown file ("name.md"). The setting "newTextDocuments" ("pdf", "md");
-/// while it is not stored it follows the mode in effect (PDF files: a PDF document).
+/// What a new text document is (qt/docs/features/md-pdf.md): a PDF text document ("name.pdf", a PDF with notes whose
+/// page 1 starts the page's Markdown text) or a Markdown file ("name.md"). The setting "newTextDocuments" ("pdf",
+/// "md"); while it is not stored it follows the mode in effect (PDF files: a PDF document).
 enum class TextKind { Pdf, Markdown };
 TextKind newTextDocuments(Settings& settings);
 void setNewTextDocuments(Settings& settings, TextKind kind);
 
-/// Version history (qt/docs/hybrid-pdf.md, "Version history"): a document that becomes a PDF with notes keeps its
-/// versions from its first save ("keepVersionsOfNewPdfs", off unless set).
+/// Version history (qt/docs/features/hybrid-pdf.md, "Version history"): a document that becomes a PDF with notes keeps
+/// its versions from its first save ("keepVersionsOfNewPdfs", off unless set).
 bool keepVersionsOfNewPdfs(Settings& settings);
 void setKeepVersionsOfNewPdfs(Settings& settings, bool on);
 

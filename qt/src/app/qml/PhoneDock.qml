@@ -1,8 +1,8 @@
-// The phone's tool dock (qt/docs/adaptive-layout.md, "The phone chrome"; qt/docs/toolbox.md, "On a phone"): in the
-// phone classes the tools are one bar at the bottom, within reach of the thumb, instead of the command bar and the view
-// pill. It hosts the toolbox: the same rail as on a larger screen, at the bottom edge (undo, redo, the same items
-// scrolling sideways with "+" at their end, the page number; qt/rail-scroll, qt/top-bar). A text document has no ink
-// tools: then the dock is
+// The phone's tool dock (qt/docs/features/adaptive-layout.md, "The phone chrome"; qt/docs/features/toolbox.md, "On a
+// phone"): in the phone classes the tools are one bar at the bottom, within reach of the thumb, instead of the command
+// bar and the view pill. It hosts the toolbox: the same rail as on a larger screen, at the bottom edge (undo, redo, the
+// same items scrolling sideways with "+" at their end, the page number; qt/rail-scroll, qt/top-bar). A text document
+// has no ink tools: then the dock is
 //   undo | redo | the page number
 // (its commands are the top bar's, in the app bar, and ⋮'s); the page number: a tap shows all pages.
 // Held sideways (a phone in landscape) it is a rail at the right side, the same buttons from the top down.
@@ -22,7 +22,7 @@ Rectangle {
     /// takes the right one)
     property real safeLeft: 0
     property real safeRight: 0
-    /// The toolbox fills the dock (qt/docs/toolbox.md, "On a phone"): its own cells give way
+    /// The toolbox fills the dock (qt/docs/features/toolbox.md, "On a phone"): its own cells give way
     property bool hostsToolbox: false
     readonly property Item toolboxSlot: toolboxHolder
     signal pagesRequested()

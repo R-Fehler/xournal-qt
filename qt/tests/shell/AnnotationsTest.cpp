@@ -1,7 +1,7 @@
 /*
- * xournal-qt: a document's annotations collected (qt/docs/annotations-md.md) - the highlighter over PDF text with the
- * text under it, a highlight annotation of the PDF itself, text and Markdown boxes, handwriting in the margin (not
- * the ink over the text), a link marker - and written as Markdown whose links lead back to their pages.
+ * xournal-qt: a document's annotations collected (qt/docs/features/annotations-md.md) - the highlighter over PDF text
+ * with the text under it, a highlight annotation of the PDF itself, text and Markdown boxes, handwriting in the margin
+ * (not the ink over the text), a link marker - and written as Markdown whose links lead back to their pages.
  *
  * @license GNU GPLv2 or later
  */
@@ -205,8 +205,8 @@ TEST(Annotations, collectsHighlightsBoxesHandwritingAndLinks) {
     }
 }
 
-// Space for notes (qt/docs/note-space.md): the PDF is drawn at an offset on a larger page, the ink moved with it; the
-// highlights still find the text under them, and the PDF's own highlights are placed where they are drawn
+// Space for notes (qt/docs/features/note-space.md): the PDF is drawn at an offset on a larger page, the ink moved with
+// it; the highlights still find the text under them, and the PDF's own highlights are placed where they are drawn
 TEST(Annotations, withSpaceForNotesHighlightsFindTheTextUnderThem) {
     QTemporaryDir tmp;
     const fs::path pdf = makePdf(tmp);

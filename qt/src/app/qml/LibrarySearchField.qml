@@ -1,5 +1,5 @@
 // xournal-qt: the search in the whole library and the extended search: in the header, or in a row of its own.
-// Part of HomeView.qml (the home screen, qt/docs/library.md), instantiated once there: it reads the home
+// Part of HomeView.qml (the home screen, qt/docs/features/library.md), instantiated once there: it reads the home
 // screen's state through `home`, and the other parts by their ids (HomeView.qml's context).
 import QtQuick
 import QtQuick.Controls

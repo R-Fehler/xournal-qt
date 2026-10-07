@@ -1,6 +1,6 @@
-// Before a web address opens in the browser (qt/docs/citations.md): the whole address, exactly as it is opened, with
-// where it goes, and Open / Copy address / Cancel. "Don't ask again" turns the question off (Settings → Documents →
-// Web and citations turns it on again); the look-up menu still shows each address before it is chosen.
+// Before a web address opens in the browser (qt/docs/features/citations.md): the whole address, exactly as it is
+// opened, with where it goes, and Open / Copy address / Cancel. "Don't ask again" turns the question off (Settings →
+// Documents → Web and citations turns it on again); the look-up menu still shows each address before it is chosen.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

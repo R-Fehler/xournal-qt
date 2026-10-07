@@ -1,7 +1,7 @@
-// The table editor of the formatting bar (qt/docs/md-editor.md, "Tables"): a table as a grid of cells, edited as in
-// a word processor instead of typing pipes. Tab / Shift+Tab go to the next / previous cell (Tab in the last cell adds
-// a row), the arrows go to the cell next to it at the edge of a cell's text, Enter to the cell below, Ctrl+Enter is
-// OK. Rows and columns are added and removed with the buttons or a cell's menu (right-click, press and hold), and a
+// The table editor of the formatting bar (qt/docs/features/md-editor.md, "Tables"): a table as a grid of cells, edited
+// as in a word processor instead of typing pipes. Tab / Shift+Tab go to the next / previous cell (Tab in the last cell
+// adds a row), the arrows go to the cell next to it at the edge of a cell's text, Enter to the cell below, Ctrl+Enter
+// is OK. Rows and columns are added and removed with the buttons or a cell's menu (right-click, press and hold), and a
 // column is aligned left, centered or right. The current row and column are tinted and named ("Row 3, Column 2").
 // OK writes a GFM pipe table (app.writeMarkdownTable: the columns padded to line up, a "|" in a cell escaped) over
 // the table at the cursor or as a new one, as one undo step; Cancel changes nothing.

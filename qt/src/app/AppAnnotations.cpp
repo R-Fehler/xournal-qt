@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the Annotations panel's "Export as Markdown" (qt/docs/annotations-md.md).
+ * xournal-qt: the Annotations panel's "Export as Markdown" (qt/docs/features/annotations-md.md).
  *
  * @license GNU GPLv2 or later
  */
@@ -22,7 +22,7 @@ using namespace xqt;
 
 namespace {
 /// Handwriting as pictures in "<name>.assets/" instead of "(handwriting)": off while the Markdown editor does not
-/// show images (qt/docs/annotations-md.md); XQT_ANNOTATION_PICTURES=1 turns it on to try.
+/// show images (qt/docs/features/annotations-md.md); XQT_ANNOTATION_PICTURES=1 turns it on to try.
 bool inkPictures() {
     static const bool on = qEnvironmentVariableIntValue("XQT_ANNOTATION_PICTURES") == 1;
     return on;

@@ -1,5 +1,6 @@
 /*
- * xournal-qt: recording and playing in the window (qt/docs/audio.md, "In the app"), the QML object `app.audio`.
+ * xournal-qt: recording and playing in the window (qt/docs/features/audio.md, "In the app"), the QML object
+ * `app.audio`.
  *
  * One recording at a time, for the document of the tab it was started in: that tab's pen strokes and new texts are
  * tied to it (DocumentSession::setRecording), and it is a voice memo of the page that was shown when it started. It
@@ -12,7 +13,7 @@
  * Self-contained so the tool bar's owner can place its button anywhere (RecordButton.qml, RecordingPill.qml,
  * PlaybackPill.qml).
  *
- * The platforms (qt/docs/audio.md, "Platforms"): the microphone permission is asked before the first recording
+ * The platforms (qt/docs/features/audio.md, "Platforms"): the microphone permission is asked before the first recording
  * (Qt's QMicrophonePermission: macOS and Android ask the user; Linux and Windows grant it), and refused it opens
  * MicrophoneDialog.qml with a way to the system's settings. A running recording is reported to the platform's hook
  * (Android: the foreground service and its notification), whose Pause, Resume and Stop come back through

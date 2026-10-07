@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the pictures of the Markdown text (![alt](path)), qt/docs/md-images.md.
+ * xournal-qt: the pictures of the Markdown text (![alt](path)), qt/docs/features/md-images.md.
  *
  * A link is a path relative to the document's folder (or to where its "name.assets/" is), an absolute path, a
  * file:// address or a web address. Page boxes are drawn without knowing their document (upstream's TextView gives
@@ -40,7 +40,7 @@ std::string percentDecoded(std::string_view s);
 /// may have a backslash on Linux). Empty for a link that is not relative.
 std::string relativePath(std::string_view link);
 
-/// Where the relative links of an open document point (qt/docs/md-images.md).
+/// Where the relative links of an open document point (qt/docs/features/md-images.md).
 struct Root {
     std::string baseDir;     ///< the folder relative links are relative to (a .md's folder); may be empty
     std::string assetsName;  ///< "name.assets": links starting with it are looked for in assetsDir
@@ -133,7 +133,7 @@ void clearCache();
 /// The pixel cache's limit: the least recently used pictures go beyond it.
 constexpr size_t CACHE_LIMIT = 64 * 1024 * 1024;
 
-// --- web pictures (never fetched here: the app fetches one when asked, see qt/docs/md-images.md) -----------------
+// --- web pictures (never fetched here: the app fetches one when asked, see qt/docs/features/md-images.md) ------------
 
 /// The folder of the fetched pictures (the app cache). Empty: web pictures are never shown.
 void setWebCacheDir(std::string dir);

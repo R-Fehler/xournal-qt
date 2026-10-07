@@ -1,8 +1,8 @@
-// xournal-qt: where the window's chrome goes (Main.qml's state, `win.layout`; qt/docs/adaptive-layout.md,
-// qt/docs/toolbox.md): the page sidebar (beside the page or a drawer), the controls' room over the canvas, the source
-// panel, the phone chrome (app bar and dock), the command bar and the toolbox's edge. It reads the window's items it
-// lays out (canvas, sideTools, toolboxRow, …) through Main's context. The window's root keeps what the tests read as
-// aliases and forwarders (sidebarShown, showSidebar, toolboxEdge, chooseToolboxEdge, …).
+// xournal-qt: where the window's chrome goes (Main.qml's state, `win.layout`; qt/docs/features/adaptive-layout.md,
+// qt/docs/features/toolbox.md): the page sidebar (beside the page or a drawer), the controls' room over the canvas, the
+// source panel, the phone chrome (app bar and dock), the command bar and the toolbox's edge. It reads the window's
+// items it lays out (canvas, sideTools, toolboxRow, …) through Main's context. The window's root keeps what the tests
+// read as aliases and forwarders (sidebarShown, showSidebar, toolboxEdge, chooseToolboxEdge, …).
 import QtQuick
 
 Item {
@@ -93,7 +93,8 @@ Item {
                                           ? Math.max(canvasControlsTop, toolboxPane.y + toolboxPane.height - 4)
                                           : canvasControlsTop
 
-    // --- the source panel: the Markdown source beside or below the page (qt/docs/adaptive-layout.md, "Panels") -------
+    // --- the source panel: the Markdown source beside or below the page
+    // (qt/docs/features/adaptive-layout.md, "Panels")
     /// The panel open now, or null
     readonly property Item sourcePanel: markdownPanel.visible ? markdownPanel : null
     /// Below the page (the page above, its source below, a divider between them) in a portrait tablet or phone, and in
@@ -121,7 +122,7 @@ Item {
     readonly property real sourceBottomHeight: Math.round(win.contentItem.height
                                                           * (1 - (sourceShareLive >= 0 ? sourceShareLive : sourcePageShare)))
 
-    // --- the phone chrome (qt/docs/adaptive-layout.md, "The phone chrome") -------------------------------------------
+    // --- the phone chrome (qt/docs/features/adaptive-layout.md, "The phone chrome") ----------------------------------
     /// A phone class (by the layout class: "Adapt the layout" off keeps the desktop layout at every size)
     readonly property bool phoneLayout: win.adaptive.phoneLayout
     /// The full chrome of a phone: the app bar at the top (the library, the title, the tab count, ⋮) instead of the tab
@@ -137,7 +138,7 @@ Item {
     /// The dock beside the page (a rail): what sits at the window's right edge ends at it
     readonly property bool dockRail: dockShown && dockVertical
 
-    // --- the command bar (qt/docs/toolbox.md, "The command bar") -----------------------------------------------------
+    // --- the command bar (qt/docs/features/toolbox.md, "The command bar") --------------------------------------------
     // One row at the top: the commands (the tools are in the toolbox).
     /// A text document's command bar is merged into its format bar: one row, ⋮ at its end; undo and redo lead it
     readonly property bool toolsInFormatBar: win.textDoc && formatBar.shown && win.modes.fullChrome && !app.toolbarHidden
@@ -147,7 +148,7 @@ Item {
     readonly property bool noToolbar: !win.modes.fullChrome || (app.toolbarHidden && !phoneChrome)
     /// The top bar is shown (at the top, in a text document's format bar, in a phone's app bar)
     readonly property bool topBarShown: !app.homeVisible && !noToolbar && !win.modes.replaying
-    /// Where undo and redo are, one place at a time (qt/docs/adaptive-layout.md, "One place for each action"):
+    /// Where undo and redo are, one place at a time (qt/docs/features/adaptive-layout.md, "One place for each action"):
     /// "toolbox" (its head, while it is shown), "formatBar" (a text document's format bar holding the commands),
     /// "toolBar" (leading the command bar while it is shown: a text document), "viewPill" (no bar shown: the compact
     /// chrome, Zen, the bar put away; in the phone chrome the dock has its own)
@@ -155,7 +156,7 @@ Item {
                                       : toolsInFormatBar ? "formatBar"
                                       : !noToolbar && !phoneChrome ? "toolBar" : "viewPill"
 
-    // --- the toolbox (qt/docs/toolbox.md) ----------------------------------------------------------------------------
+    // --- the toolbox (qt/docs/features/toolbox.md) -------------------------------------------------------------------
     /// Its edge chosen by hand in this size class (⋮ → View → Toolbox position): "left", "right", "top", "bottom"
     readonly property string toolboxChoice: {
         const c = win.layoutChoice("toolbox")

@@ -138,8 +138,8 @@ protected:
         wait(100);
     }
 
-    /// The toolbox (qt/docs/toolbox.md): the id of its `n`th entry of a type ("pen", "highlighter", "eraser", "shape",
-    /// "text", "sticky", "laser", "snip"), and its button on the rail
+    /// The toolbox (qt/docs/features/toolbox.md): the id of its `n`th entry of a type ("pen", "highlighter", "eraser",
+    /// "shape", "text", "sticky", "laser", "snip"), and its button on the rail
     QString toolEntryId(const QString& type, int n = 0) const {
         for (const QVariant& v: controller->toolboxModel()->tools()) {
             if (v.toMap().value("type") == type && n-- == 0) {
@@ -330,7 +330,7 @@ TEST_F(MainWindowTest, penHeightIsOfferedOnceThePenTellsIt) {
     xqt::PenHover::instance().reset();
 }
 
-// The pointer over the page (qt/docs/hover-cursors.md): a small dot by default, the crosshair as a setting
+// The pointer over the page (qt/docs/features/hover-cursors.md): a small dot by default, the crosshair as a setting
 // (Settings -> Pen); the canvas follows at once.
 TEST_F(MainWindowTest, thePointerOverThePageIsADotOrTheCrosshair) {
     auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
@@ -689,10 +689,10 @@ TEST_F(MainWindowTest, searchBarFindsAndSteps) {
     EXPECT_EQ(controller->searchQuery(), "");
 }
 
-// Find and replace (qt/docs/md-editor.md, "Find and replace"): Ctrl+H opens the search bar with its replace row in a
-// .md; Enter replaces the current hit and goes to the next, Ctrl+Enter replaces all (one undo step, a snackbar with
-// how many and Undo); the options are the search's while the row is shown. A document without text that can be written
-// has no replace row and no ⋮ entry.
+// Find and replace (qt/docs/features/md-editor.md, "Find and replace"): Ctrl+H opens the search bar with its replace
+// row in a .md; Enter replaces the current hit and goes to the next, Ctrl+Enter replaces all (one undo step, a snackbar
+// with how many and Undo); the options are the search's while the row is shown. A document without text that can be
+// written has no replace row and no ⋮ entry.
 TEST_F(MainWindowTest, findAndReplaceInAMarkdownFile) {
     QTemporaryDir dir;
     const fs::path file = fs::path(dir.path().toStdString()) / "cats.md";
@@ -1541,7 +1541,7 @@ TEST_F(HomeScreenTest, newMarkdownAndTextFilesAreMadeInTheFolderAndOpened) {
     EXPECT_EQ(controller->textDocument(), "markdown");
 }
 
-// A new text document in PDF files mode (qt/docs/md-pdf.md): the menu offers "New text document…", which makes
+// A new text document in PDF files mode (qt/docs/features/md-pdf.md): the menu offers "New text document…", which makes
 // "name.pdf", a PDF with notes, and opens it with the cursor in its text and the formatting bar; typing writes into
 // the text, the pen stays the pen, and ⋮ offers "Export as Markdown".
 TEST_F(HomeScreenTest, aNewTextDocumentIsAPdfInPdfFilesMode) {
@@ -2303,7 +2303,7 @@ TEST_F(HomeScreenTest, exportLibraryAsArchive) {
 }
 
 TEST_F(HomeScreenTest, shareLibraryAsZipAndOpenItInTheLibrary) {
-    // (qt/docs/library.md, "Sharing a folder or the library")
+    // (qt/docs/features/library.md, "Sharing a folder or the library")
     ASSERT_NE(find("shareLibraryItem"), nullptr);
     QObject* share = find("shareZip");
     ASSERT_NE(share, nullptr);
@@ -2907,9 +2907,9 @@ protected:
 };
 }  // namespace
 
-// The kinds of PDFs at a glance (qt/docs/library.md, "Kinds of PDFs"): a plain PDF, a PDF with notes and a PDF text
-// document have badges of their own (the text document's in another colour), said in words in the tooltip; "Only PDF
-// text documents" shows only those.
+// The kinds of PDFs at a glance (qt/docs/features/library.md, "Kinds of PDFs"): a plain PDF, a PDF with notes and a PDF
+// text document have badges of their own (the text document's in another colour), said in words in the tooltip; "Only
+// PDF text documents" shows only those.
 TEST_F(HomeScreenKindsTest, theCardsTellPlainPdfsPdfsWithNotesAndTextDocumentsApart) {
     ASSERT_TRUE(waitFor([&] { return badgeOf("essay.pdf") == "PDF MD"; }, 20000)) << badgeOf("essay.pdf").toStdString();
     EXPECT_EQ(badgeOf("lecture.pdf"), "PDF");
@@ -3836,7 +3836,7 @@ TEST_F(MainWindowTest, backgroundOfExistingPagesAndTheInsertDialog) {
     QMetaObject::invokeMethod(insert, "reject");
 }
 
-// Space for notes beside slides (qt/docs/note-space.md): the dialog from the page menu and for all pages
+// Space for notes beside slides (qt/docs/features/note-space.md): the dialog from the page menu and for all pages
 TEST_F(MainWindowTest, spaceForNotesFromThePageMenuAndForAllPages) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));
     wait(80);
@@ -4843,8 +4843,8 @@ TEST_F(MainWindowTest, thePillsOfASelectionOfferSelectMoreAndCountWhatIsSelected
     EXPECT_FALSE(notePill->isVisible());
 }
 
-// Groups (qt/docs/groups.md): the selection's pill shows Group for loose elements and Ungroup (in its place) for one
-// group, both for a group with loose elements; Ctrl+G and Ctrl+Shift+G do the same, one undo step each
+// Groups (qt/docs/features/groups.md): the selection's pill shows Group for loose elements and Ungroup (in its place)
+// for one group, both for a group with loose elements; Ctrl+G and Ctrl+Shift+G do the same, one undo step each
 TEST_F(MainWindowTest, theSelectionsPillGroupsAndUngroups) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
@@ -4900,8 +4900,8 @@ TEST_F(MainWindowTest, theSelectionsPillGroupsAndUngroups) {
     EXPECT_NE(strokes[1]->getGroup(), 0u);
 }
 
-// The setsquare and the compass share a cycling button (qt/docs/adaptive-layout.md, "Cycling buttons"): a tap puts the
-// setsquare on the page, the next tap the compass instead; the geometry pill's × takes it away.
+// The setsquare and the compass share a cycling button (qt/docs/features/adaptive-layout.md, "Cycling buttons"): a tap
+// puts the setsquare on the page, the next tap the compass instead; the geometry pill's × takes it away.
 TEST_F(MainWindowTest, theGeometryButtonPutsTheSetsquareOnThePage) {
     qobject_cast<xqt::SettingsModel*>(controller->settingsModel())->set("toolVariants", "");  // (the setsquare first)
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
@@ -4982,9 +4982,9 @@ TEST_F(MainWindowTest, theGeometryButtonPutsTheSetsquareOnThePage) {
     controller->toggleGeometryTool("");
 }
 
-// The curtain (qt/docs/curtain.md): B puts it out and takes it away; the setsquare button's list and ⋮ → View have it
-// too; Esc hides its handles (before it leaves full screen); its pill switches to the spotlight (Shift+B too) and its ×
-// takes it away. Each tab has its own.
+// The curtain (qt/docs/features/curtain.md): B puts it out and takes it away; the setsquare button's list and ⋮ → View
+// have it too; Esc hides its handles (before it leaves full screen); its pill switches to the spotlight (Shift+B too)
+// and its × takes it away. Each tab has its own.
 TEST_F(MainWindowTest, theCurtainComesWithBAndTheSetsquaresList) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
@@ -5332,9 +5332,9 @@ TEST_F(MainWindowTest, theEraserEntryErasesTheWayItsEditorSays) {
     controller->takeToolOfType("pen");
 }
 
-// The cycling buttons (qt/docs/adaptive-layout.md, "Cycling buttons"): select rectangle ↔ lasso, the snips, the
-// setsquare and the text tools share a button each (fixed tools of the toolbox). A tap on the button in use takes the
-// next variant; from another tool it takes the one used last; a long press lists them (the multi-layer selections
+// The cycling buttons (qt/docs/features/adaptive-layout.md, "Cycling buttons"): select rectangle ↔ lasso, the snips,
+// the setsquare and the text tools share a button each (fixed tools of the toolbox). A tap on the button in use takes
+// the next variant; from another tool it takes the one used last; a long press lists them (the multi-layer selections
 // only there); the keys take a variant directly and the button follows. What was used last is kept over a restart.
 // The shapes menu is gone; the pens, highlighters and shapes are the toolbox's entries (ToolboxTest).
 TEST_F(MainWindowTest, cyclingToolButtons) {
@@ -6704,7 +6704,7 @@ TEST_F(MainWindowTest, markdownCheckBoxesAreTapped) {
     key(Qt::Key_Escape);
 }
 
-// --- Hybrid PDF (qt/docs/hybrid-pdf.md) -----------------------------------------------------------------------------
+// --- Hybrid PDF (qt/docs/features/hybrid-pdf.md) ---------------------------------------------------------------------
 
 namespace {
 void makeLecturePdf(const QString& file, int pages) {
@@ -7457,8 +7457,9 @@ TEST_F(MainWindowTest, inkChangedInAnotherAppIsAskedAbout) {
     EXPECT_EQ(strokesOn(*s->getDocument(), 0), 1u);
 }
 
-// A PDF marked up in another app (qt/docs/adopt-annotations.md): the window asks once whether to make the marks
-// editable; "Not now" is remembered for the file, ⋮ → Document offers it again, and Undo brings the originals back.
+// A PDF marked up in another app (qt/docs/features/adopt-annotations.md): the window asks once whether to make the
+// marks editable; "Not now" is remembered for the file, ⋮ → Document offers it again, and Undo brings the originals
+// back.
 TEST_F(MainWindowTest, annotationsOfAnotherAppAreOfferedOnceAndMadeEditable) {
     QTemporaryDir dir;
     const QString pdf = dir.filePath("marked.pdf");
@@ -8500,8 +8501,8 @@ protected:
 };
 }  // namespace
 
-// The first start shows the introduction (qt/docs/onboarding.md): pages stepped through with Next (or swiped), Skip
-// on every page but the last, and the last page is the question how to keep documents, with the recommendation
+// The first start shows the introduction (qt/docs/features/onboarding.md): pages stepped through with Next (or swiped),
+// Skip on every page but the last, and the last page is the question how to keep documents, with the recommendation
 // chosen. Nothing but Continue closes it; then the choice is stored, and the next start shows neither the
 // introduction nor the question.
 TEST_F(FirstStartTest, theIntroductionComesFirstAndEndsInTheChoice) {
@@ -8660,7 +8661,7 @@ TEST_F(MainWindowTest, settingsChangeTheDocumentMode) {
     ASSERT_NE(intoPdf, nullptr);
     EXPECT_TRUE(xopp->property("chosen").toBool()) << "the mode in effect (the tests': Xournal++ files)";
     EXPECT_TRUE(intoPdf->isVisible());
-    // New text documents follow the mode while they are not chosen (qt/docs/md-pdf.md)
+    // New text documents follow the mode while they are not chosen (qt/docs/features/md-pdf.md)
     auto* textRow = findItem("newTextDocumentsRow");
     ASSERT_NE(textRow, nullptr);
     QQuickItem* textCombo = textRow->childItems().last();
@@ -8685,8 +8686,9 @@ TEST_F(MainWindowTest, settingsChangeTheDocumentMode) {
     xqt::DocumentMode::store(s, xqt::DocumentMode::Mode::Unset);  // (the tests share the config folder)
 }
 
-// The introduction again, from Help (qt/docs/onboarding.md): ⋮ → Help → Introduction and Settings → Help. Not the first
-// start: Skip and Esc close it, and its last page shows the way documents are kept now; Done stores another one.
+// The introduction again, from Help (qt/docs/features/onboarding.md): ⋮ → Help → Introduction and Settings → Help. Not
+// the first start: Skip and Esc close it, and its last page shows the way documents are kept now; Done stores another
+// one.
 TEST_F(MainWindowTest, theIntroductionIsInHelp) {
     Settings& s = *controller->context().getSettings();
     struct Restore {  // (the tests share the config folder)
@@ -8755,9 +8757,10 @@ TEST_F(MainWindowTest, theIntroductionIsInHelp) {
     EXPECT_EQ(xqt::DocumentMode::stored(s), xqt::DocumentMode::Mode::Pdf);
 }
 
-// The tutorial (qt/docs/onboarding.md): Markdown in the resources, with sections that ask the user to do something and
-// marked placeholders for the author's ink and screenshots. Help → Tutorial opens a copy to write on: a PDF text
-// document in the app's data folder (not in the library), the same file the next time, a fresh one on "start again".
+// The tutorial (qt/docs/features/onboarding.md): Markdown in the resources, with sections that ask the user to do
+// something and marked placeholders for the author's ink and screenshots. Help → Tutorial opens a copy to write on: a
+// PDF text document in the app's data folder (not in the library), the same file the next time, a fresh one on "start
+// again".
 TEST_F(MainWindowTest, theTutorialOpensAsACopy) {
     QFile resource(AppController::tutorialResource());
     ASSERT_TRUE(resource.open(QIODevice::ReadOnly)) << "compiled into the program";
@@ -9029,8 +9032,8 @@ TEST_F(FolderChooserWindowTest, theDownloadFolderCanBeOpenedAsLibrary) {
               QString::fromStdString(xqt::Library(phone.sharedDownloads).root().string()));
 }
 
-// The formatting bar (qt/docs/md-editor.md): shown while Markdown is written on the page; its buttons change the text
-// at the cursor; the table editor edits cells in a grid and writes a pipe table.
+// The formatting bar (qt/docs/features/md-editor.md): shown while Markdown is written on the page; its buttons change
+// the text at the cursor; the table editor edits cells in a grid and writes a pipe table.
 TEST_F(MainWindowTest, theFormattingBarAndTheTableEditor) {
     controller->setMarkdownInPanel(false);
     auto* bar = find<QQuickItem>("markdownFormatBar");
@@ -9140,8 +9143,8 @@ TEST_F(MainWindowTest, theFormattingBarAndTheTableEditor) {
     click(find<QQuickItem>("markdownCancel"));
 }
 
-// Beside the page (qt/docs/md-images.md): a picture pasted into the Markdown of saved notes is kept with the notes and
-// linked; in notes not saved yet the text is pasted as before.
+// Beside the page (qt/docs/features/md-images.md): a picture pasted into the Markdown of saved notes is kept with the
+// notes and linked; in notes not saved yet the text is pasted as before.
 TEST_F(MainWindowTest, aPicturePastedBesideThePageIsKeptWithTheNotes) {
     QTemporaryDir dir;
     const fs::path xopp = fs::path(dir.path().toStdString()) / "board.xopp";
@@ -9185,8 +9188,8 @@ TEST_F(HomeScreenMarkdownTest, aMarkdownFileHasTheFormattingBar) {
     EXPECT_TRUE(find<QQuickItem>("mdTaskList")->property("checked").toBool());
 }
 
-// Pictures in a .md (qt/docs/md-images.md): the formatting bar's image opens a file picker, a picked file is copied
-// into "kalman.assets/" and linked at the cursor; a pasted picture is saved there as image-….png; picture files
+// Pictures in a .md (qt/docs/features/md-images.md): the formatting bar's image opens a file picker, a picked file is
+// copied into "kalman.assets/" and linked at the cursor; a pasted picture is saved there as image-….png; picture files
 // dropped on the page are copied and linked. Each is one undo step of the text; undo leaves the files.
 TEST_F(HomeScreenMarkdownTest, picturesArePickedPastedAndDroppedIntoAMarkdownFile) {
     window->setWidth(1920);  // (room in the format bar for its inserts beside undo, redo and the commands)
@@ -9302,8 +9305,8 @@ TEST_F(HomeScreenMarkdownTest, picturesArePickedPastedAndDroppedIntoAMarkdownFil
     EXPECT_TRUE(editor->text() == beforeDrop) << "one undo step";
 }
 
-// A .md open in a tab, renamed in the library (qt/docs/md-images.md): its pictures' folder goes along, the links in the
-// file and in the tab are rewritten, the tab is not modified by it, and its pictures are still found.
+// A .md open in a tab, renamed in the library (qt/docs/features/md-images.md): its pictures' folder goes along, the
+// links in the file and in the tab are rewritten, the tab is not modified by it, and its pictures are still found.
 TEST_F(HomeScreenMarkdownTest, aRenamedMarkdownFileTakesItsPicturesAlongAlsoWhenOpen) {
     std::ofstream(root / "photo.md") << "# Photo\n\n![](photo.assets/a.png)\n";
     fs::create_directories(root / "photo.assets");
@@ -9335,8 +9338,8 @@ TEST_F(HomeScreenMarkdownTest, aRenamedMarkdownFileTakesItsPicturesAlongAlsoWhen
     EXPECT_FALSE(s->textChangedOnDisk(bytes)) << "no question about a change on disk";
 }
 
-// ⋮ → Remove unused images… of a .md (qt/docs/md-images.md): lists the files of its folder the text does not link to
-// (a link to a PDF there counts as used), and moves them to the trash only when asked.
+// ⋮ → Remove unused images… of a .md (qt/docs/features/md-images.md): lists the files of its folder the text does not
+// link to (a link to a PDF there counts as used), and moves them to the trash only when asked.
 TEST_F(HomeScreenMarkdownTest, removeUnusedImagesListsThemFirst) {
     FakeSystemApps apps;
     xqt::SystemApps::setInstance(&apps);
@@ -9864,7 +9867,7 @@ TEST_F(RenameTest, anOverviewCardTitleIsRenamedInPlace) {
     EXPECT_EQ(inside(cell, "overviewTitle")->property("text").toString(), "Plan.xopp");
 }
 
-// --- favourites and bookmarks (qt/docs/bookmarks.md) ---
+// --- favourites and bookmarks (qt/docs/features/bookmarks.md) ---
 
 namespace {
 /// The items of this name below `root` (through the item tree: also those a Repeater made).
@@ -10152,8 +10155,9 @@ TEST_F(HomeScreenMarkdownTest, bookmarkingAPageOfAMarkdownFile) {
     EXPECT_EQ(card->property("modelData").toMap().value("page").toInt(), 1);
 }
 
-// The canvas turned in steps of 90° (qt/docs/canvas-rotation.md): Ctrl+] and Ctrl+[, the chip in the layout pill that
-// says how far and turns it back, the fits and two taps on the page turn it upright; presenting shows it upright
+// The canvas turned in steps of 90° (qt/docs/features/canvas-rotation.md): Ctrl+] and Ctrl+[, the chip in the layout
+// pill that says how far and turns it back, the fits and two taps on the page turn it upright; presenting shows it
+// upright
 TEST_F(MainWindowTest, theCanvasTurnsInQuarterStepsAndComesBackUpright) {
     xqt::CanvasView* view = controller->tabManager().currentView();
     ASSERT_NE(view, nullptr);

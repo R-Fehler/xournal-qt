@@ -1,5 +1,5 @@
 # Explicit allowlists of upstream Xournal++ sources compiled into the Qt build (no globbing, so an
-# upstream merge never silently pulls GTK code into the Qt build). See qt/docs/adr/0002-upstream-seams.md.
+# upstream merge never silently pulls GTK code into the Qt build). See qt/docs/decisions/0002-upstream-seams.md.
 set(XOJ_SRC "${XOJ_UPSTREAM_DIR}/src")
 
 # util: everything except GTK widgets/dialog helpers (replaced by qt/compat).

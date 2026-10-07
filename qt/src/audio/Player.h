@@ -1,5 +1,5 @@
 /*
- * xournal-qt: playing a recording (qt/docs/audio.md, "Playing").
+ * xournal-qt: playing a recording (qt/docs/features/audio.md, "Playing").
  *
  * Decodes the Ogg Vorbis file while the speaker asks for samples. The position is where the reader started plus what
  * the device has played, so it follows what is heard (not what is buffered). Seeking restarts the device, so nothing

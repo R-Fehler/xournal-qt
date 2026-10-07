@@ -1,5 +1,5 @@
-// The introduction (qt/docs/onboarding.md): a few short pages, swiped or stepped through with Next, that end in the
-// question how documents are kept (DocumentModeCards, as the first-start question and Settings → Documents have
+// The introduction (qt/docs/features/onboarding.md): a few short pages, swiped or stepped through with Next, that end
+// in the question how documents are kept (DocumentModeCards, as the first-start question and Settings → Documents have
 // them). Shown once at the first start in place of that question (app.askIntro), and again from Help (⋮ → Help,
 // Settings → Help). An AdaptiveDialog: in the middle of a desktop or tablet window, the whole screen of a phone.
 //   - first start: Skip goes to the last page (the choice has to be made); only Continue closes it and stores the
@@ -134,7 +134,7 @@ AdaptiveDialog {
                                + "document was saved and opened again. With a pen, the pen writes and a finger "
                                + "scrolls and zooms.")
                 }
-                // Version history (qt/docs/hybrid-pdf.md): off by default, so said here once
+                // Version history (qt/docs/features/hybrid-pdf.md): off by default, so said here once
                 Heading { text: qsTr("Go back to earlier versions") }
                 Para {
                     objectName: "introVersions"

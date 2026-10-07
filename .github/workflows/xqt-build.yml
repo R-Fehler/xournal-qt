@@ -24,6 +24,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  docs:
+    name: Doc links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Every relative link in the fork's Markdown resolves, and every qt/docs/... path cited in code exists
+      - name: Check the doc links
+        run: python3 qt/scripts/check-doc-links.py
+
   linux:
     name: ${{ matrix.name }}
     runs-on: ubuntu-latest
@@ -81,9 +90,9 @@ jobs:
 
       - name: Validate archive PDFs with veraPDF
         if: matrix.neon == '0'
-        # Archive PDFs (qt/docs/hybrid-pdf.md, "Archive PDF") must be PDF/A-3b. veraPDF, the reference validator, is a
-        # test tool only: the app never runs it. The tests write their archive PDFs that claim PDF/A into a folder
-        # (also one saved incrementally three times, qt/pdf-incremental).
+        # Archive PDFs (qt/docs/features/hybrid-pdf.md, "Archive PDF") must be PDF/A-3b. veraPDF, the reference
+        # validator, is a test tool only: the app never runs it. The tests write their archive PDFs that claim PDF/A
+        # into a folder (also one saved incrementally three times, qt/pdf-incremental).
         env:
           VERAPDF_VERSION: 1.28.2
           VERAPDF_SHA1: 7484fd844c7f2fc5c7f554f25511e2a1b2a7dc00

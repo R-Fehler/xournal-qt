@@ -1,5 +1,5 @@
 /*
- * xournal-qt: two views scrolled together (the reference view's locked scrolling, qt/docs/reference-view.md).
+ * xournal-qt: two views scrolled together (the reference view's locked scrolling, qt/docs/features/reference-view.md).
  *
  * Generic for any two views: two different documents, a document beside itself, a version beside now. While locked,
  * scrolling, a jump to a page and zooming in either view move the other one:

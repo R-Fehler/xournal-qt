@@ -1,6 +1,6 @@
 /*
- * xournal-qt: a sticker's file (qt/docs/stickers.md): reusable content saved as a .xopp of one page, as large as the
- * content plus a margin, on plain paper of the colour of the page it came from. Ink, shapes, images and LaTeX in
+ * xournal-qt: a sticker's file (qt/docs/features/stickers.md): reusable content saved as a .xopp of one page, as large
+ * as the content plus a margin, on plain paper of the colour of the page it came from. Ink, shapes, images and LaTeX in
  * "Layer 1", Markdown boxes in the page's "Markdown" layer (at the bottom), whole sticky notes as their layers on top,
  * and optionally a picture of the background behind it all (the PDF page) in a layer "Sticker picture" at the bottom.
  * Xournal++ opens it as it is.
@@ -47,8 +47,8 @@ bool write(Document& doc, const fs::path& target, std::string* error = nullptr);
 
 /// A sticker read back as content to paste: the elements of its first page in their order (the picture first, then
 /// the Markdown boxes, then the other layers' elements), its notes (bottom first) and the bounds around them all (the
-/// page's coordinates). The elements of each layer they go into are one group (qt/docs/groups.md). Nothing (with
-/// `error`) if it cannot be read or holds nothing.
+/// page's coordinates). The elements of each layer they go into are one group (qt/docs/features/groups.md). Nothing
+/// (with `error`) if it cannot be read or holds nothing.
 std::optional<sticky::Group> read(const fs::path& file, std::string* error = nullptr);
 
 /// The content in the clipboard's format of a selection of notes and elements (sticky::GROUP_CLIPBOARD_MIME)

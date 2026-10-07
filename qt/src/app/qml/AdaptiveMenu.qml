@@ -1,4 +1,4 @@
-// A menu that fits the window (qt/docs/adaptive-layout.md, "Menus").
+// A menu that fits the window (qt/docs/features/adaptive-layout.md, "Menus").
 // - Desktop and tablet classes: a Menu as wide as its longest entry (within the window), never taller than the window,
 //   and never over the button it came from: from a button in the upper half it opens below it, from one in the lower
 //   half above it; what does not fit scrolls, with a scroll bar that shows it.
@@ -16,7 +16,7 @@ Menu {
     /// As a submenu: whether its entry is offered at all
     property bool offered: true
     /// Its title shown on top of the menu too (the sheet of the phone classes always shows a title): a menu opened by
-    /// a long press on a button names the button (qt/docs/adaptive-layout.md, "Labels without hover")
+    /// a long press on a button names the button (qt/docs/features/adaptive-layout.md, "Labels without hover")
     property bool titleShown: false
     /// As a submenu: the icon of its entry in the menu above
     property string iconName: ""

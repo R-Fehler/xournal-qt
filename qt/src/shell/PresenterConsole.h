@@ -1,15 +1,15 @@
 /*
- * xournal-qt: the presenter view on a second screen (qt/docs/presenter-view.md), as in Okular and PowerPoint.
+ * xournal-qt: the presenter view on a second screen (qt/docs/features/presenter-view.md), as in Okular and PowerPoint.
  *
  * While presenting with two screens, the audience's screen shows only the slide (full screen, without its space for
- * notes, qt/docs/note-space.md) and the window being presented from becomes the presenter's console on the other
- * screen: the current page large with its space for notes (the tab's own view, written on with the toolbox as when
- * presenting on one screen), the next page smaller, a clock, the time since the start (paused, resumed, reset), the
- * page number. With one screen, presenting is as before.
+ * notes, qt/docs/features/note-space.md) and the window being presented from becomes the presenter's console on the
+ * other screen: the current page large with its space for notes (the tab's own view, written on with the toolbox as
+ * when presenting on one screen), the next page smaller, a clock, the time since the start (paused, resumed, reset),
+ * the page number. With one screen, presenting is as before.
  *
  * The audience's screen is a second CanvasView of the presented document (as the same document beside itself,
- * qt/docs/reference-view.md: one session, one undo history, the rendered pages of both under CanvasMemory's one
- * limit). It takes no input; it follows the presenter's page, and shows what the presenter's view shows only for a
+ * qt/docs/features/reference-view.md: one session, one undo history, the rendered pages of both under CanvasMemory's
+ * one limit). It takes no input; it follows the presenter's page, and shows what the presenter's view shows only for a
  * moment (CanvasView::setMirror): a stroke while it is written, the laser pointer's ink, the curtain and the
  * spotlight. The keys that go from page to page work in its window too (AudienceWindow.qml).
  *

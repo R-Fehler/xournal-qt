@@ -1,5 +1,5 @@
-// "Remove unused images" of a .md (qt/docs/md-images.md, "Clean-up"): the files in its "name.assets" folder that the
-// text does not link to any more, listed; "Move to trash" moves them there (nothing is deleted without this).
+// "Remove unused images" of a .md (qt/docs/features/md-images.md, "Clean-up"): the files in its "name.assets" folder
+// that the text does not link to any more, listed; "Move to trash" moves them there (nothing is deleted without this).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

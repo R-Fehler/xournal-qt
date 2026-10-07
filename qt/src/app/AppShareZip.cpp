@@ -1,5 +1,5 @@
 /*
- * xournal-qt: sharing a folder or the library as a zip, and "Open in library…" for a zip (qt/docs/library.md,
+ * xournal-qt: sharing a folder or the library as a zip, and "Open in library…" for a zip (qt/docs/features/library.md,
  * "Sharing a folder or the library"): the window's part of LibraryShare and LibraryUnzip.
  *
  * @license GNU GPLv2 or later

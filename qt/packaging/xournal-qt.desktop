@@ -13,7 +13,7 @@ MimeType=application/x-xopp;application/x-xojpp;application/pdf;
 Categories=Office;Qt;
 Actions=QuickNote;
 
-# Quick note (qt/docs/quick-note.md): the launcher's and the task manager's right-click menu
+# Quick note (qt/docs/features/quick-note.md): the launcher's and the task manager's right-click menu
 [Desktop Action QuickNote]
 Name=Quick note
 Exec=xournal-qt --quick-note

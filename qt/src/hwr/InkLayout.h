@@ -1,7 +1,7 @@
 /*
  * xournal-qt: the handwriting of a page as lines and words, from the strokes' geometry and order alone (no model).
  *
- * The first step of the handwriting search (qt/docs/handwriting-search.md); a port of the trials in
+ * The first step of the handwriting search (qt/docs/features/handwriting-search.md); a port of the trials in
  * qt/research/hwr/segment.py, with the stroke order added (the research found that geometry alone fails where lines
  * are written close together or over each other):
  *  1. units: the median height of the strokes (`h`; cursive splits words into strokes of about the x-height, dots

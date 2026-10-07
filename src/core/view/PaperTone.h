@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the paper of the page being drawn on this thread, for the highlighter (qt/docs/dark-pages.md).
+ * xournal-qt: the paper of the page being drawn on this thread, for the highlighter (qt/docs/features/dark-pages.md).
  *
  * Upstream draws a highlighter by multiplying it with what is under it (CAIRO_OPERATOR_MULTIPLY, opacity 0.47): on
  * white paper a translucent marker, on dark paper (black, dark grey) nothing at all. On dark paper it lightens instead

@@ -1,8 +1,8 @@
 /*
- * xournal-qt: stickers in the window (qt/stickers, qt/docs/stickers.md): the picker's list, saving what is selected as
- * a sticker (into the library's Stickers folder or the app-wide set; also onto the clipboard) and pasting one on the
- * current page. The files are written and read off the UI thread by the current view (CanvasView::saveSticker,
- * loadSticker), which waits for that work when it goes.
+ * xournal-qt: stickers in the window (qt/stickers, qt/docs/features/stickers.md): the picker's list, saving what is
+ * selected as a sticker (into the library's Stickers folder or the app-wide set; also onto the clipboard) and pasting
+ * one on the current page. The files are written and read off the UI thread by the current view
+ * (CanvasView::saveSticker, loadSticker), which waits for that work when it goes.
  *
  * @license GNU GPLv2 or later
  */

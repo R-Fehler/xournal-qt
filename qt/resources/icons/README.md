@@ -24,39 +24,39 @@ The adaptive tool bar (qt/adaptive-toolbar; icons that must be clear without a t
   `xqt-mark-text` (lines of text, one of them highlighted: mark PDF text), `xqt-text-box` (a dashed box with a T: a
   text box) and `xqt-eraser-stroke` (a small eraser over a stroke: erase whole strokes).
 
-`xqt-flag` is Lucide's `flag`: a milestone of the version history (qt/docs/hybrid-pdf.md, "Version history");
+`xqt-flag` is Lucide's `flag`: a milestone of the version history (qt/docs/features/hybrid-pdf.md, "Version history");
 the History button of the page sidebar is `xqt-history` (Lucide's `history`).
 
 `xqt-sliders` is Lucide's `sliders-horizontal`: the library's **View** button (how the cards are shown).
 
-`xqt-curtain` (a page with its lower part covered: the curtain, qt/docs/curtain.md) and `xqt-spotlight` (black with a
+`xqt-curtain` (a page with its lower part covered: the curtain, qt/docs/features/curtain.md) and `xqt-spotlight` (black with a
 rounded hole: the spotlight) are drawn in the same style.
 
-`xqt-help` is Lucide's `circle-help`: Help (the introduction, the tutorial, the keyboard shortcuts; qt/docs/onboarding.md);
+`xqt-help` is Lucide's `circle-help`: Help (the introduction, the tutorial, the keyboard shortcuts; qt/docs/features/onboarding.md);
 `xqt-keyboard` is Lucide's `keyboard`: Help → Keyboard shortcuts.
 
 `xqt-rotate-left` and `xqt-rotate-right` are Lucide's `rotate-ccw-square` and `rotate-cw-square`: turning pages
-(qt/docs/page-rotation.md).
+(qt/docs/features/page-rotation.md).
 
-`xqt-snip` is Lucide's `scissors`: the snip tool (copy the picture of a part of a page, qt/docs/snip.md).
-`xqt-replay` is Lucide's `circle-play`: "Replay the writing" in the command bar (qt/docs/timeline.md).
-`xqt-lock` is Lucide's `lock`: read only (full screen and presenting without ink; qt/docs/toolbox.md, "Reading").
+`xqt-snip` is Lucide's `scissors`: the snip tool (copy the picture of a part of a page, qt/docs/features/snip.md).
+`xqt-replay` is Lucide's `circle-play`: "Replay the writing" in the command bar (qt/docs/features/timeline.md).
+`xqt-lock` is Lucide's `lock`: read only (full screen and presenting without ink; qt/docs/features/toolbox.md, "Reading").
 `xqt-snip-rect` and `xqt-snip-lasso` (a dashed rectangle or lasso with small scissors: the snip's two shapes, the
 toolbox's snip entry and the select list) are drawn in the same style.
 
-`xqt-sticker` is Lucide's `sticker` (a sheet with a peeled corner and a smile): the sticker tool (qt/docs/stickers.md).
+`xqt-sticker` is Lucide's `sticker` (a sheet with a peeled corner and a smile): the sticker tool (qt/docs/features/stickers.md).
 
-`xqt-zap` is Lucide's `zap`: Quick note (qt/docs/quick-note.md).
+`xqt-zap` is Lucide's `zap`: Quick note (qt/docs/features/quick-note.md).
 
 `xqt-group` and `xqt-ungroup` are Lucide's `group` and `ungroup`: grouping the selected elements and ungrouping them
-(the selection's pill, qt/docs/groups.md).
+(the selection's pill, qt/docs/features/groups.md).
 
-`xqt-replace` (a dashed box, an arrow down to a solid one: find and replace, qt/docs/md-editor.md) is drawn in the same
+`xqt-replace` (a dashed box, an arrow down to a solid one: find and replace, qt/docs/features/md-editor.md) is drawn in the same
 style, after Lucide's `replace`.
 
-`xqt-tag` is Lucide's `tag`: the library's **Tags** tab and a document's "Tags…" (qt/docs/tags.md).
+`xqt-tag` is Lucide's `tag`: the library's **Tags** tab and a document's "Tags…" (qt/docs/features/tags.md).
 
-`xqt-moon` is Lucide's `moon`: dark pages (qt/docs/dark-pages.md).
+`xqt-moon` is Lucide's `moon`: dark pages (qt/docs/features/dark-pages.md).
 
-`xqt-zen` (a page with a small dot in its lower left corner: Zen, only the page and the dot; qt/docs/zen.md) is drawn
+`xqt-zen` (a page with a small dot in its lower left corner: Zen, only the page and the dot; qt/docs/features/zen.md) is drawn
 in the same style.

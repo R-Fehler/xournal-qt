@@ -14,7 +14,7 @@ ScrollView {
         width: parent.width - 48
         x: 24
         spacing: 10
-        // The toolbox (qt/docs/toolbox.md)
+        // The toolbox (qt/docs/features/toolbox.md)
         SettingsSectionTitle { text: qsTr("Tools") }
         SettingsHint {
             text: qsTr("The toolbox holds your own tools, each with its color and width, beside the page "
@@ -102,7 +102,7 @@ ScrollView {
                        + "pen will write, or the crosshair. With the eraser it is the eraser itself, gray, "
                        + "as big as it erases at the zoom (dashed when it erases whole strokes).")
         }
-        // The pen's gestures (qt/docs/pen-gestures.md)
+        // The pen's gestures (qt/docs/features/pen-gestures.md)
         SettingsSectionTitle { text: qsTr("Gestures") }
         SettingsSwitchRow {
             objectName: "holdToStraightenSwitch"

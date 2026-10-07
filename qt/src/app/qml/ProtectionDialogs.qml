@@ -1,5 +1,5 @@
-// xournal-qt: passwords (qt/docs/hybrid-pdf.md, "Encrypted PDFs"; Main.qml's part): the password a PDF needs to open,
-// and protecting the document with one.
+// xournal-qt: passwords (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs"; Main.qml's part): the password a PDF needs
+// to open, and protecting the document with one.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -9,8 +9,8 @@ Item {
     anchors.fill: parent
     visible: false
     readonly property alias protectDialog: protectDialog
-    // A PDF that needs a password to open (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): asked here, kept in memory only
-    // while the document is open. A wrong one is said so and asked again; Cancel leaves it closed.
+    // A PDF that needs a password to open (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs"): asked here, kept in
+    // memory only while the document is open. A wrong one is said so and asked again; Cancel leaves it closed.
     AdaptiveDialog {
         id: pdfPasswordDialog
         objectName: "pdfPasswordDialog"

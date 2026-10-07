@@ -110,8 +110,8 @@ TextEditor::TextEditor(DocumentSession& session, CanvasPage& page, double x, dou
         textElement->setWrap(std::max(100.0, pageRef->getWidth() - right - x));
         textElement->setTransformation(
                 xoj::util::Matrix::TRANSLATION(x, y - textElement->getBoundingBox().height / 2));
-        session.stampAudio(*textElement);  // (a recording runs: as upstream's TextEditor, qt/docs/audio.md)
-        timeline::stampNew(*textElement);  // (when its box opened: qt/docs/timeline.md)
+        session.stampAudio(*textElement);  // (a recording runs: as upstream's TextEditor, qt/docs/features/audio.md)
+        timeline::stampNew(*textElement);  // (when its box opened: qt/docs/features/timeline.md)
         if (!md::isMarkdownLayer(*layer)) {
             useMarkdownLayer();
         }

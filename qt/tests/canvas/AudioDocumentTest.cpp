@@ -1,7 +1,7 @@
 /*
- * xournal-qt: recordings in the document (qt/docs/audio.md, "In the document"): pen strokes, shapes and new texts are
- * tied to the running recording as upstream does it (fn, ts); voice memos as the page attribute xqt-audio; removing a
- * recording as one undo step; the .xopp round trip; what the play tool finds.
+ * xournal-qt: recordings in the document (qt/docs/features/audio.md, "In the document"): pen strokes, shapes and new
+ * texts are tied to the running recording as upstream does it (fn, ts); voice memos as the page attribute xqt-audio;
+ * removing a recording as one undo step; the .xopp round trip; what the play tool finds.
  *
  * @license GNU GPLv2 or later
  */

@@ -57,8 +57,8 @@ public:
         bool faint = false;
     };
 
-    /// How the text is matched besides, the options of the find and replace bar (qt/docs/md-editor.md, "Find and
-    /// replace"; TextMatch.h): letters as typed, whole words, a regular expression. Not with the fuzzy syntax.
+    /// How the text is matched besides, the options of the find and replace bar (qt/docs/features/md-editor.md, "Find
+    /// and replace"; TextMatch.h): letters as typed, whole words, a regular expression. Not with the fuzzy syntax.
     using Options = textmatch::Options;
 
     explicit DocumentSearch(DocumentSession& session);

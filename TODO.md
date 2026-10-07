@@ -1,12 +1,11 @@
 # TODO
 
-Open work only. The goals behind it are in [VISION.md](VISION.md); how the app works now is in the docs in
-[qt/docs/](qt/docs/); what was built is in the [release notes](qt/docs/release-notes/) and in git.
+Open work only. The goals behind it are in [VISION.md](VISION.md); how the app works now is in the docs
+([qt/docs/README.md](qt/docs/README.md)); what was built is in the [release notes](qt/docs/release-notes/) and in git.
 
 **How to use this file:**
 - Each **block** is one branch `qt/<block>` in its own worktree `../xournal_qt-<block>`, merged into `master-qt` by
-  the integrating session ([AGENTS.md](AGENTS.md), "How work is organised"). Within a block, each item is one
-  commit.
+  the integrating session ([workflow.md](qt/docs/development/workflow.md)). Within a block, each item is one commit.
 - Markers: `[ ]` open · `[~]` in progress (write the branch next to it) · `[x]` done in a block, with a one-line
   note of what is left · `[?]` needs a decision from the author.
 - When a block is merged, the integrator **deletes** its `[x]` items (what is left stays as new `[ ]` items): the
@@ -54,7 +53,7 @@ Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is merged (2026-10-07).
     `ImageWorkers` owns every image pool at idle priority and shutdown stops them all (bug 5,
     `Sketches.nothingIsDrawnOrStoredAfterShutdown`); `AsyncImage` (one response, one LRU, one URL encoding); covers
     cancellable; `ImageMemory` and the words page preview / sketch / thumbnail / stand-in / cover
-    ([image-caches.md](qt/docs/image-caches.md)); `library.json` read once. Left: the session registry out of
+    ([image-caches.md](qt/docs/architecture/image-caches.md)); `library.json` read once. Left: the session registry out of
     `ThumbnailProvider` (shell §6.2, block 4 step 3: only TabManager registers); the cards' QML role `preview` →
     `cover` (with the QML); "preview" for covers and stand-ins in app/ comments and MainWindowTest names; LibraryTest.cpp
     split by topic (shell block 12); reading positions outside a library out of the cache folder (§6.6).
@@ -74,19 +73,24 @@ Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is merged (2026-10-07).
     canvas actions (`app.copySelection`, `app.zoomIn`, …) and the per-document properties stay on `AppController`
     until their features move (E–N); no per-path guard between background writes and a `DocumentSession` save (tags
     have theirs since `qt/session-io`); `WindowContext` for the feature objects not made yet.
-- [ ] **Wave 4**: `qt/architecture`: an architecture overview generated from `qt/docs/architecture/architecture.yaml`
-  (an SVG diagram and tables linking to the source on GitHub, and an interactive page on GitHub Pages), together
-  with the docs restructure planned in [docs-plan.md](qt/docs/review/2026-10/docs-plan.md) (an entry page, feature
-  docs under `features/`, a README per module, a testing and a building guide), once the code has settled.
+- [ ] **Wave 4**: `qt/docs-restructure` (part 1) · `qt/architecture` (part 2): an architecture overview generated
+  from a model in `qt/docs/architecture/` (`architecture.yaml`; an SVG diagram and tables linking to the source on
+  GitHub, and an interactive page on GitHub Pages), with the upstream core and its connections to the frontend
+  ([review README](qt/docs/review/2026-10/README.md), "Wave 4"); `qt/docs/architecture/README.md` is its placeholder.
+  - [x] `qt/docs-restructure`: the layout of [docs-plan.md](qt/docs/review/2026-10/docs-plan.md) (`features/`,
+    `decisions/`, `development/`, `architecture/`; `git mv`), every link and cited doc path fixed, a link check
+    (`qt/scripts/check-doc-links.py`, the "Doc links" job of `xqt-build.yml`), the entry page `qt/docs/README.md`,
+    building / CI / workflow guides, a README per `qt/src/<module>/`, the feature docs trimmed to how things work
+    now, the root README's pointer listed as a seam in ADR 0002. Left: a glossary and "where data lives on disk"
+    (with `qt/architecture`; the settings keys once they are typed, B13); new ADRs distilled from the feature docs
+    (the library index, memory owners, background save, canvas tiles); the device checklist's checks into the
+    feature docs (infra B14 step 6); the platform docs (`development/android.md`, `windows.md`, `macos.md`) still
+    carry dated notes and block names.
 - [ ] **Later rounds**: the feature objects out of `AppController` (app-cpp E–N, `app.versions` first) ·
   `CanvasView` steps (infra B8, B9) · the `CanvasInput` split (B11) · non-view code out of `canvas` (B12) ·
   `DocumentSession` split (session 4) · one PDF-writing entry point (session 7) · `LibraryService` and a list-model
   base (shell 6–8) · typed settings (shell 10, infra B13) · module-qualified includes and one CMake file per module
   (infra B4, B5; shell 13) · `DocumentCanvasItem` split (app-cpp O) · shared small QML components (qml B11).
-- [ ] Docs (infra B14, with wave 4): trim the feature docs to how things work now (no "the author said on …",
-  block names or measurement logs unless they explain a decision), gather the hybrid PDF's file layout into one
-  section; a glossary; where data lives on disk (config, settings keys, caches, sidecars) once the settings are
-  typed (B13); list `README.md` (the fork's top half) in `adr/0002-upstream-seams.md`.
 
 ## Decisions for the author
 - [ ] Reading library cache packs from the other cache location (shell review §4 #15) stays: it also serves read-only
@@ -128,8 +132,7 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
   load (infra B2).
 - [ ] Failed once each under load, pass alone: `CitationsTest.selectedTextIsSearchedInTheDocumentTheTabsAndTheLibrary`
   (about 1 in 4 under `-j3`), `PhoneChromeTest.presentingWithoutControlsHasTheZenDot`,
-  `PhoneChromeTest.theFold7FoldedAndUnfolded`, `AdaptiveLayoutTest.toolBarPlaceIsChosenPerSizeClass`,
-  `AdaptiveLayoutTest.classesSidebarAndControlsAtFiveSizes`, `AdaptiveLayoutTest.colorsAndWidthsTakeTheRoomThereIs`,
+  `PhoneChromeTest.theFold7FoldedAndUnfolded`, `AdaptiveLayoutTest.classesSidebarAndControlsAtFiveSizes`,
   `AdaptiveLayoutTest.menusAreSheetsOnPhones`, `AdaptiveLayoutTest.theFloatingToolboxFitsAShortWindow`,
   `SafeAreasKeyboardTest.theFormatBarDocksAboveTheKeyboardAndTheCursorStaysInView`,
   `ColorChooserTest.theHighlighterTakesHighlightColors`,
@@ -224,12 +227,12 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
 - [ ] `qt/hwr-userdata` (later): a dataset of the user's own hand made in the app, for fine-tuning.
 
 ### Platforms
-- [ ] Android ([roadmap](qt/docs/android-roadmap.md)): some texts miss “ and — (probably the symbol
+- [ ] Android ([roadmap](qt/docs/development/android-roadmap.md)): some texts miss “ and — (probably the symbol
   fallback font); the tab strip does not scroll to the current tab after a reload; a Recent card drawn while access
   was missing stays blank; Google Play needs another way than `MANAGE_EXTERNAL_STORAGE`; SD cards as a home; the
   share sheet for a shared zip (today "Save a copy…"); exporting pictures into a `content://` folder; no zip password
   (Android's libzip has no crypto); after the move on the Fold 7, switch to the release-signed APK.
-- [ ] Windows ([roadmap](qt/docs/windows-roadmap.md)): a pressure calibration in Settings → Pen; an
+- [ ] Windows ([roadmap](qt/docs/development/windows-roadmap.md)): a pressure calibration in Settings → Pen; an
   installer; the author's `qt/windows-feel` on the Surface.
 - [ ] Platform builds run only at release: a weekly `schedule:` or a `master-qt` push filter (infra §8).
 

@@ -1,5 +1,5 @@
 /*
- * xournal-qt: bookmarking a page of a Markdown text (qt/docs/bookmarks.md, "Markdown").
+ * xournal-qt: bookmarking a page of a Markdown text (qt/docs/features/bookmarks.md, "Markdown").
  *
  * The pages of a .md, and of the text of a PDF text document, have their bookmarks in their text: a comment
  * "<!-- xqt:bookmark label -->" before the block it marks (MdBookmarks.h), read into XojPage::bookmark whenever the

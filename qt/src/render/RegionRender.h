@@ -42,7 +42,7 @@ struct Request {
     bool layers = true;      ///< false: the background only (paper, ruling, PDF, background image)
     bool forScreen = true;   ///< as the screen shows it (a covering sticky note that peeks: see through)
     /// false: no paper (its colour and ruling), transparent where nothing is drawn (pages exported as pictures,
-    /// qt/docs/page-files.md); a PDF page and a background picture are still drawn
+    /// qt/docs/features/page-files.md); a PDF page and a background picture are still drawn
     bool paper = true;
 };
 

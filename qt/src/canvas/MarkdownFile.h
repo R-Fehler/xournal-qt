@@ -1,5 +1,5 @@
 /*
- * xournal-qt: a Markdown file (.md) or a text file as a document (qt/docs/md-editor.md).
+ * xournal-qt: a Markdown file (.md) or a text file as a document (qt/docs/features/md-editor.md).
  *
  * The file's text is the page's Markdown text of a new document of plain A4 pages: it flows over the pages as a
  * Markdown text written on a page does (MdPaginate.h, MarkdownSession.h), each page holding its part in a box at the
@@ -74,8 +74,8 @@ std::unique_ptr<Document> document(const std::string& source, size_t maxPages = 
 std::unique_ptr<Document> document(const std::string& source, const md::Style& style,
                                    size_t maxPages = static_cast<size_t>(-1));
 
-/// A text document of notes (qt/docs/md-pdf.md): `source` on plain A4 pages as document() makes it, with the page's
-/// Markdown text on page 1 even when it is empty (the box makes it a text document: typing goes into it).
+/// A text document of notes (qt/docs/features/md-pdf.md): `source` on plain A4 pages as document() makes it, with the
+/// page's Markdown text on page 1 even when it is empty (the box makes it a text document: typing goes into it).
 std::unique_ptr<Document> notesDocument(const std::string& source);
 
 /// Where the part of the text on each page of a document made by document() begins (bytes of the text), from its

@@ -1,6 +1,7 @@
 # xournal-qt for macOS: build the Qt frontend with Homebrew's libraries, make xournal-qt.app (macdeployqt) and a .dmg,
-# and publish it as the artifact "xournal-qt-macos-<arch>". Unsigned (an ad-hoc signature only). See qt/docs/macos.md.
-# Runs only when asked, for the release workflow, or for pushes to the qt/macos-build branch.
+# and publish it as the artifact "xournal-qt-macos-<arch>". Unsigned (an ad-hoc signature only). See
+# qt/docs/development/macos.md. Runs only when asked, for the release workflow, or for pushes to the qt/macos-build
+# branch.
 name: xournal-qt macOS
 
 on:
@@ -26,7 +27,7 @@ jobs:
             runner: macos-15
           # Intel: GitHub still has Intel runners (macos-15-intel), but Homebrew no longer publishes bottles for Intel
           # Macs (qtbase, glib, pango, poppler, qpdf: Apple Silicon and Linux only): every library, Qt included, would
-          # be compiled from source in the job, for hours. See qt/docs/macos.md, "Intel Macs".
+          # be compiled from source in the job, for hours. See qt/docs/development/macos.md, "Intel Macs".
           # - arch: x86_64
           #   runner: macos-15-intel
     runs-on: ${{ matrix.runner }}

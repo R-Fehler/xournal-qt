@@ -1,5 +1,5 @@
 /*
- * xournal-qt: recording from the microphone into an Ogg Vorbis file (qt/docs/audio.md, "Recording").
+ * xournal-qt: recording from the microphone into an Ogg Vorbis file (qt/docs/features/audio.md, "Recording").
  *
  * The time of a recording is its count of samples: positionMs() is how much sound the file holds now, so a stroke
  * stamped with it (upstream's `ts`, in milliseconds from the start of the recording) is heard at the right moment,

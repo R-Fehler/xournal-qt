@@ -1,6 +1,7 @@
 /*
- * xournal-qt: the sticker sets on disk and the picker's list (qt/docs/stickers.md): what is a sticker, folders, free
- * names, the own order in its hidden file, last used, and the list's scope, folder, search, sorts and changes.
+ * xournal-qt: the sticker sets on disk and the picker's list (qt/docs/features/stickers.md): what is a sticker,
+ * folders, free names, the own order in its hidden file, last used, and the list's scope, folder, search, sorts and
+ * changes.
  *
  * @license GNU GPLv2 or later
  */

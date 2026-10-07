@@ -1,8 +1,8 @@
 /*
  * xournal-qt: moving all libraries to another home. On Android: from the app's own folder, which Android deletes
- * with the app, to the phone's Documents/Xournal_Libraries (Library::Home; qt/docs/android.md, "Where the documents
- * are"). The user's documents are at stake, so the old place stays whole and in use until the new one is known to be
- * complete:
+ * with the app, to the phone's Documents/Xournal_Libraries (Library::Home; qt/docs/development/android.md, "Where the
+ * documents are"). The user's documents are at stake, so the old place stays whole and in use until the new one is
+ * known to be complete:
  *
  *  1. plan: each library (a folder of the old home; a loose file there too) gets its place in the new home. A name
  *     that is taken there becomes "Name (2)": libraries are never merged. An empty library (no file in it) whose

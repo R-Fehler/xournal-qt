@@ -1,5 +1,5 @@
 /*
- * xournal-qt: handwriting copied as text (qt/docs/handwriting-search.md, "Copy handwriting as text").
+ * xournal-qt: handwriting copied as text (qt/docs/features/handwriting-search.md, "Copy handwriting as text").
  *
  * The recogniser's readings of the ink words (InkText.h) become text on the clipboard, never in the document: the
  * tool "Copy handwriting as text" takes the words a sweep goes over (sweptWords), "Copy as text" of a selection all

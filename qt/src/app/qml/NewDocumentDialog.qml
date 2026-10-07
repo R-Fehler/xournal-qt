@@ -1,6 +1,6 @@
 // New document: name, page background, paper size and orientation (the settings for new pages, so the next new
 // document starts with the same choice). In the library the document is saved at once in the current folder. Or it
-// starts from a template (qt/docs/templates.md): its first page is the template's page.
+// starts from a template (qt/docs/features/templates.md): its first page is the template's page.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -19,7 +19,7 @@ AdaptiveDialog {
     /// That size as text ("" when it is one of the formats)
     property string otherPaper: ""
     property bool landscape: false
-    /// The paper (qt/docs/dark-pages.md)
+    /// The paper (qt/docs/features/dark-pages.md)
     property color paperColor: "#ffffff"
     property bool textured: false
     /// "From a template": the template's file ("": a blank page)

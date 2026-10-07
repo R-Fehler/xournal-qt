@@ -126,7 +126,8 @@ Popup {
         else searchTyping.stop()
     }
 
-    // --- the layout for the window's size (qt/docs/adaptive-layout.md, "The home screen and the tab overview") ---
+    // --- the layout for the window's size
+    // (qt/docs/features/adaptive-layout.md, "The home screen and the tab overview")
     readonly property var adaptive: typeof win !== "undefined" && win ? win.adaptive : null
     readonly property bool phoneLayout: adaptive !== null && adaptive.phoneLayout
     readonly property bool shortLayout: phoneLayout && (adaptive.layoutClass === "phoneShort" || adaptive.orientation === "landscape")
@@ -254,7 +255,7 @@ Popup {
                 required property bool searchMatch
                 required property var hitPages
                 required property string filePath
-                /// A favourite (qt/docs/bookmarks.md): asked again when a star changes anywhere
+                /// A favourite (qt/docs/features/bookmarks.md): asked again when a star changes anywhere
                 readonly property bool favourite: (overview.favouriteRevision, filePath !== "" && app.isFavouriteFile(filePath))
                 width: grid.cellWidth
                 height: grid.cellHeight

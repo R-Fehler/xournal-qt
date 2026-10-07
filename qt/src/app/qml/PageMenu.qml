@@ -16,7 +16,7 @@ Popup {
     focus: true  // (Esc, Android's back: closes it)
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
     // In the phone classes a bottom sheet (as the menus, AdaptiveMenu): across the bottom, with a handle to drag it
-    // away, the page dimmed; the buttons as big as a finger needs (qt/docs/adaptive-layout.md, "Menus")
+    // away, the page dimmed; the buttons as big as a finger needs (qt/docs/features/adaptive-layout.md, "Menus")
     readonly property var adaptiveLayout: typeof win !== "undefined" && win ? win.adaptive : null
     property bool asSheet: false
     readonly property int target: adaptiveLayout && adaptiveLayout.touchProfile ? adaptiveLayout.minTarget : 44
@@ -160,7 +160,7 @@ Popup {
                 onClicked: { app.copyPageLink(menu.page); menu.close() }
             }
             // The document beside itself (qt/self-reference), at this page: a second view with its own scrolling
-            // Writing space beside the slide on this page (or the selected pages): qt/docs/note-space.md
+            // Writing space beside the slide on this page (or the selected pages): qt/docs/features/note-space.md
             PageAction {
                 objectName: "pageMenuNoteSpace"
                 iconName: "xqt-note-space"
@@ -193,8 +193,8 @@ Popup {
                 enabled: menu.visible && app.pageSizeOf(menu.page).possible === true
                 onClicked: { app.requestPageSize(menu.pages); menu.close() }
             }
-            // A bookmark on the page (qt/docs/bookmarks.md): tap to add it (named after the page's first heading or
-            // its PDF chapter, else "Page N"); on a bookmarked page: its name, to rename or remove it
+            // A bookmark on the page (qt/docs/features/bookmarks.md): tap to add it (named after the page's first
+            // heading or its PDF chapter, else "Page N"); on a bookmarked page: its name, to rename or remove it
             PageAction {
                 id: bookmarkAction
                 objectName: "pageMenuBookmark"
@@ -211,7 +211,8 @@ Popup {
                 }
             }
         }
-        // Inserting pages, and a quarter turn of the page or the selection (qt/docs/page-rotation.md; why not: below)
+        // Inserting pages, and a quarter turn of the page or the selection (qt/docs/features/page-rotation.md; why not:
+        // below)
         RowLayout {
             Layout.fillWidth: true
             spacing: 0
@@ -220,7 +221,7 @@ Popup {
                 text: qsTr("Insert pages…")
                 onClicked: { app.requestInsertPages(menu.lastPage + 1); menu.close() }
             }
-            // Pages from a file after this one (PageFiles.qml, qt/docs/page-files.md)
+            // Pages from a file after this one (PageFiles.qml, qt/docs/features/page-files.md)
             PageAction {
                 objectName: "pageMenuInsertFile"
                 visible: menu.pageFiles
@@ -267,7 +268,7 @@ Popup {
             enabled: app.titlePage !== menu.page
             onClicked: { app.setTitlePage(menu.page); menu.close() }
         }
-        // A chapter starting here; the page saved to be added again (qt/docs/templates.md)
+        // A chapter starting here; the page saved to be added again (qt/docs/features/templates.md)
         RowLayout {
             Layout.fillWidth: true
             spacing: 0
@@ -283,7 +284,7 @@ Popup {
                 tip: qsTr("Save page as template…")
                 onClicked: { win.openTemplateSave(menu.page); menu.close() }
             }
-            // The page as a high-resolution picture on the clipboard (qt/docs/page-files.md)
+            // The page as a high-resolution picture on the clipboard (qt/docs/features/page-files.md)
             PageAction {
                 objectName: "pageMenuCopyImage"
                 implicitHeight: menu.asSheet ? Math.max(48, menu.target) : 38
@@ -293,7 +294,8 @@ Popup {
                 onClicked: { app.copyPagesAsImage(menu.pages); menu.close() }
             }
         }
-        // Selecting all; the page or the selection as files of their own (PageFiles.qml, qt/docs/page-files.md)
+        // Selecting all; the page or the selection as files of their own (PageFiles.qml,
+        // qt/docs/features/page-files.md)
         RowLayout {
             Layout.fillWidth: true
             spacing: 0

@@ -1,5 +1,5 @@
 /*
- * xournal-qt: "Open in library…" for a zip (qt/docs/library.md, "Receiving a shared zip").
+ * xournal-qt: "Open in library…" for a zip (qt/docs/features/library.md, "Receiving a shared zip").
  *
  * A zip (shared from this app, or any zip of documents) is unpacked into a new folder of the library: the zip's top
  * folder, or a folder named after the zip when its files are not in one, inside a folder the user chooses (Inbox by

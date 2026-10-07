@@ -1,6 +1,6 @@
-// While a recording runs (qt/docs/audio.md, "In the app"): a red pill at the top of the canvas with the time, the
-// level, pause/resume and stop; a warning when the first seconds were silent (a muted or wrong microphone). In another
-// tab it says which document the recording is for. Self-contained (RecordButton.qml starts the recording).
+// While a recording runs (qt/docs/features/audio.md, "In the app"): a red pill at the top of the canvas with the time,
+// the level, pause/resume and stop; a warning when the first seconds were silent (a muted or wrong microphone). In
+// another tab it says which document the recording is for. Self-contained (RecordButton.qml starts the recording).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

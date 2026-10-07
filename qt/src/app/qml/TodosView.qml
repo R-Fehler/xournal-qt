@@ -1,7 +1,7 @@
-// The library's To-dos view (home screen, qt/docs/todos.md): the to-dos of all documents of the library (task lines
-// "- [ ] …" of Markdown boxes, sticky notes, Markdown files, PDF text documents; which of them: Settings → To-dos),
-// grouped by document (or folder, or not at all) with the count per group, sorted by due date, document or last
-// change, filtered by state, due date, a text and the library's current folder. A tap opens the document at the
+// The library's To-dos view (home screen, qt/docs/features/todos.md): the to-dos of all documents of the library (task
+// lines "- [ ] …" of Markdown boxes, sticky notes, Markdown files, PDF text documents; which of them: Settings →
+// To-dos), grouped by document (or folder, or not at all) with the count per group, sorted by due date, document or
+// last change, filtered by state, due date, a text and the library's current folder. A tap opens the document at the
 // to-do's line; its check box ticks it in the document. It follows the library's "Show" filter and its Favourites
 // chip; the list comes from the library's index (no document is opened to make it).
 import QtQuick

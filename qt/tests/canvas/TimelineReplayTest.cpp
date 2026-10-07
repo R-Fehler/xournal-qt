@@ -1,7 +1,8 @@
 /*
- * xournal-qt: a view replays its document's timeline (qt/docs/timeline.md, "Replay"): the pages as of a moment, the
- * stroke being written drawn on along its length, what came since drawn over the pages' pictures without drawing them
- * again, read-only (the pen writes nothing, a tap goes to the moment of the ink), and the document as it was after.
+ * xournal-qt: a view replays its document's timeline (qt/docs/features/timeline.md, "Replay"): the pages as of a
+ * moment, the stroke being written drawn on along its length, what came since drawn over the pages' pictures without
+ * drawing them again, read-only (the pen writes nothing, a tap goes to the moment of the ink), and the document as it
+ * was after.
  *
  * @license GNU GPLv2 or later
  */

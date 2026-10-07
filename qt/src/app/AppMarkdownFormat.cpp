@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the window's side of the Markdown formatting bar and the table editor (qt/docs/md-editor.md,
+ * xournal-qt: the window's side of the Markdown formatting bar and the table editor (qt/docs/features/md-editor.md,
  * "Formatting bar"): the tools of md::format on the Markdown written on the page or in a .md (MarkdownEditor), and
  * on the source beside the page (its TextArea's document).
  *

@@ -509,7 +509,7 @@ DocumentFiles::Result relocate(const DocumentItem& item, const fs::path& folder,
     }
     if (!item.md.empty()) {
         // Its pictures ("name.assets" next to it) go along; its links to them follow a new name
-        // (qt/docs/md-images.md)
+        // (qt/docs/features/md-images.md)
         const fs::path assets = DocumentImages::assetsFolder(item.md);
         const fs::path newAssets = DocumentImages::assetsFolder(newMd);
         if (isDir(assets) && assets != newAssets) {
@@ -798,7 +798,8 @@ Listing scan(const fs::path& dir, unsigned include) {
         l.items.push_back(std::move(item));
     }
     foldConflicts(l.items);
-    // A .md's pictures ("name.assets" next to it) are part of it, not a folder of the library (qt/docs/md-images.md)
+    // A .md's pictures ("name.assets" next to it) are part of it, not a folder of the library
+    // (qt/docs/features/md-images.md)
     if (!mds.empty()) {
         std::set<std::string> assets;
         for (const auto& md: mds) {

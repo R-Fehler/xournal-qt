@@ -1,6 +1,6 @@
-// "Share folder…" / "Share library…" (qt/docs/library.md, "Sharing a folder or the library"): the folder or the whole
-// library as one zip. The options, then the progress (Cancel), then what was done with "Show in file manager" and
-// "Save a copy…". The work is AppController's (app.libraryShare: LibraryShare).
+// "Share folder…" / "Share library…" (qt/docs/features/library.md, "Sharing a folder or the library"): the folder or
+// the whole library as one zip. The options, then the progress (Cancel), then what was done with "Show in file manager"
+// and "Save a copy…". The work is AppController's (app.libraryShare: LibraryShare).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

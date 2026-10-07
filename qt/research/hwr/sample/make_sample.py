@@ -1,6 +1,6 @@
-# Makes the "Handwriting sample" pages (qt/docs/handwriting-search.md, "Your handwriting as a dataset"): a .xopp per
-# language with the sentences of sentences-<lang>.txt as numbered grey prompts (text, not ink) and room to write each
-# one under it, ten to a page. Write every sentence once, on one line, under its prompt; then
+# Makes the "Handwriting sample" pages (qt/docs/features/handwriting-search.md, "Your handwriting as a dataset"): a
+# .xopp per language with the sentences of sentences-<lang>.txt as numbered grey prompts (text, not ink) and room to
+# write each one under it, ten to a page. Write every sentence once, on one line, under its prompt; then
 #   xournal-qt-cli hwr-lines handwriting-sample-de.xopp --text sentences-de.txt --lang de --writer me --out <dir>
 # gives the line dataset with the sentences as the lines' texts (matched in reading order).
 # Run: python3 make_sample.py (writes handwriting-sample-en.xopp and handwriting-sample-de.xopp next to it).

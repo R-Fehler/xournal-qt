@@ -258,7 +258,7 @@ TEST(DocumentLayout, fitWidthFitsThePageInView) {
     EXPECT_LT(vc2.fitWidthZoom(2), vc2.fitWidthZoom(0)) << "the second row holds the slide: wider";
 }
 
-// Reading (qt/docs/toolbox.md): up and down, a drag or a fling comes to rest on a row of pages, as sideways
+// Reading (qt/docs/features/toolbox.md): up and down, a drag or a fling comes to rest on a row of pages, as sideways
 TEST(ViewSnapping, upAndDownWhileReadingARowOfPagesComesToRest) {
     const QSizeF a4(595.27559, 841.88976);
     Pages pages({a4, a4, a4, a4});

@@ -332,8 +332,8 @@ TEST_F(SettingsModelTest, snappingToTheGridIsOffUnlessChosen) {
     EXPECT_TRUE(later->getSettings()->isSnapGrid()) << "a choice is kept";
 }
 
-// The layout chosen by hand per size class (qt/docs/adaptive-layout.md): stored as layout/<class>/<what>, saved at
-// once, "" (or "auto") for the automatic choice; the reset removes them all and nothing else.
+// The layout chosen by hand per size class (qt/docs/features/adaptive-layout.md): stored as layout/<class>/<what>,
+// saved at once, "" (or "auto") for the automatic choice; the reset removes them all and nothing else.
 TEST_F(SettingsModelTest, layoutChoicesPerSizeClass) {
     QSignalSpy changed(model.get(), &SettingsModel::changed);
     EXPECT_FALSE(model->hasLayoutChoices());

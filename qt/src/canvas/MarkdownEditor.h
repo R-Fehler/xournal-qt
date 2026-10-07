@@ -76,7 +76,7 @@ public:
     /// text is clipped to the note, as it is drawn when done (with the "more below" mark when it goes on below).
     void paint(cairo_t* cr) const;
     /// A sticky note's text: the cursor is below the note's bottom (what is typed there is not seen: the window says
-    /// so, qt/docs/sticky-notes.md)
+    /// so, qt/docs/features/sticky-notes.md)
     bool cursorBelowNote() const;
     /// The note of a note's text (page coordinates of getPage(); nothing: not a note's text)
     std::optional<QRectF> noteRect() const;
@@ -112,7 +112,7 @@ public:
     /// The cursor and the other end of the selection (source offsets).
     size_t cursorPosition() const { return caret; }
     size_t anchorPosition() const { return anchor; }
-    /// The selected part of the source ("": nothing selected), for the look-up actions (qt/docs/citations.md).
+    /// The selected part of the source ("": nothing selected), for the look-up actions (qt/docs/features/citations.md).
     QString selectedText() const {
         const size_t from = std::min(caret, anchor), to = std::max(caret, anchor);
         return QString::fromStdString(md.text().substr(from, to - from));
@@ -171,8 +171,8 @@ private:
     size_t verticalMove(bool down) const;
     size_t prevChar(size_t pos) const;
     size_t nextChar(size_t pos) const;
-    /// The line of a bookmark comment (qt/docs/bookmarks.md, "Markdown") that `pos` is on: [its start, the start of
-    /// the next line). It is not drawn, so the cursor is never on it: it goes past it (the way it moved; see
+    /// The line of a bookmark comment (qt/docs/features/bookmarks.md, "Markdown") that `pos` is on: [its start, the
+    /// start of the next line). It is not drawn, so the cursor is never on it: it goes past it (the way it moved; see
     /// outsideBookmark), and deleting next to it deletes the whole line.
     std::optional<std::pair<size_t, size_t>> bookmarkLineAt(size_t pos) const;
     size_t outsideBookmark(size_t pos, bool forward) const;

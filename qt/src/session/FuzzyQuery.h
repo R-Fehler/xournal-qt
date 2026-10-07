@@ -15,7 +15,8 @@
  *   a b       a and b (a space)
  *   a | b     a or b; `|` binds closer than the space: `a b | c` is a and (b or c)
  *   ( … )     a group (an extension of fzf's syntax): `(a b) | c`; `!( … )` negates it
- *   tag:name  the document has the tag (qt/docs/tags.md; an extension): `tag:course` also finds `#course/math`,
+ *   tag:name  the document has the tag (qt/docs/features/tags.md; an extension): `tag:course` also finds
+ *   `#course/math`,
  *             `tag:course/` only the tags inside it; `!tag:name`: it has not
  *   \  \( \)  a space, a parenthesis in a term
  *

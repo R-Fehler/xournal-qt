@@ -1,6 +1,6 @@
-// The recordings of the document (qt/docs/audio.md, "In the app"): each with its pages, its length and how much ink
-// was written while it ran; play it, or remove it from the document (its ink stays, without the recording; undoable;
-// the file stays in the audio folder).
+// The recordings of the document (qt/docs/features/audio.md, "In the app"): each with its pages, its length and how
+// much ink was written while it ran; play it, or remove it from the document (its ink stays, without the recording;
+// undoable; the file stays in the audio folder).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts

@@ -1,7 +1,7 @@
 /*
- * xournal-qt: the library's tags (qt/docs/tags.md) as the window offers them: the Tags view of the library home, and
- * "Tags…" of a document (a card's menu, the document's ⋮ → Document): a PDF gets them as its keywords (an incremental
- * update of the file); other documents have the #tags typed in them.
+ * xournal-qt: the library's tags (qt/docs/features/tags.md) as the window offers them: the Tags view of the library
+ * home, and "Tags…" of a document (a card's menu, the document's ⋮ → Document): a PDF gets them as its keywords (an
+ * incremental update of the file); other documents have the #tags typed in them.
  *
  * @license GNU GPLv2 or later
  */

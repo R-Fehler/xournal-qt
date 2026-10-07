@@ -1,6 +1,6 @@
 /*
  * xournal-qt: DocumentSession, annotations of other apps made editable (AdoptAnnotations.h,
- * qt/docs/adopt-annotations.md).
+ * qt/docs/features/adopt-annotations.md).
  *
  * @license GNU GPLv2 or later
  */

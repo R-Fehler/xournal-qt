@@ -1,6 +1,7 @@
 /*
- * xournal-qt: scratch out to erase (qt/docs/pen-gestures.md): a quick zigzag of the pen over ink deletes the strokes
- * it covers. The shape test and the strokes it covers, without the canvas (GestureStrokeHandler uses them on release).
+ * xournal-qt: scratch out to erase (qt/docs/features/pen-gestures.md): a quick zigzag of the pen over ink deletes the
+ * strokes it covers. The shape test and the strokes it covers, without the canvas (GestureStrokeHandler uses them on
+ * release).
  *
  * A zigzag: drawn back and forth along a mostly horizontal axis (its main axis, within 40° of the horizontal), at
  * least three times turning back over most of its width, each sweep nearly straight and along the axis. Handwriting

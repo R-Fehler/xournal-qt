@@ -1,7 +1,7 @@
-// The toolbox (qt/docs/toolbox.md): the user's own tools in a rail docked to a side of the canvas (right by default;
-// left, top or bottom by choice, per window size), like pens lying sorted in a box on the table. One element in the
-// window, in full screen and on phones (the dock: the same rail at the bottom edge). The same element is the top bar
-// (`bar: "top"`, qt/top-bar): the other list of the one arrangement, sideways, without a grip.
+// The toolbox (qt/docs/features/toolbox.md): the user's own tools in a rail docked to a side of the canvas (right by
+// default; left, top or bottom by choice, per window size), like pens lying sorted in a box on the table. One element
+// in the window, in full screen and on phones (the dock: the same rail at the bottom edge). The same element is the top
+// bar (`bar: "top"`, qt/top-bar): the other list of the one arrangement, sideways, without a grip.
 //   head   undo, redo (pinned; the top bar: only where no rail is shown)
 //   middle the bar's items as the arrangement has them (ToolboxModel): the user's tools, dividers, groups, and the app's
 //          own tools and commands (hand, select, …; open, save, …: the window's buttons, lent to the bar); it scrolls
@@ -50,8 +50,8 @@ Rectangle {
     property bool floating: false
     /// ⋯ at its end (full screen: present, leave full screen, search, settings)
     property bool moreShown: false
-    /// The phone's dock (qt/docs/toolbox.md, "On a phone"): undo, redo, the same items scrolling sideways, "+" at their
-    /// end, and the page number
+    /// The phone's dock (qt/docs/features/toolbox.md, "On a phone"): undo, redo, the same items scrolling sideways, "+"
+    /// at their end, and the page number
     property bool compact: false
     /// The window's buttons of the app's items by name (Main.qml's toolArea.slots): those on the rail are lent to it
     property var appButtons: ({})
@@ -88,7 +88,8 @@ Rectangle {
     radius: floating ? 14 : 0
     border.width: floating ? 1 : 0
     border.color: "#d5d8dc"
-    /// A line's thickness: a whole number of device pixels (one at 100 % to 175 %, two at 200 %; qt/docs/hidpi.md)
+    /// A line's thickness: a whole number of device pixels (one at 100 % to 175 %, two at 200 %;
+    /// qt/docs/features/hidpi.md)
     readonly property real hair: DevicePixels.whole(1, Screen.devicePixelRatio)
     // The line towards the pages (docked)
     Rectangle {
@@ -428,7 +429,7 @@ Rectangle {
         menuRequested(e, button, pos)
     }
 
-    // --- carrying: an item held, then moved to another place (qt/docs/toolbox.md, "Carrying") ---------------------------
+    // --- carrying: an item held, then moved to another place (qt/docs/features/toolbox.md, "Carrying") ---------------------------
     /// The item being carried ("": none), where it would go on this bar (an index among its items; -1: not here), and
     /// the mark of that place (along the bar, in the items' coordinates)
     property string dragId: ""
@@ -1042,7 +1043,8 @@ Rectangle {
             }
         }
     }
-    // A group the user made: the member used last, with dots for how many it holds (qt/docs/toolbox.md, "Groups")
+    // A group the user made: the member used last, with dots for how many it holds (qt/docs/features/toolbox.md,
+    // "Groups")
     Component {
         id: groupComponent
         ToolEntryButton {

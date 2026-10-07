@@ -1,5 +1,6 @@
 /*
- * xournal-qt: XQT_LOG_INPUT=1 writes what the pen, touch and mouse send to stderr (qt/docs/windows.md, "Pen input").
+ * xournal-qt: XQT_LOG_INPUT=1 writes what the pen, touch and mouse send to stderr (qt/docs/development/windows.md, "Pen
+ * input").
  *
  * Per press: the event, its device (name, type, pointer type, capabilities), position, pressure, tilt, buttons, and
  * what the canvas makes of it; then the first few moves of each stroke, the release, and the pen's proximity. Off by

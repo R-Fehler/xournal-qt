@@ -1,5 +1,5 @@
-// "Open in library…" for a zip (qt/docs/library.md, "Receiving a shared zip"): a zip opened with the app, from the
-// file dialog or dropped on the library is unpacked into a new folder of the library, inside the folder chosen here
+// "Open in library…" for a zip (qt/docs/features/library.md, "Receiving a shared zip"): a zip opened with the app, from
+// the file dialog or dropped on the library is unpacked into a new folder of the library, inside the folder chosen here
 // (Inbox by default); a password is asked for when the zip has one. The work is app.libraryUnzip's (LibraryUnzip).
 import QtQuick
 import QtQuick.Controls

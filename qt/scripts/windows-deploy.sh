@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The portable Windows folder of xournal-qt, from a build made in MSYS2 UCRT64 (see qt/docs/windows.md):
+# The portable Windows folder of xournal-qt, from a build made in MSYS2 UCRT64 (see qt/docs/development/windows.md):
 #
 #   qt/scripts/windows-deploy.sh <build dir> <program folder>      e.g.  build dist/xournal-qt
 #
@@ -7,7 +7,7 @@
 #   bin/                xournal-qt.exe, xournal-qt-cli.exe, the Qt and MinGW DLLs, Qt's plugins (platforms/, styles/,
 #                       imageformats/, ...), the QML modules (qml/), qt.conf. Qt6Multimedia.dll for the recordings,
 #                       without Qt's media plugins (multimedia/: FFmpeg and Windows Media Foundation players, not
-#                       needed for audio in and out, see qt/docs/audio.md) and so without FFmpeg's DLLs
+#                       needed for audio in and out, see qt/docs/features/audio.md) and so without FFmpeg's DLLs
 #   share/xournal-qt/   page templates, palettes, icons (AppContext looks for them next to bin/)
 #   share/poppler/      poppler's encoding data (poppler finds it relative to its DLL)
 #   lib/gdk-pixbuf-2.0/ gdk-pixbuf's image loaders
@@ -131,9 +131,9 @@ for f in imageformats/qsvg.dll iconengines/qsvgicon.dll; do
     ensure_file "$qt_plugins/$f" "$bin/$f"
 done
 
-# Recordings (qt/docs/audio.md, "Platforms"): QAudioSource and QAudioSink are in Qt6Multimedia.dll itself (WASAPI).
-# windeployqt adds Qt's media plugins because the program links Qt Multimedia; they are for players, cameras and
-# video, and the FFmpeg one would bring FFmpeg's DLLs (tens of MB) along. Taken out before the DLLs are collected.
+# Recordings (qt/docs/features/audio.md, "Platforms"): QAudioSource and QAudioSink are in Qt6Multimedia.dll itself
+# (WASAPI). windeployqt adds Qt's media plugins because the program links Qt Multimedia; they are for players, cameras
+# and video, and the FFmpeg one would bring FFmpeg's DLLs (tens of MB) along. Taken out before the DLLs are collected.
 step "Qt Multimedia: the library, without the media plugins"
 if [[ -d "$bin/multimedia" ]]; then
     ls "$bin/multimedia"

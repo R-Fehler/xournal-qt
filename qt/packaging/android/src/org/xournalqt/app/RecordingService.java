@@ -1,9 +1,9 @@
-// xournal-qt: keeps a recording going while the app is in the background or the screen is off (qt/docs/audio.md,
-// "Android"). Android stops the microphone of an app that is not in front unless a foreground service of type
-// "microphone" runs, with a notification the user sees. The native side starts it when a recording starts, tells it
-// when the recording pauses or resumes, and stops it when the recording ends (XournalActivity.setRecording). The
-// recording itself runs in the app's process as before; the service holds a partial wake lock meanwhile, so the CPU
-// keeps taking the microphone's samples with the screen off.
+// xournal-qt: keeps a recording going while the app is in the background or the screen is off
+// (qt/docs/features/audio.md, "Android"). Android stops the microphone of an app that is not in front unless a
+// foreground service of type "microphone" runs, with a notification the user sees. The native side starts it when a
+// recording starts, tells it when the recording pauses or resumes, and stops it when the recording ends
+// (XournalActivity.setRecording). The recording itself runs in the app's process as before; the service holds a partial
+// wake lock meanwhile, so the CPU keeps taking the microphone's samples with the screen off.
 //
 // The notification: "Recording" with the document's title and the time (a clock that runs on from the recorded time;
 // while paused it shows where it stopped), Pause or Resume, and Stop. The buttons come back here as intents and go on

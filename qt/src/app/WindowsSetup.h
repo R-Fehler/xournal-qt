@@ -1,5 +1,5 @@
 /*
- * xournal-qt: what the app needs on Windows before the core starts (see qt/docs/windows.md).
+ * xournal-qt: what the app needs on Windows before the core starts (see qt/docs/development/windows.md).
  *
  * @license GNU GPLv2 or later
  */

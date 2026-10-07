@@ -2,15 +2,15 @@
 // - the files other apps hand over ("Open with": ACTION_VIEW; the share sheet: ACTION_SEND, ACTION_SEND_MULTIPLE),
 //   at start and while the app runs. They are content:// URIs; the native side copies them into the library
 //   (AndroidContent.cpp, AppController::receiveFiles).
-// - the launcher's shortcut "Quick note" (res/xml/shortcuts.xml, qt/docs/quick-note.md): its intent is passed on
-//   with the files, as the entry QUICK_NOTE.
+// - the launcher's shortcut "Quick note" (res/xml/shortcuts.xml, qt/docs/features/quick-note.md): its intent is passed
+//   on with the files, as the entry QUICK_NOTE.
 // - whether the device has a stylus (the default of "draw with the finger").
 // - "All files access" (MANAGE_EXTERNAL_STORAGE; the storage permission before Android 11), asked for when the user
 //   opens a folder of the shared storage as a library: whether the app has it, and the system's page to allow it.
-// - a recording (qt/docs/audio.md, "Android"): the foreground service with its notification (RecordingService), whose
-//   Pause/Resume and Stop come back to the native side; the notification permission (Android 13+), asked once; the
-//   app's page in the settings, where the microphone is allowed after a refusal.
-// See qt/docs/android.md.
+// - a recording (qt/docs/features/audio.md, "Android"): the foreground service with its notification
+//   (RecordingService), whose Pause/Resume and Stop come back to the native side; the notification permission (Android
+//   13+), asked once; the app's page in the settings, where the microphone is allowed after a refusal.
+// See qt/docs/development/android.md.
 package org.xournalqt.app;
 
 import android.Manifest;
@@ -180,8 +180,9 @@ public class XournalActivity extends QtActivity {
         return true;
     }
 
-    /// The calendar app's "new event" screen with a to-do filled in (qt/docs/todos.md): an all-day event that starts at
-    /// `beginUtcMs` (midnight UTC of its day). False when no app takes it (the native side writes an .ics then).
+    /// The calendar app's "new event" screen with a to-do filled in (qt/docs/features/todos.md): an all-day event that
+    /// starts at `beginUtcMs` (midnight UTC of its day). False when no app takes it (the native side writes an .ics
+    /// then).
     public static boolean insertCalendarEvent(String title, String description, long beginUtcMs) {
         XournalActivity a = current.get();
         if (a == null) {
@@ -204,8 +205,9 @@ public class XournalActivity extends QtActivity {
     }
 
     /// A recording runs, paused or ended (the native side, AndroidActivity.cpp): the foreground service that keeps the
-    /// microphone in the background (RecordingService, qt/docs/audio.md) starts with the first, shows the others in
-    /// its notification, and stops with the end. `labels`: the notification's texts (RecordingService.LABEL_*).
+    /// microphone in the background (RecordingService, qt/docs/features/audio.md) starts with the first, shows the
+    /// others in its notification, and stops with the end. `labels`: the notification's texts
+    /// (RecordingService.LABEL_*).
     public static void setRecording(boolean on, boolean paused, long recordedMs, String title, String[] labels) {
         final XournalActivity a = current.get();
         if (a == null) {

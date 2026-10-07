@@ -1,6 +1,6 @@
 # Training xournal-qt's handwriting models
 
-This project trains the models behind xournal-qt's handwriting search ([handwriting-search.md](../../../docs/handwriting-search.md)).
+This project trains the models behind xournal-qt's handwriting search ([handwriting-search.md](../../../docs/features/handwriting-search.md)).
 It takes you from a fresh GPU machine to a model folder that the app loads. The goal is **search**, not
 transcription: a model is good when the search finds the words you wrote among its top-k readings, even when its
 first guess is wrong. Every measure here is built around that.
@@ -167,7 +167,7 @@ The app reads a line, keeps a few readings per word and lets the search match al
 
 Decoding is the app's: TrOCR beam search with 4 beams and at most 48 tokens (a port of `BeamSearch.cpp`), and CTC
 prefix beam search with 8 prefixes and the top 5 readings. The research baselines from
-[handwriting-recognition.md](../../../docs/research/handwriting-recognition.md), measured with the same rules:
+[handwriting-recognition.md](../research.md), measured with the same rules:
 TrOCR-small int8 finds 97 % of IAM's words and 41 % of fhswf's German words; kraken PP-OCRv6 medium finds 62 % of
 the German words at top-1.
 

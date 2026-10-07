@@ -15,7 +15,7 @@ namespace {
 /// The models this build downloads.
 /// English: Xenova's ONNX export of TrOCR-small handwritten (MIT), int8. The revision and the sha256 of each file are
 /// pinned by the author (qt/scripts/hwr-model.sh prints them); until then nothing is downloaded, and the model comes
-/// from the script (qt/docs/handwriting-search.md).
+/// from the script (qt/docs/features/handwriting-search.md).
 /// German: the project's own CTC model (qt/research/hwr/train, FORMATS.md "kind": "ctc"), pinned when it is published;
 /// until then a folder holding one can be chosen in Settings.
 std::vector<ModelDownload::Model> builtIn() {

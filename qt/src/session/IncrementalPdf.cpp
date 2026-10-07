@@ -367,7 +367,7 @@ std::string Update::serializeOver(const Over& over, Stats* stats) { return seria
 
 std::string Update::serializeWith(const Tail& tail, const Over* over, Stats* stats) {
     // An encrypted file: strings and streams of the update encrypted with the file's key (AES-256 only; else the
-    // caller writes the file in full). qt/docs/hybrid-pdf.md, "Encrypted PDFs"
+    // caller writes the file in full). qt/docs/features/hybrid-pdf.md, "Encrypted PDFs"
     const PdfEncryption::Encrypter enc(pdf);
     if (enc.encrypted() && !enc.supported()) {
         throw std::runtime_error("Cannot append to this encrypted file: " + enc.why());

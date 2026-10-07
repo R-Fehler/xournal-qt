@@ -139,11 +139,11 @@ auto XojPage::getPdfPageNr() const -> size_t { return this->pdfBackgroundPage; }
 auto XojPage::getNoteSpace() const -> const NoteSpace& { return this->noteSpace; }
 void XojPage::setNoteSpace(const NoteSpace& space) { this->noteSpace = space; }
 
-// xournal-qt: bookmarks (qt/docs/bookmarks.md)
+// xournal-qt: bookmarks (qt/docs/features/bookmarks.md)
 auto XojPage::getBookmark() const -> const std::optional<std::string>& { return this->bookmark; }
 void XojPage::setBookmark(std::optional<std::string> label) { this->bookmark = std::move(label); }
 
-// xournal-qt: voice memos (qt/docs/audio.md)
+// xournal-qt: voice memos (qt/docs/features/audio.md)
 auto XojPage::getAudioMemos() const -> const std::string& { return this->audioMemos; }
 void XojPage::setAudioMemos(std::string memos) { this->audioMemos = std::move(memos); }
 

@@ -1,5 +1,5 @@
-// While a recording plays (qt/docs/audio.md, "In the app"): play/pause, 5 s back and forward, a slider with a tick at
-// each moment ink was written, the time, and ×. Self-contained.
+// While a recording plays (qt/docs/features/audio.md, "In the app"): play/pause, 5 s back and forward, a slider with a
+// tick at each moment ink was written, the time, and ×. Self-contained.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -83,7 +83,7 @@ Pane {
             font.features: { "tnum": 1 }
             font.pixelSize: 12
         }
-        // The writing with it: the document's timeline from this moment (qt/docs/timeline.md)
+        // The writing with it: the document's timeline from this moment (qt/docs/features/timeline.md)
         IconButton {
             objectName: "playbackReplay"
             iconName: "xqt-history"

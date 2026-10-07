@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the app's own network requests (qt/docs/citations.md): arXiv's search and its PDFs. Opt-in (Settings:
- * `networkAccess`), and every address is shown before it is fetched.
+ * xournal-qt: the app's own network requests (qt/docs/features/citations.md): arXiv's search and its PDFs. Opt-in
+ * (Settings: `networkAccess`), and every address is shown before it is fetched.
  *
  * NetFetch is the one way out: tests replace it (setInstance) so that no test touches the network. The real one uses
  * QNetworkAccessManager, which works asynchronously (nothing waits on the UI thread), with a timeout per request, a

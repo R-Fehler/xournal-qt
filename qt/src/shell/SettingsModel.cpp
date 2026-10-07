@@ -148,7 +148,7 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
     // The laser pointer's ink starts to fade this long after the pen is lifted (ms; upstream's setting, 500 ms)
     add("laserPointerFadeOutTime", [&s] { return QVariant(static_cast<int>(s.getLaserPointerFadeOutTime())); },
         [&s](const QVariant& v) { s.setLaserPointerFadeOutTime(static_cast<unsigned int>(std::clamp(v.toInt(), 0, 60000))); });
-    // The pen's gestures (qt/docs/pen-gestures.md): hold to straighten, and how long the pen rests for it (ms)
+    // The pen's gestures (qt/docs/features/pen-gestures.md): hold to straighten, and how long the pen rests for it (ms)
     add("holdToStraighten", [&s] { return QVariant(pengestures::holdToStraighten(s)); },
         [&s](const QVariant& v) { pengestures::setHoldToStraighten(s, v.toBool()); });
     add("holdToStraightenTime", [&s] { return QVariant(pengestures::holdTime(s)); },
@@ -185,7 +185,7 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                 app.getToolHandler()->setEraserType(type);
             }
         });
-    // The tool's pointer over the page: a small dot or the crosshair (qt/docs/hover-cursors.md)
+    // The tool's pointer over the page: a small dot or the crosshair (qt/docs/features/hover-cursors.md)
     add("hoverPointer",
         [&s] {
             return QVariant(QString::fromLatin1(hover::pointerSetting(s) == hover::Pointer::Crosshair ? "crosshair"
@@ -196,7 +196,8 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                                                                                    : hover::Pointer::Dot);
         });
 
-    // Version history (qt/docs/hybrid-pdf.md): new PDFs with notes keep their versions from their first save (off)
+    // Version history (qt/docs/features/hybrid-pdf.md): new PDFs with notes keep their versions from their first save
+    // (off)
     add("keepVersionsOfNewPdfs", [&s] { return QVariant(DocumentMode::keepVersionsOfNewPdfs(s)); },
         [&s](const QVariant& v) { DocumentMode::setKeepVersionsOfNewPdfs(s, v.toBool()); });
     // Open documents at the page they were left at (off: at their first page)
@@ -210,8 +211,8 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             s.getCustomElement("xournalQt").setBool("resumeAtLastPage", v.toBool());
             s.customSettingsChanged();
         });
-    // A tapped link to another document (qt/docs/links.md): "ask" (the default: a popup offers the three), or opened
-    // at once in a new "tab", as the "reference" or "here" (in place of the current document)
+    // A tapped link to another document (qt/docs/features/links.md): "ask" (the default: a popup offers the three), or
+    // opened at once in a new "tab", as the "reference" or "here" (in place of the current document)
     add("linkOpening",
         [&s] {
             std::string v;
@@ -226,7 +227,7 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                                                                                                  : std::string("ask"));
             s.customSettingsChanged();
         });
-    // Looking up selected text (qt/docs/citations.md): ask before a web address opens (it is shown whole), the
+    // Looking up selected text (qt/docs/features/citations.md): ask before a web address opens (it is shown whole), the
     // translator ("google", "deepl", "bing" or an address with {text} and {lang}) and the language translated into
     // ("": the system's)
     add("webConfirm",
@@ -266,8 +267,8 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                 s.customSettingsChanged();
             });
     }
-    // To-dos (qt/docs/todos.md): "Collect to-dos from" the lines with the marker ("marked", the default) or every
-    // check box ("all"); the marker (default "todo:")
+    // To-dos (qt/docs/features/todos.md): "Collect to-dos from" the lines with the marker ("marked", the default) or
+    // every check box ("all"); the marker (default "todo:")
     add("todoSource",
         [&s] { return QVariant(todos::Rules::of(s).all ? QStringLiteral("all") : QStringLiteral("marked")); },
         [&s](const QVariant& v) {
@@ -279,8 +280,8 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             s.getCustomElement("xournalQt").setString("todoMarker", v.toString().trimmed().toStdString());
             s.customSettingsChanged();
         });
-    // Hybrid PDFs (qt/docs/hybrid-pdf.md): notes of an annotated PDF go into the PDF itself (off: "name.notes.pdf");
-    // whether that was explained; a .xopp for Xournal++ written next to a hybrid PDF on every save
+    // Hybrid PDFs (qt/docs/features/hybrid-pdf.md): notes of an annotated PDF go into the PDF itself (off:
+    // "name.notes.pdf"); whether that was explained; a .xopp for Xournal++ written next to a hybrid PDF on every save
     for (const char* key: {"hybridIntoPdf", "hybridIntoPdfExplained", "hybridExportXopp"}) {
         add(key,
             [&s, key] {
@@ -318,8 +319,8 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                 DocumentMode::store(s, mode);
             }
         });
-    // What a new text document is (qt/docs/md-pdf.md): "pdf" (a PDF text document) or "md" (a Markdown file); while it
-    // is not chosen, as the way documents are kept says
+    // What a new text document is (qt/docs/features/md-pdf.md): "pdf" (a PDF text document) or "md" (a Markdown file);
+    // while it is not chosen, as the way documents are kept says
     add("newTextDocuments",
         [&s] {
             return QVariant(DocumentMode::newTextDocuments(s) == DocumentMode::TextKind::Pdf ? QStringLiteral("pdf")
@@ -329,8 +330,8 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             DocumentMode::setNewTextDocuments(
                     s, v.toString() == "pdf" ? DocumentMode::TextKind::Pdf : DocumentMode::TextKind::Markdown);
         });
-    // Quick note (qt/docs/quick-note.md): "note" (the default: a new note in the library's Inbox, named by the date and
-    // time) or "daily" (a line "- HH:MM " added to today's Inbox/<date>.md)
+    // Quick note (qt/docs/features/quick-note.md): "note" (the default: a new note in the library's Inbox, named by the
+    // date and time) or "daily" (a line "- HH:MM " added to today's Inbox/<date>.md)
     add("quickNote",
         [&s] {
             std::string v;
@@ -386,7 +387,7 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
         });
     add("zoomGestures", [&s] { return QVariant(s.isZoomGesturesEnabled()); },
         [&s](const QVariant& v) { s.setZoomGesturesEnabled(v.toBool()); });
-    // Two fingers twisted (and the touchpad's rotate gesture) turn the canvas (qt/docs/canvas-rotation.md)
+    // Two fingers twisted (and the touchpad's rotate gesture) turn the canvas (qt/docs/features/canvas-rotation.md)
     add("rotateGesture",
         [&s] {
             bool on = true;
@@ -431,7 +432,7 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                                                        ViewController::SMALLEST_ZOOM_MAX));
             s.customSettingsChanged();
         });
-    // The layout follows the window's size (qt/docs/adaptive-layout.md); off: the desktop layout at every size
+    // The layout follows the window's size (qt/docs/features/adaptive-layout.md); off: the desktop layout at every size
     add("adaptiveLayout",
         [&s] {
             bool on = true;
@@ -444,8 +445,8 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
         });
 
     // Presenting with two screens: the slide on the audience's screen, the presenter's console on the other
-    // (qt/docs/presenter-view.md; PresenterConsole reads these); swapped: the audience's screen is the primary one;
-    // the space for notes shown to the audience too (off by default); the audience following the presenter's zoom
+    // (qt/docs/features/presenter-view.md; PresenterConsole reads these); swapped: the audience's screen is the primary
+    // one; the space for notes shown to the audience too (off by default); the audience following the presenter's zoom
     // (on by default)
     for (const char* key: {"presenterView", "presenterSwapScreens", "presenterShowNotes", "presenterFollowView"}) {
         const bool fallback = std::string_view(key) == "presenterView" || std::string_view(key) == "presenterFollowView";
@@ -461,7 +462,7 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             });
     }
 
-    // The replay's hint was shown once (qt/docs/timeline.md, "The play bar"): not again
+    // The replay's hint was shown once (qt/docs/features/timeline.md, "The play bar"): not again
     add("replayHintSeen",
         [&s] {
             bool seen = false;
@@ -473,7 +474,7 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             s.customSettingsChanged();
         });
 
-    // The variant last used of each cycling tool button (qt/docs/adaptive-layout.md, "Cycling buttons"), as
+    // The variant last used of each cycling tool button (qt/docs/features/adaptive-layout.md, "Cycling buttons"), as
     // "group=variant;…", e.g. "select=selectRegion;snip=snipLasso"
     add("toolVariants",
         [&s] {
@@ -568,7 +569,7 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             const PageType current = settings.getPageTemplateSettings().getBackgroundType();
             const auto& types = this->app.getPageTypes()->getPageTypes();
             for (size_t i = 0; i < types.size(); ++i) {
-                // (the paper's texture and ruling colors aside: qt/docs/dark-pages.md)
+                // (the paper's texture and ruling colors aside: qt/docs/features/dark-pages.md)
                 if (types[i]->page.format == current.format &&
                     paper::baseConfig(types[i]->page.config) == paper::baseConfig(current.config)) {
                     return QVariant(static_cast<int>(i));
@@ -634,7 +635,7 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                 });
             }
         });
-    // Textured paper (qt/docs/dark-pages.md: the page type's xqt-texture)
+    // Textured paper (qt/docs/features/dark-pages.md: the page type's xqt-texture)
     add("pageTexture", [&s] { return QVariant(paper::textured(s.getPageTemplateSettings().getBackgroundType().config)); },
         [withTemplate](const QVariant& v) {
             withTemplate([&](PageTemplateSettings& tpl) {

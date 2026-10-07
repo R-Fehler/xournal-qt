@@ -1,5 +1,5 @@
 /*
- * xournal-qt: annotations of other apps made editable (qt/docs/adopt-annotations.md).
+ * xournal-qt: annotations of other apps made editable (qt/docs/features/adopt-annotations.md).
  *
  * No real exports of GoodNotes, Drawboard or Preview were at hand: the fixtures are PDFs made here (cairo) with
  * annotations added by qpdf the way the PDF standard defines them, plus the keys the apps are known or assumed to
@@ -579,7 +579,7 @@ TEST_F(AdoptAnnotationsTest, undoAfterTheNotesWentIntoThePdfItselfBringsTheOrigi
 }
 
 TEST_F(AdoptAnnotationsTest, appStyles) {
-    // As GoodNotes is assumed to write an Editable export (qt/docs/adopt-annotations.md): ink per stroke, the
+    // As GoodNotes is assumed to write an Editable export (qt/docs/features/adopt-annotations.md): ink per stroke, the
     // highlighter as ink with an opacity in its appearance only
     makePdf(path("gn.pdf"), 1);
     editPdf(path("gn.pdf"), [](QPDF& q) {

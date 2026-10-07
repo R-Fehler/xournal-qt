@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the window's side of text files edited as documents (qt/docs/md-editor.md): opening them, and their
- * changes on disk by other programs.
+ * xournal-qt: the window's side of text files edited as documents (qt/docs/features/md-editor.md): opening them, and
+ * their changes on disk by other programs.
  *
  * @license GNU GPLv2 or later
  */
@@ -231,7 +231,7 @@ bool AppController::editAsNotes() {
     }
     const fs::path md = s->textFile()->path();
     const std::string text = s->currentText();  // (as it is here, saved or not)
-    // (a text document of notes: typing goes into its text, also when the .md is empty; qt/docs/md-pdf.md)
+    // (a text document of notes: typing goes into its text, also when the .md is empty; qt/docs/features/md-pdf.md)
     auto notes = std::make_unique<DocumentSession>(*app, MarkdownFile::notesDocument(text));
     fs::path xopp = md;
     xopp.replace_extension(".xopp");
@@ -250,7 +250,7 @@ bool AppController::editAsNotes() {
     return true;
 }
 
-// --- text documents as PDF (qt/docs/md-pdf.md) ------------------------------------------------------------------------
+// --- text documents as PDF (qt/docs/features/md-pdf.md) ------------------------------------------------------------------------
 
 bool AppController::newTextAsPdf() const {
     return DocumentMode::newTextDocuments(*app->getSettings()) == DocumentMode::TextKind::Pdf;
@@ -300,7 +300,7 @@ bool AppController::openAsPdfDocument() {
     for (int i = 2; fs::exists(pdf, ec); ++i) {
         pdf = md.parent_path() / (md.stem().string() + " (" + std::to_string(i) + ").pdf");
     }
-    // Its pictures go into the PDF: into its work folder first, packed by the save (qt/docs/md-images.md)
+    // Its pictures go into the PDF: into its work folder first, packed by the save (qt/docs/features/md-images.md)
     DocumentImages::copyLinked(text, DocumentImages::workFolder(pdf));
     if (!makeTextPdf(text, pdf)) {
         return false;
@@ -362,7 +362,7 @@ bool AppController::exportMarkdown(const QUrl& file) {
         std::shared_lock lock(*s->getDocument());
         text = TextDocument::markdown(*s->getDocument());
     }
-    // Its pictures: into "name.assets/" next to it, the links to them written so (qt/docs/md-images.md)
+    // Its pictures: into "name.assets/" next to it, the links to them written so (qt/docs/features/md-images.md)
     size_t pictures = 0;
     text = DocumentImages::exportPictures(text, target, pictures);
     const QString path = QString::fromStdString(target.string());

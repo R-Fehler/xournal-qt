@@ -1,7 +1,7 @@
 /*
- * xournal-qt: the toolbox's tools and the arrangement of both bars (ToolboxModel, qt/docs/toolbox.md): the defaults,
- * entries added, changed, moved, replaced and removed, dividers, the app's items (one home each), groups, the colors of
- * roles, what "+" prefills, the most recent entry of a type, the JSON and its debounced writes.
+ * xournal-qt: the toolbox's tools and the arrangement of both bars (ToolboxModel, qt/docs/features/toolbox.md): the
+ * defaults, entries added, changed, moved, replaced and removed, dividers, the app's items (one home each), groups, the
+ * colors of roles, what "+" prefills, the most recent entry of a type, the JSON and its debounced writes.
  *
  * @license GNU GPLv2 or later
  */
@@ -77,7 +77,7 @@ TEST(ToolboxModel, entriesAreNormalized) {
     EXPECT_EQ(shape.value("base"), "pen");
     EXPECT_EQ(ToolboxModel::normalized({{"type", "eraser"}, {"variant", "whiteout"}, {"width", 0}}).value("width"), 8.5);
     EXPECT_EQ(ToolboxModel::normalized({{"type", "text"}, {"role", "nonsense"}}).value("role"), "");
-    // A snip: its shape only (qt/docs/toolbox.md, "Cycling")
+    // A snip: its shape only (qt/docs/features/toolbox.md, "Cycling")
     const QVariantMap snip = ToolboxModel::normalized({{"type", "snip"}, {"variant", "lasso"}, {"color", "#ff0000"}});
     EXPECT_EQ(snip.value("variant"), "lasso");
     EXPECT_FALSE(snip.contains("color"));

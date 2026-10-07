@@ -1,7 +1,7 @@
 /*
  * xournal-qt: upstream's SaveHandler, with the pictures of the document's Markdown texts at the end of the document
- * as extra <preview> elements (DocumentImages.h, "pictures inside a .xopp"; qt/docs/md-images.md). A document without
- * pictures is written exactly as upstream writes it.
+ * as extra <preview> elements (DocumentImages.h, "pictures inside a .xopp"; qt/docs/features/md-images.md). A document
+ * without pictures is written exactly as upstream writes it.
  *
  * @license GNU GPLv2 or later
  */

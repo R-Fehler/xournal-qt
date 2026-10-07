@@ -1,6 +1,6 @@
 // xournal-qt: the switch in the home screen's header: the library's name with ▾ (the libraries), Recent,
 // Favourites, Tags, Bookmarks, To-dos.
-// Part of HomeView.qml (the home screen, qt/docs/library.md), instantiated once there: it reads the home
+// Part of HomeView.qml (the home screen, qt/docs/features/library.md), instantiated once there: it reads the home
 // screen's state through `home`, and the other parts by their ids (HomeView.qml's context).
 import QtQuick
 import QtQuick.Controls
@@ -52,7 +52,7 @@ Rectangle {
             icon.color: "#3c4043"
             display: AbstractButton.IconOnly
             onClicked: Popups.openAt(libraryMenu)
-            // (a finger held on it says what it is, as the other buttons: qt/docs/adaptive-layout.md)
+            // (a finger held on it says what it is, as the other buttons: qt/docs/features/adaptive-layout.md)
             property bool heldTip: false
             onPressAndHold: heldTip = true
             onReleased: heldTip = false
@@ -187,7 +187,7 @@ Rectangle {
             }
         }
         // The tags of the library's documents (#tags typed in them, keywords of PDFs): a page listing them with
-        // counts; a tap on one filters the library (qt/docs/tags.md)
+        // counts; a tap on one filters the library (qt/docs/features/tags.md)
         PageTab {
             id: tagsTab
             objectName: "tagsPageButton"

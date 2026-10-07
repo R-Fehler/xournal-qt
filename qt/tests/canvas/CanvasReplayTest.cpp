@@ -1851,8 +1851,8 @@ TEST_F(CanvasReplayTest, aLongPressSelectsTheWordOfThePdfAndTheHandlesWidenIt) {
     EXPECT_FALSE(view->hasPdfTextSelection()) << "a tap beside the selected text unselects it";
 }
 
-// Space for notes (qt/docs/note-space.md): the PDF is drawn at an offset; its text is selected and marked where it is
-// drawn, not where it is on the PDF page
+// Space for notes (qt/docs/features/note-space.md): the PDF is drawn at an offset; its text is selected and marked
+// where it is drawn, not where it is on the PDF page
 TEST_F(CanvasReplayTest, withSpaceForNotesPdfTextIsSelectedAndMarkedOnTheSlide) {
     input.reset();
     view.reset();
@@ -2382,7 +2382,7 @@ TEST_F(CanvasReplayTest, withFingerDrawingOneFingerDrawsAndTwoFingersScroll) {
     EXPECT_EQ(elementCount(0), 0u) << "palm rejection";
 }
 
-// --- sticky notes (qt/docs/sticky-notes.md) -------------------------------------------------------------------------
+// --- sticky notes (qt/docs/features/sticky-notes.md) -----------------------------------------------------------------
 
 namespace {
 /// Dark pixels of the page on the screen (its buffer and what is drawn over it) in this part (page coordinates)
@@ -3020,7 +3020,7 @@ TEST_F(CanvasReplayTest, aPastedOrCutStickyNoteIsDrawnWhereItIs) {
 
 /// XQT_BENCH_STICKY=1: copy, paste and cut of a note with 300 strokes on it (Ctrl+C, Ctrl+V, Ctrl+X), in ms: what
 /// happens at the key press, and the page drawn again after it (until the render workers are idle).
-// --- sticky notes as containers (qt/sticky-containers, qt/docs/sticky-notes.md) ------------------------------------
+// --- sticky notes as containers (qt/sticky-containers, qt/docs/features/sticky-notes.md) -----------------------------
 
 namespace {
 /// The Markdown texts of a layer

@@ -1,5 +1,6 @@
-# Audio recordings (qt/docs/audio.md): the Ogg Vorbis codec, vendored (qt/3rdparty/libogg, qt/3rdparty/libvorbis),
-# so recordings are written and read the same way on every platform, with no system library and no FFmpeg.
+# Audio recordings (qt/docs/features/audio.md): the Ogg Vorbis codec, vendored (qt/3rdparty/libogg,
+# qt/3rdparty/libvorbis), so recordings are written and read the same way on every platform, with no system library and
+# no FFmpeg.
 
 # --- libogg 1.3.6 -----------------------------------------------------------------------------------------------------
 set(XQT_OGG_DIR "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/libogg")
@@ -83,7 +84,7 @@ set_target_properties(xqt-audio PROPERTIES AUTOMOC ON)
 # every platform: PulseAudio/PipeWire, WASAPI, Core Audio, AAudio/OpenSL ES). Without it the app builds and runs, and
 # does not offer recording; XQT_FAKE_AUDIO=1 then gives fake devices (qt/src/audio/FakeAudio.h) to try the UI.
 # The release packages for Windows, macOS and Android configure with XQT_REQUIRE_AUDIO=ON, so that a missing Qt
-# Multimedia fails their build instead of shipping without recording (qt/docs/releasing.md).
+# Multimedia fails their build instead of shipping without recording (qt/docs/development/releasing.md).
 option(XQT_AUDIO "Audio recordings: record and play through Qt Multimedia when it is found" ON)
 option(XQT_REQUIRE_AUDIO "Fail when Qt Multimedia is not found (release packages: they offer recording)" OFF)
 set(XQT_HAVE_QT_MULTIMEDIA OFF)

@@ -1,6 +1,6 @@
 /*
- * xournal-qt: page templates (qt/docs/templates.md): the sets on disk (the Templates folder, the app-wide set, the
- * attached PDF going along), saving a page as a template with and without its background and content, and adding a
+ * xournal-qt: page templates (qt/docs/features/templates.md): the sets on disk (the Templates folder, the app-wide set,
+ * the attached PDF going along), saving a page as a template with and without its background and content, and adding a
  * template's page as a pasted copy of that page: a PDF page shows that PDF page (its text searchable) and is saved
  * right in a .xopp and in a PDF with notes; one undo step; a new document that starts with it.
  *

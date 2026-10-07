@@ -1,4 +1,4 @@
-// Pages as files (qt/docs/page-files.md), self-contained: the window only places it and opens its dialogs.
+// Pages as files (qt/docs/features/page-files.md), self-contained: the window only places it and opens its dialogs.
 // - "Insert pages from a file…": a PDF, a PDF with notes or a .xopp; all its pages, a range, or pages ticked on their
 //   pictures; before or after a page. A protected PDF asks for its password here. The pages are inserted as pasted
 //   pages are: their text stays searchable, one undo step.

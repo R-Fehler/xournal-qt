@@ -1,9 +1,9 @@
 /*
- * xournal-qt: Help (qt/docs/onboarding.md). The tutorial is a Markdown text shipped in the resources
+ * xournal-qt: Help (qt/docs/features/onboarding.md). The tutorial is a Markdown text shipped in the resources
  * (qt/resources/help/tutorial.md, its pictures in tutorial.assets/). Help → Tutorial opens a copy of it to write on:
- * a PDF text document (qt/docs/md-pdf.md) in the app's data folder, not in a library, so the user's folders stay clean
- * and the copy is there next time with what was written on it. Save as… puts it into a library when the user wants it
- * there. "Start the tutorial again" replaces the copy with a fresh one.
+ * a PDF text document (qt/docs/features/md-pdf.md) in the app's data folder, not in a library, so the user's folders
+ * stay clean and the copy is there next time with what was written on it. Save as… puts it into a library when the user
+ * wants it there. "Start the tutorial again" replaces the copy with a fresh one.
  *
  * When the author ships a finished tutorial.pdf (a PDF with notes: the text with ink written on it in the app) next to
  * tutorial.md, the copy is that PDF instead.

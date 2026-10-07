@@ -112,7 +112,7 @@ using fileio::hasExtension;
 namespace {
 void prepareLoaded(Document& doc) {
     doc.setDocumentHandler(&detachedHandler());  // the LoadHandler's handler dies with it
-    // A text document: its bookmarks are its text's comments (qt/docs/bookmarks.md)
+    // A text document: its bookmarks are its text's comments (qt/docs/features/bookmarks.md)
     TextDocument::syncBookmarks(doc);
     // Element sizes are computed lazily, also by the (parallel) renderers: compute them once, here, before any
     // renderer sees the document.
@@ -129,8 +129,8 @@ void prepareLoaded(Document& doc) {
 auto DocumentSession::loadFile(const fs::path& path, bool attachPdf, const std::string& password) -> LoadResult {
     LoadResult result;
     if (hasExtension(path, ".pdf")) {
-        // xournal-qt: an encrypted PDF (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): a password to open it, or none (only
-        // an owner password: it opens, its restrictions are noted)
+        // xournal-qt: an encrypted PDF (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs"): a password to open it, or
+        // none (only an owner password: it opens, its restrictions are noted)
         const PdfEncryption::Status enc = PdfEncryption::probe(path, password);
         if (!enc.readable && enc.needsPassword) {
             result.needsPassword = true;
@@ -155,7 +155,7 @@ auto DocumentSession::loadFile(const fs::path& path, bool attachPdf, const std::
                 result.hybrid = true;
                 result.hybridChanged = std::move(opened.changed);
                 // The pictures its Markdown carries: into its work folder, found there from now on (while the result
-                // lives, and then by the session's own root; qt/docs/md-images.md)
+                // lives, and then by the session's own root; qt/docs/features/md-images.md)
                 DocumentImages::unpack(path, opened.pictures);
                 if (result.encrypted) {
                     HybridPdf::markUnpacked(DocumentImages::workFolder(path));  // (removed at a start after a crash)
@@ -212,8 +212,8 @@ auto DocumentSession::loadFile(const fs::path& path, bool attachPdf, const std::
             }
         }
         if (result.document) {
-            // The pictures its Markdown carries (qt/docs/md-images.md): into its work folder, found there while the
-            // result lives (its boxes are sized with them below)
+            // The pictures its Markdown carries (qt/docs/features/md-images.md): into its work folder, found there
+            // while the result lives (its boxes are sized with them below)
             if (!DocumentImages::carriedPicturesOf(*result.document).empty() && DocumentImages::unpackXopp(path)) {
                 result.pictures = std::make_shared<md::images::RootHandle>(DocumentImages::embeddedRoot(path));
             }
@@ -924,7 +924,7 @@ void DocumentSession::applyBookmark(const PageRef& page, const std::optional<std
     Q_EMIT bookmarksChanged();
 }
 
-// --- audio recordings (qt/docs/audio.md) -------------------------------------------------------------------------------
+// --- audio recordings (qt/docs/features/audio.md) -------------------------------------------------------------------------------
 
 void DocumentSession::setRecording(const std::string& name, std::function<size_t()> clock) {
     recording = name;
@@ -1097,7 +1097,7 @@ fs::path DocumentSession::documentFile() const {
 
 bool DocumentSession::isReadOnly() const {
     // Also a version of a PDF with notes cut out of its file (VersionCache): it is shown to read and compare, a
-    // throwaway copy that nothing should be written into (qt/docs/hybrid-pdf.md, "Version history")
+    // throwaway copy that nothing should be written into (qt/docs/features/hybrid-pdf.md, "Version history")
     return replaying || (!shownPath.empty() && shownReadOnly && !hasFilePath()) ||
            (hasFilePath() && VersionCache::instance().contains(getFilePath()));
 }
@@ -1312,7 +1312,7 @@ auto DocumentSession::writeDocument(Document& doc, const fs::path& target) -> Sa
     h.prepareSave(&doc, target);
     const std::vector<std::string> carried = DocumentImages::carriedPicturesOf(doc);
     doc.unlock_shared();
-    h.addPictures(DocumentImages::picturesData(carried));  // (its Markdown's pictures: qt/docs/md-images.md)
+    h.addPictures(DocumentImages::picturesData(carried));  // (its Markdown's pictures: qt/docs/features/md-images.md)
     h.saveTo(target);
     if (!h.getErrorMessage().empty()) {
         return {false, FS(_F("Save file error: {1}") % h.getErrorMessage())};
@@ -1647,7 +1647,7 @@ fs::path DocumentSession::protectedAutosavePath(qint64 pid, quint64 serial) {
 auto DocumentSession::autosave() -> SaveResult {
     if (isProtected() && !hasExtension(doc->getFilepath(), ".xopp") && !hasExtension(doc->getFilepath(), ".xoj")) {
         // A protected document: an encrypted PDF with notes in the app cache, the same password, written in the
-        // background like a PDF copy (never an unencrypted .xopp; qt/docs/hybrid-pdf.md, "Encrypted PDFs")
+        // background like a PDF copy (never an unencrypted .xopp; qt/docs/features/hybrid-pdf.md, "Encrypted PDFs")
         undoRedo->documentAutosaved();
         const fs::path target = protectedAutosavePath(Util::getPid(), serialNo);
         SaveRequest r;

@@ -1,14 +1,16 @@
-// The cycling tool buttons (qt/docs/adaptive-layout.md, "Cycling buttons"): tools that do almost the same share one
-// button. A tap on it while its tool is in use takes the next variant; a tap while another tool is in use takes it
-// with the variant last used (remembered per group, in the settings); a long press lists all variants. The fixed
-// tools of the toolbox, the phone's sheet "My tools" and the toolbox's snip entry use the same groups.
+// The cycling tool buttons (qt/docs/features/adaptive-layout.md, "Cycling buttons"): tools that do almost the same
+// share one button. A tap on it while its tool is in use takes the next variant; a tap while another tool is in use
+// takes it with the variant last used (remembered per group, in the settings); a long press lists all variants. The
+// fixed tools of the toolbox, the phone's sheet "My tools" and the toolbox's snip entry use the same groups.
 //   select    rectangle ↔ lasso (the multi-layer ones only in the list)
-//   snip      rectangle ↔ lasso snip (one picture to the clipboard, then the tool before, qt/docs/snip.md): a fixed
+//   snip      rectangle ↔ lasso snip (one picture to the clipboard, then the tool before, qt/docs/features/snip.md): a
+//   fixed
 //             tool of the toolbox (qt/copy-tools); the toolbox's snip entry cycles the same way
 //   text      mark PDF text ↔ copy handwriting as text (one sweep over ink, its words to the clipboard, then the tool
-//             before; qt/docs/handwriting-search.md); the PDF text tool's button, whose list also says how it marks
+//             before; qt/docs/features/handwriting-search.md); the PDF text tool's button, whose list also says how it
+//             marks
 //   geometry  setsquare ↔ compass (on the page; the geometry pill takes it away); curtain and spotlight only in the list (they are
-//             not tools of their own: they lie over the page whatever tool is in hand, qt/docs/curtain.md)
+//             not tools of their own: they lie over the page whatever tool is in hand, qt/docs/features/curtain.md)
 // The kinds of shapes and erasers are listed here too (the toolbox's editor offers them); the toolbox's entries take
 // them. The keyboard's tools (S, L, Shift+S, Shift+L) take a variant directly; the button follows and remembers it.
 import QtQuick
@@ -73,7 +75,7 @@ QtObject {
         }
     })
 
-    /// How sharp a snip's picture is (app.snipResolution; Settings and the snip's list, qt/docs/snip.md)
+    /// How sharp a snip's picture is (app.snipResolution; Settings and the snip's list, qt/docs/features/snip.md)
     readonly property var snipResolutions: [
         { key: "screen", name: qsTr("As sharp as the screen (at least 200 dpi)"), short: qsTr("Screen") },
         { key: "high", name: qsTr("High resolution (300 dpi)"), short: qsTr("300 dpi") },

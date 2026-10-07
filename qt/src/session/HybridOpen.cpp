@@ -152,8 +152,8 @@ void dropRecordings(QPDF& q) {
 }
 
 /// The picture attachments of a text document (listed in the marker's /Files with a folder in their name,
-/// "name.assets/…"; qt/docs/md-images.md) written into `dir`/pictures under their names. The folder is made also when
-/// there are none (the cache entry has its pictures then).
+/// "name.assets/…"; qt/docs/features/md-images.md) written into `dir`/pictures under their names. The folder is made
+/// also when there are none (the cache entry has its pictures then).
 void extractPictures(QPDF& q, QPDFObjectHandle marker, const fs::path& dir) {
     const fs::path pictures = dir / PICTURES_NAME;
     std::error_code ec;
@@ -186,7 +186,7 @@ void extractPictures(QPDF& q, QPDFObjectHandle marker, const fs::path& dir) {
 }
 
 /// The recordings a PDF carries (the marker's /Audio) written into `dir`/audio under their names in the document
-/// (qt/docs/audio.md). The folder is made also when there are none.
+/// (qt/docs/features/audio.md). The folder is made also when there are none.
 void extractAudio(QPDF& q, QPDFObjectHandle marker, const fs::path& dir) {
     const fs::path folder = dir / AUDIO_NAME;
     std::error_code ec;
@@ -339,7 +339,7 @@ Opened open(const fs::path& pdf) {
         const fs::path dir = entryOf(pdf, stamp);
         const fs::path base = dir / CLEAN_NAME, xopp = dir / DATA_NAME, check = dir / CHECK_NAME;
         // A protected PDF (PdfEncryption.h): its Xournal data is read into memory on every opening, never written into
-        // the cache; the clean copy there is encrypted like the file (qt/docs/hybrid-pdf.md, "Encrypted PDFs")
+        // the cache; the clean copy there is encrypted like the file (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs")
         const bool secret = PdfEncryption::isProtected(pdf);
         std::vector<std::pair<std::string, std::string>> files;  // (the .xopp and its attached files, by their names)
         std::error_code ec;

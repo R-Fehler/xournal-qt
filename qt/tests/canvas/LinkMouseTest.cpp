@@ -1,7 +1,7 @@
 /*
- * xournal-qt: links with the mouse (qt/docs/links.md, "Links with the mouse"). A click follows a link as a tap does
- * (the same signal, so the same sheet), with the hand, the select tools and the tools that draw - without drawing a
- * dot; a drag that begins on a link still draws. In text being written a plain click puts the cursor, Ctrl + click
+ * xournal-qt: links with the mouse (qt/docs/features/links.md, "Links with the mouse"). A click follows a link as a tap
+ * does (the same signal, so the same sheet), with the hand, the select tools and the tools that draw - without drawing
+ * a dot; a drag that begins on a link still draws. In text being written a plain click puts the cursor, Ctrl + click
  * follows. The mouse looks up links on every move, so they come from what each page keeps: counted here.
  *
  * @license GNU GPLv2 or later

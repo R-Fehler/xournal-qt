@@ -1,0 +1,277 @@
+# Markdown boxes
+
+Write Markdown onto a page. The page shows it formatted as you type: headings, **bold** / *italic* / ~~struck~~,
+`code`, links, lists (nested, numbered, task lists), quotes, code blocks, tables, rules and math formulas. The
+dialect is CommonMark with GitHub's extensions (tables, strikethrough, task lists, bare web addresses),
+`[[wiki links]]` and `$…$` / `$$…$$` formulas (as in Obsidian, Zettlr and GitHub).
+
+## Two kinds of Markdown text, two ways of writing
+- **The page's Markdown text** starts at the top-left margin and goes to the right margin. It flows onto the next
+  pages (see below). The margins are 2 cm on A5 and bigger pages; a smaller page (A6, A7 flashcards) has them in
+  proportion to its short side, as A5 has them (13.5 %), at least 5 mm: about 14 mm on A6, 10 mm on A7. On a ruled
+  page with a margin line the text starts after the line (1 inch from the edge on A5 and bigger, as upstream draws
+  it; on a smaller page to the same scale as the margins: half an inch on A7).
+  Text of a small page written at 2 cm before is still found there, and moves to the new margins when it is edited
+  (`qt/src/session/PageMargins.h`). The writing button (in its Markdown mode) or Ctrl+Alt+M writes it **on the page**, formatted
+  while typing, with the cursor at the end of what the current page holds; the button again (or Escape) is done.
+  Its source beside the page is in the button's menu (press and hold, or right-click: "Markdown source beside the
+  page"), and Ctrl+Alt+M while writing on the page opens it there too. With the text tool, a tap on it writes it
+  on the page.
+- **Markdown text boxes** go anywhere on a page: the text tool always writes Markdown; tap where the text should go.
+  A tap on a box (text tool) edits it again.
+- **A sticky note's text**: a tap with the text tool on a sticky note writes the note's one Markdown
+  text, which lies in the note's layer at its top left and is as wide as the note (it flows again when the note is
+  resized); the note pill's "Text" does the same. See [sticky-notes.md](sticky-notes.md), "Notes as containers".
+
+Writing:
+- **On the page** (the default): as in Typora or Obsidian's live preview. The text is shown formatted while it is
+  typed, and the block with the cursor shows its Markdown with the marks dimmed. A heading keeps its size and bold
+  stays bold, so `**` around a bold word is grey. Taps put the cursor where they are, in the text as drawn, and a
+  drag selects. The page's text flows over its pages while it is written, and the cursor goes with it.
+  - Keys:
+    - Enter starts a new paragraph. In a list it starts the next item; on an empty item the list ends. In code it
+      starts a new line (also at the end of the text, while its fence is not closed yet). After a code block's
+      closing fence, Enter leaves the code: the code is shown finished and the cursor is where the next paragraph
+      goes.
+    - Shift+Enter continues the paragraph on a new line.
+    - Moving: the arrows (with Ctrl, by words; Up and Down go by the lines as drawn), Home and End (with Ctrl, the
+      whole text). Shift selects.
+    - Editing: Backspace and Delete, Ctrl+A / C / X / V.
+    - Formatting: Ctrl+B / I / E / K (bold, italic, code, link), Ctrl+1 / 2 / 3 / 0 (headings), Tab and Shift+Tab
+      (list levels). Each is one undo step; the marks go again when pressed on text that has them.
+  - The formatting bar, a row under the top bar while Markdown is written, has these and the other tools (lists,
+    check boxes, quote, code block, formula, table editor, rule, image, page break): [md-editor.md](md-editor.md),
+    "Formatting bar".
+  - Ctrl+Z / Ctrl+Shift+Z and the undo and redo buttons undo and redo in the text being written; once it is done, the
+    whole edit is one undo step.
+  - Escape (or a tap elsewhere) is done.
+  - Ctrl+Alt+M opens the same text beside the page.
+- **Beside the page** (the writing button's menu: "Markdown source beside the page", or Ctrl+Alt+M while writing on
+  the page, which takes the box or text being written along): the source in an editor beside the page, and the page
+  shows it formatted while typing. The text tool always writes Markdown on the page, as in a `.md`; an ordinary text
+  box (of a Xournal++ file) is edited as it is.
+
+## Tables
+Columns are as wide as a browser makes them (VS Code's preview, GitHub: CSS's automatic table layout). A table whose
+cells fit side by side on one line each is as wide as its text (not stretched to the box). Otherwise every column
+gets at least its widest word (an inline code, a formula or a picture counts as one word) and the rest of the width
+goes to the columns in proportion to how much more room their longest line needs; text wraps between words inside a
+cell. A table whose words do not fit side by side (many columns) is drawn smaller, down to 60 % of the text's size;
+only past that do words break, and a table is never wider than the box and no cell runs over the next. Code:
+`Layouter::table` in `qt/src/markdown/MdLayout.cpp`.
+
+Each page lays out the rows it holds on its own, so a table split over pages can have slightly different column
+widths on each page.
+
+## Flowing onto pages
+The page's Markdown text goes on on the next pages when it is longer than the page: while typing, it is split onto
+the pages again, pages are added after them (the same size and background; after a PDF page a plain one), and the
+pages added go again when the text gets shorter. After editing, pages at the end that only held an emptied part of
+the text go as well (a page with anything else on it stays). The whole edit, pages included, is one undo step.
+Opening any of its pages (the text tool on the text, or the writing button there) edits the whole text.
+
+Every page holds a part that is a Markdown text of its own, so each page is drawn from its own box (and Xournal++
+shows each page's source). A page is split only where the rest reads the same on its own:
+- between blocks, and a heading goes with the block after it;
+- between the lines of a paragraph, not inside **bold**, a link and the like, with two lines on each page where
+  possible;
+- between the lines of a code block: the page closes the fence and the next page opens it again;
+- between the items of a list: a numbered list goes on with its numbers;
+- between the rows of a table: the next page repeats the header.
+
+A page break (`<div style="page-break-after: always"></div>`, the formatting bar's "Page break") ends the page after
+it; it is not drawn ([md-editor.md](md-editor.md), "Page breaks").
+
+When the pages get another size (the page menu's "Page size…"), the text flows anew on them at their new width and
+margins: cards added or gone as with typing, all in the one undo step of the size change
+(`qt/src/canvas/PageResize.h`).
+
+A part that continues the page before starts with a comment, `<!-- xqt:cont … -->` (not shown), which says what was
+added for the page (a fence, a table header), so the parts give exactly the text again. A block that cannot be split
+and is higher than a page (a long quote) stays on its page and goes below its bottom margin; the editor
+says so.
+
+Code: `qt/src/markdown/MdPaginate.*`, `qt/src/canvas/MarkdownSession.*`.
+
+## Moving
+Markdown text boxes (and the page's text) are selected and moved like everything else: a rectangle or a lasso
+around them, or a tap with the object select tool, when nothing of the selected layer is there. Then they can be
+moved (also to another page: they go into that page's Markdown layer), deleted, copied or cut. The selection is
+the box as it is drawn. While they are selected, the layer "Markdown" is the selected layer; when the selection
+ends, the layer selected before is again (the pen writes where it did). They are not put into a sticky note when
+dragged onto one (they stay in the Markdown layer). A sticky note's text moves with its note and is not selected
+on its own.
+
+A text box selected alone has a double arrow (⟷) on the selection's right knob: that knob (and the right edge
+around it) sets the box's width, as below; the other knobs scale, turn, move and delete it as for any selection.
+The page's own text and a selection of several elements keep the plain right knob, which scales.
+
+## Size
+**Width of a text box.** A Markdown text box has a handle in the middle of its right edge (a white knob with a
+double arrow, as the selection's knobs): while it is written on the page (just outside its frame), and while it is
+selected alone (on the selection's right knob). Dragging it (pen, finger or mouse; the mouse shows the ⟷ cursor over
+it) makes the box narrower or wider: the text flows anew while it is dragged, and the box is as high as its text.
+At least 2 cm, at most to the page's right edge. Undo: written on the page, each drag is an undo step of the text
+being written (Ctrl+Z) and part of the edit's one undo step; selected, the drag is one undo step (the box stays
+selected). The page's own Markdown text has no handle: it goes from margin to margin, and a box beside it does not
+change how it flows over the pages. A sticky note's text has no handle either: it is as wide as its note, whose own
+handle (bottom right) sets the width ([sticky-notes.md](sticky-notes.md)); it is never selected alone.
+
+The width is upstream's `wrap` attribute of the text element (the wrap width of Xournal++'s text tool, which has a
+handle of its own for it): saved in the `.xopp` and read again, and Xournal++ wraps the source at that width.
+Code: `qt/src/canvas/MarkdownBoxResize.*` (the handle, the drag, the undo step), `MarkdownEditor::widthHandle` and
+`MarkdownSession::setWidth`.
+
+**Font size.** The body text is drawn at the text's font size: the size Xournal++ shows the source in is the size it is drawn at.
+Headings, code and the rest scale from it. New Markdown text gets the Markdown size, which is 60 % of the text font
+by default (a 16 pt text font gives 10 pt). It can be set in the text tool's font menu and in
+the editor beside the page ("Size", which also changes the text being edited).
+
+## Using it
+- Write on the page with the writing button (`textModeButton`, "Write on the page": a tap writes Markdown on the
+  page), with Ctrl+Alt+M, or with a tap of the text tool (the text tool always writes Markdown). The source editor
+  beside the page is the writing button's "Markdown source beside the page" (held or right-clicked).
+- The formatting bar above the source has the same tools as on the page (the table editor too), acting on the
+  source, each one undo step of the source. Enter continues a list, and Enter on an empty item ends it.
+- Keys: Ctrl+B / I / E (code) / K (link), Ctrl+1-3 for headings (Ctrl+0: paragraph), Tab / Shift+Tab to indent list
+  items.
+- Done (or Esc) keeps the text, and the whole edit is one undo step. Cancel puts the page back.
+- With the text tool, a tap on a box opens its Markdown again.
+- A tap on a link opens it; `[text](#Page:12)` goes to page 12 of the document.
+- Headings 1-3 are chapters in the contents.
+- The search finds text in boxes and marks it where it is drawn: on the formatted words (headings, lists, code,
+  the pages the text flows onto), a phrase over a line break on each of its lines, and while the text is written on
+  the page, the block with the cursor where its source is shown. `md::sourceRects` gives where any range of the
+  source is drawn.
+- A tap on a task's check box switches it (`- [ ]` / `- [x]`): with the text tool, the hand, a select tool or a
+  finger, also while writing on the page. One undo step (while writing: in the text being written).
+- Code blocks with a language (```` ```python ````, `cpp`, `js`, `bash`, ...) are syntax highlighted (Kate's
+  highlighter, KSyntaxHighlighting; optional at build time).
+
+## Math
+`$…$` is a formula in the text, `$$…$$` a formula block of its own (display style: big sums and fractions), centered
+in the box. The `$$` may stand on lines of their own. As in md4c (the parser) and GitHub, an opening `$` does not
+follow a letter or digit and a closing one is not followed by one: `costs $5 and $10` stays text, and `\$` is a
+dollar sign.
+An empty formula (`$ $`, `$$ $$`, only blanks or line breaks between the marks) is no formula: it is shown as it is
+written, marks and all (md4c makes a formula of the blank; MicroTeX would draw nothing).
+
+**`\( … \)` and `\[ … \]`** (as ChatGPT and other chat apps write formulas, and LaTeX) are formulas too:
+`\(x^2\)` in the text, `\[ … \]` a formula block. md4c only knows `$`, so `md::parse` gives it the text with these
+pairs as `$…$` and `$$…$$` (`qt/src/markdown/MdTexDelimiters.*`) and maps every place it reports back to the text as
+written: the file keeps `\(`, the block being written shows it, and the cursor, the search and the page splits stay
+where they belong. One pass over the lines; a pair is rewritten only
+- within a paragraph (a `\[` whose `\]` comes after a blank line stays text, and so does an unclosed one);
+- outside code (fenced and indented blocks, `` `inline` `` spans of any number of backticks) and outside a `$…$`
+  formula; `\\(` is a backslash and a "(";
+- `\[` only where it begins a line's text and `\]` only where it ends one (a full stop or comma may follow):
+  `\[1\]` inside a line is an escaped bracket, as pandoc writes them;
+- where md4c takes the `$` as a formula's mark. **Known limit:** md4c ignores a `$` right after a letter or digit
+  (opening) or right before one (closing), so `the \(n\)th` stays text ("(n)th"); punctuation around a formula is
+  fine (`(\(x\)),`). A pair next to another `$` (`\(a\)\(b\)`) or one whose `$` would close money before it
+  (`$5, so \( x \)`) stays text too.
+
+**Pasting** into a Markdown text (writing on the page, the `.md` editor, the Markdown panel) converts the pasted
+text's pairs for good: the file then has `$…$`, which Obsidian and GitHub show. The same rules decide, applied to the
+text as it is after the paste: nothing is converted in code or next to a letter, a plain text (`.txt`) is left alone,
+and the paste is one undo step as any other. In the panel it is the keyboard's paste (Ctrl+V) that converts
+(a paste from a touch keyboard's menu comes as it is).
+
+- **Drawn by MicroTeX** (vendored, `qt/3rdparty/microtex`, MIT) with the Latin Modern Math font, which is compiled
+  into the program: no LaTeX, no external program, the same on Android. Formulas are paths (vector): sharp at any
+  zoom, and in the PDF export and the hybrid PDF as vector drawing (not as text: the TeX is not selectable there).
+  They are drawn 1.2 times the size of the text around them (Latin Modern's letters are smaller than a sans
+  text's; KaTeX does the same) and in its color (in a link, a quote, a heading); `\textcolor{red}{x}` colors a part.
+  MicroTeX knows unicode-math's names; `\hbar` was missing there and is added in the vendored copy (the same symbol
+  as `\hslash`, U+210F).
+- **In the text**: a formula takes the place of one character (U+FFFC) of the Pango layout, with a shape as big as
+  the formula, on the text's baseline. So lines break around it, pages are split around it (never inside a
+  formula, and a `$$` block keeps its `$$` lines), and a tap on it is a place in the text. A formula wider than the
+  box is made smaller to fit.
+- **Writing on the page**: the block with the cursor shows its Markdown, formulas included (their source in a
+  monospaced font), as for the other marks; a `$$` block being written also shows the formula below its source.
+  The other blocks show the formulas drawn. A tap on a drawn formula puts the cursor into its source (its start or
+  end, by the half tapped). In a `$$` (or `\[`) block that is not closed yet, Enter starts a line of the formula
+  (as in a code block), not a new paragraph.
+- **Errors**: a formula that MicroTeX cannot read is shown as its source, in red. Resting the mouse on it shows why
+  (a tool tip). Nothing a formula says can crash the app: MicroTeX gets no source longer than 8,000 bytes or nested
+  deeper than 64 braces, its exceptions are caught, and the crashes found by fuzzing it are fixed in the vendored copy
+  (its README).
+- **Search**: the TeX stays searchable text. The search and the library's index search a box's texts with each
+  formula's source in place of its character (`md::searchText`), and a hit inside a formula marks the formula
+  (a display formula: the formula, not its whole line).
+- **Cache**: formulas are laid out once per source (and style, inline or display) and kept as their paths in em,
+  shared by every thread that draws (the canvas, thumbnails, previews, the export). Size and color are applied when
+  drawing, so zooming and a heading's size need no new layout. The cache owns at most 16 MB (the least recently used
+  go; a formula takes 2–10 KB). MicroTeX with its font takes about 12 MB once the first formula is drawn (28 ms). A
+  page of 50 formulas: laid out in about 5 ms the first time, drawn in about 9 ms, then from the cache
+  (`MdMathText.PageOfFormulas`; `XQT_BENCH_MATH=1` prints the times). A character that the math font does not have
+  (Chinese, emoji in `\text{}`) is drawn by Pango: the first of a font takes 60–100 ms (loading it).
+- **Not supported by MicroTeX**: `\color{…}` outside arrays (use `\textcolor`), and `\newcommand` is shared by all
+  formulas (MicroTeX keeps macros globally), so a macro defined in one formula is only known in the others once that
+  one was laid out.
+
+Code: `qt/src/markdown/MdMath.*` (MicroTeX, the recording as paths, the cache), `MdLayout.cpp` (the shapes in the
+text, `searchText`, `mathAt`), `CanvasView::mathErrorAt` and `DocumentCanvasItem` (the tool tip).
+
+## Emoji
+- **Colour, the same everywhere**: emoji in Markdown and text boxes are drawn from the app's own Noto Color Emoji
+  (`qt/resources/fonts`, README there), on every system, in the thumbnails, the PDF export, the hybrid PDF and print.
+  In PDFs each emoji is a picture of the font's resolution (Cairo alone puts a blurred 16-pixel one there).
+  Sequences (👩‍💻, 🇩🇪, 👍🏽, ❤️) are one picture. Code: `qt/src/markdown/EmojiFont.*`.
+- **Shortcodes**: `:smile:` is shown as 😄 and stays `:smile:` in the file, as on GitHub (its names: gemoji,
+  `qt/3rdparty/gemoji`). Not in code, not in a plain text; the block with the cursor shows `:smile:`. The emoji stands
+  for the whole shortcode, as an entity does (a tap on it is its start or end). Code: `qt/src/markdown/EmojiData.*`,
+  `MdLayout.cpp` (`withEmoji`).
+- **Completion**: `:` and two letters (`:smi`) in a text box, in Markdown on the page, a `.md` file or the editor
+  beside the page open a list of emoji below the cursor (one-word names first: smile, smiley, smirk, then smile_cat,
+  then names with a later word, then tags). Enter, Tab or a tap put the emoji itself (not the shortcode) in the text;
+  Escape closes the list for that shortcode. Not after a letter, digit or colon (`10:30`, `std::`). An on-screen
+  keyboard's word being typed counts. Code: `qt/src/canvas/EmojiCompletion.*` (the canvas), `MarkdownPanel.qml` and
+  `qt/src/quick/EmojiNames.*` (beside the page), `EmojiSuggestions.qml` (the list).
+- **Picker**: the 🙂 button (`emojiButton`, on the top bar while writing on the page, among the Markdown buttons) opens
+  a search over names, tags and descriptions and the emoji by category; a tap puts one at the cursor.
+  `EmojiPicker.qml`.
+- **One character**: the cursor, Backspace and Delete go over a whole emoji sequence (Pango's grapheme clusters,
+  `qt/src/markdown/Grapheme.*`; also beside the page, where Qt 6.7 splits flags).
+
+## How it is stored (Xournal++ compatible)
+A box is an ordinary Xournal++ text element in a layer named "Markdown" at the bottom of the page. Ink written with
+the pen goes on top of it, into the layer it went into before. A sticky note's text is such a text element in the
+note's layer, at the note's top left plus its padding, with a wrap width ([sticky-notes.md](sticky-notes.md)).
+
+**Which layers hold boxes** (`md::holdsBoxes`, `md::boxesOf`): the page's Markdown layer, and sticky notes with
+their text. Editing, hit tests (links, check boxes, formulas, "Load image"), the search, the chapters, the
+annotations, the pictures carried in the file and the exports see both; the page's own text (the one at its
+margins, flowing over pages: `pageBoxOf`, pagination) is only ever in the Markdown layer. A text knows it is a
+Markdown text (`Text::isMarkdown`): by its layer's name, or, for a note's text, by the frontend's
+`xoj::markdown::classifier` (ADR-0002).
+- **Text:** the Markdown source.
+- **Font:** the body text's family and size.
+- **Color:** the text color.
+- **Wrap width:** the width of the box.
+- **Position:** the top left of the box.
+
+Pictures of the Markdown (`![](../name.assets/…)`) are carried at the end of the `.xopp` as extra `<preview>` elements,
+which Xournal++ ignores ([md-images.md](md-images.md), "Markdown boxes in a `.xopp`").
+
+Xournal++ shows the source as plain text and keeps it unchanged. xournal-qt draws it formatted everywhere a page is
+drawn (canvas, thumbnails, previews, PDF export) through small seams in upstream's `Text`, `Layer` and `TextView`: a text in a Markdown layer knows it is one, is drawn formatted and is as big as it is drawn (ADR-0002).
+
+The drawing is vector (Pango / Cairo, as upstream's texts). In the PDF the text stays text. The layout does not
+depend on the zoom, so lines break at the same places on the canvas, in the thumbnails and in the PDF.
+
+Code: `qt/src/markdown/` (parser `MdDocument`, layout `MdLayout`, boxes `MdBox`), `qt/src/canvas/MarkdownSession.*`
+(editing, pages), `qt/src/canvas/MarkdownEditor.*` (on the page), `qt/src/app/qml/MarkdownPanel.qml` (beside it). The parser is md4c (vendored, `qt/3rdparty/md4c`).
+
+`.md` files are edited the same way, on their own pages: [md-editor.md](md-editor.md).
+
+## Images
+`![alt](../path)` is drawn in the text (a picture alone in its paragraph as wide as the column, one in a line as high
+as the line); a missing file shows its alt text and path in red, and a web picture is never fetched unasked:
+[md-images.md](md-images.md).
+
+## Not yet
+- Flattening into Text mode.
+- Math: the error of a formula on a touch screen (no mouse to rest on it); per-formula editing inside a block (the
+  whole block shows its source, as for the other marks).

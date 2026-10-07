@@ -72,7 +72,7 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
             e->blockText << simplified(QString::fromStdString(text));
             e->blockLevel.push_back(p.kind == md::Passage::Kind::Heading ? p.level : 0);
         }
-        // Its bookmarks (qt/docs/bookmarks.md, "Markdown"): on the pages the text is laid out on as it opens
+        // Its bookmarks (qt/docs/features/bookmarks.md, "Markdown"): on the pages the text is laid out on as it opens
         if (md::bookmarks::mayContain(source)) {
             md::images::RootHandle root(DocumentImages::markdownRoot(item.md));  // (its pictures: their heights)
             const auto pages = MarkdownFile::document(source);
@@ -128,7 +128,8 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
     }
     if (!loaded.document) {
         // unreadable: empty, not read again until it changes. A PDF protected with a password is never read (not even
-        // while it is open in the app: its text stays out of the index; qt/docs/hybrid-pdf.md, "Encrypted PDFs")
+        // while it is open in the app: its text stays out of the index; qt/docs/features/hybrid-pdf.md, "Encrypted
+        // PDFs")
         e->locked = loaded.needsPassword;
         return e;
     }
@@ -211,7 +212,7 @@ bool LibraryIndex::fillPages(Entry& e, Document& doc, const EntryPtr& donor, boo
                     tags::merge(e.textTags, text->isMarkdown() ? tags::inMarkdown(text->getText())
                                                                : tags::inText(QString::fromStdString(text->getText())));
                     if (text->isMarkdown()) {
-                        // Its links (Markdown boxes, link markers), for backlinks (qt/docs/links.md)
+                        // Its links (Markdown boxes, link markers), for backlinks (qt/docs/features/links.md)
                         for (const md::LinkTarget& l: md::linksOf(md::parse(text->getText()))) {
                             QStringList& into = l.wiki ? e.wikiLinks : e.links;
                             if (const QString t = QString::fromStdString(l.target); !into.contains(t)) {

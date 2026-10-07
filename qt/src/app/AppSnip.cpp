@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the snip tool of the window (qt/snip, qt/docs/snip.md): armed from its button (a fixed tool of the
- * rail, qt/copy-tools), the image button's list or a toolbox entry, the next rectangle or lasso on a page (Snip.h,
+ * xournal-qt: the snip tool of the window (qt/snip, qt/docs/features/snip.md): armed from its button (a fixed tool of
+ * the rail, qt/copy-tools), the image button's list or a toolbox entry, the next rectangle or lasso on a page (Snip.h,
  * CanvasView::snip) puts its picture on the clipboard, with a link to where it came from; then the tool used before
  * comes back. Pasted into a document of the app, the window offers to add that link next to the picture
  * (CanvasView::addSnipLink). "Copy handwriting as text" is armed the same way (AppInkCopy.cpp).

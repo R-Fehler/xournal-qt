@@ -1,6 +1,6 @@
 /*
- * xournal-qt: dark pages, the color mapping (qt/docs/dark-pages.md): roles to their dark equivalents, other colors by a
- * lightness flip that keeps their hue, the table the shader reads, the pictures kept.
+ * xournal-qt: dark pages, the color mapping (qt/docs/features/dark-pages.md): roles to their dark equivalents, other
+ * colors by a lightness flip that keeps their hue, the table the shader reads, the pictures kept.
  *
  * @license GNU GPLv2 or later
  */

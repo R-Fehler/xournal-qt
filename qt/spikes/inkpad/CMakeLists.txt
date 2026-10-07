@@ -1,4 +1,4 @@
-# M0 spike: compare Qt Quick vs QWidget canvas hosts for tablet/touch input (see qt/docs/adr/0001-ui-host.md).
+# M0 spike: compare Qt Quick vs QWidget canvas hosts for tablet/touch input (see qt/docs/decisions/0001-ui-host.md).
 qt_add_executable(xqt-inkpad
     main.cpp
     Diagnostics.h Diagnostics.cpp

@@ -1,5 +1,5 @@
 /*
- * xournal-qt: Ogg Vorbis files of the audio recordings (qt/docs/audio.md), with the vendored libvorbis.
+ * xournal-qt: Ogg Vorbis files of the audio recordings (qt/docs/features/audio.md), with the vendored libvorbis.
  *
  * Recordings are mono Ogg Vorbis at the input device's rate, as Xournal++ writes them (through libsndfile there), so
  * either app plays the other's files. The writer puts every page into the file as soon as the encoder gives it: a
@@ -21,7 +21,7 @@
 namespace xqt::audio {
 
 /// The encoder's quality (libvorbis' VBR quality, -0.1 … 1). 0.1 gives about 60 kbit/s for dense sound in mono at 44.1
-/// or 48 kHz, less for speech with its pauses (qt/docs/audio.md, "Format"): under 30 MB an hour.
+/// or 48 kHz, less for speech with its pauses (qt/docs/features/audio.md, "Format"): under 30 MB an hour.
 constexpr float DEFAULT_QUALITY = 0.1f;
 
 /// Writes a mono Ogg Vorbis file.

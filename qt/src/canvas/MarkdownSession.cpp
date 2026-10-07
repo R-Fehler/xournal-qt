@@ -145,7 +145,7 @@ MarkdownSession::Page MarkdownSession::pageOf(const PageRef& page, double x, dou
     p.y = y;
     if (!pageText) {
         // A sticky note there: its one Markdown text, in the note's layer, the note being its frame (the text at its
-        // top left, as wide as the note; qt/docs/sticky-notes.md)
+        // top left, as wide as the note; qt/docs/features/sticky-notes.md)
         std::shared_lock lock(*session.getDocument());
         Layer* note = nullptr;
         if (wanted) {  // (beginText: the note that holds it, if it is a note's text)
@@ -287,7 +287,7 @@ void MarkdownSession::setBox(Page& p, const std::string& text) {
             t->setFont(XojFont(style.family, style.size));
             t->setColor(style.color);
             t->setWrap(style.width);
-            timeline::stampNew(*t);  // (when the box was begun: qt/docs/timeline.md)
+            timeline::stampNew(*t);  // (when the box was begun: qt/docs/features/timeline.md)
             p.box = t.get();
             p.layer->addElement(std::move(t));
         }

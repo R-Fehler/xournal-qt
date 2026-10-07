@@ -15,7 +15,7 @@ cmake --build build-qt
 ctest --test-dir build-qt -j8
 ```
 
-Packages and how a release is made: [`qt/docs/releasing.md`](qt/docs/releasing.md). Linux only so far.
+Packages and how a release is made: [`qt/docs/development/releasing.md`](qt/docs/development/releasing.md).
 
 Everything else in the tree is upstream Xournal++. The upstream GTK build (root `CMakeLists.txt`) is left untouched.
 
@@ -42,7 +42,7 @@ These rules keep `git merge upstream/master` cheap.
 2. **Never reformat upstream files.** Keep diffs minimal and local.
 3. **Tag every fork edit in an upstream file** with a `xournal-qt:` comment.
    - Prefer `#ifdef XOJ_NO_GTK` guards over rewriting code.
-   - List each touched file in [`qt/docs/adr/0002-upstream-seams.md`](qt/docs/adr/0002-upstream-seams.md).
+   - List each touched file in [`qt/docs/decisions/0002-upstream-seams.md`](qt/docs/decisions/0002-upstream-seams.md).
 4. **Prefer seams with upstream names.**
    - New interfaces (for example `UndoContext`) keep the method names of the GTK `Control` class, so method bodies stay byte-identical.
 5. **Fork-owned code belongs under `qt/`.**
@@ -69,7 +69,8 @@ The script:
 Merge roughly monthly.
 
 ## Where things are
-- `qt/docs/adr/`: architecture decision records.
+- `qt/docs/README.md`: the developer docs (layout, building, testing, features, decisions).
+- `qt/docs/decisions/`: architecture decision records.
 - `qt/spikes/`: throwaway experiments (M0 input and canvas spike).
 - `qt/tools/`: developer tools (merge script, image diff, tablet logger).
 - How the fork came to be and its big decisions: `qt/docs/history/README.md`; open work: `TODO.md`.

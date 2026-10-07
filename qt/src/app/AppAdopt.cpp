@@ -1,5 +1,5 @@
 /*
- * xournal-qt: AppController, annotations of other apps made editable (qt/docs/adopt-annotations.md;
+ * xournal-qt: AppController, annotations of other apps made editable (qt/docs/features/adopt-annotations.md;
  * session/AdoptAnnotations.h).
  *
  * Opening a PDF (plain, or with notes) looks at its annotations on a worker; when other apps' marks can be made

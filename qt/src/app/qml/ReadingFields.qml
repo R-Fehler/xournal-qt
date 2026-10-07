@@ -5,7 +5,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-// Reading (qt/docs/zen.md): read only, anywhere. Big fields at the left and right edges (a fifth of the page's width each, at least a finger wide, its
+// Reading (qt/docs/features/zen.md): read only, anywhere. Big fields at the left and right edges (a fifth of the page's width each, at least a finger wide, its
 // whole height, invisible) turn the pages: the previous or the next one (its top; presenting: the slide). A short
 // arrow at that edge says the tap was taken. The page itself finds the taps (DocumentCanvas.edgeTapWidth,
 // edgeTapped: a tap that is no link and no note), so a swipe there scrolls as anywhere; these items only show

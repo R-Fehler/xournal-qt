@@ -1,6 +1,6 @@
 /*
  * xournal-qt: "Share folder…" / "Share library…": a folder of the library (with its subfolders) or the whole library
- * as one zip (qt/docs/library.md, "Sharing a folder or the library").
+ * as one zip (qt/docs/features/library.md, "Sharing a folder or the library").
  *
  * Three formats:
  *  - xournal-qt (as is): the documents as they are, with the library's readings of exactly these documents written

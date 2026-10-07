@@ -26,9 +26,9 @@ Item {
     property bool isFolder: false
     /// A folder opened as a library (Recent): the folder with a library mark
     property bool isLibrary: false
-    /// The library's Stickers folder (qt/docs/stickers.md): the folder with a sticker mark
+    /// The library's Stickers folder (qt/docs/features/stickers.md): the folder with a sticker mark
     property bool isStickers: false
-    /// The library's Templates folder (qt/docs/templates.md): the folder with a template mark
+    /// The library's Templates folder (qt/docs/features/templates.md): the folder with a template mark
     property bool isTemplates: false
     property int itemCount: 0
     property bool hasPdf: false
@@ -60,9 +60,9 @@ Item {
     property int conflicts: 0
     property string snippet
     /// A favourite (starred): a star on the card, tap it to take the star away; the mouse over a card shows an empty
-    /// star to add it (qt/docs/bookmarks.md)
+    /// star to add it (qt/docs/features/bookmarks.md)
     property bool favourite: false
-    /// Its tags (qt/docs/tags.md): a few on the preview, then "+N"
+    /// Its tags (qt/docs/features/tags.md): a few on the preview, then "+N"
     property var tags: []
     /// How many are shown before "+N"
     readonly property int tagsShown: width < 170 ? 1 : width < 240 ? 2 : 3
@@ -222,7 +222,7 @@ Item {
                 }
                 // "PDF" for documents with a PDF (annotated or not), "MD" for Markdown files, "IMG" for images, the
                 // extension of text and other files. With notes (a .xopp next to it, or in the PDF): "PDF ✎"; a PDF
-                // text document: "PDF MD" in blue (a PDF that carries Markdown, as the "MD" of Markdown files); an archive PDF: "PDF/A" (qt/docs/library.md, "Kinds of PDFs").
+                // text document: "PDF MD" in blue (a PDF that carries Markdown, as the "MD" of Markdown files); an archive PDF: "PDF/A" (qt/docs/features/library.md, "Kinds of PDFs").
                 Rectangle {
                     id: pdfBadge
                     objectName: "kindBadge"
@@ -633,7 +633,7 @@ Item {
                     width: Math.max(24, Math.round(thumbHeight / (modelData.aspect > 0 ? modelData.aspect : 1.414)))
                     height: strip.height
                     onClicked: card.pageActivated(modelData.page)
-                    // Press and hold, or a right click: a link to this page (qt/docs/links.md)
+                    // Press and hold, or a right click: a link to this page (qt/docs/features/links.md)
                     onPressAndHold: hitMenu.openMenu()
                     TapHandler { acceptedButtons: Qt.RightButton; onTapped: function(point) { hitMenu.openMenu(point.position) } }
                     AdaptiveMenu {

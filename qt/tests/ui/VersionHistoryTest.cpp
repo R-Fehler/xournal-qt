@@ -1,6 +1,6 @@
 /*
- * xournal-qt: version history in the real window (qt/docs/hybrid-pdf.md, "Version history"): the sidebar's History
- * button explains it and turns it on (off by default), ⋮ → Document → Version history… opens the same panel,
+ * xournal-qt: version history in the real window (qt/docs/features/hybrid-pdf.md, "Version history"): the sidebar's
+ * History button explains it and turns it on (off by default), ⋮ → Document → Version history… opens the same panel,
  * Ctrl+Alt+S saves with a message (a milestone), a version restored from its row's menu, and Share sends the PDF
  * without its versions unless chosen.
  *

@@ -155,8 +155,8 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
     x /= zoom;
     y /= zoom;
 
-    // xournal-qt: sticky notes (qt/docs/sticky-notes.md). A select tool takes a note (the handle of the selected one
-    // resizes it, with any tool); the tools that write write on the note under them.
+    // xournal-qt: sticky notes (qt/docs/features/sticky-notes.md). A select tool takes a note (the handle of the
+    // selected one resizes it, with any tool); the tools that write write on the note under them.
     const ToolType toolType = h->getToolType();
     const bool selectTool = toolType == TOOL_SELECT_RECT || toolType == TOOL_SELECT_REGION ||
                             toolType == TOOL_SELECT_MULTILAYER_RECT || toolType == TOOL_SELECT_MULTILAYER_REGION ||
@@ -236,9 +236,9 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
         this->inputHandler->onButtonPressEvent(pos, zoom);
         if (Stroke* stroke = this->inputHandler->getStroke()) {
             penfill::apply(*control.getSettings(), *h, *stroke);  // (its fill color, before its view is made)
-            timeline::stampNew(*stroke);  // (when it was made: qt/docs/timeline.md)
+            timeline::stampNew(*stroke);  // (when it was made: qt/docs/features/timeline.md)
             if (h->getToolType() == TOOL_PEN) {
-                control.stampAudio(*stroke);  // (a recording runs: upstream's InputHandler::createStroke, qt/docs/audio.md)
+                control.stampAudio(*stroke);  // (a recording runs: upstream's InputHandler::createStroke, qt/docs/features/audio.md)
             }
         }
         this->overlayViews.emplace_back(this->inputHandler->createView(this));
@@ -282,7 +282,7 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
     } else if (h->getToolType() == TOOL_SELECT_PDF_TEXT_LINEAR || h->getToolType() == TOOL_SELECT_PDF_TEXT_RECT) {
         view.pdfTextPress(*this, x, y);
     } else if (h->getToolType() == TOOL_PLAY_OBJECT) {
-        view.playAt(*this, x, y);  // (upstream's PlayObject: the ink's recording, qt/docs/audio.md)
+        view.playAt(*this, x, y);  // (upstream's PlayObject: the ink's recording, qt/docs/features/audio.md)
     } else if (h->getToolType() == TOOL_SELECT_OBJECT) {
         const bool aggregate = add && (view.getSelection() || together);
         selectObjectAt(x, y, false, aggregate);
@@ -383,7 +383,7 @@ bool CanvasPage::selectObjectAt(double x, double y, bool multiLayer, bool aggreg
     if (!match) {
         return false;
     }
-    // xournal-qt: a member of a group selects the whole group (qt/docs/groups.md)
+    // xournal-qt: a member of a group selects the whole group (qt/docs/features/groups.md)
     InsertionOrderRef members;
     {
         std::shared_lock lock(*ctrl.getDocument());
@@ -630,7 +630,8 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
     }
     if (this->selector) {
         // Port of XojPageView::onButtonReleaseEvent (selector part)
-        // xournal-qt: the lasso the selection is made with (a sticker's picture is cut to it: qt/docs/stickers.md)
+        // xournal-qt: the lasso the selection is made with (a sticker's picture is cut to it:
+        // qt/docs/features/stickers.md)
         const bool lassoUsed = dynamic_cast<LassoSelector*>(this->selector.get()) != nullptr &&
                                !this->selector->userTapped(getZoom());
         view.selectedWith(this->page, lassoUsed ? this->selector->getBoundary()
@@ -639,7 +640,7 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
         const bool together = view.notes().hasSelection() || view.mixed().active();
         const bool aggregate = add && (view.getSelection() || together);
         if (!this->selector->userTapped(getZoom()) && selectNotesAndElements(aggregate)) {
-            // xournal-qt: whole sticky notes in it (qt/docs/sticky-notes.md, "Several notes at once")
+            // xournal-qt: whole sticky notes in it (qt/docs/features/sticky-notes.md, "Several notes at once")
             this->selector.reset();
             return false;
         }
@@ -668,7 +669,7 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
             markdownBefore = this->page->getSelectedLayerId();  // (a multi-layer selector found Markdown texts)
         }
         if (layerOfFinalizedSel) {
-            // xournal-qt: a group with any member in it is selected whole (qt/docs/groups.md)
+            // xournal-qt: a group with any member in it is selected whole (qt/docs/features/groups.md)
             const auto withGroups = [&](const InsertionOrderRef& found) {
                 std::shared_lock lock(*control.getDocument());
                 const auto layers = this->page->getLayersView();
@@ -804,7 +805,7 @@ void CanvasPage::selectInNote(Layer* note, bool tapped) {
     }
     {
         std::shared_lock lock(*doc);
-        elements = groups::withMembers(*note, elements);  // xournal-qt: groups whole (qt/docs/groups.md)
+        elements = groups::withMembers(*note, elements);  // xournal-qt: groups whole (qt/docs/features/groups.md)
     }
     view.setSelection(SelectionFactory::createFromElementsOnActiveLayer(&control, this->page, this, elements).release());
     view.noteSelectionMade(this->page, before, note);

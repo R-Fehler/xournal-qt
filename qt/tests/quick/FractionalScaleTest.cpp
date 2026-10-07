@@ -1,7 +1,8 @@
 /*
- * xournal-qt: the canvas on a screen at 125 %, 150 % (qt/docs/hidpi.md). Its pictures (page tiles, the selection,
- * the curtain's knob) are drawn with the screen's pixels and land on whole device pixels, so they are as sharp as at
- * 100 %. CTest runs these once as they are and once with QT_SCALE_FACTOR=1.25 (FractionalScaleCanvas.quick@125).
+ * xournal-qt: the canvas on a screen at 125 %, 150 % (qt/docs/features/hidpi.md). Its pictures (page tiles, the
+ * selection, the curtain's knob) are drawn with the screen's pixels and land on whole device pixels, so they are as
+ * sharp as at 100 %. CTest runs these once as they are and once with QT_SCALE_FACTOR=1.25
+ * (FractionalScaleCanvas.quick@125).
  *
  * @license GNU GPLv2 or later
  */
@@ -162,9 +163,9 @@ TEST_F(FractionalScaleCanvas, pageTilesAreShownPixelForPixel) {
     EXPECT_EQ(differing, 0) << "pixels blended: the tiles are not on whole device pixels (dpr " << dpr << ")";
 }
 
-// Turned by a quarter (qt/docs/canvas-rotation.md) the tiles still land on whole device pixels: the window shows the
-// rendered pixels unchanged, turned. The canvas here is not a whole number of device pixels wide (as a half of the
-// window beside a reference can be): the turn's translation has to be put on a whole pixel.
+// Turned by a quarter (qt/docs/features/canvas-rotation.md) the tiles still land on whole device pixels: the window
+// shows the rendered pixels unchanged, turned. The canvas here is not a whole number of device pixels wide (as a half
+// of the window beside a reference can be): the turn's translation has to be put on a whole pixel.
 TEST_F(FractionalScaleCanvas, pageTilesAreShownPixelForPixelTurnedByAQuarter) {
     QQmlProperty(canvas, "anchors.fill").write(QVariant::fromValue<QQuickItem*>(nullptr));
     canvas->setSize(QSizeF(999.63, 800));

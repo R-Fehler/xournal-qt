@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the size class of a window, and the touch profile (qt/docs/adaptive-layout.md).
+ * xournal-qt: the size class of a window, and the touch profile (qt/docs/features/adaptive-layout.md).
  *
  * One place that knows how much room a window has, instead of a threshold in every QML file. The class follows the
  * window's size with a hysteresis (HYSTERESIS_PX: dragging a window edge does not make the layout flicker; a jump of

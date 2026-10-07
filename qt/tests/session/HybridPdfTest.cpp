@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the hybrid PDF (qt/docs/hybrid-pdf.md): the file is valid, other apps see our drawing as we draw it,
- * and it opens again as the same document.
+ * xournal-qt: the hybrid PDF (qt/docs/features/hybrid-pdf.md): the file is valid, other apps see our drawing as we draw
+ * it, and it opens again as the same document.
  *
  * @license GNU GPLv2 or later
  */
@@ -1426,7 +1426,7 @@ TEST_F(ArchivePdfTest, aHybridPdfOfAPdfASourceDoesNotClaimPdfA) {
     EXPECT_NE(streamText(a.getRoot().getKey("/Metadata")).find("<pdfaid:part>3</pdfaid:part>"), std::string::npos);
 }
 
-// --- saving again: incremental updates (qt/docs/hybrid-pdf.md, "Saving: incremental updates") ------------------------
+// --- saving again: incremental updates (qt/docs/features/hybrid-pdf.md, "Saving: incremental updates") ---------------
 
 namespace {
 
@@ -1565,8 +1565,8 @@ TEST_F(IncrementalSaveTest, ctrlSAppendsOnlyWhatChanged) {
 }
 
 // The embedded .xopp is the same bytes when the same document is written again (version history stores older
-// versions as byte deltas of it, qt/docs/hybrid-pdf.md "Version history"): written twice in full, and saved again
-// without a change through the session (which puts a preview of the first page into it)
+// versions as byte deltas of it, qt/docs/features/hybrid-pdf.md "Version history"): written twice in full, and saved
+// again without a change through the session (which puts a preview of the first page into it)
 TEST_F(IncrementalSaveTest, theEmbeddedXoppIsTheSameBytesForTheSameDocument) {
     auto embedded = [](const fs::path& pdf) {
         QPDF q;

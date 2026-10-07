@@ -1,6 +1,6 @@
 /*
  * xournal-qt: links between documents kept working when documents are renamed or moved in the app
- * (qt/docs/links.md, "Keeping links working").
+ * (qt/docs/features/links.md, "Keeping links working").
  *
  * The library index knows the links of every document (Markdown files, Markdown boxes and link markers of .xopp
  * files). After a rename or move, `plan` works out which links now point elsewhere - links to a moved document, and

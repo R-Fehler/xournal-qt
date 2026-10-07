@@ -1,5 +1,5 @@
 // Settings: a large modal sheet with sections (pen, touch, stabilizer, documents, display, search, new pages,
-// storage, shortcuts). On a desktop or a tablet the sections are tabs; on a phone (qt/docs/adaptive-layout.md) the sheet
+// storage, shortcuts). On a desktop or a tablet the sections are tabs; on a phone (qt/docs/features/adaptive-layout.md) the sheet
 // takes the whole screen and shows the sections as a list, each opening as a page with a back arrow. Below 600 px the
 // rows put their label above the slider or the box.
 // The values are upstream Xournal++'s settings (settings.xml keys); they apply immediately and are saved when the
@@ -63,8 +63,8 @@ Popup {
     }
     function showShortcuts() { showSection(shortcutsSection) }
     function showSearch() { showSection(searchSection) }
-    /// Help (qt/docs/onboarding.md): the window shows the introduction, the tutorial, the question whether to start
-    /// the tutorial again (the sheet is closed first)
+    /// Help (qt/docs/features/onboarding.md): the window shows the introduction, the tutorial, the question whether to
+    /// start the tutorial again (the sheet is closed first)
     signal introRequested()
     signal tutorialRequested()
     signal restartTutorialRequested()
@@ -211,7 +211,7 @@ Popup {
             // --- Shortcuts ---
             SettingsShortcuts {}
 
-            // --- Help: the introduction of the first start, the keyboard shortcuts (qt/docs/onboarding.md) ---
+            // --- Help: the introduction of the first start, the keyboard shortcuts (qt/docs/features/onboarding.md)
             SettingsHelp {}
         }
     }

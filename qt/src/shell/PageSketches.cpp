@@ -41,7 +41,7 @@ QString prefixOf(const fs::path& file) {
 fs::path folderOf(DocumentSession& session) {
     const fs::path file = session.documentFile();
     if (file.empty() || PdfEncryption::isProtected(file)) {
-        return {};  // (a protected PDF: its pages are never stored unencrypted; qt/docs/hybrid-pdf.md)
+        return {};  // (a protected PDF: its pages are never stored unencrypted; qt/docs/features/hybrid-pdf.md)
     }
     fs::path pdf;
     {

@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the microphone and the speaker behind small interfaces (qt/docs/audio.md, "Devices").
+ * xournal-qt: the microphone and the speaker behind small interfaces (qt/docs/features/audio.md, "Devices").
  *
  * The recorder and the player (Recorder.h, Player.h) only see these. Three backends:
  * - Qt Multimedia (QAudioSource / QAudioSink, QtAudioDevice.cpp): built when Qt6::Multimedia is found and XQT_AUDIO is
@@ -74,9 +74,9 @@ inline bool available() { return backend() != Backend::None; }
 /// Whether this build has the Qt Multimedia backend.
 bool builtWithQtMultimedia();
 
-/// What recording runs on, for `xournal-qt --audio-info` and the CI's smoke tests (qt/docs/audio.md, "Platforms"):
-/// the first line is "recording: available (…)" or "recording: not offered (…)", then with Qt Multimedia the
-/// microphones and speakers the system has (listing them asks for no permission).
+/// What recording runs on, for `xournal-qt --audio-info` and the CI's smoke tests (qt/docs/features/audio.md,
+/// "Platforms"): the first line is "recording: available (…)" or "recording: not offered (…)", then with Qt Multimedia
+/// the microphones and speakers the system has (listing them asks for no permission).
 std::string describe();
 
 /// A new microphone or speaker of the current backend (nullptr: none).

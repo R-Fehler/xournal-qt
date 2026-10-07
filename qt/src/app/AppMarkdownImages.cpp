@@ -1,8 +1,8 @@
 /*
- * xournal-qt: web pictures of Markdown texts (qt/docs/md-images.md, "Web images"). A picture at an https:// address is
- * never fetched unasked: its "Load image" asks the window (webImageRequested), which shows the whole address, and
- * loadWebImage() fetches it through NetFetch (opt-in: `networkAccess`) into the app cache only. The texts that show it
- * are laid out again.
+ * xournal-qt: web pictures of Markdown texts (qt/docs/features/md-images.md, "Web images"). A picture at an https://
+ * address is never fetched unasked: its "Load image" asks the window (webImageRequested), which shows the whole
+ * address, and loadWebImage() fetches it through NetFetch (opt-in: `networkAccess`) into the app cache only. The texts
+ * that show it are laid out again.
  *
  * @license GNU GPLv2 or later
  */
@@ -119,7 +119,7 @@ void AppController::relayoutPictures(const std::string& link) {
     }
 }
 
-// --- Remove unused images (qt/docs/md-images.md, "Clean-up") -----------------------------------------------------------
+// --- Remove unused images (qt/docs/features/md-images.md, "Clean-up") -----------------------------------------------------------
 
 QStringList AppController::unusedMarkdownImages() const {
     const DocumentSession* s = session();

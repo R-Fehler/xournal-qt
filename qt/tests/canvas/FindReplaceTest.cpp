@@ -1,8 +1,8 @@
 /*
- * xournal-qt: find and replace in a document (FindReplace.h, qt/docs/md-editor.md "Find and replace"): a .md and a .txt
- * edited, a PDF text document with Markdown text boxes and a sticky note's text; "Replace all" is one undo step (the
- * text being written: one of its own), "Replace" replaces the current hit of the search and goes to the next one,
- * and what cannot be written (PDF text, plain text elements, hidden layers, read-only files) is never changed.
+ * xournal-qt: find and replace in a document (FindReplace.h, qt/docs/features/md-editor.md "Find and replace"): a .md
+ * and a .txt edited, a PDF text document with Markdown text boxes and a sticky note's text; "Replace all" is one undo
+ * step (the text being written: one of its own), "Replace" replaces the current hit of the search and goes to the next
+ * one, and what cannot be written (PDF text, plain text elements, hidden layers, read-only files) is never changed.
  *
  * @license GNU GPLv2 or later
  */

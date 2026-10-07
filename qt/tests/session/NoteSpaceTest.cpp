@@ -1,7 +1,7 @@
 /*
- * xournal-qt: space for notes beside slides (qt/docs/note-space.md): the model and its .xopp round trip, applying it
- * (one undo step), drawing (the PDF at its offset, the ink with it), PDF text (selection, search, boxes), the plain
- * PDF export, the hybrid PDF (larger boxes, text found where it is) and its incremental saves.
+ * xournal-qt: space for notes beside slides (qt/docs/features/note-space.md): the model and its .xopp round trip,
+ * applying it (one undo step), drawing (the PDF at its offset, the ink with it), PDF text (selection, search, boxes),
+ * the plain PDF export, the hybrid PDF (larger boxes, text found where it is) and its incremental saves.
  *
  * @license GNU GPLv2 or later
  */

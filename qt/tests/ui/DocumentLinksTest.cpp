@@ -1,7 +1,7 @@
 /*
- * xournal-qt: links between documents in the real window (qt/docs/links.md): a tapped link asks where to open the
- * document (a new tab, the reference, here), remembers the choice if asked to, goes to the chapter, heading or page,
- * and Back and Forward go across documents.
+ * xournal-qt: links between documents in the real window (qt/docs/features/links.md): a tapped link asks where to open
+ * the document (a new tab, the reference, here), remembers the choice if asked to, goes to the chapter, heading or
+ * page, and Back and Forward go across documents.
  *
  * @license GNU GPLv2 or later
  */
@@ -450,8 +450,8 @@ TEST_F(DocumentLinksTest, aLinkWhoseFileWasMovedElsewhereIsFoundOrLocated) {
     EXPECT_NE(note->currentText().find("[lost](../Archive/kalman.xopp#page=1)"), std::string::npos) << note->currentText();
 }
 
-// Links with the mouse (qt/docs/links.md): resting on a link shows where it leads in a line at the bottom of the
-// canvas; in a text being written a plain click puts the cursor there, Ctrl + click follows.
+// Links with the mouse (qt/docs/features/links.md): resting on a link shows where it leads in a line at the bottom of
+// the canvas; in a text being written a plain click puts the cursor there, Ctrl + click follows.
 TEST_F(DocumentLinksTest, hoveringALinkShowsWhereItLeadsAndAClickInWrittenTextPutsTheCursor) {
     ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "Notes" / "a.md").string())));
     wait(200);

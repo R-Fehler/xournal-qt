@@ -1,5 +1,6 @@
 /*
- * xournal-qt: copy handwriting as text (qt/copy-tools, qt/docs/handwriting-search.md, "Copy handwriting as text").
+ * xournal-qt: copy handwriting as text (qt/copy-tools, qt/docs/features/handwriting-search.md, "Copy handwriting as
+ * text").
  *
  * The tool (the "Text" button's second variant, Shift+T) is armed as a snip is (AppSnip.cpp, Snip.h with
  * snip::Purpose::InkText): the next lasso dragged over a page is a sweep (CanvasView::inkSwept), and the tool used

@@ -1,5 +1,5 @@
 /*
- * xournal-qt: links between documents kept working (qt/docs/links.md): the library index records the links of
+ * xournal-qt: links between documents kept working (qt/docs/features/links.md): the library index records the links of
  * notes and Markdown files, backlinks come from them, and after a rename or move the links that point elsewhere now
  * are written anew - in the text of a Markdown file byte for byte, in the Markdown boxes of a .xopp.
  *

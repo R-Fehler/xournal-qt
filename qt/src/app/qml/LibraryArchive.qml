@@ -1,6 +1,6 @@
 // xournal-qt: exporting the library as an archive: what it does, the whole library or this folder, the folder
 // it goes to, and what was written.
-// Part of HomeView.qml (the home screen, qt/docs/library.md), instantiated once there: it reads the home
+// Part of HomeView.qml (the home screen, qt/docs/features/library.md), instantiated once there: it reads the home
 // screen's state through `home`, and the other parts by their ids (HomeView.qml's context).
 import QtQuick
 import QtQuick.Controls

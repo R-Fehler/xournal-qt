@@ -1,7 +1,7 @@
 /*
- * xournal-qt: a sticker's file (qt/docs/stickers.md): one page of the content's size plus the margin, on plain paper
- * of the source page's colour, the layers as the app keeps them (the picture, Markdown, the ink, the notes), read back
- * as the content to paste, opened by upstream's loader without a warning; the name suggested for it.
+ * xournal-qt: a sticker's file (qt/docs/features/stickers.md): one page of the content's size plus the margin, on plain
+ * paper of the source page's colour, the layers as the app keeps them (the picture, Markdown, the ink, the notes), read
+ * back as the content to paste, opened by upstream's loader without a warning; the name suggested for it.
  *
  * @license GNU GPLv2 or later
  */

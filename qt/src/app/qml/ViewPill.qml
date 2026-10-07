@@ -278,7 +278,7 @@ Pane {
             enabled: app.pageNumber < app.pageCount
             onClicked: app.nextPage()
         }
-        // The canvas turned (qt/docs/canvas-rotation.md): by how much; a tap turns it upright again
+        // The canvas turned (qt/docs/features/canvas-rotation.md): by how much; a tap turns it upright again
         ToolButton {
             objectName: "rotationChip"
             visible: app.canvasRotation !== 0

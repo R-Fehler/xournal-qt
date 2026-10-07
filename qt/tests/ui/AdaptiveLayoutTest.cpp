@@ -1,8 +1,8 @@
 /*
- * xournal-qt: the layout for the window's size (qt/docs/adaptive-layout.md) in the real window: the size class at the
- * audit's sizes, the page sidebar beside the page or as a drawer, the choices kept per size class and their reset,
- * the hysteresis and a held pointer, the chrome apart from the window state, and no control of the home screen or the
- * document outside the window.
+ * xournal-qt: the layout for the window's size (qt/docs/features/adaptive-layout.md) in the real window: the size class
+ * at the audit's sizes, the page sidebar beside the page or as a drawer, the choices kept per size class and their
+ * reset, the hysteresis and a held pointer, the chrome apart from the window state, and no control of the home screen
+ * or the document outside the window.
  *
  * The menus (qt/adaptive-menus): at each size ⋮ (and its submenus), the page menu, the library menu and a card's menu
  * fit in the window, as wide as their entries and clear of their buttons; in the phone classes they are a bottom sheet
@@ -132,7 +132,7 @@ namespace {
 struct Known {
     const char* screen;  ///< "home", "doc"
     const char* item;    ///< its label in the walk (LayoutWalk.h), or the start of it
-    const char* block;   ///< the block that fixes it (qt/docs/ui-adaptive-audit.md, "Implementation blocks")
+    const char* block;   ///< the block of the UI audit that fixes it (qt/docs/history/README.md)
 };
 const Known knownOutside[] = {
         // (the view pill stays inside the window since qt/adaptive-toolbar, the library header since qt/adaptive-home)
@@ -289,7 +289,7 @@ protected:
         }
         return false;
     }
-    // --- the toolbox (qt/docs/toolbox.md) ---
+    // --- the toolbox (qt/docs/features/toolbox.md) ---
     /// The id of the toolbox's `n`th entry of a type ("pen", "highlighter", "eraser", "text", "sticky", …)
     QString entryOf(const QString& type, int n = 0) const {
         for (const QVariant& v: controller->toolboxModel()->tools()) {
@@ -300,7 +300,7 @@ protected:
         return {};
     }
     QQuickItem* toolEntry(const QString& id) const { return findItem(("toolEntry_" + id).toUtf8().constData()); }
-    /// A tool of the rail: on it, in sight or scrolled out of it (it scrolls, nothing folds; qt/docs/toolbox.md, "A rail
+    /// A tool of the rail: on it, in sight or scrolled out of it (it scrolls, nothing folds; qt/docs/features/toolbox.md, "A rail
     /// that scrolls")
     bool onTheRail(QQuickItem* button) const {
         auto* box = named("toolbox");
@@ -930,7 +930,7 @@ std::vector<AdaptiveLayoutTest::DialogCase> AdaptiveLayoutTest::documentDialogs(
             {"unsavedDialog", "open", {}, "question"},
             {"webConfirm", "ask", {longUrl, QString("Search the web")}, "question"},
             {"messageDialog", "open", {}, "card"},
-            {"introDialog", "show", {}, "form"},  // (the first start: qt/docs/onboarding.md)
+            {"introDialog", "show", {}, "form"},  // (the first start: qt/docs/features/onboarding.md)
     };
     if (all) {
         const std::vector<DialogCase> more{
@@ -1911,8 +1911,8 @@ TEST_F(AdaptiveLayoutTest, theToolsFitAt720) {
     EXPECT_LT(sceneRect(topBar()).bottom(), sceneRect(named("canvas")).top() + 1) << "the bar above the page";
 }
 
-// New has one place where a tab strip is shown (qt/docs/adaptive-layout.md, "One place for each action"): the tab
-// strip's "+"; its item of the arrangement is offered only where there is none (the compact chrome's ⋯, a phone)
+// New has one place where a tab strip is shown (qt/docs/features/adaptive-layout.md, "One place for each action"): the
+// tab strip's "+"; its item of the arrangement is offered only where there is none (the compact chrome's ⋯, a phone)
 TEST_F(AdaptiveLayoutTest, newIsTheTabStripsPlusWhereThereIsOne) {
     openDocument();
     resize(1920, 1080);
@@ -2464,8 +2464,8 @@ TEST_F(AdaptiveLayoutTest, toolBarPictures) {
     }
 }
 
-// One place for each action (qt/docs/adaptive-layout.md): ⋮ repeats no button of the tool bar, "more tools", the view
-// pill or the sidebar
+// One place for each action (qt/docs/features/adaptive-layout.md): ⋮ repeats no button of the tool bar, "more tools",
+// the view pill or the sidebar
 TEST_F(AdaptiveLayoutTest, moreMenuRepeatsNoButton) {
     openDocument();
     for (const char* gone: {"settingsItem", "fullScreenItem", "presentItem", "allPagesItem", "insertImageItem",
@@ -2658,7 +2658,7 @@ TEST_F(PhoneChromeTest, theTabCountTapDoubleTapAndLongPress) {
 }
 
 // A tool's editor (its colors and width), its menu and the catalog ("+", which replaced "My tools" in qt/top-bar) are
-// sheets at the bottom on a phone; the dock shows the tool in hand (qt/docs/toolbox.md, "Where it is")
+// sheets at the bottom on a phone; the dock shows the tool in hand (qt/docs/features/toolbox.md, "Where it is")
 TEST_F(PhoneChromeTest, theEditorTheMenuAndTheCatalogAreSheets) {
     openDocument();
     resize(412, 915);
@@ -2737,7 +2737,7 @@ TEST_F(PhoneChromeTest, thePageNumberOpensThePagesWithTheContentsAndTheZoom) {
 }
 
 // Zen (only the page and the dot) is automatic only in a tiny window (under 360 px either way); a phone keeps its tools.
-// Leaving it there is remembered for tiny windows (qt/docs/zen.md).
+// Leaving it there is remembered for tiny windows (qt/docs/features/zen.md).
 TEST_F(PhoneChromeTest, zenIsAutomaticOnlyInATinyWindow) {
     openDocument();
     auto chrome = [&] { return window->property("chromeMode").toString(); };
@@ -3566,9 +3566,9 @@ protected:
 };
 }  // namespace
 
-// The colors of a tool (qt/docs/color-palettes.md): its editor shows the roles of the chosen palette, with their names
-// (only the roles that palette defines), and the palette can be chosen there; a color taken from it remembers its
-// role, and the tool follows when another palette is chosen.
+// The colors of a tool (qt/docs/features/color-palettes.md): its editor shows the roles of the chosen palette, with
+// their names (only the roles that palette defines), and the palette can be chosen there; a color taken from it
+// remembers its role, and the tool follows when another palette is chosen.
 TEST_F(ColorChooserTest, theEditorOffersThePalettesRoles) {
     openDocument();
     setUpPalettes();

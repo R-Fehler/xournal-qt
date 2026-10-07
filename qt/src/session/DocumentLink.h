@@ -1,5 +1,6 @@
 /*
- * xournal-qt: links between documents (qt/docs/links.md) - the link format and where a link leads in a document.
+ * xournal-qt: links between documents (qt/docs/features/links.md) - the link format and where a link leads in a
+ * document.
  *
  * A link is one URI, the path relative to the document that holds it, as in Markdown and HTML:
  *

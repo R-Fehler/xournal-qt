@@ -1,7 +1,7 @@
-// One button for tools that do almost the same (qt/docs/adaptive-layout.md, "Cycling buttons"; ToolGroups.qml):
-// its icon is the variant in use (or the one last used), the dots below say how many there are and which one it is.
-// A tap on it while its tool is in use takes the next variant, else its tool with the variant last used; a long
-// press (or a right click) lists all variants with their names, to pick one.
+// One button for tools that do almost the same (qt/docs/features/adaptive-layout.md, "Cycling buttons";
+// ToolGroups.qml): its icon is the variant in use (or the one last used), the dots below say how many there are and
+// which one it is. A tap on it while its tool is in use takes the next variant, else its tool with the variant last
+// used; a long press (or a right click) lists all variants with their names, to pick one.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

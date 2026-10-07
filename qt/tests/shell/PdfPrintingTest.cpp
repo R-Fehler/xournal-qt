@@ -166,8 +166,8 @@ bool waitUntil(const std::function<bool()>& done, int ms = 10000) {
 }
 }  // namespace
 
-// A protected document (qt/docs/hybrid-pdf.md, "Encrypted PDFs") printed without its annotations: its PDF as it is,
-// without the password (the printer cannot open an encrypted PDF), and no ink; with them: the ink too
+// A protected document (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs") printed without its annotations: its PDF as
+// it is, without the password (the printer cannot open an encrypted PDF), and no ink; with them: the ink too
 TEST(PrintFile, aProtectedDocumentIsPrintedWithOrWithoutItsAnnotations) {
     QTemporaryDir tmp;
     const fs::path dir(tmp.path().toStdString());

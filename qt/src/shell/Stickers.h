@@ -1,12 +1,12 @@
 /*
- * xournal-qt: the sticker sets on disk (qt/docs/stickers.md) and the picker's list of them.
+ * xournal-qt: the sticker sets on disk (qt/docs/features/stickers.md) and the picker's list of them.
  *
  * Two sets: the library's, its visible folder "Stickers" (a fixed English name, subfolders for topics), and the
  * app-wide one in the app's data folder ("In all libraries"). A sticker is a .xopp (StickerFile.h) or a picture. The
  * own order of a folder is a hidden file in it, ".sticker-order.json" (it syncs with the folder); when each sticker was
  * last used is the device's, kept in the library's config folder ("stickers.json").
  *
- * The same folder model holds the page templates (qt/docs/templates.md, Kind::Templates): the library's folder
+ * The same folder model holds the page templates (qt/docs/features/templates.md, Kind::Templates): the library's folder
  * "Templates", the app-wide "<AppDataLocation>/templates", ".template-order.json", "templates.json"; a template is a
  * .xopp only (TemplateFile.h), with the PDF attached to it ("name.xopp.bg.pdf"), which goes wherever it goes.
  *

@@ -105,7 +105,7 @@ void load(CachedDocument& cached, const DocumentItem& item) {
         static std::mutex loading;
         std::lock_guard loadLock(loading);
         if (!item.md.empty()) {
-            // A Markdown file (its bookmarks, qt/docs/bookmarks.md): its pages as it opens, with its pictures
+            // A Markdown file (its bookmarks, qt/docs/features/bookmarks.md): its pages as it opens, with its pictures
             cached.pictures = std::make_unique<md::images::RootHandle>(DocumentImages::markdownRoot(item.md));
             cached.doc = MarkdownFile::document(MarkdownFile::read(item.md));
         } else {

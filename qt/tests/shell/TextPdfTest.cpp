@@ -1,6 +1,6 @@
 /*
- * xournal-qt: text documents as PDF, the app's side (qt/docs/md-pdf.md): what a new text document is (the setting,
- * its default by the way documents are kept), "Open as PDF document" of a .md, "Export as Markdown", and the
+ * xournal-qt: text documents as PDF, the app's side (qt/docs/features/md-pdf.md): what a new text document is (the
+ * setting, its default by the way documents are kept), "Open as PDF document" of a .md, "Export as Markdown", and the
  * library's search in a PDF text document.
  *
  * @license GNU GPLv2 or later
@@ -219,10 +219,10 @@ TEST_F(TextPdf, exportAsMarkdownWritesTheText) {
     EXPECT_FALSE(c.textNotes());
 }
 
-// qt/docs/md-images.md: a PDF text document carries its pictures as attachments "name.assets/…" (nothing is written
-// next to it); opened, they are in its work folder in the app cache; an incremental save adds a new one and keeps the
-// ones it has; a full write drops those the text does not link to; Export as Markdown writes them next to the .md;
-// Open as PDF document packs a .md's pictures.
+// qt/docs/features/md-images.md: a PDF text document carries its pictures as attachments "name.assets/…" (nothing is
+// written next to it); opened, they are in its work folder in the app cache; an incremental save adds a new one and
+// keeps the ones it has; a full write drops those the text does not link to; Export as Markdown writes them next to the
+// .md; Open as PDF document packs a .md's pictures.
 // A .md whose name has blanks: the link to its picture is written as an address ("my%20notes.assets/…"), so that it
 // resolves (the author: a link with the blanks as they are did not).
 TEST_F(TextPdf, aPictureOfAMarkdownFileWithBlanksInItsNameIsLinkedSoItResolves) {
@@ -329,7 +329,7 @@ TEST_F(TextPdf, picturesAreCarriedInsideAPdfTextDocument) {
     EXPECT_EQ(attachment(root / "notes.pdf", "notes.assets/a.png"), readFile(root / "notes.assets" / "a.png"));
 }
 
-// qt/docs/md-images.md: the Markdown of notes (.xopp) carries its pictures inside the .xopp, as extra <preview xqt-file>
+// qt/docs/features/md-images.md: the Markdown of notes (.xopp) carries its pictures inside the .xopp, as extra <preview xqt-file>
 // elements at the end (Xournal++ ignores them); a .xopp without pictures is written as before; opened again, they
 // are in its work folder; a PDF with notes made from it carries them as attachments.
 TEST_F(TextPdf, picturesOfNotesAreCarriedInsideTheXopp) {
@@ -354,7 +354,7 @@ TEST_F(TextPdf, picturesOfNotesAreCarriedInsideTheXopp) {
     const std::string xml = gunzipFile(xopp);
     EXPECT_NE(xml.find("<preview xqt-file=\"lecture.assets/image-2026-09-26-090000.png\">"), std::string::npos);
     EXPECT_LT(xml.find("<preview>"), xml.find("<preview xqt-file")) << "the document's own preview first";
-    if (const char* keep = std::getenv("XQT_KEEP_XOPP")) {  // (to open it in Xournal++: qt/docs/md-images.md)
+    if (const char* keep = std::getenv("XQT_KEEP_XOPP")) {  // (to open it in Xournal++: qt/docs/features/md-images.md)
         fs::copy_file(xopp, keep, fs::copy_options::overwrite_existing);
     }
     const auto carried = DocumentImages::xoppPictures(xopp);
@@ -382,8 +382,8 @@ TEST_F(TextPdf, picturesOfNotesAreCarriedInsideTheXopp) {
     EXPECT_EQ(attachment(root / "Physics" / "lecture.pdf", *link), carried[0].second);
 }
 
-// The work folders in the app cache have an owner (qt/docs/md-images.md): those not used for 60 days go at start; a
-// document opened marks its own as used.
+// The work folders in the app cache have an owner (qt/docs/features/md-images.md): those not used for 60 days go at
+// start; a document opened marks its own as used.
 TEST_F(TextPdf, oldWorkFoldersArePruned) {
     const fs::path used = DocumentImages::workFolder(root / "used.xopp");
     const fs::path old = DocumentImages::workFolder(root / "old.xopp");

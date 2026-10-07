@@ -275,7 +275,7 @@ TEST_F(InkLibraryTest, theLibrarysHandwritingIsReadOnMainsPower) {
 }
 
 TEST_F(InkLibraryTest, aSharedZipUnpackedWithOtherTimesIsNotReadAgain) {
-    // (qt/docs/library.md, "Sharing a folder or the library": the readings go along, and survive any unzip)
+    // (qt/docs/features/library.md, "Sharing a folder or the library": the readings go along, and survive any unzip)
     fs::create_directories(root / "Lib");
     const fs::path a = writeNotes(tmp, "Lib/a.xopp", 2, 2, 1);
     const fs::path b = writeNotes(tmp, "Lib/b.xopp", 1, 1, 7);

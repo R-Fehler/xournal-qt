@@ -1,6 +1,6 @@
 /*
- * xournal-qt: version history inside a PDF with notes (qt/docs/hybrid-pdf.md, "Version history"; the plan:
- * qt/docs/research/version-history.md, "Confirmed by the author").
+ * xournal-qt: version history inside a PDF with notes (qt/docs/features/hybrid-pdf.md, "Version history"; the plan
+ * the author confirmed: qt/docs/history/README.md, "Where the old notes went").
  *
  * A version is a revision of the file that our save wrote while history is on: the file cut after that revision's
  * "%%EOF" is the file as it was saved then (PdfRevisions.h). One version per local calendar day: the first save of a

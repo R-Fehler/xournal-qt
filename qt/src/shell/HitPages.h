@@ -36,7 +36,7 @@ public:
     /// marksOf() the fuzzy search's terms.
     static QString baseUrl(const DocumentItem& item, const QString& marks);
     /// URL of the picture of an area of a page (page points; the handwriting beside a to-do's check-box stamp,
-    /// qt/docs/todos.md): appended to baseUrl(item, ""), drawn by renderArea.
+    /// qt/docs/features/todos.md): appended to baseUrl(item, ""), drawn by renderArea.
     static QString areaUrl(const QString& base, int page, const QRectF& area);
     /// Draw an area of a page `width` pixels wide (as the screen shows it, RegionRender.h), from the same kept
     /// documents. Blocks; any thread.

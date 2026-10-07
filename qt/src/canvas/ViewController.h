@@ -54,15 +54,15 @@ public:
     double maxZoom() const { return 7.0 * z100; }  // upstream DEFAULT_ZOOM_MAX
 
     /// The size of the (upright) view the layout is seen through: the screen's (the canvas item's), or while the canvas
-    /// is turned the bounding box of the turned screen (qt/docs/canvas-rotation.md). Everything of the view (scroll
-    /// position, anchors, pinch, fits) works in this upright view; only input and what is shown over the canvas are
-    /// mapped between it and the screen (screenToView, viewToScreen).
+    /// is turned the bounding box of the turned screen (qt/docs/features/canvas-rotation.md). Everything of the view
+    /// (scroll position, anchors, pinch, fits) works in this upright view; only input and what is shown over the canvas
+    /// are mapped between it and the screen (screenToView, viewToScreen).
     QSizeF viewSize() const { return view; }
     /// The size of the canvas on the screen (item pixels)
     QSizeF screenSize() const { return screen; }
     void setViewSize(QSizeF screenSize);
 
-    // --- the canvas turned (qt/docs/canvas-rotation.md) -------------------------------------------------------
+    // --- the canvas turned (qt/docs/features/canvas-rotation.md) -----------------------------------------------------
     /// Degrees clockwise the canvas is turned on the screen, in [0, 360)
     double rotation() const { return angle; }
     bool rotated() const { return angle != 0; }
@@ -164,7 +164,7 @@ public:
     void panBy(QPointF deltaView);
     void scrollToPage(size_t page);
 
-    // --- a place in the document, for keeping two views together (ScrollLock, qt/docs/reference-view.md) ------------
+    // --- a place in the document, for keeping two views together (ScrollLock, qt/docs/features/reference-view.md) ----
     /// A page and a point on it relative to its size (0..1 across the page; outside it in the gap around it)
     struct Place {
         size_t page = 0;
@@ -204,17 +204,17 @@ public:
     void fitPresentedPage(size_t page);
     /// Presenting: the zoom at which the page fills the view (as much as its shape allows)
     double presentedZoom(size_t page) const;
-    /// The audience's screen of the presenter view (qt/docs/presenter-view.md): zoom so that a part of a page (the
-    /// slide without its space for notes) fills the view as far as its shape allows, centre it, and keep that (also
-    /// when the view changes size or the pages move).
+    /// The audience's screen of the presenter view (qt/docs/features/presenter-view.md): zoom so that a part of a page
+    /// (the slide without its space for notes) fills the view as far as its shape allows, centre it, and keep that
+    /// (also when the view changes size or the pages move).
     void fitPageRect(size_t page, QRectF rectPt);
     /// What a new view or layout starts with: sideways the height, else the width of the page.
     void fitDefault(std::optional<size_t> page = std::nullopt);
     /// Scrolling sideways, come to rest on whole pages (their group: a column, a pair) after a drag, a fling or a
     /// wheel. `maxStep`: a swipe goes at most this many pages on (0: as far as it flies).
     void setSnapping(bool snap, int maxStep = 0);
-    /// Up and down too (reading, qt/docs/toolbox.md): a drag or a fling comes to rest on a row of pages: its top at
-    /// the view's top, or within it when it is taller than the view; a row that fits rests in the middle
+    /// Up and down too (reading, qt/docs/features/toolbox.md): a drag or a fling comes to rest on a row of pages: its
+    /// top at the view's top, or within it when it is taller than the view; a row that fits rests in the middle
     void setSnappingVertically(bool on) { snapVertical = on; }
     bool snapping() const { return snap && (layout->horizontal() || snapVertical); }
     /// A scroll delta (wheel, touchpad): sideways, what cannot scroll up or down scrolls left or right.

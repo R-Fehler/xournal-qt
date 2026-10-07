@@ -25,7 +25,7 @@ public:
     /// macOS, ShellExecute on Windows, an intent on Android).
     virtual bool openWithSystemApp(const QString& path);
     /// Open a web address (http, https) in the browser (QDesktopServices::openUrl). The caller has shown it first
-    /// (qt/docs/citations.md).
+    /// (qt/docs/features/citations.md).
     virtual bool openWebAddress(const QUrl& url);
     /// Show a file in the file manager, selected: org.freedesktop.FileManager1.ShowItems over D-Bus on Linux (the
     /// folder itself when no file manager answers there), `explorer /select,` on Windows, `open -R` on macOS. A

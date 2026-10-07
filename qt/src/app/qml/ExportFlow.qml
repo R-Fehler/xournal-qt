@@ -16,7 +16,7 @@ Item {
         }
         exportDialog.open()
     }
-    // "Export as Markdown" (qt/docs/md-pdf.md): next to the document (Xournal++ files; asked before a file is
+    // "Export as Markdown" (qt/docs/features/md-pdf.md): next to the document (Xournal++ files; asked before a file is
     // replaced), else where this dialog says
     function exportMarkdown() {
         const file = app.markdownExportFile()

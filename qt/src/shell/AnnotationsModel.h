@@ -1,6 +1,6 @@
 /*
  * xournal-qt: the annotations of the current document for the page sidebar's Annotations panel
- * (qt/docs/annotations-md.md), and the pictures of its handwriting.
+ * (qt/docs/features/annotations-md.md), and the pictures of its handwriting.
  *
  * It works only while the panel is shown (`active`). Changes are collected (a page's revision changed, pages came or
  * went) and read once the writing pauses, on a background worker at low priority: a page whose revision is the one

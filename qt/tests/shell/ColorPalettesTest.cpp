@@ -237,7 +237,7 @@ TEST(ColorPalettes, aColorTakenFromAPaletteRemembersItsRole) {
     c.shutdown();
 }
 
-// --- dark pages and page colors (qt/docs/dark-pages.md) ---------------------------------------------------------------
+// --- dark pages and page colors (qt/docs/features/dark-pages.md) ---------------------------------------------------------------
 
 // Every role of the light palettes shows on a dark page as the Dark palette's color of the same role
 TEST(ColorPalettes, darkPagesShowEachRoleInTheDarkPalettesColor) {

@@ -50,9 +50,9 @@ class LibraryModel final: public QAbstractListModel {
     /// list) - not at what is written in the documents.
     Q_PROPERTY(bool namesOnly READ namesOnly WRITE setNamesOnly NOTIFY namesOnlyChanged)
     /// Only the favourites (starred documents; DocumentPlaces): all of the library's, without folders, like the flat
-    /// list; combined with the "Show" filter and the search (qt/docs/bookmarks.md)
+    /// list; combined with the "Show" filter and the search (qt/docs/features/bookmarks.md)
     Q_PROPERTY(bool favouritesOnly READ favouritesOnly WRITE setFavouritesOnly NOTIFY favouritesOnlyChanged)
-    /// Only documents with this tag or one inside it (qt/docs/tags.md; "": all): of the current folder and its
+    /// Only documents with this tag or one inside it (qt/docs/features/tags.md; "": all): of the current folder and its
     /// subfolders (all of the library's with favouritesOnly or flat), without folders; combined with the "Show" filter
     /// and the search
     Q_PROPERTY(QString tagFilter READ tagFilter WRITE setTagFilter NOTIFY tagFilterChanged)
@@ -135,7 +135,7 @@ public:
         PdfKindRole,
         /// The document is a favourite (starred)
         FavouriteRole,
-        /// Its tags (qt/docs/tags.md), from the index ([] until it is indexed, and for folders)
+        /// Its tags (qt/docs/features/tags.md), from the index ([] until it is indexed, and for folders)
         TagsRole,
         /// A PDF with notes that keeps its versions (version history): how many, from the index (0: none)
         VersionsRole,

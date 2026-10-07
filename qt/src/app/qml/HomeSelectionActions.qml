@@ -1,6 +1,6 @@
 // xournal-qt: the actions on a selection in a bar at the bottom (a phone, or no room in the selection bar):
 // Open, Copy, Move, Trash, and ⋮ for the rest.
-// Part of HomeView.qml (the home screen, qt/docs/library.md), instantiated once there: it reads the home
+// Part of HomeView.qml (the home screen, qt/docs/features/library.md), instantiated once there: it reads the home
 // screen's state through `home`, and the other parts by their ids (HomeView.qml's context).
 import QtQuick
 import QtQuick.Controls

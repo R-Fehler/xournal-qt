@@ -1,13 +1,13 @@
-// The sticker picker (qt/docs/stickers.md): the stickers of the library's Stickers folder ("This library") or of the
-// app-wide set ("All libraries") as a grid of previews, by folder, found by name, sorted by last use, the own order, the
-// name or the date added. A tap pastes the sticker on the current page (and puts it on the clipboard), selected; the
-// card's menu (press and hold, right click) renames, reorders, moves, opens, copies and deletes it. "+ Save selection"
-// makes a sticker of what is selected. A bottom sheet in the phone classes; elsewhere it opens beside `owner` (none: in
-// the middle of the window).
+// The sticker picker (qt/docs/features/stickers.md): the stickers of the library's Stickers folder ("This library") or
+// of the app-wide set ("All libraries") as a grid of previews, by folder, found by name, sorted by last use, the own
+// order, the name or the date added. A tap pastes the sticker on the current page (and puts it on the clipboard),
+// selected; the card's menu (press and hold, right click) renames, reorders, moves, opens, copies and deletes it. "+
+// Save selection" makes a sticker of what is selected. A bottom sheet in the phone classes; elsewhere it opens beside
+// `owner` (none: in the middle of the window).
 //
-// With `mode: "templates"` it is the page template picker (qt/docs/templates.md): the library's Templates folder and
-// the app-wide set; a tap adds the template's page at `insertAt` (or, `pickOnly`, only says which: `chosen`), and
-// "+ Save this page" saves the current page as a template. The object names begin with "template" then
+// With `mode: "templates"` it is the page template picker (qt/docs/features/templates.md): the library's Templates
+// folder and the app-wide set; a tap adds the template's page at `insertAt` (or, `pickOnly`, only says which:
+// `chosen`), and "+ Save this page" saves the current page as a template. The object names begin with "template" then
 // ("templateChooser" with `pickOnly`).
 import QtQuick
 import QtQuick.Controls

@@ -4,8 +4,8 @@
  * Upstream fills a stroke or a shape with its own color, at the tool's fill opacity (Tool fill / fill alpha, in its
  * tool settings). The author wants another color too: the pen keeps one in our settings ("xournalQt" /
  * "penFillColor", "#rrggbb"; empty: the stroke's color), and a stroke begun with it gets it
- * (Stroke::getFillColor, saved as xqt-fill-color; docs/adr/0002-upstream-seams.md). The highlighter fills with its
- * own color only: upstream draws a filled highlighter through a mask in the stroke's color.
+ * (Stroke::getFillColor, saved as xqt-fill-color; qt/docs/decisions/0002-upstream-seams.md). The highlighter fills with
+ * its own color only: upstream draws a filled highlighter through a mask in the stroke's color.
  *
  * @license GNU GPLv2 or later
  */

@@ -1,7 +1,7 @@
 /*
- * xournal-qt: tags in the library home's real window (qt/docs/tags.md): the Tags tab with its tags and counts (nested
- * ones folded), a tap that shows the documents with the tag (with the "Show" filter and the folder), the chip that takes
- * the filter away, tags on the cards ("+N" when there are more).
+ * xournal-qt: tags in the library home's real window (qt/docs/features/tags.md): the Tags tab with its tags and counts
+ * (nested ones folded), a tap that shows the documents with the tag (with the "Show" filter and the folder), the chip
+ * that takes the filter away, tags on the cards ("+N" when there are more).
  *
  * @license GNU GPLv2 or later
  */

@@ -1,6 +1,6 @@
-# Handwriting search (qt/docs/handwriting-search.md): what the recognised words are and how the search matches them
-# live in xqt-session (InkText.h); the layout of ink into lines and words, the recognisers and the background service
-# are added here as they come.
+# Handwriting search (qt/docs/features/handwriting-search.md): what the recognised words are and how the search matches
+# them live in xqt-session (InkText.h); the layout of ink into lines and words, the recognisers and the background
+# service are added here as they come.
 
 add_library(xqt-hwr STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/InkLayout.h

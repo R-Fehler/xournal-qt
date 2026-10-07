@@ -1,6 +1,7 @@
 /*
- * xournal-qt: stickers in a view (qt/docs/stickers.md): the selection as a sticker's content, the sticker written off
- * the UI thread (with the picture of the page's background behind it), and a sticker pasted on the current page.
+ * xournal-qt: stickers in a view (qt/docs/features/stickers.md): the selection as a sticker's content, the sticker
+ * written off the UI thread (with the picture of the page's background behind it), and a sticker pasted on the current
+ * page.
  *
  * @license GNU GPLv2 or later
  */

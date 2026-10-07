@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the quick tests at any scale factor (QT_SCALE_FACTOR=1.25, 1.5, 2; qt/docs/hidpi.md).
+ * xournal-qt: the quick tests at any scale factor (QT_SCALE_FACTOR=1.25, 1.5, 2; qt/docs/features/hidpi.md).
  *
  * The tests think in the window's logical pixels. Two things Qt hands them are in device pixels:
  * - QWindowSystemInterface takes the positions of the events it is given as the platform's (native, device pixels),

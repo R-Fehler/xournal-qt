@@ -1,7 +1,7 @@
 /*
- * xournal-qt: finding the paper of a reference in the library by its title (qt/docs/citations.md). The papers of the
- * test library are named by numbers, as arXiv names them: their titles are in the PDF's /Title, or only on the first
- * page (in the largest font, next to the arXiv stamp in the margin).
+ * xournal-qt: finding the paper of a reference in the library by its title (qt/docs/features/citations.md). The papers
+ * of the test library are named by numbers, as arXiv names them: their titles are in the PDF's /Title, or only on the
+ * first page (in the largest font, next to the arXiv stamp in the margin).
  *
  * @license GNU GPLv2 or later
  */

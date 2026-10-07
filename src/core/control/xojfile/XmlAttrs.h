@@ -26,8 +26,8 @@ constexpr auto FILEVERSION_STR = u8"fileversion";
 constexpr auto WIDTH_STR = u8"width";  // also in stroke
 constexpr auto HEIGHT_STR = u8"height";
 constexpr auto NOTESPACE_STR = u8"notespace";  // xournal-qt: "left top right bottom" (model/NoteSpace.h)
-constexpr auto BOOKMARK_STR = u8"xqt-bookmark";  // xournal-qt: the page's bookmark label (qt/docs/bookmarks.md)
-constexpr auto PAGE_AUDIO_STR = u8"xqt-audio";  // xournal-qt: the page's voice memos (qt/docs/audio.md)
+constexpr auto BOOKMARK_STR = u8"xqt-bookmark";  // xournal-qt: page bookmark (qt/docs/features/bookmarks.md)
+constexpr auto PAGE_AUDIO_STR = u8"xqt-audio";  // xournal-qt: the page's voice memos (qt/docs/features/audio.md)
 
 // background
 constexpr auto NAME_STR = u8"name";  // also in layer

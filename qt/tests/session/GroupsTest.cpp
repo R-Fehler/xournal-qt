@@ -1,5 +1,5 @@
 /*
- * xournal-qt: groups of elements (qt/docs/groups.md): the element attribute xqt-group (written only on grouped
+ * xournal-qt: groups of elements (qt/docs/features/groups.md): the element attribute xqt-group (written only on grouped
  * elements, read back, ignored by upstream's loader without a message), groups kept by copies of elements and by the
  * pieces the eraser leaves.
  *

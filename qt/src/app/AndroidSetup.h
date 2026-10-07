@@ -1,5 +1,5 @@
 /*
- * xournal-qt: what the app needs on Android before the core starts (see qt/docs/android.md).
+ * xournal-qt: what the app needs on Android before the core starts (see qt/docs/development/android.md).
  *
  * @license GNU GPLv2 or later
  */

@@ -37,11 +37,12 @@ build-qt/xqt-ui-tests --gtest_filter='ToolboxTest.*'          # one binary direc
 
 1. **While working**: only the labels, or `-R` filters, of what changed. Build only those test binaries. Don't
    rebuild or retest after edits to docs or QML text alone.
-2. **Before a block is merged**: the full suite once (`ctest --test-dir build-qt -j3`), and the UI tests of popups,
-   keys and window states also on Qt 6.8 (below).
+2. **Before a block is merged**: the full suite once, on GitHub (push `qt/<block>`: `xqt-block-tests.yml` runs it in
+   four shards, [ci.md](../development/ci.md)) or locally on a big machine (`ctest --test-dir build-qt -j$(nproc)`),
+   and the UI tests of popups, keys and window states also on Qt 6.8 (below).
 3. **The CI** (`.github/workflows/xqt-build.yml`) builds and runs everything on Debian 13 (Qt 6.8) and KDE neon
    (Qt 6.7) on every push of `master-qt` and `claude/**`. A test that fails only there: reproduce it in the same
-   container with `qt/scripts/ci-container.sh` ([releasing.md](../releasing.md)).
+   container with `qt/scripts/ci-container.sh` ([ci.md](../development/ci.md)).
 4. **The author** runs the long suites and tests by hand on the devices ([device checklist](device-checklist.md)).
 
 The routine run should stay **under a minute**: long tests go behind a label or an environment variable. The UI label
@@ -117,7 +118,7 @@ cmake --build /home/user/build-qt68 -j3 --target xqt-ui-tests && ctest --test-di
 | `XQT_SHOTS=<dir>` | regenerates the README's pictures from the UI tests (also `XQT_TOOLBAR_SHOTS`, `XQT_STICKY_SHOTS`, `XQT_MATH_SHOTS`) |
 | `XOJ_UPSTREAM_BIN` | upstream's `xournalpp` for the golden tests and `StickyNoteTest` |
 | `XQT_HWR_MODEL`, `XQT_HWR_CTC_MODEL` | run the handwriting tests with a real model folder |
-| `XQT_PERF=1` | the running app writes a line a second about the canvas work ([performance-logging.md](performance-logging.md)) |
+| `XQT_PERF=1` | the running app writes a line a second about the canvas work ([performance-logging.md](../development/performance-logging.md)) |
 | `XQT_KEEP`, `XQT_KEEP_PDF=<file>` | keep the PDFs some Markdown tests write, to look at them |
 
 `qt/tools/tsan.supp` holds the suppressions for a ThreadSanitizer build (no CI job uses it yet).

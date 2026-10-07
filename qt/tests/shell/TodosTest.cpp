@@ -1,7 +1,7 @@
 /*
- * xournal-qt: to-dos (qt/docs/todos.md): the task lines of Markdown (boxes, sticky notes' texts, Markdown files, PDF
- * text documents) read into the library index's "notes" pack with their page, box, line, due date and whether they
- * are done; which of them are to-dos (the marker, or every check box; stamps always).
+ * xournal-qt: to-dos (qt/docs/features/todos.md): the task lines of Markdown (boxes, sticky notes' texts, Markdown
+ * files, PDF text documents) read into the library index's "notes" pack with their page, box, line, due date and
+ * whether they are done; which of them are to-dos (the marker, or every check box; stamps always).
  *
  * @license GNU GPLv2 or later
  */

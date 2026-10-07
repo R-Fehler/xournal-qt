@@ -3,7 +3,7 @@
 // deletes it. On selected PDF text only copying and marking make sense, so the rest is not offered. One per canvas:
 // the notes (target app.edit), the reference beside them (target app.reference.edit); on a canvas for reading only: copy,
 // select all, go to a page, fit width - nothing that changes it. Selected text (PDF text or the text being written)
-// can be looked up (qt/docs/citations.md).
+// can be looked up (qt/docs/features/citations.md).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -29,7 +29,8 @@ Popup {
     /// Where it was asked for, in canvas coordinates
     property point at: Qt.point(0, 0)
     property bool onPdfText: false
-    /// Selected text (PDF text, or of the text being written) to look up (qt/docs/citations.md); read when it opens
+    /// Selected text (PDF text, or of the text being written) to look up (qt/docs/features/citations.md); read when it
+    /// opens
     property string lookUpText: ""
     /// What the clipboard holds cannot be watched, so it is looked at when the pill opens
     property bool pasteAvailable: false

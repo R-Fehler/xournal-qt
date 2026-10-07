@@ -1,5 +1,5 @@
 @echo off
-rem Xournal Qt with a log of what the pen, the fingers and the mouse send (qt/docs/windows.md, "Pen input").
+rem Xournal Qt with a log of what the pen, the fingers and the mouse send (qt/docs/development/windows.md, "Pen input").
 rem Double-click it, draw a few strokes with the pen (light and hard), touch the page, then close Xournal Qt.
 rem The log is input-log.txt next to this file; it opens when the program has closed.
 setlocal

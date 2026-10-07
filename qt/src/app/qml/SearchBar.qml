@@ -4,10 +4,10 @@
 // the fuzzy search's syntax (FuzzyToggle): it shows the mode of the document's search (on for one handed over from
 // the library or the tab overview with Fuzzy on), and a tap sets the app-wide setting and searches the text again.
 //
-// Find and replace (Ctrl+H, the bar's replace button, ⋮; qt/docs/md-editor.md "Find and replace"): a second row, only
-// where text can be written (app.canReplace: a .md or .txt edited, Markdown text on pages), with the options (case,
-// whole words, regular expression: the search takes them while the row is shown), Replace (the current hit, then the
-// next; Enter in its field) and Replace all (one undo step, Ctrl+Enter; a snackbar says how many). While the source
+// Find and replace (Ctrl+H, the bar's replace button, ⋮; qt/docs/features/md-editor.md "Find and replace"): a second
+// row, only where text can be written (app.canReplace: a .md or .txt edited, Markdown text on pages), with the options
+// (case, whole words, regular expression: the search takes them while the row is shown), Replace (the current hit, then
+// the next; Enter in its field) and Replace all (one undo step, Ctrl+Enter; a snackbar says how many). While the source
 // is written beside the page (`sourcePanel`), they work on that source.
 import QtQuick
 import QtQuick.Controls

@@ -1,7 +1,7 @@
 /*
- * xournal-qt: the Annotations panel of the page sidebar in the real window (qt/docs/annotations-md.md): it lists the
- * document's notes by page, a tap goes to the page, it follows an edit (reading only the page that changed), the
- * filter chooses the kinds, and "Export as Markdown" writes the file next to the document.
+ * xournal-qt: the Annotations panel of the page sidebar in the real window (qt/docs/features/annotations-md.md): it
+ * lists the document's notes by page, a tap goes to the page, it follows an edit (reading only the page that changed),
+ * the filter chooses the kinds, and "Export as Markdown" writes the file next to the document.
  *
  * @license GNU GPLv2 or later
  */

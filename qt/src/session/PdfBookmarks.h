@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the bookmarks of a PDF with notes in its own outline (qt/docs/bookmarks.md).
+ * xournal-qt: the bookmarks of a PDF with notes in its own outline (qt/docs/features/bookmarks.md).
  *
  * They are the children of a top-level outline item "Bookmarks", the last one, so every PDF viewer lists them next
  * to the document's own table of contents, which stays as it is. Each child goes to its page ([page /XYZ null null

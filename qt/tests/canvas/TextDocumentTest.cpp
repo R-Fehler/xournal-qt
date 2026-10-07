@@ -298,8 +298,8 @@ static int redPixels(cairo_surface_t* s) {
     return n;
 }
 
-// qt/docs/md-images.md: a .md's pictures in "name.assets/" next to it are drawn on its pages, laid out with them
-// (the file's root is there while the pages are made, and while the session lives).
+// qt/docs/features/md-images.md: a .md's pictures in "name.assets/" next to it are drawn on its pages, laid out with
+// them (the file's root is there while the pages are made, and while the session lives).
 TEST_F(TextDocumentTest, aPictureNextToTheFileIsDrawnOnItsPage) {
     const fs::path dir(tmp.path().toStdString());
     writePng(dir / "notes.assets" / "red.png", 400, 200);  // 300 × 150 pt
@@ -338,8 +338,8 @@ TEST_F(TextDocumentTest, aPictureNextToTheFileIsDrawnOnItsPage) {
     EXPECT_TRUE(md::images::resolve("notes.assets/red.png").empty());
 }
 
-// A web picture is never fetched unasked (qt/docs/md-images.md): it shows its alt text and "Load image", and a tap on
-// that asks the window (imageLoadRequested), also while the text is written.
+// A web picture is never fetched unasked (qt/docs/features/md-images.md): it shows its alt text and "Load image", and a
+// tap on that asks the window (imageLoadRequested), also while the text is written.
 TEST_F(TextDocumentTest, aWebPicturesLoadButtonAsksTheWindow) {
     const std::string url = "https://example.org/logo.png";
     const fs::path p = file("web.md", "# Web\n\nSee ![Logo](" + url + ") here.\n\nMore text.\n");
@@ -454,7 +454,7 @@ TEST_F(TextDocumentTest, aContinuousPageGrowsWithTheTextAndSwitchesToPagesAndBac
     EXPECT_EQ(session->currentText(), expected);
 }
 
-// --- bookmarks in a .md (qt/docs/bookmarks.md, "Markdown") ------------------------------------------------------
+// --- bookmarks in a .md (qt/docs/features/bookmarks.md, "Markdown") --------------------------------------------------
 
 namespace {
 std::vector<std::pair<size_t, std::string>> bookmarksOf(DocumentSession& s) {
@@ -640,7 +640,7 @@ TEST_F(TextDocumentTest, aBookmarkLineIsSavedByteForByte) {
 }
 
 // XQT_BENCH_TEXT=1: typing into a long .md on pages and on one continuous page (which lays out all of the text on
-// every key: see qt/docs/md-editor.md)
+// every key: see qt/docs/features/md-editor.md)
 TEST_F(TextDocumentTest, benchTyping) {
     if (!qEnvironmentVariableIsSet("XQT_BENCH_TEXT")) {
         GTEST_SKIP() << "XQT_BENCH_TEXT not set";

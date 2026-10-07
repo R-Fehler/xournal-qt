@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the recordings of a document (qt/docs/audio.md, "In the document").
+ * xournal-qt: the recordings of a document (qt/docs/features/audio.md, "In the document").
  *
  * As in Xournal++, a stroke or a text can be tied to a moment of a recording: AudioContent's audio filename (`fn`, the
  * recording's bare name, found in the audio folder) and timestamp (`ts`, milliseconds from its start). xournal-qt

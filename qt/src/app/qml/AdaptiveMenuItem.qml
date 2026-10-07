@@ -1,4 +1,4 @@
-// An entry of an AdaptiveMenu (qt/docs/adaptive-layout.md, "Menus").
+// An entry of an AdaptiveMenu (qt/docs/features/adaptive-layout.md, "Menus").
 // `offered` says whether the entry is there at all. (Not `visible`: every entry of a closed menu reads as invisible,
 // and the sheet of the phone classes asks while the menu itself stays closed.) It is as tall as a finger needs in the
 // touch profile (48), else 40.

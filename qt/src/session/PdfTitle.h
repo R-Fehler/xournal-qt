@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the title of a PDF, for finding the paper of a reference in the library (qt/docs/citations.md).
+ * xournal-qt: the title of a PDF, for finding the paper of a reference in the library (qt/docs/features/citations.md).
  *
  * Papers are often named by numbers (arXiv: 1706.03762.pdf), so the library matches their titles, from two places:
  *  - the PDF's /Title (its document information), when it looks like a title: not empty, not a file name

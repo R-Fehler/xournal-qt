@@ -88,9 +88,9 @@ struct Block {
     size_t textEnd = NO_SOURCE;
 };
 
-/// A plain text (a .txt edited as a document, qt/docs/md-editor.md): a source that starts with this line (a Markdown
-/// comment) is no Markdown. It is laid out line by line as it is: every line of it is a paragraph of one run, the
-/// text of that line, with no formatting. A page's slice that continues a plain text starts with
+/// A plain text (a .txt edited as a document, qt/docs/features/md-editor.md): a source that starts with this line (a
+/// Markdown comment) is no Markdown. It is laid out line by line as it is: every line of it is a paragraph of one run,
+/// the text of that line, with no formatting. A page's slice that continues a plain text starts with
 /// "<!-- xqt:cont plain -->" (MdPaginate.h).
 constexpr std::string_view PLAIN_MARKER = "<!-- xqt:plain -->";
 constexpr std::string_view PLAIN_CONTINUATION = "<!-- xqt:cont plain -->";

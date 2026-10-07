@@ -45,7 +45,8 @@ Item {
         }
         onAccepted: app.keepHybridData()
     }
-    // Annotations of another app in the PDF: make them editable? (qt/docs/adopt-annotations.md; asked once per file)
+    // Annotations of another app in the PDF: make them editable? (qt/docs/features/adopt-annotations.md; asked once per
+    // file)
     AdaptiveDialog {
         id: adoptDialog
         objectName: "adoptDialog"
@@ -138,7 +139,7 @@ Item {
         }
         onAccepted: app.editAnyway(true)
     }
-    // "Linked from": the documents of the library that link to this one (qt/docs/links.md)
+    // "Linked from": the documents of the library that link to this one (qt/docs/features/links.md)
     AdaptiveDialog {
         id: backlinksDialog
         objectName: "backlinksDialog"
@@ -284,7 +285,7 @@ Item {
                               false, qsTr("Settings"), function() { settingsPage.open(); settingsPage.showSearch() })
             }
         }
-        // A snip pasted from a document with a file (qt/docs/snip.md): a link to its page, if wanted
+        // A snip pasted from a document with a file (qt/docs/features/snip.md): a link to its page, if wanted
         function onSnipLinkOffered(title) {
             snackbar.show(qsTr("Add a link to the source page (%1)?").arg(title), false, qsTr("Add link"),
                           function() { app.addSnipLink() })

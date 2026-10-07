@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the window's side of links between documents (qt/docs/links.md): following a link to a document (a new
- * tab, the reference, or in place of the current one), and going back and forth across documents.
+ * xournal-qt: the window's side of links between documents (qt/docs/features/links.md): following a link to a document
+ * (a new tab, the reference, or in place of the current one), and going back and forth across documents.
  *
  * @license GNU GPLv2 or later
  */

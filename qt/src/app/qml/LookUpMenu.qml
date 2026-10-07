@@ -1,6 +1,6 @@
-// "Look up" on selected text (qt/docs/citations.md): the pill of selected PDF text and the context pill open it.
-// First the searches here (the document, the open tabs, the library: the text, at most its first 200 characters), then
-// a bibliography entry's paper in the library (FindPaperSheet) and arXiv, then the web (the search engine of
+// "Look up" on selected text (qt/docs/features/citations.md): the pill of selected PDF text and the context pill open
+// it. First the searches here (the document, the open tabs, the library: the text, at most its first 200 characters),
+// then a bibliography entry's paper in the library (FindPaperSheet) and arXiv, then the web (the search engine of
 // Settings, Google Scholar, a translator). Each
 // entry that leads to the web shows its address under its name, so the address is seen before it is chosen; the
 // window then asks with the whole address (WebConfirm) unless that was turned off. An AdaptiveMenu: a sheet on phones,

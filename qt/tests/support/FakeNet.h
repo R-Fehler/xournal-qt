@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the network for tests (qt/docs/citations.md): answers what the test says, records what was asked
+ * xournal-qt: the network for tests (qt/docs/features/citations.md): answers what the test says, records what was asked
  * and when. Installed with NetFetch::setInstance, so no test touches the network.
  *
  * @license GNU GPLv2 or later

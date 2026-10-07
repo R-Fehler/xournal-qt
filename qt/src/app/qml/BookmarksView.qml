@@ -1,7 +1,7 @@
-// The library's Bookmarks view (home screen, qt/docs/bookmarks.md): the bookmarked pages of all documents of the
-// library, grouped by document (its name, its folder), each a picture of the page with its label. A tap (or a click)
-// opens the document at that page; press and hold or a right click: a menu. It follows the library's search text,
-// its "Show" filter and its Favourites chip. The list comes from the library's index (no document is opened); the
+// The library's Bookmarks view (home screen, qt/docs/features/bookmarks.md): the bookmarked pages of all documents of
+// the library, grouped by document (its name, its folder), each a picture of the page with its label. A tap (or a
+// click) opens the document at that page; press and hold or a right click: a menu. It follows the library's search
+// text, its "Show" filter and its Favourites chip. The list comes from the library's index (no document is opened); the
 // pictures are drawn like the pages of the extended search.
 import QtQuick
 import QtQuick.Controls
@@ -103,7 +103,7 @@ FocusScope {
                                 acceptedButtons: Qt.RightButton
                                 onTapped: function(point) { pageMenu.openMenu(point.position) }
                             }
-                            // (a sheet on a phone: qt/docs/adaptive-layout.md, "Menus")
+                            // (a sheet on a phone: qt/docs/features/adaptive-layout.md, "Menus")
                             AdaptiveMenu {
                                 id: pageMenu
                                 objectName: "bookmarkMenu"

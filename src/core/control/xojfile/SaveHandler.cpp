@@ -309,10 +309,10 @@ void SaveHandler::visitPage(XmlNode* root, ConstPageRef p, const Document* doc, 
     if (const NoteSpace& s = p->getNoteSpace(); !s.empty()) {  // xournal-qt: model/NoteSpace.h
         page->setAttrib(xoj::xml_attrs::NOTESPACE_STR, std::vector<double>{s.left, s.top, s.right, s.bottom});
     }
-    if (const auto& bookmark = p->getBookmark()) {  // xournal-qt: qt/docs/bookmarks.md
+    if (const auto& bookmark = p->getBookmark()) {  // xournal-qt: qt/docs/features/bookmarks.md
         page->setAttrib(xoj::xml_attrs::BOOKMARK_STR, *bookmark);
     }
-    if (const auto& memos = p->getAudioMemos(); !memos.empty()) {  // xournal-qt: qt/docs/audio.md
+    if (const auto& memos = p->getAudioMemos(); !memos.empty()) {  // xournal-qt: qt/docs/features/audio.md
         page->setAttrib(xoj::xml_attrs::PAGE_AUDIO_STR, memos);
     }
 

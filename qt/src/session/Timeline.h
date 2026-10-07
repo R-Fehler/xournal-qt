@@ -1,7 +1,7 @@
 /*
- * xournal-qt: the timeline of a document (qt/docs/timeline.md, "The timeline"): its elements in the order they were
- * made, and its recordings, on one clock. The replay (CanvasView::setReplay, app.timeline) shows the document as of a
- * moment of it.
+ * xournal-qt: the timeline of a document (qt/docs/features/timeline.md, "The timeline"): its elements in the order they
+ * were made, and its recordings, on one clock. The replay (CanvasView::setReplay, app.timeline) shows the document as
+ * of a moment of it.
  *
  * - **One clock**: absolute times (ms since 1970 UTC). An element is at the time it was made (xqt-created,
  *   ElementTimes.h). An element tied to a recording (upstream's fn/ts) is at the recording's start plus its ts, so it

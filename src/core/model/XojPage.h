@@ -66,15 +66,15 @@ public:
     void setNoteSpace(const NoteSpace& space);
 
     /**
-     * xournal-qt: the page is bookmarked (qt/docs/bookmarks.md): its label ("": the app names it). Saved as the page
-     * attribute xqt-bookmark="label"; nullopt: not bookmarked.
+     * xournal-qt: the page is bookmarked (qt/docs/features/bookmarks.md): its label ("": the app names it). Saved as
+     * the page attribute xqt-bookmark="label"; nullopt: not bookmarked.
      */
     const std::optional<std::string>& getBookmark() const;
     void setBookmark(std::optional<std::string> label);
 
     /**
-     * xournal-qt: the recordings tied to the page as a whole, its voice memos (qt/docs/audio.md): their file names as in
-     * an element's audio filename, separated by "|". Saved as the page attribute xqt-audio="…"; "": none.
+     * xournal-qt: the recordings tied to the page as a whole, its voice memos (qt/docs/features/audio.md): their file
+     * names as in an element's audio filename, separated by "|". Saved as the page attribute xqt-audio="…"; "": none.
      */
     const std::string& getAudioMemos() const;
     void setAudioMemos(std::string memos);

@@ -1,6 +1,6 @@
 /*
  * xournal-qt: the one owner of the memory of the image caches. What each cache may keep is set here, in one table
- * (the words are those of qt/docs/image-caches.md):
+ * (the words are those of qt/docs/architecture/image-caches.md):
  *
  * | Pictures                          | Kept by                  | Limit                                                |
  * | --------------------------------- | ------------------------ | ---------------------------------------------------- |

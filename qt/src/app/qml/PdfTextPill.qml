@@ -80,7 +80,7 @@ Pane {
         IconButton { objectName: pill.named("pdfUnderlineButton"); visible: !pill.readingOnly; iconName: "xqt-underline"; tip: qsTr("Underline"); onClicked: pill.target.markPdfText("underline") }
         IconButton { objectName: pill.named("pdfStrikeButton"); visible: !pill.readingOnly; iconName: "xqt-strikethrough"; tip: qsTr("Strike through"); onClicked: pill.target.markPdfText("strikethrough") }
         IconButton { objectName: pill.named("pdfCopyTextButton"); iconName: "xopp-edit-copy"; tip: qsTr("Copy text"); onClicked: pill.target.copyPdfText() }
-        // Look up: the paper of a reference, Google Scholar, a translator (qt/docs/citations.md)
+        // Look up: the paper of a reference, Google Scholar, a translator (qt/docs/features/citations.md)
         IconButton {
             objectName: pill.named("pdfLookUpButton")
             iconName: "xqt-search"

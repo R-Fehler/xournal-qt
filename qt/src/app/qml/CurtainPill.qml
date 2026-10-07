@@ -1,6 +1,6 @@
-// While the curtain or the spotlight is out (qt/docs/curtain.md; B / Shift+B, the setsquare button's list, ⋮ → View): a
-// small pill at the top right of the canvas, below the setsquare's. Its icon shows or hides the handles (a tap on the
-// black does that too, Esc hides them); the next one puts out the other of the two instead; its × takes it away.
+// While the curtain or the spotlight is out (qt/docs/features/curtain.md; B / Shift+B, the setsquare button's list, ⋮ →
+// View): a small pill at the top right of the canvas, below the setsquare's. Its icon shows or hides the handles (a tap
+// on the black does that too, Esc hides them); the next one puts out the other of the two instead; its × takes it away.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

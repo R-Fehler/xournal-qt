@@ -452,7 +452,7 @@ bool MixedSelection::dropOnOtherPage() {
                 e->move(dx - already.x(), dy - already.y());
                 movedItems.push_back({into, e});
             }
-            // xournal-qt: not joined to a group of that page with their number (qt/docs/groups.md)
+            // xournal-qt: not joined to a group of that page with their number (qt/docs/features/groups.md)
             groups::separate(moved, *into, *doc);
         }
         steps->add(std::make_unique<MoveUndoAction>(layer, fromRef, std::move(moved), dx, dy, into, toRef));
@@ -617,7 +617,7 @@ bool MixedSelection::pasteGroup(size_t pNr, sticky::Group content, std::optional
         return false;
     }
     {
-        // Pasted elements and stickers are new (qt/docs/timeline.md)
+        // Pasted elements and stickers are new (qt/docs/features/timeline.md)
         std::vector<Element*> pasted;
         for (auto& e: group->elements) {
             pasted.push_back(e.get());
@@ -690,7 +690,7 @@ bool MixedSelection::pasteGroup(size_t pNr, sticky::Group content, std::optional
     if (!group->elements.empty()) {
         auto undo = std::make_unique<AddUndoAction>(onPage, false);
         std::unique_lock lock(*doc);
-        // xournal-qt: copied groups get new numbers: they never join one of the page's (qt/docs/groups.md)
+        // xournal-qt: copied groups get new numbers: they never join one of the page's (qt/docs/features/groups.md)
         std::vector<Element*> pasted;
         for (const auto& e: group->elements) {
             pasted.push_back(e.get());

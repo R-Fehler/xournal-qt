@@ -1,6 +1,7 @@
-// xournal-qt: the window's view modes (Main.qml's state, `win.modes`; qt/docs/zen.md, qt/docs/adaptive-layout.md):
-// the chrome (full or compact), full screen and the window's state, presenting, Zen, read only and Read, the replay.
-// The window's root keeps what the tests read and write as aliases and forwarders (fullScreenMode, zen, setZen, …).
+// xournal-qt: the window's view modes (Main.qml's state, `win.modes`; qt/docs/features/zen.md,
+// qt/docs/features/adaptive-layout.md): the chrome (full or compact), full screen and the window's state, presenting,
+// Zen, read only and Read, the replay. The window's root keeps what the tests read and write as aliases and forwarders
+// (fullScreenMode, zen, setZen, …).
 import QtQuick
 import QtQuick.Window
 
@@ -18,7 +19,7 @@ Item {
     /// Nothing over the page but the page: Zen (presenting without controls too), or the replay
     readonly property bool hudHidden: zenShown || (replaying && !app.homeVisible)
 
-    // --- Zen and read only (qt/docs/zen.md) ---------------------------------------------------------------------------
+    // --- Zen and read only (qt/docs/features/zen.md) ---------------------------------------------------------------------------
     /// Zen turned on by hand (⋮ → View → Zen, its keys, the command bar's button, Read)
     property bool zenByHand: false
     /// Zen of itself: a tiny window (under 360 px either way: split screen, a pop-up window), unless it was left there
@@ -75,9 +76,9 @@ Item {
         readStarted = readEnteredFullScreen = readEnteredZen = false
     }
     function toggleReading() { readStarted && readOnlyOn ? stopReading() : startReading() }
-    /// The document's timeline is replayed (qt/docs/timeline.md): the page as of a moment and the play bar at the
-    /// bottom, read-only; no tools (as reading), the play bar's keys. The command bar and the phone's dock are put away
-    /// meanwhile.
+    /// The document's timeline is replayed (qt/docs/features/timeline.md): the page as of a moment and the play bar at
+    /// the bottom, read-only; no tools (as reading), the play bar's keys. The command bar and the phone's dock are put
+    /// away meanwhile.
     readonly property bool replaying: app.timeline.active
 
     // --- full screen and the window's state ----------------------------------------------------------------------------
@@ -140,7 +141,7 @@ Item {
         }
     }
 
-    // --- presenting (qt/docs/presenter-view.md) ------------------------------------------------------------------------
+    // --- presenting (qt/docs/features/presenter-view.md) ------------------------------------------------------------------------
     /// Present from the current page: full screen, a page fills it. `clean`: without controls (below). With two
     /// screens this window becomes the presenter's console on one of them (off the audience's screen first) and the
     /// audience's window shows the slide on the other.

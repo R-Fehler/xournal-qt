@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the canvas turned (qt/docs/canvas-rotation.md): the upright view the layout is seen through, the mapping
- * between it and the screen, turning about an anchor, the steps of 90°, snapping and the turn of two fingers.
+ * xournal-qt: the canvas turned (qt/docs/features/canvas-rotation.md): the upright view the layout is seen through, the
+ * mapping between it and the screen, turning about an anchor, the steps of 90°, snapping and the turn of two fingers.
  *
  * @license GNU GPLv2 or later
  */

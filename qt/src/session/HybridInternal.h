@@ -2,7 +2,7 @@
  * xournal-qt: the parts of the PDF with notes (HybridPdf.h) that its files share. Not an API: only the HybridPdf files
  * include it.
  *
- * Where what is (qt/docs/hybrid-pdf.md says how it works):
+ * Where what is (qt/docs/features/hybrid-pdf.md says how it works):
  * - HybridCommon.cpp: small helpers of all of them (writing a QPDF, our annotations and marks, the text layer of the
  *   handwriting on a page, space for notes), and strip(), which takes everything of ours out of a PDF;
  * - HybridPrepare.cpp: prepare(), everything that needs the document (the .xopp, the drawings by cairo);
@@ -54,9 +54,9 @@ namespace xqt::HybridPdf::detail {
 inline constexpr const char* MARKER = "/XournalQt";  ///< in the catalog, and the private key of our annotations
 inline constexpr const char* CLEAN_NAME = "base.pdf";
 inline constexpr const char* CHECK_NAME = "changed.txt";
-/// The recordings it carries (qt/docs/audio.md)
+/// The recordings it carries (qt/docs/features/audio.md)
 inline constexpr const char* AUDIO_NAME = "audio";
-/// The pictures a text document carries (qt/docs/md-images.md)
+/// The pictures a text document carries (qt/docs/features/md-images.md)
 inline constexpr const char* PICTURES_NAME = "pictures";
 /// The file's page objects the clean copy's pages are
 inline constexpr const char* PAGES_NAME = "pages.txt";
@@ -64,7 +64,8 @@ inline constexpr const char* PAGES_NAME = "pages.txt";
 /// (removeProtectedLeftovers)
 inline constexpr const char* UNPACKED_PREFIX = "unpacked-";
 inline constexpr double MARGIN = 2.0;  ///< around a layer's elements (pt)
-/// A base page with space for notes (qt/docs/note-space.md): its boxes as the PDF had them (/MediaBox, /CropBox)
+/// A base page with space for notes (qt/docs/features/note-space.md): its boxes as the PDF had them (/MediaBox,
+/// /CropBox)
 inline constexpr const char* BOXES = "/XournalQtBoxes";
 
 // --- small helpers (HybridCommon.cpp) -------------------------------------------------------------------------------
@@ -137,8 +138,8 @@ struct PageSpec {
     size_t drawnPage = npos;  ///< base page drawn by cairo (page of `drawn`; npos: the file has it, see Reuse)
     size_t annotsFrom = npos; ///< a drawn page: the annotations of other apps on this page of the background PDF
     std::string sig;          ///< a drawn page: what it shows (its background as saved, its size)
-    NoteSpace space;          ///< a page of the background PDF: its space for notes (qt/docs/note-space.md)
-    std::string bookmark;     ///< the title of its bookmark in the outline (qt/docs/bookmarks.md); "": none
+    NoteSpace space;          ///< a page of the background PDF: its space for notes (qt/docs/features/note-space.md)
+    std::string bookmark;     ///< the title of its bookmark in the outline (qt/docs/features/bookmarks.md); "": none
 };
 
 struct AnnotSpec {
@@ -152,7 +153,8 @@ struct AnnotSpec {
     std::string text;
 };
 
-/// A link of a Markdown box as a PDF /Link (qt/docs/links.md): a web address (/URI), or another PDF at a page (/GoToR).
+/// A link of a Markdown box as a PDF /Link (qt/docs/features/links.md): a web address (/URI), or another PDF at a page
+/// (/GoToR).
 struct LinkSpec {
     size_t page = 0;
     double x0 = 0, y0 = 0, x1 = 0, y1 = 0;  ///< where it is drawn (page coordinates, y down)
@@ -245,7 +247,7 @@ enum class Mode {
 /// again).
 QPDFObjectHandle spacesList(const Prepared& prep);
 
-/// The document's bookmarks for the outline (qt/docs/bookmarks.md): the base page of each bookmarked page.
+/// The document's bookmarks for the outline (qt/docs/features/bookmarks.md): the base page of each bookmarked page.
 std::vector<PdfBookmarks::Entry> bookmarksOf(const Prepared& prep, const std::vector<QPDFObjectHandle>& order);
 
 /// Version history (PdfHistory.h): what our marker says about it after this save.
@@ -343,7 +345,7 @@ Embedded embedFiles(ObjectSink& sink, QPDF& q, const Prepared& prep, bool archiv
 QPDFObjectHandle writeInkText(ObjectSink& sink, const Prepared& prep, const std::vector<QPDFObjectHandle>& order,
                               QPDFObjectHandle& font, const std::function<bool(size_t, const std::string&)>& keep);
 
-/// What the marker says (qt/docs/hybrid-pdf.md, "The marker").
+/// What the marker says (qt/docs/features/hybrid-pdf.md, "The marker").
 struct MarkerContent {
     bool archive = false;
     Embedded files;                                             ///< /Data, /Files, /Audio

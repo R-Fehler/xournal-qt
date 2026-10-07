@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the presenter view on a second screen (see PresenterConsole.h, qt/docs/presenter-view.md).
+ * xournal-qt: the presenter view on a second screen (see PresenterConsole.h, qt/docs/features/presenter-view.md).
  *
  * @license GNU GPLv2 or later
  */
@@ -36,7 +36,7 @@ bool setting(Settings& s, const char* key, bool fallback) {
     return on;
 }
 
-/// The slide of a page: the page without its space for notes (qt/docs/note-space.md), in page points
+/// The slide of a page: the page without its space for notes (qt/docs/features/note-space.md), in page points
 QRectF slideOf(const XojPage& page) {
     const NoteSpace& n = page.getNoteSpace();
     const QRectF whole(0, 0, page.getWidth(), page.getHeight());

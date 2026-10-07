@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the hybrid PDF (qt/docs/hybrid-pdf.md).
+ * xournal-qt: the hybrid PDF (qt/docs/features/hybrid-pdf.md).
  *
  * One PDF that any PDF app shows as the author sees it, and that also carries the whole Xournal document:
  * - base pages: the pages of the document's background PDF (copied with qpdf, its outline and links kept), or the
@@ -56,7 +56,7 @@ constexpr const char* DATA_NAME = "document.xopp";
 constexpr const char* NAME_PREFIX = "xopp:";
 
 /// A hybrid PDF as this app last wrote it (or as it was when it was opened): what an incremental save builds on
-/// (qt/docs/hybrid-pdf.md, "Saving: incremental updates").
+/// (qt/docs/features/hybrid-pdf.md, "Saving: incremental updates").
 struct Revision {
     std::string stamp;  ///< the file's size and time then (another version of the file is written in full)
     /// The page objects of the file (object number, generation) by the page numbers of the document's background PDF
@@ -65,7 +65,7 @@ struct Revision {
     bool valid() const { return !stamp.empty(); }
 };
 
-/// Version history (qt/docs/hybrid-pdf.md, "Version history"; PdfHistory.h).
+/// Version history (qt/docs/features/hybrid-pdf.md, "Version history"; PdfHistory.h).
 struct History {
     /// Keep the versions of the file: one per day plus milestones; never compacted (a fallback appends the whole
     /// document instead of writing the file anew). Off: the file's list of versions goes with this save.
@@ -92,7 +92,7 @@ struct WriteOptions {
     const History* history = nullptr;
     /// How the file is encrypted when it is written in full (default: as its background PDF is). An incremental
     /// save keeps the file's encryption; another one (protecting it, changing or removing its password) needs
-    /// `compact`. qt/docs/hybrid-pdf.md, "Encrypted PDFs"
+    /// `compact`. qt/docs/features/hybrid-pdf.md, "Encrypted PDFs"
     PdfEncryption::Encryption encryption;
 };
 
@@ -189,9 +189,9 @@ void forgetHistory(QPDF& q);
 /// Write the file anew in one piece, without its earlier revisions and its version history (the same content; qpdf),
 /// atomically. For a file shared as it is. `to`: a copy written there instead (the file keeps its history).
 bool compact(const fs::path& pdf, std::string& error, const fs::path& to = {});
-/// The same for sharing a folder or the library as a zip (qt/docs/library.md, "Sharing a folder or the library"):
-/// `withoutRecordings` also leaves out the recordings the PDF carries (the marker's /Audio; its strokes keep their
-/// names, as for a recording that is nowhere).
+/// The same for sharing a folder or the library as a zip (qt/docs/features/library.md, "Sharing a folder or the
+/// library"): `withoutRecordings` also leaves out the recordings the PDF carries (the marker's /Audio; its strokes keep
+/// their names, as for a recording that is nowhere).
 bool compact(const fs::path& pdf, std::string& error, const fs::path& to, bool withoutRecordings);
 /// The bytes of the recordings a PDF with notes carries (its marker's /Audio; 0: none, not ours, or protected).
 uint64_t recordingBytes(const fs::path& pdf);
@@ -221,10 +221,11 @@ struct Opened {
     /// Our annotations that another app changed, moved or deleted since we wrote them (their /NM).
     std::vector<std::string> changed;
     fs::path base;  ///< the clean copy: the document's background PDF
-    /// A folder with the pictures a text document carries, under their names ("name.assets/…"; qt/docs/md-images.md)
+    /// A folder with the pictures a text document carries, under their names ("name.assets/…";
+    /// qt/docs/features/md-images.md)
     fs::path pictures;
-    /// A folder with the recordings it carries, under their names in the document (qt/docs/audio.md); also registered
-    /// for the PDF with audio::setExtractedFolder, so they are found while it is open.
+    /// A folder with the recordings it carries, under their names in the document (qt/docs/features/audio.md); also
+    /// registered for the PDF with audio::setExtractedFolder, so they are found while it is open.
     fs::path audio;
 };
 /// Open a hybrid PDF: its embedded document, with the clean copy as background PDF. The document's file path is

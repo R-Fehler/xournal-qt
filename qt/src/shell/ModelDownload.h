@@ -1,5 +1,5 @@
 /*
- * xournal-qt: downloads a handwriting model once, with the user's consent (qt/docs/handwriting-search.md).
+ * xournal-qt: downloads a handwriting model once, with the user's consent (qt/docs/features/handwriting-search.md).
  *
  * The app ships without the models (about 64 MB for English). When the user switches the handwriting search on,
  * Settings offers to download the models its languages need, one by one, showing where from and how big first (as the

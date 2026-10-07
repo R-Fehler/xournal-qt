@@ -698,7 +698,8 @@ bool CanvasInput::actionStart(const Event& event) {
     this->refusedPress =
             this->readOnlyPress && view.isReadingOnly() && !view.getSession().isReadOnly() && !view.replay();
     if (view.replay() && !snipping) {
-        this->readOnlyPress = true;  // replaying (qt/docs/timeline.md): every tool scrolls, a tap goes to its moment
+        // replaying (qt/docs/features/timeline.md): every tool scrolls, a tap goes to its moment
+        this->readOnlyPress = true;
     }
     if (toolType == TOOL_HAND || this->readOnlyPress) {
         return true;  // the hand tool does not change the selection (scrolling keeps it)
@@ -1567,7 +1568,7 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         } else if (pts.size() >= 2) {
             const double dist = std::hypot(pts[0].x() - pts[1].x(), pts[0].y() - pts[1].y());
             // The angle of the line between the first two fingers on the screen: twisted, they turn the canvas
-            // (qt/docs/canvas-rotation.md)
+            // (qt/docs/features/canvas-rotation.md)
             const double fingers = std::atan2(screenPts[1].y() - screenPts[0].y(), screenPts[1].x() - screenPts[0].x()) *
                                    180.0 / M_PI;
             if (!pinching) {
@@ -1814,7 +1815,7 @@ bool CanvasInput::nativeGestureEvent(QNativeGestureEvent* e, QPointF viewPos) {
         vc.zoomBy(1.0 + e->value(), viewPos);
     } else if (e->gestureType() == Qt::RotateNativeGesture) {
         // The touchpad's turn (degrees, clockwise): the canvas turns about the pointer once it adds up to the start
-        // of a turn, snapping to quarters (qt/docs/canvas-rotation.md)
+        // of a turn, snapping to quarters (qt/docs/features/canvas-rotation.md)
         if (view.rotationGestureAllowed()) {
             vc.twistBy(e->value(), vc.viewToScreen(viewPos));
         }

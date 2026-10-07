@@ -28,14 +28,15 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
     const QString tools = tr("Tools");
     actions = {
             {"newDocument", tr("New document"), document, QStringList{"Ctrl+Shift+N"} + standard(QKeySequence::AddTab)},
-            // (qt/docs/quick-note.md: a new note in the library's Inbox, or a line in today's Markdown note there)
+            // (qt/docs/features/quick-note.md: a new note in the library's Inbox, or a line in today's Markdown note
+            // there)
             {"quickNote", tr("Quick note"), document, {"Ctrl+Alt+N"}},
-            // (qt/docs/audio.md: a recording for this document, started or stopped; the record button's tap)
+            // (qt/docs/features/audio.md: a recording for this document, started or stopped; the record button's tap)
             {"record", tr("Record audio (start or stop)"), document, {"Ctrl+Shift+R"}},
             {"open", tr("Open…"), document, standard(QKeySequence::Open)},
             {"save", tr("Save"), document, standard(QKeySequence::Save)},
             {"saveAs", tr("Save as…"), document, standard(QKeySequence::SaveAs)},
-            // (version history: a milestone, qt/docs/hybrid-pdf.md "Version history")
+            // (version history: a milestone, qt/docs/features/hybrid-pdf.md "Version history")
             {"saveWithMessage", tr("Save with a message…"), document, {"Ctrl+Alt+S"}},
             {"export", tr("Export as plain PDF…"), document, {"Ctrl+E"}},
             {"print", tr("Print…"), document, standard(QKeySequence::Print)},
@@ -50,7 +51,7 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"addPage", tr("Add a page"), pages, {"Ctrl+N"}},
             {"pageGrid", tr("All pages"), pages, {"Ctrl+Alt+G"}},
             {"contents", tr("Contents overview"), pages, {"Ctrl+Alt+O"}},
-            // (qt/docs/page-files.md: the page as a high-resolution PNG on the clipboard)
+            // (qt/docs/features/page-files.md: the page as a high-resolution PNG on the clipboard)
             {"copyPageImage", tr("Copy the page as an image"), pages, {"Ctrl+Shift+C"}},
 
             {"undo", tr("Undo"), edit, standard(QKeySequence::Undo)},
@@ -72,7 +73,8 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"fitWidth", tr("Fit the width"), view, {"Ctrl+0"}},
             // (Ctrl+0 fits the width here, as it long has; 1:1 as in image and drawing programs)
             {"realSize", tr("Real size (100 %, as large as the paper)"), view, {"Ctrl+1"}},
-            // (qt/docs/canvas-rotation.md: the canvas only, the pages stay as they are; a fit turns it upright)
+            // (qt/docs/features/canvas-rotation.md: the canvas only, the pages stay as they are; a fit turns it
+            // upright)
             {"rotateRight", tr("Turn the canvas clockwise (90°)"), view, {"Ctrl+]"}},
             {"rotateLeft", tr("Turn the canvas counter-clockwise (90°)"), view, {"Ctrl+["}},
             {"fullScreen", tr("Full screen"), view, {"F11"}},
@@ -82,9 +84,9 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"present", tr("Present (full screen, page by page)"), view, {"F5"}},
             // (only the page: no floating toolbox; again while presenting: the controls back)
             {"presentClean", tr("Present without controls"), view, {"Ctrl+F5"}},
-            // (qt/docs/zen.md: Read is Zen and read only, in full screen; again: back)
+            // (qt/docs/features/zen.md: Read is Zen and read only, in full screen; again: back)
             {"read", tr("Read (Zen, read only, full screen)"), view, {"Ctrl+Alt+R"}},
-            // (qt/docs/zen.md: only the page and a faint dot; again, or Esc: the controls back)
+            // (qt/docs/features/zen.md: only the page and a faint dot; again, or Esc: the controls back)
             {"zen", tr("Zen (only the page)"), view, {"Ctrl+Alt+Z"}},
             {"back", tr("Back"), view, standard(QKeySequence::Back)},
             {"forward", tr("Forward"), view, standard(QKeySequence::Forward)},
@@ -103,7 +105,7 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"snip", tr("Snip: copy the picture of a rectangle"), tools, {"Shift+S"}},
             {"snipLasso", tr("Snip with the lasso"), tools, {"Shift+L"}},
             // (one sweep over handwriting: its words to the clipboard as text, then the tool before; the "Text"
-            // button's second tool, qt/docs/handwriting-search.md)
+            // button's second tool, qt/docs/features/handwriting-search.md)
             {"copyInkText", tr("Copy handwriting as text"), tools, {"Shift+T"}},
             {"toolHand", tr("Hand (scroll)"), tools, {"A"}},
             {"insertImage", tr("Insert an image…"), tools, {"I"}},
@@ -112,7 +114,7 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"spotlight", tr("Spotlight (only a part of the page shown)"), tools, {"Shift+B"}},
 
             {"find", tr("Search"), search, standard(QKeySequence::Find)},
-            // (where text can be written: a .md or .txt, Markdown text on pages; qt/docs/md-editor.md)
+            // (where text can be written: a .md or .txt, Markdown text on pages; qt/docs/features/md-editor.md)
             {"replace", tr("Find and replace"), search, {"Ctrl+H"}},
             {"searchAllDocuments", tr("Search all open documents"), search, {"Ctrl+Shift+F"}},
             {"searchLibrary", tr("Search the library"), search, {"Ctrl+Alt+F"}},

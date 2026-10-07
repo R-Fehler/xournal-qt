@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the UI audit of window sizes (qt/docs/ui-adaptive-audit.md). Opt-in, not a test that passes or fails:
+ * xournal-qt: the UI audit of window sizes (qt/docs/history/README.md). Opt-in, not a test that passes or fails:
  *   XQT_UI_AUDIT=<folder> ./xqt-ui-tests --gtest_filter='AdaptiveAudit*'   (about 20 minutes for all sizes)
  *   (XQT_UI_AUDIT_SIZES=412x915,1280x800 limits the sizes, XQT_UI_AUDIT_SCREENS=doc,moreMenu the screens)
  * For each window size it walks the screens (library, document with the page sidebar, the ⋮ menu, tab overview,

@@ -1,8 +1,8 @@
-// The selected sticky note (qt/docs/sticky-notes.md), beside it: its color, cover mode (self-testing), its Markdown
-// text, an image onto it, copy, cut, delete, and "Select more" (qt/touch-multiselect). Every change is one undo step;
-// paste (Ctrl+V, the context pill) puts a copied note on the page in view. The note itself is moved by dragging it,
-// resized by the handle at its bottom right corner. Of the notes (target: app.edit) or of the reference beside them
-// (target: app.reference.edit; for reading only: copy and deselect).
+// The selected sticky note (qt/docs/features/sticky-notes.md), beside it: its color, cover mode (self-testing), its
+// Markdown text, an image onto it, copy, cut, delete, and "Select more" (qt/touch-multiselect). Every change is one
+// undo step; paste (Ctrl+V, the context pill) puts a copied note on the page in view. The note itself is moved by
+// dragging it, resized by the handle at its bottom right corner. Of the notes (target: app.edit) or of the reference
+// beside them (target: app.reference.edit; for reading only: copy and deselect).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -18,7 +18,7 @@ Pane {
     readonly property bool readingOnly: canvasItem.readingOnly
     /// "Image…": the window's file dialog; the image goes onto the selected note (target.insertImage)
     signal imageRequested()
-    /// "Save as sticker…" (qt/docs/stickers.md): the window opens its dialog
+    /// "Save as sticker…" (qt/docs/features/stickers.md): the window opens its dialog
     signal stickerRequested()
     visible: target.noteSelected && !hidden
     /// Above the note (below it where there is no room), going along with it; at the top of the canvas when the

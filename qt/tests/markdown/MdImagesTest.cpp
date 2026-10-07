@@ -1,6 +1,6 @@
 /*
- * xournal-qt: pictures in the Markdown text (qt/docs/md-images.md): the image run, links to files, sizes, the cache,
- * drawing and pagination.
+ * xournal-qt: pictures in the Markdown text (qt/docs/features/md-images.md): the image run, links to files, sizes, the
+ * cache, drawing and pagination.
  *
  * @license GNU GPLv2 or later
  */
@@ -284,7 +284,7 @@ TEST(MdImages, InlineImageIsAsHighAsTheLine) {
 }
 
 // A picture in a table's cell is a word that cannot break: its column is as wide as the picture, which keeps the size
-// it has in a line of text, also beside a column of long text (qt/docs/md-images.md).
+// it has in a line of text, also beside a column of long text (qt/docs/features/md-images.md).
 TEST(MdImages, PictureInATableCellKeepsItsSize) {
     TempDir t;
     writePng(t.dir / "banner.png", 400, 20);  // 300 × 15 pt: in a line of text 288 × 14.4 pt

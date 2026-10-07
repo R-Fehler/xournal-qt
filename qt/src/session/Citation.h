@@ -1,6 +1,6 @@
 /*
- * xournal-qt: citations (qt/docs/citations.md) - what selected text is looked up as: the query of a web search, the
- * address of a translator; the title of a bibliography entry, and how well a document's title matches it.
+ * xournal-qt: citations (qt/docs/features/citations.md) - what selected text is looked up as: the query of a web
+ * search, the address of a translator; the title of a bibliography entry, and how well a document's title matches it.
  *
  * Pure functions, no network: the addresses built here are shown to the user before anything opens them.
  *

@@ -85,7 +85,7 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, si
         }
         std::string whyFull;
         if (options.revision && options.revision->valid() && !options.compact && exists) {
-            // Only what changed, appended (qt/docs/hybrid-pdf.md, "Saving: incremental updates")
+            // Only what changed, appended (qt/docs/features/hybrid-pdf.md, "Saving: incremental updates")
             try {
                 auto existing = openExisting(target, *options.revision, mode == Mode::Archive, whyFull);
                 step("open the file");
@@ -171,7 +171,7 @@ Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf, size
     try {
         WorkDir work;
         // The recordings, as Xournal++ finds them wherever the copy goes: copied into "name.audio" next to it and
-        // named there by their absolute paths (qt/docs/audio.md, "Export for Xournal++")
+        // named there by their absolute paths (qt/docs/features/audio.md, "Export for Xournal++")
         std::map<std::string, std::string> audioNames;
         {
             std::vector<audio::Recording> recordings;

@@ -1,6 +1,6 @@
 /*
- * xournal-qt: test PDFs for the citation tests (qt/docs/citations.md): papers whose file names are numbers, with
- * their title in the PDF's /Title, or only as the largest text of the first page, and a reference list.
+ * xournal-qt: test PDFs for the citation tests (qt/docs/features/citations.md): papers whose file names are numbers,
+ * with their title in the PDF's /Title, or only as the largest text of the first page, and a reference list.
  *
  * @license GNU GPLv2 or later
  */

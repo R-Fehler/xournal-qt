@@ -1,5 +1,5 @@
 /*
- * xournal-qt: find and replace in the source of a text (qt/docs/md-editor.md, "Find and replace").
+ * xournal-qt: find and replace in the source of a text (qt/docs/features/md-editor.md, "Find and replace").
  *
  * The search bar's replace row changes the Markdown (or plain text) as it is written, not the text as it is drawn.
  * The source is matched the way the search matches what the page shows (TextMatch.h), as far as a source allows:

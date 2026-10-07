@@ -1,6 +1,6 @@
-// The microphone refused (qt/docs/audio.md, "Platforms"): macOS and Android ask before the first recording, and when
-// the answer is no (then or earlier) recording cannot start. This says so plainly, where the microphone is allowed,
-// and opens that page of the system's settings where the app can (macOS, Windows, Android). Opened by
+// The microphone refused (qt/docs/features/audio.md, "Platforms"): macOS and Android ask before the first recording,
+// and when the answer is no (then or earlier) recording cannot start. This says so plainly, where the microphone is
+// allowed, and opens that page of the system's settings where the app can (macOS, Windows, Android). Opened by
 // app.audio.microphoneDenied; closing it or opening the settings clears that.
 import QtQuick
 import QtQuick.Controls

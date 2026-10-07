@@ -166,7 +166,7 @@ INSTANTIATE_TEST_SUITE_P(Fixtures, PageRasterTest,
                                            std::make_tuple(u8"packaged_xopp/pdfBackground/old.xopp", 1.0, 1.25)),
                          pageRasterName);
 
-// Space for notes (qt/docs/note-space.md): the canvas draws the PDF at the page's offset, as every export does
+// Space for notes (qt/docs/features/note-space.md): the canvas draws the PDF at the page's offset, as every export does
 TEST(PageRaster, aPageWithSpaceForNotesMatchesUpstreamsDrawing) {
     Settings settings(fs::path{});
     auto loaded = load(u8"packaged_xopp/pdfBackground/old.xopp");

@@ -1,5 +1,5 @@
-// The phone's app bar (qt/docs/adaptive-layout.md, "The phone chrome"): in the phone classes a slim bar at the top
-// instead of the tab strip and the tool bar, as a phone's browser has it:
+// The phone's app bar (qt/docs/features/adaptive-layout.md, "The phone chrome"): in the phone classes a slim bar at the
+// top instead of the tab strip and the tool bar, as a phone's browser has it:
 //   the library (home) | the document's title, with dots for the open documents under it | the tab count | ⋮
 // - a swipe along the bar (only the bar: the page keeps every touch) goes to the next or the previous document;
 // - the tab count: a tap shows all open documents (after the double-tap time, so a double tap does not flash them), a

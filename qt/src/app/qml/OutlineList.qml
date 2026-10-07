@@ -1,6 +1,6 @@
 // The table of contents as text, for the page sidebar: indented by level, the current section highlighted; tap to
 // go there, the arrows collapse and expand. The document's bookmarks come first, in a section of their own (tap: go
-// there; press and hold or a right click: rename, remove; qt/docs/bookmarks.md).
+// there; press and hold or a right click: rename, remove; qt/docs/features/bookmarks.md).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -117,7 +117,7 @@ ListView {
         bottomPadding: 6
         highlighted: index === app.outline.currentRow
         onClicked: if (page >= 0) { app.jumpToPage(page); list.picked() }
-        // Press and hold, or a right click: a link to the chapter (qt/docs/links.md)
+        // Press and hold, or a right click: a link to the chapter (qt/docs/features/links.md)
         onPressAndHold: if (page >= 0) chapterMenu.openMenu()
         TapHandler { acceptedButtons: Qt.RightButton; onTapped: if (entry.page >= 0) chapterMenu.openMenu() }
         AdaptiveMenu {

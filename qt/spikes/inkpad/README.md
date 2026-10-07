@@ -4,7 +4,7 @@ This throwaway app checks what Qt 6.7.2 on Plasma Wayland delivers from the pen 
 - **quick**: a `QQuickItem` with GPU texture tiles and an event filter on the window;
 - **widget**: a raster `QWidget`.
 
-The results decide [ADR-0001](../../docs/adr/0001-ui-host.md).
+The results decide [ADR-0001](../../docs/decisions/0001-ui-host.md).
 
 ## Build and run
 ```sh

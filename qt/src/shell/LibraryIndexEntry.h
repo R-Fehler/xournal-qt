@@ -42,13 +42,13 @@ struct LibraryIndex::Entry {
     std::vector<int> blockLevel;     ///< per passage: a heading's level (0: not a heading)
     QStringList links;               ///< link targets (for backlinks)
     QStringList wikiLinks;           ///< [[wiki link]] targets
-    /// Its bookmarks (qt/docs/bookmarks.md): page -> label ("": the automatic one). Stored in "notes" when there
-    /// are any.
+    /// Its bookmarks (qt/docs/features/bookmarks.md): page -> label ("": the automatic one). Stored in "notes" when
+    /// there are any.
     std::map<int, QString> bookmarks;
-    /// Its to-dos (task lines of its Markdown, qt/docs/todos.md), without their file. Stored in "notes".
+    /// Its to-dos (task lines of its Markdown, qt/docs/features/todos.md), without their file. Stored in "notes".
     std::vector<Todo> todos;
-    /// Its tags (qt/docs/tags.md): of its text (`#tag`), and the keywords of its PDF (kept with the PDF's stamp).
-    /// Stored in "notes".
+    /// Its tags (qt/docs/features/tags.md): of its text (`#tag`), and the keywords of its PDF (kept with the PDF's
+    /// stamp). Stored in "notes".
     QStringList textTags, pdfTags;
     /// Both, each once
     QStringList tags() const;
@@ -87,8 +87,8 @@ QString ownStamp(const DocumentItem& item);
 bool isPdfFile(const fs::path& p);
 /// How many versions it keeps (version history: the marker's /History, read with the kind; 0: none).
 int versionsOfPdf(const fs::path& pdf);
-/// What a PDF is (qt/docs/library.md, "Kinds of PDFs"): by its marker (HybridPdf::markerOf: read when it was opened
-/// and remembered, so no second read). A text document is a PDF with notes that carries its "name.md".
+/// What a PDF is (qt/docs/features/library.md, "Kinds of PDFs"): by its marker (HybridPdf::markerOf: read when it was
+/// opened and remembered, so no second read). A text document is a PDF with notes that carries its "name.md".
 PdfKind kindOfPdf(const fs::path& pdf);
 /// The kind of an entry: what it read ("xopp" also for .xoj, "pdf", "md", "image", "text").
 QString entryKind(const DocumentItem& item);

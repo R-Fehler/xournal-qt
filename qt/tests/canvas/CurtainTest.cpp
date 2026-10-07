@@ -1,8 +1,8 @@
 /*
- * xournal-qt: the curtain (CurtainLayer, qt/docs/curtain.md): a black sheet over part of the page, for teaching and
- * presenting. Put out over the lower half of the page in view; nothing is written, erased or followed on it (a tap
- * shows its handles); its handles size and turn it, a drag on it moves it, two fingers carry, turn and size it; it goes
- * along to the page the view is at. It is never part of the document.
+ * xournal-qt: the curtain (CurtainLayer, qt/docs/features/curtain.md): a black sheet over part of the page, for
+ * teaching and presenting. Put out over the lower half of the page in view; nothing is written, erased or followed on
+ * it (a tap shows its handles); its handles size and turn it, a drag on it moves it, two fingers carry, turn and size
+ * it; it goes along to the page the view is at. It is never part of the document.
  *
  * @license GNU GPLv2 or later
  */

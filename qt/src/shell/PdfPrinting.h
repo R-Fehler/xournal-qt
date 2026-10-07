@@ -23,8 +23,8 @@ class DocumentSession;
 
 /// Write what is printed of a document into `file` (AppController::printDocument): with its annotations, the
 /// document exported as a PDF (`range`: its pages, "" all); without, the PDF it annotates as it is. A protected
-/// document (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): drawn through poppler, which has its password, and without
-/// annotations its PDF decrypted (the printer cannot open an encrypted one). Returns "" or why it failed.
+/// document (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs"): drawn through poppler, which has its password, and
+/// without annotations its PDF decrypted (the printer cannot open an encrypted one). Returns "" or why it failed.
 std::string writePrintFile(DocumentSession& session, bool withAnnotations, const std::string& range,
                            const fs::path& file);
 

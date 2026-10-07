@@ -12,7 +12,7 @@ Pane {
     property Item canvasItem
     property var target: app.edit
     property bool hidden: false
-    /// "Save as sticker…" (qt/docs/stickers.md): the window opens its dialog
+    /// "Save as sticker…" (qt/docs/features/stickers.md): the window opens its dialog
     signal stickerRequested()
     property string namePrefix: ""
     function named(n) { return namePrefix === "" ? n : namePrefix + n.charAt(0).toUpperCase() + n.slice(1) }
@@ -82,8 +82,8 @@ Pane {
             tip: qsTr("Save as sticker… (to paste it again from the sticker button)")
             onClicked: pill.stickerRequested()
         }
-        // Groups (qt/docs/groups.md): one button for each that can be done; a selection that is one group shows
-        // only "Ungroup"
+        // Groups (qt/docs/features/groups.md): one button for each that can be done; a selection that is one group
+        // shows only "Ungroup"
         IconButton {
             objectName: pill.named("selectionGroup")
             visible: !pill.readingOnly && pill.target.canGroup

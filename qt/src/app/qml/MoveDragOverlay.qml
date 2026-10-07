@@ -1,5 +1,5 @@
 // xournal-qt: moving documents and folders of the library by dragging them onto a folder or a breadcrumb.
-// Part of HomeView.qml (the home screen, qt/docs/library.md), instantiated once there: it reads the home
+// Part of HomeView.qml (the home screen, qt/docs/features/library.md), instantiated once there: it reads the home
 // screen's state through `home`, and the other parts by their ids (HomeView.qml's context).
 import QtQuick
 import QtQuick.Controls

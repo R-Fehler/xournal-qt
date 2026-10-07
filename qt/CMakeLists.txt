@@ -53,7 +53,7 @@ set(CMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE PRE_TEST)
 # Absolute path of the upstream Xournal++ sources inside this fork.
 set(XOJ_UPSTREAM_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.." CACHE INTERNAL "")
 
-# Android (see docs/android.md): the app only. Tests, the CLI and the spikes are desktop tools.
+# Android (see qt/docs/development/android.md): the app only. Tests, the CLI and the spikes are desktop tools.
 if(ANDROID)
     set(_xqt_desktop OFF)
 else()
@@ -76,11 +76,11 @@ qt_standard_project_setup(REQUIRES 6.5)
 # glib/gio headers use "signals" as an identifier: never use Qt's keyword macros.
 add_compile_definitions(QT_NO_KEYWORDS)
 
-# Windows with MinGW (MSYS2, see docs/windows.md): big translation units (AppController, the QML cache) have more
-# sections than COFF allows by default. And MinGW's C library headers hide M_PI, the POSIX names and more under strict
-# ISO C++ (__STRICT_ANSI__), which upstream's code uses: compile as gnu++20 there, as upstream Xournal++ does on MSYS2.
-# The stack of every thread is 8 MB, as on Linux, not MinGW's 2 MB (a reservation of address space, not memory): the
-# core, Pango and the render workers were only ever run with Linux's.
+# Windows with MinGW (MSYS2, see qt/docs/development/windows.md): big translation units (AppController, the QML cache)
+# have more sections than COFF allows by default. And MinGW's C library headers hide M_PI, the POSIX names and more
+# under strict ISO C++ (__STRICT_ANSI__), which upstream's code uses: compile as gnu++20 there, as upstream Xournal++
+# does on MSYS2. The stack of every thread is 8 MB, as on Linux, not MinGW's 2 MB (a reservation of address space, not
+# memory): the core, Pango and the render workers were only ever run with Linux's.
 if(MINGW)
     add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-Wa,-mbig-obj>")
     set(CMAKE_CXX_EXTENSIONS ON)

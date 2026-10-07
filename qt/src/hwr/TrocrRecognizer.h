@@ -1,6 +1,6 @@
 /*
  * xournal-qt: the recogniser of the handwriting search on Linux (and the fallback elsewhere): TrOCR-small, handwritten,
- * int8, in ONNX Runtime (qt/docs/research/handwriting-recognition.md: 97 % of the English words found among its
+ * int8, in ONNX Runtime (qt/research/hwr/research.md: 97 % of the English words found among its
  * readings on IAM, about 0.2 s per line on two threads of a laptop).
  *
  * The model is a folder (HandwritingSearch::modelDir) with the ONNX export's files and a manifest "model.json"

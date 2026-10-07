@@ -328,7 +328,7 @@ bool PdfPageKeeper::toImageBackground(XojPage& page, const XojPdfPage& pdf, doub
     img.setAttach(true);  // stored in the .xopp
     page.setBackgroundImage(img);
     page.setBackgroundType(PageType(PageTypeFormat::Image));
-    page.setNoteSpace({});  // (the space is part of the picture now: qt/docs/note-space.md)
+    page.setNoteSpace({});  // (the space is part of the picture now: qt/docs/features/note-space.md)
     return true;
 }
 

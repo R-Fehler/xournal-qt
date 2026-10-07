@@ -1,6 +1,6 @@
 /*
- * xournal-qt: zip files through libzip (sharing a folder or the library as a zip, qt/docs/library.md "Sharing a
- * folder or the library").
+ * xournal-qt: zip files through libzip (sharing a folder or the library as a zip, qt/docs/features/library.md "Sharing
+ * a folder or the library").
  *
  * Writing: every entry carries its modification time twice, as the DOS time every unzipper reads (local time, two
  * seconds) and as the extended timestamp field (0x5455, UTC seconds) that Info-ZIP, 7-Zip, macOS and this app read, so

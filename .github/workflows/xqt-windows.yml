@@ -1,6 +1,6 @@
 # xournal-qt for Windows: build the Qt frontend in MSYS2 UCRT64 (upstream Xournal++'s Windows toolchain) and
 # publish a portable folder as the artifact "xournal-qt-windows-x64" (downloaded as xournal-qt-windows-x64.zip).
-# See qt/docs/windows.md. Runs only when asked, or for pushes to the qt/windows-build branch.
+# See qt/docs/development/windows.md. Runs only when asked, or for pushes to the qt/windows-build branch.
 name: xournal-qt Windows
 
 on:

@@ -418,8 +418,9 @@ TEST_F(LibraryFilesTest, aRenameSaysWhyANameCannotBeUsed) {
     fs::permissions(root / "notes.md", fs::perms::owner_read | fs::perms::owner_write, fs::perm_options::replace);
 }
 
-// qt/docs/md-images.md: a .md and its pictures in "name.assets/" are one document. The library shows one card and
-// no folder; rename, move, copy and trash take both; a new name rewrites the links to the pictures (and nothing else).
+// qt/docs/features/md-images.md: a .md and its pictures in "name.assets/" are one document. The library shows one card
+// and no folder; rename, move, copy and trash take both; a new name rewrites the links to the pictures (and nothing
+// else).
 TEST_F(LibraryFilesTest, aMarkdownFileAndItsPicturesAreOneDocument) {
     const std::string text = "# Notes\n\n![](notes.assets/a.png)\n\n![x](./notes.assets/b%20c.png \"t\") and "
                              "![y](<notes.assets/b c.png>)\n\n![ref][r]\n\n<img src=\"notes.assets/a.png\">\n\n"

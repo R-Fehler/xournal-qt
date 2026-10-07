@@ -1,6 +1,7 @@
 /*
- * xournal-qt: citations in the real window (qt/docs/citations.md): selected text is looked up - Google Scholar and a
- * translator in the browser, the address always shown before it opens; a reference finds its paper in the library.
+ * xournal-qt: citations in the real window (qt/docs/features/citations.md): selected text is looked up - Google Scholar
+ * and a translator in the browser, the address always shown before it opens; a reference finds its paper in the
+ * library.
  *
  * No test touches the network or starts a browser: the browser is a fake SystemApps.
  *
@@ -590,9 +591,9 @@ TEST_F(CitationsTest, anArxivPaperIsDownloadedAfterTheOptInAndOpensAsReference) 
     xqt::ArxivQueue::setInterval(3000);
 }
 
-// A web picture in a Markdown text (qt/docs/md-images.md): never fetched unasked. Its "Load image" shows the whole
-// address (and, while connecting was not decided, what that means); Cancel sends nothing; Load fetches it (the opt-in
-// then), keeps it in the app cache and the text shows it. Networking off: nothing is sent.
+// A web picture in a Markdown text (qt/docs/features/md-images.md): never fetched unasked. Its "Load image" shows the
+// whole address (and, while connecting was not decided, what that means); Cancel sends nothing; Load fetches it (the
+// opt-in then), keeps it in the app cache and the text shows it. Networking off: nothing is sent.
 TEST_F(CitationsTest, aWebPictureIsLoadedOnlyWhenAskedWithItsAddressShown) {
     xqt::test::FakeNet net;
     QImage logo(24, 12, QImage::Format_RGB32);

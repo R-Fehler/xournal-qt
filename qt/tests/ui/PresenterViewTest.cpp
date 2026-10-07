@@ -1,5 +1,6 @@
 /*
- * xournal-qt: the presenter view on a second screen (qt/docs/presenter-view.md) in the real window, off-screen.
+ * xournal-qt: the presenter view on a second screen (qt/docs/features/presenter-view.md) in the real window,
+ * off-screen.
  *
  * Qt's off-screen platform takes its screens from a file: PresenterView.ui@2screens runs these tests with two
  * (qt/tests/ui/offscreen-two-screens.json: a laptop 1920 x 1080, the primary one, and a projector 1280 x 720 at its

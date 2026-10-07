@@ -1,7 +1,8 @@
 /*
- * xournal-qt: pages as files in the real window (qt/docs/page-files.md): the "Insert pages from a file" dialog (pages
- * ticked on their pictures, a range, a protected PDF's password), the page menus' entries, the extract, split and
- * picture dialogs, and "Copy page as image" (the menu entry and Ctrl+Shift+C: a high-resolution PNG on the clipboard).
+ * xournal-qt: pages as files in the real window (qt/docs/features/page-files.md): the "Insert pages from a file" dialog
+ * (pages ticked on their pictures, a range, a protected PDF's password), the page menus' entries, the extract, split
+ * and picture dialogs, and "Copy page as image" (the menu entry and Ctrl+Shift+C: a high-resolution PNG on the
+ * clipboard).
  *
  * @license GNU GPLv2 or later
  */

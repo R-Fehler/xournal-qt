@@ -17,10 +17,10 @@
  * only. A text or code file's entry (kind "text") has its text, if the file is not bigger than TEXT_LIMIT (else its
  * name only). Other files are not in the index.
  *
- * The handwriting recognised in documents (qt/docs/handwriting-search.md) is kept apart, in the pack "ink-text" of each
- * folder (InkTextStore.h, inkText()): the search counts it with the rules of InkText.h when the document's main file is
- * still the one its handwriting was read from. A document found only through handwriting the recogniser was unsure of
- * is listed after those with exact hits (fuzzyOnly), the surer ones first (inkScore).
+ * The handwriting recognised in documents (qt/docs/features/handwriting-search.md) is kept apart, in the pack
+ * "ink-text" of each folder (InkTextStore.h, inkText()): the search counts it with the rules of InkText.h when the
+ * document's main file is still the one its handwriting was read from. A document found only through handwriting the
+ * recogniser was unsure of is listed after those with exact hits (fuzzyOnly), the surer ones first (inkScore).
  *
  * The index is spread over several files: LibraryIndex.cpp (lifetime, updates, moves, documents saved by the app),
  * LibraryIndexPacks.cpp (the packs on disk), LibraryIndexRead.cpp (reading a document), LibraryIndexSearch.cpp (the
@@ -130,9 +130,9 @@ public:
     /// The text of the pages of this PDF read before (by PDF page, 0-based), if it was read from the file as it is now
     /// (same size and time): an open document takes it for its search instead of reading it again.
     std::map<int, QString> knownPdfText(const fs::path& pdf) const;
-    /// The document was protected with a password (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): its entry is emptied
-    /// and locked now (its text, title, tags and handwriting go from the packs at the next flush), never read again.
-    /// False when its folder's packs are not read yet (the next update reads it: locked then).
+    /// The document was protected with a password (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs"): its entry is
+    /// emptied and locked now (its text, title, tags and handwriting go from the packs at the next flush), never read
+    /// again. False when its folder's packs are not read yet (the next update reads it: locked then).
     bool documentProtected(const fs::path& file);
     /// A document open in the app was saved: its entry is made from the document in memory and the PDF text the app
     /// knows (by PDF page), instead of reading the file again. False if that is not possible (not in the library, its
@@ -157,7 +157,7 @@ public:
     /// Make the vocabularies of all documents in the background (the fuzzy search is on: its first search does not
     /// wait for them). Documents that have them are skipped.
     void prepareWords();
-    /// A bookmarked page of an indexed document (qt/docs/bookmarks.md).
+    /// A bookmarked page of an indexed document (qt/docs/features/bookmarks.md).
     struct Bookmark {
         fs::path file;      ///< the document's main file
         int page = 0;       ///< 0-based
@@ -168,9 +168,9 @@ public:
     std::vector<Bookmark> bookmarks() const;
     /// Changes when the bookmarks of a document changed, or a document with bookmarks came or went.
     quint64 bookmarkChanges() const { return markChanges.load(); }
-    /// A to-do of an indexed document (qt/docs/todos.md): a task line of a Markdown box, a sticky note's text, a page
-    /// of a text document, or a Markdown file. All task lines are indexed; which of them the To-dos view lists (the
-    /// ones with the marker, or all) is its setting.
+    /// A to-do of an indexed document (qt/docs/features/todos.md): a task line of a Markdown box, a sticky note's text,
+    /// a page of a text document, or a Markdown file. All task lines are indexed; which of them the To-dos view lists
+    /// (the ones with the marker, or all) is its setting.
     struct Todo {
         fs::path file;        ///< the document's main file
         int page = -1;        ///< 0-based; -1: a Markdown file (no pages in the index)
@@ -190,8 +190,9 @@ public:
     std::vector<Todo> todos() const;
     /// Changes when the to-dos of a document changed, or a document with to-dos came or went.
     quint64 todoChanges() const { return todoChangeCount.load(); }
-    /// The tags of an indexed document (qt/docs/tags.md): the `#tags` of its typed text, Markdown boxes, sticky notes
-    /// (a Markdown file: its text and front matter), and the keywords of the PDF it uses; each once, in that order.
+    /// The tags of an indexed document (qt/docs/features/tags.md): the `#tags` of its typed text, Markdown boxes,
+    /// sticky notes (a Markdown file: its text and front matter), and the keywords of the PDF it uses; each once, in
+    /// that order.
     struct Tagged {
         fs::path file;  ///< the document's main file
         QStringList tags;
@@ -257,7 +258,7 @@ public:
     /// The indexed documents with a page whose text (of its text elements) has this fingerprint (DocumentLink.h).
     std::vector<fs::path> filesWithPageText(const QString& fingerprint) const;
 
-    /// A document whose title matches a reference's (qt/docs/citations.md).
+    /// A document whose title matches a reference's (qt/docs/features/citations.md).
     struct TitleHit {
         fs::path file;
         QString title;    ///< what it is called: its /Title, else its largest first-page text, else its name

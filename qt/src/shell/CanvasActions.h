@@ -3,7 +3,8 @@
  * back - for the pills of a canvas (SelectionPill, NotePill, PdfTextPill, PdfTextHandles, ContextPill: their
  * `target`) and for the keys. A window has one for its current document (`app.edit`, AppController) and one for the
  * reference beside it (`app.reference.edit`, ReferenceMode): the same code for both, so that what one allows the
- * other cannot forget (qt/docs/reference-view.md). It follows a view (setView); what may be done in it is its Policy.
+ * other cannot forget (qt/docs/features/reference-view.md). It follows a view (setView); what may be done in it is its
+ * Policy.
  *
  * @license GNU GPLv2 or later
  */
@@ -35,10 +36,10 @@ class CanvasActions final: public QObject {
     Q_PROPERTY(bool selectMoreAvailable READ selectMoreAvailable NOTIFY selectMoreChanged)
     Q_PROPERTY(bool selectingMore READ selectingMore WRITE setSelectingMore NOTIFY selectMoreChanged)
     Q_PROPERTY(int selectedCount READ selectedCount NOTIFY selectMoreChanged)
-    /// Groups (qt/docs/groups.md)
+    /// Groups (qt/docs/features/groups.md)
     Q_PROPERTY(bool canGroup READ canGroup NOTIFY selectionChanged)
     Q_PROPERTY(bool canUngroup READ canUngroup NOTIFY selectionChanged)
-    /// A sticky note is selected: its pill (qt/docs/sticky-notes.md)
+    /// A sticky note is selected: its pill (qt/docs/features/sticky-notes.md)
     Q_PROPERTY(bool noteSelected READ noteSelected NOTIFY noteSelectionChanged)
     Q_PROPERTY(QColor noteColor READ noteColor WRITE setNoteColor NOTIFY noteSelectionChanged)
     Q_PROPERTY(bool noteCovers READ noteCovers WRITE setNoteCovers NOTIFY noteSelectionChanged)

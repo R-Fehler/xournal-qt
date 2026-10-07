@@ -1,0 +1,797 @@
+# The PDF with notes (hybrid PDF)
+
+The document is **one PDF file**. Any PDF app (Acrobat, Preview, Xodo, Drawboard, a browser) shows it as the author
+sees it: the pages, the ink, the text, the pasted pages. It also carries the full Xournal data, so xournal-qt opens it
+again with every feature: strokes stay editable, and layers, text elements, Markdown and page backgrounds stay as they
+were (like draw.io PDFs). Background: [VISION.md](../../../VISION.md) ("PDF as the document"). In the app it is called
+"PDF with notes"; this page also covers its relatives: the archive PDF, incremental saves, PDF files mode, version
+history and encryption.
+
+## The file
+
+A PDF with notes is a normal PDF with these additions (the whole layout in one place; the sections below say how each
+part is written and read):
+
+1. **Base pages.** Each page's own content is the original PDF page (copied with qpdf) or a generated background
+   (plain, ruled, graph, images) drawn by cairo into a page of its own; pages whose PDF page is missing get a drawn
+   page too. Pages pasted from other PDFs are real pages of this file. The background PDF's page tree is rebuilt in
+   document order (pages shown twice are shallow copies, pages no longer shown lose their content but stay for
+   bookmarks), so the PDF's outline, links, names and metadata stay.
+2. **The drawing as annotations, not page content**: one annotation per **visible** layer with content per page
+   (hidden layers are only in the embedded data). A layer with strokes is an `/Ink` (all its strokes in `/InkList`,
+   `/C` and `/BS /W` of its first stroke); a layer without strokes is a `/Stamp`. The appearance stream `/AP` draws the
+   **whole layer** in its order (strokes, text, images, TeX), so a mixed layer stays one annotation and looks exact
+   (pressure widths, the highlighter's blending); text elements also go into `/Contents`. The appearance is the layer
+   drawn by cairo on a PDF page of its own and turned into a Form XObject with qpdf, as upstream's export does (its
+   transparency group not isolated, so the highlighter multiplies with the page); its `/BBox` is the layer's box plus
+   2 pt, its `/Matrix` places it on the page's crop box with the page's `/Rotate` undone. Points and boxes are written
+   with 0.1 pt precision. Marks: `/NM (xopp:p<page>-l<layer>)` (1-based) and a private `/XournalQt << /Page /Layer >>`;
+   `/F 4` (print). A sticky note is a `/Stamp` of its own ([sticky-notes.md](sticky-notes.md)).
+   Annotations rather than page content, because the app must show the base page *without* the drawing when it
+   opens the file (the drawing then comes from the embedded data); content merged into the page could not be
+   separated again. One annotation per layer and page, not per stroke, keeps viewers fast.
+3. **The Xournal data as an embedded file**: `document.xopp` in `/EmbeddedFiles` (subtype `application/x-xopp`),
+   written by upstream's SaveHandler with one change: its PDF background is this file by name (`domain="absolute"`,
+   relative `filename`), and PDF page *i* of the `.xopp` is base page *i*. Attached background images go along as
+   `document.xopp.bg_N.png`; image files of the user are referred to by absolute path. The pictures of its Markdown
+   ([md-images.md](md-images.md)), a text document's `name.md` ([md-pdf.md](md-pdf.md)) and recordings
+   ([audio.md](audio.md): `audio-p012-p015-<name>.ogg`, `audio/ogg`, `/AFRelationship /Supplement` in an archive)
+   are embedded files too.
+4. **A marker** in the catalog: `/XournalQt << /Version 1 /Data (document.xopp) /Files [...] /Audio [...] /Annots <<
+   /xopp:p1-l1 (hash) ... >> >>`, so opening the file knows what it is without unpacking anything. The hashes of our
+   annotations are in the marker, not in the `.xopp` (which stays exactly upstream's format). A hash covers what
+   another app may change: `/Subtype`, `/Rect` and `/InkList` (to 0.1 pt), `/C`; not the appearance stream, which some
+   apps write again on every save. `/Audio` lists the recordings (attachment and name in the document) apart from
+   `/Files`.
+5. **Links** of Markdown boxes and link markers as `/Link` annotations ([links.md](links.md), "The hybrid PDF");
+   **handwriting as invisible text** where it was read ([handwriting-search.md](handwriting-search.md)); bookmarks
+   in the outline ([bookmarks.md](bookmarks.md)); keywords as tags ([tags.md](tags.md)); the version history in
+   incremental updates ("Version history" below).
+
+A merged-PDF mark (`/XournalQtPages`, [page-files.md](page-files.md)) that the background had is removed: a PDF with
+notes is never rewritten as a merged PDF. Written to a temporary file next to the target and renamed over it
+(`fileio::AtomicFile`: synced to the storage), with object streams (smaller); the PDF's streams are left as they are.
+
+**Upstream Xournal++** opens a PDF with notes as an ordinary PDF: it sees our annotations as part of the page and can
+annotate over them; it does not get the editable strokes. That is what the `.xopp` export is for.
+
+**Other apps** may not honour every detail of `/AP` (the highlighter's `/BM /Multiply`), and an app that rewrites the
+file may drop the attachment or unknown dictionaries: the ink then stays as annotations (it could be read back from
+`/InkList`, without pressure). The round trip in other viewers is open work (TODO.md).
+
+## Code
+
+`qt/src/session/HybridPdf.h` (the API) and its parts (qpdf and cairo); `HybridInternal.h` holds what the parts share:
+
+| File | What |
+| --- | --- |
+| `HybridPdf.cpp` | `write` (incremental when it can, else in full; with version history: `writeKeeping`), `writeArchive`, `exportXopp` |
+| `HybridPrepare.cpp` | `prepare`: everything that needs the document (the `.xopp` and its hashes, cairo's drawings, links, recordings) |
+| `HybridFullWrite.cpp` | `assemble`: the file written in full (plain, PDF with notes, archive PDF) |
+| `HybridAppend.cpp` | `openExisting` and the incremental update (`appendChanges`) |
+| `HybridMarker.cpp` | what both writers write the same way, through an `ObjectSink`: the marker, the document information, the text layer of the handwriting, the embedded files |
+| `HybridHistory.cpp` | writing the version history (`PdfHistory.cpp` reads it) |
+| `HybridCache.cpp` | the clean copies in the app cache |
+| `HybridOpen.cpp` | reading the marker, `open`, `compact`, `importCopy` |
+| `HybridCommon.cpp` | small helpers, and `strip`, which takes everything of ours out of a PDF |
+
+Tests: `qt/tests/session/HybridPdfTest.cpp` and `HybridMarkerTest.cpp` (label `session`). `qpdf --check` passes;
+each page drawn by poppler (with annotations) matches our PDF export of the same document (mean difference < 0.5/255,
+< 0.2 % of the pixels off); a written file opens as the same document as a `.xopp` round trip gives (pages, sizes,
+backgrounds and the PDF text on each page, layers, strokes with pressure, colours and tools, texts); saved again after
+a change; a comment added with qpdf stays in the clean copy and survives a save; a moved and a deleted annotation of
+ours are reported, and importing them empties those layers (undo brings them back); notes saved into the PDF itself
+keep `name.original.pdf` byte for byte; the `.xopp` export opens as the same document with a base PDF without
+annotations. `XQT_HYBRID_SAMPLE=<file>` makes the first test copy its PDF with notes there (a sample for other apps).
+
+## Opening
+
+`DocumentSession::loadFile` opens a PDF with the marker as its embedded document (`HybridPdf::open`); the marker is
+looked up with qpdf (about 20 ms for a 1,300-page PDF, remembered by path, size and time), so ordinary PDFs open
+without delay. The **clean copy** (`~/.cache/xournal-qt/hybrid-pdf/<hash of the path>-<size>-<time>/base.pdf`, with
+the extracted `document.xopp` and a `changed.txt`) is made once per version of the file and is the document's
+background PDF, so the drawing is not shown twice; the file path of the document is the PDF with notes, so the tab,
+recent files and Ctrl+S use it. Library, covers and search load it the same way.
+
+- Our annotations are removed from the clean copy; annotations of other apps stay in it (poppler shows them) and are
+  written again on save, also on pages with a generated background (the session remembers which page of the clean
+  copy each page was, so they follow a page that is moved). The clean copy is the document's PDF even when no page
+  shows a PDF page.
+- The clean copy carries the merged-PDF mark `Own`, so "Save as" `.xopp` puts its pages next to the `.xopp`
+  (`name.pdf` or `.name.pages.pdf`) instead of referring into the cache.
+- The cache: a document retains the clean copy it uses (in this process); opening a file removes the clean copies of
+  its other versions (older than a minute) and every entry not used for a day. Each save touches the entry in use.
+  After a save the clean copy of the new version is made in the background, so the next open does not wait for it.
+- **Edited in another app**: each annotation of ours whose hash differs, or that is missing, is reported
+  (`LoadResult::hybridChanged`), and the app asks: **Keep the Xournal data** (the next save writes it again) or
+  **Import the other app's changes**: `DocumentSession::importHybridChanges` makes a clean copy that keeps those
+  annotations as plain ones (`/NM (imported:…)`, without our key) the background, and empties the layers they stood
+  for, undoably. A page removed in another app is not handled: the embedded document then refers to base pages by
+  their old numbers.
+- Annotations other apps made can be converted into editable ink: [adopt-annotations.md](adopt-annotations.md).
+
+## Saving
+
+- `save()` of a document whose file is a `.pdf` writes the PDF with notes from the document: an incremental update
+  where it can ("Saving: incremental updates" below), else in full from the clean base. Writing into a user's PDF that
+  is not a PDF with notes yet keeps `name.original.pdf` once, and the document takes its pages from a copy in the cache
+  from then on (the file it read them from changes).
+- **In the background** (`DocumentSave.cpp`): the document's pages are copied on the UI thread (a few milliseconds),
+  the drawing, the `.xopp` and qpdf work on that copy on a worker, and the undo stack's saved point is the copied state.
+- `.xopp` stays the format of every document not saved as a PDF with notes; autosaves and crash saves are `.xopp` files
+  in the cache.
+- Settings → Documents: **Save notes into the PDF itself** (off; turning it on explains it once: Ctrl+S on an
+  annotated PDF then writes into it without asking, keeping `name.original.pdf` the first time) and **On every save of
+  a hybrid PDF, also write a .xopp for Xournal++** (off; one global setting).
+- Export as PDF of a PDF with notes suggests `name_export.pdf`, never the file itself.
+- **Library**: a PDF with notes is one card; its search text is the text of its pages plus the text elements of the
+  embedded document, read again when the file changes (the index keys it by the file itself, not by the clean copy).
+  With its exported `.xopp` it is one card that opens the PDF (only checked when `.name.pages.pdf` exists, so listing
+  folders stays cheap). Its kind shows as a badge ([library.md](library.md), "Kinds of PDFs").
+
+**Size and time** (`XQT_BENCH_HYBRID=<pdf>` runs `HybridPdfTest.benchSaveAndOpen`, `XQT_HYBRID_TIMES=1` prints the
+steps): with notes on every 25th page of a 1,321-page, 9.9 MB manual, a full write takes about 6 s and makes a file
+about the size of a plain PDF export of the same notes; opening it the first time (the clean copy made) about as long,
+again about 0.5 s. Most of a full write is qpdf resolving and writing every page; incremental saves avoid it.
+
+## Save as, the old `.xopp`, Share
+
+1. **Save as with a type.** One Save as dialog (⋮ → Save as…, Ctrl+Shift+S, and Ctrl+S of a document without a
+   file) with two file types: "Xournal notes (.xopp)" and "PDF with notes, editable (.pdf)". New documents start on
+   `.xopp` (decided with the author), a document that is a hybrid PDF already starts on the PDF with its own name. The name
+   follows the type (`AppController::fileForFormat`: the suggestion of one type becomes the other's; else the
+   extension is swapped, and a `.pdf` taken by another PDF becomes `name.notes.pdf`). The extension typed wins over
+   the chosen type (`savesAsPdf`): `x.pdf` is a PDF with notes, `x.xopp` a `.xopp`; no extension: the type. "Export as
+   plain PDF…" draws the notes into the pages (nothing editable). The `.xopp` suggestion of a hybrid PDF is `name.xopp` (not upstream's
+   `name.pdf.xopp`).
+2. **The old `.xopp`.** Saving a document that was saved as `name.xopp` as a PDF with notes asks once, before
+   anything is written, what happens to `name.xopp`:
+   - **Move it to the trash** (the default; the PDF now holds everything). After the PDF is written, the `.xopp`
+     goes to the desktop trash with the files that belong to it alone (the library's trash:
+     `DocumentFiles::trash` with its attached PDF, `.name.pages.pdf` and background images, plus a `name.pdf` of
+     only pasted pages made for it). The PDF it annotates stays. When the document shows its pages from one of
+     those files, it takes them from a copy in the app cache first (`DocumentSession::detachBackground`, a hard
+     link where possible: the same pages under the same numbers).
+   - **Keep it updated for Xournal++**: the `.xopp` is written again from the PDF's notes now (with its PDF by the
+     export's rules: `name.pdf` if free, else the hidden `.name.pages.pdf`) and on every save of this document.
+     This is per document: the hybrid PDF records it in its marker (`/XoppExport`, relative to the PDF when it is
+     beside it or below; `HybridPdf::xoppExportOf`, `DocumentSession::xoppExport`), so it survives closing and
+     reopening. Deleting that `.xopp` ends it (then a save does not write it or record it). The global setting "On
+     every save of a hybrid PDF, also write a .xopp" does it for every PDF with notes.
+   - **Keep it as it is**: not touched, not updated. Kept beside the hybrid PDF of its name (`notes.xopp` next to
+     the new `notes.pdf`), the library shows one card that opens the hybrid PDF, as for its export: every same-name
+     pair of a `.xopp` and a PDF looks into the PDF (`HybridPdf::isHybrid`, remembered per file version; lone PDFs
+     are not looked into, and the library index does not record it). A `.xopp` changed more than a minute after the
+     PDF (edited in Xournal++ afterwards; an export is written right after the PDF) is not hidden: the two are listed
+     as two documents, each opening its own file.
+
+   The dialog has **"Don't ask again"**, which stores the choice in the setting `hybridOldXopp` (`ask`, `trash`,
+   `update`, `keep`); Settings → Documents → Hybrid PDF shows it and sets it back to "Ask each time". Cancel
+   writes nothing. Only `.xopp` files are asked about (`.xoj` ones are left alone).
+   If the `.xopp` is open in another tab of this process: without unsaved changes that tab is closed; with changes
+   the `.xopp` is kept as it is and a message says why. (Another process, e.g. a library's window, is not seen.)
+   All trashing of the app goes through `SystemApps::moveToTrash`, so tests never fill the user's trash.
+3. **Share…** (⋮ → Share…, the tab menu, and the menu of a PDF or notes card in the library or Recent; a card of
+   notes, also a PDF with its `.xopp`, is opened first and shared as the open document) offers three things:
+   - **PDF with notes (opens in any app)**: the hybrid PDF itself, saved first when it has changes; a PDF without
+     notes as it is; notes that go into the PDF itself are saved first. On the desktop the file manager then shows
+     it, selected (`SystemApps::share`: `ShowItems` over D-Bus, `explorer /select,`, `open -R`); Android and iOS
+     will open the share sheet (false there for now). A document without a file opens Save as on the PDF type and
+     shares after the save. A `.xopp` is never turned into a PDF unasked: the window offers **Save as PDF with
+     notes…** (the document becomes the PDF; the old-.xopp question applies) or **Save a PDF copy…** (a hybrid PDF
+     written from the document, `SaveKind::ExportHybrid`, never over the PDF it shows; the document keeps its file,
+     format and unsaved changes).
+   - **Copy the PDF with notes**: the same PDF onto the clipboard, to paste it into another
+     app or a chat (`SystemApps::copyToClipboard`): its URL as `text/uri-list` (Dolphin, browsers, Telegram and
+     most chat apps take a pasted file that way) and as GNOME's `x-special/gnome-copied-files`, the PDF's bytes as
+     `application/pdf` up to 50 MB, and the path as text. "PDF copied: paste it into another app". A `.xopp` is
+     not asked about here: a PDF copy is written into the app cache (`~/.cache/xournal-qt/share/name.pdf`) and
+     copied; the document stays as it is.
+   - **For Xournal++ (.xopp + PDF)**: a one-time export into a folder the user chooses, never the document's own
+     folder (there the library would take it for the document), as `name.xopp` + `name.xopp.bg.pdf`: upstream's
+     attached PDF (`<background type="pdf" domain="attach" filename="bg.pdf">`, which upstream's `LoadHandler`
+     resolves as the `.xopp`'s path + `.bg.pdf`), so the pair opens with its pages right wherever it is moved
+     together (tested with the LoadHandler, also after moving both). Its PDF is the base pages in document order,
+     page *i* of the `.xopp` showing page *i*; no PDF is written when no page shows a PDF page. A name taken there
+     becomes "name (2)". Then the file manager shows the files, and the note offers **Copy** (both files as a
+     URI list). From a library card, the PDF is loaded and exported on a worker, without opening a tab.
+   The one-time export is Share's; a `.xopp` kept beside the PDF is "Keep it updated for Xournal++" (or the global
+   setting).
+
+## Annotations of other apps made editable
+
+Annotations other apps added to the PDF (their highlights, ink, text boxes, notes) are shown by the background and
+kept when saving (above). With the user's consent they become ours instead
+([adopt-annotations.md](adopt-annotations.md)): converted into a layer "From <app>" per page and sticky notes, and
+the document's background PDF becomes a copy without them (`adopt::prepare`; the same pages under the same numbers).
+So the next save of a PDF with notes writes our annotations in their place, written in full (the incremental base is
+dropped, as after importing changes); a `.xopp` gets the copy beside it as `.name.pages.pdf` (the copy is a merged PDF
+`WithSource`); the user's PDF itself is not written (in the PDF itself mode its original is kept as for any first
+save). Undo takes the earlier background back (a hard link to the user's PDF's bytes in the cache, should the file be
+written meanwhile). Our own annotations (`xopp:` names, the private key) are never adopted.
+
+## Archive PDF
+
+An export meant for keeping: a **PDF/A-3b** file that stays readable
+for decades in any PDF viewer, with the ink merged into the pages so no viewer can hide or lose it, and the full
+Xournal data embedded so xournal-qt still opens it for editing.
+
+### The file (`HybridPdf::writeArchive`, `qt/src/session/ArchivePdf.*`; tests `ArchivePdfTest` in `HybridPdfTest.cpp`)
+
+It is a hybrid PDF with three differences:
+
+1. **The ink is page content, not annotations.** Each visible layer is drawn by cairo exactly as for a hybrid PDF's
+   `/AP`, and placed as a Form XObject (`/XqtInkN` in the page's resources, the same `/Matrix`: crop box, rotation
+   undone; the transparency group not isolated, so the highlighter multiplies) by a content stream appended **after**
+   the page's own streams, which stay untouched: `/Contents [ (q) <the page's own streams> (Q q /XqtInk1 Do Q …) ]`,
+   like upstream's PDF export (QPdfExport). Every viewer draws it as part of the page.
+   - **Reopening stays fully editable.** Both added streams carry our private key `/XournalQt` in their stream
+     dictionary; the second lists the XObjects it adds (`/XObjects [/XqtInk1 …]`) and the layers it draws
+     (`/Layers [(xopp:p1-l1) …]`). The reader's clean copy (the background) removes exactly those two streams and
+     those XObjects (`unflatten`), so the background is the original page, pixel for pixel, and the strokes come from
+     the embedded `.xopp` only: erasing one and saving removes it from the page and from the data. The page's
+     resources get their own copy when written (a shared dictionary is never changed for other pages).
+   - Content another app appended **after** ours stays in the background; it keeps a plain `q`/`Q` around the page's
+     own content (in place of our marked ones), so it is drawn where it was. The marker lists the layers merged in
+     (`/Flattened`); one whose stream is gone (another app rewrote the page's content as one stream) is reported like
+     a changed annotation ("edited in another app"; importing keeps the other app's page as it is).
+2. **Links stay `/Link` annotations** (`/URI`, `/GoToR`, as in a hybrid PDF), with the print flag (PDF/A wants it on
+   every annotation). They are the only annotations of ours.
+3. **PDF/A-3b** (`ArchivePdf::conform`, run on the assembled file):
+   - The `document.xopp` (and attached background images) are **associated files** of the document: the catalog's
+     `/AF` array, `/AFRelationship /Source` (images `/Supplement`), MIME type `application/x-xopp` (it is gzipped
+     XML, so not `+xml`), `/Params /ModDate`, `/F` and `/UF`. Embedded files of the source PDF become associated files
+     too (`/Unspecified`, a MIME type if they had none).
+   - An **sRGB output intent** (`/GTS_PDFA1`) with its ICC profile embedded: Graeme W. Gill's sRGB profile from
+     ArgyllCMS, version 2.2, 3,268 bytes, public domain (MIT in TeX Live's copy; see `qt/resources/icc/README.md`),
+     compiled into the app (`XqtSession.cmake` writes it as a byte array). A version 2 profile is accepted by every
+     PDF/A part and validator.
+   - **XMP metadata** (unfiltered: qpdf leaves metadata streams uncompressed) with the same title, author, subject,
+     keywords, creator (`xournal-qt <version>`), producer and dates as the rebuilt document information dictionary
+     (dates in UTC, `D:…+00'00'` and `…+00:00`), and `pdfaid:part 3`, `pdfaid:conformance B` **only when every check
+     passed**. The title is the source PDF's, else the file name without `.archive.pdf`.
+   - Written with a document `/ID`, never encrypted, at least PDF 1.7, an end of line before every `endstream`
+     (veraPDF's rule 6.1.7.1-2), object streams (allowed from PDF/A-2 on). Streams with an LZW filter are decoded and
+     compressed again.
+   - The marker says `/Version 2 /Archive true` (older builds refuse it instead of showing the ink twice); hybrid PDFs
+     stay version 1.
+   - **A hybrid PDF never claims PDF/A.** Its annotations and attachment are not PDF/A, so when its source PDF was
+     PDF/A the writer removes the PDF/A identification (`pdfaid:part`, `conformance`, `amd`, `rev`, as elements or
+     attributes) from the XMP metadata it keeps; the rest of the metadata and an output intent (which alone claims
+     nothing) stay. The same for the base pages exported for Xournal++. Silent: the UI says nothing about it.
+   - **Saving an archive PDF again in the app** (Ctrl+S after opening it) writes an archive PDF again (the file's
+     marker decides); the clean copy has no output intent, `/AF` or metadata of ours left, so a hybrid PDF written
+     from it never claims PDF/A.
+
+### What is checked, what is repaired
+
+The source PDF's pages are walked (content streams, resources, Form XObjects, patterns, Type 3 glyphs, annotation
+appearances). The file is always written; when a check fails, it has no PDF/A identification and the report lists
+why ("not PDF/A: the source PDF has fonts that are not embedded: Helvetica"). Compliance is never claimed when a
+check failed.
+
+- **Not PDF/A (reported):** fonts without `/FontFile*` (also the standard 14), DeviceCMYK colours (operators `k`/`K`,
+  colour spaces, images, shadings, inline images, group spaces) without `/DefaultCMYK` (the output intent is RGB),
+  annotations other than links and pop-ups without an appearance, form buttons whose appearance has no states,
+  sound/movie/screen/3D/rich media/file attachment annotations, PostScript XObjects, reference XObjects, streams
+  stored in other files, inline images with LZW or smoothing.
+- **Repaired (the pages look the same):** JavaScript (`/Names /JavaScript`, an `/OpenAction` script), `/AA` of the
+  catalog, pages, annotations and form fields, actions PDF/A forbids (launch, sound, movie, hide, named actions other
+  than the four page moves, …) and every action of a form field: removed ("JavaScript and actions PDF/A does not
+  allow were removed"). Hidden annotations: removed. Annotations: the print flag set, text notes no zoom/no
+  rotate, appearance states other than the normal one removed. Images: `/Interpolate false`, no `/Alternates`,
+  `/OPI`. Graphics states: no transfer functions or halftones. Fonts: `/CharSet` and `/CIDSet` removed (optional,
+  and often wrong in subsets). Forms: no `/NeedAppearances`, no XFA. Optional content configurations get a name
+  and lose `/AS`. Page-level output intents, `/Perms` and `/Requirements` are removed.
+- **Not checked** (veraPDF would find them): `.notdef` glyphs referenced by text, the insides of font programs
+  (widths, cmaps), ICC profiles inside the source PDF, implementation limits, and the rarer rules. In a sample of
+  19 PDFs from the system's documentation, every file our check called PDF/A-3b passed veraPDF, and every file it
+  did not failed veraPDF for the reasons listed (the files that also used `.notdef` glyphs used CMYK too).
+
+### Export for the archive (per document)
+
+- **⋮ → Export → Export for the archive…** (not for Markdown and text files) and **Share… → For the archive (PDF/A)**
+  (the tab menu and a library card's Share too) open a dialog that says what it means, in the author's words: "A PDF
+  made for keeping (PDF/A-3). It stays readable for decades in any PDF viewer. Your ink is merged into the pages, so no
+  viewer can hide or lose it. The full Xournal data is embedded, so this app can still open it for editing."
+- Where it goes: **next to the document as `name.archive.pdf`** (the default; `lecture.notes.pdf` gives
+  `lecture.archive.pdf`; an archive PDF itself gets `name.archive (2).pdf`, never its own file), or **in a folder I
+  choose…** (a folder dialog; the same name there). A document without a file yet only has the folder. An existing
+  file of that name is replaced (it is the archive of the same document).
+- It runs in the background ("Writing the archive PDF…"): the current document through the save machinery
+  (`SaveKind::ExportArchive`, `DocumentSession::exportArchive`): its state now, unsaved changes included; the document
+  keeps its file, its changes and its saved point. A library card's document is loaded and written on a worker
+  without a tab (`AppController::exportArchive(target, file)`).
+- Afterwards a report: "name.archive.pdf is a PDF/A-3b file …", or "… was written … It is not PDF/A, because:" with
+  the reasons, plus a grey line with what was changed to conform, and **Show in folder** (the file manager, where
+  sharing works).
+- Tests: `MainWindowTest.exportForTheArchive` (the dialog's text and default, the report, the file with the unsaved
+  stroke, the document still modified, Share's entry, a folder, a card's document).
+
+### Export library as archive (`qt/src/shell/LibraryArchive.*`; tests `LibraryArchiveTest`, `HomeScreenTest.exportLibraryAsArchive`)
+
+- **Library menu → Export library as archive…**: a dialog explains it (every document an archive PDF, other files
+  copied as they are, a README, a new folder, the library unchanged) and offers **the whole library** or **only this
+  folder** (with its subfolders; when a folder is open). Then a folder dialog.
+- Everything goes into a **new folder "<name> archive <YYYY-MM-DD>"** (" (2)" when it exists) inside the chosen one,
+  so nothing there is overwritten; `<name>` is the library's (or the folder's). A chosen folder inside the library is
+  refused ("The archive never goes into the library itself"); nothing is ever written into the library.
+- The folder structure is kept. The documents are the library's cards (`DocumentFiles::scanRecursive` with all files):
+  a `.xopp` alone, a `.xopp` with its PDF, a hybrid PDF (with its exported `.xopp`), a plain PDF, and a `.xopp` over
+  an image. Each is loaded like a card (`DocumentSession::loadFile`) and written as `<name>.pdf` (not `.archive.pdf`
+  there: the whole folder is the archive; " (2)" when two documents of a folder share a name). The image a `.xopp`
+  annotates is copied too. Markdown, images, text and all other files are copied as they are, with their times.
+  Hidden files and folders (the library's `.xournal_library`) are not.
+- **Links** between documents lead to their archive PDFs: `HybridPdf::LinkMap` reads each link from the document's own
+  folder, and a linked document of the export (its `.xopp` or its PDF) becomes a `/GoToR` to its archive PDF, at the
+  document's page (`page=`; archive pages are document pages).
+- A **README.txt** in the new folder: what the files are (PDF/A-3, the ink in the pages), how to edit again (open the
+  PDF in xournal-qt; `document.xopp` is an attachment), that other files are copied, the counts, the files that are
+  not PDF/A with the reasons, the ones that failed, and "incomplete" when it was cancelled.
+- It runs on a worker thread of the global pool at low priority, one file after the other, with a progress dialog
+  ("3 of 12 · Lectures/lecture.xopp") and **Cancel** (looked at between files; what was written stays, with the
+  README). At the end a summary: "N archived (N of them PDF/A-3b), N copied, N not PDF/A, N failed", the reasons,
+  and **Show in file manager**. A document whose PDF is missing, or that cannot be read, is listed as failed and the
+  rest goes on.
+
+Sharing a folder or the whole library as a zip, for other people rather than for keeping (the documents as they are
+with the library's readings, for Xournal++, or as plain PDFs), is "Share folder…" / "Share library…":
+[library.md](library.md), "Sharing a folder or the library".
+
+### Validation
+
+- The tests: `qpdf --check` passes; poppler draws each page like our PDF export (mean difference < 0.5/255, < 0.2 %
+  of the pixels off); the embedded `.xopp` opens as the same document; the background of the reopened file is the
+  original PDF pixel for pixel; erasing a stroke and saving removes it from the page and the data; another app's
+  appended content stays; the associated file, output intent (the profile's bytes), XMP (identification, title and
+  dates matching the document information) are there; a source PDF with Helvetica not embedded and CMYK colours is
+  written without the identification and both reasons are reported; JavaScript and a smoothed image are repaired.
+- **veraPDF** (the reference validator, Java; a test tool only, never run by the app): CI (Linux) downloads its
+  greenfield CLI from Maven Central (`org.verapdf.apps:greenfield-apps`, checked by SHA-1), runs `ArchivePdfTest`
+  with `XQT_ARCHIVE_SAMPLES=<folder>` (the tests copy their archive PDFs that claim PDF/A there) and fails when one
+  of them is not PDF/A-3b. Locally: `java -cp greenfield-apps-1.28.2.jar org.verapdf.apps.GreenfieldCliWrapper
+  --flavour 3b --format text <files>`; `XQT_ARCHIVE_SOURCE=<pdf>` makes `ArchivePdfTest.archiveOfAGivenPdf` write
+  an archive of any PDF (with a stroke on page 1) and print its report, to compare with veraPDF.
+
+## Saving: incremental updates
+
+Ctrl+S on a hybrid or archive PDF appends only what changed, as a standard incremental update (ISO 32000-1, 7.5.6),
+the way Acrobat and Drawboard save: the file's bytes stay as they are, and a new revision follows them. On
+pgfmanual (1,321 pages, notes on 53) a save after one stroke takes about 0.2 s instead of 7.5 s and appends about
+22 KB (measurements below).
+
+### The appender (`qt/src/session/IncrementalPdf.*`)
+
+qpdf reads and changes the PDF but can only write whole files, so the update is written by our own small appender,
+with every object serialised through qpdf (`unparseResolved`, a stream's dictionary and its raw data):
+
+- The file is opened with qpdf and an `Update` is started. Each object of the file is `touch()`ed before it is
+  changed (its text is remembered); at the end the touched objects whose text differs are written again under their
+  numbers, with the new objects they reach. Nothing else of the file is read or written.
+- New objects are made by the `Update` (`add`, `addStream`, `copy` of another PDF's objects, `copyStream`), numbered
+  after the file's highest object. Not with qpdf's `makeIndirectObject`, `newStream` or `copyForeignObject`: the
+  first new object makes qpdf read every object of the file to find a free number (pgfmanual: 1.1 s with qpdf 12.4,
+  6.4 s with 10.6; the whole appended save takes about 0.2 s). A number is taken with a null object that is replaced
+  later (qpdf 12 gives a handle of a number the file does not have that is bound to nothing). A new stream is a
+  dictionary in the qpdf document (so other objects can refer to it) whose data the `Update` keeps.
+- qpdf 12 or newer is needed; the desktop build compiles a pinned release ([releasing.md](../development/releasing.md), "Which
+  package for which system").
+- The cross-reference section matches the file's style: a cross-reference stream after one (PDF 1.5; our full
+  writes use them), with the new dictionaries in an object stream, else a classic table. The trailer has `/Size`,
+  `/Root`, `/Info`, `/ID` (the file's first identifier, a new second one) and `/Prev` (the last `startxref`, the
+  one thing read from the file's bytes directly). New streams without a filter are compressed (not XMP metadata);
+  every `endstream` has an end of line before it (PDF/A).
+- **Crash safety.** The update is written to a copy of the file (`.name.pdf.<pid>-<n>.part` next to it; copying uses
+  `copy_file_range` or a reflink where the file system has one: about 10 ms for 10 MB here), flushed to the disk
+  (`fsync`) and renamed over the file. A crash, a full disk or any failure at any point leaves the previous revision
+  exactly as it was, and readers of the file meanwhile (the library's index and covers, other apps, a sync
+  client) never see a half-written update: appending in place would leave a tail without `startxref` after a crash,
+  which readers repair in different ways, and could be read half-written. The price is the copy; the new bytes on
+  the disk are the update's. Temporary files a crash left behind are removed by the next save of that file (after
+  ten minutes). The in-memory state of the session (the revision, below) changes only after the rename succeeded.
+  Tested with an injected failure before the first byte and after the last one: the file is byte for byte what it
+  was, no temporary file is left, and the next save succeeds.
+
+### What changes, and how it is found without reading the pages
+
+A long PDF written with object streams has its page dictionaries spread over the whole file, so reading every page
+means reading most of the file (seconds). An incremental save reads only what it changes:
+
+- **Which base page is which.** A `Revision` (in `HybridPdf.h`) maps the page numbers of the document's background
+  PDF to the page objects of the file. After opening, it comes from the clean copy's cache entry: `pages.txt` lists
+  the file's page objects in order (the clean copy's page *k* is the file's page *k*), valid while the file is that
+  version (size and time) and was not edited in another app (`changed.txt` empty). After a save it comes from the
+  save itself: the session keeps it (`DocumentSession::hybridRevision`) while the numbering of the background PDF
+  stays. Pages pasted from other PDFs (the merged PDF grows, the numbers stay) are copied from the background PDF.
+- **What each drawing shows.** Each layer and each generated background has a *sig*: a hash of its XML as the
+  `.xopp` holds it (the layer's elements, or the background with an image's pixels), the page size and the app's
+  version. `prepare()` computes the `.xopp` first and draws only what the file does not have yet. The sig is in
+  our annotation's private dictionary (`/XournalQt /Sig`), in an archive page's ink stream (`/Sigs`), and in a
+  drawn base page (`/XournalQt /Bg`); the marker lists the drawn pages (`/Drawn`).
+- **The record.** The marker records each layer's sig, its drawing (Form XObject) and its annotation (`/Layers <<
+  /xopp:p3-l1 [(sig) form annot] >>`). A page in its place whose layers and links are as recorded is not read at all.
+  Only changed pages are: their annotations of other apps stay in place, ours are kept when unchanged (written again
+  when only their name or page moved), a drawing the file has with the same sig is reused (a copy when it is placed
+  differently), and only new drawings are added.
+- **Per save** the update holds: the changed pages (their `/Annots` or, in an archive PDF, the `/Contents` and
+  `/Resources`), the new or rewritten annotations and drawings, the page tree's root when pages were added,
+  removed or moved, new base pages, the embedded `document.xopp` (a new stream in its file specification; for
+  archive files with `/Params /ModDate`), the marker (hashes, record, `/Base` and `/Updates`), and `/Info` (and the XMP
+  metadata of an archive PDF). Attached background images (`document.xopp.bg_N.png`) and other attachments whose
+  size and MD5 checksum are what the file has are not written again. A removed page is only taken out of the page
+  tree (its objects stay, so undo can bring it back cheaply; the next full write drops it).
+- A file whose marker has no record of our layers (an earlier pre-release's) is written in full once; that write
+  makes the record, so the next saves append.
+
+### When the whole file is written anew (compaction)
+
+- **Save as**, and a save that **shares** the file (Share → PDF with notes, Copy the PDF with notes: older
+  revisions can still hold ink that was deleted, a privacy matter): `SaveRequest::compact`, and a hybrid PDF that holds
+  earlier revisions counts as needing a save before it is shared (`AppController::shareStep`). A hybrid PDF card of
+  the library shared as it is is first written anew in one piece by qpdf, the same content (`HybridPdf::compact`,
+  on a worker). **Export** (plain PDF, archive, For Xournal++, a PDF copy) and the library's archive export always
+  write fresh files from the document.
+- When the file would then have grown by more than **25%** since it was last written in full (`/Base` in the
+  marker; `HybridPdf::compactAbove`). For small files that is soon: they are cheap to write.
+- When many pages changed at once: more than a quarter of the pages are new base pages (pasted, or a new
+  background drawn), or more than a quarter of the file's pages were removed (their dead weight would stay).
+- When there is nothing to build on: the file changed since it was written or opened (another app saved it), it was
+  edited in another app (its hash check found a change), the other app's version was imported, the file is
+  encrypted with an older method than AES-256 (AES-256 files are appended to encrypted: "Encrypted PDFs" below), its
+  page tree is not flat or passes attributes on, the embedded images changed, or anything unexpected
+  (an exception): the save falls back to the full write, which is always correct. `XQT_HYBRID_TIMES=1` prints why.
+
+### The clean copy and "edited in another app"
+
+- **The clean copy is kept** across incremental saves: when the pages are the same pages in the same order, the
+  cache entry of the new version gets the clean copy of the previous one as a hard link (a copy where links fail),
+  with the new `document.xopp`, so opening the file again takes 0.4 s instead of 5 s. When pages were added, removed or
+  moved, the next open makes a clean copy of that version (in the background right after the save).
+- **"Edited in another app"** works on incremental files too: qpdf reads the latest revision, and the hashes
+  in the latest marker describe our annotations as they are now. When another app appends its own update that moves
+  or deletes one of ours, the check reports it; the next save writes the file anew. An update of another app that
+  only adds its own annotations is kept, and the next save appends on top of it.
+
+### PDF/A
+
+PDF/A-2 and -3 allow incremental updates. An archive PDF saved again stays PDF/A-3b: the update has no encryption,
+a cross-reference stream and object streams (allowed from PDF/A-2 on), `/ID` in its trailer, an end of line before
+every `endstream`, and nothing after `%%EOF` but one end of line. The document information's `/ModDate` and the XMP
+metadata's `xmp:ModifyDate` and `MetadataDate` get the same new date (the XMP stream is written again, uncompressed,
+with its creation date and PDF/A identification kept; `ArchivePdf::update`). A new drawing is checked and repaired
+like the source PDF was (`ArchivePdf::check`, e.g. an image's `/Interpolate`) before it is copied into the file; if it
+cannot conform, the file is written anew instead, which claims PDF/A
+only when everything conforms. CI's veraPDF step also validates an archive
+PDF saved incrementally three times (`IncrementalSaveTest.anArchivePdfStaysPdfAAfterIncrementalSaves`).
+
+### Tests and measurements
+
+Tests: `IncrementalPdfTest` (the appender: both cross-reference styles, the previous revision readable, poppler and
+`qpdf --check`, new and copied objects, a failed write) and `IncrementalSaveTest` in `HybridPdfTest.cpp` (only what
+changed is appended; eight saves in a row with every kind of change — strokes, an erased stroke, pages moved,
+added, deleted, a background changed, a text, a page shown twice — each checked with `qpdf --check`, drawn by
+poppler like a full write of the same document, and opened as the same document; pages pasted from another PDF;
+the compaction rules; exports and shared files without earlier revisions; the clean copy kept; another app's
+appended revision; a file without the layer record written in full once; an archive PDF staying PDF/A). UI: sharing compacts
+(`sharingThePdfWithNotes`, `shareFromALibraryCard`).
+
+**Time** (`XQT_BENCH_HYBRID=<pdf>` runs `IncrementalSaveTest.benchCtrlS`, `XQT_BENCH_SAVE=<pdf with notes>` one
+save, `XQT_HYBRID_TIMES=1` prints the steps): on the 1,321-page manual with notes, Ctrl+S after one stroke appends
+about 23 KB in 0.1–0.2 s (a PDF with notes or an archive PDF), where a full write takes 1.4 s (an archive PDF 3.3 s:
+the PDF/A check walks every page) with qpdf 12. The appended bytes are mostly the embedded `.xopp`, which is always
+written whole. At 25 % growth the file is written in full again: here after about 110 such saves.
+
+Validation of the files after several incremental saves (`XQT_INCREMENTAL_SAMPLES=<folder>` writes them, with a full
+write of the same document): `qpdf --check` passes after every save; poppler (in the tests), pdfium (Chrome's
+renderer, through pypdfium2, with annotations) and Ghostscript 9.55 draw every page of the lecture after eight saves,
+and pages 1, 2, 11, 26, 41, 51, 71, 76, 101, 126, 131, 501, 1001 and 1321 of pgfmanual (hybrid and archive),
+identically to the full write (no pixel differs). veraPDF 1.28.2 passes the archive PDF saved incrementally three
+times (PDF/A-3b); pgfmanual's archive PDF is not PDF/A with or without increments (its source is not, and the file
+does not claim it). MuPDF and pdf.js were not tried.
+
+## PDF files mode
+
+The author's decision: people can work with PDFs only, the Drawboard way:
+every document is a single PDF, with no sidecars.
+
+### The setting and the first-start question
+
+- `documentMode` in the `xournalQt` part of `settings.xml` (`session/DocumentMode.h`): `pdf` ("PDF files") or `xopp`
+  ("Xournal++ files", the behaviour before). While it is not stored the app works as Xournal++ files.
+- The first start of the main window where it is not stored asks once (`DocumentModeDialog.qml`): "How do you want to
+  keep your documents?", two cards (`DocumentModeCards.qml`):
+  - **PDF files** (like Drawboard PDF, GoodNotes, Xodo): every document is one PDF that any app opens; notes on a
+    PDF are saved into that PDF, nothing else is written next to the files. *Recommended for most people*; chosen
+    to start with.
+  - **Xournal++ files** (like Xournal++): `.xopp` notes next to their PDFs, fully compatible with Xournal++.
+    *Recommended if you also use Xournal++*.
+
+  A line says it can be changed in Settings → Documents and that copies for Xournal++ stay available through
+  Share → "For Xournal++". Only **Continue** closes it (Escape and a tap outside do not); the choice is stored then.
+  Existing installs are asked too. After a crash the recovery question follows it.
+- Settings → Documents shows the same cards at the top ("Keep documents as"); a tap changes the mode at once. In PDF
+  files mode the switch "Save notes into the PDF itself" is hidden: it is always so.
+- Tests and scripts: `XQT_DOCUMENT_MODE=xopp|pdf` stands in for a choice that is not stored and keeps the question
+  away (a stored choice wins). The UI tests set `xopp` in `tests/ui/main.cpp`; `FirstStartTest` unsets it to test the
+  question, and the tests of PDF files mode store the mode and set it back.
+
+### What PDF files mode does
+
+- **New documents** are PDFs with notes: the library's New document saves `name.pdf` at once
+  (`AppController::createDocument`); a new tab's Save as starts on "PDF with notes" with `name.pdf`
+  (`AppController::saveFormat`, also used by the window's Save as for every document: a hybrid PDF stays a PDF, a
+  `.xopp` a `.xopp`, everything without a file of its own takes the mode's type).
+- **Annotating a PDF writes into that PDF.** Ctrl+S (and closing with Save) saves without a dialog, as with "Save notes
+  into the PDF itself": there is no "where to save the .xopp" step. The first save turns the plain PDF into a PDF with
+  notes (written in full, atomically: a temporary file renamed over it); from then on Ctrl+S appends incremental
+  updates (above). Save as suggests the PDF itself.
+  - *The original pages are never rewritten*: their content streams are copied as they are (`qpdf_dl_none`), our ink
+    is annotations on top (`PdfOnlyMode.annotatingAPdfSavesIntoItThenAppends` compares the raw content streams of
+    every page before and after both saves).
+  - *No `name.original.pdf`* next to it (nothing is written next to the files). Instead the original is kept once in
+    the app cache, `~/.cache/xournal-qt/originals/<hash of its path>/name.pdf`, as a hard link where the file system
+    allows (it costs nothing: the file is replaced by a rename, so the link keeps the original bytes), else a copy.
+    Entries older than 30 days are removed at the next such save. No UI; it is a safety net for a writer bug.
+  - *A one-time notice* after the first time notes go into a PDF of the user's: "Your notes are saved in
+    lecture.pdf. Its pages stay as they were; other PDF apps show the notes as annotations." (a snackbar, setting
+    `pdfOnlyIntoPdfNoticed`). Not a dialog before the save: the user chose PDF files with that explanation at the first
+    start, and a question on every first save of a PDF would be friction the chosen mode is meant to remove. The notice
+    makes sure nobody is surprised that the PDF itself changed.
+- **Pasted pages go into the PDF.** A PDF with notes never writes `.name.pages.pdf` or `.name.next.pdf`: pasted
+  PDF pages live in the merged PDF in the cache until the save copies them into the file (as for every hybrid PDF).
+  The paste note says "it goes into the PDF when saved".
+- **Images are inside.** An image written on (`photo.png` opened) is saved as `photo.pdf`; on every save of a PDF with
+  notes in this mode, an image file shown as a page background becomes an attached image of the embedded `.xopp`
+  (embedded in the PDF), so the PDF does not depend on the image file. Images inserted on pages were always inside
+  the `.xopp` data.
+- **Autosave and recovery stay in the app cache.** Upstream (and Xournal++ files mode) autosaves a saved document as
+  `.name.autosave.xopp` next to it; in PDF files mode every autosave goes to `~/.cache/xournal-qt/autosaves/<pid>-<tab
+  serial>.autosave.xopp`, the name unsaved tabs always had (`DocumentSession::autosavePath`). Recovery after a crash
+  looks there for saved documents too (`SessionRecovery::findCandidates`, whatever the mode is now), recovers the
+  document as its PDF, and its next save writes into it. Crash (emergency) saves were already in the cache; so are the
+  clean copies, the merged PDFs of pasted pages and the kept originals.
+- **Existing `.xopp` files keep their format**: they open and save as `.xopp` (with their sidecars, which are part of
+  that format); Save as starts on `.xopp` for them. Save as → "PDF with notes" and its old-`.xopp` question work as
+  before.
+- **Xournal++ files mode** is exactly the behaviour before the question existed.
+- Not changed by the mode: Share (a hybrid PDF, "For Xournal++" exports into a chosen folder), the archive export, the
+  "edited in another app" check, and the explicit per-document "Keep it updated for Xournal++" and the global "also
+  write a .xopp" setting (both write a `.xopp` next to the PDF because the user asked for it).
+- **Windows, not verified:** the first save renames the new file over the user's PDF. The document itself reads its
+  pages from a copy in the cache before that, but another program or a preview worker of the app that
+  has the PDF open without `FILE_SHARE_DELETE` makes the rename fail on Windows; the save then reports an error and
+  the file stays as it was. Incremental saves rename over the file too. A retry, or `ReplaceFileW`, may be needed
+  there.
+
+## Version history
+
+The author: "a fully version controlled PDF document leveraging the append saving … a version sidebar,
+the save date as the commit message and optional milestone messages", off by default but easy to find.
+
+### The model
+
+- **A version is a revision of the file that our save wrote while history is on** (Ctrl+S, Save on close, "Save with
+  a message…"; autosaves never touch the PDF). The file cut after that revision's `%%EOF` is the file as it was saved
+  then (`PdfRevisions`: our own walk of the cross-reference chain, classic tables and streams, other apps' updates, a
+  damaged tail; a prefix opens in qpdf through a bounded input source).
+- **One version per local calendar day.** The first save of a day appends a new version; a further save that day
+  appends and then writes the day's two revisions again as one over the prefix before them
+  (`IncrementalPdf::Update::serializeOver`, `append(…, keep)`): what only the earlier save used goes, the file grows
+  by the day's last state only. A version written in full (the first save of a new file) and a version followed by
+  another app's revision are never cut away: the next save is a new version.
+- **A milestone is a version with a message** ("Save with a message…", Ctrl+Alt+S, at most 200 characters). It is never
+  replaced; the saves after it start a new version. A milestone saved on a day whose version is unnamed takes that
+  version's place. A message can be given or changed later (only the marker is appended; that update counts as part
+  of the current version, see `/Start` below).
+- **Version 0 is the file as it was when history began:** a plain PDF "as received" (the first save with history on
+  appends the whole document on top of it, its bytes stay; streams the file has already are referred to, not copied:
+  `Update::copyAll` with `indexReuse`), or a PDF with notes as it was (its `.xopp`'s checksum recorded).
+- **No compaction while on.** The 25 % rule and the many-pages rule are off. Where a save cannot build on the file
+  (another app saved it, it was edited elsewhere, anything unexpected) the whole document is appended as one update
+  instead of writing the file anew, so no version is lost. Save as over another file, Export, and Share without the
+  versions write fresh files.
+- **Restore** never rewrites history: the version's pages replace the document's pages in one undo step; the next save
+  is a new version with the message "Restored the version of …" (never in place of the day's version).
+- **No pruning** in this build: all versions are kept; the panel shows the size they take.
+
+### In the file
+
+- The marker gets `/History << /On true /Count n /Latest (date) /Start offset >>` and `/Versions`, a compressed stream
+  with one JSON line per version: `id`, `date` (UTC), `day` (local), `msg`, `start` and `end` in the file, `sha` (SHA-256
+  of the uncompressed `.xopp`), `kind` (`received`, `full`, `delta`), `base` (a delta's version), `pages`. Each
+  revision's list covers the versions before it and its own; the latest is the truth. `/Count` is what the library
+  reads (no list, no chain). `/Start` says where the revision with this marker begins: it tells our revisions from
+  other apps'.
+- `PdfHistory::list` checks the list against the file: a listed end that is no revision end is a version another app
+  removed (it wrote the file anew; said once in the panel), a revision after the first version that no version covers
+  is another app's ("Changed in another app", with its `/ModDate`).
+- **Older versions as deltas.** At the first save of a new version, the version before it (still the file's last
+  revision, ours, an ordinary day's version) is written again: its pages and drawings stay the same objects, so any
+  PDF viewer still shows that version as it was; its `document.xopp` leaves the attachment tree and the marker gets
+  `/XoppDelta << /Data stream /Base id >>`, a byte delta (`ByteDelta`: copy ranges and inserts, 16-byte blocks by a
+  rolling hash) of its uncompressed `.xopp` against the version before it. It stays whole when it is a milestone,
+  every 30th version, the first version, after another app's revision, or when the delta would be more than half of
+  its `.xopp`. The delta is checked to give the version back before it is written, and every rebuilt version against
+  its SHA-256 (`PdfHistory::xmlOf`). The latest version always has a whole `document.xopp` (Acrobat's attachments,
+  `pdfdetach`); the `.xopp` of any version: `xournal-qt-cli export-xopp <file.pdf> [--version N] [-o out.xopp]`.
+  The writer gives the same bytes for the same document (a test), so the deltas stay small; a change on the first
+  page changes the `.xopp`'s preview and with it its delta.
+- Attached background images whose size and checksum the file has are not written again (with or without history).
+
+### In the app
+
+- The page sidebar's **History** button (a clock, after Annotations): while versions are not kept, what they are and
+  the switch "Keep versions of this document" (a `.xopp` document: "needs a PDF with notes", with Save as PDF with
+  notes…; an archive PDF and a text file keep none). On: the list newest first ("Unsaved changes", versions with their
+  date as "Today 14:30", milestones with a flag and their message, other apps' revisions), the Milestones filter, the
+  size line, "Save with a message…". A row's menu: Show beside the document (read-only, as the reference), Compare with
+  now, Compare with another version…, Restore this version…, Open as a copy (a new document, not saved), Add / Change
+  the message…
+- **Comparing** ([reference-view.md](reference-view.md) "Scrolling both sides together, and
+  comparing"): "Compare with now" shows the version beside the document, both scrolled together, the pages that
+  changed marked in the page lists, with next and previous change; "Compare with another version…" and a tap on
+  another row shows the newer of the two read-only in a tab of its own with the older beside it. The pages are
+  compared by what they hold (`VersionDiff`: each element's XML as the `.xopp` holds it, the background, the size), not by the
+  marker's `/Layers` sigs: those miss the unsaved changes of "now" and change with the app's version. A version cut out
+  of the file is read-only wherever it is shown, and is not added to Recent.
+- ⋮ → Document → "Version history…" and "Save with a message… (Ctrl+Alt+S)". Settings → Documents → "Keep versions
+  of new PDFs with notes" (off). The choice per document is the session's (`keepsVersions`) until a save writes it.
+- **Share** sends a PDF with notes that keeps versions without them (a copy written anew in the app cache; the file is
+  never compacted in place while it keeps versions), with a check box "With its version history" for the file itself.
+  Sharing a folder or the library as a zip does the same per file ("Version history", off by default; [library.md](library.md),
+  "Sharing a folder or the library").
+- The library's cards (and Recent) show a small clock on documents that keep versions; the tooltip says how many.
+- **The version cache** (`VersionCache`, the owner of the versions cut out of files to be shown or opened): the last
+  five used, at most 500 MB, removed when the app quits; other processes' after a day. A version a tab shows (beside
+  the document, compared, opened) is pinned by its tab: the limit never removes it and counts only the versions
+  nobody shows; closed, it is an unused one again.
+
+### Size
+
+Each day's version adds only a delta (`XQT_BENCH_HISTORY=1 xqt-session-tests --gtest_filter='*benchTenDays*'`): on a
+generated lecture of 20 pages with 20 strokes added a day, 5–7 KB a day where a whole `.xopp` per version would add
+25–32 KB.
+
+### Other apps
+
+- Acrobat's "Save" appends its own update: the versions stay, its revision is listed as "Changed in another app" and
+  never cut away. Acrobat "Save As", "Reduce file size", macOS Preview and most mobile apps write the file anew: the
+  latest state stays, the versions are gone (the panel says how many were removed). To be checked on the device
+  ([testing/device-checklist.md](../testing/device-checklist.md)).
+- An old version cut out of the file shows correctly in any PDF viewer (its page drawings are complete); its `.xopp`
+  needs xournal-qt or `xournal-qt-cli export-xopp` when it is a delta.
+
+### Not built (follow-ups)
+
+- **Play**: the scrubber across versions with ▶ belongs on the replay's play bar ([timeline.md](timeline.md)). Compare
+  is built ([reference-view.md](reference-view.md)); left of it: on a changed page, what was added and removed
+  highlighted.
+- Pruning (thinning unnamed versions) and "Remove unnamed versions": only if real files need it.
+- Signed revisions are not looked for (our appender never cuts a revision that is not ours and the last).
+- A cheaper version 0 for long PDFs: the first save appends our page tree with references to the original's streams;
+  page dictionaries and resources are copied (small next to the content, but not nothing).
+
+## Encrypted PDFs
+
+The author: "support pdf encryption and opening of encrypted PDFs using qpdf". Code:
+`qt/src/session/PdfEncryption.*` (qpdf), the window's part `qt/src/app/AppEncryption.cpp`; tests
+`PdfEncryptionTest` (session) and `PdfPasswordTest` (UI). The encrypted fixtures are made in the tests with qpdf.
+
+### Opening
+
+- `DocumentSession::loadFile(path, attachPdf, password)` first asks qpdf what the PDF's encryption is
+  (`PdfEncryption::probe`: the trailer and the cross-reference table). A PDF with a **user password** opens only with
+  it: without one the result says `needsPassword` (`wrongPassword` for a wrong one) and nothing is opened. A `.xopp`
+  whose background PDF has one is the same (`passwordFile` is that PDF: LoadHandler asks for its password through a
+  hook, `LoadHandler::pdfPassword`).
+- The window asks (`pdfPasswordDialog`: the file's name, the password hidden, "The password is not right. Try again."
+  for a wrong one, Cancel leaves it closed). Several waiting (a recovery) are asked one after the other.
+- A PDF with **only an owner password** (restrictions) opens without asking. Anyone can read it, so it is not treated
+  as confidential (cached, indexed like any PDF). Its restrictions are **honoured for printing and copying text**
+  (Print says the author does not allow it; copying PDF text says so); changing it is allowed (we write notes as
+  annotations, and saving keeps its encryption and restrictions as they are). pdf.js and Chrome ignore restrictions;
+  Acrobat and Preview honour them.
+- **The password lives in memory only** (`PdfEncryption`'s registry): while a document of the file is open
+  (`PdfEncryption::hold`), for the file and the files the app makes from it in its cache (the clean copy, a merged PDF
+  of pasted pages, a version cut out of the file, the autosave), each encrypted with the same key. Never in settings,
+  recent files, the session journal, logs or crash reports; overwritten when it is forgotten. Closing the last tab of
+  the file forgets it: opening it again asks again.
+- poppler gets it through upstream's `Document::password` (a seam: `setPdfPassword`), qpdf through
+  `PdfEncryption::openQpdf` everywhere the session's files are read (`HybridPdf`, `MergedPdf`, `PdfRevisions`).
+- Only code that works for an open document reads through the registry. The library's index, its covers, the tags
+  and titles of cards, and every other background reader open files without a password: they never read a protected
+  PDF, also while it is open (decided: the library does not index it, not even in memory). The card shows a lock
+  ("Protected with a password"; `LibraryIndex::lockedOf`, stored in the folder's notes).
+
+### A PDF with notes, encrypted
+
+- The embedded `document.xopp` is encrypted with the file (an embedded file stream). Opening a protected PDF with notes
+  reads it **into memory** every time (`LoadHandler::loadDocument` from an input stream, a seam; attached background
+  images from memory too); the cache entry holds only the clean copy (written by qpdf with the file's encryption) and
+  the list of its pages, never the `.xopp`. Saving writes the `.xopp` in memory (`SaveHandler` into a string, gzipped
+  here).
+- **Saving keeps the encryption.** A full write takes the file's encryption parameters (`PdfEncryption::Encryption`,
+  `CopyOf` the protected file; qpdf's `copyEncryptionParameters`, which needs no owner password). Save as `.pdf` and
+  "Save a PDF copy" keep the password; Save as `.xopp`, the `.xopp` export for Xournal++ and "Keep it updated for
+  Xournal++" are refused for a protected document (a `.xopp` cannot be encrypted).
+- **Appending stays fast, encrypted.** With AES-256 (V5, R5/R6, the standard crypt filter) every object has the
+  file's key itself, so the appender (`IncrementalPdf`) encrypts what it writes with qpdf's public API: the key
+  (`QPDF::getEncryptionKey`), AES (`QPDFCryptoProvider`'s rijndael, CBC with a random IV and PKCS#5 padding done by
+  us): strings of objects outside object streams (as hex strings), stream data (after compression), whole object
+  streams (their objects' strings not separately), never the cross-reference stream; metadata streams follow
+  `/EncryptMetadata`; the trailer refers to the same `/Encrypt` dictionary and keeps the first `/ID`. Ctrl+S, the
+  day's version and version history work the same. Tested: `qpdf --check` with the password after each save, poppler
+  draws every page, every earlier revision cut out of the file opens with the password, the strings decrypt to what
+  was written (our annotations' hash check), and nothing of the file reads without it. Files with older encryption
+  (RC4, AES-128) are written in full instead, keeping their encryption.
+- Encryption adds no measurable time to an appended save (`XQT_BENCH_ENCRYPTED=1 xqt-session-tests
+  --gtest_filter='*benchLong*'`); protecting a file and files with older encryption cost a full write.
+
+### Protecting, changing, removing
+
+- ⋮ → Document → **Protect with a password…** (a PDF, a PDF with notes; not an archive PDF: PDF/A allows no
+  encryption) and **Change or remove the password…** (`protectDialog`): the password twice; "Restrict what others can
+  do with it" with Allow printing / copying text / changes and a second (owner) password, which must differ.
+- AES-256 (R6) through qpdf (`QPDFWriter::setR6EncryptionParameters`), the metadata encrypted. **Without restrictions
+  the owner password is random** and known to nobody: there is nothing to lift, and anyone with the password has every
+  right (decided; with the same password for both some readers misbehave, qpdf warns). Other apps then cannot change
+  its security settings (Acrobat asks for the owner password); this app only needs the password to open it.
+- Unsaved changes are saved into the PDF first; then the whole file is written anew encrypted
+  (`PdfEncryption::rewrite`, atomic), its version history removed (earlier revisions would keep the old password or
+  none: the dialog says so when it keeps versions), and the document is opened again from it (its undo history starts
+  anew). Everything the app made of the file before (unencrypted, or with the old password) is removed
+  (`AppController::forgetDerivatives`, also when the password is changed or removed): clean copies of every version
+  with their `.xopp`, pictures and recordings (`HybridPdf::forgetCopies`), the stored pictures of its pages of every
+  version (`PageSketches::forgetFile`: their folders are named after the document first, `<hash of its path>-…`;
+  folders of the older naming are removed at the next start), its card's picture (the library's covers pack, or the
+  one for Recent), its library entry (text, title, tags, to-dos: an empty, locked entry written at once,
+  `LibraryIndex::documentProtected`) and its handwriting, versions cut out of it (tabs showing them are closed),
+  the original kept in PDF files mode, the Markdown work folder, copies shared from it. A `name.original.pdf` kept
+  next to the file earlier (Xournal++ files mode) is the user's file and stays. Tested:
+  `PdfPasswordTest.protectingRemovesEverythingTheCachesKeptOfIt` (a library document indexed, previewed, its pages
+  stored, a clean copy and a shared copy, then protected: its marker text is readable nowhere in the cache or the
+  library's packs, no picture of it is left).
+- Removing the password writes the file anew without encryption (the version history goes too).
+- **Share → "Protect with a password"**: the PDF with notes goes as a copy encrypted with the password typed there
+  (written into the app cache, then shown or copied; `sharePdfProtected`); the document keeps its file. A protected
+  document is shared with its own password. **Export as plain PDF** of a protected document is protected with the
+  same password (drawn through the cairo backend, which reads the PDF with poppler; qpdf's backend reads the file
+  itself). The archive export of a protected document has no password (PDF/A forbids encryption; its dialog says so).
+  "For Xournal++" is refused (Xournal++ cannot open encrypted PDFs). A folder or the library shared as a zip takes
+  protected PDFs as they are, encrypted, in every format ([library.md](library.md), "Sharing a folder or the library").
+
+### Nothing unencrypted on disk
+
+For a protected document (its file, or the PDF its `.xopp` annotates):
+
+| what | how |
+| --- | --- |
+| autosave | an encrypted PDF with notes in the cache, `<pid>-<serial>.autosave.pdf`, the same password, written in the background like a PDF copy; recovery after a crash asks for the password |
+| crash (emergency) save | not written (no qpdf in a crash handler); the last autosave is what is recovered |
+| clean copy, merged PDF of pasted pages, the copy a save reads pages from | encrypted like the file (qpdf keeps the encryption it read) |
+| the embedded `.xopp` | in memory only, when opening and saving |
+| page stand-ins on disk (PageSketches) | not stored; thumbnails, sketches and stand-ins stay in memory |
+| the library's text index, tags, card cover | not read (the file opens only with the password) |
+| the document's search | in memory (its own poppler instance gets the password) |
+| handwriting | recognised in memory, never handed to the library's cache |
+| version cache, "Show beside the document" | a version is a prefix of the encrypted file, opened with the password |
+| Share, PDF copy, export | encrypted (above) |
+| extract, split ([page-files.md](page-files.md)) | PDFs with notes encrypted with the same password, never a `.xopp`; pages as pictures refused (copying a page as an image to the clipboard is allowed, as the snip) |
+| printing | an unencrypted PDF for the printer in a temporary folder (without annotations: its PDF decrypted, as it is); removed as soon as `lp` has spooled it (it returns then), at the latest after ten minutes, at once after printing on Windows (Qt's print engine) or to a file, or when cancelled |
+
+Pictures of Markdown boxes and voice memos the PDF carries are taken out into the app cache while it is open (the
+renderer and the player read files): their folders are marked with the process (`unpacked-<pid>`), removed when the
+document is closed, and at the next start of the app for every process that no longer runs (a crash;
+`HybridPdf::removeProtectedLeftovers`, called before anything is opened). Known gaps: a Markdown work folder made only
+after opening (a picture inserted then) is not marked (removed when the document is closed, not after a crash); an
+attached page-background image passes through a temporary file of the save's work folder (removed at once). Tested by `PdfEncryptionTest
+.nothingOfAProtectedDocumentStaysUnencryptedInTheCache`: after opening, editing, autosaving, saving, a copy and
+opening again, no file in the cache holds a marker text of the document readable (as bytes, gunzipped, or in a PDF
+that opens without a password).
+
+### Other platforms
+
+Nothing platform-specific: qpdf and poppler do the work on every system. Windows: the protected file is replaced by a
+rename as every save is (see "PDF files mode"). Android: the password dialog uses the system keyboard; whether it
+offers to remember the password (autofill) depends on the keyboard (the field is a password field).
+

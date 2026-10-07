@@ -812,7 +812,7 @@ void AppController::connectCurrentDocument() {
             [this](int page, const QPolygonF& path) { inkSwept(current->view(), page, path); });
     connect(d, &CurrentDocument::messageRequested, this,
             [this](const QString& title, const QString& text) { Q_EMIT message(title, text, true); });
-    // The play tool on ink with a recording (qt/docs/audio.md)
+    // The play tool on ink with a recording (qt/docs/features/audio.md)
     connect(d, &CurrentDocument::playRequested, this, [this](const QString& name, qint64 ts) {
         if (audioControl) {
             audioControl->playMoment(name, ts);
@@ -1798,7 +1798,7 @@ fs::path AppController::journalFileFor(const Library& lib) {
 }
 
 bool AppController::createDocument(const QString& name, bool inLibrary) {
-    // Ink that reads on the new document's paper (qt/docs/dark-pages.md)
+    // Ink that reads on the new document's paper (qt/docs/features/dark-pages.md)
     inkForPaper(toQColor(app->getSettings()->getPageTemplateSettings().getBackgroundColor()));
     if (!inLibrary || !library->available()) {
         // The page template settings (background, size) are what the dialog changed.
@@ -3006,7 +3006,7 @@ bool AppController::openLoaded(const fs::path& file, const QString& path, xqt::D
         tabs->currentSession()->setHybridChanges(hybridChanged);
         Q_EMIT hybridEditedElsewhere(QString::fromStdString(file.filename().string()));
     }
-    // Marks of other apps in its PDF: asked once whether to make them editable (qt/docs/adopt-annotations.md)
+    // Marks of other apps in its PDF: asked once whether to make them editable (qt/docs/features/adopt-annotations.md)
     scanAdoptable(tabs->currentSession(), true);
     return true;
 }
@@ -3036,7 +3036,7 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
     }
     if (s->isProtected() && (way == SaveWay::ExportXopp || way == SaveWay::ShareXopp ||
                              (way == SaveWay::SaveAs && lowerExtension(target) != ".pdf"))) {
-        // A protected document: never written as a .xopp (it cannot be encrypted; qt/docs/hybrid-pdf.md)
+        // A protected document: never written as a .xopp (it cannot be encrypted; qt/docs/features/hybrid-pdf.md)
         Q_EMIT message(tr("Not saved"),
                        tr("This document is protected with a password, and Xournal++ files (.xopp) cannot be. Save it "
                           "as a PDF with notes, or remove the password first (⋮ → Document → Change or remove the "
@@ -3721,7 +3721,7 @@ bool AppController::handOver(const QStringList& given, bool toClipboard) {
     if (given.isEmpty()) {
         return false;
     }
-    // A .md with its pictures: the "name.assets" folder next to it goes along (qt/docs/md-images.md)
+    // A .md with its pictures: the "name.assets" folder next to it goes along (qt/docs/features/md-images.md)
     QStringList files;
     for (const QString& f: given) {
         files.push_back(f);
@@ -4156,7 +4156,7 @@ void AppController::undo() {
         return;
     }
     if (!session() || session()->isReplaying()) {
-        return;  // (replaying: nothing changes, qt/docs/timeline.md)
+        return;  // (replaying: nothing changes, qt/docs/features/timeline.md)
     }
     session()->clearSelectionEndText();  // first: finishing a text edit is itself an undo step
     endMarkdown(true);                   // (as is the Markdown being written beside the page)
@@ -4549,7 +4549,7 @@ bool AppController::insertPages(int position, int background, int paper, bool la
     if (landscape) {
         size.transpose();
     }
-    Color bgColor;  // (the paper: qt/docs/dark-pages.md)
+    Color bgColor;  // (the paper: qt/docs/features/dark-pages.md)
     const PageType type = paperTypeOf(background, paperColor, textured, bgColor);
     std::vector<PageRef> pages;
     for (int i = 0; i < count; ++i) {
@@ -4567,7 +4567,7 @@ bool AppController::insertPages(int position, int background, int paper, bool la
     return true;
 }
 
-// --- space for notes beside slides (qt/docs/note-space.md) --------------------------------------------------------
+// --- space for notes beside slides (qt/docs/features/note-space.md) --------------------------------------------------
 
 QVariantMap AppController::noteSpaceOf(int page) const {
     DocumentSession* s = session();
@@ -4711,7 +4711,7 @@ int AppController::applyPageSize(const QList<int>& pages, double width, double h
 namespace {
 /// PDF pages turn in the PDF: a turned copy of the page in the document's merged PDF. In a PDF with notes it is saved
 /// into the file; in a .xopp it is in the hidden ".name.pages.pdf" next to it, which Xournal++ reads too (the author,
-/// 2026-10-04; the PDF the .xopp annotates is never changed). qt/docs/page-rotation.md
+/// 2026-10-04; the PDF the .xopp annotates is never changed). qt/docs/features/page-rotation.md
 pagerotate::PdfPages pdfRotation() { return pagerotate::PdfPages::InPdf; }
 }  // namespace
 
@@ -4790,7 +4790,7 @@ bool AppController::changePageBackground(const QList<int>& pages, int background
     if (!s || background < 0 || background >= static_cast<int>(types.size())) {
         return false;
     }
-    Color bgColor;  // (the paper: qt/docs/dark-pages.md)
+    Color bgColor;  // (the paper: qt/docs/features/dark-pages.md)
     const PageType type = paperTypeOf(background, paperColor, textured, bgColor);
     Document* doc = s->getDocument();
     std::vector<size_t> changed;
@@ -4965,8 +4965,8 @@ bool AppController::exportPdf(const QUrl& url) {
     if (target.extension() != ".pdf") {
         target += ".pdf";
     }
-    // A protected document (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): its PDF is drawn through poppler, which has
-    // its password (qpdf's backend reads the file itself), and the export is protected with the same password
+    // A protected document (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs"): its PDF is drawn through poppler, which
+    // has its password (qpdf's backend reads the file itself), and the export is protected with the same password
     const bool secret = session()->isProtected();
     try {
         // Port of PdfExportJob: upstream blocks the UI while exporting, too.

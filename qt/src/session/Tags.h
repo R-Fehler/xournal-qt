@@ -1,5 +1,5 @@
 /*
- * xournal-qt: tags (qt/docs/tags.md): `#tag` in what is typed, and keywords of PDFs.
+ * xournal-qt: tags (qt/docs/features/tags.md): `#tag` in what is typed, and keywords of PDFs.
  *
  * A tag is written `#name`: letters, digits, `-`, `_` and `/` for nested tags (`#course/math` is inside `#course`),
  * with at least one letter (`#3`, `#1984` are none). The `#` starts the text or follows a space or an opening mark

@@ -263,11 +263,11 @@ void XmlParser::parsePageTag(const XmlParserHelper::AttributeMap& attributeMap) 
             this->builder.setPageNoteSpace(l, t, r, b);
         }
     }
-    // xournal-qt: a bookmark on the page (qt/docs/bookmarks.md)
+    // xournal-qt: a bookmark on the page (qt/docs/features/bookmarks.md)
     if (const auto label = XmlParserHelper::getAttrib<std::string_view>(xoj::xml_attrs::BOOKMARK_STR, attributeMap)) {
         this->builder.setPageBookmark(std::string{*label});
     }
-    // xournal-qt: voice memos on the page (qt/docs/audio.md)
+    // xournal-qt: voice memos on the page (qt/docs/features/audio.md)
     if (const auto memos = XmlParserHelper::getAttrib<std::string_view>(xoj::xml_attrs::PAGE_AUDIO_STR, attributeMap)) {
         this->builder.setPageAudio(std::string{*memos});
     }
