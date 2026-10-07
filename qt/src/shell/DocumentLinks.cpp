@@ -14,7 +14,7 @@
 
 #include "DocumentChapters.h"
 #include "DocumentFiles.h"
-#include "Library.h"
+#include "LibraryIndex.h"
 #include "MarkdownFile.h"
 #include "session/DocumentSession.h"
 #include "session/TextFile.h"

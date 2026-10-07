@@ -14,7 +14,7 @@
 #include "session/Citation.h"
 #include "session/PdfTitle.h"
 #include "shell/DocumentFiles.h"
-#include "shell/Library.h"
+#include "shell/LibraryIndex.h"
 #include "shell/LibraryCache.h"
 
 #include "support/CitationPdfs.h"

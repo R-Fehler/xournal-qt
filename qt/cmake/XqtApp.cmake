@@ -86,6 +86,15 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HandwritingSettings.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Library.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Library.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/FileStamps.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/FileStamps.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryIndex.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryIndexEntry.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryIndex.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryIndexPacks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryIndexRead.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryIndexSearch.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryIndexQueries.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryArchive.h

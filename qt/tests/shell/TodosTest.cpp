@@ -25,6 +25,7 @@
 #include "session/StickyNote.h"
 #include "shell/DocumentFiles.h"
 #include "shell/Library.h"
+#include "shell/LibraryIndex.h"
 #include "shell/LibraryCache.h"
 #include "shell/LibraryModel.h"
 #include "shell/LibraryTodos.h"

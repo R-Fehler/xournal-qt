@@ -21,7 +21,7 @@
 #include "util/PathUtil.h"
 
 #include "ImageFile.h"
-#include "Library.h"
+#include "FileStamps.h"
 #include "MarkdownFile.h"
 #include "Thumbnails.h"
 

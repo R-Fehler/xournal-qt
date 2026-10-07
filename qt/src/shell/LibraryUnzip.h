@@ -6,7 +6,7 @@
  * default), " (2)" when the name is taken. Its files get the times the zip gives (UTC from the extended timestamp,
  * else the DOS time). The library's readings a shared zip carries (".xournal_library/" packs) go where the library
  * keeps its cache (in the folders, or in the app cache), so its documents are not read again: their stamps match,
- * and where an unzip changed their times the library adopts the entries by size and content hash (Library.h).
+ * and where an unzip changed their times the library adopts the entries by size and content hash (LibraryIndex.h).
  *
  * Safe against crafted zips: no paths outside the target (no "..", no absolute paths, no drive letters), symbolic
  * links are left out, at most MAX_ENTRIES entries, the sizes must fit the free space and MAX_BYTES, and each entry is

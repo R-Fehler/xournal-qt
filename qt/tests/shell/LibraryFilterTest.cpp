@@ -25,6 +25,7 @@
 #include "AppController.h"
 #include "MarkdownFile.h"
 #include "shell/Library.h"
+#include "shell/LibraryIndex.h"
 #include "shell/LibraryModel.h"
 #include "support/TestSupport.h"
 

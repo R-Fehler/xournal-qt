@@ -19,7 +19,7 @@
 #include "session/PdfEncryption.h"
 #include "session/VersionCache.h"
 #include "shell/DocumentFiles.h"
-#include "shell/Library.h"
+#include "shell/LibraryIndex.h"
 #include "shell/LibraryModel.h"
 #include "shell/Previews.h"
 #include "shell/PageSketches.h"

@@ -20,7 +20,8 @@
 #include "session/DocumentSession.h"
 #include "session/DocumentTextIndex.h"
 
-#include "Library.h"
+#include "FileStamps.h"
+#include "LibraryIndex.h"
 #include "MarkdownFile.h"
 #include "MdImages.h"
 #include "Thumbnails.h"

@@ -22,7 +22,7 @@
 #include "CanvasMemory.h"
 #include "DocumentFiles.h"
 #include "DocumentPlaces.h"
-#include "Library.h"
+#include "FileStamps.h"
 #include "Previews.h"
 #include "Thumbnails.h"
 #include "DarkPages.h"

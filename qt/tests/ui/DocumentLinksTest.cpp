@@ -32,7 +32,6 @@
 #include "session/DocumentLink.h"
 #include "markdown/MdBox.h"
 #include "session/DocumentSession.h"
-#include "shell/Library.h"
 #include "shell/LibraryModel.h"
 #include "shell/PageSketches.h"
 #include "shell/Previews.h"

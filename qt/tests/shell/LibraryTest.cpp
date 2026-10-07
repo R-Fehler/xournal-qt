@@ -31,6 +31,7 @@
 #include "shell/DocumentPlaces.h"
 #include "shell/HitPages.h"
 #include "shell/Library.h"
+#include "shell/LibraryIndex.h"
 #include "shell/LibraryCache.h"
 #include "shell/LibraryModel.h"
 #include "shell/Previews.h"

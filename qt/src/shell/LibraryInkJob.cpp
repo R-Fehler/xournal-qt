@@ -13,7 +13,8 @@
 #include "hwr/LanguagePlan.h"
 #include "session/DocumentSession.h"
 
-#include "Library.h"
+#include "FileStamps.h"
+#include "LibraryIndex.h"
 
 #ifdef _WIN32
 #ifndef NOMINMAX

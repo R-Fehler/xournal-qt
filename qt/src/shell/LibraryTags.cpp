@@ -6,7 +6,7 @@
 #include "session/Tags.h"
 
 #include "DocumentPlaces.h"
-#include "Library.h"
+#include "LibraryIndex.h"
 #include "LibraryModel.h"
 
 namespace xqt {

@@ -39,7 +39,8 @@
 #include <QVariantMap>
 
 #include "DocumentFiles.h"
-#include "Library.h"
+#include "FileStamps.h"
+#include "LibraryIndex.h"
 #include "filesystem.h"
 
 namespace xqt {

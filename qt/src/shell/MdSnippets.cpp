@@ -16,7 +16,8 @@
 #include "session/TextMatch.h"
 
 #include "HitPages.h"
-#include "Library.h"
+#include "FileStamps.h"
+#include "LibraryIndex.h"
 #include "MarkdownFile.h"
 #include "MdLayout.h"
 #include "MdPassages.h"

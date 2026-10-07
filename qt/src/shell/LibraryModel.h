@@ -27,6 +27,7 @@
 #include "DocumentFiles.h"
 #include "GridSelection.h"
 #include "Library.h"
+#include "LibraryIndex.h"
 
 class QFileSystemWatcher;
 

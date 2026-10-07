@@ -20,7 +20,7 @@
 #include "session/DocumentSession.h"
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentLinks.h"
-#include "shell/Library.h"
+#include "shell/LibraryIndex.h"
 #include "shell/LinkRewrite.h"
 #include "support/TestSupport.h"
 

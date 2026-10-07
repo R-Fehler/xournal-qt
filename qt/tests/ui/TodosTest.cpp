@@ -34,6 +34,7 @@
 #include "session/DocumentSession.h"
 #include "shell/HitPages.h"
 #include "shell/Library.h"
+#include "shell/LibraryIndex.h"
 #include "shell/LibraryModel.h"
 #include "shell/LibraryTodos.h"
 #include "shell/MdSnippets.h"

@@ -37,7 +37,7 @@
 #include "session/PdfEncryption.h"
 #include "shell/DocumentFiles.h"
 #include "shell/HitPages.h"
-#include "shell/Library.h"
+#include "shell/LibraryIndex.h"
 #include "shell/LibraryModel.h"
 #include "shell/MdSnippets.h"
 #include "shell/PageSketches.h"
