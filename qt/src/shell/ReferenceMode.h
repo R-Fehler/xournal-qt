@@ -256,6 +256,8 @@ private:
     /// a new reference)
     void relock();
     bool pairLocked(const DocumentSession* x, const DocumentSession* y) const;
+    /// The PDF shown allows copying its text (else said so, through `copied`)
+    bool copyingAllowed();
 
     TabManager& tabs;
     Settings* settings;

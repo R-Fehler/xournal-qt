@@ -11,7 +11,8 @@ scrolled together), `VersionCompare` and `VersionDiff` (comparing versions). Tes
 
 - Opened with "Open as reference" (the tab strip's menu of another tab, the book on a card of the tab overview,
   a library card, a link's popup). The reference is another open tab; each tab has at most one.
-- For reading by default: tools scroll there, selections can be copied but not moved. The pen button of its pill
+- For reading by default: tools scroll there, selections can be copied but not moved. A PDF whose author does
+  not allow copying its text (opened without its owner password) refuses it there as on the notes. The pen button of its pill
   lets the tool in hand write there too (per tab; off for every new reference).
 - The pill: page number (go to a page), the page grid, scroll both sides together (see below), edit, copy, fit width,
   swap sides, swap roles (the reference becomes the notes), "Show as a tab", close. Keys act on the side tapped last. In a narrow half (under 480 px: a

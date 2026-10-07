@@ -6,9 +6,12 @@
 #include <algorithm>
 
 #include <QCoreApplication>
+#include <QClipboard>
 #include <QElapsedTimer>
+#include <QGuiApplication>
 #include <QPointer>
 #include <QSignalSpy>
+#include <QTemporaryDir>
 #include <gtest/gtest.h>
 
 #include "control/settings/Settings.h"
@@ -587,4 +590,47 @@ TEST(ReferenceMode, aVersionBesideTheDocumentCannotBeWrittenIn) {
     EXPECT_FALSE(t.ref().editable());
     t.ref().setEditing(true);
     EXPECT_FALSE(t.ref().editing());
+}
+
+// A PDF whose author forbids copying its text (opened without its owner password): its text is not copied from the
+// reference either, neither from its pill nor by Ctrl+C while the reference has the keys (review 2026-10, bug 1)
+TEST(ReferenceMode, theTextOfAPdfThatForbidsCopyingIsNotCopiedFromTheReference) {
+    QTemporaryDir dir;
+    const fs::path pdf = fs::path(dir.path().toStdString()) / "no copying.pdf";
+    const xqt::test::TextPdfStyle style;
+    xqt::test::makeTextPdf(pdf, {"Words that may not be copied"}, style);
+    AppController c;
+    c.newDocument();  // (the notes)
+    ASSERT_TRUE(c.openAsReference(xqt::test::qstr(pdf)));
+    ASSERT_TRUE(c.reference().active());
+    CanvasView* v = c.reference().canvas();
+    ASSERT_NE(v, nullptr);
+    v->getSession().setPermissions(true, false);
+    v->getViewController().setViewSize(QSizeF(600, 800));
+    QCoreApplication::processEvents();
+    const double zoom = v->getViewController().zoom();
+    const QPointF onText = v->pageViewRect(0).topLeft() + QPointF(style.x + 40, style.y - 6) * zoom;
+    const auto select = [&] {
+        ASSERT_TRUE(v->selectPdfTextAt(onText, true));
+        ASSERT_TRUE(v->hasPdfTextSelection());
+    };
+    QClipboard* clipboard = QGuiApplication::clipboard();
+
+    select();
+    clipboard->setText("before");
+    EXPECT_FALSE(c.reference().copyPdfText()) << "the pill's Copy";
+    EXPECT_EQ(clipboard->text().toStdString(), "before");
+    select();
+    EXPECT_FALSE(c.reference().copy()) << "the reference's own Copy";
+    EXPECT_EQ(clipboard->text().toStdString(), "before");
+    select();
+    c.reference().setFocused(true);
+    EXPECT_FALSE(c.copySelection()) << "Ctrl+C with the keys at the reference";
+    EXPECT_EQ(clipboard->text().toStdString(), "before");
+
+    // Allowed: copied (the same steps)
+    v->getSession().setPermissions(true, true);
+    select();
+    EXPECT_TRUE(c.reference().copyPdfText());
+    EXPECT_TRUE(clipboard->text().contains("copied")) << clipboard->text().toStdString();
 }

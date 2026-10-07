@@ -503,6 +503,9 @@ bool ReferenceMode::copy() {
     if (!shownView) {
         return false;
     }
+    if (shownView->hasPdfTextSelection() && !copyingAllowed()) {
+        return false;
+    }
     if (shownView->copyPdfText()) {
         shownView->clearPdfTextSelection();
         Q_EMIT copied(tr("Text copied from the reference"));
@@ -580,7 +583,20 @@ QString ReferenceMode::shownFile() const {
 
 QString ReferenceMode::selectedText() const { return shownView ? shownView->selectedText() : QString(); }
 
+bool ReferenceMode::copyingAllowed() {
+    if (shownSession && !shownSession->allowsCopying()) {
+        // A PDF whose owner does not allow copying its text (opened without its owner password): honoured, as on the
+        // notes
+        Q_EMIT copied(tr("The author of this PDF does not allow copying its text"));
+        return false;
+    }
+    return true;
+}
+
 bool ReferenceMode::copyPdfText() {
+    if (!copyingAllowed()) {
+        return false;
+    }
     const bool ok = shownView && shownView->copyPdfText();
     if (ok) {
         shownView->clearPdfTextSelection();
