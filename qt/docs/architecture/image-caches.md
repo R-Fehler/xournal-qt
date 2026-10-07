@@ -1,5 +1,8 @@
 # Image caches: the pictures the app draws ahead and keeps
 
+A sub-page of the [architecture overview](README.md): its block [Pictures and caches](README.md#pictures-and-caches)
+in detail.
+
 Besides the rendered pages of the canvas ([CanvasMemory](../../src/canvas/CanvasMemory.h)), the app draws smaller
 pictures of pages and documents and keeps them, so that lists and grids show them at once. They have one vocabulary,
 one owner of their memory and one owner of their worker threads.

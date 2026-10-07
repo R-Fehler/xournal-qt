@@ -26,6 +26,9 @@ block. This page is what the integrator hands every block agent (point it here i
   JS globals (`console`, …). E.g. `AbstractButton.click()` is 6.8: tests emit `clicked`/`triggered` instead.
 - A refactoring changes structure, not behaviour: the tests that pass before pass after (except tests that only pin
   removed behaviour, which go with them). Keep the objectNames tests use.
+- A block that adds, moves or removes a module, a CMake target or a key class updates
+  `qt/docs/architecture/architecture.yaml` and reruns `python3 qt/scripts/architecture/generate.py` in the same
+  commit (CI's `--check` fails otherwise; a moved file in a YAML path fails it too).
 - Don't add to VISION.md. In your last commit: TODO.md (your items `[x]` with a one-line note of what is left), the
   feature doc of what changed, a user-visible change in the next draft under `qt/docs/release-notes/`.
 - Decide obvious things yourself. If something is genuinely the author's decision, choose the conservative option,
