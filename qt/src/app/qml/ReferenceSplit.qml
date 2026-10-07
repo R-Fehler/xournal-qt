@@ -431,18 +431,18 @@ Item {
                     Popup {
                         id: referencePagePopup
                         objectName: "referencePagePopup"
-                        readonly property bool asSheet: typeof win !== "undefined" && win !== null && win.phoneLayout === true
+                        readonly property bool asSheet: typeof win !== "undefined" && win !== null && win.layout.phoneLayout === true
                         parent: asSheet ? Overlay.overlay : referencePageButton
                         modal: asSheet
                         dim: asSheet
-                        x: asSheet ? win.sheetX : 0
-                        y: asSheet ? win.sheetBottom - height : -height - 8
-                        width: asSheet ? win.sheetWidth : implicitWidth
+                        x: asSheet ? win.insets.sheetX : 0
+                        y: asSheet ? win.insets.sheetBottom - height : -height - 8
+                        width: asSheet ? win.insets.sheetWidth : implicitWidth
                         padding: 8
                         leftPadding: asSheet ? 20 : 8
                         rightPadding: asSheet ? 20 : 8
                         topPadding: asSheet ? 16 : 8
-                        bottomPadding: asSheet ? 16 + win.sheetBottomPadding : 8
+                        bottomPadding: asSheet ? 16 + win.insets.sheetBottomPadding : 8
                         background: Rectangle {
                             color: "#ffffff"
                             radius: referencePagePopup.asSheet ? 16 : 4

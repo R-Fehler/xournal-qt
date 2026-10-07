@@ -145,8 +145,8 @@ Pane {
             ToolTip.delay: 600
         }
         ToolSeparator { visible: !pill.readingOnly }
-        IconButton { objectName: pill.named("noteCopy"); iconName: "xopp-edit-copy"; tip: qsTr("Copy the note (Ctrl+C), to paste it on another page"); onClicked: pill.target.copyStickyNote() }
-        IconButton { objectName: pill.named("noteCut"); visible: !pill.readingOnly; iconName: "xopp-edit-cut"; tip: qsTr("Cut the note (Ctrl+X): paste it on another page to move it there"); onClicked: pill.target.cutStickyNote() }
+        IconButton { objectName: pill.named("noteCopy"); iconName: "xopp-edit-copy"; tip: qsTr("Copy the note%1, to paste it on another page").arg(win.keyNote("copy")); onClicked: pill.target.copyStickyNote() }
+        IconButton { objectName: pill.named("noteCut"); visible: !pill.readingOnly; iconName: "xopp-edit-cut"; tip: qsTr("Cut the note%1: paste it on another page to move it there").arg(win.keyNote("cut")); onClicked: pill.target.cutStickyNote() }
         IconButton {
             objectName: pill.named("noteSticker")
             visible: pill.target === app  // (the notes; not the reference beside them)
@@ -154,7 +154,7 @@ Pane {
             tip: qsTr("Save the note as a sticker…")
             onClicked: pill.stickerRequested()
         }
-        IconButton { objectName: pill.named("noteDelete"); visible: !pill.readingOnly; iconName: "xqt-delete"; tip: qsTr("Delete the note (Del)"); onClicked: pill.target.deleteStickyNote() }
+        IconButton { objectName: pill.named("noteDelete"); visible: !pill.readingOnly; iconName: "xqt-delete"; tip: qsTr("Delete the note") + win.keyNote("deleteSelection"); onClicked: pill.target.deleteStickyNote() }
         // Select more (qt/touch-multiselect): taps add notes and elements to the selection or take them away
         IconButton {
             objectName: pill.named("noteSelectMore")

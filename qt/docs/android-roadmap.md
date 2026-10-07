@@ -113,7 +113,7 @@ A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translatio
   and the tab menu offers no window of its own there.
 - Done (`qt/safe-areas-keyboard`): **safe areas**: the status bar, the gesture bar and a cut-out overlap the window in
   edge-to-edge mode (target SDK 35+ forces edge-to-edge); `main.cpp` reads `QWindow::safeAreaMargins()` (Qt 6.9+)
-  into `win.safeInsets` for every window, and the chrome, the pills, the sheets and the dialogs keep clear of them.
+  into `win.insets` for every window, and the chrome, the pills, the sheets and the dialogs keep clear of them.
 - (E) **Density**: Qt scales by the device pixel ratio; the Material style's touch targets are fine, the canvas
   zoom levels and the pen widths in pixels need checking at DPR 2.6–3.
 

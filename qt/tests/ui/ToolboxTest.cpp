@@ -225,7 +225,7 @@ protected:
         s.text = QString("%1×%2 %3%4: %5 cells, %6 in sight, room %7, view %8, content %9, at %10%11")
                          .arg(window->width())
                          .arg(window->height())
-                         .arg(win("layoutClass").toString(), box->property("compact").toBool() ? " (dock)" : "")
+                         .arg(win("adaptive").value<QObject*>()->property("layoutClass").toString(), box->property("compact").toBool() ? " (dock)" : "")
                          .arg(s.cells)
                          .arg(s.inSight)
                          .arg(s.room)
@@ -1905,7 +1905,7 @@ protected:
         fullScreenSettled();
         EXPECT_TRUE(win("fullScreenMode").toBool()) << "full screen";
         EXPECT_TRUE(zen()) << "Zen";
-        EXPECT_TRUE(win("reading").toBool());
+        EXPECT_TRUE(win("readOnlyOn").toBool());
         EXPECT_TRUE(canvas->property("readingOnly").toBool());
         EXPECT_FALSE(shown(find("toolbox"))) << "no tools";
         EXPECT_FALSE(shown(find("viewPill"))) << "no view pill";

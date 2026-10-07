@@ -98,7 +98,7 @@ Pane {
             implicitHeight: 40
             icon.width: 20
             icon.height: 20
-            tip: qsTr("Stop recording (Ctrl+Shift+R)")
+            tip: qsTr("Stop recording") + win.keyNote("record")
             onClicked: app.audio.stopRecording()
         }
     }

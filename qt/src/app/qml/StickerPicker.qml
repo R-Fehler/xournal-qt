@@ -37,19 +37,19 @@ Popup {
     property real ownerY: 0
     readonly property var model: templates ? app.templates : app.stickers
     /// A bottom sheet in the phone classes (Main.qml's sheet geometry)
-    readonly property bool asSheet: typeof win !== "undefined" && win !== null && win.phoneLayout === true
+    readonly property bool asSheet: typeof win !== "undefined" && win !== null && win.layout.phoneLayout === true
     /// Something is selected that can become a sticker (asked when it opens)
     property bool canSave: false
     parent: asSheet || !owner ? Overlay.overlay : owner
     modal: asSheet || !owner
     dim: asSheet
-    x: asSheet ? win.sheetX : owner ? ownerX : Math.round((parent.width - width) / 2)
-    y: asSheet ? win.sheetBottom - height : owner ? ownerY : Math.round((parent.height - height) / 2)
-    width: asSheet ? win.sheetWidth : 400
-    height: asSheet ? Math.min(560, Math.round((win.sheetBottom - win.safeTop) * 0.85)) : 480
+    x: asSheet ? win.insets.sheetX : owner ? ownerX : Math.round((parent.width - width) / 2)
+    y: asSheet ? win.insets.sheetBottom - height : owner ? ownerY : Math.round((parent.height - height) / 2)
+    width: asSheet ? win.insets.sheetWidth : 400
+    height: asSheet ? Math.min(560, Math.round((win.insets.sheetBottom - win.insets.top) * 0.85)) : 480
     margins: asSheet ? 0 : 8
     padding: 8
-    bottomPadding: asSheet ? 8 + win.sheetBottomPadding : 8
+    bottomPadding: asSheet ? 8 + win.insets.sheetBottomPadding : 8
     focus: true
     closePolicy: asSheet || !owner ? Popup.CloseOnEscape | Popup.CloseOnPressOutside
                                    : Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent

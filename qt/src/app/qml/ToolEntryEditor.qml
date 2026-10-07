@@ -34,7 +34,7 @@ Popup {
     property string edge: "right"
     readonly property bool adding: entryId === ""
     readonly property string type: entry && entry.type ? entry.type : ""
-    readonly property bool asSheet: win.phoneLayout
+    readonly property bool asSheet: win.layout.phoneLayout
     readonly property var store: app.toolbox
     signal added(string id)
 
@@ -117,7 +117,7 @@ Popup {
     focus: true  // (Esc closes it)
     padding: 12
     topPadding: 10
-    width: asSheet ? win.sheetWidth : 340
+    width: asSheet ? win.insets.sheetWidth : 340
     height: Math.min(implicitHeight, (parent ? parent.height : 600) - 16)
     // Beside its button, towards the page. Placed (not bound to the button): a button can go away while the editor is
     // open (the rail made anew, the tool replaced), and a binding then put the editor in the window's top left corner
@@ -148,9 +148,9 @@ Popup {
         function onWidthChanged() { editor.place() }
         function onHeightChanged() { editor.place() }
     }
-    x: asSheet ? win.sheetX : placedX
-    y: asSheet ? win.sheetBottom - height : placedY
-    bottomPadding: asSheet ? 12 + win.sheetBottomPadding : 12
+    x: asSheet ? win.insets.sheetX : placedX
+    y: asSheet ? win.insets.sheetBottom - height : placedY
+    bottomPadding: asSheet ? 12 + win.insets.sheetBottomPadding : 12
     background: Rectangle {
         radius: editor.asSheet ? 16 : 12
         color: "#ffffff"

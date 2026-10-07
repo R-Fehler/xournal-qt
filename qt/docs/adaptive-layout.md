@@ -18,6 +18,7 @@ reads the window's size class from there instead of keeping a threshold of its o
 | `heightClass` | `short` (< 560), `medium` (< 900), `tall` |
 | `orientation` | `portrait` (h > w) or `landscape` |
 | `phone` | one of the phone classes (phone portrait, phone short, tiny) |
+| `phoneLayout` | laid out as a phone: `phone` by the layout class (false while "Adapt the layout" is off); what the QML reads (the app bar, the dock, menus as sheets) |
 | `roomForSidebar` | the page sidebar fits beside the page (below) |
 | `classWidth`, `classHeight` | the size the class was taken from |
 | `held` | a pointer is held in the window (mouse button, pen, finger), or QML set `hold` |
@@ -110,15 +111,15 @@ switch of its own, [zen.md](zen.md).)
   bottom), `minTarget` wide in the touch profile (24 px otherwise). Not in the compact chrome or Zen, not while
   presenting, and not while the tool bar is put away (unless the sidebar is open: then it closes it).
 
-`win.showSidebar(shown)` and `win.dockSidebar()` are the functions; `sidebarDocked`, `sidebarAsDrawer` and
+`win.layout.showSidebar(shown)` and `win.layout.dockSidebar()` are the functions; `sidebarDocked`, `sidebarAsDrawer` and
 `sidebarDrawerOpen` the state.
 
 The drawer (qt/adaptive-panels):
-- it **slides** in from the left and out again (180 ms, `win.drawerSlide` 0 → 1), the dimmed page fades with it. Only
+- it **slides** in from the left and out again (180 ms, `win.layout.drawerSlide` 0 → 1), the dimmed page fades with it. Only
   a tap slides it (the arrow, the dimmed page, a page, a chapter or an annotation picked, Esc, the back key); a change
   of the size class takes it away at once;
 - **Esc and Android's back key** close it;
-- its width (`win.drawerWidth`): 210 px on a tablet and a desktop; on a phone up to 85 % of the window (at most
+- its width (`win.layout.drawerWidth`): 210 px on a tablet and a desktop; on a phone up to 85 % of the window (at most
   360 px: 350 at 412), so the thumbnails are larger (the list is one column as wide as the drawer); a phone held
   sideways 260 px (a page's thumbnail stays shorter than the window);
 - Pages, Layers, Contents and Annotations work the same in it; a page, a chapter or an annotation picked closes it,
@@ -137,14 +138,14 @@ Four separate things (audit D5; since qt/zen, 0.8.0, Zen and read only are switc
 
 - **Full screen** (F11, `fullScreenMode`, as before) is the compact chrome in a full-screen window. Leaving it gives
   the window back its state and ends presenting, as before.
-- **Zen** hides the HUD (`win.hudHidden`: the top bar, the toolbox, the pills, the format bar) and the chrome
-  around the page (`win.fullChrome` false: the tab strip, the sidebar and its arrow, the phone's app bar and dock; the
+- **Zen** hides the HUD (`win.modes.hudHidden`: the top bar, the toolbox, the pills, the format bar) and the chrome
+  around the page (`win.modes.fullChrome` false: the tab strip, the sidebar and its arrow, the phone's app bar and dock; the
   compact chrome's tab dots); the dot in the lower left corner and its pill bring it back. The pen writes on. Presenting
   without controls (`cleanPage`) is presenting in Zen.
 - **Read only** is apart from all of these (anywhere): [zen.md](zen.md).
 - The home screen always keeps the tab strip (it is the way back to the documents); in the phone classes the app bar.
 
-Zen of itself (`win.zenAuto`, since qt/zen; before, the reader chrome of qt/phone-chrome): in a **tiny** window (under
+Zen of itself (`win.modes.zenAuto`, since qt/zen; before, the reader chrome of qt/phone-chrome): in a **tiny** window (under
 360 px either way: split screen, Android's pop-up view), nowhere else. Leaving it there stores `off` for the tiny class;
 Zen turned on there again stores `""` (automatic again). Gone in 0.8.0: the reader chrome (`chromeMode` "reader",
 `chromeAuto`, `chromeSetting`, `chooseChrome`) and the compact chrome chosen for a class in a normal window (Settings →
@@ -170,7 +171,7 @@ and the page grid, a popup of icons) follows the same rules.
   the menu itself stays closed and **`MenuSheet.qml`** shows its entries, one sheet per window (`menuSheet` in
   `Main.qml`):
   - a bottom sheet, as wide as the safe area (at most 640 px, centred in it), at most 85 % of the window high (the
-    rest scrolls), its last row above the bottom safe area (`win.safeBottom`); while the soft keyboard is open it
+    rest scrolls), its last row above the bottom safe area (`win.insets.bottom`); while the soft keyboard is open it
     rests on the keyboard (below, "Safe areas and the soft keyboard");
   - rows of at least 48 px; a check mark for a checked choice, an arrow for a submenu;
   - **a submenu drills in**: the sheet shows its entries, with a back arrow and its title (and deeper: View → Dark
@@ -306,8 +307,8 @@ layout (`xqt-page-single` / `xqt-book-open`), "more tools" (`xqt-tools-more`), a
 
 ### The view pill
 
-Undo and redo while the tool bar is not shown (it is put away, the compact chrome, a text document whose tool
-bar is merged into its format bar; `win.undoInToolBar`: otherwise they lead the tool bar), the page layout, the page
+Undo and redo where no bar holds them (`win.layout.undoPlace`: "toolbox", "formatBar", "toolBar" or "viewPill":
+the bar is put away, the compact chrome, Zen), the page layout, the page
 grid, **the contents** (moved here from the tool bar), the page number, and a small **zoom percentage** (no − / + any
 more):
 
@@ -338,7 +339,7 @@ Under 360 px also no redo (Ctrl+Y) and no separators.
 they would meet it: the selection's pill (centred at the bottom; smaller where the canvas is narrower than it), the
 back / forward pill and the "shown read-only" note (lower left), the sticky note's pill; the toolbox floating at the
 bottom edge in the compact chrome (a phone upright) puts the view pill above it, and floating at a side it ends above
-the pill (`floatBottom`). (The pen pill of the compact chrome went with the classic tool bar in 0.8.0.) `win.clearOfPills(item, lowY, others)`
+the pill (`floatBottom`). (The pen pill of the compact chrome went with the classic tool bar in 0.8.0.) `win.layout.clearOfPills(item, lowY, others)`
 does it for the pills of `Main.qml`. (Qt 6.7 crashes when a binding of `y` reads the geometry of items itself through
 a function: the result goes through a property of its own, `clearY`.)
 
@@ -373,6 +374,11 @@ sight:
 | All open documents | the tab strip's overview button, ⋮ → View | Ctrl+Shift+E | the tab dots (compact) | the tab count of the app bar (a tap; a double tap: the document used before; a long press: the ones used lately) |
 | Undo, redo | the head of the toolbox (pinned; qt/undo-redo, before: the view pill); a text document: the start of its format bar | Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y (the tips show the keys set) | the floating toolbox; a text document in the compact chrome: the view pill | the dock; with the soft keyboard open, the end of the format bar above it |
 
+The keys in this table are the defaults: Settings → Shortcuts changes them, and every tip and menu entry names the keys
+as they are set (`win.withKeys(text, id)`: all of an action's keys, the tips of undo and redo; `win.keyNote(id)`: its
+first key, " (Ctrl+P)", for the other tips, the menus and sentences). No label writes a key that can be changed into its
+text; the keys that cannot be changed (Esc, Enter, Space, the format bar's Ctrl+B …) are written as they are.
+
 Zen hides everything; its dot and the dot's pill bring the controls back ([zen.md](zen.md)). Zen: the top bar (on every
 screen, phones too), ⋮ → View → Zen, Ctrl+Alt+Z, the floating toolbox's ⋯; Android's Back leaves it. Read only: ⋮ →
 View → Read only, the dot's pill, the floating toolbox's ⋯.
@@ -384,11 +390,11 @@ The author's rule stays: a single A4 page stays well visible; nothing at the sid
 ### The Markdown source panel
 
 The source of Markdown on a page (and of a Markdown text box; the deprecated text flow panel the same) goes where the
-window has room for it (`win.sourceAtBottom`, `win.sourcePanel`):
+window has room for it (`win.layout.sourceAtBottom`, `win.layout.sourcePanel`):
 
 | Where | When | Size |
 | --- | --- | --- |
-| **beside the page** (right) | desktop wide and narrow, a phone held sideways (915×412), "Adapt the layout" off | 38 % of the window, 360 to 600 px, never more than half of it (`win.sourceSideWidth`) |
+| **beside the page** (right) | desktop wide and narrow, a phone held sideways (915×412), "Adapt the layout" off | 38 % of the window, 360 to 600 px, never more than half of it (`win.layout.sourceSideWidth`) |
 | **below the page** | tablet portrait, phone portrait, and a desktop-narrow or tiny window whose area is portrait (600×800) | the page above keeps the whole width; the source takes the bottom half on a tablet, the bottom 60 % on a phone |
 
 Below the page, the **divider** between them (`sourceDivider`, a touch-sized grip; the whole edge takes a drag) moves
@@ -433,9 +439,9 @@ its name. The panel's own bar (beside or below the page) follows the same rules 
 
 ### What the later blocks can use
 
-`win.sourceAtBottom` and `win.sourceBottomHeight` (the panel's place; the keyboard shrinks the room it is taken
-from), `win.drawerWidth`, `viewPill.compact`, `MarkdownFormatBar.phone` (its scrolling form, the one docked above the
-keyboard), `win.clearOfPills` (for pills that float over the page). The phone chrome (below) took the drawer's width and the
+`win.layout.sourceAtBottom` and `win.layout.sourceBottomHeight` (the panel's place; the keyboard shrinks the room it is taken
+from), `win.layout.drawerWidth`, `viewPill.compact`, `MarkdownFormatBar.phone` (its scrolling form, the one docked above the
+keyboard), `win.layout.clearOfPills` (for pills that float over the page). The phone chrome (below) took the drawer's width and the
 format bar as they are; its dock is a bar of its own (the page ends above it), so no pill needs to go above it.
 
 ## Dialogs and sheets: `AdaptiveDialog` (qt/adaptive-dialogs)
@@ -481,7 +487,10 @@ without `parent`, `modal`, `anchors.centerIn`, `width`, `height`, `x` or `y` (th
 
 ### Settings
 
-`SettingsPage.qml` keeps its own sheet (sections of fixed rows):
+`SettingsPage.qml` keeps its own sheet (sections of fixed rows). It holds the frame (the header, the phone's list,
+the tabs); each section is a file (`SettingsPen.qml` … `SettingsHelp.qml`, with the dialogs it opens), made of the rows
+`SettingsSwitchRow.qml`, `SettingsSliderRow.qml`, `SettingsComboRow.qml`, `SettingsHint.qml` and
+`SettingsSectionTitle.qml` (they read `sheet.s` and `sheet.narrow` through the sheet's context):
 
 - On a desktop or a tablet: the tabs, in a sheet `min(920, window − 32)` wide and the window's height less 48, above
   the soft keyboard. Each section scrolls.
@@ -576,8 +585,8 @@ page well visible, and in phone portrait a **bottom tool dock**. The main target
 phone portrait) and unfolded (900 × 1000: tablet portrait, which keeps the tablet's layout: the tab strip, the command
 bar and the docked toolbox), and very small or slim desktop windows of the same classes.
 
-In the phone classes (`win.phoneLayout`: phone portrait, phone short, tiny, by the layout class) the full chrome is the
-**phone chrome** (`win.phoneChrome`): no tab strip, no bar of its own for the top bar and no view pill, but
+In the phone classes (`win.layout.phoneLayout`: phone portrait, phone short, tiny, by the layout class) the full chrome is the
+**phone chrome** (`win.layout.phoneChrome`): no tab strip, no bar of its own for the top bar and no view pill, but
 
 **The app bar** (`PhoneAppBar.qml`, `phoneAppBar`, 48 px below the status bar, `safeTop`; with the top bar under it
 upright):
@@ -606,13 +615,13 @@ columns). While the soft keyboard is open (the dock gone) undo and redo are at t
 (The classic dock's tool in use, color and width cells went with the classic tool bar in 0.8.0; "All tools" with "My
 tools" in qt/top-bar.)
 
-- Phone portrait: at the bottom, above the navigation bar (`win.safeBottom`), in the window's footer: the page ends
+- Phone portrait: at the bottom, above the navigation bar (`win.insets.bottom`), in the window's footer: the page ends
   above it and keeps the whole width.
-- Held sideways (phone short, or a tiny window in landscape; `win.dockVertical`): a **rail at the right side**, the
+- Held sideways (phone short, or a tiny window in landscape; `win.layout.dockVertical`): a **rail at the right side**, the
   same cells from the top down, below the app bar; the page number is in the app bar then (qt/top-bar: with the
   insets the rail had room for about one tool once undo, redo, "My tools" and the page number took theirs). A phone in
   landscape lacks height, not width. The page, the Markdown source beside it and the reference end at the rail
-  (`win.dockRail`).
+  (`win.layout.dockRail`).
 - Full screen (the compact chrome) on a phone: the toolbox floats at its edge as on a desktop (since 0.8.0; before, the
   classic tool square was there).
 
@@ -655,15 +664,15 @@ gesture bar over its bottom, and a camera cut-out over a side when a phone is he
 
 ### Safe areas
 
-`win.safeInsets` (`top`, `right`, `bottom`, `left`; `win.safeTop`, `safeRight`, `safeBottom`, `safeLeft` are its
-aliases): set by `main.cpp` for every window (also a tab's window of its own) from `QWindow::safeAreaMargins()` on Qt
+`win.insets` (`WindowInsets.qml`: `top`, `right`, `bottom`, `left`; the window's `safeTop`, `safeRight`,
+`safeBottom`, `safeLeft` are their aliases for `main.cpp` and the tests): set by `main.cpp` for every window (also a tab's window of its own) from `QWindow::safeAreaMargins()` on Qt
 6.9+, and again when they change (turned, folded, unfolded); 0 with the desktop's Qt 6.7. `XQT_SAFE_AREA="t,r,b,l"`
 sets them by hand (to look at a phone's insets on the desktop); the tests set the properties.
 
 **The pages go on under the bars** (edge to edge); only the controls keep clear. Where the controls over the pages may
-go, in the content item's coordinates (the area between the header and the footer): `win.controlsLeft`,
+go, in the content item's coordinates (the area between the header and the footer): `win.insets.controlsLeft`,
 `controlsRight`, `controlsTop`, `controlsBottom` (the last also above the keyboard), and over the canvas
-`win.canvasControlsLeft/Right/Top/Bottom`. `win.contentBottomInset` is how much of the content item lies under the
+`win.layout.canvasControlsLeft/Right/Top/Bottom`. `win.insets.contentBottomInset` is how much of the content item lies under the
 bottom inset (0 where a footer took it: the dock, the keyboard's room).
 
 | Edge | What keeps clear |
@@ -672,23 +681,23 @@ bottom inset (0 where a footer took it: the dock, the keyboard's room).
 | bottom | the dock, the floating toolbox, the view pill, the back / forward pill, the note of a file shown read-only, the selection and note pills, the snackbar (in the document and on the home screen), the page grid's and the contents' pills, the reference's pill, the canvas's scroll bars, the Zen dot and its pill, presenting's page number, the drawer's lists, the Markdown source's text, bottom sheets (menus, a tool's editor, page menu, emoji, the reference's page field), dialogs, Settings, the tab overview, the home screen's "+" and selection bar |
 | left / right | the app bar's and the tab strip's ends, the top bar, the docked toolbox (it grows by the inset), the dock's rail (the right inset) and its row, the drawer (beside a left cut-out, `sidebarLeftFill` has its color under it), the sidebar's arrow, the floating toolbox, the view pill, the scroll bars, the Markdown source beside the page, the format bar's row, the home screen (its color under the insets), the sheets (as wide as the safe area, centred in it), dialogs, Settings, the tab overview |
 
-Bottom sheets take their place from `win.sheetWidth`, `sheetX`, `sheetBottom` (the keyboard's top while it is open,
+Bottom sheets take their place from `win.insets.sheetWidth`, `sheetX`, `sheetBottom` (the keyboard's top while it is open,
 else the window's bottom) and `sheetBottomPadding` (the room for the navigation bar under their last row);
 `MenuSheet` and the editor's sheet compute the same.
 
 ### The soft keyboard
 
-`win.keyboardTop` (the keyboard's top in the window; the window's height while it is closed), `keyboardHeight` and
+`win.insets.keyboardTop` (the keyboard's top in the window; the window's height while it is closed), `keyboardHeight` and
 `keyboardOpen`, from `Qt.inputMethod.keyboardRectangle` (Android reports it in the screen's pixels: divided by the
 device pixel ratio; the logic `NewDocumentDialog` had). Where the platform makes the window smaller instead, the
-keyboard lies below the window and nothing changes. `win.fakeKeyboardHeight` (tests; `XQT_FAKE_KEYBOARD=<height>`)
+keyboard lies below the window and nothing changes. `win.insets.fakeKeyboardHeight` (tests; `XQT_FAKE_KEYBOARD=<height>`)
 puts a keyboard of that height at the bottom.
 
 - **The footer makes room for it** (`bottomPadding: keyboardHeight`), as Android's `adjustResize` would: the pages,
   the Markdown source, the pills, the home screen and the snackbar end above the keyboard. AdaptiveDialog, Settings,
   the sheets and the menus (the desktop menus' bottom margin) keep above it.
 - **The dock goes** while it is open (`dockShown`), also the rail held sideways: the format bar takes its place.
-- **The format bar docks right above the keyboard** on a phone (`win.phoneLayout`) while it is open and the page's
+- **The format bar docks right above the keyboard** on a phone (`win.layout.phoneLayout`) while it is open and the page's
   Markdown (in place, a text box, a text document) has the keys (`formatBar.docked`: it moves into the footer), as
   Obsidian, iA Writer and Google Docs have it. The source panel's bar moves to the panel's bottom
   (`MarkdownPanel.barDocked`), right above the keyboard too. On a tablet the bar stays at the top.
@@ -722,7 +731,7 @@ The author's decisions of 2026-09-26 on the audit's proposals:
   with the values listed there.
 - Sizes of targets: `win.adaptive.touchProfile ? win.adaptive.minTarget : <the desktop size>`, or `minTarget`
   directly where 40 on the desktop is fine.
-- Hiding HUD items: add `!win.hudHidden` to their `visible`; the chrome's own items test `win.chromeMode`.
+- Hiding HUD items: add `!win.modes.hudHidden` to their `visible`; the chrome's own items test `win.modes.chromeMode`.
 - Drag gestures of QML that must not see the layout change under them can set `win.adaptive.hold`.
 
 ### Thresholds not moved yet
@@ -740,9 +749,9 @@ so they are not size classes either:
 
 | Where | Threshold | What |
 | --- | --- | --- |
-| `Main.qml` `sourceAtBottom` | the class (tablet portrait, phone portrait), or a portrait area in desktop narrow / tiny | the Markdown source below the page |
-| `Main.qml` `sourceSideWidth` | `min(600, max(min(360, area / 2), 0.38 w))` | the source beside the page |
-| `Main.qml` `drawerWidth` | 210; phone: `min(360, 0.85 w)`; phone held sideways: 260 | the sidebar as a drawer |
+| `ChromeLayout.qml` `sourceAtBottom` | the class (tablet portrait, phone portrait), or a portrait area in desktop narrow / tiny | the Markdown source below the page |
+| `ChromeLayout.qml` `sourceSideWidth` | `min(600, max(min(360, area / 2), 0.38 w))` | the source beside the page |
+| `ChromeLayout.qml` `drawerWidth` | 210; phone: `min(360, 0.85 w)`; phone held sideways: 260 | the sidebar as a drawer |
 | `ViewPill.qml` `compact`, `tight` | canvas < 520, < 360 | the compact view pill |
 | `ReferenceSplit.qml` `vertical` | the area h > w (16 px margin) | top and bottom |
 | `ReferenceSplit.qml` `narrow` | the reference's half < 480 | the pill: page and ⋮ |

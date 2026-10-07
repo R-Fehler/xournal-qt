@@ -65,6 +65,9 @@ class AdaptiveLayout: public QObject {  // (not final: QML derives from it)
     Q_PROPERTY(QString orientation READ orientation NOTIFY changed)
     /// A phone class (phonePortrait, phoneShort, tiny): the compact layouts
     Q_PROPERTY(bool phone READ phone NOTIFY changed)
+    /// The layout of a phone class: `phone`, unless "Adapt the layout" is off (the layout class is desktopWide then).
+    /// What the QML lays out by (the app bar, the dock, menus as sheets); `phone` is the window's size alone.
+    Q_PROPERTY(bool phoneLayout READ phoneLayout NOTIFY changed)
     /// Room for the page sidebar beside the page (window >= SIDEBAR_ROOM_PX, not portrait, not a phone)
     Q_PROPERTY(bool roomForSidebar READ roomForSidebar NOTIFY changed)
     /// The size the class was taken from (it may lag behind the window while a pointer is held)
@@ -93,6 +96,7 @@ public:
     QString widthClass() const;
     QString orientation() const { return portrait ? QStringLiteral("portrait") : QStringLiteral("landscape"); }
     bool phone() const;
+    bool phoneLayout() const { return adapting && phone(); }
     bool roomForSidebar() const;
     double classWidth() const { return width; }
     double classHeight() const { return height; }

@@ -10,7 +10,7 @@ import QtQuick.Layouts
 Pane {
     id: pill
     objectName: "geometryPill"
-    visible: app.geometryTool !== "" && !app.homeVisible && !win.hudHidden  // (presenting without controls: none)
+    visible: app.geometryTool !== "" && !app.homeVisible && !win.modes.hudHidden  // (presenting without controls: none)
     padding: 2
     Material.foreground: "#303030"
     background: Rectangle {

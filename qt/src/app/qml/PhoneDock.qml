@@ -115,7 +115,7 @@ Rectangle {
                 Material.foreground: "#3c4043"
                 Accessible.name: qsTr("All pages")
                 ToolTip.visible: hovered
-                ToolTip.text: qsTr("All pages, the contents and the zoom (Ctrl+Alt+G)")
+                ToolTip.text: qsTr("All pages, the contents and the zoom") + win.keyNote("pageGrid")
                 ToolTip.delay: 600
                 onClicked: dock.pagesRequested()
             }

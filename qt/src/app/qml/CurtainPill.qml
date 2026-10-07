@@ -9,7 +9,7 @@ import QtQuick.Layouts
 Pane {
     id: pill
     objectName: "curtainPill"
-    visible: app.curtain !== "" && !app.homeVisible && !win.hudHidden  // (presenting without controls: none)
+    visible: app.curtain !== "" && !app.homeVisible && !win.modes.hudHidden  // (presenting without controls: none)
     padding: 2
     Material.foreground: "#303030"
     background: Rectangle {
@@ -44,7 +44,7 @@ Pane {
             implicitHeight: 44
             icon.width: 22
             icon.height: 22
-            tip: pill.spotlight ? qsTr("The curtain instead") : qsTr("The spotlight instead (Shift+B)")
+            tip: pill.spotlight ? qsTr("The curtain instead") : qsTr("The spotlight instead") + win.keyNote("spotlight")
             onClicked: app.toggleCurtain(pill.spotlight ? "curtain" : "spotlight")
         }
         ToolSeparator {}

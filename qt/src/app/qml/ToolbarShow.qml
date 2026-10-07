@@ -9,12 +9,12 @@ import QtQuick.Layouts
 Rectangle {
     id: toolbarShow
     objectName: "toolbarShow"
-    visible: !app.homeVisible && win.fullChrome && app.toolbarHidden && !win.phoneChrome && !win.replaying
+    visible: !app.homeVisible && win.modes.fullChrome && app.toolbarHidden && !win.layout.phoneChrome && !win.modes.replaying
     z: 60
     width: 96
     height: 16
     x: Math.round((parent.width - width) / 2)
-    y: win.controlsTop
+    y: win.insets.controlsTop
     radius: 8
     color: "#f1f3f4"
     border.width: 1

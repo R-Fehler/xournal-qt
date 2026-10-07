@@ -153,7 +153,7 @@ The bar at the top (qt/top-bar; it replaced the command bar of qt/ui-rework and 
   window class (`layout/<class>/topBarScroll`).
 - **"+" and ⋮ are pinned at its end** (⋮ last). "+" opens the catalog for the top bar (below). The buttons of the moment
   sit before "+" while they are offered: the emoji while writing, a `.md`'s "Edit as notes", "Open externally" (they
-  are not items of the arrangement). Undo and redo lead it only where no rail is shown (`win.undoInToolBar`).
+  are not items of the arrangement). Undo and redo lead it only where no rail is shown (`win.layout.undoPlace` "toolBar").
 - **Items not offered here are skipped, not removed**: the milestone where the document keeps no versions, the favourite
   outside a library, a text document's ink tools, record without an audio backend, New where the tab strip has "+",
   full screen and present in full screen. A divider that would then lead, end or follow another is left out.
@@ -232,12 +232,12 @@ to be invisible and produce a zen mode UI which fitted also for tiny screen docu
 qt/zen (0.8.0) there are three switches of their own: full screen, **Zen** and **read only**; Read is Zen and read only
 together ([zen.md](zen.md) has the whole of it).
 
-- **Zen** (`win.zen`): only the page and a faint dot in its lower left corner; everything around the page is hidden
-  (`win.hudHidden`: this toolbox, docked or floating, the top bar, the tabs, the sidebar's arrow, the pills). The
+- **Zen** (`win.modes.zen`): only the page and a faint dot in its lower left corner; everything around the page is hidden
+  (`win.modes.hudHidden`: this toolbox, docked or floating, the top bar, the tabs, the sidebar's arrow, the pills). The
   tool in hand keeps writing, P, H, E, T take the tools. The dot's pill: Show controls, Read only, the page number,
   fit the width / the whole page. ⋮ → View → Zen, the top bar's Zen, Ctrl+Alt+Z, the floating toolbox's ⋯;
   automatic in a tiny window (leaving it there is remembered for the class). Esc leaves it.
-- **Read only** (`win.readOnly`; anywhere, with or without Zen or full screen; ⋮ → View → Read only, the dot's pill,
+- **Read only** (`win.modes.readOnly`; anywhere, with or without Zen or full screen; ⋮ → View → Read only, the dot's pill,
   the floating toolbox's ⋯ → "Read only"). The tools stay where they are (Zen hides them, read only does not). While it
   is on:
   - the page cannot be written on (`DocumentCanvas.readingOnly`): the pen and the fingers scroll, PDF text can still be
@@ -356,7 +356,7 @@ unused); the shell, canvas and UI tests run with the toolbox.
 | `qt/src/app/qml/Toolbox.qml` | a bar (`bar`: "rail" or "top"): head, the items (entries, app items lent to it, groups and their list), tail; scrolling (the cut, the fades, the tool in hand into view, the place per class); carrying an item within it and to the other bar (`peer`, `reach`, `dragOver`, `dropHere`, `leaveBars`), the ring of a group; the grip (the rail) |
 | `qt/src/app/qml/ToolEntryButton.qml` | one tool: its icon and a sample of its ink; lifted in hand; the hold, the carrying, the wheel; a group's face (dots), the ring |
 | `qt/src/app/qml/ToolEntryEditor.qml` | the editor (and the draft of a new tool, for either bar) |
-| `Main.qml` and its parts | `Main.qml`: where the rail is (`toolboxDocked`, `toolboxFloating`, `toolboxInDock`, `toolboxEdge`) and the top bar (`topBarPane`, `win.topBarShown`), the format bar's undo / redo, Zen and read only (`win.zen`, `win.readOnly`, `win.reading`); `AppButtons.qml`: the window's buttons of the app items (`toolArea.slots`); `MoreMenu.qml`: ⋮ (`moreMenu`, its `CommandItem`s); `ToolboxMenus.qml`: the menus (`toolEntryMenu` for tools, app items and groups, the catalog `toolTypeMenu`, `catalogRows()`, `toolboxMoreMenu` with `topBarCommands()`), "Grouped · Undo", "Removed · Undo"; `ReadingFields.qml`, `ZenDot.qml`, `ZenPill.qml`, `ReadOnlyNote.qml`; `zenBackShortcut` in `WindowShortcuts.qml` ([zen.md](zen.md)) |
+| `Main.qml` and its parts | `Main.qml`: where the rail is (`ChromeLayout.qml`, `win.layout`: `toolboxDocked`, `toolboxFloating`, `toolboxInDock`, `toolboxEdge`) and the top bar (`topBarPane`, `win.layout.topBarShown`), the format bar's undo / redo, Zen and read only (`ViewModes.qml`, `win.modes`: `zen`, `readOnly`, `readOnlyOn`); `AppButtons.qml`: the window's buttons of the app items (`toolArea.slots`); `MoreMenu.qml`: ⋮ (`moreMenu`, its `CommandItem`s); `ToolboxMenus.qml`: the menus (`toolEntryMenu` for tools, app items and groups, the catalog `toolTypeMenu`, `catalogRows()`, `toolboxMoreMenu` with `topBarCommands()`), "Grouped · Undo", "Removed · Undo"; `ReadingFields.qml`, `ZenDot.qml`, `ZenPill.qml`, `ReadOnlyNote.qml`; `backShortcut` in `WindowShortcuts.qml` ([zen.md](zen.md)) |
 | `PhoneDock.qml`, `PhoneAppBar.qml` | the dock hosts the rail; the app bar hosts the top bar (`toolsSlot`) and, held sideways, the page number |
 | `MarkdownFormatBar.qml` | a text document's commands (`commandsSlot`, `holdsCommands`): the row scrolls as the bars do |
 | `qt/src/canvas/ViewController.*`, `CanvasView`, `DocumentCanvasItem.snapVertically` | snapping up and down while reading |

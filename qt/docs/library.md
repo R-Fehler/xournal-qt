@@ -684,3 +684,15 @@ xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open 
     selected, taps select too. Ctrl+A selects all, Esc clears the selection.
   - The bar at the top: Open, Copy to…, Move to…, (Remove from list), Trash.
   - Dragging a selected card moves the whole selection.
+
+### In the code
+
+`HomeView.qml` holds the home screen's state (the page shown, the columns of the grids, the selection's helpers, the
+card menu's target `menu*`) and lays out its parts, each a file of its own instantiated once there:
+`HomeSelectionBar.qml` and `HomeSelectionActions.qml` (what to do with a selection: the row at the top, or the bar at
+the bottom), `HomeHeader.qml` (the header's buttons and the slots the switch, the breadcrumbs and the search go into),
+`LibrarySwitch.qml`, `LibraryCrumbs.qml`, `LibrarySearchField.qml`, `LibraryShowMenu.qml`, `LibrarySortMenu.qml`,
+`LibraryGridPage.qml` and `RecentGridPage.qml` (the two grids), `MoveDragOverlay.qml`, `LibraryItemMenu.qml` (a card's
+menu), and the dialogs in `LibraryDialogs.qml`, `LibraryArchive.qml` and `LibraryImport.qml`. The parts read the state
+through `home` and one another by their ids (HomeView.qml's context); an id another part uses is an alias on its file's
+root (`libraryPage.libraryGrid`, `libraryDialogs.renameDialog`).

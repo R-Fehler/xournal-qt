@@ -288,7 +288,7 @@ never in the repository.
 | Crash handlers (`SessionRecovery::installCrashHandlers`) | they replace the system's handlers, and a crash would leave no backtrace in logcat; to be chained later |
 | Lua plugins, X11, gtksourceview | already off in the Qt build |
 | Floating point `std::from_chars` | missing in the NDK's libc++; upstream's `g_ascii_strtod` fallback is used (the same check as upstream's CMake) |
-| Edge to edge (target SDK 35+): the status bar, the gesture bar and a camera cut-out lie over the window, and the window may not be made smaller for the soft keyboard any more | `main.cpp` reads `QWindow::safeAreaMargins()` into `win.safeInsets` (the controls keep clear, the page is drawn under the bars); the window makes room for the keyboard itself (`win.keyboardTop` from `Qt.inputMethod.keyboardRectangle`, in the screen's pixels) and keeps the text cursor above it (qt/safe-areas-keyboard; adaptive-layout.md, "Safe areas and the soft keyboard") |
+| Edge to edge (target SDK 35+): the status bar, the gesture bar and a camera cut-out lie over the window, and the window may not be made smaller for the soft keyboard any more | `main.cpp` reads `QWindow::safeAreaMargins()` into `win.insets` (the controls keep clear, the page is drawn under the bars); the window makes room for the keyboard itself (`win.insets.keyboardTop` from `Qt.inputMethod.keyboardRectangle`, in the screen's pixels) and keeps the text cursor above it (qt/safe-areas-keyboard; adaptive-layout.md, "Safe areas and the soft keyboard") |
 
 ## Checked so far (without the phone)
 

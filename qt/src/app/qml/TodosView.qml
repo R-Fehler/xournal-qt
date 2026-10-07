@@ -20,8 +20,7 @@ FocusScope {
     /// Room below the last to-do (the home screen's floating "+" on a phone)
     property real bottomSpace: 0
     /// A phone class: the filters scroll sideways in one row, the rows are taller
-    readonly property bool phone: typeof win !== "undefined" && win && win.adaptive
-                                  ? ["phonePortrait", "phoneShort", "tiny"].indexOf(win.adaptive.layoutClass) >= 0 : false
+    readonly property bool phone: typeof win !== "undefined" && win && win.adaptive ? win.adaptive.phoneLayout : false
     readonly property int rowHeight: phone ? 52 : 44
 
     Binding { target: view.todos; property: "active"; value: view.shown }

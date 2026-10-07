@@ -25,7 +25,7 @@ Menu {
     /// The window's layout (Main.qml's `win.adaptive`), if there is one
     readonly property var adaptiveLayout: typeof win !== "undefined" && win ? win.adaptive : null
     /// In a phone class (by the layout class: "Adapt the layout" off keeps the desktop menus) it opens as a sheet
-    readonly property bool asSheet: adaptiveLayout !== null && ["phonePortrait", "phoneShort", "tiny"].indexOf(adaptiveLayout.layoutClass) >= 0
+    readonly property bool asSheet: adaptiveLayout !== null && adaptiveLayout.phoneLayout
     /// The widest entry offered (a binding: entries come and go, and change their text, with the document)
     readonly property real entryWidth: {
         let w = 0
@@ -93,10 +93,10 @@ Menu {
             menuSheet.show(control)
             return
         }
-        const safeTop = typeof win !== "undefined" && win && win.safeTop ? win.safeTop : 0
+        const safeTop = typeof win !== "undefined" && win && win.insets.top ? win.insets.top : 0
         // (above the navigation bar, and above the soft keyboard while it is open)
-        const safeBottom = typeof win !== "undefined" && win && win.safeBottom !== undefined
-                           ? Math.max(win.safeBottom, win.keyboardHeight) : 0
+        const safeBottom = typeof win !== "undefined" && win && win.insets.bottom !== undefined
+                           ? Math.max(win.insets.bottom, win.insets.keyboardHeight) : 0
         let top = 8 + safeTop, bottom = 8 + safeBottom
         if (anchor && anchor.height <= 96) {
             const r = anchor.mapToItem(null, 0, 0, anchor.width, anchor.height)

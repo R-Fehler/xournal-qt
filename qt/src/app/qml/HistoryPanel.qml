@@ -317,7 +317,7 @@ Item {
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap
             color: "#6b6f75"
-            text: panel.model.milestonesOnly ? qsTr("No milestones yet. Save with a message (Ctrl+Alt+S) to make one.")
+            text: panel.model.milestonesOnly ? qsTr("No milestones yet. Save with a message%1 to make one.").arg(win.keyNote("saveWithMessage"))
                                              : qsTr("No versions yet: the next save keeps the first one.")
         }
     }

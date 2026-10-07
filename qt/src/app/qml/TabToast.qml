@@ -11,8 +11,8 @@ Rectangle {
     objectName: "fullScreenTabToast"
     z: 59
     anchors.horizontalCenter: parent.horizontalCenter
-    y: win.controlsTop + fullScreenTabs.height + 8
-    visible: opacity > 0 && win.chromeMode === "compact" && !win.zenShown
+    y: win.insets.controlsTop + fullScreenTabs.height + 8
+    visible: opacity > 0 && win.modes.chromeMode === "compact" && !win.modes.zenShown
     opacity: 0
     width: Math.min(tabToastText.implicitWidth + 28, parent.width - 160)
     height: 32

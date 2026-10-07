@@ -10,11 +10,11 @@ Rectangle {
     id: presentIndicator
     objectName: "presentPageIndicator"
     z: 90
-    visible: app.presenting && !win.presentClean && opacity > 0  // (without controls: not even the number)
+    visible: app.presenting && !win.modes.presentClean && opacity > 0  // (without controls: not even the number)
     opacity: 0
     anchors.horizontalCenter: canvas.horizontalCenter
     anchors.bottom: canvas.bottom
-    anchors.bottomMargin: 18 + canvas.y + canvas.height - win.canvasControlsBottom
+    anchors.bottomMargin: 18 + canvas.y + canvas.height - win.layout.canvasControlsBottom
     width: indicatorText.implicitWidth + 24
     height: 30
     radius: 15

@@ -42,9 +42,9 @@ Row {
             objectName: "moreMenu"
             AdaptiveMenuItem { objectName: "saveAsItem"; offered: !win.textDoc; text: qsTr("Save as…"); icon.source: app.iconUrl("xopp-document-save"); onTriggered: openSaveDialog(null) }
             AdaptiveMenuItem { objectName: "shareItem"; text: qsTr("Share…"); icon.source: app.iconUrl("xqt-share"); onTriggered: shareFlow.shareDialog.openFor("") }
-            AdaptiveMenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); icon.source: app.iconUrl("xopp-document-print"); onTriggered: printDialog.open() }
+            AdaptiveMenuItem { objectName: "printItem"; text: qsTr("Print…") + win.keyNote("print"); icon.source: app.iconUrl("xopp-document-print"); onTriggered: printDialog.open() }
             // Find and replace: where text can be written (the search itself: View → Search, and the bars)
-            AdaptiveMenuItem { objectName: "replaceItem"; offered: app.canReplace && !win.reading; text: qsTr("Find and replace (Ctrl+H)"); icon.source: app.iconUrl("xqt-replace"); onTriggered: searchBar.openReplace() }
+            AdaptiveMenuItem { objectName: "replaceItem"; offered: app.canReplace && !win.modes.readOnlyOn; text: qsTr("Find and replace") + win.keyNote("replace"); icon.source: app.iconUrl("xqt-replace"); onTriggered: searchBar.openReplace() }
             MenuSeparator {}
             // The document as a file: new, open, save, its name, other ways of editing it, links, its bookmark
             // and star
@@ -257,7 +257,7 @@ Row {
                 CommandItem { slot: "fullScreen" }
                 CommandItem { slot: "present" }
                 // (the phone chrome: its tab count)
-                AdaptiveMenuItem { objectName: "allDocumentsItem"; offered: !win.phoneChrome; text: qsTr("All open documents"); icon.source: app.iconUrl("xqt-tabs-grid"); onTriggered: tabOverview.open() }
+                AdaptiveMenuItem { objectName: "allDocumentsItem"; offered: !win.layout.phoneChrome; text: qsTr("All open documents"); icon.source: app.iconUrl("xqt-tabs-grid"); onTriggered: tabOverview.open() }
                 // Phones: the view pill has no room for the page layout button
                 AdaptiveMenuItem {
                     objectName: "pageLayoutItem"
@@ -268,26 +268,26 @@ Row {
                 }
                 // A black sheet over part of the page, for teaching and presenting (qt/docs/curtain.md)
                 AdaptiveMenuItem { objectName: "curtainItem"; offered: !win.textDoc; checkable: true; checked: app.curtain === "curtain"; text: qsTr("Curtain (B)"); icon.source: app.iconUrl("xqt-curtain"); onTriggered: app.toggleCurtain("curtain") }
-                AdaptiveMenuItem { objectName: "spotlightItem"; offered: !win.textDoc; checkable: true; checked: app.curtain === "spotlight"; text: qsTr("Spotlight (Shift+B)"); icon.source: app.iconUrl("xqt-spotlight"); onTriggered: app.toggleCurtain("spotlight") }
-                AdaptiveMenuItem { objectName: "presentCleanItem"; text: qsTr("Present without controls (Ctrl+F5)"); icon.source: app.iconUrl("xopp-presentation-mode"); onTriggered: win.startPresenting(true) }
+                AdaptiveMenuItem { objectName: "spotlightItem"; offered: !win.textDoc; checkable: true; checked: app.curtain === "spotlight"; text: qsTr("Spotlight") + win.keyNote("spotlight"); icon.source: app.iconUrl("xqt-spotlight"); onTriggered: app.toggleCurtain("spotlight") }
+                AdaptiveMenuItem { objectName: "presentCleanItem"; text: qsTr("Present without controls") + win.keyNote("presentClean"); icon.source: app.iconUrl("xopp-presentation-mode"); onTriggered: win.modes.startPresenting(true) }
                 // Zen: only the page and a faint dot (qt/docs/zen.md)
                 AdaptiveMenuItem {
                     objectName: "zenItem"
                     checkable: true
-                    checked: win.zenShown
+                    checked: win.modes.zenShown
                     text: win.withKeys(qsTr("Zen (only the page)"), "zen")
                     icon.source: app.iconUrl("xqt-zen")
-                    onTriggered: win.setZen(!win.zenShown)
+                    onTriggered: win.modes.setZen(!win.modes.zenShown)
                 }
                 // Read only: the pen does not write, the edges turn the pages
                 AdaptiveMenuItem {
                     objectName: "readOnlyItem"
-                    offered: win.readOnlyOffered
+                    offered: win.modes.readOnlyOffered
                     checkable: true
-                    checked: win.readOnlyOn
+                    checked: win.modes.readOnlyOn
                     text: qsTr("Read only")
                     icon.source: app.iconUrl("xqt-lock")
-                    onTriggered: win.readOnly = !win.readOnlyOn
+                    onTriggered: win.modes.readOnly = !win.modes.readOnlyOn
                 }
                 // Read: Zen and read only, in full screen
                 AdaptiveMenuItem {
@@ -295,7 +295,7 @@ Row {
                     offered: !win.textDoc
                     text: win.withKeys(qsTr("Read (Zen, read only)"), "read")
                     icon.source: app.iconUrl("xqt-book-open")
-                    onTriggered: win.startReading()
+                    onTriggered: win.modes.startReading()
                 }
                 // Pages shown dark, the document unchanged (qt/docs/dark-pages.md)
                 AdaptiveMenu {
@@ -319,14 +319,14 @@ Row {
                 // The toolbox's edge in this size class (qt/docs/toolbox.md); the phone classes have their dock
                 AdaptiveMenu {
                     objectName: "toolboxPositionMenu"
-                    offered: !win.phoneLayout
+                    offered: !win.layout.phoneLayout
                     title: qsTr("Toolbox position")
                     iconName: "xqt-panel-top"
                     component EdgeItem: AdaptiveMenuItem {
                         property string edge
                         checkable: true
-                        checked: win.toolboxEdge === edge
-                        onTriggered: win.chooseToolboxEdge(edge)
+                        checked: win.layout.toolboxEdge === edge
+                        onTriggered: win.layout.chooseToolboxEdge(edge)
                     }
                     EdgeItem { objectName: "toolboxRightItem"; text: qsTr("Right"); edge: "right" }
                     EdgeItem { objectName: "toolboxLeftItem"; text: qsTr("Left"); edge: "left" }
@@ -337,7 +337,7 @@ Row {
                         objectName: "toolboxAutoItem"
                         text: qsTr("Automatic for this window size")
                         checkable: true
-                        checked: win.toolboxChoice === ""
+                        checked: win.layout.toolboxChoice === ""
                         onTriggered: win.chooseLayout("toolbox", "")
                     }
                 }
@@ -351,7 +351,7 @@ Row {
                 AdaptiveMenuItem { objectName: "helpIntroItem"; text: qsTr("Introduction"); icon.source: app.iconUrl("xqt-book-open"); onTriggered: startupFlow.introDialog.show() }
                 AdaptiveMenuItem { objectName: "helpTutorialItem"; text: qsTr("Tutorial"); icon.source: app.iconUrl("xqt-notebook-pen"); onTriggered: app.openTutorial() }
                 AdaptiveMenuItem { objectName: "helpRestartTutorialItem"; offered: app.tutorialExists; text: qsTr("Start the tutorial again…"); icon.source: app.iconUrl("xopp-edit-undo"); onTriggered: startupFlow.restartTutorialDialog.open() }
-                AdaptiveMenuItem { objectName: "helpShortcutsItem"; text: qsTr("Keyboard shortcuts (F1)"); icon.source: app.iconUrl("xqt-keyboard"); onTriggered: shortcutSheet.open() }
+                AdaptiveMenuItem { objectName: "helpShortcutsItem"; text: qsTr("Keyboard shortcuts") + win.keyNote("shortcuts"); icon.source: app.iconUrl("xqt-keyboard"); onTriggered: shortcutSheet.open() }
             }
             CommandItem { slot: "settings" }
         }

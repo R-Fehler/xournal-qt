@@ -12,14 +12,14 @@ import QtQuick.Layouts
 AbstractButton {
     id: sidebarArrow
     objectName: "sidebarArrow"
-    readonly property bool open: win.sidebarShown && sidebar.visible
-    visible: win.fullChrome && !app.homeVisible && !win.hudHidden && !app.presenting
-             && (open || !app.toolbarHidden || win.phoneChrome)
+    readonly property bool open: win.layout.sidebarShown && sidebar.visible
+    visible: win.modes.fullChrome && !app.homeVisible && !win.modes.hudHidden && !app.presenting
+             && (open || !app.toolbarHidden || win.layout.phoneChrome)
     z: 50  // (over the drawer and its dimmed page)
     width: win.adaptive.touchProfile ? win.adaptive.minTarget : 24
     height: win.adaptive.touchProfile ? 64 : 56
     // (40 % down: clear of the search bar at the top and the pills at the bottom)
-    x: open ? sidebar.x + sidebar.width : Math.max(referenceSplit.x, win.controlsLeft)
+    x: open ? sidebar.x + sidebar.width : Math.max(referenceSplit.x, win.insets.controlsLeft)
     y: referenceSplit.y + Math.round(referenceSplit.height * 0.4 - height / 2)
     focusPolicy: Qt.NoFocus
     hoverEnabled: true
@@ -27,7 +27,7 @@ AbstractButton {
     ToolTip.visible: hovered
     ToolTip.text: open ? qsTr("Close the pages") : qsTr("Pages, layers, contents, annotations")
     ToolTip.delay: 600
-    onClicked: win.showSidebar(!open)
+    onClicked: win.layout.showSidebar(!open)
     background: null
     contentItem: Item {
         Rectangle {  // a slim tab against the edge

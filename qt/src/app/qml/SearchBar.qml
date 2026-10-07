@@ -241,7 +241,7 @@ Pane {
             // The replace row (where text can be written)
             IconButton {
                 objectName: "replaceToggle"
-                iconName: "xqt-replace"; tip: qsTr("Find and replace (Ctrl+H)")
+                iconName: "xqt-replace"; tip: qsTr("Find and replace") + win.keyNote("replace")
                 label: qsTr("Replace")
                 visible: bar.replaceAllowed && app.canReplace
                 implicitWidth: 40; implicitHeight: 40

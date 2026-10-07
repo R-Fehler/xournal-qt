@@ -220,6 +220,10 @@ endif()
 # The QML UI as a static QML module (XournalQt), used by the app and by the UI tests.
 set(XQT_QML_FILES
     src/app/qml/Main.qml
+    # (the window's state objects: win.insets, win.modes, win.layout)
+    src/app/qml/WindowInsets.qml
+    src/app/qml/ViewModes.qml
+    src/app/qml/ChromeLayout.qml
     # (the parts of the window, each instantiated once in Main.qml)
     src/app/qml/SaveFlow.qml
     src/app/qml/ShareFlow.qml
@@ -263,6 +267,22 @@ set(XQT_QML_FILES
     src/app/qml/TabStrip.qml
     src/app/qml/PageSidebar.qml
     src/app/qml/SettingsPage.qml
+    # (the settings' rows and sections, instantiated in SettingsPage.qml)
+    src/app/qml/SettingsSectionTitle.qml
+    src/app/qml/SettingsHint.qml
+    src/app/qml/SettingsSwitchRow.qml
+    src/app/qml/SettingsSliderRow.qml
+    src/app/qml/SettingsComboRow.qml
+    src/app/qml/SettingsPen.qml
+    src/app/qml/SettingsTouch.qml
+    src/app/qml/SettingsStabilizer.qml
+    src/app/qml/SettingsDocuments.qml
+    src/app/qml/SettingsDisplay.qml
+    src/app/qml/SettingsSearch.qml
+    src/app/qml/SettingsNewPages.qml
+    src/app/qml/SettingsStorage.qml
+    src/app/qml/SettingsShortcuts.qml
+    src/app/qml/SettingsHelp.qml
     src/app/qml/TabOverview.qml
     src/app/qml/SearchBar.qml
     src/app/qml/PageGrid.qml
@@ -276,6 +296,22 @@ set(XQT_QML_FILES
     src/app/qml/Snackbar.qml
     src/app/qml/SelectionMark.qml
     src/app/qml/HomeView.qml
+    # (the parts of HomeView.qml, each instantiated once there)
+    src/app/qml/HomeSelectionBar.qml
+    src/app/qml/HomeHeader.qml
+    src/app/qml/LibrarySwitch.qml
+    src/app/qml/LibraryShowMenu.qml
+    src/app/qml/LibrarySortMenu.qml
+    src/app/qml/LibraryCrumbs.qml
+    src/app/qml/LibrarySearchField.qml
+    src/app/qml/LibraryGridPage.qml
+    src/app/qml/RecentGridPage.qml
+    src/app/qml/HomeSelectionActions.qml
+    src/app/qml/MoveDragOverlay.qml
+    src/app/qml/LibraryItemMenu.qml
+    src/app/qml/LibraryDialogs.qml
+    src/app/qml/LibraryArchive.qml
+    src/app/qml/LibraryImport.qml
     src/app/qml/ShareZipDialog.qml
     src/app/qml/OpenZipDialog.qml
     src/app/qml/FolderChooser.qml
@@ -434,6 +470,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/UiFixture.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/QmlApiTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/MainWindowTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/EscapeKeysTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ReferenceWindowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/PresenterViewTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/DocumentLinksTest.cpp

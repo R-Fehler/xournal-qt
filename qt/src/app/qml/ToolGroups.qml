@@ -59,8 +59,8 @@ QtObject {
             variants: [
                 { key: "setsquare", icon: "xopp-setsquare", name: qsTr("Setsquare") },
                 { key: "compass", icon: "xopp-compass", name: qsTr("Compass") },
-                { key: "curtain", icon: "xqt-curtain", name: qsTr("Curtain (B)"), listOnly: true, curtain: true },
-                { key: "spotlight", icon: "xqt-spotlight", name: qsTr("Spotlight (Shift+B)"), listOnly: true, curtain: true }
+                { key: "curtain", icon: "xqt-curtain", name: qsTr("Curtain") + win.keyNote("curtain"), listOnly: true, curtain: true },
+                { key: "spotlight", icon: "xqt-spotlight", name: qsTr("Spotlight") + win.keyNote("spotlight"), listOnly: true, curtain: true }
             ]
         },
         "eraser": {

@@ -14,7 +14,7 @@ Item {
     id: readingTapFields
     objectName: "readingTapFields"
     readonly property bool inputTransparent: true
-    visible: win.reading && !win.replaying && !pageGrid.visible && !contentsOverview.visible
+    visible: win.modes.readOnlyOn && !win.modes.replaying && !pageGrid.visible && !contentsOverview.visible
     z: 4  // (over the page, under its pills)
     x: canvas.x
     y: canvas.y

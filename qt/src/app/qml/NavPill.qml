@@ -9,10 +9,10 @@ import QtQuick.Layouts
 Pane {
     id: navPill
     objectName: "navPill"
-    visible: (app.canGoBack || app.canGoForward) && !pageGrid.visible && !win.hudHidden
+    visible: (app.canGoBack || app.canGoForward) && !pageGrid.visible && !win.modes.hudHidden
     anchors.left: canvas.left
-    anchors.leftMargin: (zenDot.visible ? 56 : 20) + win.canvasControlsLeft - canvas.x  // (in Zen: beside the dot)
-    readonly property real clearY: win.clearOfPills(navPill, win.canvasControlsBottom - 24 - height, [viewPill])
+    anchors.leftMargin: (zenDot.visible ? 56 : 20) + win.layout.canvasControlsLeft - canvas.x  // (in Zen: beside the dot)
+    readonly property real clearY: win.layout.clearOfPills(navPill, win.layout.canvasControlsBottom - 24 - height, [viewPill])
     y: clearY
     padding: 2
     Material.foreground: "#303030"
@@ -27,14 +27,14 @@ Pane {
         IconButton {
             objectName: "navBack"
             iconName: "xopp-navigate-back"
-            tip: qsTr("Back to where you were (Alt+Left)")
+            tip: qsTr("Back to where you were") + win.keyNote("back")
             enabled: app.canGoBack
             onClicked: app.navigateBack()
         }
         IconButton {
             objectName: "navForward"
             iconName: "xopp-navigate-forward"
-            tip: qsTr("Forward (Alt+Right)")
+            tip: qsTr("Forward") + win.keyNote("forward")
             enabled: app.canGoForward
             onClicked: app.navigateForward()
         }

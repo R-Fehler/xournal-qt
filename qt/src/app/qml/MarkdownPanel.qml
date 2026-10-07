@@ -28,8 +28,8 @@ Pane {
 
     /// On a phone while the soft keyboard is open for the source (the panel ends above it): its format bar at the
     /// panel's bottom, right above the keyboard, as the page's format bar
-    readonly property bool barDocked: typeof win !== "undefined" && win !== null && win.phoneLayout === true
-                                      && win.keyboardOpen && area.activeFocus
+    readonly property bool barDocked: typeof win !== "undefined" && win !== null && win.layout.phoneLayout === true
+                                      && win.insets.keyboardOpen && area.activeFocus
     /// The text's cursor scrolled into view in its scroll view
     function showCursor() {
         const f = areaScroll.contentItem

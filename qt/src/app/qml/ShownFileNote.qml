@@ -11,13 +11,13 @@ Pane {
     objectName: "shownFileNote"
     property string closedFor: ""
     visible: app.shownFileNote !== "" && closedFor !== app.title && !pageGrid.visible && !contentsOverview.visible
-             && !win.hudHidden
+             && !win.modes.hudHidden
     // (bottom left: the search bar is at the top, the page and zoom pill at the bottom right; above them where it
     // would meet them in a narrow canvas)
     anchors.left: canvas.left
-    anchors.leftMargin: (zenDot.visible ? 56 : 24) + win.canvasControlsLeft - canvas.x  // (in Zen: beside the dot)
+    anchors.leftMargin: (zenDot.visible ? 56 : 24) + win.layout.canvasControlsLeft - canvas.x  // (in Zen: beside the dot)
     // (through a property of its own: a binding of y that reads the geometry itself crashes Qt 6.7)
-    readonly property real clearY: win.clearOfPills(shownFileNote, win.canvasControlsBottom - 24 - height, [viewPill, navPill])
+    readonly property real clearY: win.layout.clearOfPills(shownFileNote, win.layout.canvasControlsBottom - 24 - height, [viewPill, navPill])
     y: clearY
     width: Math.min(canvas.width - anchors.leftMargin - 16,
                     Math.max(160, Math.min(canvas.width - viewPill.width - 80, 560)))

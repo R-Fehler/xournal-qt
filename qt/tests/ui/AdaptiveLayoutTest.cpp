@@ -24,6 +24,7 @@
  * @license GNU GPLv2 or later
  */
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -437,8 +438,10 @@ protected:
     void settled(QObject* popup, std::source_location where = std::source_location::current()) {
         const bool done = upTo(
                 [&] {
-                    return popup->property("scale").toDouble() == 1.0 && popup->property("opacity").toDouble() == 1.0 &&
-                           (!popup->property("slide").isValid() || popup->property("slide").toDouble() == 0.0);
+                    // (within 1e-9: a popup's enter transition may end a hair short of its end value, e.g. the Material
+                    // menu's scale at 0.9999999999998, and stays there; it is opened all the same)
+                    const auto at = [&](const char* p, double v) { return std::abs(popup->property(p).toDouble() - v) < 1e-9; };
+                    return at("scale", 1.0) && at("opacity", 1.0) && (!popup->property("slide").isValid() || at("slide", 0.0));
                 },
                 untilMs);
         if (!done) {
@@ -1491,7 +1494,7 @@ TEST_F(AdaptiveLayoutTest, sidebarChoicesAreKeptPerSizeClass) {
     // Its button: a drawer over the page
     click(pages);
     EXPECT_TRUE(sidebar->isVisible());
-    EXPECT_TRUE(flag("sidebarAsDrawer"));
+    EXPECT_FALSE(window->property("layout").value<QObject*>()->property("sidebarDocked").toBool()) << "a drawer";
     EXPECT_DOUBLE_EQ(canvas->mapToScene(QPointF(0, 0)).x(), canvasX) << "over the page, not beside it";
     auto* scrim = findItem("sidebarScrim");
     ASSERT_NE(scrim, nullptr);
@@ -1525,7 +1528,7 @@ TEST_F(AdaptiveLayoutTest, sidebarChoicesAreKeptPerSizeClass) {
     click(pages);
     click(findItem("sidebarPin"));
     EXPECT_TRUE(sidebar->isVisible());
-    EXPECT_FALSE(flag("sidebarAsDrawer"));
+    EXPECT_TRUE(window->property("layout").value<QObject*>()->property("sidebarDocked").toBool()) << "beside the page";
     EXPECT_GT(canvas->mapToScene(QPointF(0, 0)).x(), canvasX) << "beside the page";
     EXPECT_EQ(choice("tabletPortrait", "sidebar"), "shown");
 
@@ -1562,7 +1565,16 @@ TEST_F(AdaptiveLayoutTest, sidebarChoicesAreKeptPerSizeClass) {
     EXPECT_EQ(sizeClass(), "tabletPortrait") << "the class is still known (Settings shows it)";
     EXPECT_EQ(adaptive->property("layoutClass").toString(), "desktopWide");
     EXPECT_TRUE(sidebar->isVisible());
-    EXPECT_FALSE(flag("sidebarAsDrawer"));
+    EXPECT_TRUE(window->property("layout").value<QObject*>()->property("sidebarDocked").toBool()) << "beside the page";
+    // A phone's size: a phone class, laid out as a desktop (phoneLayout follows the layout class)
+    resize(412, 915);
+    EXPECT_TRUE(adaptive->property("phone").toBool());
+    EXPECT_FALSE(adaptive->property("phoneLayout").toBool());
+    EXPECT_FALSE(window->property("phoneLayout").toBool());
+    QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "adaptiveLayout"), Q_ARG(QVariant, true));
+    until([&] { return adaptive->property("layoutClass").toString() == "phonePortrait"; });
+    EXPECT_TRUE(adaptive->property("phoneLayout").toBool());
+    EXPECT_TRUE(window->property("phoneLayout").toBool());
 }
 
 // A window edge dragged a little past a limit does not change the class; while a pointer is held (a stroke) nothing
