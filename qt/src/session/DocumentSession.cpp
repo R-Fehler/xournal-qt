@@ -50,6 +50,7 @@
 #include "DocumentSaveTask.h"
 #include "DocumentImages.h"
 #include "DocumentSearch.h"
+#include "FileIo.h"
 #include "HybridPdf.h"
 #include "MergedPdf.h"
 #include "PageBookmarks.h"
@@ -104,11 +105,7 @@ DocumentHandler& detachedHandler() {
     return handler;
 }
 
-bool hasExtension(const fs::path& p, const char* ext) {
-    auto e = p.extension().string();
-    std::transform(e.begin(), e.end(), e.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return e == ext;
-}
+using fileio::hasExtension;
 }  // namespace
 
 namespace {
@@ -1384,18 +1381,12 @@ std::vector<fs::path> DocumentSession::filesOnDisk() const {
 }
 
 std::optional<DocumentSession::DiskStamp> DocumentSession::diskStampOf(const fs::path& file) {
-    std::error_code ec;
-    const auto size = fs::file_size(file, ec);
-    if (ec) {
-        return std::nullopt;
-    }
-    const auto time = fs::last_write_time(file, ec);
-    if (ec) {
+    const auto onDisk = fileio::fileStamp(file);
+    if (!onDisk) {
         return std::nullopt;
     }
     DiskStamp stamp;
-    stamp.size = size;
-    stamp.time = std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch()).count();
+    stamp.file = *onDisk;
     // The first and the last 64 KB (the end of a PDF has its cross-reference table, of a .xopp gzip's checksum)
     QFile f(QString::fromStdString(file.string()));
     if (f.open(QIODevice::ReadOnly)) {
@@ -1435,11 +1426,11 @@ bool DocumentSession::filesChangedOnDisk() {
             }
             continue;
         }
-        if (!now || (now->size == known->second.size && now->time == known->second.time)) {
+        if (!now || now->file == known->second.file) {
             next[f] = known->second;  // (unchanged; or gone for a moment: asked again when it is back)
             continue;
         }
-        if (now->size == known->second.size && now->sample == known->second.sample) {
+        if (now->file.size == known->second.file.size && now->sample == known->second.sample) {
             next[f] = *now;  // (only touched)
             continue;
         }
@@ -1477,20 +1468,13 @@ bool DocumentSession::setVersionMessage(int id, const std::string& message, std:
         return false;
     }
     const fs::path file = getFilePath();
-    // (as HybridPdf keeps a file's version: its size and time)
-    auto stamp = [&file] {
-        std::error_code ec;
-        const auto size = fs::file_size(file, ec);
-        const auto time = fs::last_write_time(file, ec);
-        return std::to_string(size) + "-" + std::to_string(static_cast<long long>(time.time_since_epoch().count()));
-    };
-    const std::string was = stamp();
+    const std::string was = fileio::stampOf(file);  // (the stamp HybridPdf keeps of the file's version)
     if (!HybridPdf::setVersionMessage(file, id, message, error)) {
         return false;
     }
     if (hybridRevision && hybridRevisionFile == file && hybridRevision->stamp == was) {
         // (the pages are the same objects: the next save appends as before)
-        hybridRevision->stamp = stamp();
+        hybridRevision->stamp = fileio::stampOf(file);
     }
     stampFiles();  // (the app's own change, never one "by another program")
     Q_EMIT versionsChanged();

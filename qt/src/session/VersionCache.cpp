@@ -8,6 +8,7 @@
 #include "util/PathUtil.h"
 #include "util/Util.h"
 
+#include "FileIo.h"
 #include "HybridPdf.h"
 
 namespace xqt {
@@ -15,10 +16,7 @@ namespace xqt {
 namespace {
 std::string keyOf(const fs::path& pdf, int id) {
     std::error_code ec;
-    const auto size = fs::file_size(pdf, ec);
-    const auto time = fs::last_write_time(pdf, ec);
-    const std::string text = fs::absolute(pdf, ec).string() + "|" + std::to_string(size) + "|" +
-                             std::to_string(static_cast<long long>(time.time_since_epoch().count()));
+    const std::string text = fs::absolute(pdf, ec).string() + "|" + fileio::stampOf(pdf);
     return QCryptographicHash::hash(QByteArray::fromStdString(text), QCryptographicHash::Sha1).toHex().left(16).toStdString() +
            "-" + std::to_string(id);
 }

@@ -13,6 +13,7 @@
 
 #include "util/PathUtil.h"
 
+#include "FileIo.h"
 #include "PdfEncryption.h"
 
 namespace xqt::MergedPdf {
@@ -51,23 +52,16 @@ void mark(QPDF& pdf, Kind kind) {
 }
 
 void writeAtomically(QPDF& pdf, const fs::path& target) {
-    fs::path tmp = target.parent_path() / ("." + target.filename().string() + ".part");
-    try {
-        QPDFWriter w(pdf, tmp.string().c_str());
+    fileio::AtomicFile file(target);
+    {
+        QPDFWriter w(pdf, file.temp().string().c_str());
         w.setObjectStreamMode(qpdf_o_generate);  // smaller: object streams
         // The streams as they are (decoding and compressing them again took half of the time: 9 s for 1,300 pages)
         w.setDecodeLevel(qpdf_dl_none);
         w.write();
-    } catch (...) {
-        std::error_code ec;
-        fs::remove(tmp, ec);
-        throw;
     }
-    std::error_code ec;
-    fs::rename(tmp, target, ec);
-    if (ec) {
-        fs::remove(tmp, ec);
-        throw std::runtime_error("Could not write \"" + target.string() + "\": " + ec.message());
+    if (std::string error; !file.commit(error)) {
+        throw std::runtime_error(error);
     }
 }
 

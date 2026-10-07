@@ -18,6 +18,7 @@
 #include "util/GzUtil.h"
 #include "util/PathUtil.h"
 
+#include "FileIo.h"
 #include "MdBox.h"
 
 #include "MdDocument.h"
@@ -51,14 +52,7 @@ fs::path workFolder(const fs::path& document) {
     std::error_code ec;
     const fs::path abs = fs::absolute(document, ec);
     // (FNV-1a of the path: the same folder for the same document in every run)
-    uint64_t h = 1469598103934665603ULL;
-    for (const unsigned char c: utf8(ec ? document : abs)) {
-        h ^= c;
-        h *= 1099511628211ULL;
-    }
-    char name[20];
-    std::snprintf(name, sizeof name, "%016llx", static_cast<unsigned long long>(h));
-    return Util::getCacheSubfolder("md-assets") / name;
+    return Util::getCacheSubfolder("md-assets") / fileio::hex16(fileio::fnv1a(utf8(ec ? document : abs)));
 }
 
 void touchWorkFolder(const fs::path& document) {

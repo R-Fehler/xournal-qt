@@ -5,10 +5,11 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QRegularExpression>
-#include <QSaveFile>
 #include <QThread>
 
 #include "util/PathUtil.h"
+
+#include "session/FileIo.h"
 
 #include "DocumentFiles.h"
 
@@ -66,10 +67,7 @@ std::optional<QCborMap> readFile(const fs::path& file, const QString& pack, int 
 }
 
 bool writeFile(const fs::path& file, const QByteArray& data) {
-    QSaveFile f(qstr(file));  // written under another name, then renamed: whole or not at all
-    // flush() before commit(): Qt 6.7's commit() does not notice a short write (a full disk, a file size limit) and
-    // renames the cut file over the old one; flush() reports it (fixed in Qt 6.8). Without commit() nothing is renamed.
-    return f.open(QIODevice::WriteOnly) && f.write(data) == data.size() && f.flush() && f.commit();
+    return fileio::writeFileAtomically(qstr(file), data);  // (whole or not at all)
 }
 
 /// Files of the entries that have one: "<pack>-<16 hex digits>.pack"
@@ -210,8 +208,9 @@ void remove(const fs::path& dir, const QString& pack) {
 }
 
 bool isOurs(const QString& name) {
-    // Packs, the files of big entries, and what QSaveFile writes before it renames ("notes.pack.AbC123")
-    static const QRegularExpression pack(QStringLiteral("^[a-z][a-z-]*(-[0-9a-f]{16})?\\.pack(\\..+)?$"));
+    // Packs, the files of big entries, and what is written before it is renamed (fileio::AtomicFile:
+    // ".notes.pack.<pid>-<n>.part")
+    static const QRegularExpression pack(QStringLiteral("^\\.?[a-z][a-z-]*(-[0-9a-f]{16})?\\.pack(\\..+)?$"));
     return pack.match(name).hasMatch();
 }
 

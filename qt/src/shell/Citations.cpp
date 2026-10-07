@@ -8,7 +8,6 @@
 #include <QClipboard>
 #include <QDir>
 #include <QFileInfo>
-#include <QSaveFile>
 #include <QGuiApplication>
 #include <QPointer>
 #include <QThreadPool>
@@ -16,6 +15,7 @@
 
 #include "control/settings/Settings.h"
 #include "session/Citation.h"
+#include "session/FileIo.h"
 #include "session/FuzzyQuery.h"
 
 #include "Library.h"
@@ -354,9 +354,8 @@ bool Citations::arxivDownload(int index, const QString& folder) {
         QThreadPool::globalInstance()->start([self, path, body = r.body] {
             QString problem;
             QDir().mkpath(QFileInfo(path).absolutePath());
-            QSaveFile file(path);
-            if (!file.open(QIODevice::WriteOnly) || file.write(body) != body.size() || !file.commit()) {
-                problem = tr("The PDF could not be saved: %1").arg(file.errorString());
+            if (QString why; !fileio::writeFileAtomically(path, body, fileio::Sync::Durable, &why)) {
+                problem = tr("The PDF could not be saved: %1").arg(why);
             }
             QMetaObject::invokeMethod(QCoreApplication::instance(), [self, path, problem] {
                 if (!self) {

@@ -11,13 +11,13 @@
 #include <QFileInfo>
 #include <QImage>
 #include <QPointer>
-#include <QSaveFile>
 #include <QUrl>
 
 #include "control/settings/Settings.h"
 #include "model/Document.h"
 #include "model/Layer.h"
 #include "model/Text.h"
+#include "session/FileIo.h"
 #include "model/XojPage.h"
 
 #include "AppController.h"
@@ -80,8 +80,7 @@ bool AppController::loadWebImage(const QString& address) {
             Q_EMIT self->message(tr("Load image"), tr("What that address gave is no picture."), true);
             return;
         }
-        QSaveFile file(QString::fromStdString(cache));
-        if (!file.open(QIODevice::WriteOnly) || file.write(reply.body) != reply.body.size() || !file.commit()) {
+        if (!fileio::writeFileAtomically(QString::fromStdString(cache), reply.body, fileio::Sync::None)) {  // (a cache)
             Q_EMIT self->message(tr("Load image"), tr("The picture could not be kept in the app's cache."), true);
             return;
         }

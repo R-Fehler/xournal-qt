@@ -33,6 +33,10 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSession.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSession.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSave.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/FileIo.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/FileIo.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageCopy.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageCopy.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentMode.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentMode.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSaveTask.h
@@ -238,6 +242,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/PdfEncryptionTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/PdfHistoryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/ByteDeltaTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/FileIoTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/VersionDiffTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BackgroundSaveTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TextFileTest.cpp

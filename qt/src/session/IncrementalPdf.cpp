@@ -22,6 +22,7 @@
 
 #include "util/Util.h"
 
+#include "FileIo.h"
 #include "PdfEncryption.h"
 
 namespace xqt::IncrementalPdf {
@@ -134,12 +135,6 @@ int widthFor(uint64_t v) {
     return w;
 }
 
-/// A unique temporary name next to `target`.
-fs::path partOf(const fs::path& target) {
-    static std::atomic<unsigned> counter{0};
-    return target.parent_path() / ("." + target.filename().string() + "." + std::to_string(Util::getPid()) + "-" +
-                                   std::to_string(++counter) + ".part");
-}
 
 }  // namespace
 
@@ -239,14 +234,6 @@ QPDFObjectHandle Update::copyStream(QPDFObjectHandle stream) {
 QPDFObjectHandle Update::copy(QPDFObjectHandle foreign) { return copyValue(foreign, true); }
 
 namespace {
-uint64_t fnv(const std::string& s) {
-    uint64_t h = 1469598103934665603ULL;
-    for (unsigned char c: s) {
-        h ^= c;
-        h *= 1099511628211ULL;
-    }
-    return h;
-}
 
 /// What a stream is, to find the same one in another PDF: its dictionary (without /Length) and its data. Empty: its
 /// dictionary refers to other objects (not compared).
@@ -261,7 +248,7 @@ std::string reuseKey(OH stream) {
         dict.removeKey("/Length");
     }
     const std::string data = rawData(stream);
-    return dict.unparse() + "|" + std::to_string(data.size()) + "|" + std::to_string(fnv(data));
+    return dict.unparse() + "|" + std::to_string(data.size()) + "|" + std::to_string(fileio::fnv1a(data));
 }
 }  // namespace
 
@@ -636,10 +623,9 @@ Result append(const fs::path& file, const Tail& tail, const std::string& update,
         }
         ec.clear();
     }
-    const fs::path part = partOf(file);
+    fileio::AtomicFile out(file);  // (a temporary file next to it: removed when it is not committed)
+    const fs::path& part = out.temp();
     auto fail = [&](const std::string& why) {
-        std::error_code rec;
-        fs::remove(part, rec);
         r.ok = false;
         r.error = "Could not write \"" + file.string() + "\": " + why;
         return r;
@@ -679,18 +665,14 @@ Result append(const fs::path& file, const Tail& tail, const std::string& update,
         ok = false;
     }
     ok = ok && std::fflush(f) == 0;
-#ifdef _WIN32
-    ok = ok && _commit(_fileno(f)) == 0;
-#else
-    ok = ok && fsync(fileno(f)) == 0;  // (on the disk before it replaces the file)
-#endif
     ok = (std::fclose(f) == 0) && ok;
     if (!ok) {
         return fail("the update could not be written");
     }
-    fs::rename(part, file, ec);
-    if (ec) {
-        return fail(ec.message());
+    if (std::string error; !out.commit(error)) {  // (on the storage before it replaces the file)
+        r.ok = false;
+        r.error = error;
+        return r;
     }
     r.ok = true;
     r.size = kept + update.size();

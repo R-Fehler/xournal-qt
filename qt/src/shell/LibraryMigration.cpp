@@ -17,7 +17,6 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QPointer>
-#include <QSaveFile>
 #include <QThread>
 #include <QThreadPool>
 #ifdef Q_OS_UNIX
@@ -25,6 +24,7 @@
 #endif
 
 #include "util/PathUtil.h"
+#include "session/FileIo.h"
 
 #include "DocumentFiles.h"
 #include "DocumentPlaces.h"
@@ -192,11 +192,7 @@ void mergeConfig(const fs::path& from, const fs::path& to) {
             for (auto i = moved.begin(); i != moved.end(); ++i) {
                 merged.insert(i.key(), i.value());
             }
-            QSaveFile f(qstr(target));
-            if (f.open(QIODevice::WriteOnly)) {
-                f.write(QJsonDocument(merged).toJson(QJsonDocument::Compact));
-                f.commit();
-            }
+            fileio::writeFileAtomically(qstr(target), QJsonDocument(merged).toJson(QJsonDocument::Compact));
         }
     }
     fs::remove_all(from, ec);
@@ -507,12 +503,7 @@ bool writeManifest(const Plan& plan, const fs::path& file) {
                         {"dropped", dropped}};
     std::error_code ec;
     fs::create_directories(file.parent_path(), ec);
-    QSaveFile f(qstr(file));
-    if (!f.open(QIODevice::WriteOnly)) {
-        return false;
-    }
-    f.write(QJsonDocument(o).toJson(QJsonDocument::Indented));
-    return f.commit();
+    return fileio::writeFileAtomically(qstr(file), QJsonDocument(o).toJson(QJsonDocument::Indented));
 }
 
 std::optional<Plan> readManifest(const fs::path& file) {

@@ -58,10 +58,12 @@
 #include "DocumentSearch.h"
 #include "DocumentTextIndex.h"
 #include "DocumentSession.h"
+#include "FileIo.h"
 #include "audio/AudioFiles.h"
 #include "audio/DocumentAudio.h"
 #include "HybridPdf.h"
 #include "MergedPdf.h"
+#include "PageCopy.h"
 #include "PdfPageKeeper.h"
 #include "PictureSaveHandler.h"
 #include "TextFile.h"
@@ -85,32 +87,9 @@ DocumentHandler& copyHandler() {
     return handler;
 }
 
-bool hasExtension(const fs::path& p, const char* ext) {
-    auto e = p.extension().string();
-    std::transform(e.begin(), e.end(), e.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return e == ext;
-}
-
 fs::path backgroundOf(Document& doc) {
     std::shared_lock lock(doc);
     return doc.getPdfFilepath();
-}
-
-/// A deep copy of a page: its layers and elements (the copy constructor leaves out what is visible and the name of
-/// its background).
-PageRef copyOf(const PageRef& page) {
-    struct Access: XojPage {
-        using XojPage::setLayerVisible;  // (for the LayerController only)
-    };
-    constexpr auto setLayerVisible = &Access::setLayerVisible;
-    auto copy = std::make_shared<XojPage>(*page);
-    for (Layer::Index i = 0; i <= page->getLayerCount(); ++i) {  // (0: the background)
-        ((*copy).*setLayerVisible)(i, page->isLayerVisible(i));
-    }
-    if (page->backgroundHasName()) {
-        copy->setBackgroundName(page->getBackgroundName());
-    }
-    return copy;
 }
 
 /// What the writers read of a document, copied (the caller holds its read lock). Its PDF is not loaded: the writers
@@ -125,7 +104,7 @@ std::unique_ptr<Document> snapshotOf(const Document& doc) {
     std::vector<PageRef> pages;
     pages.reserve(doc.getPageCount());
     for (size_t i = 0; i < doc.getPageCount(); ++i) {
-        pages.push_back(copyOf(doc.getPage(i)));
+        pages.push_back(deepCopyOf(doc.getPage(i)));
     }
     copy->addPages(pages.begin(), pages.end());
     return copy;
@@ -440,7 +419,7 @@ void DocumentSession::beginSave() {
         }
         case SaveKind::Hybrid:
             t.target = t.request.target;
-            if (!hasExtension(t.target, ".pdf")) {
+            if (!fileio::hasExtension(t.target, ".pdf")) {
                 t.target += ".pdf";
             }
             t.hybrid = true;
@@ -452,7 +431,7 @@ void DocumentSession::beginSave() {
         case SaveKind::ExportHybrid:
         case SaveKind::ExportArchive: {
             t.target = t.request.target;
-            if (!hasExtension(t.target, ".pdf")) {
+            if (!fileio::hasExtension(t.target, ".pdf")) {
                 t.target += ".pdf";
             }
             t.hybrid = true;  // (its pages as a hybrid PDF is written from them)

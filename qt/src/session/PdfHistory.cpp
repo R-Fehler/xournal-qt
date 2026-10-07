@@ -11,9 +11,9 @@
 #include <qpdf/QPDF.hh>
 #include <qpdf/QPDFEmbeddedFileDocumentHelper.hh>
 #include <qpdf/QPDFObjectHandle.hh>
-#include <zlib.h>
 
 #include "ByteDelta.h"
+#include "FileIo.h"
 
 namespace xqt::PdfHistory {
 
@@ -52,42 +52,14 @@ std::string sha256(const std::string& data) {
             .toStdString();
 }
 
-std::string gunzip(const std::string& data, bool& ok) {
-    ok = false;
-    z_stream z{};
-    if (inflateInit2(&z, 16 + MAX_WBITS) != Z_OK) {
-        return {};
-    }
-    std::string out;
-    char buf[65536];
-    z.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
-    z.avail_in = static_cast<uInt>(data.size());
-    int rc = Z_OK;
-    while (rc == Z_OK) {
-        z.next_out = reinterpret_cast<Bytef*>(buf);
-        z.avail_out = sizeof buf;
-        rc = inflate(&z, Z_NO_FLUSH);
-        out.append(buf, sizeof buf - z.avail_out);
-    }
-    inflateEnd(&z);
-    ok = rc == Z_STREAM_END;
-    return out;
-}
+std::string gunzip(const std::string& data, bool& ok) { return fileio::gunzip(data, ok); }
 
 std::string gzip(const std::string& data) {
-    z_stream z{};
-    if (deflateInit2(&z, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 16 + MAX_WBITS, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+    try {
+        return fileio::gzip(data);
+    } catch (const std::exception&) {
         return {};
     }
-    std::string out(deflateBound(&z, static_cast<uLong>(data.size())) + 32, '\0');
-    z.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
-    z.avail_in = static_cast<uInt>(data.size());
-    z.next_out = reinterpret_cast<Bytef*>(out.data());
-    z.avail_out = static_cast<uInt>(out.size());
-    const int rc = deflate(&z, Z_FINISH);
-    out.resize(z.total_out);
-    deflateEnd(&z);
-    return rc == Z_STREAM_END ? out : std::string();
 }
 
 std::string toJsonLines(const std::vector<Version>& versions) {

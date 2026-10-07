@@ -1,12 +1,13 @@
 #include "TodoCalendar.h"
 
+#include "session/FileIo.h"
+
 #include <map>
 
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
-#include <QSaveFile>
 #include <QStandardPaths>
 #include <QTimeZone>
 #include <QVariantMap>
@@ -164,8 +165,7 @@ QString writeToCache(const Item& item) {
     }
     const QString path =
             dir.filePath(QStringLiteral("%1-%2.ics").arg(name.isEmpty() ? QStringLiteral("todo") : name, day(item.due)));
-    QSaveFile f(path);
-    if (!f.open(QIODevice::WriteOnly) || f.write(ics({item})) < 0 || !f.commit()) {
+    if (!fileio::writeFileAtomically(path, ics({item}))) {
         return {};
     }
     return path;

@@ -23,21 +23,13 @@
 #include "util/Util.h"
 
 #include "DocumentSession.h"
+#include "FileIo.h"
 #include "PdfEncryption.h"
 
 namespace xqt {
 
 namespace {
-/// Size and modification time: whether a file is still the one that was looked at.
-std::string stampOf(const fs::path& p) {
-    std::error_code ec;
-    const auto size = fs::file_size(p, ec);
-    if (ec) {
-        return {};
-    }
-    const auto time = fs::last_write_time(p, ec);
-    return std::to_string(size) + ":" + std::to_string(static_cast<long long>(time.time_since_epoch().count()));
-}
+using fileio::stampOf;  // (whether a file is still the one that was looked at)
 
 bool isPdf(const PageRef& p) { return p->getBackgroundType().isPdfPage(); }
 
@@ -45,18 +37,14 @@ bool contains(const std::vector<size_t>& v, size_t x) { return std::find(v.begin
 
 /// Copy a file to `target` through a temporary file next to it.
 bool copyAtomically(const fs::path& from, const fs::path& target, std::string& error) {
-    const fs::path tmp = target.parent_path() / ("." + target.filename().string() + ".part");
+    fileio::AtomicFile out(target);
     std::error_code ec;
-    fs::copy_file(from, tmp, fs::copy_options::overwrite_existing, ec);
-    if (!ec) {
-        fs::rename(tmp, target, ec);
-    }
+    fs::copy_file(from, out.temp(), fs::copy_options::overwrite_existing, ec);
     if (ec) {
         error = ec.message();
-        fs::remove(tmp, ec);
         return false;
     }
-    return true;
+    return out.commit(error);
 }
 }  // namespace
 
@@ -108,12 +96,7 @@ bool PdfPageKeeper::switchTo(const fs::path& pdf, std::string& error) {
 
 namespace {
 std::string keyOf(const std::string& pdf) {
-    uint64_t h = 1469598103934665603ULL;  // (FNV-1a)
-    for (unsigned char c: pdf) {
-        h ^= c;
-        h *= 1099511628211ULL;
-    }
-    return std::to_string(h) + ":" + std::to_string(pdf.size());
+    return std::to_string(fileio::fnv1a(pdf)) + ":" + std::to_string(pdf.size());
 }
 }  // namespace
 
@@ -758,25 +741,18 @@ void PdfPageKeeper::beforeSave(const fs::path& target) {
 
 bool PdfPageKeeper::commitFile(const fs::path& staged, const fs::path& name, std::string& error) {
     // A second name for the same file, then over the old one: the open PDF keeps reading it
-    const fs::path tmp = name.parent_path() / ("." + name.filename().string() + ".part");
+    fileio::AtomicFile out(name);
     std::error_code ec;
-    fs::remove(tmp, ec);
-    ec.clear();
-    fs::create_hard_link(staged, tmp, ec);
+    fs::create_hard_link(staged, out.temp(), ec);
     if (ec) {
         ec.clear();
-        fs::copy_file(staged, tmp, fs::copy_options::overwrite_existing, ec);
-    }
-    if (!ec) {
-        fs::rename(tmp, name, ec);
+        fs::copy_file(staged, out.temp(), fs::copy_options::overwrite_existing, ec);
     }
     if (ec) {
         error = ec.message();
-        std::error_code ignored;
-        fs::remove(tmp, ignored);
         return false;
     }
-    return true;
+    return out.commit(error);
 }
 
 void PdfPageKeeper::commitApplied(const fs::path& staged, bool committed) {

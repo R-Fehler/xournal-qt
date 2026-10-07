@@ -27,6 +27,7 @@
 #include "DocumentSession.h"
 #include "HybridPdf.h"
 #include "MergedPdf.h"
+#include "FileIo.h"
 #include "PageNoteSpace.h"
 #include "PdfEncryption.h"
 #include "PdfPageKeeper.h"
@@ -36,17 +37,7 @@ namespace xqt {
 
 namespace {
 
-std::string stampOf(const fs::path& file) {
-    std::error_code ec;
-    const auto size = fs::file_size(file, ec);
-    if (ec) {
-        return {};
-    }
-    // (libc++'s file clock counts in a 128-bit integer, which std::to_string does not take; nanoseconds since 1970 fit
-    // into 64 bits until 2262)
-    const auto time = static_cast<long long>(fs::last_write_time(file, ec).time_since_epoch().count());
-    return std::to_string(size) + ":" + std::to_string(time);
-}
+using fileio::stampOf;
 
 bool inSomeCache(const fs::path& pdf) { return HybridPdf::inCache(pdf) || MergedPdf::inCache(pdf); }
 

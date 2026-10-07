@@ -7,9 +7,10 @@
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QSaveFile>
 
 #include "util/PathUtil.h"
+
+#include "session/FileIo.h"
 
 #include "DocumentFiles.h"
 
@@ -37,13 +38,8 @@ struct Store {
         }
         std::error_code ec;
         fs::create_directories(file.parent_path(), ec);
-        QSaveFile f(QString::fromStdString(file.string()));  // (written in full or not at all)
-        if (f.open(QIODevice::WriteOnly)) {
-            f.write(QJsonDocument(entries).toJson(QJsonDocument::Compact));
-            if (f.flush()) {  // (see LibraryCache.cpp, writeFile)
-                f.commit();
-            }
-        }
+        fileio::writeFileAtomically(QString::fromStdString(file.string()),
+                                    QJsonDocument(entries).toJson(QJsonDocument::Compact));
     }
 };
 

@@ -5,12 +5,12 @@
  * @license GNU GPLv2 or later
  */
 #include <QFile>
-#include <QSaveFile>
 
 #include "AppController.h"
 #include "CanvasView.h"
 #include "MarkdownEditor.h"
 #include "session/DocumentSession.h"
+#include "session/FileIo.h"
 #include "shell/DocumentFiles.h"
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
@@ -70,8 +70,7 @@ bool AppController::quickNoteAt(const QDateTime& when) {
             bytes += '\n';
         }
         bytes += QByteArray::fromStdString(line);
-        QSaveFile f(qstr(md));
-        if (!f.open(QIODevice::WriteOnly) || f.write(bytes) != bytes.size() || !f.commit()) {
+        if (!fileio::writeFileAtomically(qstr(md), bytes)) {
             Q_EMIT message(tr("Cannot create the file"), tr("\"%1\" cannot be written.").arg(qstr(md)), true);
             return false;
         }

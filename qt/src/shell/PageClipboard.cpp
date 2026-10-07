@@ -9,6 +9,7 @@
 #include "model/PageType.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "session/FileIo.h"
 #include "session/MergedPdf.h"
 #include "session/PdfPageKeeper.h"
 #include "util/Util.h"
@@ -19,15 +20,7 @@ namespace xqt {
 static_assert(PageClipboard::IMAGE_DPI == region::MIN_DPI, "pictures of pages: one resolution");
 
 namespace {
-std::string stampOf(const fs::path& p) {
-    std::error_code ec;
-    const auto size = fs::file_size(p, ec);
-    if (ec) {
-        return {};
-    }
-    const auto time = fs::last_write_time(p, ec);
-    return std::to_string(size) + ":" + std::to_string(static_cast<long long>(time.time_since_epoch().count()));
-}
+using fileio::stampOf;
 }  // namespace
 
 void PageClipboard::copy(DocumentSession& session, const std::vector<size_t>& indices, bool withPdf) {

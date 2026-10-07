@@ -13,11 +13,11 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QSaveFile>
 
 #include "control/xojfile/SaveHandler.h"
 #include "model/Document.h"
 #include "session/DocumentSession.h"
+#include "session/FileIo.h"
 #include "util/PathUtil.h"
 #include "util/Util.h"
 
@@ -233,12 +233,7 @@ bool SessionRecovery::writeJournal(const Journal& journal, const fs::path& file)
     }
     const QJsonObject root{
             {"pid", journal.pid}, {"clean", journal.clean}, {"current", journal.current}, {"tabs", tabs}};
-    QSaveFile f(QString::fromStdString(file.string()));
-    if (!f.open(QIODevice::WriteOnly)) {
-        return false;
-    }
-    f.write(QJsonDocument(root).toJson());
-    return f.flush() && f.commit();  // (see LibraryCache.cpp, writeFile)
+    return fileio::writeFileAtomically(QString::fromStdString(file.string()), QJsonDocument(root).toJson());
 }
 
 std::optional<SessionRecovery::Journal> SessionRecovery::readJournal(const fs::path& file) {

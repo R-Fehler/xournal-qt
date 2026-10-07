@@ -16,7 +16,6 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QMetaObject>
-#include <QSaveFile>
 #include <QStandardPaths>
 #include <QThreadPool>
 #ifdef Q_OS_ANDROID
@@ -33,6 +32,7 @@
 #include "session/DocumentImages.h"
 #include "session/PageBookmarks.h"
 #include "session/FuzzyQuery.h"
+#include "session/FileIo.h"
 #include "session/HybridPdf.h"
 #include "session/PdfTitle.h"
 #include "session/TextMatch.h"
@@ -228,13 +228,7 @@ void changeSettings(const fs::path& file, const fs::path& root, const std::funct
     QJsonObject settings = settingsOf(file);
     settings["root"] = QString::fromStdString(root.string());  // (for people looking at the folder)
     change(settings);
-    QSaveFile f(QString::fromStdString(file.string()));
-    if (f.open(QIODevice::WriteOnly)) {
-        f.write(QJsonDocument(settings).toJson());
-        if (f.flush()) {  // (see LibraryCache.cpp, writeFile)
-            f.commit();
-        }
-    }
+    fileio::writeFileAtomically(QString::fromStdString(file.string()), QJsonDocument(settings).toJson());
 }
 }  // namespace
 

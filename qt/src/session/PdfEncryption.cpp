@@ -21,6 +21,8 @@
 #include "pdf/base/XojPdfDocument.h"
 #include "util/Util.h"
 
+#include "FileIo.h"
+
 namespace xqt::PdfEncryption {
 
 namespace {
@@ -73,12 +75,6 @@ Registry& registry() {
     return *r;
 }
 
-/// A temporary name next to `target`.
-fs::path partOf(const fs::path& target) {
-    static std::atomic<unsigned> counter{0};
-    return target.parent_path() / ("." + target.filename().string() + "." + std::to_string(Util::getPid()) + "-" +
-                                   std::to_string(++counter) + ".part");
-}
 
 }  // namespace
 
@@ -184,8 +180,7 @@ void apply(QPDFWriter& w, QPDF& source, const Encryption& how) {
 
 bool rewrite(const fs::path& pdf, const std::string& password, const fs::path& target, const Protection* protection,
              std::string& error, const std::function<void(QPDF&)>& strip) {
-    const fs::path tmp = partOf(target);
-    std::error_code ec;
+    fileio::AtomicFile file(target);
     try {
         QPDF q;
         q.setSuppressWarnings(true);
@@ -193,7 +188,7 @@ bool rewrite(const fs::path& pdf, const std::string& password, const fs::path& t
         if (strip) {
             strip(q);
         }
-        QPDFWriter w(q, tmp.string().c_str());
+        QPDFWriter w(q, file.temp().string().c_str());
         w.setObjectStreamMode(qpdf_o_generate);
         w.setDecodeLevel(qpdf_dl_none);  // (the streams as they are: decrypted and encrypted again only)
         Encryption how;
@@ -208,17 +203,10 @@ bool rewrite(const fs::path& pdf, const std::string& password, const fs::path& t
         scrub(how.protection.ownerPassword);
         w.write();
     } catch (const std::exception& e) {
-        fs::remove(tmp, ec);
         error = e.what();
         return false;
     }
-    fs::rename(tmp, target, ec);
-    if (ec) {
-        fs::remove(tmp, ec);
-        error = "Could not write \"" + target.string() + "\": " + ec.message();
-        return false;
-    }
-    return true;
+    return file.commit(error);
 }
 
 // --- The registry ---------------------------------------------------------------------------------------------

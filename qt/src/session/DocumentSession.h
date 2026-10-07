@@ -33,6 +33,7 @@
 #include "pdf/base/XojPdfPage.h"
 #include "undo/UndoRedoHandler.h"  // for UndoRedoListener
 
+#include "FileIo.h"
 #include "HeadlessViews.h"
 #include "MdImages.h"
 #include "PdfEncryption.h"
@@ -677,8 +678,7 @@ private:
     std::string lastAutosavedText;
     /// filesOnDisk() as read or written last (size, time, a sample of the content)
     struct DiskStamp {
-        std::uintmax_t size = 0;
-        std::int64_t time = 0;
+        fileio::FileStamp file;
         QByteArray sample;
     };
     static std::optional<DiskStamp> diskStampOf(const fs::path& file);
