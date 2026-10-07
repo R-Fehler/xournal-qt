@@ -56,7 +56,7 @@ Item {
         case "curtain": app.curtainHandles = false; break
         case "selection":
             if (app.hasSelection || app.noteSelected) app.clearSelection()
-            if (app.pdfTextIsSelected) app.clearPdfTextSelection()
+            if (app.pdfTextIsSelected) app.edit.clearPdfTextSelection()
             break
         case "snip": app.cancelSnip(); break
         case "stamp": app.cancelTodoStamp(); break
