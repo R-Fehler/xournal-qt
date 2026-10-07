@@ -42,7 +42,7 @@ Popup {
     /// Its bottom edge: the window's, or the soft keyboard's top while it is open
     readonly property real bottomEdge: parent ? (inWindow ? Math.min(parent.height, win.insets.keyboardTop) : parent.height) : 0
     /// The window left the phone classes: the menu is a menu again, so the sheet goes
-    readonly property bool phoneClass: adaptiveLayout !== null && ["phonePortrait", "phoneShort", "tiny"].indexOf(adaptiveLayout.layoutClass) >= 0
+    readonly property bool phoneClass: adaptiveLayout !== null && adaptiveLayout.phoneLayout
     onPhoneClassChanged: if (!phoneClass && visible) close()
 
     width: parent ? Math.min(parent.width - safeLeft - safeRight, 640) : 360

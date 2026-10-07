@@ -24,7 +24,7 @@ Rectangle {
     readonly property var adaptive: typeof win !== "undefined" && win ? win.adaptive : null
     readonly property string layoutClass: adaptive ? adaptive.layoutClass : "desktopWide"
     /// A phone class: the "+" floats at the bottom, the actions on a selection are a bar at the bottom
-    readonly property bool phoneLayout: ["phonePortrait", "phoneShort", "tiny"].indexOf(layoutClass) >= 0
+    readonly property bool phoneLayout: adaptive !== null && adaptive.phoneLayout
     /// A phone held sideways (or another short window of a phone class): one header row with the breadcrumbs in it,
     /// shorter cards
     readonly property bool shortLayout: phoneLayout && (layoutClass === "phoneShort"

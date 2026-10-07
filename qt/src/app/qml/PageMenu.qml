@@ -41,7 +41,7 @@ Popup {
     /// In the phone classes: a sheet at the bottom instead.
     function openFor(p, item, x, y) {
         page = p
-        asSheet = adaptiveLayout !== null && ["phonePortrait", "phoneShort", "tiny"].indexOf(adaptiveLayout.layoutClass) >= 0
+        asSheet = adaptiveLayout !== null && adaptiveLayout.phoneLayout
         if (asSheet) {
             handle.offset = 0
             // (the window's sheet: inside the safe area, on the soft keyboard while it is open)

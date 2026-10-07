@@ -18,6 +18,7 @@ reads the window's size class from there instead of keeping a threshold of its o
 | `heightClass` | `short` (< 560), `medium` (< 900), `tall` |
 | `orientation` | `portrait` (h > w) or `landscape` |
 | `phone` | one of the phone classes (phone portrait, phone short, tiny) |
+| `phoneLayout` | laid out as a phone: `phone` by the layout class (false while "Adapt the layout" is off); what the QML reads (the app bar, the dock, menus as sheets) |
 | `roomForSidebar` | the page sidebar fits beside the page (below) |
 | `classWidth`, `classHeight` | the size the class was taken from |
 | `held` | a pointer is held in the window (mouse button, pen, finger), or QML set `hold` |
@@ -306,8 +307,8 @@ layout (`xqt-page-single` / `xqt-book-open`), "more tools" (`xqt-tools-more`), a
 
 ### The view pill
 
-Undo and redo while the tool bar is not shown (it is put away, the compact chrome, a text document whose tool
-bar is merged into its format bar; `win.layout.undoInToolBar`: otherwise they lead the tool bar), the page layout, the page
+Undo and redo where no bar holds them (`win.layout.undoPlace`: "toolbox", "formatBar", "toolBar" or "viewPill":
+the bar is put away, the compact chrome, Zen), the page layout, the page
 grid, **the contents** (moved here from the tool bar), the page number, and a small **zoom percentage** (no − / + any
 more):
 

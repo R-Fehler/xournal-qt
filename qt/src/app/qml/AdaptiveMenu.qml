@@ -25,7 +25,7 @@ Menu {
     /// The window's layout (Main.qml's `win.adaptive`), if there is one
     readonly property var adaptiveLayout: typeof win !== "undefined" && win ? win.adaptive : null
     /// In a phone class (by the layout class: "Adapt the layout" off keeps the desktop menus) it opens as a sheet
-    readonly property bool asSheet: adaptiveLayout !== null && ["phonePortrait", "phoneShort", "tiny"].indexOf(adaptiveLayout.layoutClass) >= 0
+    readonly property bool asSheet: adaptiveLayout !== null && adaptiveLayout.phoneLayout
     /// The widest entry offered (a binding: entries come and go, and change their text, with the document)
     readonly property real entryWidth: {
         let w = 0

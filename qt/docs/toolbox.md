@@ -153,7 +153,7 @@ The bar at the top (qt/top-bar; it replaced the command bar of qt/ui-rework and 
   window class (`layout/<class>/topBarScroll`).
 - **"+" and ⋮ are pinned at its end** (⋮ last). "+" opens the catalog for the top bar (below). The buttons of the moment
   sit before "+" while they are offered: the emoji while writing, a `.md`'s "Edit as notes", "Open externally" (they
-  are not items of the arrangement). Undo and redo lead it only where no rail is shown (`win.layout.undoInToolBar`).
+  are not items of the arrangement). Undo and redo lead it only where no rail is shown (`win.layout.undoPlace` "toolBar").
 - **Items not offered here are skipped, not removed**: the milestone where the document keeps no versions, the favourite
   outside a library, a text document's ink tools, record without an audio backend, New where the tab strip has "+",
   full screen and present in full screen. A divider that would then lead, end or follow another is left out.

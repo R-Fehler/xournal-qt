@@ -128,7 +128,7 @@ Popup {
 
     // --- the layout for the window's size (qt/docs/adaptive-layout.md, "The home screen and the tab overview") ---
     readonly property var adaptive: typeof win !== "undefined" && win ? win.adaptive : null
-    readonly property bool phoneLayout: adaptive !== null && ["phonePortrait", "phoneShort", "tiny"].indexOf(adaptive.layoutClass) >= 0
+    readonly property bool phoneLayout: adaptive !== null && adaptive.phoneLayout
     readonly property bool shortLayout: phoneLayout && (adaptive.layoutClass === "phoneShort" || adaptive.orientation === "landscape")
     /// Below 600 px, and where the title, the search and the buttons do not fit side by side, the header wraps: the
     /// title and the buttons in one row, the search across the width below

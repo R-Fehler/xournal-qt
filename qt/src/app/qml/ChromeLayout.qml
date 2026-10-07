@@ -123,7 +123,7 @@ Item {
 
     // --- the phone chrome (qt/docs/adaptive-layout.md, "The phone chrome") -------------------------------------------
     /// A phone class (by the layout class: "Adapt the layout" off keeps the desktop layout at every size)
-    readonly property bool phoneLayout: ["phonePortrait", "phoneShort", "tiny"].indexOf(win.adaptive.layoutClass) >= 0
+    readonly property bool phoneLayout: win.adaptive.phoneLayout
     /// The full chrome of a phone: the app bar at the top (the library, the title, the tab count, ⋮) instead of the tab
     /// strip, and the tool dock at the bottom instead of the command bar and the view pill
     readonly property bool phoneChrome: phoneLayout && win.modes.fullChrome
@@ -147,11 +147,13 @@ Item {
     readonly property bool noToolbar: !win.modes.fullChrome || (app.toolbarHidden && !phoneChrome)
     /// The top bar is shown (at the top, in a text document's format bar, in a phone's app bar)
     readonly property bool topBarShown: !app.homeVisible && !noToolbar && !win.modes.replaying
-    /// Undo and redo: the toolbox's head while it is shown; else they lead the command bar while it is shown (a text
-    /// document), its format bar when the bar is merged into it (toolsInFormatBar), the view pill while no bar is
-    /// shown (the compact chrome, Zen, the bar put away), the dock in the phone chrome: one place at a time
-    /// (qt/docs/adaptive-layout.md, "One place for each action")
-    readonly property bool undoInToolBar: !noToolbar && !toolsInFormatBar && !phoneChrome && !toolboxShown
+    /// Where undo and redo are, one place at a time (qt/docs/adaptive-layout.md, "One place for each action"):
+    /// "toolbox" (its head, while it is shown), "formatBar" (a text document's format bar holding the commands),
+    /// "toolBar" (leading the command bar while it is shown: a text document), "viewPill" (no bar shown: the compact
+    /// chrome, Zen, the bar put away; in the phone chrome the dock has its own)
+    readonly property string undoPlace: toolboxShown ? "toolbox"
+                                      : toolsInFormatBar ? "formatBar"
+                                      : !noToolbar && !phoneChrome ? "toolBar" : "viewPill"
 
     // --- the toolbox (qt/docs/toolbox.md) ----------------------------------------------------------------------------
     /// Its edge chosen by hand in this size class (⋮ → View → Toolbox position): "left", "right", "top", "bottom"

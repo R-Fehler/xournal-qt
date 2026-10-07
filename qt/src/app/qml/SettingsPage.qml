@@ -20,7 +20,7 @@ Popup {
     readonly property var win: ApplicationWindow.window
     readonly property var adaptive: win && win.adaptive ? win.adaptive : null
     /// A phone: the whole screen, the sections as a list
-    readonly property bool phone: adaptive !== null && ["phonePortrait", "phoneShort", "tiny"].indexOf(adaptive.layoutClass) >= 0
+    readonly property bool phone: adaptive !== null && adaptive.phoneLayout
     /// The rows put their label above the control
     readonly property bool narrow: width < 600
     /// On a phone: a section is shown (else the list of them)

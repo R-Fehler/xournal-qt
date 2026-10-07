@@ -382,7 +382,7 @@ ApplicationWindow {
     Row {
         objectName: "formatUndo"
         parent: formatBar.leading
-        visible: win.layout.toolsInFormatBar
+        visible: win.layout.undoPlace === "formatBar"
         width: visible ? implicitWidth : 0
         anchors.verticalCenter: parent ? parent.verticalCenter : undefined
         IconButton {
@@ -528,7 +528,7 @@ ApplicationWindow {
         readonly property bool inline: win.layout.toolsInFormatBar && !win.layout.phoneChrome
         parent: win.layout.phoneChrome ? phoneAppBar.toolsSlot : inline ? formatBar.commandsSlot : topTools
         visible: win.layout.topBarShown
-        headShown: win.layout.undoInToolBar
+        headShown: win.layout.undoPlace === "toolBar"
         // (in the format bar: its buttons' size)
         cell: inline ? 40 : win.adaptive.touchProfile ? win.adaptive.minTarget : 44
         x: inline || win.layout.phoneChrome ? 0 : win.insets.left + 2

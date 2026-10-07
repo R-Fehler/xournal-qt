@@ -15,7 +15,7 @@ Pane {
     // also in full screen; presenting only the page number, for a moment (presentPageIndicator); not in Zen
     visible: !pageGrid.visible && !contentsOverview.visible && !app.presenting && !win.modes.hudHidden && !win.layout.phoneChrome
     /// The compact pill, in a canvas under 520 px wide (a phone, a half beside the reference or the source): undo,
-    /// redo (while the tool bar is not shown: win.layout.undoInToolBar), the page number (a tap: all pages), the contents
+    /// redo (where no bar holds them: win.layout.undoPlace), the page number (a tap: all pages), the contents
     /// and the zoom; the page layout is in ⋮ → View then
     readonly property bool compact: canvas.width < 520
     /// Narrower than the compact pill (a very small window): no redo (Ctrl+Y) and no separators
@@ -56,7 +56,7 @@ Pane {
         // Undo and redo while the tool bar is not shown (it leads with them otherwise: one place at a time)
         IconButton {
             objectName: "undoButton"
-            visible: !win.layout.undoInToolBar && !win.layout.toolboxShown && !win.layout.toolsInFormatBar
+            visible: win.layout.undoPlace === "viewPill"
             iconName: "xopp-edit-undo"
             label: qsTr("Undo")
             tip: win.withKeys(qsTr("Undo"), "undo")
@@ -67,7 +67,7 @@ Pane {
         }
         IconButton {
             objectName: "redoButton"
-            visible: !win.layout.undoInToolBar && !win.layout.toolboxShown && !win.layout.toolsInFormatBar && !viewPill.tight
+            visible: win.layout.undoPlace === "viewPill" && !viewPill.tight
             iconName: "xopp-edit-redo"
             label: qsTr("Redo")
             tip: win.withKeys(qsTr("Redo"), "redo")
@@ -76,7 +76,7 @@ Pane {
             enabled: app.canRedo
             onClicked: app.redo()
         }
-        ToolSeparator { visible: !win.layout.undoInToolBar && !win.layout.toolboxShown && !win.layout.toolsInFormatBar && !viewPill.tight }
+        ToolSeparator { visible: win.layout.undoPlace === "viewPill" && !viewPill.tight }
         IconButton {
             objectName: "layoutButton"
             visible: viewPill.layoutShown

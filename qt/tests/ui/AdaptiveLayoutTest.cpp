@@ -1566,6 +1566,15 @@ TEST_F(AdaptiveLayoutTest, sidebarChoicesAreKeptPerSizeClass) {
     EXPECT_EQ(adaptive->property("layoutClass").toString(), "desktopWide");
     EXPECT_TRUE(sidebar->isVisible());
     EXPECT_TRUE(window->property("layout").value<QObject*>()->property("sidebarDocked").toBool()) << "beside the page";
+    // A phone's size: a phone class, laid out as a desktop (phoneLayout follows the layout class)
+    resize(412, 915);
+    EXPECT_TRUE(adaptive->property("phone").toBool());
+    EXPECT_FALSE(adaptive->property("phoneLayout").toBool());
+    EXPECT_FALSE(window->property("phoneLayout").toBool());
+    QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "adaptiveLayout"), Q_ARG(QVariant, true));
+    until([&] { return adaptive->property("layoutClass").toString() == "phonePortrait"; });
+    EXPECT_TRUE(adaptive->property("phoneLayout").toBool());
+    EXPECT_TRUE(window->property("phoneLayout").toBool());
 }
 
 // A window edge dragged a little past a limit does not change the class; while a pointer is held (a stroke) nothing
