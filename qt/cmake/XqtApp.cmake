@@ -252,6 +252,22 @@ set(XQT_QML_FILES
     src/app/qml/TabStrip.qml
     src/app/qml/PageSidebar.qml
     src/app/qml/SettingsPage.qml
+    # (the settings' rows and sections, instantiated in SettingsPage.qml)
+    src/app/qml/SettingsSectionTitle.qml
+    src/app/qml/SettingsHint.qml
+    src/app/qml/SettingsSwitchRow.qml
+    src/app/qml/SettingsSliderRow.qml
+    src/app/qml/SettingsComboRow.qml
+    src/app/qml/SettingsPen.qml
+    src/app/qml/SettingsTouch.qml
+    src/app/qml/SettingsStabilizer.qml
+    src/app/qml/SettingsDocuments.qml
+    src/app/qml/SettingsDisplay.qml
+    src/app/qml/SettingsSearch.qml
+    src/app/qml/SettingsNewPages.qml
+    src/app/qml/SettingsStorage.qml
+    src/app/qml/SettingsShortcuts.qml
+    src/app/qml/SettingsHelp.qml
     src/app/qml/TabOverview.qml
     src/app/qml/SearchBar.qml
     src/app/qml/PageGrid.qml

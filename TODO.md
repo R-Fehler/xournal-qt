@@ -44,6 +44,14 @@ Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is merged (2026-10-07).
 - [ ] **Wave 3**: `qt/qml-split-2` (HomeView, SettingsPage, the Escape/Back dispatcher, bug 4) · `qt/library-split`
   (`Library.*`, shared image-provider plumbing and shutdown, bug 5) · `qt/hybridpdf-split` (`HybridPdf.cpp`, one
   marker writer) · `qt/app-services` (`AppServices` / `OpenDocuments` / `CurrentDocument`, bug 1).
+  - [x] `qt/qml-split-2`: one ordered Esc/Back dispatcher (bug 4, `EscapeKeysTest`), `record` in the shortcuts and
+    labels naming the keys as set (`win.keyNote`); the window's state in `WindowInsets`/`ViewModes`/`ChromeLayout`
+    (`win.insets/modes/layout`, Main.qml 1,100 lines), `AdaptiveLayout.phoneLayout`, `layout.undoPlace`; HomeView
+    (3,003 → ~500 lines, 15 parts) and SettingsPage (1,887 → ~220, 10 sections, 5 rows) split by pure moves. Left:
+    Main's search forwards and dialog openers (B3, `WindowActions`); B7's one `DocumentGrid` with the favourites in
+    C++, the menu target object and the search field's `type(text)`; B8's section model (the names are written twice,
+    the indices are magic) and SettingsPage's own keyboard fallback; the `typeof win` guards (B6); whether Back should
+    also do the rest of Esc's list (see the block's report).
 - [ ] **Wave 4**: `qt/architecture`: an architecture overview generated from `qt/docs/architecture/architecture.yaml`
   (an SVG diagram and tables linking to the source on GitHub, and an interactive page on GitHub Pages), together
   with the docs restructure planned in [docs-plan.md](qt/docs/review/2026-10/docs-plan.md) (an entry page, feature

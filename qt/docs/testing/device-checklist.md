@@ -126,6 +126,13 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
       controls stay clear of the status and gesture bars and above the soft keyboard; F11, F5, Read and Zen enter and
       leave as before, and leaving full screen goes back to maximized on KDE.
 
+## The home screen and the settings in parts (`qt/qml-split-2`)
+
+- [ ] On the Fold (folded, unfolded, sideways) and a desktop: the home screen's header, switch, breadcrumbs, search,
+      grids, the floating "+", a card's menu and its dialogs (rename, move to, trash, import, archive) as before.
+- [ ] Settings: every tab (desktop) and every section of the list (phone) shows its rows; Reset, Remove the cache
+      folders and a shortcut's key capture open their dialogs.
+
 ## Esc and Back (`qt/qml-split-2`)
 
 - [ ] A desktop: full screen with a selected sticky note, then with an armed snip: Esc unselects or puts the snip

@@ -487,7 +487,10 @@ without `parent`, `modal`, `anchors.centerIn`, `width`, `height`, `x` or `y` (th
 
 ### Settings
 
-`SettingsPage.qml` keeps its own sheet (sections of fixed rows):
+`SettingsPage.qml` keeps its own sheet (sections of fixed rows). It holds the frame (the header, the phone's list,
+the tabs); each section is a file (`SettingsPen.qml` … `SettingsHelp.qml`, with the dialogs it opens), made of the rows
+`SettingsSwitchRow.qml`, `SettingsSliderRow.qml`, `SettingsComboRow.qml`, `SettingsHint.qml` and
+`SettingsSectionTitle.qml` (they read `sheet.s` and `sheet.narrow` through the sheet's context):
 
 - On a desktop or a tablet: the tabs, in a sheet `min(920, window − 32)` wide and the window's height less 48, above
   the soft keyboard. Each section scrolls.
