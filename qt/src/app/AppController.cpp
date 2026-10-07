@@ -360,6 +360,14 @@ AppController::~AppController() {
         for (AppController* w: documentWindows()) {
             delete w;
         }
+        // ... and so do those closed but not deleted yet (their deleteLater waits for an event loop that may not run
+        // again): left to QObject they would go after this window's services, which their destructors use
+        const QObjectList left = children();  // (a copy: deleting one changes the list)
+        for (QObject* child: left) {
+            if (auto* w = qobject_cast<AppController*>(child)) {
+                delete w;
+            }
+        }
     }
     appServices->openDocuments().remove(this);
     if (!isSecondary()) {

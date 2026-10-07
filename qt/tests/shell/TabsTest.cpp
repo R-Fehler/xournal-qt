@@ -31,8 +31,10 @@
 #include <QQuickImageResponse>
 #include "undo/InsertUndoAction.h"
 #include "undo/UndoRedoHandler.h"
+#include "hwr/HandwritingSearch.h"
 
 #include "AppController.h"
+#include "AppServices.h"
 #include "CurrentDocument.h"
 #include "CanvasMemory.h"
 #include "CanvasPage.h"
@@ -320,6 +322,25 @@ TEST(Windows, aTabMovesToAWindowOfItsOwnAndBack) {
     window->windowClosed();
     EXPECT_TRUE(c.documentWindows().empty());
     QCoreApplication::processEvents();  // (the controller is deleted later)
+}
+
+// A window closed but not deleted yet (its deleteLater waits for the event loop, which a quit may never run again) goes
+// before the services of the main window: its destructor still uses them (ThreadSanitizer found the use after free).
+TEST(Windows, aClosedWindowNotDeletedYetGoesBeforeTheServicesOfTheMainWindow) {
+    auto c = std::make_unique<AppController>();
+    ASSERT_TRUE(c->openPath(fixturePath(u8"load/pages.xopp")));
+    c->newDocument();
+    c->undockTab(0);
+    ASSERT_EQ(c->documentWindows().size(), 1u);
+    AppController* window = c->documentWindows().front();
+    window->windowClosed();  // (no event loop runs after it: deleted with the main window)
+    bool servicesGone = false;
+    bool windowWentFirst = false;
+    QObject::connect(&c->services().handwriting(), &QObject::destroyed, [&] { servicesGone = true; });
+    QObject::connect(window, &QObject::destroyed, [&] { windowWentFirst = !servicesGone; });
+    c.reset();
+    EXPECT_TRUE(servicesGone);
+    EXPECT_TRUE(windowWentFirst) << "the closed window outlived the services it uses";
 }
 
 TEST(Windows, closingAWindowKeepsDocumentsWithUnsavedChanges) {
