@@ -58,6 +58,8 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
 - [ ] Printing on a real printer: page range, copies, landscape pages turned onto the sheet.
 - [ ] Recording with the built-in microphone and a headset; playing from a stroke at the right speed.
 - [ ] Killed with an unsaved document: the next start offers to recover it.
+- [ ] Quitting while pictures are still being drawn (the library grid's covers right after opening a big library,
+  the page sidebar of a long PDF, the library search's pages) closes at once and leaves no crash report.
 
 ## Windows (the portable zip, Surface)
 

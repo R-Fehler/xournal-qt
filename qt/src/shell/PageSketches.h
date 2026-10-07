@@ -9,7 +9,7 @@
  * Poppler costs nearly the same at any width (parsing, decoding images), so a page is drawn once at the preview width
  * and its sketch is scaled from that. Nothing is ever drawn in front of the canvas or of a sharp thumbnail.
  *
- * Pages are drawn by two low-priority workers, so the canvas and the sharp thumbnails go first; nothing new is
+ * Pages are drawn by two workers at idle priority (ImageWorkers.h), so the canvas goes first; nothing new is
  * started while the canvas renders the pages in view (RenderService::visiblePagesBusy). Each draws the PDF
  * with an instance of its own (poppler draws one page of an instance at a time: the canvas does not wait for them),
  * kept while there is something to draw. What comes first:
@@ -148,7 +148,7 @@ private:
     /// File of a page's stored preview if the page is as saved (under mtx; empty: not)
     fs::path diskFile(quint64 session, quint64 pageId, quint64 revision) const;
     void markStored(quint64 session, quint64 pageId);
-    static constexpr int WORKERS = 2;
+    static constexpr int WORKERS = 2;  ///< jobs at a time (drawing or storing; ImageWorkers' Sketches pool has 2)
     /// A PDF instance of the session's document for a worker (loaded if none is spare; null: use the document's)
     std::unique_ptr<XojPdfDocument> takePdf(quint64 session, const fs::path& path, size_t pages);
     void givePdf(quint64 session, const fs::path& path, std::unique_ptr<XojPdfDocument> pdf);

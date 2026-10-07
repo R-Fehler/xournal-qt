@@ -2,7 +2,6 @@
 
 #include <atomic>
 #include <chrono>
-#include <list>
 #include <mutex>
 #include <shared_mutex>
 #include <unordered_map>
@@ -10,53 +9,19 @@
 #include <QColor>
 #include <QCoreApplication>
 #include <QPointer>
-#include <QThread>
-#include <QThreadPool>
 
 #include "model/Document.h"
 #include "render/RenderService.h"
 #include "session/DocumentSession.h"
 #include "session/DocumentTextIndex.h"
 
+#include "AsyncImage.h"
+#include "ImageWorkers.h"
 #include "Thumbnails.h"
 
 namespace xqt {
 
 namespace {
-/// One worker, at low priority: the annotations are never urgent.
-QThreadPool& makePool(QThreadPool*& pool) {
-    pool = new QThreadPool;  // (never destroyed: see the post routine)
-    pool->setMaxThreadCount(1);
-    pool->setThreadPriority(QThread::LowPriority);
-    return *pool;
-}
-QThreadPool& readPool() {
-    static QThreadPool* pool = nullptr;
-    static QThreadPool& p = [] {
-        QThreadPool& made = makePool(pool);
-        // Before the program's statics go: a task still running would release its poppler document while poppler
-        // and glib are torn down
-        qAddPostRoutine([] {
-            pool->clear();
-            pool->waitForDone();
-        });
-        return std::ref(made);
-    }();
-    return p;
-}
-QThreadPool& picturePool() {
-    static QThreadPool* pool = nullptr;
-    static QThreadPool& p = [] {
-        QThreadPool& made = makePool(pool);
-        qAddPostRoutine([] {
-            pool->clear();
-            pool->waitForDone();
-        });
-        return std::ref(made);
-    }();
-    return p;
-}
-
 unsigned bitOf(annotations::Kind kind) { return 1U << static_cast<unsigned>(annotations::groupOf(kind)); }
 
 using annotations::pictureRect;
@@ -193,7 +158,8 @@ void AnnotationsModel::start() {
     const quint64 id = sessionId;
     const quint64 gen = generation;
     QPointer<AnnotationsModel> self(this);
-    readPool().start([self, state, stamps = std::move(stamps), pdf, numbering, id, gen] {
+    // (one worker at idle priority: the annotations are never urgent)
+    ImageWorkers::start(ImageWorkers::Pool::Annotations, [self, state, stamps = std::move(stamps), pdf, numbering, id, gen] {
         std::vector<annotations::Item> all;
         std::vector<quint64> revisions;
         bool gone = false;
@@ -449,53 +415,13 @@ QHash<int, QByteArray> AnnotationsModel::roleNames() const {
 // --- pictures of handwriting -----------------------------------------------------------------------------------
 
 namespace {
-class PictureResponse final: public QQuickImageResponse {
-public:
-    QQuickTextureFactory* textureFactory() const override { return QQuickTextureFactory::textureFactoryForImage(image); }
-    void cancel() override { cancelled = true; }
-    QImage image;
-    std::atomic<bool> cancelled{false};
-};
-
 std::atomic<int> pictureRenders{0};
 
 /// The pictures drawn last, by their id and width, up to PICTURE_CACHE_BYTES (the least recently used go first):
 /// scrolling back in the panel shows them at once. Their ids hold the page's revision, so an edited page's pictures
 /// are simply not asked for again.
-class PictureCache {
-public:
-    QImage find(const QString& key) {
-        std::lock_guard lock(mtx);
-        auto it = index.find(key);
-        if (it == index.end()) {
-            return {};
-        }
-        entries.splice(entries.begin(), entries, it->second);
-        return it->second->second;
-    }
-    void put(const QString& key, const QImage& img) {
-        std::lock_guard lock(mtx);
-        if (index.count(key)) {
-            return;
-        }
-        entries.emplace_front(key, img);
-        index[key] = entries.begin();
-        bytes += img.sizeInBytes();
-        while (bytes > AnnotationImageProvider::PICTURE_CACHE_BYTES && entries.size() > 1) {
-            bytes -= entries.back().second.sizeInBytes();
-            index.erase(entries.back().first);
-            entries.pop_back();
-        }
-    }
-
-private:
-    std::mutex mtx;
-    std::list<std::pair<QString, QImage>> entries;
-    std::unordered_map<QString, std::list<std::pair<QString, QImage>>::iterator> index;
-    qint64 bytes = 0;
-};
-PictureCache& pictureCache() {
-    static PictureCache cache;
+LruImageCache<QString>& pictureCache() {
+    static LruImageCache<QString> cache(AnnotationImageProvider::PICTURE_CACHE_BYTES, 1);
     return cache;
 }
 }  // namespace
@@ -503,7 +429,7 @@ PictureCache& pictureCache() {
 int AnnotationImageProvider::renderCount() { return pictureRenders.load(); }
 
 QQuickImageResponse* AnnotationImageProvider::requestImageResponse(const QString& id, const QSize& requestedSize) {
-    auto* response = new PictureResponse;
+    auto* response = new AsyncImageResponse;
     // <session>/<revision>/<x>,<y>,<w>,<h>
     const QStringList parts = id.split(u'/');
     const quint64 sessionId = parts.value(0).toULongLong();
@@ -513,38 +439,32 @@ QQuickImageResponse* AnnotationImageProvider::requestImageResponse(const QString
     const int width = requestedSize.width() > 0 ? requestedSize.width() : 240;
     const QString key = id + u'@' + QString::number(width);
     if (QImage kept = pictureCache().find(key); !kept.isNull()) {
-        response->image = std::move(kept);
-        QMetaObject::invokeMethod(response, &QQuickImageResponse::finished, Qt::QueuedConnection);
+        response->finish(std::move(kept));
         return response;
     }
     // The one asked for last first: that is what is in view now (the rows scrolled past are cancelled)
     static std::atomic<int> order{0};
-    picturePool().start(QRunnable::create([response, sessionId, revision, rect, width, key] {
-        QImage img;
-        if (!response->cancelled) {
-            // Not while the canvas has pages in view to draw (the PDF is drawn with the document's instance)
-            RenderService::waitForVisiblePages(std::chrono::milliseconds(300));
-        }
-        if (!response->cancelled && rect.width() > 0 && rect.height() > 0) {
-            if (DocumentSession* s = ThumbnailProvider::acquireSession(sessionId)) {
-                if (auto stamp = s->pageOfRevision(revision)) {
-                    // (at most 4 pixels per point: a tiny dot is not drawn as a poster)
-                    img = annotations::drawArea(*s->getDocument(), stamp->page, rect,
-                                                std::min(4.0, width / rect.width()));
-                    ++pictureRenders;
-                    pictureCache().put(key, img);
+    ImageWorkers::respond(
+            ImageWorkers::Pool::AnnotationPictures, response,
+            [response, sessionId, revision, rect, width, key]() -> QImage {
+                // Not while the canvas has pages in view to draw (the PDF is drawn with the document's instance)
+                RenderService::waitForVisiblePages(std::chrono::milliseconds(300));
+                QImage img;
+                if (!response->isCancelled() && rect.width() > 0 && rect.height() > 0) {
+                    if (DocumentSession* s = ThumbnailProvider::acquireSession(sessionId)) {
+                        if (auto stamp = s->pageOfRevision(revision)) {
+                            // (at most 4 pixels per point: a tiny dot is not drawn as a poster)
+                            img = annotations::drawArea(*s->getDocument(), stamp->page, rect,
+                                                        std::min(4.0, width / rect.width()));
+                            ++pictureRenders;
+                            pictureCache().put(key, img);
+                        }
+                        ThumbnailProvider::releaseSession(sessionId);
+                    }
                 }
-                ThumbnailProvider::releaseSession(sessionId);
-            }
-        }
-        QMetaObject::invokeMethod(
-                response,
-                [response, img = std::move(img)]() mutable {
-                    response->image = std::move(img);
-                    Q_EMIT response->finished();
-                },
-                Qt::QueuedConnection);
-    }), ++order);
+                return img;
+            },
+            ++order);
     return response;
 }
 

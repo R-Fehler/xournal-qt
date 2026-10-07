@@ -12,7 +12,7 @@
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QFile>
-#include <QThreadPool>
+#include <QThread>
 
 #include "model/Document.h"
 #include "session/DocumentImages.h"
@@ -20,7 +20,9 @@
 #include "session/FileIo.h"
 #include "util/PathUtil.h"
 
+#include "AsyncImage.h"
 #include "ImageFile.h"
+#include "ImageWorkers.h"
 #include "FileStamps.h"
 #include "MarkdownFile.h"
 #include "Thumbnails.h"
@@ -64,24 +66,6 @@ State& state() {
     static State s;
     return s;
 }
-QThreadPool& pool() {
-    static QThreadPool* p = [] {
-        auto* tp = new QThreadPool;
-        tp->setMaxThreadCount(std::max(1, std::min(3, QThread::idealThreadCount() / 2)));
-        return tp;
-    }();
-    return *p;
-}
-/// Writes the packs (not held up by the previews being drawn)
-QThreadPool& writer() {
-    static QThreadPool* p = [] {
-        auto* tp = new QThreadPool;
-        tp->setMaxThreadCount(1);
-        return tp;
-    }();
-    return *p;
-}
-
 int titleOf(const DocumentItem& item) { return DocumentPlaces::titlePage(DocumentPlaces::keyOf(item)); }
 
 /// What a stored preview shows: the document's files as they are, and its title page.
@@ -392,19 +376,12 @@ QImage render(const DocumentItem& item) {
                                              PreviewCache::WIDTH);
 }
 
-class PreviewResponse final: public QQuickImageResponse {
-public:
-    QQuickTextureFactory* textureFactory() const override {
-        return QQuickTextureFactory::textureFactoryForImage(image);
-    }
-    QImage image;
-};
 }  // namespace
 
 void PreviewCache::setLibrary(const CacheLocation& location) {
     auto& s = state();
     if (!s.scheduler && QCoreApplication::instance()) {
-        s.scheduler = new WriteScheduler([] { writer().start([] { writeChanged(); }); });  // (lives as long as the app)
+        s.scheduler = new WriteScheduler([] { ImageWorkers::start(ImageWorkers::Pool::CoverFiles, [] { writeChanged(); }); });  // (lives as long as the app)
         s.scheduler->moveToThread(QCoreApplication::instance()->thread());
     }
     flush();  // what the library before has not written yet
@@ -484,15 +461,9 @@ QImage PreviewCache::preview(const DocumentItem& item) {
 }
 
 QString PreviewCache::url(const DocumentItem& item) {
-    const QByteArray path = QByteArray::fromStdString(item.main().string())
-                                    .toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals);
     // The stamp only makes the URL change with the files (QML caches images by URL).
-    const QString stamp = QString::fromLatin1(
-            QCryptographicHash::hash(documentStamp(item).toUtf8() + '\n' + QByteArray::number(titleOf(item)),
-                                     QCryptographicHash::Md5)
-                    .toHex()
-                    .left(8));
-    return QStringLiteral("image://preview/") + QString::fromLatin1(path) + '/' + stamp;
+    return QStringLiteral("image://preview/") + urlEncodePath(item.main()) + '/' +
+           urlStamp(documentStamp(item).toUtf8() + '\n' + QByteArray::number(titleOf(item)));
 }
 
 void PreviewCache::prune(const std::vector<DocumentItem>& items) {
@@ -645,7 +616,7 @@ void PreviewCache::moved(const std::vector<std::pair<fs::path, fs::path>>& moves
 
 bool PreviewCache::flush() {
     auto& s = state();
-    writer().waitForDone();
+    ImageWorkers::waitForDone(ImageWorkers::Pool::CoverFiles);
     if (s.scheduler && QThread::currentThread() == s.scheduler->thread()) {
         s.scheduler->cancel();
     }
@@ -654,7 +625,7 @@ bool PreviewCache::flush() {
 
 void PreviewCache::discard() {
     auto& s = state();
-    writer().waitForDone();
+    ImageWorkers::waitForDone(ImageWorkers::Pool::CoverFiles);
     if (s.scheduler) {
         s.scheduler->cancel();
     }
@@ -674,29 +645,13 @@ int PreviewCache::packsRead() { return state().reads.load(); }
 int PreviewCache::packsWritten() { return state().writes.load(); }
 int PreviewCache::stampPacksWritten() { return state().stampWrites.load(); }
 
-void PreviewProvider::shutdown() {
-    pool().clear();
-    pool().waitForDone();
-    PreviewCache::flush();
-}
-
 QQuickImageResponse* PreviewProvider::requestImageResponse(const QString& id, const QSize& /*requestedSize*/) {
-    auto* response = new PreviewResponse;
-    const fs::path file(QByteArray::fromBase64(id.section('/', 0, 0).toLatin1(),
-                                               QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals)
-                                .toStdString());
-    pool().start([response, file] {
-        QImage img;
-        if (const DocumentItem item = DocumentFiles::itemOf(file, DocumentFiles::TextFiles); item.valid()) {
-            img = PreviewCache::preview(item);
-        }
-        QMetaObject::invokeMethod(
-                response,
-                [response, img = std::move(img)]() mutable {
-                    response->image = std::move(img);
-                    Q_EMIT response->finished();
-                },
-                Qt::QueuedConnection);
+    auto* response = new AsyncImageResponse;
+    const fs::path file = urlDecodePath(id.section('/', 0, 0));
+    // (a response QML cancelled before its worker began, e.g. a card flung past, does not load its document)
+    ImageWorkers::respond(ImageWorkers::Pool::Covers, response, [file] {
+        const DocumentItem item = DocumentFiles::itemOf(file, DocumentFiles::TextFiles);
+        return item.valid() ? PreviewCache::preview(item) : QImage();
     });
     return response;
 }

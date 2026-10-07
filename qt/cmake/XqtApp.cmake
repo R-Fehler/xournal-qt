@@ -47,6 +47,10 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PresenterConsole.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/AsyncImage.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/AsyncImage.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageWorkers.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageWorkers.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PageSketches.h
@@ -509,6 +513,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryCacheTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CliTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ThumbnailsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ImageWorkersTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CanvasMemoryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PastedPdfPagesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PdfOnlyModeTest.cpp

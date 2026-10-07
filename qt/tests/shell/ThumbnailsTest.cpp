@@ -485,6 +485,36 @@ TEST_F(Sketches, theStoredPreviewsUsedLongestAgoGoFirst) {
     }
 }
 
+// The image workers draw and store pictures with Qt's image plugins, Cairo and poppler: AppController::shutdown stops
+// all of them before the application takes those away. Once it returned, nothing is drawn or stored any more (the
+// sharp thumbnails, the sketches and the stand-ins stored on disk).
+TEST_F(Sketches, nothingIsDrawnOrStoredAfterShutdown) {
+    AppController c;
+    openLecture(c);
+    DocumentSession* s = c.tabManager().currentSession();
+    const quint64 id = ThumbnailProvider::idOf(s);
+    const fs::path folder = PageSketches::instance().diskFolder(id);
+    ASSERT_FALSE(folder.empty());
+    // Much to draw: big thumbnails of every page in many widths (each drawn), and the pages' sketches
+    ThumbnailProvider provider;
+    const int pages = pagesOf(c).rowCount();
+    for (int width = 2048; width >= 1024; width -= 64) {
+        for (int p = 0; p < pages; ++p) {
+            // (the responses are left alone: a worker may still finish one)
+            provider.requestImageResponse(urlOf(c, p).mid(QString("image://thumbnail/").size()), QSize(width, 0));
+        }
+    }
+    processEventsFor(30);
+    c.shutdown();
+    const int thumbnails = ThumbnailProvider::renderCount();
+    const int sketches = PageSketches::instance().drawCount();
+    const size_t stored = storedFiles(folder);
+    processEventsFor(400);
+    EXPECT_EQ(ThumbnailProvider::renderCount(), thumbnails) << "a thumbnail was drawn after shutdown";
+    EXPECT_EQ(PageSketches::instance().drawCount(), sketches) << "a page was sketched after shutdown";
+    EXPECT_EQ(storedFiles(folder), stored) << "a stand-in was stored after shutdown";
+}
+
 // XQT_BENCH_PDF=<big pdf>: how long sketching all its pages takes, and whether edits (the document lock) or the UI
 // have to wait for it.
 TEST_F(Sketches, benchBigPdf) {

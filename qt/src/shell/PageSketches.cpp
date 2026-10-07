@@ -6,9 +6,6 @@
 
 #include <QCryptographicHash>
 #include <QFile>
-#include <QRunnable>
-#include <QThread>
-#include <QThreadPool>
 
 #include "model/Document.h"
 #include "pdf/base/XojPdfDocument.h"
@@ -22,6 +19,7 @@
 #include "CanvasMemory.h"
 #include "DocumentFiles.h"
 #include "DocumentPlaces.h"
+#include "ImageWorkers.h"
 #include "FileStamps.h"
 #include "Previews.h"
 #include "Thumbnails.h"
@@ -30,17 +28,6 @@
 namespace xqt {
 
 namespace {
-/// Workers below the others: the canvas and the sharp thumbnails go first.
-QThreadPool& sketchPool(int workers) {
-    static QThreadPool* p = [workers] {
-        auto* tp = new QThreadPool;
-        tp->setMaxThreadCount(workers);
-        tp->setThreadPriority(QThread::LowestPriority);
-        return tp;
-    }();
-    return *p;
-}
-
 /// The start of the names of the folders of a document's stored previews (every version of it): a hash of its path.
 QString prefixOf(const fs::path& file) {
     return QString::fromLatin1(
@@ -451,7 +438,7 @@ void PageSketches::plan() {
     // Once after the start: the stored previews used longest ago go
     static bool trimmed = false;
     if (!std::exchange(trimmed, true)) {
-        QThreadPool::globalInstance()->start([] { trimDisk(DISK_LIMIT); });
+        ImageWorkers::start(ImageWorkers::Pool::SketchFiles, [] { trimDisk(DISK_LIMIT); });
     }
 
     // Who gets pictures: in that order, while the budget lasts; the others lose theirs
@@ -529,8 +516,7 @@ void PageSketches::next() {
                 if (file.empty() || stored || !v || v->revision != job.revision) {
                     continue;
                 }
-                ++running;
-                QThreadPool::globalInstance()->start([this, job, file, image = v->image] {
+                const bool started = ImageWorkers::start(ImageWorkers::Pool::SketchFiles, [this, job, file, image = v->image] {
                     writePage(file, image);
                     markStored(job.session, job.pageId);
                     QMetaObject::invokeMethod(
@@ -541,6 +527,11 @@ void PageSketches::next() {
                             },
                             Qt::QueuedConnection);
                 });
+                if (!started) {
+                    jobs.clear();  // (shut down)
+                    return;
+                }
+                ++running;
                 continue;
             }
             const Picture* s = sketches.find(job.session, job.pageId);
@@ -575,8 +566,21 @@ void PageSketches::next() {
                 pdfPages = doc->getPdfPageCount();
             }
         }
-        ++running;
-        sketchPool(WORKERS).start(QRunnable::create([this, job, target, session, from, pdfPath, pdfPages, file, stored] {
+        ThumbnailProvider::releaseSession(job.session);
+        const bool started = ImageWorkers::start(ImageWorkers::Pool::Sketches, [this, job, target, from, pdfPath, pdfPages, file, stored] {
+            // The session again on the worker: a job that is dropped (shutdown) holds none, and a document closed
+            // meanwhile is not drawn
+            DocumentSession* session = ThumbnailProvider::acquireSession(job.session);
+            if (!session) {
+                QMetaObject::invokeMethod(
+                        this,
+                        [this] {
+                            --running;
+                            next();
+                        },
+                        Qt::QueuedConnection);
+                return;
+            }
             QImage img = from;
             if (img.isNull()) {
                 img = ThumbnailProvider::keptImage(job.session, job.revision, target);
@@ -616,7 +620,12 @@ void PageSketches::next() {
                         }
                     },
                     Qt::QueuedConnection);
-        }));
+        });
+        if (!started) {
+            jobs.clear();  // (shut down)
+            return;
+        }
+        ++running;
     }
 }
 
