@@ -103,7 +103,20 @@ A hybrid PDF is a normal PDF with four additions:
 
 ## What is built (`qt/hybrid-pdf`)
 
-Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/HybridPdfTest.cpp`.
+Code: `qt/src/session/HybridPdf.h` (the API) and its parts (qpdf and cairo), tests in
+`qt/tests/session/HybridPdfTest.cpp` and `HybridMarkerTest.cpp`. `HybridInternal.h` holds what the parts share:
+
+| File | What |
+| --- | --- |
+| `HybridPdf.cpp` | `write` (incremental when it can, else in full; with version history: `writeKeeping`), `writeArchive`, `exportXopp` |
+| `HybridPrepare.cpp` | `prepare`: everything that needs the document (the `.xopp` and its hashes, cairo's drawings, links, recordings) |
+| `HybridFullWrite.cpp` | `assemble`: the file written in full (plain, PDF with notes, archive PDF) |
+| `HybridAppend.cpp` | `openExisting` and the incremental update (`appendChanges`) |
+| `HybridMarker.cpp` | what both writers write the same way, through an `ObjectSink`: the marker, the document information, the text layer of the handwriting, the embedded files |
+| `HybridHistory.cpp` | writing the version history (`PdfHistory.cpp` reads it) |
+| `HybridCache.cpp` | the clean copies in the app cache |
+| `HybridOpen.cpp` | reading the marker, `open`, `compact`, `importCopy` |
+| `HybridCommon.cpp` | small helpers, and `strip`, which takes everything of ours out of a PDF |
 
 1. **Writer** (done). `HybridPdf::write(document, target)`:
    - Base pages: the background PDF is opened with qpdf and its page tree is rebuilt in document order (pages shown

@@ -100,7 +100,7 @@ the text has a bookmark of its own (the page's).
 | File | What |
 | --- | --- |
 | `qt/src/session/TextDocument.*` | the flow of a document (`isTextDocument`, `flowText`, `markdown`), the attachments, the name |
-| `qt/src/session/HybridPdf.cpp` | the attachment hook: written with the data, replaced on incremental saves, stripped from the clean copy |
+| `qt/src/session/HybridMarker.cpp`, `HybridCommon.cpp` | the attachment hook: written with the data, replaced on incremental saves (`embedFiles`), stripped from the clean copy (`strip`) |
 | `qt/src/session/DocumentMode.*` | the `newTextDocuments` setting |
 | `qt/src/app/AppTextFiles.cpp` | `createTextDocument`, `openAsPdfDocument`, `exportMarkdown` |
 | `qt/src/canvas/CanvasView.cpp`, `qt/src/quick/DocumentCanvasItem.cpp` | typing into the flow |

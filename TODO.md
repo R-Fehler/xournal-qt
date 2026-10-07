@@ -44,6 +44,12 @@ Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is merged (2026-10-07).
 - [ ] **Wave 3**: `qt/qml-split-2` (HomeView, SettingsPage, the Escape/Back dispatcher, bug 4) · `qt/library-split`
   (`Library.*`, shared image-provider plumbing and shutdown, bug 5) · `qt/hybridpdf-split` (`HybridPdf.cpp`, one
   marker writer) · `qt/app-services` (`AppServices` / `OpenDocuments` / `CurrentDocument`, bug 1).
+  - [x] `qt/hybridpdf-split`: `HybridPdf.cpp` (4,458 lines) split into nine files by subsystem behind
+    `HybridInternal.h` (session block 3; `prepare()` takes a `PrepareOptions`), and one writer of the marker, the
+    handwriting text and the embedded files for the full write and the incremental update (`HybridMarker.cpp`,
+    `ObjectSink`; block 5; `HybridMarkerTest` compares the two). Left: the "try incremental, else full" block that
+    `write()` and `writeKeeping()` both have (with session block 7); `PdfBookmarks::write` and `markHistoryIn` could
+    take an `ObjectSink`; splitting `HybridPdfTest.cpp` (block 9); `HybridSaveHandler` in ADR 0002 (block 10).
 - [ ] **Wave 4**: `qt/architecture`: an architecture overview generated from `qt/docs/architecture/architecture.yaml`
   (an SVG diagram and tables linking to the source on GitHub, and an interactive page on GitHub Pages), together
   with the docs restructure planned in [docs-plan.md](qt/docs/review/2026-10/docs-plan.md) (an entry page, feature

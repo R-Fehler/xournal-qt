@@ -83,6 +83,15 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/VersionDiff.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPdf.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPdf.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridInternal.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridCommon.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPrepare.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridFullWrite.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridAppend.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridMarker.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridHistory.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridCache.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridOpen.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ArchivePdf.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/ArchivePdf.cpp
     ${CMAKE_BINARY_DIR}/generated/SrgbIcc.cpp
@@ -239,6 +248,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/FuzzyQueryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/MergedPdfTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/HybridPdfTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/HybridMarkerTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/IncrementalPdfTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/PdfRevisionsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/PdfEncryptionTest.cpp

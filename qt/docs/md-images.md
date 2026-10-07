@@ -141,7 +141,7 @@ document, each with an attribute naming the picture and its data in base64 (as a
 | `qt/src/canvas/MdImageDecoder.*` | the app's decoder (Qt) and the web cache folder |
 | `qt/src/session/DocumentImages.*` | a document's root and `name.assets`, the work folder, carried pictures, the `.xopp`'s pictures, renaming links, unused pictures |
 | `qt/src/session/PictureSaveHandler.h` | a `.xopp` with its pictures |
-| `qt/src/session/HybridPdf.cpp`, `TextDocument.cpp` | pictures as PDF attachments (extracted with the clean copy; incremental saves add new ones) |
+| `qt/src/session/HybridMarker.cpp`, `HybridOpen.cpp`, `TextDocument.cpp` | pictures as PDF attachments (`embedFiles`: incremental saves add new ones; extracted with the clean copy) |
 | `qt/src/canvas/MarkdownImages.*`, `qt/src/app/AppMarkdownFormat.cpp` | paste, drop, the picker |
 | `qt/src/app/AppMarkdownImages.cpp`, `qml/WebImageConfirm.qml`, `qml/UnusedImagesDialog.qml` | web pictures, removing unused ones |
 | `qt/src/shell/DocumentFiles.cpp` | the `.md` and its `name.assets` in the library |
