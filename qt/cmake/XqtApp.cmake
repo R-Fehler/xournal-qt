@@ -388,6 +388,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/UiFixture.h
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/UiFixture.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/QmlApiTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/MainWindowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ReferenceWindowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/PresenterViewTest.cpp
@@ -417,7 +418,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/FractionalScaleTest.cpp)
     target_link_libraries(xqt-ui-tests PRIVATE xqt-quick xqt-shell xqt-test-support xqt-uiplugin Qt6::QuickControls2
         Qt6::Test GTest::gtest)
-    target_compile_definitions(xqt-ui-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
+    target_compile_definitions(xqt-ui-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}"
+        XQT_QML_SOURCE_DIR="${CMAKE_CURRENT_LIST_DIR}/../src/app/qml")
     target_include_directories(xqt-ui-tests PRIVATE "${TEST_CONFIG_DIR}")
     gtest_discover_tests(xqt-ui-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS ui
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
