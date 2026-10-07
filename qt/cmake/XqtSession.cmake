@@ -302,8 +302,6 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/DarkPagesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PdfCacheTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/ClockTest.cpp)
-    target_link_libraries(xqt-canvas-tests PRIVATE xqt-canvas Qt6::Test GTest::gtest
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/DarkPagesTest.cpp)
     target_link_libraries(xqt-canvas-tests PRIVATE xqt-canvas xqt-test-support Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-canvas-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-canvas-tests PRIVATE "${TEST_CONFIG_DIR}")
