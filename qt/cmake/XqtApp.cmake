@@ -419,6 +419,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/UiFixture.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/QmlApiTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/MainWindowTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/EscapeKeysTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ReferenceWindowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/PresenterViewTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/DocumentLinksTest.cpp

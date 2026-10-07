@@ -6,45 +6,80 @@ import XournalQt.Canvas
 
 Item {
     id: windowShortcuts
-    // Esc and Android's back key close the drawer
-    Shortcut {
-        sequences: ["Escape", "Back"]
-        enabled: win.sidebarDrawerOpen && sidebar.visible
-        onActivated: win.showSidebar(false)
+    // --- Esc and Android's back key: one dispatcher (qt/docs/zen.md, "Esc and Back") ------------------------------
+    // Two enabled Shortcuts of the same key are "ambiguous" to Qt, and then neither acts. So Esc and Back have ONE
+    // Shortcut each, and what a press does is the first step of this list that applies (the next press: the next one):
+    //   0. what is in front takes the key itself: a popup (Qt gives a modal popup, or one that closes on Esc, the key
+    //      before the window's shortcuts; Back also waits while win.backTakers counts an open one), and an item that
+    //      claims it while it has the focus (the page jump, the page grid, a search field, a text being typed)
+    //   1. drawer       the page sidebar's drawer closes                                    Esc, Back
+    //   2. curtain      the curtain's handles hide                                          Esc
+    //   3. selection    the selected elements, sticky note or PDF text are unselected       Esc
+    //   4. snip         an armed snip is put away                                           Esc
+    //   5. stamp        the armed to-do stamp is put away                                   Esc
+    //   6. replay       the replay ends                                                     Esc
+    //   7. presenting   presenting ends (full screen stays: the next Esc leaves it)         Esc
+    //   8. zen          Esc: the Zen pill closes, else Zen ends; Back: Zen ends. Read ends    Esc, Back
+    //                   with it (read only, and the full screen it entered). Presenting
+    //                   without controls is Zen: Back brings the controls back.
+    //   9. fullScreen   full screen ends                                                    Esc
+    /// The step Esc takes now ("": none, the key goes on to the item with the focus)
+    readonly property string escapeStep: stepFor(false)
+    /// The step Android's back key (and gesture) takes now ("": none, the system's: the app goes to the background)
+    readonly property string backStep: stepFor(true)
+    function stepFor(back) {
+        if (back && win.backTakers > 0) return ""
+        if (win.sidebarDrawerOpen && sidebar.visible) return "drawer"
+        if (back) return win.zenShown ? "zen" : ""
+        if (docKeys && app.curtainHandles) return "curtain"
+        if (docKeys && (app.hasSelection || app.noteSelected || app.pdfTextIsSelected)) return "selection"
+        if (app.snip !== "") return "snip"
+        if (app.todoStamp) return "stamp"
+        if (win.replaying && !app.homeVisible) return "replay"
+        if (app.presenting) return "presenting"
+        if (win.zenShown) return "zen"
+        if (win.fullScreenMode) return "fullScreen"
+        return ""
     }
-    // Esc leaves Zen: the pill first, a selection first loses its selection; Read ends with it (read only, and the
-    // full screen it entered). Presenting: Esc ends presenting (below).
-    Shortcut {
-        sequence: "Escape"
-        enabled: win.zenShown && !app.presenting && !win.replaying && !app.hasSelection && !app.noteSelected
-                 && !app.pdfTextIsSelected && !win.sidebarDrawerOpen && !app.curtainHandles && app.snip === ""
-                 && !app.todoStamp
-        onActivated: {
-            if (zenPill.visible) {
+    function takeStep(step, back) {
+        switch (step) {
+        case "drawer": win.showSidebar(false); break
+        case "curtain": app.curtainHandles = false; break
+        case "selection":
+            if (app.hasSelection || app.noteSelected) app.clearSelection()
+            if (app.pdfTextIsSelected) app.clearPdfTextSelection()
+            break
+        case "snip": app.cancelSnip(); break
+        case "stamp": app.cancelTodoStamp(); break
+        case "replay": app.timeline.stop(); break
+        case "presenting": app.presenting = false; break
+        case "zen":
+            if (zenPill.visible && !back) {
                 zenPill.opened = false
-                return
+                break
             }
-            if (win.readStarted) win.stopReading()
-            win.setZen(false)
-        }
-    }
-    // Android's back key (and the back gesture) leaves Zen before anything else it does (the author, 2026-10-06: "the
-    // back gesture or button should leave zen mode on android"): the controls come back (presenting: its controls);
-    // Read ends with it. A popup open over the page (a sheet, a dialog, the editor) takes it first: it is in front.
-    Shortcut {
-        objectName: "zenBackShortcut"
-        sequence: "Back"
-        enabled: win.zenShown && win.backTakers === 0 && !win.sidebarDrawerOpen
-        onActivated: {
             zenPill.opened = false
             if (win.readStarted) win.stopReading()
             win.setZen(false)
+            break
+        case "fullScreen": win.fullScreenMode = false; break
         }
+    }
+    Shortcut {
+        objectName: "escapeShortcut"
+        sequence: "Escape"
+        enabled: windowShortcuts.escapeStep !== ""
+        onActivated: windowShortcuts.takeStep(windowShortcuts.escapeStep, false)
+    }
+    Shortcut {
+        objectName: "backShortcut"
+        sequence: "Back"
+        enabled: windowShortcuts.backStep !== ""
+        onActivated: windowShortcuts.takeStep(windowShortcuts.backStep, true)
     }
     // Read (Zen, read only, full screen) and Zen: their keys (changeable)
     Shortcut { sequences: win.keysOf("read"); enabled: !app.homeVisible && !win.textDoc && !win.replaying; onActivated: win.toggleReading() }
     Shortcut { sequences: win.keysOf("zen"); enabled: !app.homeVisible; onActivated: win.setZen(!win.zenShown) }
-    Shortcut { sequence: "Escape"; enabled: win.replaying && !app.homeVisible; onActivated: app.timeline.stop() }
     Shortcut { sequence: "Space"; enabled: win.replaying && !app.homeVisible; onActivated: app.timeline.toggle() }
     Shortcut { sequence: "Left"; enabled: win.replaying && !app.homeVisible; onActivated: app.timeline.skip(-5000) }
     Shortcut { sequence: "Right"; enabled: win.replaying && !app.homeVisible; onActivated: app.timeline.skip(5000) }
@@ -110,12 +145,9 @@ Item {
     Shortcut { sequences: win.keysOf("copyInkText"); enabled: toolKeys; onActivated: win.toolGroups.activate("text", "copyInkText") }
     Shortcut { sequences: win.keysOf("toolHand"); enabled: toolKeys; onActivated: app.selectTool("hand") }
     Shortcut { sequences: win.keysOf("insertImage"); enabled: toolKeys; onActivated: imageDialog.open() }
-    // The curtain: out or away again (whatever is out); Esc hides its handles first
+    // The curtain: out or away again (whatever is out); Esc hides its handles first (escapeStep)
     Shortcut { sequences: win.keysOf("curtain"); enabled: toolKeys && !win.textDoc; onActivated: app.toggleCurtain(app.curtain !== "" ? "" : "curtain") }
     Shortcut { sequences: win.keysOf("spotlight"); enabled: toolKeys && !win.textDoc; onActivated: app.toggleCurtain("spotlight") }
-    Shortcut { sequence: "Escape"; enabled: docKeys && app.curtainHandles; onActivated: app.curtainHandles = false }
-    Shortcut { sequence: "Escape"; enabled: app.snip !== "" && !app.curtainHandles; onActivated: app.cancelSnip() }
-    Shortcut { sequence: "Escape"; enabled: app.todoStamp && app.snip === ""; onActivated: app.cancelTodoStamp() }
     Shortcut { sequences: win.keysOf("redo"); enabled: docKeys; onActivated: app.redo() }
     // (the reference, while it has the keys and is written in)
     Shortcut { sequences: win.keysOf("save"); enabled: docKeys; onActivated: if (!app.saveReferenceInHand()) saveOrAsk(null) }
@@ -176,14 +208,12 @@ Item {
     Shortcut { sequences: win.keysOf("shortcuts"); onActivated: shortcutSheet.open() }
     // (not StandardKey.FullScreen as well: it is F11 on KDE, twice the same key is ambiguous)
     Shortcut { sequences: win.keysOf("fullScreen"); enabled: !app.homeVisible; onActivated: win.fullScreenMode = !win.fullScreenMode }
-    Shortcut { sequence: "Escape"; enabled: win.fullScreenMode && !win.zenShown && !app.hasSelection && !app.presenting && !app.curtainHandles; onActivated: win.fullScreenMode = false }
-    // Presenting: F5 starts and ends it, Escape ends it (full screen stays: a second Escape leaves that too)
+    // Presenting: F5 starts and ends it, Esc ends it (escapeStep; full screen stays: a second Esc leaves that too)
     Shortcut {
         sequences: win.keysOf("present")
         enabled: !app.homeVisible
         onActivated: app.presenting ? (app.presenting = false) : win.startPresenting()
     }
-    Shortcut { sequence: "Escape"; enabled: app.presenting && !app.hasSelection && !app.curtainHandles; onActivated: app.presenting = false }
     // Without controls: Ctrl+F5 starts presenting so, and while presenting hides or shows the controls
     Shortcut {
         sequences: win.keysOf("presentClean")
@@ -222,7 +252,6 @@ Item {
     Shortcut { sequences: win.keysOf("ungroup"); enabled: docKeys; onActivated: app.ungroupSelection() }
     // The page (the first selected page) as a high-resolution picture on the clipboard (qt/docs/page-files.md)
     Shortcut { sequences: win.keysOf("copyPageImage"); enabled: docKeys && !win.textDoc; onActivated: app.copyPagesAsImage(app.pages.selectionCount > 0 ? app.pages.selectedPages() : []) }
-    Shortcut { sequence: "Escape"; enabled: docKeys && (app.hasSelection || app.noteSelected) && !win.sidebarDrawerOpen && !app.curtainHandles; onActivated: app.clearSelection() }
     Shortcut { sequences: win.keysOf("findNext"); enabled: docKeys; onActivated: app.searchNext() }
     Shortcut { sequences: win.keysOf("findPrevious"); enabled: docKeys; onActivated: app.searchPrevious() }
     Shortcut { sequences: win.keysOf("zoomIn"); enabled: docKeys; onActivated: app.zoomIn() }

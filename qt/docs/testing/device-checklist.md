@@ -123,6 +123,12 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
 - [ ] ⋮, the toolbox's menus and the catalog open at their buttons (a sheet on the phone); Back closes a sheet, then
       leaves Zen, as before.
 
+## Esc and Back (`qt/qml-split-2`)
+
+- [ ] A desktop: full screen with a selected sticky note, then with an armed snip: Esc unselects or puts the snip
+      away, the next Esc leaves full screen. Presenting likewise (the second Esc ends presenting).
+- [ ] Android: Back closes the drawer, then leaves Zen; with nothing of that open it leaves the app as before.
+
 ## Saving and tags (`qt/session-io`)
 
 - [ ] A PDF with notes that keeps its versions, open in a tab: give it a tag (card menu → Tags…) and press Ctrl+S at
