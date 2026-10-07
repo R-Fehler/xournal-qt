@@ -17,8 +17,10 @@ ctest --test-dir build-qt -j8              # the full suite: 1865 tests
   `-g1`, lld. CI and releases leave it off. The CI builds with Qt 6.7 (KDE neon) and 6.8 (Debian 13): **no Qt API
   newer than 6.7** in C++ or QML (e.g. `AbstractButton.click()` is 6.8), and no QML property named like a JS global.
 - **Tiers**: while working, only the labels or `-R` filters of what changed, and only the targets you need; the full
-  suite once before a block is merged; the CI on every push of `master-qt` and `claude/**`; the author tests by hand
-  at the end. Don't rebuild or retest after edits to docs or QML text alone.
+  suite of a block **on GitHub**: push `qt/<block>` and `xqt-block-tests.yml` builds it once and runs the suite in four
+  shards (the working machine stays free for editing and building); the CI with both Linux Qt versions and QML
+  compiled ahead of time (`xqt-build.yml`) on every push of `master-qt` and `claude/**`; the author tests by hand at
+  the end. On a big machine the full suite can of course run locally too (`ctest -j$(nproc)`). Don't rebuild or retest after edits to docs or QML text alone.
 - Tests run off-screen with temporary config and cache folders. They never write into `test/files` (upstream's
   fixtures), the working directory or the author's configuration. Flaky tests: rerun alone first; the known ones are
   in [TODO.md](TODO.md), "Flaky tests".
@@ -50,11 +52,13 @@ ctest --test-dir build-qt -j8              # the full suite: 1865 tests
 
 - Open work is in [TODO.md](TODO.md), in **blocks**. A block is a branch `qt/<block>` in its own worktree
   `../xournal_qt-<block>` with its own `build-qt`; ccache (4.7 or newer) shares objects between worktrees. Blocks are
-  usually done by agents; the main session works on architecture and integration and merges them into `master-qt`
-  after the full suite passed, with an annotated tag `ms/<date>-<block>` on the merge commit. After a merge,
-  `build-release` (the build the author tries) is rebuilt and never left broken.
-- The machine (8 threads, 16 GB) runs at most two builds at a time. With several agents, every build and test goes
-  through `qt/scripts/build-slot.sh` with `-j3`.
+  usually done by agents; the main session (the integrator) works on architecture and integration and merges them
+  into the integration branch after their full suite passed, with an annotated tag `ms/<date>-<block>` on the merge
+  commit (`qt/scripts/agents/merge-block.sh`). The brief every block agent gets, and the integrator's routine:
+  [qt/docs/agents/block-brief.md](qt/docs/agents/block-brief.md).
+- Parallel builds: a 4-core machine takes two or three agents at once; with several agents on a small machine, run
+  builds and tests through `qt/scripts/build-slot.sh`. A bigger machine takes more (each build dir ~1.2 GB with
+  FAST_DEV).
 - **The refactoring of 2026-10**: the reviews and the plan in waves are in
   [qt/docs/review/2026-10/README.md](qt/docs/review/2026-10/README.md); a refactoring changes structure, not behaviour.
 - **Where to record what**: open work → TODO.md (done items are deleted at the merge); how a feature works now →
