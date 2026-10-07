@@ -18,12 +18,12 @@ and put it at the top of "recently changed". So it is kept like the title page a
 
 - documents of the library: in the library's folder in the config (`~/.config/xournal-qt/libraries/<key>/pages.json`),
   by their path in the library;
-- other documents: in the user's cache (`~/.cache/xournal-qt/documents/pages.json`), by their whole path.
+- other documents: in the app's config folder (`~/.config/xournal-qt/documents/pages.json`), by their whole path.
 
 The key is the document's PDF when it has one (a PDF keeps its star when its `.xopp` comes), else its main file
 (`DocumentPlaces::keyOf`). Renaming and moving in the app (library, tab rename, Recent) go through
 `DocumentPlaces::moved`, so the star follows. **Moving or renaming the file with another program loses the star**
-(the same as the reading position). A cleaned cache loses the stars of documents outside libraries.
+(the same as the reading position). Cleaning the caches keeps every star.
 
 ### Where it shows
 - Library cards: a filled star at the top left of a starred card (tap: remove it); under the mouse every card shows

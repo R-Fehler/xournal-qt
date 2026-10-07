@@ -26,6 +26,7 @@
 #include "model/Layer.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
+#include "util/PathUtil.h"
 #include "session/DocumentSession.h"
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentPlaces.h"
@@ -748,6 +749,24 @@ TEST_F(LibraryTest, readingPositionsSurviveRemovingTheCache) {
     model.setLibrary(std::make_unique<Library>(root));
     EXPECT_EQ(DocumentPlaces::lastPage(root / "Physics" / "sheet.pdf"), 1);
 
+}
+
+// Documents outside a library keep their reading positions (and stars) in the app's config folder, not in its cache
+TEST_F(LibraryTest, readingPositionsOutsideALibraryAreKeptInTheConfig) {
+    const fs::path file = DocumentPlaces::defaultOutsideFile();
+    const auto below = [](const fs::path& p, const fs::path& folder) {
+        const fs::path rel = p.lexically_normal().lexically_relative(folder.lexically_normal());
+        return !rel.empty() && *rel.begin() != "..";
+    };
+    EXPECT_TRUE(below(file, Util::getConfigSubfolder())) << file;
+    EXPECT_FALSE(below(file, Util::getCacheSubfolder())) << file;
+
+    DocumentPlaces::setOutsideFile(file);
+    const fs::path elsewhere = root / "elsewhere.xopp";
+    DocumentPlaces::setLastPage(elsewhere, 2);
+    EXPECT_TRUE(fs::exists(file));
+    EXPECT_EQ(DocumentPlaces::lastPage(elsewhere), 2);
+    DocumentPlaces::setLastPage(elsewhere, -1);
 }
 
 // The library sorts by when its documents were last read in the app, and shows when and at which page.

@@ -61,7 +61,7 @@ std::pair<Store*, QString> find(State& s, const fs::path& document) {
         return {&s.library, QString::fromStdString(document.lexically_normal().lexically_relative(s.root).string())};
     }
     if (!s.outsideSet) {
-        s.outside.file = Util::getCacheSubfolder("documents") / "pages.json";
+        s.outside.file = defaultOutsideFile();
         s.outsideSet = true;
     }
     return {&s.outside, QString::fromStdString(document.lexically_normal().string())};
@@ -125,6 +125,8 @@ void setOutsideFile(const fs::path& file) {
     s.outside = Store{file, {}, false};
     s.outsideSet = true;
 }
+
+fs::path defaultOutsideFile() { return Util::getConfigSubfolder("documents") / "pages.json"; }
 
 int titlePage(const fs::path& document) { return static_cast<int>(get(document, "title", 0)); }
 void setTitlePage(const fs::path& document, int page) { set(document, "title", std::max(0, page), 0); }

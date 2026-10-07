@@ -5,8 +5,8 @@
  *
  * A .xopp has no place for them, so they are kept aside, in a small JSON file: for the documents of the library in
  * the library's folder in the config ("~/.config/xournal-qt/libraries/<key>/pages.json", by their path in the
- * library; not in its cache folders, which can be removed at any time), for the others in the user's cache (by
- * their whole path). Renaming and moving in the app take the entries along; moved or renamed by another program, a
+ * library), for the others in the app's config folder ("~/.config/xournal-qt/documents/pages.json", by their whole
+ * path) - never in a cache folder, which can be removed at any time. Renaming and moving in the app take the entries along; moved or renamed by another program, a
  * document loses them.
  *
  * Safe from any thread (covers are drawn by workers).
@@ -36,8 +36,10 @@ fs::path keyOf(const fs::path& file);
 
 /// The documents in `root` keep their pages in `file` (empty root: no library).
 void setLibrary(const fs::path& root, const fs::path& file);
-/// Where the documents outside the library keep theirs (default: the user's cache; tests use their own).
+/// Where the documents outside the library keep theirs (default: defaultOutsideFile(); tests use their own).
 void setOutsideFile(const fs::path& file);
+/// "documents/pages.json" in the app's config folder.
+fs::path defaultOutsideFile();
 
 /// The title page (0-based; 0 unless chosen otherwise).
 int titlePage(const fs::path& document);
