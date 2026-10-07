@@ -982,6 +982,12 @@ fit two pages side by side when unfolded. I would maybe put this into settings a
     moved and turned.
 
 ### Bugs
+- [ ] **Android: the top bar scrolls into a blank area at its end (about the last quarter)** (the author on 0.8.0,
+  2026-10-06). Not reproduced off-screen: at 412x915, 915x412 and 900x1000 with the touch profile the content length
+  matches the buttons (1057 px for a row of 1053 px) and every lent button is visible. The author's guess, likely: the
+  buttons of the moment pinned before "+" (`Toolbox.leadingTail`: the emoji while writing, edit as notes, open
+  externally) count or take room while they are not shown on Android. Needs the device (adb, a screenshot scrolled to
+  the end): postponed by the author.
 - [x] **A PDF page pasted into a document that has a PDF showed late on the canvas**: fixed in `qt/background-save`.
 - [x] **Fit width uses the widest page, not the current one** (fixed in `qt/present`) (the author, 2026-09-24): after pasting a 16:9 page
   into an A4 document, fit width fits the 16:9 width. It should fit the current page (in several columns, the
