@@ -1,7 +1,8 @@
 /*
  * xournal-qt: Esc and Android's back key in the real window (qt/docs/zen.md, "Esc and Back"): with more than one
  * thing to leave (full screen with a selected note, an armed snip, the to-do stamp, the replay; presenting likewise),
- * one press does the first of them in a fixed order, the next press the next one.
+ * one press does the first of them in a fixed order, the next press the next one. And the keys a button names are the
+ * keys set in the shortcuts (a rebound key shows in the tips).
  *
  * @license GNU GPLv2 or later
  */
@@ -13,6 +14,8 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <gtest/gtest.h>
+
+#include "shell/ShortcutsModel.h"
 
 #include "AppController.h"
 #include "support/TestSupport.h"
@@ -32,7 +35,11 @@ protected:
         until([&] { return !controller->property("homeVisible").toBool(); });
     }
     void TearDown() override {
+        shortcuts()->resetAll();  // (the tests share the config folder)
         closeApp();
+    }
+    xqt::ShortcutsModel* shortcuts() const {
+        return qobject_cast<xqt::ShortcutsModel*>(controller->property("shortcuts").value<QObject*>());
     }
     bool flag(const char* name) const { return window->property(name).toBool(); }
     void fullScreen() {
@@ -133,4 +140,23 @@ TEST_F(EscapeKeysTest, zenThenFullScreen) {
     EXPECT_TRUE(flag("fullScreenMode"));
     key(Qt::Key_Escape);
     EXPECT_FALSE(flag("fullScreenMode"));
+}
+
+// Recording has a key of the shortcuts (Ctrl+Shift+R): listed, and it can be changed
+TEST_F(EscapeKeysTest, recordingIsAShortcutThatCanBeChanged) {
+    EXPECT_EQ(shortcuts()->keys("record"), QStringList{"Ctrl+Shift+R"});
+    ASSERT_TRUE(shortcuts()->setKeys("record", "Ctrl+Alt+Y"));
+    EXPECT_EQ(shortcuts()->keys("record"), QStringList{"Ctrl+Alt+Y"});
+    auto* button = find<QQuickItem>("recordButton");
+    ASSERT_NE(button, nullptr);
+    EXPECT_TRUE(button->property("tip").toString().contains("Ctrl+Alt+Y")) << button->property("tip").toString().toStdString();
+}
+
+// A button's tip names the keys as they are set: rebound, the tip says the new keys
+TEST_F(EscapeKeysTest, tipsNameTheKeysAsTheyAreSet) {
+    auto* button = find<QQuickItem>("fullScreenButton");
+    ASSERT_NE(button, nullptr);
+    EXPECT_EQ(button->property("tip").toString(), "Full screen (F11)");
+    ASSERT_TRUE(shortcuts()->setKeys("fullScreen", "F10"));
+    EXPECT_EQ(button->property("tip").toString(), "Full screen (F10)");
 }

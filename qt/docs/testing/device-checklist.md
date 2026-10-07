@@ -128,6 +128,7 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
 - [ ] A desktop: full screen with a selected sticky note, then with an armed snip: Esc unselects or puts the snip
       away, the next Esc leaves full screen. Presenting likewise (the second Esc ends presenting).
 - [ ] Android: Back closes the drawer, then leaves Zen; with nothing of that open it leaves the app as before.
+- [ ] Settings → Shortcuts: give "Record audio" other keys: they record, and the record button's tip names them.
 
 ## Saving and tags (`qt/session-io`)
 

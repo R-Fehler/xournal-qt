@@ -27,14 +27,14 @@ Pane {
         IconButton {
             objectName: "navBack"
             iconName: "xopp-navigate-back"
-            tip: qsTr("Back to where you were (Alt+Left)")
+            tip: qsTr("Back to where you were") + win.keyNote("back")
             enabled: app.canGoBack
             onClicked: app.navigateBack()
         }
         IconButton {
             objectName: "navForward"
             iconName: "xopp-navigate-forward"
-            tip: qsTr("Forward (Alt+Right)")
+            tip: qsTr("Forward") + win.keyNote("forward")
             enabled: app.canGoForward
             onClicked: app.navigateForward()
         }

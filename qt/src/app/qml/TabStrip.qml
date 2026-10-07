@@ -90,7 +90,7 @@ Rectangle {
         IconButton {
             objectName: "overviewButton"
             iconName: "xqt-tabs-grid"
-            tip: qsTr("All open documents (Ctrl+Shift+E)")
+            tip: qsTr("All open documents") + win.keyNote("tabOverview")
             implicitWidth: strip.target
             implicitHeight: strip.target
             icon.width: 22
@@ -104,7 +104,7 @@ Rectangle {
             objectName: "previousTabButton"
             visible: app.tabs.count > 1
             iconName: "xqt-chevron-left"
-            tip: qsTr("Previous document (Ctrl+PgUp)")
+            tip: qsTr("Previous document") + win.keyNote("previousTab")
             implicitWidth: strip.target
             implicitHeight: strip.target
             icon.width: 22
@@ -116,7 +116,7 @@ Rectangle {
             objectName: "nextTabButton"
             visible: app.tabs.count > 1
             iconName: "xqt-chevron-right"
-            tip: qsTr("Next document (Ctrl+PgDown)")
+            tip: qsTr("Next document") + win.keyNote("nextTab")
             implicitWidth: strip.target
             implicitHeight: strip.target
             icon.width: 22

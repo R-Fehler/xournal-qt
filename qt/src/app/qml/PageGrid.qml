@@ -391,7 +391,7 @@ Rectangle {
             }
             ToolSeparator {}
             IconButton {
-                iconName: "xopp-edit-undo"; tip: qsTr("Undo page change (Ctrl+Z)")
+                iconName: "xopp-edit-undo"; tip: qsTr("Undo page change") + win.keyNote("undo")
                 implicitWidth: 44; implicitHeight: 44
                 enabled: app.canUndoPages
                 onClicked: app.undoPages()
@@ -466,7 +466,7 @@ Rectangle {
                 visible: pageGrid.phoneTools
                 iconName: "xqt-toc"
                 label: qsTr("Contents")
-                tip: qsTr("Contents with the pages of each chapter (Ctrl+Alt+O)")
+                tip: qsTr("Contents with the pages of each chapter") + win.keyNote("contents")
                 implicitWidth: 44; implicitHeight: 44
                 onClicked: pageGrid.contentsRequested()
             }

@@ -30,6 +30,8 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"newDocument", tr("New document"), document, QStringList{"Ctrl+Shift+N"} + standard(QKeySequence::AddTab)},
             // (qt/docs/quick-note.md: a new note in the library's Inbox, or a line in today's Markdown note there)
             {"quickNote", tr("Quick note"), document, {"Ctrl+Alt+N"}},
+            // (qt/docs/audio.md: a recording for this document, started or stopped; the record button's tap)
+            {"record", tr("Record audio (start or stop)"), document, {"Ctrl+Shift+R"}},
             {"open", tr("Open…"), document, standard(QKeySequence::Open)},
             {"save", tr("Save"), document, standard(QKeySequence::Save)},
             {"saveAs", tr("Save as…"), document, standard(QKeySequence::SaveAs)},

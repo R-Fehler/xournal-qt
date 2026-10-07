@@ -144,8 +144,7 @@ its toolbox wants it.
   wherever the user carries it (the rail, a group, off the bars: the catalog), in ⋮ → Tools, and in full screen the
   floating toolbox's ⋯ (it lists the top bar). Offered only when recording is available (a build with Qt Multimedia, or
   `XQT_FAKE_AUDIO=1`) and not in a text file; without it no bar, ⋮ or the catalog has a record button, and
-  Ctrl+Shift+R does nothing. Ctrl+Shift+R starts and stops. (The classic tool bar's "insert" group had it until
-  0.8.0.)
+  Ctrl+Shift+R does nothing. Ctrl+Shift+R starts and stops (the shortcut `record`: Settings → Shortcuts changes it).
 - **The pills** (recording, playback) sit at the top of the page, in the middle; below the toolbox when it floats at
   the top edge (full screen, presenting).
 - **Recording**: a tap starts recording for the document of this tab; the recording is a voice memo of the page shown

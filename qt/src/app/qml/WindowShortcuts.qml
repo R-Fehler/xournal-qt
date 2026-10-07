@@ -85,11 +85,8 @@ Item {
     Shortcut { sequence: "Right"; enabled: win.replaying && !app.homeVisible; onActivated: app.timeline.skip(5000) }
     Shortcut { sequence: "Home"; enabled: win.replaying && !app.homeVisible; onActivated: app.timeline.seek(0) }
     Shortcut { sequence: "End"; enabled: win.replaying && !app.homeVisible; onActivated: app.timeline.seek(app.timeline.duration) }
-    Shortcut {
-        sequence: "Ctrl+Shift+R"
-        enabled: app.audio.available && !app.homeVisible
-        onActivated: app.audio.toggleRecording()
-    }
+    // Recording (qt/docs/audio.md): starts or stops it for this document
+    Shortcut { sequences: win.keysOf("record"); enabled: app.audio.available && !app.homeVisible; onActivated: app.audio.toggleRecording() }
     // Document shortcuts do nothing while the home screen is shown.
     readonly property bool docKeys: !app.homeVisible && !app.markdownActive && !replaying
     Shortcut { sequences: win.keysOf("undo"); enabled: docKeys; onActivated: app.undo() }

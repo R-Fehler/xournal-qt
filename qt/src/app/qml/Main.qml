@@ -422,6 +422,12 @@ ApplicationWindow {
         const keys = keysOf(id)
         return keys.length > 0 ? text + " (" + keys.join(", ") + ")" : text
     }
+    /// The first key of an action as a note for a label or a sentence (" (Ctrl+P)"; "" when it has none):
+    /// qsTr("Print…") + win.keyNote("print"). Labels name the keys as they are set, never keys written into the text.
+    function keyNote(id) {
+        const keys = keysOf(id)
+        return keys.length > 0 ? " (" + keys[0] + ")" : ""
+    }
     Connections {
         target: app
         function onHomeVisibleChanged() {

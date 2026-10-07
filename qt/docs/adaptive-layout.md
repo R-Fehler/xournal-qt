@@ -373,6 +373,11 @@ sight:
 | All open documents | the tab strip's overview button, ⋮ → View | Ctrl+Shift+E | the tab dots (compact) | the tab count of the app bar (a tap; a double tap: the document used before; a long press: the ones used lately) |
 | Undo, redo | the head of the toolbox (pinned; qt/undo-redo, before: the view pill); a text document: the start of its format bar | Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y (the tips show the keys set) | the floating toolbox; a text document in the compact chrome: the view pill | the dock; with the soft keyboard open, the end of the format bar above it |
 
+The keys in this table are the defaults: Settings → Shortcuts changes them, and every tip and menu entry names the keys
+as they are set (`win.withKeys(text, id)`: all of an action's keys, the tips of undo and redo; `win.keyNote(id)`: its
+first key, " (Ctrl+P)", for the other tips, the menus and sentences). No label writes a key that can be changed into its
+text; the keys that cannot be changed (Esc, Enter, Space, the format bar's Ctrl+B …) are written as they are.
+
 Zen hides everything; its dot and the dot's pill bring the controls back ([zen.md](zen.md)). Zen: the top bar (on every
 screen, phones too), ⋮ → View → Zen, Ctrl+Alt+Z, the floating toolbox's ⋯; Android's Back leaves it. Read only: ⋮ →
 View → Read only, the dot's pill, the floating toolbox's ⋯.

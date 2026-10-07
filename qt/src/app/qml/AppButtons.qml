@@ -78,7 +78,7 @@ Item {
             property bool offered: !win.textDoc
             iconName: "xqt-page-text"
             label: qsTr("Write on the page")
-            tip: qsTr("Write on the page: Markdown, shown formatted (Ctrl+Alt+M). Hold: its source beside the page")
+            tip: qsTr("Write on the page: Markdown, shown formatted%1. Hold: its source beside the page").arg(win.keyNote("markdownMode"))
             checked: markdownPanel.visible || app.markdownOnPage
             ownHold: true
             readonly property string holdText: qsTr("Markdown source beside the page…")
@@ -356,7 +356,7 @@ Item {
             parent: toolBank
             iconName: "xqt-search"
             label: qsTr("Search")
-            tip: qsTr("Search (Ctrl+F)")
+            tip: qsTr("Search") + win.keyNote("find")
             checked: searchBar.visible
             onClicked: searchBar.visible ? searchBar.closeBar() : searchBar.openBar()
         }
@@ -368,7 +368,7 @@ Item {
             property bool offered: !win.fullScreenMode
             iconName: "xopp-fullscreen"
             label: qsTr("Full screen")
-            tip: qsTr("Full screen (F11)")
+            tip: qsTr("Full screen") + win.keyNote("fullScreen")
             onClicked: win.fullScreenMode = true
         }
         // Present: full screen, page by page (from the current page); held or right-clicked: only the page
@@ -379,10 +379,10 @@ Item {
             property bool offered: !win.fullScreenMode
             iconName: "xopp-presentation-mode"
             label: qsTr("Present")
-            tip: qsTr("Present (F5; hold: its menu with \"Present without controls\", Ctrl+F5)")
+            tip: qsTr("Present%1. Hold: its menu with \"Present without controls\"%2").arg(win.keyNote("present")).arg(win.keyNote("presentClean"))
             ownHold: true
             /// What its long press does (in its menu on a bar)
-            readonly property string holdText: qsTr("Present without controls (Ctrl+F5)")
+            readonly property string holdText: qsTr("Present without controls") + win.keyNote("presentClean")
             onClicked: win.startPresenting()
             onPressAndHold: win.startPresenting(true)
             TapHandler {
@@ -397,7 +397,7 @@ Item {
             parent: toolBank
             iconName: "xqt-settings"
             label: qsTr("Settings")
-            tip: qsTr("Settings (Ctrl+,)")
+            tip: qsTr("Settings") + win.keyNote("settings")
             onClicked: settingsPage.open()
         }
         // New: the tab strip's "+" where the tab strip is shown (one place for each action, qt/docs/adaptive-layout.md);
@@ -418,7 +418,7 @@ Item {
             parent: toolBank
             iconName: "xopp-document-open"
             label: qsTr("Open…")
-            tip: qsTr("Open (in a new tab; Ctrl+O)")
+            tip: qsTr("Open in a new tab%1").arg(win.keyNote("open"))
             onClicked: openDialog.open()
         }
         IconButton {
@@ -427,7 +427,7 @@ Item {
             parent: toolBank
             iconName: "xopp-document-save"
             label: qsTr("Save")
-            tip: qsTr("Save (Ctrl+S)")
+            tip: qsTr("Save") + win.keyNote("save")
             onClicked: saveOrAsk(null)
         }
         // A .md: a copy as notes (a .xopp) to write on with the pen; the .md stays as it is
@@ -468,7 +468,7 @@ Item {
             parent: toolBank
             iconName: "xopp-document-print"
             label: qsTr("Print")
-            tip: qsTr("Print… (Ctrl+P)")
+            tip: qsTr("Print…") + win.keyNote("print")
             onClicked: printDialog.open()
         }
         IconButton {

@@ -16,9 +16,9 @@ IconButton {
     icon.color: here || app.audio.recording ? "#d32f2f" : "#303030"
     checked: here
     label: here ? qsTr("Stop recording") : qsTr("Record audio")
-    tip: here ? qsTr("Stop recording (Ctrl+Shift+R)")
+    tip: here ? qsTr("Stop recording") + win.keyNote("record")
               : app.audio.recording ? qsTr("Recording for %1 (tap: stop it)").arg(app.audio.recordingTitle)
-                                    : qsTr("Record audio: ink written meanwhile plays its moment (Ctrl+Shift+R; hold: play tool, recordings)")
+                                    : qsTr("Record audio: ink written meanwhile plays its moment%1. Hold: the play tool, recordings").arg(win.keyNote("record"))
     ownHold: true
     /// What its long press does (in its menu on a bar)
     readonly property string holdText: qsTr("The play tool, the recordings…")

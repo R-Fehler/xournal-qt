@@ -44,7 +44,7 @@ Pane {
             implicitHeight: 44
             icon.width: 22
             icon.height: 22
-            tip: pill.spotlight ? qsTr("The curtain instead") : qsTr("The spotlight instead (Shift+B)")
+            tip: pill.spotlight ? qsTr("The curtain instead") : qsTr("The spotlight instead") + win.keyNote("spotlight")
             onClicked: app.toggleCurtain(pill.spotlight ? "curtain" : "spotlight")
         }
         ToolSeparator {}

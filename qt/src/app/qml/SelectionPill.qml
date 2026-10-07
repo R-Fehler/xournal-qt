@@ -63,7 +63,7 @@ Pane {
             ToolTip.delay: 600
             HoverHandler { id: countHover }
         }
-        IconButton { objectName: pill.named("selectionCopy"); iconName: "xopp-edit-copy"; tip: qsTr("Copy (Ctrl+C)"); onClicked: pill.target.copySelection() }
+        IconButton { objectName: pill.named("selectionCopy"); iconName: "xopp-edit-copy"; tip: qsTr("Copy") + win.keyNote("copy"); onClicked: pill.target.copySelection() }
         // The handwriting in it as text (qt/copy-tools; the notes only): the readings of its words to the clipboard
         IconButton {
             objectName: pill.named("selectionCopyText")
@@ -73,8 +73,8 @@ Pane {
             tip: qsTr("Copy as text (the handwriting's words, as the handwriting search read them)")
             onClicked: app.copySelectionAsText()
         }
-        IconButton { objectName: pill.named("selectionCut"); visible: !pill.readingOnly; iconName: "xopp-edit-cut"; tip: qsTr("Cut (Ctrl+X)"); onClicked: pill.target.cutSelection() }
-        IconButton { objectName: pill.named("selectionPaste"); visible: !pill.readingOnly; iconName: "xopp-edit-paste"; tip: qsTr("Paste (Ctrl+V)"); onClicked: pill.target.pasteElements() }
+        IconButton { objectName: pill.named("selectionCut"); visible: !pill.readingOnly; iconName: "xopp-edit-cut"; tip: qsTr("Cut") + win.keyNote("cut"); onClicked: pill.target.cutSelection() }
+        IconButton { objectName: pill.named("selectionPaste"); visible: !pill.readingOnly; iconName: "xopp-edit-paste"; tip: qsTr("Paste") + win.keyNote("paste"); onClicked: pill.target.pasteElements() }
         IconButton {
             objectName: pill.named("selectionSticker")
             visible: pill.target === app  // (the notes; not the reference beside them)
@@ -89,7 +89,7 @@ Pane {
             visible: !pill.readingOnly && pill.target.canGroup
             iconName: "xqt-group"
             label: qsTr("Group")
-            tip: qsTr("Group (Ctrl+G): selected together from now on")
+            tip: qsTr("Group%1: selected together from now on").arg(win.keyNote("group"))
             onClicked: pill.target.groupSelection()
         }
         IconButton {
@@ -97,10 +97,10 @@ Pane {
             visible: !pill.readingOnly && pill.target.canUngroup
             iconName: "xqt-ungroup"
             label: qsTr("Ungroup")
-            tip: qsTr("Ungroup (Ctrl+Shift+G)")
+            tip: qsTr("Ungroup") + win.keyNote("ungroup")
             onClicked: pill.target.ungroupSelection()
         }
-        IconButton { objectName: pill.named("selectionDelete"); visible: !pill.readingOnly; iconName: "xqt-delete"; tip: qsTr("Delete (Del)"); onClicked: pill.target.deleteSelection() }
+        IconButton { objectName: pill.named("selectionDelete"); visible: !pill.readingOnly; iconName: "xqt-delete"; tip: qsTr("Delete") + win.keyNote("deleteSelection"); onClicked: pill.target.deleteSelection() }
         ToolSeparator {}
         // Select more (qt/touch-multiselect): taps add notes and elements to the selection or take them away
         IconButton {

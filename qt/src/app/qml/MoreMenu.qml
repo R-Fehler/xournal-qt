@@ -42,9 +42,9 @@ Row {
             objectName: "moreMenu"
             AdaptiveMenuItem { objectName: "saveAsItem"; offered: !win.textDoc; text: qsTr("Save as…"); icon.source: app.iconUrl("xopp-document-save"); onTriggered: openSaveDialog(null) }
             AdaptiveMenuItem { objectName: "shareItem"; text: qsTr("Share…"); icon.source: app.iconUrl("xqt-share"); onTriggered: shareFlow.shareDialog.openFor("") }
-            AdaptiveMenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); icon.source: app.iconUrl("xopp-document-print"); onTriggered: printDialog.open() }
+            AdaptiveMenuItem { objectName: "printItem"; text: qsTr("Print…") + win.keyNote("print"); icon.source: app.iconUrl("xopp-document-print"); onTriggered: printDialog.open() }
             // Find and replace: where text can be written (the search itself: View → Search, and the bars)
-            AdaptiveMenuItem { objectName: "replaceItem"; offered: app.canReplace && !win.reading; text: qsTr("Find and replace (Ctrl+H)"); icon.source: app.iconUrl("xqt-replace"); onTriggered: searchBar.openReplace() }
+            AdaptiveMenuItem { objectName: "replaceItem"; offered: app.canReplace && !win.reading; text: qsTr("Find and replace") + win.keyNote("replace"); icon.source: app.iconUrl("xqt-replace"); onTriggered: searchBar.openReplace() }
             MenuSeparator {}
             // The document as a file: new, open, save, its name, other ways of editing it, links, its bookmark
             // and star
@@ -268,8 +268,8 @@ Row {
                 }
                 // A black sheet over part of the page, for teaching and presenting (qt/docs/curtain.md)
                 AdaptiveMenuItem { objectName: "curtainItem"; offered: !win.textDoc; checkable: true; checked: app.curtain === "curtain"; text: qsTr("Curtain (B)"); icon.source: app.iconUrl("xqt-curtain"); onTriggered: app.toggleCurtain("curtain") }
-                AdaptiveMenuItem { objectName: "spotlightItem"; offered: !win.textDoc; checkable: true; checked: app.curtain === "spotlight"; text: qsTr("Spotlight (Shift+B)"); icon.source: app.iconUrl("xqt-spotlight"); onTriggered: app.toggleCurtain("spotlight") }
-                AdaptiveMenuItem { objectName: "presentCleanItem"; text: qsTr("Present without controls (Ctrl+F5)"); icon.source: app.iconUrl("xopp-presentation-mode"); onTriggered: win.startPresenting(true) }
+                AdaptiveMenuItem { objectName: "spotlightItem"; offered: !win.textDoc; checkable: true; checked: app.curtain === "spotlight"; text: qsTr("Spotlight") + win.keyNote("spotlight"); icon.source: app.iconUrl("xqt-spotlight"); onTriggered: app.toggleCurtain("spotlight") }
+                AdaptiveMenuItem { objectName: "presentCleanItem"; text: qsTr("Present without controls") + win.keyNote("presentClean"); icon.source: app.iconUrl("xopp-presentation-mode"); onTriggered: win.startPresenting(true) }
                 // Zen: only the page and a faint dot (qt/docs/zen.md)
                 AdaptiveMenuItem {
                     objectName: "zenItem"
@@ -351,7 +351,7 @@ Row {
                 AdaptiveMenuItem { objectName: "helpIntroItem"; text: qsTr("Introduction"); icon.source: app.iconUrl("xqt-book-open"); onTriggered: startupFlow.introDialog.show() }
                 AdaptiveMenuItem { objectName: "helpTutorialItem"; text: qsTr("Tutorial"); icon.source: app.iconUrl("xqt-notebook-pen"); onTriggered: app.openTutorial() }
                 AdaptiveMenuItem { objectName: "helpRestartTutorialItem"; offered: app.tutorialExists; text: qsTr("Start the tutorial again…"); icon.source: app.iconUrl("xopp-edit-undo"); onTriggered: startupFlow.restartTutorialDialog.open() }
-                AdaptiveMenuItem { objectName: "helpShortcutsItem"; text: qsTr("Keyboard shortcuts (F1)"); icon.source: app.iconUrl("xqt-keyboard"); onTriggered: shortcutSheet.open() }
+                AdaptiveMenuItem { objectName: "helpShortcutsItem"; text: qsTr("Keyboard shortcuts") + win.keyNote("shortcuts"); icon.source: app.iconUrl("xqt-keyboard"); onTriggered: shortcutSheet.open() }
             }
             CommandItem { slot: "settings" }
         }

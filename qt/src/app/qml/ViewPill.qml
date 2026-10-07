@@ -206,7 +206,7 @@ Pane {
             visible: !viewPill.compact  // (the compact pill: its page number opens them)
             iconName: "xqt-pages-grid"
             label: qsTr("All pages")
-            tip: qsTr("All pages (Ctrl+Alt+G)")
+            tip: qsTr("All pages") + win.keyNote("pageGrid")
             implicitWidth: 40; implicitHeight: 40
             icon.width: 22; icon.height: 22
             onClicked: pageGrid.open()
@@ -216,7 +216,7 @@ Pane {
             objectName: "contentsButton"
             iconName: "xqt-toc"
             label: qsTr("Contents")
-            tip: qsTr("Contents with the pages of each chapter (Ctrl+Alt+O)")
+            tip: qsTr("Contents with the pages of each chapter") + win.keyNote("contents")
             implicitWidth: 40; implicitHeight: 40
             icon.width: 22; icon.height: 22
             checked: contentsOverview.visible
@@ -254,7 +254,7 @@ Pane {
             Material.foreground: "#505050"
             Accessible.name: qsTr("All pages")
             ToolTip.visible: hovered
-            ToolTip.text: qsTr("All pages (Ctrl+Alt+G)")
+            ToolTip.text: qsTr("All pages") + win.keyNote("pageGrid")
             ToolTip.delay: 600
             onClicked: pageGrid.open()
         }
@@ -342,10 +342,10 @@ Pane {
                 title: qsTr("Zoom")
                 /// A fit chosen in the page grid of the phone chrome: back to the page, to see it
                 function done() { if (pageGrid.visible && pageGrid.phoneTools) pageGrid.close() }
-                AdaptiveMenuItem { objectName: "fitWidthItem"; text: qsTr("Fit the width (Ctrl+0)"); icon.source: app.iconUrl("xqt-fit-width"); onTriggered: { app.fitWidth(); fitMenu.done() } }
+                AdaptiveMenuItem { objectName: "fitWidthItem"; text: qsTr("Fit the width") + win.keyNote("fitWidth"); icon.source: app.iconUrl("xqt-fit-width"); onTriggered: { app.fitWidth(); fitMenu.done() } }
                 AdaptiveMenuItem {
                     objectName: "realSizeItem"
-                    text: qsTr("Real size, 100 % (Ctrl+1)")
+                    text: qsTr("Real size, 100 %") + win.keyNote("realSize")
                     onTriggered: { app.zoomToRealSize(); fitMenu.done() }
                 }
                 AdaptiveMenuItem { objectName: "fitHeightItem"; text: qsTr("Fit the height"); onTriggered: { app.fitHeight(); fitMenu.done() } }

@@ -412,14 +412,14 @@ Popup {
                     SwitchRow { objectName: "presenterShowNotesSwitch"; key: "presenterShowNotes"; text: qsTr("The audience sees the space for notes too") }
                     SwitchRow { objectName: "presenterFollowSwitch"; key: "presenterFollowView"; text: qsTr("The audience follows the zoom of the console") }
                     Hint {
-                        text: qsTr("With a second screen (a projector), presenting (F5) shows only the slide there, "
+                        text: qsTr("With a second screen (a projector), presenting%1 shows only the slide there, "
                                    + "and on this screen the page with its space for notes, the next page, the clock "
                                    + "and the time since the start. Write on the page here: the audience sees it at "
                                    + "once. The audience's screen is the one that is not the main screen; swap them "
                                    + "when it is the other way round. With the space for notes shown too, the audience "
                                    + "sees the whole page and what is written beside the slide. Zooming in on the console "
                                    + "shows the audience the same part of the page, as large as their screen allows; "
-                                   + "a frame on the console shows what they see.")
+                                   + "a frame on the console shows what they see.").arg(sheet.win.keyNote("present"))
                     }
                     SectionTitle { text: qsTr("Grid") }
                     SwitchRow { objectName: "snapGridSwitch"; key: "snapGrid"; text: qsTr("Snap to the grid") }
@@ -1735,7 +1735,11 @@ Popup {
                         }
                     }
                     SectionTitle { text: qsTr("Keyboard shortcuts") }
-                    Hint { text: qsTr("F1 shows them over the page; Shortcuts here changes them.") }
+                    Hint {
+                        readonly property var keys: sheet.win.keysOf("shortcuts")
+                        text: keys.length > 0 ? qsTr("%1 shows them over the page; Shortcuts here changes them.").arg(keys[0])
+                                              : qsTr("Shortcuts here changes them.")
+                    }
                     Button {
                         objectName: "helpShortcutsButton"
                         text: qsTr("Show the shortcuts")

@@ -183,9 +183,9 @@ AdaptiveDialog {
                 }
                 Heading { text: qsTr("Search on three levels") }
                 Para {
-                    text: qsTr("This document (Ctrl+F), all open documents, or the whole library, the text of "
+                    text: qsTr("This document%1, all open documents, or the whole library, the text of "
                                + "PDFs included. Hits are marked on the pages. Turn on <b>Fuzzy</b> to find words "
-                               + "with letters left out or mistyped.")
+                               + "with letters left out or mistyped.").arg(win.keyNote("find"))
                 }
                 Heading { text: qsTr("Tabs") }
                 Para {

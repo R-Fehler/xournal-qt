@@ -33,13 +33,13 @@ Item {
         objectName: "toolboxMoreMenu"
         AdaptiveMenuItem {
             objectName: "toolboxPresentItem"
-            text: app.presenting ? qsTr("Stop presenting (Esc)") : qsTr("Present (F5)")
+            text: app.presenting ? qsTr("Stop presenting (Esc)") : qsTr("Present") + win.keyNote("present")
             icon.source: app.iconUrl("xopp-presentation-mode")
             onTriggered: app.presenting ? (app.presenting = false) : win.startPresenting()
         }
         AdaptiveMenuItem {
             objectName: "toolboxPresentCleanItem"
-            text: app.presenting ? qsTr("Hide the tools (Ctrl+F5)") : qsTr("Present without controls (Ctrl+F5)")
+            text: (app.presenting ? qsTr("Hide the tools") : qsTr("Present without controls")) + win.keyNote("presentClean")
             icon.source: app.iconUrl("xqt-eye-off")
             onTriggered: app.presenting ? (win.presentClean = true) : win.startPresenting(true)
         }
@@ -62,7 +62,7 @@ Item {
         }
         AdaptiveMenuItem {
             objectName: "toolboxSearchItem"
-            text: qsTr("Search (Ctrl+F)")
+            text: qsTr("Search") + win.keyNote("find")
             icon.source: app.iconUrl("xqt-search")
             onTriggered: searchBar.openBar()
         }

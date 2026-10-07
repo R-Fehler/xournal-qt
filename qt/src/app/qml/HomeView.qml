@@ -726,7 +726,7 @@ Rectangle {
                 label: qsTr("Settings")
                 implicitWidth: home.phoneLayout ? 44 : 48
                 iconName: "xqt-settings"
-                tip: qsTr("Settings (Ctrl+,)")
+                tip: qsTr("Settings") + win.keyNote("settings")
                 onClicked: home.settingsRequested()
             }
         }
