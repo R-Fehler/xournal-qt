@@ -2914,10 +2914,19 @@ void CanvasView::layerChanged(size_t page) {
     mixedSelection->validate();
 }
 
-PdfCache* CanvasView::rasterPdfCache(bool background) const {
-    if (!background) {
-        return pdfCache.get();
+std::shared_ptr<PdfCache> CanvasView::rasterPdfCache(bool background) const {
+    if (background) {
+        if (auto own = backgroundCache()) {
+            return own;
+        }
     }
+    std::lock_guard lock(pdfCacheMutex);
+    return pdfCache;
+}
+
+std::shared_ptr<PdfCache> CanvasView::backgroundCache() const {
+    // (the first render in advance loads the PDF under the lock: a second background worker waits for it, and so does
+    // a replacement of the caches on the UI thread; the pages in view do not)
     std::lock_guard lock(backgroundPdfMutex);
     if (!backgroundPdfLoaded) {
         backgroundPdfLoaded = true;
@@ -2936,33 +2945,42 @@ PdfCache* CanvasView::rasterPdfCache(bool background) const {
             GError* error = nullptr;
             // (not loadable, e.g. with a password, or changed on disk: the document's own instance)
             if (own.load(path, PdfEncryption::passwordOf(path), &error) && own.getPageCount() == count) {
-                backgroundPdfCache = std::make_unique<PdfCache>(own, nullptr);  // (keeps nothing: size 0)
+                backgroundPdfCache = std::make_shared<PdfCache>(own, nullptr);  // (keeps nothing: size 0)
             }
             if (error) {
                 g_error_free(error);
             }
         }
     }
-    return backgroundPdfCache ? backgroundPdfCache.get() : pdfCache.get();
+    return backgroundPdfCache;
 }
 
 XojPdfPageSPtr CanvasView::rasterPendingPdfPage(size_t number) const { return session.pendingPdfPage(number); }
 
 void CanvasView::recreatePdfCache() { replacePdfCache(true); }
 
+void CanvasView::retirePdfCache(std::shared_ptr<PdfCache> cache) {
+    if (cache) {
+        QThreadPool::globalInstance()->start([cache = std::move(cache)] { cache->evictAllExcept({}); });
+    }
+}
+
 void CanvasView::replacePdfCache(bool rerender) {
-    // The old ones may still be in use by a render: they go with the view (empty)
-    evictPdfCache({});
-    retiredPdfCaches.push_back(std::move(pdfCache));
+    // The new cache is made before it replaces the old one: a render always finds one. A render may still draw with
+    // an old one: it holds it, and the old one goes when that render is done.
+    auto fresh = std::make_shared<PdfCache>(session.getDocument()->getPdfDocument(), session.getSettings());
+    fresh->setMaxSize(std::min<size_t>(4, static_cast<size_t>(std::max(1, session.getSettings()->getPdfPageCacheSize()))));
+    std::shared_ptr<PdfCache> old;
+    {
+        std::lock_guard lock(pdfCacheMutex);
+        old = std::exchange(pdfCache, std::move(fresh));
+    }
+    retirePdfCache(std::move(old));
     {
         std::lock_guard lock(backgroundPdfMutex);
-        if (backgroundPdfCache) {
-            retiredPdfCaches.push_back(std::move(backgroundPdfCache));
-        }
+        retirePdfCache(std::exchange(backgroundPdfCache, nullptr));
         backgroundPdfLoaded = false;
     }
-    pdfCache = std::make_shared<PdfCache>(session.getDocument()->getPdfDocument(), session.getSettings());
-    pdfCache->setMaxSize(std::min<size_t>(4, static_cast<size_t>(std::max(1, session.getSettings()->getPdfPageCacheSize()))));
     const size_t before = std::exchange(pdfCachePages, session.getDocument()->getPdfPageCount());
     for (auto& p: pages) {
         // (a page drawn again goes to the queue of the pages in view: all of them there would make the pages the

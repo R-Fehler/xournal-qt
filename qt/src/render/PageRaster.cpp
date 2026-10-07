@@ -207,10 +207,11 @@ auto PageRaster::createMask(const Range& range, const RasterParams& params) cons
 void PageRaster::renderToBuffer(cairo_t* cr, const RasterParams&, bool background, bool whole,
                                 const render::ElementFilter* filter) const {
     Document* doc = host->rasterDocument();
-    PdfCache* pdfCache = host->rasterPdfCache(background);
+    // (held until the render is done: the host may replace its caches meanwhile)
+    const std::shared_ptr<PdfCache> pdfCache = host->rasterPdfCache(background);
 
     DocumentView localView;
-    localView.setPdfCache(pdfCache);
+    localView.setPdfCache(pdfCache.get());
     xoj::view::BackgroundFlags flags = xoj::view::BACKGROUND_SHOW_ALL;
 
     // xournal-qt: render the PDF background without holding the document lock. Same condition as
@@ -249,7 +250,7 @@ void PageRaster::renderToBuffer(cairo_t* cr, const RasterParams&, bool backgroun
             pending->render(cr);  // (a pasted page: from the pasted PDF until the merged PDF is written; a part)
             cairo_restore(cr);
         } else {
-            xoj::view::PdfBackgroundView(width, height, pdfPageNo, pdfCache, space.left, space.top, !space.empty())
+            xoj::view::PdfBackgroundView(width, height, pdfPageNo, pdfCache.get(), space.left, space.top, !space.empty())
                     .draw(cr);
         }
         flags.showPDF = xoj::view::HIDE_PDF_BACKGROUND;
