@@ -144,4 +144,4 @@ Without them the build says so and dark pages are drawn on the CPU.
   ruling visible on dark papers, a highlighter on dark paper visible and yellow (and upstream's on white).
 - `xqt-ui-tests` `DarkPagesUiTest.*`: the View menu, the background dialog's swatches and texture, the print warning.
 
-Device checks: [device-checklist.md](testing/device-checklist.md), "Dark pages and page colors".
+Device checks: [device-checklist.md](testing/device-checklist.md).
