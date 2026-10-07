@@ -107,7 +107,8 @@ datasets with their licences, the base model and the scores. Training stops at `
 
 - Precision is automatic: bf16 on GPUs that have it (Ampere or newer), fp16 with a gradient scaler on Volta and
   Turing (for example the 2080 Ti), fp32 on older GPUs. On a GTX 1080 Ti (Pascal) a matmul runs at 8.9 TFLOPS in
-  fp32, 8.4 in fp16 and 5.5 in emulated bf16 (measured).
+  fp32, 8.4 in fp16 and 5.5 in emulated bf16 (measured). Measured there in fp32 at the configs' batch sizes:
+  TrOCR 9.1 GB and 44 lines/s per GPU, CTC 60–90 lines/s (8 loader workers; the augmentation on the CPU limits it).
 - PyTorch's CUDA 12.8 wheels are fine for Volta and newer. For Pascal, install from the `cu126` index instead (its
   `sm_60` kernels run on `sm_61`): change the index URL in `requirements-gpu.txt`.
 - With N GPUs, one step sees `batch_size × grad_accum × N` lines. The learning rate is not scaled for you. With 4 or

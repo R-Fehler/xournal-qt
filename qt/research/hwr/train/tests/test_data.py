@@ -207,3 +207,7 @@ def test_writer_splits_take_their_share_of_the_lines():
         assert 0.07 < share[name] / len(lines) < 0.13, share
     one_each = assign_writer_splits([f"font{i}" for i in range(30)])     # one line per writer: 3 test, 3 val
     assert Counter(one_each.values()) == Counter({"train": 24, "test": 3, "val": 3})
+
+
+def test_targets_have_no_invisible_characters():
+    assert text.clean_line("Zeit​schrift  Ab­satz﻿") == "Zeitschrift Absatz"

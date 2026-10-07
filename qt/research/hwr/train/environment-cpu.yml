@@ -9,6 +9,7 @@ dependencies:
   - torchvision
   - transformers
   - tokenizers
+  - sentencepiece
   - onnx
   - onnxruntime
   - onnxscript
