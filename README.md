@@ -8,6 +8,11 @@ app, on Linux, Windows, macOS and Android, from a desktop to a pen tablet to a p
 
 <br clear="left">
 
+<!-- xournal-qt: the fork's part of this README ends at "Everything below is the README of upstream Xournal++"
+     (a seam: qt/docs/decisions/0002-upstream-seams.md) -->
+> **Developers:** the docs start at [qt/docs/README.md](qt/docs/README.md) (the repository's layout, building,
+> testing, the features, the decisions); agents read [AGENTS.md](AGENTS.md) first.
+
 <img src="qt/docs/screenshots/adaptive.png" width="100%" alt="The same page of notes on a desktop (with the page sidebar), an upright tablet (two rows of tools) and a phone (a top bar and a tool dock)">
 
 ## Why
@@ -94,8 +99,8 @@ markup tools (stamps, measurements).
 
 Releases have packages for Linux (`.deb` for KDE neon / Ubuntu 22.04 and Debian 13 / Ubuntu 25.04, an AppImage),
 Windows (a portable zip), Android 9 and newer (an APK) and macOS 15 on Apple Silicon (an unsigned `.dmg`):
-[releases](https://github.com/R-Fehler/xournal-qt/releases), and [qt/docs/development/releasing.md](qt/docs/development/releasing.md) for
-which one fits. From source (Linux, Qt 6.5 or newer):
+[releases](https://github.com/R-Fehler/xournal-qt/releases), and
+[qt/docs/development/releasing.md](qt/docs/development/releasing.md) for which one fits. From source (Linux, Qt 6.5 or newer):
 
 ```sh
 qt/scripts/linux-deps.sh                                          # Debian / Ubuntu: what the build needs
@@ -104,8 +109,9 @@ cmake --build build-qt
 ./build-qt/xournal-qt
 ```
 
-More: [how it came to be](qt/docs/history/README.md) · [the adaptive layout](qt/docs/features/adaptive-layout.md)
-· [Markdown](qt/docs/features/md-editor.md) · [the library](qt/docs/features/library.md) · [Android](qt/docs/development/android.md) ·
+More: [the developer docs](qt/docs/README.md) · [how it came to be](qt/docs/history/README.md) ·
+[the adaptive layout](qt/docs/features/adaptive-layout.md) · [Markdown](qt/docs/features/md-editor.md) ·
+[the library](qt/docs/features/library.md) · [Android](qt/docs/development/android.md) ·
 [macOS](qt/docs/development/macos.md) · [how the fork is kept](FORK.md)
 
 ---

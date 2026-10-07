@@ -15,7 +15,7 @@ cmake --build build-qt
 ctest --test-dir build-qt -j8
 ```
 
-Packages and how a release is made: [`qt/docs/development/releasing.md`](qt/docs/development/releasing.md). Linux only so far.
+Packages and how a release is made: [`qt/docs/development/releasing.md`](qt/docs/development/releasing.md).
 
 Everything else in the tree is upstream Xournal++. The upstream GTK build (root `CMakeLists.txt`) is left untouched.
 
@@ -69,6 +69,7 @@ The script:
 Merge roughly monthly.
 
 ## Where things are
+- `qt/docs/README.md`: the developer docs (layout, building, testing, features, decisions).
 - `qt/docs/decisions/`: architecture decision records.
 - `qt/spikes/`: throwaway experiments (M0 input and canvas spike).
 - `qt/tools/`: developer tools (merge script, image diff, tablet logger).
