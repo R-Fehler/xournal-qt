@@ -89,7 +89,8 @@ Each port records its upstream origin in a comment. Re-check them after upstream
 - `src/core`: everything not listed in `qt/cmake/XojSources.cmake`.
   - For M1 that includes all of `gui/`, except `LayoutMapper.cpp`, `GladeSearchpath.cpp` and `toolbarMenubar/model/ColorPalette.cpp`.
   - `undo/*`, `control/layer/*` and the tool layer (`xoj-tools`: `InputHandler`, `StrokeHandler`, `StrokeStabilizer`, `SnapToGridInputHandler`, `EraseHandler`, the stroke overlay views, `InputUtils`, `LegacyRedrawable`) **are** compiled, unmodified, against the shadow interfaces.
-  - Not yet: selection, text, shapes, spline, vertical space, geometry tools (the laser pointer: its view is compiled, its handler ported, see below).
+  - Also compiled into `xoj-tools`: selection (`Selector`, `EditSelection`, `PdfElemSelection`), the shape and spline handlers with their overlay views, and the geometry tools' views.
+  - Not yet: text, vertical space, the geometry tools' input handlers (the laser pointer: its view is compiled, its handler ported, see below).
 
 ## Verification
 - `qt/tests/golden/run_golden.sh`: `xournal-qt-cli` PNG and PDF export are pixel identical to upstream `xournalpp` built at the merge base, and `.xopp` round trips keep the document structure.
