@@ -583,7 +583,8 @@ the save date as the commit message and optional milestone messages", off by def
 - **A milestone is a version with a message** ("Save with a message…", Ctrl+Alt+S, at most 200 characters). It is never
   replaced; the saves after it start a new version. A milestone saved on a day whose version is unnamed takes that
   version's place. A message can be given or changed later (only the marker is appended; that update counts as part
-  of the current version, see `/Start` below).
+  of the current version, see `/Start` below). It is written like a save, on the save's worker after the saves
+  before it (`DocumentSession::SaveKind::VersionMessage`), never on the UI thread.
 - **Version 0 is the file as it was when history began:** a plain PDF "as received" (the first save with history on
   appends the whole document on top of it, its bytes stay; streams the file has already are referred to, not copied:
   `Update::copyAll` with `indexReuse`), or a PDF with notes as it was (its `.xopp`'s checksum recorded).

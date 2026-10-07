@@ -131,6 +131,10 @@ public:
         /// A copy as an archive PDF (PDF/A-3b, HybridPdf::writeArchive) at `target`: the document keeps its file, state
         /// and saved point. The result has the PDF/A report.
         ExportArchive,
+        /// The message of the version `version` of the document's PDF with notes becomes `message`
+        /// (HybridPdf::setVersionMessage: only the marker, appended): after the saves before it, on the worker. The
+        /// document, its saved point and the next incremental save stay as they are.
+        VersionMessage,
     };
     static bool isExport(SaveKind kind) {
         return kind == SaveKind::ExportXopp || kind == SaveKind::ExportHybrid || kind == SaveKind::ExportArchive;
@@ -152,8 +156,10 @@ public:
         /// revisions in the file may still hold deleted ink).
         bool compact = false;
         /// Save of a hybrid PDF that keeps its versions (keepsVersions()): a milestone with this message ("Save with
-        /// a message…"); empty: the day's version.
+        /// a message…"); empty: the day's version. VersionMessage: the version's new message.
         std::string message;
+        /// VersionMessage: the version (PdfHistory::Version::id).
+        int version = -1;
         /// A PDF with notes: how it is encrypted (protecting it, changing or removing its password: needs `compact`).
         /// None given: a protected document's files stay encrypted with its password (encryptionForSave()).
         std::optional<PdfEncryption::Encryption> encryption;
@@ -193,8 +199,9 @@ public:
     void setKeepsVersions(bool on);
     /// The choice was made here and is not in the file yet.
     bool versionsChoicePending() const { return versionsChoice.has_value(); }
-    /// Give a version of the file a message, or change it (HybridPdf::setVersionMessage): not while a save runs. The
-    /// next save still builds on the file (only its marker changed).
+    /// Give a version of the file a message, or change it (SaveKind::VersionMessage; HybridPdf::setVersionMessage),
+    /// waiting for it and the saves before it. The next save still builds on the file (only its marker changed).
+    /// Without waiting: saveInBackground with a VersionMessage request.
     bool setVersionMessage(int id, const std::string& message, std::string& error);
     /// A version was restored (its pages replaced the document's): the next save is a new version with this message
     /// (unless it has its own), never in place of the day's version.
@@ -609,6 +616,7 @@ private:
     void updateModified();
     void updateSaving();
     void beginTextSave();
+    void beginVersionMessage();
 
     // UndoRedoListener
     void undoRedoChanged() override;

@@ -1451,22 +1451,13 @@ void DocumentSession::setKeepsVersions(bool on) {
 }
 
 bool DocumentSession::setVersionMessage(int id, const std::string& message, std::string& error) {
-    if (isSaving() || !isHybrid()) {
-        error = isSaving() ? "A save is running." : "The document is not a PDF with notes.";
-        return false;
-    }
-    const fs::path file = getFilePath();
-    const std::string was = fileio::stampOf(file);  // (the stamp HybridPdf keeps of the file's version)
-    if (!HybridPdf::setVersionMessage(file, id, message, error)) {
-        return false;
-    }
-    if (hybridRevision && hybridRevisionFile == file && hybridRevision->stamp == was) {
-        // (the pages are the same objects: the next save appends as before)
-        hybridRevision->stamp = fileio::stampOf(file);
-    }
-    stampFiles();  // (the app's own change, never one "by another program")
-    Q_EMIT versionsChanged();
-    return true;
+    SaveRequest r;
+    r.kind = SaveKind::VersionMessage;
+    r.version = id;
+    r.message = message;
+    const SaveResult result = saveNow(std::move(r));
+    error = result.error;
+    return result.ok;
 }
 
 void DocumentSession::versionRestored(const std::string& message) { restoredMessage = message; }

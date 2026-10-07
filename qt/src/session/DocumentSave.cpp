@@ -388,6 +388,9 @@ void DocumentSession::updateSaving() {
 
 void DocumentSession::beginSave() {
     SaveTask& t = *saveTask;
+    if (t.request.kind == SaveKind::VersionMessage) {
+        return beginVersionMessage();
+    }
     if (text && !hasFilePath()) {
         // A text file: its text, never a .xopp or a hybrid PDF (nor a copy as one)
         if (t.request.kind == SaveKind::Save || t.request.kind == SaveKind::SaveAs) {
@@ -432,6 +435,8 @@ void DocumentSession::beginSave() {
             }
             t.hybrid = true;
             break;
+        case SaveKind::VersionMessage:
+            return;  // (beginVersionMessage)
         case SaveKind::ExportXopp:
             t.target = t.request.target;
             t.expectedBg = backgroundOf(*doc);
@@ -814,6 +819,35 @@ void DocumentSession::beginTextSave() {
             });
 }
 
+void DocumentSession::beginVersionMessage() {
+    SaveTask& t = *saveTask;
+    if (!isHybrid()) {
+        return finishSave({false, "The document is not a PDF with notes.", {}});
+    }
+    t.target = getFilePath();
+    onWorker(
+            [&t] {
+                t.stampBefore = fileio::stampOf(t.target);  // (the stamp HybridPdf keeps of the file's version)
+                std::string error;
+                if (!HybridPdf::setVersionMessage(t.target, t.request.version, t.request.message, error)) {
+                    t.result = {false, error, {}};
+                    return;
+                }
+                t.result = {true, {}, {}};
+            },
+            [this] {
+                SaveTask& t = *saveTask;
+                if (t.result.ok) {
+                    if (hybridRevision && hybridRevisionFile == t.target && hybridRevision->stamp == t.stampBefore) {
+                        // (the pages are the same objects: the next save appends as before)
+                        hybridRevision->stamp = fileio::stampOf(t.target);
+                    }
+                    Q_EMIT versionsChanged();
+                }
+                finishSave(t.result);  // (it stamps the files: the app's own change, never one "by another program")
+            });
+}
+
 void DocumentSession::finishWrite() {
     SaveTask& t = *saveTask;
     if (isExport(t.request.kind)) {
@@ -879,7 +913,7 @@ void DocumentSession::finishSave(SaveResult result) {
     }
     lastSaveResult = result;
     stampFiles();  // (what was written is the app's own: never a change "by another program")
-    if (result.ok && !isExport(task->request.kind)) {
+    if (result.ok && !isExport(task->request.kind) && task->request.kind != SaveKind::VersionMessage) {
         madeUnsaved = false;  // (made from a .md: it is in its own file now)
         Q_EMIT filePathChanged();
     }

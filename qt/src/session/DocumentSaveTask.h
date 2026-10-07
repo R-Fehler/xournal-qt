@@ -62,6 +62,8 @@ struct DocumentSession::SaveTask {
     // --- or a text file (DocumentSession::beginTextSave): the text and the bytes written for it
     bool textSave = false;
     std::string text, textBytes;
+    // --- or a version's message (DocumentSession::beginVersionMessage): the file's stamp before it
+    std::string stampBefore;
     // --- or pasted PDF pages joining the merged PDF
     std::shared_ptr<PdfMerge> merge;
     // --- the step that runs
