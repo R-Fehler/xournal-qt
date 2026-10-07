@@ -17,6 +17,11 @@ QStringList standard(QKeySequence::StandardKey key) {
     }
     return list;
 }
+
+QStringList withoutBackKey(QStringList keys) {
+    keys.removeAll(QKeySequence(Qt::Key_Back).toString(QKeySequence::PortableText));
+    return keys;
+}
 }  // namespace
 
 ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractListModel(parent), settings(settings) {
@@ -88,7 +93,9 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"read", tr("Read (Zen, read only, full screen)"), view, {"Ctrl+Alt+R"}},
             // (qt/docs/features/zen.md: only the page and a faint dot; again, or Esc: the controls back)
             {"zen", tr("Zen (only the page)"), view, {"Ctrl+Alt+Z"}},
-            {"back", tr("Back"), view, standard(QKeySequence::Back)},
+            // (without the Back key, which Qt 6.11 lists here: Android's back button and gesture are the window's
+            // step out of things, WindowShortcuts.qml; two shortcuts on one key make Qt do neither)
+            {"back", tr("Back"), view, withoutBackKey(standard(QKeySequence::Back))},
             {"forward", tr("Forward"), view, standard(QKeySequence::Forward)},
             {"settings", tr("Settings"), view, {"Ctrl+,"}},
             {"shortcuts", tr("These shortcuts"), view, {"F1", "Ctrl+/"}},

@@ -294,6 +294,23 @@ TEST(Shortcuts, noKeysAreUsedTwice) {
     }
 }
 
+TEST(Shortcuts, theWindowsOwnEscapeAndBackKeysAreNoActionsKeys) {
+    // Escape and the Back key (Android's back button and gesture) step out of things in WindowShortcuts.qml. An action
+    // that also took one of them would make it ambiguous, and Qt would do neither. Qt 6.11 lists the Back key under
+    // QKeySequence::Back, which the "back" action (to the place before a link) starts from.
+    AppController c;
+    auto* shortcuts = qobject_cast<ShortcutsModel*>(c.shortcutsModel());
+    ASSERT_NE(shortcuts, nullptr);
+    const QStringList windowKeys{QKeySequence(Qt::Key_Escape).toString(QKeySequence::PortableText),
+                                 QKeySequence(Qt::Key_Back).toString(QKeySequence::PortableText)};
+    for (int row = 0; row < shortcuts->rowCount(); ++row) {
+        const QString id = shortcuts->data(shortcuts->index(row), ShortcutsModel::IdRole).toString();
+        for (const QString& keys: shortcuts->keys(id)) {
+            EXPECT_FALSE(windowKeys.contains(keys)) << id.toStdString() << " takes " << keys.toStdString();
+        }
+    }
+}
+
 TEST(SaveAs, suggestsTheDocumentsOwnFolderAndTheLibraryForNewOnes) {
     QTemporaryDir tmp;
     const fs::path lib = fs::path(tmp.path().toStdString()) / "Library";
