@@ -25,6 +25,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
@@ -404,6 +405,28 @@ Result appendChanges(Existing& e, const Prepared& prep, bool archive, const Revi
 
 /// The dictionary `to` becomes `from` (the same object, written again).
 void replaceAll(QPDFObjectHandle to, QPDFObjectHandle from);
+
+/// What appendIfPossible() needs besides the file.
+struct AppendTry {
+    const Revision* rev = nullptr;  ///< the file as last written or opened (WriteOptions::revision; valid)
+    std::string cleanCopyOf;        ///< the stamp of the version whose clean copy serves the file after the update
+    bool archive = false;           ///< an archive PDF saved again
+    /// The document prepared, without what the file has drawn already (an error in Prepared::error, or thrown)
+    std::function<Prepared(const Reuse*)> prepared;
+    /// Version history (may be empty: none): what the marker says, the update beginning at the file's end
+    std::function<HistoryMark(const Existing&)> markOf;
+    std::string exportName;          ///< write()'s /XoppExport
+    Revision* written = nullptr;     ///< WriteOptions::written
+    /// Called once the update is in the file, before its clean copy is kept (may be empty)
+    std::function<Result(Result)> appended;
+};
+
+/// A save that only appends what changed (qt/docs/features/hybrid-pdf.md, "Saving: incremental updates"): the file
+/// opened as `*how.rev`, the document prepared, the update appended, the clean copy kept. Returns the result when the
+/// file was written, or could not be (then it is as it was); nothing when it is to be written in full instead
+/// (`whyFull` says why: the file is not that revision, the policy, or what was thrown).
+std::optional<Result> appendIfPossible(const fs::path& target, const AppendTry& how, std::string& whyFull,
+                                       Steps& step);
 
 
 // --- the clean copies (HybridCache.cpp) -----------------------------------------------------------------------------

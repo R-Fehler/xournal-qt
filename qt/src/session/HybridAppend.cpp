@@ -931,6 +931,41 @@ Result appendChanges(Existing& e, const Prepared& prep, bool archive, const Revi
     return Appending(e, prep, archive, rev, history).run(xoppExport, target, written, why);
 }
 
+std::optional<Result> appendIfPossible(const fs::path& target, const AppendTry& how, std::string& whyFull,
+                                       Steps& step) {
+    try {
+        auto existing = openExisting(target, *how.rev, how.archive, whyFull);
+        step("open the file");
+        if (!existing) {
+            return std::nullopt;
+        }
+        Prepared prep = how.prepared(&existing->reuse);
+        step("draw what changed and write the .xopp");
+        if (!prep.error.empty()) {
+            Result r;
+            r.error = prep.error;
+            return r;
+        }
+        const std::optional<HistoryMark> mark = how.markOf ? std::optional(how.markOf(*existing)) : std::nullopt;
+        Result r = appendChanges(*existing, prep, how.archive, *how.rev, mark ? &*mark : nullptr, how.exportName,
+                                 target, how.written, whyFull);
+        if (r.ok) {
+            if (how.appended) {
+                r = how.appended(r);
+            }
+            keepCleanCopy(target, how.cleanCopyOf, prep, existing->tree);
+            step("keep the clean copy");
+            return r;
+        }
+        if (!r.error.empty()) {
+            return r;  // (the file could not be written: it is as it was)
+        }
+    } catch (const std::exception& e) {
+        whyFull = e.what();
+    }
+    return std::nullopt;
+}
+
 }  // namespace detail
 
 }  // namespace xqt::HybridPdf

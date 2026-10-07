@@ -85,35 +85,20 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, si
         }
         std::string whyFull;
         if (options.revision && options.revision->valid() && !options.compact && exists) {
-            // Only what changed, appended (qt/docs/features/hybrid-pdf.md, "Saving: incremental updates")
-            try {
-                auto existing = openExisting(target, *options.revision, mode == Mode::Archive, whyFull);
-                step("open the file");
-                if (existing) {
-                    PrepareOptions how = preparing(target, baseOf, pdfPageCount, options);
-                    how.reuse = &existing->reuse;
-                    Prepared prep = prepare(doc, target.filename().string(), work.path, how);
-                    step("draw what changed and write the .xopp");
-                    if (!prep.error.empty()) {
-                        r.error = prep.error;
-                        return r;
-                    }
-                    const std::string was = options.revision->stamp;
-                    r = appendChanges(*existing, prep, mode == Mode::Archive, *options.revision, nullptr,
-                                      exportName, target, options.written, whyFull);
-                    if (r.ok) {
-                        keepCleanCopy(target, was, prep, existing->tree);
-                        step("keep the clean copy");
-                        return r;
-                    }
-                    if (!r.error.empty()) {
-                        return r;  // (the file could not be written: it is as it was)
-                    }
-                    r = Result();
-                }
-            } catch (const std::exception& e) {
-                whyFull = e.what();
-                r = Result();
+            // Only what changed, appended
+            AppendTry how;
+            how.rev = options.revision;
+            how.cleanCopyOf = options.revision->stamp;
+            how.archive = mode == Mode::Archive;
+            how.prepared = [&](const Reuse* reuse) {
+                PrepareOptions prep = preparing(target, baseOf, pdfPageCount, options);
+                prep.reuse = reuse;
+                return prepare(doc, target.filename().string(), work.path, prep);
+            };
+            how.exportName = exportName;
+            how.written = options.written;
+            if (auto appended = appendIfPossible(target, how, whyFull, step)) {
+                return *appended;
             }
             if (step.on) {
                 std::fprintf(stderr, "hybrid-pdf: written in full: %s\n", whyFull.c_str());

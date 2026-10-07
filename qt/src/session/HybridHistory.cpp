@@ -371,29 +371,20 @@ Result writeKeeping(Document& doc, const fs::path& target, const BasePageOf& bas
     };
     std::string whyFull;
     if (rev.valid()) {
-        try {
-            auto existing = openExisting(target, rev, false, whyFull);
-            if (existing) {
-                Prepared prep = prepared(&existing->reuse);
-                versions.push_back(v);
-                HistoryMark mark{versions, existing->tail.size};
-                const std::string was = options.revision->stamp;
-                Result r = appendChanges(*existing, prep, false, rev, &mark, exportName, target, options.written, whyFull);
-                if (r.ok) {
-                    r = finish(r);
-                    keepCleanCopy(target, was, prep, existing->tree);
-                    return r;
-                }
-                if (!r.error.empty()) {
-                    return r;  // (the file could not be written: it is as it was)
-                }
-                versions.pop_back();
-            }
-        } catch (const std::exception& e) {
-            whyFull = e.what();
-            if (!versions.empty() && versions.back().id == v.id) {
-                versions.pop_back();
-            }
+        AppendTry how;
+        how.rev = &rev;
+        how.cleanCopyOf = options.revision->stamp;
+        how.prepared = prepared;
+        how.markOf = [&](const Existing& existing) {
+            HistoryMark mark{versions, existing.tail.size};
+            mark.versions.push_back(v);
+            return mark;
+        };
+        how.exportName = exportName;
+        how.written = options.written;
+        how.appended = finish;
+        if (auto appended = appendIfPossible(target, how, whyFull, step)) {
+            return *appended;
         }
     } else {
         whyFull = "no revision to build on";
