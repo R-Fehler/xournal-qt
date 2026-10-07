@@ -84,14 +84,10 @@ struct Steps {
 };
 
 using fileio::stampOf;
-inline uint64_t fnv(const std::string& s) { return fileio::fnv1a(s); }
-inline std::string hex(uint64_t v) { return fileio::hex16(v); }
-inline std::string bytesOf(const fs::path& p) { return fileio::readFile(p); }
 
+/// `data` as the file's content, written in place (not atomically: the callers write into a temporary name or a folder
+/// of their own, then rename it).
 bool writeFile(const fs::path& p, const std::string& data);
-
-/// A unique temporary name next to `target` (several threads may make the same clean copy at once).
-inline fs::path partOf(const fs::path& target) { return fileio::tempNameFor(target); }
 
 /// How an archive PDF is written (PDF/A): never encrypted, at least PDF 1.7, streams with a forbidden filter decoded.
 struct ArchiveWrite {
@@ -236,14 +232,30 @@ struct Prepared {
     PdfEncryption::Encryption encryption;  ///< how the file is encrypted when written in full (WriteOptions)
 };
 
-/// The words of the text layer of each page (`pages`: the recognised handwriting per page; may be null).
-void addInkWords(Prepared& prep, const std::vector<std::shared_ptr<const ink::PageText>>* pages);
+/// What prepare() takes besides the document.
+struct PrepareOptions {
+    BasePageOf baseOf;           ///< as write()'s
+    size_t pdfPageCount = npos;  ///< as write()'s
+    /// Upstream's attached PDF of a .xopp is the PDF (exportXopp's `attached`)
+    bool attach = false;
+    /// The links of Markdown boxes become /Link annotations, relative to the PDF written into this folder; empty: none
+    fs::path linkFolder;
+    const LinkMap* linkMap = nullptr;  ///< an archive written into another folder (writeArchive's `links`)
+    const Reuse* reuse = nullptr;      ///< what the existing file has drawn already (an incremental save)
+    /// The recordings' names written into the .xopp instead of theirs (exportXopp)
+    const std::map<std::string, std::string>* audioNames = nullptr;
+    /// The recognised handwriting per page (WriteOptions::inkText; may be null)
+    const std::vector<std::shared_ptr<const ink::PageText>>* inkText = nullptr;
+    PdfEncryption::Encryption encryption;  ///< WriteOptions::encryption
+};
 
-/// Everything that needs the document: under its shared lock (and briefly its lock).
-Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work, const BasePageOf& baseOf,
-                 size_t pdfPageCount, bool attach = false, const fs::path& linkFolder = {},
-                 const LinkMap* linkMap = nullptr, const Reuse* reuse = nullptr,
-                 const std::map<std::string, std::string>* audioNames = nullptr);
+/// How write() saves the document as `target` (WriteOptions; the links relative to its folder).
+PrepareOptions preparing(const fs::path& target, const BasePageOf& baseOf, size_t pdfPageCount,
+                         const WriteOptions& options);
+
+/// Everything that needs the document, for the PDF `pdfName`, with the files of the write in `work`: under its shared
+/// lock (and briefly its lock).
+Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work, const PrepareOptions& options);
 
 // --- the file written in full (HybridFullWrite.cpp) -----------------------------------------------------------------
 

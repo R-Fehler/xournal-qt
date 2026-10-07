@@ -183,7 +183,7 @@ std::string hashOf(QPDFObjectHandle annot) {
     canonical(out, annot.getKey("/InkList"), 10);
     out << '|';
     canonical(out, annot.getKey("/C"), 1000);
-    return hex(fnv(out.str()));
+    return fileio::hex16(fileio::fnv1a(out.str()));
 }
 
 bool restoreBoxes(QPDFObjectHandle page) {

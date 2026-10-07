@@ -244,13 +244,11 @@ bool linkFor(const md::LinkHit& hit, const fs::path& folder, LinkSpec& spec, con
 std::string sigOf(uint64_t saved, double width, double height) {
     std::ostringstream key;
     key << PROJECT_STRING << '|' << std::llround(width * 100) << 'x' << std::llround(height * 100) << '|' << saved;
-    return hex(fnv(key.str()));
+    return fileio::hex16(fileio::fnv1a(key.str()));
 }
 
-}  // namespace
 
-namespace detail {
-
+/// The words of the text layer of each page (`pages`: the recognised handwriting per page; may be null).
 void addInkWords(Prepared& prep, const std::vector<std::shared_ptr<const ink::PageText>>* pages) {
     prep.inkWords.assign(prep.pages.size(), {});
     for (size_t i = 0; pages && i < pages->size() && i < prep.pages.size(); ++i) {
@@ -260,15 +258,33 @@ void addInkWords(Prepared& prep, const std::vector<std::shared_ptr<const ink::Pa
     }
 }
 
-Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work, const BasePageOf& baseOf,
-                 size_t pdfPageCount, bool attach, const fs::path& linkFolder,
-                 const LinkMap* linkMap, const Reuse* reuse,
-                 const std::map<std::string, std::string>* audioNames) {
+}  // namespace
+
+namespace detail {
+
+PrepareOptions preparing(const fs::path& target, const BasePageOf& baseOf, size_t pdfPageCount,
+                         const WriteOptions& options) {
+    PrepareOptions o;
+    o.baseOf = baseOf;
+    o.pdfPageCount = pdfPageCount;
+    o.linkFolder = target.parent_path();
+    o.inkText = options.inkText;
+    o.encryption = options.encryption;
+    return o;
+}
+
+Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work, const PrepareOptions& options) {
+    const BasePageOf& baseOf = options.baseOf;
+    const size_t pdfPageCount = options.pdfPageCount;
+    const fs::path& linkFolder = options.linkFolder;
+    const LinkMap* linkMap = options.linkMap;
+    const Reuse* reuse = options.reuse;
     Prepared out;
+    out.encryption = options.encryption;
     // The .xopp first (not written yet): its hashes say what each drawing shows
     const fs::path xopp = work / DATA_NAME;
-    HybridSaveHandler h(pdfName, attach);
-    h.audioNames = audioNames;
+    HybridSaveHandler h(pdfName, options.attach);
+    h.audioNames = options.audioNames;
     std::vector<audio::Recording> recordings;  // (qt/docs/audio.md: their files are found after the lock)
     fs::path docFile;
     {
@@ -442,13 +458,13 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
         out.error = h.getErrorMessage();
         return out;
     }
-    out.xopp = secret ? std::move(inMemory) : bytesOf(xopp);
+    out.xopp = secret ? std::move(inMemory) : fileio::readFile(xopp);
     std::error_code ec;
     const std::string prefix = std::string(DATA_NAME) + ".";
     for (auto it = fs::directory_iterator(work, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
         const std::string n = it->path().filename().string();
         if (n.rfind(prefix, 0) == 0) {
-            out.extras.emplace_back(n, bytesOf(it->path()));
+            out.extras.emplace_back(n, fileio::readFile(it->path()));
         }
     }
     // The recordings, for other apps too (qt/docs/audio.md): "audio-p012-…ogg" with their pages. One whose file is
@@ -468,6 +484,7 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
         a.fixed = true;
         out.attachments.push_back(std::move(a));
     }
+    addInkWords(out, options.inkText);
     return out;
 }
 

@@ -158,7 +158,7 @@ void extractPictures(QPDF& q, QPDFObjectHandle marker, const fs::path& dir) {
     const fs::path pictures = dir / PICTURES_NAME;
     std::error_code ec;
     fs::create_directories(dir, ec);
-    const fs::path tmp = partOf(pictures);
+    const fs::path tmp = fileio::tempNameFor(pictures);
     fs::remove_all(tmp, ec);
     fs::create_directories(tmp, ec);
     QPDFObjectHandle files = marker.getKey("/Files");
@@ -190,7 +190,7 @@ void extractPictures(QPDF& q, QPDFObjectHandle marker, const fs::path& dir) {
 void extractAudio(QPDF& q, QPDFObjectHandle marker, const fs::path& dir) {
     const fs::path folder = dir / AUDIO_NAME;
     std::error_code ec;
-    const fs::path tmp = partOf(folder);
+    const fs::path tmp = fileio::tempNameFor(folder);
     fs::remove_all(tmp, ec);
     fs::create_directories(tmp, ec);
     QPDFEmbeddedFileDocumentHelper efdh(q);
@@ -292,10 +292,10 @@ Revision revisionOf(const fs::path& cleanCopy, const fs::path& pdf) {
         std::error_code ec;
         if (stamp.empty() || cleanCopy.filename() != CLEAN_NAME ||
             dir.lexically_normal() != entryOf(pdf, stamp).lexically_normal() || !fs::exists(dir / CHECK_NAME, ec) ||
-            !bytesOf(dir / CHECK_NAME).empty() || !fs::exists(dir / PAGES_NAME, ec)) {
+            !fileio::readFile(dir / CHECK_NAME).empty() || !fs::exists(dir / PAGES_NAME, ec)) {
             return rev;  // (another version of the file, or edited in another app: written in full)
         }
-        std::istringstream in(bytesOf(dir / PAGES_NAME));
+        std::istringstream in(fileio::readFile(dir / PAGES_NAME));
         int obj = 0, gen = 0;
         while (in >> obj >> gen) {
             rev.pages.emplace_back(obj, gen);
@@ -392,7 +392,7 @@ Opened open(const fs::path& pdf) {
                 writePdfTo(q, base, {}, fileio::Sync::None);  // (encrypted as the file is; a cache entry)
                 if (!secret) {
                     for (const auto& [n, data]: files) {
-                        const fs::path tmp = partOf(dir / n);
+                        const fs::path tmp = fileio::tempNameFor(dir / n);
                         if (!writeFile(tmp, data)) {
                             throw std::runtime_error("Could not write into the cache: " + (dir / n).string());
                         }
@@ -403,7 +403,7 @@ Opened open(const fs::path& pdf) {
                 for (const auto& c: changed) {
                     list += c + "\n";
                 }
-                const fs::path tmp = partOf(check);
+                const fs::path tmp = fileio::tempNameFor(check);
                 writeFile(tmp, list);
                 fs::rename(tmp, check, ec);  // last: the entry is complete
             } else {
@@ -429,7 +429,7 @@ Opened open(const fs::path& pdf) {
         o.audio = dir / AUDIO_NAME;
         audio::setExtractedFolder(pdf, o.audio);
         {
-            std::istringstream in(bytesOf(check));
+            std::istringstream in(fileio::readFile(check));
             for (std::string line; std::getline(in, line);) {
                 if (!line.empty()) {
                     o.changed.push_back(line);
@@ -490,7 +490,8 @@ fs::path importCopy(const fs::path& pdf, const std::vector<std::string>& keep, s
         PdfEncryption::openQpdf(q, pdf);
         strip(q, std::set<std::string>(keep.begin(), keep.end()));
         MergedPdf::mark(q, MergedPdf::Kind::Own);
-        const fs::path target = dir / ("imported-" + hex(fnv(stamp + std::to_string(keep.size()))) + ".pdf");
+        const std::string key = fileio::hex16(fileio::fnv1a(stamp + std::to_string(keep.size())));
+        const fs::path target = dir / ("imported-" + key + ".pdf");
         writePdfTo(q, target, {}, fileio::Sync::None);  // (a cache entry)
         PdfEncryption::derive(target, pdf);
         return target;

@@ -880,7 +880,7 @@ private:
                 params.replaceKey("/CheckSum", QPDFObjectHandle::newString(md5));
                 params.replaceKey("/ModDate", QPDFObjectHandle::newString(now));
                 dict.replaceKey("/Params", params);
-                QPDFObjectHandle stream = u.addStream(dict, bytesOf(a.file));
+                QPDFObjectHandle stream = u.addStream(dict, fileio::readFile(a.file));
                 QPDFObjectHandle ef = QPDFObjectHandle::newDictionary();
                 ef.replaceKey("/F", stream);
                 ef.replaceKey("/UF", stream);

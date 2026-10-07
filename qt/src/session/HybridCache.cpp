@@ -33,7 +33,7 @@ namespace detail {
 fs::path entryOf(const fs::path& pdf, const std::string& stamp) {
     std::error_code ec;
     const fs::path abs = fs::weakly_canonical(pdf, ec);
-    return cacheFolder() / (hex(fnv((ec ? pdf : abs).string())) + "-" + stamp);
+    return cacheFolder() / (fileio::hex16(fileio::fnv1a((ec ? pdf : abs).string())) + "-" + stamp);
 }
 
 void prune(const fs::path& keep) {
@@ -75,12 +75,12 @@ void keepCleanCopy(const fs::path& target, const std::string& was, const Prepare
     std::error_code ec;
     const fs::path from = entryOf(target, was);
     const fs::path to = entryOf(target, stampOf(target));
-    if (!fs::exists(from / CHECK_NAME, ec) || !fs::exists(from / CLEAN_NAME, ec) || !bytesOf(from / CHECK_NAME).empty() ||
-        fs::exists(to / CHECK_NAME, ec)) {
+    if (!fs::exists(from / CHECK_NAME, ec) || !fs::exists(from / CLEAN_NAME, ec) ||
+        !fileio::readFile(from / CHECK_NAME).empty() || fs::exists(to / CHECK_NAME, ec)) {
         return;
     }
     const std::string list = pagesText(pages);
-    if (bytesOf(from / PAGES_NAME) != list) {
+    if (fileio::readFile(from / PAGES_NAME) != list) {
         return;  // (pages added, removed or moved: the next open makes a clean copy of this version)
     }
     fs::create_directories(to, ec);
@@ -100,7 +100,7 @@ void keepCleanCopy(const fs::path& target, const std::string& was, const Prepare
             writeFile(to / name, data);
         }
     }
-    const fs::path tmp = partOf(to / CHECK_NAME);
+    const fs::path tmp = fileio::tempNameFor(to / CHECK_NAME);
     writeFile(tmp, "");
     fs::rename(tmp, to / CHECK_NAME, ec);  // last: the entry is complete
 }

@@ -262,10 +262,9 @@ Result writeKeeping(Document& doc, const fs::path& target, const BasePageOf& bas
     v.day = PdfHistory::localDay(when);
     v.message = options.history->message;
     auto prepared = [&](const Reuse* reuse) {
-        Prepared prep = prepare(doc, target.filename().string(), work, baseOf, pdfPageCount, false,
-                                target.parent_path(), nullptr, reuse);
-        addInkWords(prep, options.inkText);
-        prep.encryption = options.encryption;
+        PrepareOptions how = preparing(target, baseOf, pdfPageCount, options);
+        how.reuse = reuse;
+        Prepared prep = prepare(doc, target.filename().string(), work, how);
         if (!prep.error.empty()) {
             throw std::runtime_error(prep.error);
         }

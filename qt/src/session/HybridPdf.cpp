@@ -90,10 +90,9 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, si
                 auto existing = openExisting(target, *options.revision, mode == Mode::Archive, whyFull);
                 step("open the file");
                 if (existing) {
-                    Prepared prep = prepare(doc, target.filename().string(), work.path, baseOf, pdfPageCount, false,
-                                            target.parent_path(), nullptr, &existing->reuse);
-                    addInkWords(prep, options.inkText);
-        prep.encryption = options.encryption;
+                    PrepareOptions how = preparing(target, baseOf, pdfPageCount, options);
+                    how.reuse = &existing->reuse;
+                    Prepared prep = prepare(doc, target.filename().string(), work.path, how);
                     step("draw what changed and write the .xopp");
                     if (!prep.error.empty()) {
                         r.error = prep.error;
@@ -125,9 +124,7 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, si
             whyFull = "no revision to build on";
         }
         Prepared prep =
-                prepare(doc, target.filename().string(), work.path, baseOf, pdfPageCount, false, target.parent_path());
-        addInkWords(prep, options.inkText);
-        prep.encryption = options.encryption;
+                prepare(doc, target.filename().string(), work.path, preparing(target, baseOf, pdfPageCount, options));
         step("draw and write the .xopp");
         if (!prep.error.empty()) {
             r.error = prep.error;
@@ -151,9 +148,13 @@ Result writeArchive(Document& doc, const fs::path& target, const BasePageOf& bas
     Result r;
     try {
         WorkDir work;
-        Prepared prep = prepare(doc, target.filename().string(), work.path, baseOf, pdfPageCount, false,
-                                target.parent_path(), links.archived || !links.from.empty() ? &links : nullptr);
-        addInkWords(prep, inkText);
+        PrepareOptions how;
+        how.baseOf = baseOf;
+        how.pdfPageCount = pdfPageCount;
+        how.linkFolder = target.parent_path();
+        how.linkMap = links.archived || !links.from.empty() ? &links : nullptr;
+        how.inkText = inkText;
+        Prepared prep = prepare(doc, target.filename().string(), work.path, how);
         if (!prep.error.empty()) {
             r.error = prep.error;
             return r;
@@ -199,8 +200,11 @@ Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf, size
                 audioNames[rec.name] = std::string(abs.begin(), abs.end());
             }
         }
-        const Prepared prep = prepare(doc, pdf.filename().string(), work.path, {}, pdfPageCount, attached, {}, nullptr,
-                                      nullptr, &audioNames);
+        PrepareOptions how;
+        how.pdfPageCount = pdfPageCount;
+        how.attach = attached;
+        how.audioNames = &audioNames;
+        const Prepared prep = prepare(doc, pdf.filename().string(), work.path, how);
         if (!prep.error.empty()) {
             r.error = prep.error;
             return r;
