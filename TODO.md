@@ -84,8 +84,19 @@ All four waves are merged (2026-10-07). The architecture overview:
 - [ ] **A touch on the "pages with hits" filter can make the maximized window half as high** (old, touch only,
   KWin; also the page grid button). Suspect a touch whose item disappears mid-touch, taken by KWin as a window
   gesture. Next time: `XQT_LOG_WINDOW=1`, look for a touch cancel before the resize.
-- [x] A test leaves a settings file `non-existing-file-path` in the working directory: the unit tests now run in
-  `build-qt/unit-cwd` (`qt/test-support`). Nothing left.
+- [ ] **Qt 6.8.4 (conda-forge, QML compiled ahead of time): two UI tests fail every time**, on 0.8.0's `master-qt`
+  too; the CI's Debian 13 (Qt 6.8.2) passes them. `HomeScreenTest.theFavouritesChipShowsOnlyStarredDocuments`
+  (in MainWindowTest.cpp) segfaults at its start, with nothing logged; `ToolboxTest.theTopBarShowsTheStoredArrangement
+  AndScrolls`: at 1000 px the top bar does not scroll (`scrolls` false, no end fade). Both pass on 6.9.3 and 6.11.2.
+  Build: `~/xqt-env68` via `XQT_QT_SPEC=qt6-main=6.8 qt/scripts/cloud-env.sh`, `-DXQT_FAST_DEV=OFF`. gdb needs ptrace,
+  which the training server does not allow.
+- [ ] **Qt 6.11.2** (the Android build's Qt, conda-forge on the desktop): the whole suite passes but
+  `AdaptiveLayoutTest.theHomeScreensPlusAndViewMenusWork`, every time: at 412×915, after "Open a file…" the star
+  does not switch Recent to the library's favourites (`page` stays 1); the off-screen file dialog likely still takes
+  the click. Also logged there and on 6.9: `StickerPicker.qml:46/47` "Cannot read property 'width'/'height' of null".
+- [ ] Nothing runs the tests on the Qt the Android APK ships (6.11.2): the Back key bug fixed for 0.9.0 (Qt 6.11
+  lists the Back key under `QKeySequence::Back`) showed only there. A CI job (conda-forge's Qt 6.11 or aqt) for the
+  `ui` and `shell` labels would catch the next one.
 
 ## Flaky tests
 - [ ] Under heavy load (four agents building, 2026-10-07) `StickerToolTest.theSelectionBecomesAStickerOfTheLibraryAndIsOnTheClipboard`,
