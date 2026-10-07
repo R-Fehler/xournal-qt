@@ -83,8 +83,11 @@ to-do stamp or the replay, and presenting likewise, once ignored Esc altogether.
 9. Full screen ends.
 
 Esc and Android's back key (and gesture) take the same steps (the author: "I want a consistent android back
-behavior"). When no step is left, Back is the system's: on Android the app goes to the background.
-Tests: `EscapeOrBackTest` (each order with Esc and with Back), `ToolboxTest.backLeavesZen`.
+behavior"). When no step is left, Back on Android asks first: "Leave Xournal Qt?" (`LeaveAppDialog`; Stay, Back
+again or a tap outside keep the app; Leave closes the window as ⋮ → Quit does, unsaved documents asked about first).
+Elsewhere Back with no step left is the system's.
+Tests: `EscapeOrBackTest` (each order with Esc and with Back), `EscapeKeysTest.backWithNothingLeftAsksBeforeLeaving`,
+`ToolboxTest.backLeavesZen`.
 
 ## Gone
 

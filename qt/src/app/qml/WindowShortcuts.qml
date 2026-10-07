@@ -22,8 +22,12 @@ Item {
     //   8. zen          the Zen pill closes, else Zen ends; Read ends with it (read only, and the full screen it
     //                   entered). Presenting without controls is Zen: the controls come back.
     //   9. fullScreen   full screen ends
+    //  10. leave        Back only, where leaving is asked (Android): "Leave Xournal Qt?" (LeaveAppDialog)
     // Esc and Android's back key (and gesture) take the same steps (the author, 2026-10-07: "I want a consistent
-    // android back behavior"); when none is left, Back is the system's: the app goes to the background.
+    // android back behavior"); when none is left, Back on Android asks before the app is left ("leaving the app
+    // should only happen after confirming it in a small dialog"); elsewhere it is the system's.
+    /// Back with nothing left asks before the app is left (Android; the tests switch it on)
+    property bool confirmLeave: Qt.platform.os === "android"
     /// Popups open that close on Android's back key (sheets, dialogs, the editor, the pickers count themselves through
     /// win.takeBack): Back waits for them (a second enabled Back shortcut would make the key ambiguous)
     property int backTakers: 0
@@ -43,6 +47,7 @@ Item {
         if (app.presenting) return "presenting"
         if (win.modes.zenShown) return "zen"
         if (win.modes.fullScreenMode) return "fullScreen"
+        if (back && confirmLeave) return "leave"
         return ""
     }
     function takeStep(step, back) {
@@ -67,6 +72,7 @@ Item {
             win.modes.setZen(false)
             break
         case "fullScreen": win.modes.fullScreenMode = false; break
+        case "leave": leaveAppDialog.open(); break
         }
     }
     Shortcut {

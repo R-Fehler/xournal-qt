@@ -153,6 +153,37 @@ INSTANTIATE_TEST_SUITE_P(Keys, EscapeOrBackTest, ::testing::Values(int(Qt::Key_E
                              return info.param == Qt::Key_Back ? std::string("Back") : std::string("Escape");
                          });
 
+// Android's back key with nothing left to step out of asks before the app is left (the author: "leaving the app should
+// only happen after confirming it in a small dialog on android"): Stay keeps it, Leave closes the window; Esc never
+// asks
+TEST_F(EscapeKeysTest, backWithNothingLeftAsksBeforeLeaving) {
+    auto* shortcuts = window->findChild<QObject*>("windowShortcuts");
+    ASSERT_NE(shortcuts, nullptr);
+    shortcuts->setProperty("confirmLeave", true);  // (on Android by itself)
+    auto* dialog = window->findChild<QObject*>("leaveAppDialog");
+    ASSERT_NE(dialog, nullptr);
+    key(Qt::Key_Escape);
+    wait(100);
+    EXPECT_FALSE(dialog->property("visible").toBool()) << "Esc does not ask";
+    key(Qt::Key_Back);
+    ASSERT_TRUE(until([&] { return dialog->property("opened").toBool(); })) << "Back asks";
+    EXPECT_TRUE(window->isVisible());
+    QMetaObject::invokeMethod(dialog, "reject");
+    ASSERT_TRUE(until([&] { return !dialog->property("visible").toBool(); }));
+    EXPECT_TRUE(window->isVisible()) << "Stay keeps the app";
+    // Back while it asks closes the question (it is in front), the app stays
+    key(Qt::Key_Back);
+    ASSERT_TRUE(until([&] { return dialog->property("opened").toBool(); }));
+    key(Qt::Key_Back);
+    ASSERT_TRUE(until([&] { return !dialog->property("visible").toBool(); }));
+    EXPECT_TRUE(window->isVisible());
+    // Leave: the window closes as ⋮ → Quit does
+    key(Qt::Key_Back);
+    ASSERT_TRUE(until([&] { return dialog->property("opened").toBool(); }));
+    QMetaObject::invokeMethod(dialog, "accept");
+    EXPECT_TRUE(until([&] { return !window->isVisible(); })) << "Leave closes the window";
+}
+
 // Recording has a key of the shortcuts (Ctrl+Shift+R): listed, and it can be changed
 TEST_F(EscapeKeysTest, recordingIsAShortcutThatCanBeChanged) {
     EXPECT_EQ(shortcuts()->keys("record"), QStringList{"Ctrl+Shift+R"});

@@ -988,6 +988,7 @@ ApplicationWindow {
     }
     // The microphone refused by the system (macOS, Android): where to allow it
     MicrophoneDialog {}
+    LeaveAppDialog { id: leaveAppDialog }
     // The replay of the timeline (qt/docs/timeline.md): its play bar at the bottom of the page, above the navigation
     // bar and clear of a cut-out (the safe area), off the side edges (where Android's back gesture starts); the view
     // pill, the tools and the phone's dock are put away meanwhile (hudHidden, dockShown)
@@ -1084,7 +1085,7 @@ ApplicationWindow {
         onLibrarySearchRequested: win.searchLibrary()
     }
 
-    WindowShortcuts { id: windowShortcuts }
+    WindowShortcuts { id: windowShortcuts; objectName: "windowShortcuts" }
     // The keys come from the shortcut settings (app.shortcuts); reading its revision keeps the bindings fresh.
     function keysOf(id) { return (app.shortcuts.revision, app.shortcuts.keys(id)) }
     function searchLibrary() {
