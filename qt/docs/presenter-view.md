@@ -1,7 +1,7 @@
 # The presenter view on a second screen (qt/presenter-view)
 
 Status: built (2026-10-05); the notes for the audience and the audience following the zoom: qt/presenter-follow
-(2026-10-05). Idea A14 of [ideas-2026-10.md](ideas-2026-10.md), chosen by the author; as in Okular and
+(2026-10-05). Idea A14 of [the ideas of 2026-10](history/README.md), chosen by the author; as in Okular and
 PowerPoint.
 
 While presenting with two screens (a laptop and a projector), the audience's screen shows only the slide, full screen,

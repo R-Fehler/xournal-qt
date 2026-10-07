@@ -1,6 +1,6 @@
 # Page templates (`qt/templates`)
 
-The author (2026-10-04, A12 of [ideas-2026-10.md](ideas-2026-10.md)): "Save page as template", chosen when adding
+The author (2026-10-04, A12 of [the ideas of 2026-10](history/README.md)): "Save page as template", chosen when adding
 pages; "the template should include the pdf page / background if wanted by the user so effectively it's the same as
 copy pasting a pdf page."
 

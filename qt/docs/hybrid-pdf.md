@@ -1,7 +1,7 @@
 # Hybrid PDF: design draft
 
 Status: **design agreed 2026-09-24**; built as `qt/hybrid-pdf` right after `qt/pdf-pages`. Background: [VISION.md](../../VISION.md) ("PDF as
-the document") and [platform-research.md](platform-research.md) (qpdf can write everything needed).
+the document") and [the platform research](history/README.md) (qpdf can write everything needed).
 
 ## Goal
 
@@ -670,9 +670,8 @@ every document is a single PDF, with no sidecars.
 ## Version history (`qt/pdf-history`)
 
 The author (2026-10-05): "a fully version controlled PDF document leveraging the append saving … a version sidebar,
-the save date as the commit message and optional milestone messages", off by default but easy to find. The research
-and the plan: [research/version-history.md](research/version-history.md); its section "Confirmed by the author"
-is what is built.
+the save date as the commit message and optional milestone messages", off by default but easy to find. What follows is
+what is built (the research and the plan were deleted: [history/README.md](history/README.md)).
 
 ### The model
 

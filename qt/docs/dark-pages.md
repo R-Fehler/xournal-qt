@@ -3,7 +3,7 @@
 The author (round of 2026-10-05 evening): dark mode for pages, inverted on the GPU with pictures kept, ink and
 highlighter shown as their dark equivalents (palette roles) and readable in both; curated page colors (black, grey,
 illustration paper, textured paper) for `.xopp` and PDFs, with a printing warning for dark pages. Idea A5 of
-[ideas-2026-10.md](ideas-2026-10.md).
+[the ideas of 2026-10](history/README.md).
 
 Two things that look alike and are not:
 

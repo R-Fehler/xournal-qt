@@ -1,7 +1,7 @@
 # Adopting annotations from other apps
 
 Status: research written 2026-10-05 (before the code), built as `qt/adopt-annotations` (B8 of
-[ideas-2026-10.md](ideas-2026-10.md)). Scope (the author through the integrator, 2026-10-05): real sample PDFs of the
+[the ideas of 2026-10](history/README.md)). Scope (the author through the integrator, 2026-10-05): real sample PDFs of the
 apps come later; until then only what is clear without them is built: the standard annotation types as ISO 32000
 defines them, placement, consent, the layer, undo and the round trip, and the app's name as a label. No guessing of
 app-specific encodings (flattened GoodNotes ink, Drawboard pressure); the place where such handling plugs in is

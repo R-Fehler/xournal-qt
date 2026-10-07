@@ -72,4 +72,4 @@ Merge roughly monthly.
 - `qt/docs/adr/`: architecture decision records.
 - `qt/spikes/`: throwaway experiments (M0 input and canvas spike).
 - `qt/tools/`: developer tools (merge script, image diff, tablet logger).
-- The implementation plan and milestone status are in `qt/docs/ROADMAP.md`.
+- How the fork came to be and its big decisions: `qt/docs/history/README.md`; open work: `TODO.md`.

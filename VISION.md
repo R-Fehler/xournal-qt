@@ -1,7 +1,7 @@
 # Vision
 
 > Written by the author, maintained by hand. Agents: only record here what the author said, and keep it short.
-> Tasks go to [TODO.md](TODO.md); what is built and measured goes to [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md).
+> Tasks go to [TODO.md](TODO.md); what is built goes to the docs in [qt/docs/](qt/docs/) and the [release notes](qt/docs/release-notes/).
 
 ## What xournal-qt is
 

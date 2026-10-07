@@ -104,7 +104,7 @@ cmake --build build-qt
 ./build-qt/xournal-qt
 ```
 
-More: [what it can do and where it is going](qt/docs/ROADMAP.md) · [the adaptive layout](qt/docs/adaptive-layout.md)
+More: [how it came to be](qt/docs/history/README.md) · [the adaptive layout](qt/docs/adaptive-layout.md)
 · [Markdown](qt/docs/md-editor.md) · [the library](qt/docs/library.md) · [Android](qt/docs/android.md) ·
 [macOS](qt/docs/macos.md) · [how the fork is kept](FORK.md)
 

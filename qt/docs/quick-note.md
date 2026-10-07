@@ -1,7 +1,7 @@
 # Quick note
 
 One action makes a note to write on at once, as Apple's Quick Note, OneNote's quick notes and Obsidian's daily notes
-do (idea A11 of [ideas-2026-10.md](ideas-2026-10.md)).
+do (idea A11 of [the ideas of 2026-10](history/README.md)).
 
 ## What it makes
 
