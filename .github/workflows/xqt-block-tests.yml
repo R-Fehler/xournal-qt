@@ -1,0 +1,109 @@
+# xournal-qt: the full test suite of a block branch (qt/<block>), on GitHub's machines instead of the machine the
+# agents work on (AGENTS.md, "Blocks and merging"). One build, then the tests in four shards side by side.
+#
+# The build is the development build (XQT_FAST_DEV: QML not compiled ahead of time, -g1), which is small enough to
+# hand to the shards as one archive. The release configuration (QML compiled ahead of time, both Qt versions) is
+# xqt-build.yml's, on the integration branch and master-qt.
+#
+# The compiler cache: a branch can read the caches of the default branch (master-qt) and its own. master-qt's pushes
+# run this too, so a new block branch starts from a warm cache.
+name: xournal-qt block tests
+
+on:
+  push:
+    branches: ['qt/**', master-qt]
+    paths:
+      - 'qt/**'
+      - 'src/**'
+      - 'test/**'
+      - 'cmake/**'
+      - '.github/workflows/xqt-block-tests.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: xqt-block-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (Debian 13, Qt 6.8)
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1500M
+    steps:
+      - name: What the checkout needs in the container
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates ccache zstd
+
+      - uses: actions/checkout@v4
+
+      - name: Install the build dependencies
+        run: bash qt/scripts/linux-deps.sh
+
+      - name: Compiler cache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: xqt-block-ccache-${{ github.sha }}
+          restore-keys: xqt-block-ccache-
+
+      - name: Configure
+        run: cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DXQT_FAST_DEV=ON -DXQT_BUILD_SPIKES=OFF
+
+      - name: Build
+        run: cmake --build build -j "$(nproc)"
+
+      - name: Pack the build for the test shards
+        run: tar --zstd -cf build.tar.zst build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: build.tar.zst
+          retention-days: 1
+
+  tests:
+    name: Tests ${{ matrix.shard }}/4
+    needs: build
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - name: What the checkout needs in the container
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates zstd
+
+      - uses: actions/checkout@v4
+
+      - name: Install the run-time dependencies
+        run: bash qt/scripts/linux-deps.sh
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build
+
+      - name: Unpack the build
+        run: tar --zstd -xf build.tar.zst
+
+      - name: Test (every fourth test, from this shard's number)
+        # (a failed test runs up to twice more, as in xqt-build.yml; each repeat is listed in the log)
+        run: |
+          ctest --test-dir build -N | tail -1
+          ctest --test-dir build -I ${{ matrix.shard }},,4 -j "$(nproc)" --output-on-failure --timeout 300 \
+            --repeat until-pass:3
+
+      - name: Keep the test output of a failed shard
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-${{ matrix.shard }}
+          path: |
+            build/Testing/**
+          if-no-files-found: ignore
