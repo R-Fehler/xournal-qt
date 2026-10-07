@@ -761,11 +761,12 @@ void PdfPageKeeper::commitApplied(const fs::path& staged, bool committed) {
         return;
     }
     Document* doc = session.getDocument();
-    doc->lock();
-    if (doc->getPdfFilepath() == staged) {  // (unless pages were pasted meanwhile: then it reads another file)
-        doc->setPdfAttributes(stagedAs, false);
+    {
+        std::unique_lock lock(*doc);
+        if (doc->getPdfFilepath() == staged) {  // (unless pages were pasted meanwhile: then it reads another file)
+            doc->setPdfAttributes(stagedAs, false);
+        }
     }
-    doc->unlock();
     leftStaging = staged;
     stagedAs.clear();
     knownPath.clear();

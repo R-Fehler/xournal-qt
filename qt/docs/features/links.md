@@ -176,7 +176,9 @@ Written as `#page=12&pdfpage=7`. Viewers that know only `page=` still get close.
     its text), and are saved when they had no unsaved changes (so the file has the new link too); with unsaved
     changes they keep the change until they are saved.
   - The others in the background: a `.md` through its text file (`TextFile`: byte for byte where nothing changed,
-    written atomically), a `.xopp` loaded and written again. Then the note **"Updated N links"**, and the library
+    written atomically), a `.xopp` loaded and written again, each read and written as one step under the file's write
+    lock (`fileio::FileWriteLock`: a save of the same file by a tab that opened it meanwhile waits, and the reverse,
+    so neither writes over what the other wrote). Then the note **"Updated N links"**, and the library
     reads them again. A hybrid PDF and an old `.xoj` that are not open are left as they are (said in the code; not
     in the note).
 - **A link whose file is gone** (moved outside the app): the library index is asked for a document of that file

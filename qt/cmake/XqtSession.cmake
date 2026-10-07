@@ -37,6 +37,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/FileIo.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageCopy.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageCopy.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/DetachedDocument.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/DetachedDocument.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentMode.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentMode.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSaveTask.h
@@ -65,6 +67,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageBookmarks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfBookmarks.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfBookmarks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfObjectSink.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfObjectSink.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/MergedPdf.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/MergedPdf.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfEncryption.h
@@ -248,6 +252,10 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/FuzzyQueryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/MergedPdfTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/HybridPdfTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/HybridPdfTestSupport.h
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/ArchivePdfTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/IncrementalSaveTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/HybridPdfBench.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/HybridMarkerTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/IncrementalPdfTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/PdfRevisionsTest.cpp
@@ -256,6 +264,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/ByteDeltaTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/FileIoTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TagsWriteTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/WriteGuardTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/LockRulesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/VersionDiffTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BackgroundSaveTest.cpp

@@ -65,7 +65,8 @@ The library home's switch: Library, Recent, Favourites, Bookmarks, **To-dos** (`
     the new state until the index has it);
   - **not open**: a `.md` through its text (byte for byte elsewhere: a BOM and CRLF stay); a `.xopp` or a PDF with
     notes (also a PDF text document) loaded in the background, changed and saved the way the app saves (a PDF with
-    notes: an incremental update), without opening a tab;
+    notes: an incremental update), without opening a tab. The `.md` is read and written again as one step under the
+    file's write lock (`fileio::FileWriteLock`): a save of the same file by a tab waits for it, and the reverse;
   - **refused with a message**: a read-only file, an archive PDF ("open it to tick the to-do"), an old `.xoj`, a file
     another app changed (our annotations of a PDF with notes edited elsewhere) or that could not be read whole.
 

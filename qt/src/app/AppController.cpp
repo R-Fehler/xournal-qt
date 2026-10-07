@@ -3263,11 +3263,21 @@ bool AppController::saveWithMessage(const QString& message, const QJSValue& then
 
 bool AppController::setVersionMessage(int id, const QString& message) {
     DocumentSession* s = session();
-    std::string error;
-    if (!s || !s->setVersionMessage(id, message.simplified().left(200).toStdString(), error)) {
-        Q_EMIT this->message(tr("The message could not be changed"), QString::fromStdString(error), true);
+    if (!s) {
         return false;
     }
+    // Written on the save's worker, after the saves before it (qpdf never runs on this thread)
+    DocumentSession::SaveRequest request;
+    request.kind = DocumentSession::SaveKind::VersionMessage;
+    request.version = id;
+    request.message = message.simplified().left(200).toStdString();
+    QPointer<AppController> self(this);
+    request.done = [self](const DocumentSession::SaveResult& r) {
+        if (self && !r.ok) {
+            Q_EMIT self->message(tr("The message could not be changed"), QString::fromStdString(r.error), true);
+        }
+    };
+    s->saveInBackground(std::move(request));
     return true;
 }
 

@@ -14,7 +14,6 @@
 #include <QCryptographicHash>
 #include <QFile>
 #include <qpdf/DLL.h>
-#include <qpdf/Pipeline.hh>
 #include <qpdf/QPDFEmbeddedFileDocumentHelper.hh>
 #include <qpdf/QPDFFileSpecObjectHelper.hh>
 #include <qpdf/QPDFNameTreeObjectHelper.hh>
@@ -111,20 +110,6 @@ bool measureFile(const fs::path& file, long long& size, std::string& md5) {
     size = f.size();
     md5 = hash.result().toStdString();
     return true;
-}
-
-/// Gives a file to qpdf in pieces, when the stream is written.
-std::function<void(Pipeline*)> fileProvider(const fs::path& file) {
-    return [file](Pipeline* p) {
-        QFile f(QString::fromStdU16String(file.u16string()));
-        if (f.open(QIODevice::ReadOnly)) {
-            QByteArray chunk;
-            while (!(chunk = f.read(1 << 16)).isEmpty()) {
-                p->write(reinterpret_cast<const unsigned char*>(chunk.constData()), static_cast<size_t>(chunk.size()));
-            }
-        }
-        p->finish();
-    };
 }
 
 /// A file a PDF with notes carries, as its embedded stream and file specification are written.
@@ -293,31 +278,6 @@ void embedAudio(ObjectSink& sink, QPDF& q, QPDFEmbeddedFileDocumentHelper& efdh,
 }  // namespace
 
 namespace detail {
-
-// --- ObjectSink ---------------------------------------------------------------------------------------------------
-
-QPDFObjectHandle FullSink::add(QPDFObjectHandle value) { return q.makeIndirectObject(value); }
-
-QPDFObjectHandle FullSink::addStream(QPDFObjectHandle dict, const std::string& data) {
-    QPDFObjectHandle stream = QPDFObjectHandle::newStream(&q, data);
-    for (const auto& k: dict.getKeys()) {
-        stream.getDict().replaceKey(k, dict.getKey(k));
-    }
-    return stream;
-}
-
-QPDFObjectHandle FullSink::addFileStream(QPDFObjectHandle dict, const fs::path& file) {
-    QPDFObjectHandle stream = QPDFObjectHandle::newStream(&q);
-    stream.replaceStreamData(fileProvider(file), QPDFObjectHandle::newNull(), QPDFObjectHandle::newNull());
-    for (const auto& k: dict.getKeys()) {
-        stream.getDict().replaceKey(k, dict.getKey(k));
-    }
-    return stream;
-}
-
-QPDFObjectHandle UpdateSink::addFileStream(QPDFObjectHandle dict, const fs::path& file) {
-    return u.addStream(dict, fileio::readFile(file));
-}
 
 // --- the embedded files -------------------------------------------------------------------------------------------
 

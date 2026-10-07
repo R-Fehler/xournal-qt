@@ -10,9 +10,10 @@
 
 #include "model/BackgroundImage.h"
 #include "model/Document.h"
-#include "model/DocumentHandler.h"
 #include "model/PageType.h"
 #include "model/XojPage.h"
+
+#include "session/DetachedDocument.h"
 
 namespace xqt::ImageFile {
 
@@ -36,12 +37,6 @@ QImage read(const fs::path& file, int width) {
 }
 
 namespace {
-/// Receives the events of the documents made here until a session owns them. It has no listeners.
-DocumentHandler& handler() {
-    static DocumentHandler h;
-    return h;
-}
-
 /// The image by its path (gdk-pixbuf reads it, as upstream's loader will). False if it cannot.
 bool byPath(BackgroundImage& img, const fs::path& file) {
     GError* error = nullptr;
@@ -109,7 +104,7 @@ std::unique_ptr<Document> document(const fs::path& file, std::string& error) {
     auto page = std::make_shared<XojPage>(std::max(1.0, size.width() * scale), std::max(1.0, size.height() * scale));
     page->setBackgroundImage(img);
     page->setBackgroundType(PageType(PageTypeFormat::Image));
-    auto doc = std::make_unique<Document>(&handler());
+    auto doc = newDetachedDocument();
     doc->addPage(std::move(page));
     return doc;
 }

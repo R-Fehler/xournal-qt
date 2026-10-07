@@ -7,6 +7,7 @@
  */
 #include <chrono>
 #include <fstream>
+#include <future>
 #include <iterator>
 #include <memory>
 
@@ -22,6 +23,7 @@
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "session/FileIo.h"
 #include "session/StickyNote.h"
 #include "shell/DocumentFiles.h"
 #include "shell/Library.h"
@@ -405,4 +407,27 @@ TEST(Todos, calendarFilesAndTheMarkdownExport) {
     ASSERT_TRUE(f.open(QIODevice::ReadOnly));
     EXPECT_TRUE(f.readAll().contains("DTSTART;VALUE=DATE:20261012"));
     EXPECT_FALSE(todocal::insertIntoCalendar(item)) << "only on Android";
+}
+
+// A to-do ticked in a Markdown file (on a worker) while another writer of the app holds the file (a save of the open
+// file, a link rewrite: fileio::FileWriteLock): it waits, then reads the file as that one left it and writes it
+TEST(Todos, aMarkdownFileIsWrittenOneWriterAtATime) {
+    QTemporaryDir tmp;
+    const fs::path file = fs::path(tmp.path().toStdString()) / "a.md";
+    writeFile(file, "- [ ] todo: one\n");
+    std::future<bool> ticked;
+    bool found = false;
+    std::string error;
+    {
+        const fileio::FileWriteLock lock(file);
+        ticked = std::async(std::launch::async, [&] {
+            return todos::setInMarkdownFile(file, "todo: one", 0, true, found, error);
+        });
+        EXPECT_EQ(ticked.wait_for(std::chrono::milliseconds(300)), std::future_status::timeout)
+                << "the to-do was written while another writer held the file";
+        writeFile(file, "- [ ] todo: one\n- [ ] todo: two\n");  // (what the other writer wrote)
+    }
+    ASSERT_TRUE(ticked.get()) << error;
+    EXPECT_TRUE(found);
+    EXPECT_EQ(xqt::test::readFile(file), "- [x] todo: one\n- [ ] todo: two\n") << "written on top of the other writer's";
 }

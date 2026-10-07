@@ -6,7 +6,6 @@
 #include <shared_mutex>
 
 #include "model/Document.h"
-#include "model/DocumentHandler.h"
 #include "model/Font.h"
 #include "model/Layer.h"
 #include "model/MarkdownText.h"
@@ -18,6 +17,7 @@
 #include "MarkdownSession.h"
 #include "MdBox.h"
 #include "MdPaginate.h"
+#include "session/DetachedDocument.h"
 #include "session/PageMargins.h"
 #include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
@@ -29,12 +29,6 @@ namespace xqt::MarkdownFile {
 static_assert(TextFile::PAGE_MARGIN == PageMargins::FULL, "the session finds the page's text at the margins");
 
 namespace {
-/// Receives the events of the documents made here until a session owns them. It has no listeners.
-DocumentHandler& handler() {
-    static DocumentHandler h;
-    return h;
-}
-
 /// Where the text goes on a page: the page's text of MarkdownSession (at the margins of a plain page).
 md::Frame frame() {
     return {PAGE_WIDTH - 2 * PageMargins::FULL, PAGE_HEIGHT - 2 * PageMargins::FULL};
@@ -162,7 +156,7 @@ std::unique_ptr<Document> document(const std::string& source, size_t maxPages) {
 namespace {
 std::unique_ptr<Document> make(const std::string& source, const md::Style& s, size_t maxPages, bool firstBox) {
     md::installRenderer();  // (idempotent: the boxes are drawn formatted and are as big as they are drawn)
-    auto doc = std::make_unique<Document>(&handler());
+    auto doc = newDetachedDocument();
     const md::Frame f = frame();
     const md::Pagination pages = md::paginate(source, s, [f](size_t) { return f; });
     const size_t count = std::max<size_t>(1, std::min(maxPages, pages.slices.size()));
@@ -205,7 +199,7 @@ std::unique_ptr<Document> notesDocument(const std::string& source) {
 namespace {
 std::unique_ptr<Document> continuousDocument(const std::string& source, const md::Style& s) {
     md::installRenderer();
-    auto doc = std::make_unique<Document>(&handler());
+    auto doc = newDetachedDocument();
     const md::Frame f{frame().width, CONTINUOUS_FRAME};
     const md::Pagination pages = md::onePage(source, s);
     auto page = std::make_shared<XojPage>(PAGE_WIDTH, PAGE_HEIGHT);

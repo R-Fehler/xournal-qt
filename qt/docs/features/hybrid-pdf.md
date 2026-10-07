@@ -68,21 +68,22 @@ file may drop the attachment or unknown dictionaries: the ink then stays as anno
 | `HybridPdf.cpp` | `write` (incremental when it can, else in full; with version history: `writeKeeping`), `writeArchive`, `exportXopp` |
 | `HybridPrepare.cpp` | `prepare`: everything that needs the document (the `.xopp` and its hashes, cairo's drawings, links, recordings) |
 | `HybridFullWrite.cpp` | `assemble`: the file written in full (plain, PDF with notes, archive PDF) |
-| `HybridAppend.cpp` | `openExisting` and the incremental update (`appendChanges`) |
-| `HybridMarker.cpp` | what both writers write the same way, through an `ObjectSink`: the marker, the document information, the text layer of the handwriting, the embedded files |
+| `HybridAppend.cpp` | `openExisting` and the incremental update (`appendChanges`); `appendIfPossible`, the "append what changed, else write in full" step of `write` and `writeKeeping` |
+| `HybridMarker.cpp` | what both writers write the same way, through an `ObjectSink` (`PdfObjectSink.h`: a `FullSink` or an `UpdateSink`): the marker, the document information, the text layer of the handwriting, the embedded files; the outline's bookmarks (`PdfBookmarks`) and the version history (`HybridHistory.cpp`) go through it too |
 | `HybridHistory.cpp` | writing the version history (`PdfHistory.cpp` reads it) |
 | `HybridCache.cpp` | the clean copies in the app cache |
 | `HybridOpen.cpp` | reading the marker, `open`, `compact`, `importCopy` |
 | `HybridCommon.cpp` | small helpers, and `strip`, which takes everything of ours out of a PDF |
 
-Tests: `qt/tests/session/HybridPdfTest.cpp` and `HybridMarkerTest.cpp` (label `session`). `qpdf --check` passes;
-each page drawn by poppler (with annotations) matches our PDF export of the same document (mean difference < 0.5/255,
-< 0.2 % of the pixels off); a written file opens as the same document as a `.xopp` round trip gives (pages, sizes,
-backgrounds and the PDF text on each page, layers, strokes with pressure, colours and tools, texts); saved again after
-a change; a comment added with qpdf stays in the clean copy and survives a save; a moved and a deleted annotation of
-ours are reported, and importing them empties those layers (undo brings them back); notes saved into the PDF itself
-keep `name.original.pdf` byte for byte; the `.xopp` export opens as the same document with a base PDF without
-annotations. `XQT_HYBRID_SAMPLE=<file>` makes the first test copy its PDF with notes there (a sample for other apps).
+Tests: `qt/tests/session/HybridPdfTest.cpp` and `HybridMarkerTest.cpp` (label `session`; their shared helpers and
+fixtures in `HybridPdfTestSupport.h`, the measurements in `HybridPdfBench.cpp`). `qpdf --check` passes; each page drawn
+by poppler (with annotations) matches our PDF export of the same document (mean difference < 0.5/255, < 0.2 % of the
+pixels off); a written file opens as the same document as a `.xopp` round trip gives (pages, sizes, backgrounds and the
+PDF text on each page, layers, strokes with pressure, colours and tools, texts); saved again after a change; a comment
+added with qpdf stays in the clean copy and survives a save; a moved and a deleted annotation of ours are reported, and
+importing them empties those layers (undo brings them back); notes saved into the PDF itself keep `name.original.pdf`
+byte for byte; the `.xopp` export opens as the same document with a base PDF without annotations.
+`XQT_HYBRID_SAMPLE=<file>` makes the first test copy its PDF with notes there (a sample for other apps).
 
 ## Opening
 
@@ -216,7 +217,7 @@ An export meant for keeping: a **PDF/A-3b** file that stays readable
 for decades in any PDF viewer, with the ink merged into the pages so no viewer can hide or lose it, and the full
 Xournal data embedded so xournal-qt still opens it for editing.
 
-### The file (`HybridPdf::writeArchive`, `qt/src/session/ArchivePdf.*`; tests `ArchivePdfTest` in `HybridPdfTest.cpp`)
+### The file (`HybridPdf::writeArchive`, `qt/src/session/ArchivePdf.*`; tests `ArchivePdfTest.cpp`)
 
 It is a hybrid PDF with three differences:
 
@@ -467,7 +468,7 @@ PDF saved incrementally three times (`IncrementalSaveTest.anArchivePdfStaysPdfAA
 ### Tests and measurements
 
 Tests: `IncrementalPdfTest` (the appender: both cross-reference styles, the previous revision readable, poppler and
-`qpdf --check`, new and copied objects, a failed write) and `IncrementalSaveTest` in `HybridPdfTest.cpp` (only what
+`qpdf --check`, new and copied objects, a failed write) and `IncrementalSaveTest.cpp` (only what
 changed is appended; eight saves in a row with every kind of change — strokes, an erased stroke, pages moved,
 added, deleted, a background changed, a text, a page shown twice — each checked with `qpdf --check`, drawn by
 poppler like a full write of the same document, and opened as the same document; pages pasted from another PDF;
@@ -582,7 +583,8 @@ the save date as the commit message and optional milestone messages", off by def
 - **A milestone is a version with a message** ("Save with a message…", Ctrl+Alt+S, at most 200 characters). It is never
   replaced; the saves after it start a new version. A milestone saved on a day whose version is unnamed takes that
   version's place. A message can be given or changed later (only the marker is appended; that update counts as part
-  of the current version, see `/Start` below).
+  of the current version, see `/Start` below). It is written like a save, on the save's worker after the saves
+  before it (`DocumentSession::SaveKind::VersionMessage`), never on the UI thread.
 - **Version 0 is the file as it was when history began:** a plain PDF "as received" (the first save with history on
   appends the whole document on top of it, its bytes stay; streams the file has already are referred to, not copied:
   `Update::copyAll` with `indexReuse`), or a PDF with notes as it was (its `.xopp`'s checksum recorded).

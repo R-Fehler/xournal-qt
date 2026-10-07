@@ -7,11 +7,11 @@
 #include <shared_mutex>
 
 #include "model/Document.h"
-#include "model/DocumentHandler.h"
 #include "model/Layer.h"
 #include "model/PageType.h"
 #include "model/XojPage.h"
 
+#include "DetachedDocument.h"
 #include "DocumentSession.h"
 #include "HybridPdf.h"
 #include "PageCopy.h"
@@ -19,12 +19,6 @@
 namespace xqt::pagefiles {
 
 namespace {
-/// The events of a document that is never open in a session go nowhere
-DocumentHandler& handler() {
-    static DocumentHandler h;
-    return h;
-}
-
 std::string trimmed(const std::string& s) {
     size_t a = 0;
     size_t b = s.size();
@@ -175,7 +169,7 @@ std::vector<std::vector<size_t>> splitAt(size_t count, std::vector<size_t> start
 }
 
 std::unique_ptr<Document> subset(Document& doc, const std::vector<size_t>& pages) {
-    auto copy = std::make_unique<Document>(&handler());
+    auto copy = newDetachedDocument();
     std::shared_lock lock(doc);
     copy->setFilepath(doc.getFilepath());
     copy->setPdfAttributes(doc.getPdfFilepath(), false);

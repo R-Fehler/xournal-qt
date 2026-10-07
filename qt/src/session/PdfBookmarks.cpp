@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <set>
 
-#include "IncrementalPdf.h"
+#include "PdfObjectSink.h"
 
 namespace xqt::PdfBookmarks {
 
@@ -118,14 +118,10 @@ long long visibleOf(OH item) {
 
 class Writer {
 public:
-    Writer(QPDF& pdf, IncrementalPdf::Update* update): pdf(pdf), u(update) {}
+    explicit Writer(ObjectSink& sink): sink(sink) {}
 
-    void touch(OH o) {
-        if (u) {
-            u->touch(o);
-        }
-    }
-    OH add(OH value) { return u ? u->add(value) : pdf.makeIndirectObject(value); }
+    void touch(OH o) { sink.touch(o); }
+    OH add(OH value) { return sink.add(value); }
 
     /// New children of `item`, linked to each other.
     void fill(OH item, const std::vector<Entry>& entries) {
@@ -161,8 +157,7 @@ public:
         }
     }
 
-    QPDF& pdf;
-    IncrementalPdf::Update* u;
+    ObjectSink& sink;
 };
 }  // namespace
 
@@ -171,8 +166,8 @@ std::vector<Entry> read(QPDF& pdf) {
     return item.isNull() ? std::vector<Entry>() : entriesOf(item);
 }
 
-bool write(QPDF& pdf, const std::vector<Entry>& entries, IncrementalPdf::Update* update) {
-    Writer w(pdf, update);
+bool write(QPDF& pdf, ObjectSink& sink, const std::vector<Entry>& entries) {
+    Writer w(sink);
     OH root = pdf.getRoot();
     OH outlines = root.getKey("/Outlines");
     auto touchOutlines = [&] { w.touch(outlines.isIndirect() ? outlines : root); };

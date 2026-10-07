@@ -4,13 +4,13 @@
 #include <memory>
 
 #include "model/Document.h"
-#include "model/DocumentHandler.h"
 #include "model/Layer.h"
 #include "model/MarkdownText.h"
 #include "model/PageType.h"
 #include "model/XojPage.h"
 #include "util/Color.h"
 
+#include "DetachedDocument.h"
 #include "DocumentSession.h"
 #include "FileIo.h"
 #include "StickyNote.h"
@@ -18,12 +18,6 @@
 namespace xqt::templates {
 
 namespace {
-/// The document's events go nowhere (it is never open in a session)
-DocumentHandler& handler() {
-    static DocumentHandler h;
-    return h;
-}
-
 bool writeBytes(const fs::path& target, const std::string& bytes) {
     std::string error;
     return fileio::writeFileAtomically(target, bytes, error);
@@ -75,7 +69,7 @@ bool write(PageRef page, const std::string& pdf, const fs::path& target, std::st
         }
         return false;
     };
-    auto doc = std::make_unique<Document>(&handler());
+    auto doc = newDetachedDocument();
     const fs::path attached = attachedPdfOf(target);
     std::error_code ec;
     // (upstream's save keeps an attached PDF that is there already: never one of another template of this name)

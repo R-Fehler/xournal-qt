@@ -268,6 +268,7 @@ TEST_F(VersionHistoryTest, restoreAndMessageFromTheRowMenu) {
     findItem("versionMessageField")->setProperty("text", "Three strokes");
     click(findItem("versionMessageSave"));
     ASSERT_TRUE(waitOpened(dialog, false));
+    waitSaved();  // (written on the save's worker)
     const auto listed = xqt::PdfHistory::list(notes);
     ASSERT_EQ(listed.versions.size(), 3u);
     EXPECT_EQ(listed.versions.back().message, "Three strokes");

@@ -460,8 +460,8 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
     const std::vector<QPDFObjectHandle> order = basePages(out, drawn, prep, hybrid);
     r.pages = order.size();
     step("base pages");
-    PdfBookmarks::write(out, bookmarksOf(prep, order));  // (also the base pages for Xournal++: as they are now)
     FullSink sink(out);
+    PdfBookmarks::write(out, sink, bookmarksOf(prep, order));  // (also the base pages for Xournal++: as they are now)
     if (hybrid) {
         QPDFObjectHandle hashes;
         QPDFObjectHandle flattened = QPDFObjectHandle::newArray();

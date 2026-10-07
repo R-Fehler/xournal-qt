@@ -12,6 +12,7 @@
 #include "DocumentFiles.h"
 #include "session/DocumentLink.h"
 #include "session/DocumentSession.h"
+#include "session/FileIo.h"
 #include "session/TextFile.h"
 
 namespace xqt::LinkRewrite {
@@ -174,6 +175,7 @@ int rewriteDocument(Document& doc, const std::vector<Change>& changes) {
 }
 
 int rewriteFile(const fs::path& file, const std::vector<Change>& changes, std::string& error) {
+    const fileio::FileWriteLock lock(file);  // (read and written again as one: a save of the file waits, and the reverse)
     if (DocumentFiles::isMarkdownFile(file)) {
         TextFile t;
         if (!t.load(file, TextFile::Kind::Markdown, error)) {

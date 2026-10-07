@@ -239,15 +239,16 @@ bool storeAsDelta(const fs::path& target, const PdfHistory::Listed& listed, std:
     return true;
 }
 
-/// The marker's history written again in the update `u` of `q`, which begins at `start`: the update is the current
-/// version's last revision, ours (PdfHistory::list tells our revisions from other apps' by /Start).
-void markHistoryIn(QPDF& q, IncrementalPdf::Update& u, std::vector<PdfHistory::Version> versions, uint64_t start) {
+/// The marker's history written again into `q` through `sink` (an update of the file that begins at `start`): the
+/// update is the current version's last revision, ours (PdfHistory::list tells our revisions from other apps' by
+/// /Start).
+void markHistoryIn(QPDF& q, ObjectSink& sink, std::vector<PdfHistory::Version> versions, uint64_t start) {
     versions.back().end = 0;  // (the current version: as its own list says it)
     QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
-    u.touch(marker.isIndirect() ? marker : q.getRoot());
+    sink.touch(marker.isIndirect() ? marker : q.getRoot());
     HistoryMark mark{std::move(versions), start};
     putHistory(marker, &mark,
-               [&](const std::string& data) { return u.addStream(QPDFObjectHandle::newDictionary(), data); });
+               [&](const std::string& data) { return sink.addStream(QPDFObjectHandle::newDictionary(), data); });
 }
 
 }  // namespace
@@ -371,29 +372,20 @@ Result writeKeeping(Document& doc, const fs::path& target, const BasePageOf& bas
     };
     std::string whyFull;
     if (rev.valid()) {
-        try {
-            auto existing = openExisting(target, rev, false, whyFull);
-            if (existing) {
-                Prepared prep = prepared(&existing->reuse);
-                versions.push_back(v);
-                HistoryMark mark{versions, existing->tail.size};
-                const std::string was = options.revision->stamp;
-                Result r = appendChanges(*existing, prep, false, rev, &mark, exportName, target, options.written, whyFull);
-                if (r.ok) {
-                    r = finish(r);
-                    keepCleanCopy(target, was, prep, existing->tree);
-                    return r;
-                }
-                if (!r.error.empty()) {
-                    return r;  // (the file could not be written: it is as it was)
-                }
-                versions.pop_back();
-            }
-        } catch (const std::exception& e) {
-            whyFull = e.what();
-            if (!versions.empty() && versions.back().id == v.id) {
-                versions.pop_back();
-            }
+        AppendTry how;
+        how.rev = &rev;
+        how.cleanCopyOf = options.revision->stamp;
+        how.prepared = prepared;
+        how.markOf = [&](const Existing& existing) {
+            HistoryMark mark{versions, existing.tail.size};
+            mark.versions.push_back(v);
+            return mark;
+        };
+        how.exportName = exportName;
+        how.written = options.written;
+        how.appended = finish;
+        if (auto appended = appendIfPossible(target, how, whyFull, step)) {
+            return *appended;
         }
     } else {
         whyFull = "no revision to build on";
@@ -473,7 +465,8 @@ void keepHistoryIn(const fs::path& pdf, QPDF& q, IncrementalPdf::Update& u, uint
     }
     const PdfHistory::Listed listed = PdfHistory::list(pdf);
     if (listed.on && listed.lastIsOurs && !listed.versions.empty()) {
-        markHistoryIn(q, u, listed.versions, start);
+        UpdateSink sink(u);
+        markHistoryIn(q, sink, listed.versions, start);
     }
 }
 
@@ -506,7 +499,8 @@ bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, 
             q.setSuppressWarnings(true);
             PdfEncryption::openQpdf(q, pdf);
             IncrementalPdf::Update u(q);
-            markHistoryIn(q, u, listed.versions, tail.size);
+            UpdateSink sink(u);
+            markHistoryIn(q, sink, listed.versions, tail.size);
             bytes = u.serialize(tail);
         }
         const std::string was = stampOf(pdf);

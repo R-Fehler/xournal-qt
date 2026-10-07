@@ -37,7 +37,6 @@
 #include "control/settings/Settings.h"
 #include "control/xojfile/SaveHandler.h"
 #include "model/Document.h"
-#include "model/DocumentHandler.h"
 #include "model/Layer.h"
 #include "model/XojPage.h"
 #include "pdf/base/XojPdfPage.h"
@@ -52,6 +51,7 @@
 #include "view/background/BackgroundFlags.h"
 
 #include "AppContext.h"
+#include "DetachedDocument.h"
 #include "DocumentImages.h"
 #include "DocumentMode.h"
 #include "DocumentSaveTask.h"
@@ -81,12 +81,6 @@ QThreadPool& savePool() {
     return *pool;
 }
 
-/// Receives the events of the copies. It has no listeners.
-DocumentHandler& copyHandler() {
-    static DocumentHandler handler;
-    return handler;
-}
-
 fs::path backgroundOf(Document& doc) {
     std::shared_lock lock(doc);
     return doc.getPdfFilepath();
@@ -95,7 +89,7 @@ fs::path backgroundOf(Document& doc) {
 /// What the writers read of a document, copied (the caller holds its read lock). Its PDF is not loaded: the writers
 /// only need its file and number of pages.
 std::unique_ptr<Document> snapshotOf(const Document& doc) {
-    auto copy = std::make_unique<Document>(&copyHandler());
+    auto copy = newDetachedDocument();
     copy->setFilepath(doc.getFilepath());
     copy->setPdfAttributes(doc.getPdfFilepath(), doc.isAttachPdf());
     copy->setPathStorageMode(doc.getPathStorageMode());
@@ -394,6 +388,9 @@ void DocumentSession::updateSaving() {
 
 void DocumentSession::beginSave() {
     SaveTask& t = *saveTask;
+    if (t.request.kind == SaveKind::VersionMessage) {
+        return beginVersionMessage();
+    }
     if (text && !hasFilePath()) {
         // A text file: its text, never a .xopp or a hybrid PDF (nor a copy as one)
         if (t.request.kind == SaveKind::Save || t.request.kind == SaveKind::SaveAs) {
@@ -425,9 +422,10 @@ void DocumentSession::beginSave() {
             audio::adoptExtracted(names, before);
             // Like Control::saveImpl(saveAs=true): the document takes the new path before saving (the location of an
             // attached background PDF is derived from it).
-            doc->lock();
-            doc->setFilepath(t.target);
-            doc->unlock();
+            {
+                std::unique_lock lock(*doc);
+                doc->setFilepath(t.target);
+            }
             break;
         }
         case SaveKind::Hybrid:
@@ -437,6 +435,8 @@ void DocumentSession::beginSave() {
             }
             t.hybrid = true;
             break;
+        case SaveKind::VersionMessage:
+            return;  // (beginVersionMessage)
         case SaveKind::ExportXopp:
             t.target = t.request.target;
             t.expectedBg = backgroundOf(*doc);
@@ -749,6 +749,9 @@ void DocumentSession::takeSnapshot() {
                     }
                     return;
                 }
+                // One writer of the file at a time: a background writer of the app (a link rewrite, a to-do ticked
+                // in the library) that holds it finishes first (a PDF with notes: HybridPdf::write takes it)
+                const fileio::FileWriteLock lock(t.target);
                 if (!t.attachedPdf.empty()) {
                     writeAttachedPdf(t.attachedPdfFrom, t.attachedPdf);
                 }
@@ -797,6 +800,7 @@ void DocumentSession::beginTextSave() {
     t.textBytes = text->encode(t.text);
     onWorker(
             [&t] {
+                const fileio::FileWriteLock lock(t.target);  // (one writer of the file at a time)
                 std::string error;
                 if (!TextFile::writeAtomically(t.target, t.textBytes, error)) {
                     t.result = {false, FS(_F("Could not write \"{1}\": {2}") % t.target.u8string() % error), {}};
@@ -819,26 +823,56 @@ void DocumentSession::beginTextSave() {
             });
 }
 
+void DocumentSession::beginVersionMessage() {
+    SaveTask& t = *saveTask;
+    if (!isHybrid()) {
+        return finishSave({false, "The document is not a PDF with notes.", {}});
+    }
+    t.target = getFilePath();
+    onWorker(
+            [&t] {
+                t.stampBefore = fileio::stampOf(t.target);  // (the stamp HybridPdf keeps of the file's version)
+                std::string error;
+                if (!HybridPdf::setVersionMessage(t.target, t.request.version, t.request.message, error)) {
+                    t.result = {false, error, {}};
+                    return;
+                }
+                t.result = {true, {}, {}};
+            },
+            [this] {
+                SaveTask& t = *saveTask;
+                if (t.result.ok) {
+                    if (hybridRevision && hybridRevisionFile == t.target && hybridRevision->stamp == t.stampBefore) {
+                        // (the pages are the same objects: the next save appends as before)
+                        hybridRevision->stamp = fileio::stampOf(t.target);
+                    }
+                    Q_EMIT versionsChanged();
+                }
+                finishSave(t.result);  // (it stamps the files: the app's own change, never one "by another program")
+            });
+}
+
 void DocumentSession::finishWrite() {
     SaveTask& t = *saveTask;
     if (isExport(t.request.kind)) {
         return finishSave(t.result);
     }
     const bool ok = t.result.ok;
-    doc->lock();
-    if (t.handler) {
-        t.handler->updateDocumentInfo(doc.get());
+    {
+        std::unique_lock lock(*doc);
+        if (t.handler) {
+            t.handler->updateDocumentInfo(doc.get());
+        }
+        if (ok && doc->getFilepath() == t.pathWhenTaken) {  // (unless it was moved in the library meanwhile)
+            doc->setFilepath(t.target);
+        }
+        if (ok && t.preview) {
+            doc->setPreview(t.preview);
+        }
+        if (t.xoppWritten && !t.createBackup) {
+            doc->setCreateBackupOnSave(true);
+        }
     }
-    if (ok && doc->getFilepath() == t.pathWhenTaken) {  // (unless it was moved in the library meanwhile)
-        doc->setFilepath(t.target);
-    }
-    if (ok && t.preview) {
-        doc->setPreview(t.preview);
-    }
-    if (t.xoppWritten && !t.createBackup) {
-        doc->setCreateBackupOnSave(true);
-    }
-    doc->unlock();
     if (!t.hybrid) {
         if (t.commitTried) {
             pdfPages->commitApplied(t.staged, t.committed);
@@ -883,7 +917,7 @@ void DocumentSession::finishSave(SaveResult result) {
     }
     lastSaveResult = result;
     stampFiles();  // (what was written is the app's own: never a change "by another program")
-    if (result.ok && !isExport(task->request.kind)) {
+    if (result.ok && !isExport(task->request.kind) && task->request.kind != SaveKind::VersionMessage) {
         madeUnsaved = false;  // (made from a .md: it is in its own file now)
         Q_EMIT filePathChanged();
     }

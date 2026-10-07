@@ -9,7 +9,7 @@
  * - HybridFullWrite.cpp: assemble(), the file written in full (plain, PDF with notes, archive PDF);
  * - HybridAppend.cpp: openExisting() and the incremental update of an existing file;
  * - HybridMarker.cpp: what both writers put into the file the same way (the marker, the document information, the
- *   text layer of the handwriting, the embedded files), through an ObjectSink;
+ *   text layer of the handwriting, the embedded files), through an ObjectSink (PdfObjectSink.h);
  * - HybridHistory.cpp: writing the version history (PdfHistory.cpp reads it);
  * - HybridCache.cpp: the clean copies in the app cache;
  * - HybridOpen.cpp: reading the marker, opening, compacting;
@@ -25,6 +25,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
@@ -45,6 +46,7 @@
 #include "PdfBookmarks.h"
 #include "PdfEncryption.h"
 #include "PdfHistory.h"
+#include "PdfObjectSink.h"
 #include "TextDocument.h"
 
 class Document;
@@ -271,50 +273,6 @@ Revision revisionAfterFull(const fs::path& target, const Prepared& prep);
 
 // --- what both writers write the same way (HybridMarker.cpp) -------------------------------------------------------
 
-/// Where the objects a write makes go: a QPDF written in full (FullSink), or an incremental update of a file
-/// (UpdateSink, which also needs to know what of the file changes). The marker, the text layer of the handwriting and
-/// the embedded files are written through it, so both writers write them the same way.
-class ObjectSink {
-public:
-    virtual ~ObjectSink() = default;
-    /// A new indirect object with this (direct) value.
-    virtual QPDFObjectHandle add(QPDFObjectHandle value) = 0;
-    /// A new stream: its dictionary (direct, complete: it may not be changed afterwards) and data.
-    virtual QPDFObjectHandle addStream(QPDFObjectHandle dict, const std::string& data) = 0;
-    /// A new stream of a file's bytes (read when the PDF is written where it can be, else now).
-    virtual QPDFObjectHandle addFileStream(QPDFObjectHandle dict, const fs::path& file) = 0;
-    /// This object of the file is about to be changed.
-    virtual void touch(QPDFObjectHandle object) = 0;
-};
-
-/// A PDF written in full: new objects of `q`; nothing to touch.
-class FullSink final: public ObjectSink {
-public:
-    explicit FullSink(QPDF& q): q(q) {}
-    QPDFObjectHandle add(QPDFObjectHandle value) override;
-    QPDFObjectHandle addStream(QPDFObjectHandle dict, const std::string& data) override;
-    QPDFObjectHandle addFileStream(QPDFObjectHandle dict, const fs::path& file) override;
-    void touch(QPDFObjectHandle) override {}
-
-private:
-    QPDF& q;
-};
-
-/// An incremental update (IncrementalPdf::Update): new objects numbered by it, changed ones touched.
-class UpdateSink final: public ObjectSink {
-public:
-    explicit UpdateSink(IncrementalPdf::Update& u): u(u) {}
-    QPDFObjectHandle add(QPDFObjectHandle value) override { return u.add(value); }
-    QPDFObjectHandle addStream(QPDFObjectHandle dict, const std::string& data) override {
-        return u.addStream(dict, data);
-    }
-    QPDFObjectHandle addFileStream(QPDFObjectHandle dict, const fs::path& file) override;
-    void touch(QPDFObjectHandle object) override { u.touch(object); }
-
-private:
-    IncrementalPdf::Update& u;
-};
-
 /// The name tree of the embedded files, and what holds it, are about to change.
 void touchNames(ObjectSink& sink, QPDFObjectHandle root);
 
@@ -404,6 +362,28 @@ Result appendChanges(Existing& e, const Prepared& prep, bool archive, const Revi
 
 /// The dictionary `to` becomes `from` (the same object, written again).
 void replaceAll(QPDFObjectHandle to, QPDFObjectHandle from);
+
+/// What appendIfPossible() needs besides the file.
+struct AppendTry {
+    const Revision* rev = nullptr;  ///< the file as last written or opened (WriteOptions::revision; valid)
+    std::string cleanCopyOf;        ///< the stamp of the version whose clean copy serves the file after the update
+    bool archive = false;           ///< an archive PDF saved again
+    /// The document prepared, without what the file has drawn already (an error in Prepared::error, or thrown)
+    std::function<Prepared(const Reuse*)> prepared;
+    /// Version history (may be empty: none): what the marker says, the update beginning at the file's end
+    std::function<HistoryMark(const Existing&)> markOf;
+    std::string exportName;          ///< write()'s /XoppExport
+    Revision* written = nullptr;     ///< WriteOptions::written
+    /// Called once the update is in the file, before its clean copy is kept (may be empty)
+    std::function<Result(Result)> appended;
+};
+
+/// A save that only appends what changed (qt/docs/features/hybrid-pdf.md, "Saving: incremental updates"): the file
+/// opened as `*how.rev`, the document prepared, the update appended, the clean copy kept. Returns the result when the
+/// file was written, or could not be (then it is as it was); nothing when it is to be written in full instead
+/// (`whyFull` says why: the file is not that revision, the policy, or what was thrown).
+std::optional<Result> appendIfPossible(const fs::path& target, const AppendTry& how, std::string& whyFull,
+                                       Steps& step);
 
 
 // --- the clean copies (HybridCache.cpp) -----------------------------------------------------------------------------

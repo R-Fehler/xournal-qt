@@ -933,7 +933,8 @@ public:
     /// "Save with a message…" (Ctrl+Alt+S): a save that makes a milestone (a version with this message, never
     /// replaced). Like saveInBackground otherwise.
     Q_INVOKABLE bool saveWithMessage(const QString& message, const QJSValue& then = QJSValue());
-    /// Give a version a message (an empty one: none) or change it; false and a message when it cannot.
+    /// Give a version a message (an empty one: none) or change it, in the background after the saves before it
+    /// (DocumentSession::SaveKind::VersionMessage); a message when it cannot. False without a document.
     Q_INVOKABLE bool setVersionMessage(int id, const QString& message);
     /// Show version `id` beside the document, read-only (as its reference; the file of the version in VersionCache).
     Q_INVOKABLE bool viewVersion(int id);

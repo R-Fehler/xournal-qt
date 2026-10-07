@@ -46,6 +46,7 @@
 
 #include "AppContext.h"
 #include "audio/DocumentAudio.h"
+#include "DetachedDocument.h"
 #include "DocumentMode.h"
 #include "DocumentSaveTask.h"
 #include "DocumentImages.h"
@@ -100,12 +101,6 @@ void DocumentSession::addPageUndoAction(UndoActionPtr action) {
 }
 
 namespace {
-/// Receives the events of documents that are not owned by a session yet (while loading). It has no listeners.
-DocumentHandler& detachedHandler() {
-    static DocumentHandler handler;
-    return handler;
-}
-
 using fileio::hasExtension;
 }  // namespace
 
@@ -466,9 +461,10 @@ void DocumentSession::insertNewPage(size_t position, bool automatedInsertion) {
 
 void DocumentSession::insertPage(const PageRef& page, size_t position, bool shouldScrollToPage) {
     // Port of Control::insertPage
-    doc->lock();
-    doc->insertPage(page, position);
-    doc->unlock();
+    {
+        std::unique_lock lock(*doc);
+        doc->insertPage(page, position);
+    }
     addPageUndoAction(std::make_unique<InsertDeletePageUndoAction>(page, position, true));
     firePageInserted(position);
     getCursor()->updateCursor();
@@ -701,9 +697,10 @@ void DocumentSession::applyPageOrder(const std::vector<PageRef>& target, const s
         const XojPage* p = doc->getPage(i).get();
         if (!keep.count(p) || move.count(p)) {
             firePageDeleted(i);
-            doc->lock();
-            doc->deletePage(i);
-            doc->unlock();
+            {
+                std::unique_lock lock(*doc);
+                doc->deletePage(i);
+            }
         }
     }
     std::unordered_set<const XojPage*> present;
@@ -713,9 +710,10 @@ void DocumentSession::applyPageOrder(const std::vector<PageRef>& target, const s
     size_t firstChange = npos;
     for (size_t i = 0; i < target.size(); ++i) {
         if (!present.count(target[i].get())) {
-            doc->lock();
-            doc->insertPage(target[i], i);
-            doc->unlock();
+            {
+                std::unique_lock lock(*doc);
+                doc->insertPage(target[i], i);
+            }
             firePageInserted(i);
             firstChange = std::min(firstChange, i);
         }
@@ -853,9 +851,10 @@ void DocumentSession::deletePage() {
     }
     // Upstream: first send the event, then delete the page.
     firePageDeleted(pNr);
-    doc->lock();
-    doc->deletePage(pNr);
-    doc->unlock();
+    {
+        std::unique_lock lock(*doc);
+        doc->deletePage(pNr);
+    }
     addPageUndoAction(std::make_unique<InsertDeletePageUndoAction>(page, pNr, false));
     if (pNr >= doc->getPageCount()) {
         pNr = doc->getPageCount() - 1;
@@ -1304,34 +1303,39 @@ void DocumentSession::installLoadHooks() {
 
 auto DocumentSession::writeDocument(Document& doc, const fs::path& target) -> SaveResult {
     updatePreview(doc);
-    doc.lock();
-    doc.setFilepath(target);  // an attached background PDF is written next to it
-    doc.unlock();
+    {
+        std::unique_lock lock(doc);
+        doc.setFilepath(target);  // an attached background PDF is written next to it
+    }
     PictureSaveHandler h;
-    doc.lock_shared();
-    h.prepareSave(&doc, target);
-    const std::vector<std::string> carried = DocumentImages::carriedPicturesOf(doc);
-    doc.unlock_shared();
+    std::vector<std::string> carried;
+    {
+        std::shared_lock lock(doc);
+        h.prepareSave(&doc, target);
+        carried = DocumentImages::carriedPicturesOf(doc);
+    }
     h.addPictures(DocumentImages::picturesData(carried));  // (its Markdown's pictures: qt/docs/features/md-images.md)
     h.saveTo(target);
     if (!h.getErrorMessage().empty()) {
         return {false, FS(_F("Save file error: {1}") % h.getErrorMessage())};
     }
-    doc.lock();
-    h.updateDocumentInfo(&doc);
-    doc.unlock();
+    {
+        std::unique_lock lock(doc);
+        h.updateDocumentInfo(&doc);
+    }
     return {true, {}};
 }
 
 void DocumentSession::relocate(const fs::path& xopp, const fs::path& pdf) {
-    doc->lock();
-    if (!xopp.empty()) {
-        doc->setFilepath(xopp);
+    {
+        std::unique_lock lock(*doc);
+        if (!xopp.empty()) {
+            doc->setFilepath(xopp);
+        }
+        if (!pdf.empty()) {
+            doc->setPdfAttributes(pdf, doc->isAttachPdf());
+        }
     }
-    if (!pdf.empty()) {
-        doc->setPdfAttributes(pdf, doc->isAttachPdf());
-    }
-    doc->unlock();
     stampFiles();  // (moved or written by the app)
     Q_EMIT filePathChanged();
 }
@@ -1447,22 +1451,13 @@ void DocumentSession::setKeepsVersions(bool on) {
 }
 
 bool DocumentSession::setVersionMessage(int id, const std::string& message, std::string& error) {
-    if (isSaving() || !isHybrid()) {
-        error = isSaving() ? "A save is running." : "The document is not a PDF with notes.";
-        return false;
-    }
-    const fs::path file = getFilePath();
-    const std::string was = fileio::stampOf(file);  // (the stamp HybridPdf keeps of the file's version)
-    if (!HybridPdf::setVersionMessage(file, id, message, error)) {
-        return false;
-    }
-    if (hybridRevision && hybridRevisionFile == file && hybridRevision->stamp == was) {
-        // (the pages are the same objects: the next save appends as before)
-        hybridRevision->stamp = fileio::stampOf(file);
-    }
-    stampFiles();  // (the app's own change, never one "by another program")
-    Q_EMIT versionsChanged();
-    return true;
+    SaveRequest r;
+    r.kind = SaveKind::VersionMessage;
+    r.version = id;
+    r.message = message;
+    const SaveResult result = saveNow(std::move(r));
+    error = result.error;
+    return result.ok;
 }
 
 void DocumentSession::versionRestored(const std::string& message) { restoredMessage = message; }
@@ -1669,10 +1664,12 @@ auto DocumentSession::autosave() -> SaveResult {
     undoRedo->documentAutosaved();
 
     const fs::path filepath = autosavePath();
-    doc->lock_shared();
-    handler.prepareSave(doc.get(), filepath);
-    const std::vector<std::string> carried = DocumentImages::carriedPicturesOf(*doc);
-    doc->unlock_shared();
+    std::vector<std::string> carried;
+    {
+        std::shared_lock lock(*doc);
+        handler.prepareSave(doc.get(), filepath);
+        carried = DocumentImages::carriedPicturesOf(*doc);
+    }
     handler.addPictures(DocumentImages::picturesData(carried));  // (recovered, its pictures come back)
 
     g_message("%s", FS(_F("Autosaving to {1}") % filepath.string()).c_str());
@@ -1681,9 +1678,10 @@ auto DocumentSession::autosave() -> SaveResult {
     tempfile += u8"~";
     handler.saveTo(tempfile);
 
-    doc->lock();
-    handler.updateDocumentInfo(doc.get());
-    doc->unlock();
+    {
+        std::unique_lock lock(*doc);
+        handler.updateDocumentInfo(doc.get());
+    }
 
     if (const auto& error = handler.getErrorMessage(); !error.empty()) {
         return {false, FS(_F("Error while autosaving: {1}") % error)};
@@ -1767,9 +1765,10 @@ fs::path DocumentSession::namedAutosavePath(fs::path document) {
 
 void DocumentSession::markRecovered(const fs::path& original) {
     // Like upstream's checkForEmergencySave: the content is not saved anywhere yet.
-    doc->lock();
-    doc->setFilepath(original);
-    doc->unlock();
+    {
+        std::unique_lock lock(*doc);
+        doc->setFilepath(original);
+    }
     undoRedo->addUndoAction(std::make_unique<EmergencySaveRestore>());
     Q_EMIT filePathChanged();
 }
