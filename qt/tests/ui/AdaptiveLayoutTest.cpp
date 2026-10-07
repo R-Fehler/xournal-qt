@@ -434,11 +434,20 @@ protected:
         return content && focus && (focus == content || content->isAncestorOf(focus));
     }
     /// Until a popup's enter transition is over (a menu grows in, a sheet slides in): it is where it stays
-    void settled(QObject* popup) {
-        until([&] {
-            return popup->property("scale").toDouble() == 1.0 && popup->property("opacity").toDouble() == 1.0 &&
-                   (!popup->property("slide").isValid() || popup->property("slide").toDouble() == 0.0);
-        });
+    void settled(QObject* popup, std::source_location where = std::source_location::current()) {
+        const bool done = upTo(
+                [&] {
+                    return popup->property("scale").toDouble() == 1.0 && popup->property("opacity").toDouble() == 1.0 &&
+                           (!popup->property("slide").isValid() || popup->property("slide").toDouble() == 0.0);
+                },
+                untilMs);
+        if (!done) {
+            ADD_FAILURE_AT(where.file_name(), static_cast<int>(where.line()))
+                    << popup->objectName().toStdString() << " did not settle: scale "
+                    << popup->property("scale").toDouble() << " opacity " << popup->property("opacity").toDouble()
+                    << " slide " << popup->property("slide").toDouble() << " visible "
+                    << popup->property("visible").toBool() << " opened " << popup->property("opened").toBool();
+        }
     }
     std::vector<QQuickItem*> menuEntries(QObject* menu) const {
         std::vector<QQuickItem*> entries;

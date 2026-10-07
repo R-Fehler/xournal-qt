@@ -20,7 +20,7 @@ working directory.
 | `quick` | `xqt-quick-tests` | `qt/tests/quick` | 64 | ~74 s | `DocumentCanvasItem`: rendering, input, fractional scales |
 | `shell` | `xqt-shell-tests` | `qt/tests/shell` | 424 | ~62 s | library, tabs, models, settings, CLI |
 | `ui` | `xqt-ui-tests` | `qt/tests/ui` | 419 | ~1700 s | the real window (`Main.qml` + `AppController`) driven off-screen |
-| `golden` | `run_golden.sh` | `qt/tests/golden` | 1 | | CLI output against upstream's (skips without an upstream build) |
+| `golden` | `run_golden.sh` | `qt/tests/golden` | 2 | | `golden-roundtrip`: the CLI saves and loads again (same structure and picture), runs everywhere; `golden-quick`: CLI output against upstream's (skipped without upstream's binary, `XOJ_UPSTREAM_BIN`) |
 
 A few tests run twice with another environment: `FractionalScaleCanvas.quick@125/@167`, `FractionalScale.ui@150`,
 `ReadingPhone.ui@phone`, `TimelinePhone.ui@phone`, `PresenterView.ui@2screens` (off-screen screens from
@@ -45,18 +45,39 @@ build-qt/xqt-ui-tests --gtest_filter='ToolboxTest.*'          # one binary direc
 4. **The author** runs the long suites and tests by hand on the devices ([device checklist](device-checklist.md)).
 
 The routine run should stay **under a minute**: long tests go behind a label or an environment variable. The UI label
-breaks this today (each test starts its own process and loads the whole UI); the refactoring's wave 2 works on it.
+breaks this today (each test starts its own process and loads the whole UI). The UI tests keep the compiled QML in
+`build-qt/ui-tests-qmlcache` (`QML_DISK_CACHE_PATH`), so a process does not compile `Main.qml` and its files again:
+with `XQT_FAST_DEV` that halved the time of a short test.
 
 ## Writing a test
 
 - **A bug gets a failing test first.** Show that it fails for the stated reason, then fix it.
 - Start from the closest existing test of the same layer: a session test needs no view; a canvas test builds a
-  `CanvasView` on a `DocumentSession`; a UI test starts from the fixture of `MainWindowTest.cpp` (its `SetUp`,
-  `find`/`findItem`, `click`, `key`, `until`). One shared fixture and shared helpers (`qt/tests/support/`) are being
-  built in wave 2 (`qt/test-support`); until then helpers such as `waitFor` and `makeTextPdf` are copied per file.
+  `CanvasView` on a `DocumentSession`; a UI test derives from the shared fixture (below).
+- **Shared helpers** (`qt/tests/support/`, the static library `xqt-test-support`, linked into every test binary of
+  the fork; include them as `"support/TestSupport.h"`): `waitFor(condition, ms)` runs the event loop until the
+  condition holds and **fails the test** at the caller's line when it times out (wrap it in `ASSERT_TRUE` to stop
+  there); `waitUpTo` is the same without failing, `processEventsFor(ms)` a fixed wait; `readFile`, `writeFile` (makes
+  the folders), `gunzip`, `gunzipFile`; `makeTextPdf(path, pageTexts, style)` with `numbered("page", n)`;
+  `fixture(u8"load/strokes.xopp")` / `fixturePath(…)` for upstream's read-only fixtures. The other headers there
+  (`SearchHits.h`, `FailingWrites.h`, `FakeNet.h`, `CitationPdfs.h`, `ArxivSamples.h`) are header-only helpers of
+  a few binaries. A helper needed by a second file goes there instead of being copied.
+- **The UI fixture** (`qt/tests/ui/UiFixture.h`, `xqt::test::UiFixture`): the real window with the engine the app has
+  (`src/app/EngineSetup.h`, shared with `main.cpp`: every image provider, `app`). `SetUp` is `makeController()`, what
+  the test prepares, then `ASSERT_NO_FATAL_FAILURE(loadWindow({.size = …, .activate = …}))`; `TearDown` is
+  `closeApp()`. Helpers: `find<T>(name)` (QObject children), `findItem(name)` (the item tree: a Repeater's
+  delegates), `findInScene` (also the popups), `entryOf(menu, name)`, `click`, `key`, `type`, `nextFrame`,
+  `scrollIntoView`, `waitOpened(popup, open)`, `until(condition)` (fails on a timeout, `untilMs` by default) and
+  `upTo` (does not), `wait(ms)` (fixed).
 - **QML items a test needs carry an `objectName`.** Find them by it, never by position or text.
-- **Wait for a state, not for time.** Prefer `QTest::qWaitFor(condition)` (inside `ASSERT_TRUE`) over a fixed
-  `wait(N)`; a fixed wait is either too long or flaky under load.
+- **Wait for a state, not for time.** `until(condition)` / `waitFor(condition)` over a fixed `wait(N)`; a fixed wait is
+  either too long or flaky under load. A fixed wait stays only for a duration that is the point (press and hold) or to
+  show that something does *not* happen; `XQT_WAIT_LOG=<file>` makes every fixed wait of the UI fixture append
+  `<file>:<line> <ms>` to that file, to find where a run waits.
+- **The names the QML uses on `app`** are checked against the C++ meta-objects by `QmlApiTest` (`ctest -R QmlApi`):
+  a renamed `AppController` member, or one of a sub-object (`app.library.x`), or a name a pill reads from its
+  `target` missing on `ReferenceMode`, fails there instead of reading `undefined` at run time. A name reached on
+  purpose without a C++ member goes into its allowlist with the reason.
 - **Only Qt ≤ 6.7 API**, in tests as in the app: e.g. `AbstractButton.click()` is 6.8, so tests emit
   `clicked`/`triggered` instead. No QML property names that are JS globals (`console`, …).
 - Fixture files a test needs are written into a `QTemporaryDir` (or read from `qt/tests/<label>/` data folders);
@@ -86,7 +107,7 @@ cmake --build /home/user/build-qt68 -j3 --target xqt-ui-tests && ctest --test-di
 | --- | --- |
 | `XQT_BENCH_PDF=<file>`, `XQT_BENCH_SCROLL`, `XQT_BENCH_HYBRID`, `XQT_BENCH_STICKY`, `XQT_BENCH_GEOMETRY` | turn on benchmarks that otherwise skip |
 | `XQT_SHOTS=<dir>` | regenerates the README's pictures from the UI tests (also `XQT_TOOLBAR_SHOTS`, `XQT_STICKY_SHOTS`, `XQT_MATH_SHOTS`) |
-| `XQT_UPSTREAM_BIN` | upstream's `xournalpp` for the golden tests and `StickyNoteTest` |
+| `XOJ_UPSTREAM_BIN` | upstream's `xournalpp` for the golden tests and `StickyNoteTest` |
 | `XQT_HWR_MODEL`, `XQT_HWR_CTC_MODEL` | run the handwriting tests with a real model folder |
 | `XQT_PERF=1` | the running app writes a line a second about the canvas work ([performance-logging.md](performance-logging.md)) |
 | `XQT_KEEP`, `XQT_KEEP_PDF=<file>` | keep the PDFs some Markdown tests write, to look at them |

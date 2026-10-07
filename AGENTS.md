@@ -78,7 +78,7 @@ Dependencies point down this list only (`xqt-shell` also compiles `src/app`; the
 | `qt/src/shell` | `xqt-shell` | library, tabs, image providers, models for the QML lists, settings models |
 | `qt/src/app` | `xqt-shell`, `xqt-ui`, `xournal-qt` | `AppController` (the QML API `app`), `main.cpp`, `qml/` (the whole UI) |
 | `qt/cli`, `qt/tools` | `xournal-qt-cli`, `xoj-imgdiff` | headless export (upstream's flags), developer tools |
-| `qt/tests` | one binary per label | `unit session canvas markdown audio hwr quick shell ui`, plus `golden` |
+| `qt/tests` | one binary per label | `unit session canvas markdown audio hwr quick shell ui`, plus `golden`; shared helpers in `support/` (`xqt-test-support`), the UI fixture in `ui/UiFixture.h` |
 | `qt/3rdparty`, `qt/packaging`, `qt/scripts` | | vendored libraries; packaging; build, deploy and environment scripts |
 
 ## What the moving parts assume
