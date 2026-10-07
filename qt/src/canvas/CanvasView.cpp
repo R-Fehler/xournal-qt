@@ -71,7 +71,6 @@
 #include "StickyNotes.h"
 #include "TextEditor.h"
 #include "TimelineReplay.h"
-#include "TextFlow.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentLink.h"
@@ -2312,7 +2311,7 @@ bool CanvasView::ensureTextEditor() {
     }
     const size_t page = std::min(currentPageNo(), session.getDocument()->getPageCount() - 1);
     if (textMode()) {
-        startMarkdown(page, true, TextFlow::MARGIN, TextFlow::MARGIN);
+        startMarkdown(page, true, PageMargins::FULL, PageMargins::FULL);
         return markdownEditor != nullptr;
     }
     if (!typesIntoFlow()) {

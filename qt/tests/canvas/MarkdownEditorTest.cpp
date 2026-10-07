@@ -33,7 +33,7 @@
 #include "CanvasView.h"
 #include "MarkdownEditor.h"
 #include "MdBox.h"
-#include "TextFlow.h"
+#include "session/PageMargins.h"
 
 using namespace xqt;
 
@@ -66,8 +66,8 @@ protected:
 
     /// Start writing the page's text on page 0.
     MarkdownEditor& start() {
-        const auto m = TextFlow::styleFor(session->getDocument()->getPage(0), TextFlow::Style{});
-        view->startMarkdown(0, true, m.leftMargin + 5, TextFlow::MARGIN + 5);
+        const auto m = PageMargins::of(session->getDocument()->getPage(0));
+        view->startMarkdown(0, true, m.left + 5, PageMargins::FULL + 5);
         EXPECT_NE(view->getMarkdownEditor(), nullptr);
         processEvents();
         return *view->getMarkdownEditor();
@@ -192,7 +192,7 @@ TEST_F(MarkdownEditorTest, writingAfterACodeBlockAtTheEndIsShownAtOnce) {
 TEST_F(MarkdownEditorTest, searchHitsFollowTheTextAsItIsDrawnWhileWriting) {
     MarkdownEditor& editor = start();
     type("# Title\nSome **strong** needle");
-    const auto m = TextFlow::styleFor(session->getDocument()->getPage(0), TextFlow::Style{});
+    const auto m = PageMargins::of(session->getDocument()->getPage(0));
     const auto hitOf = [&] {
         if (session->search().query() != "needle") {
             session->search().setQuery("needle", false);
@@ -204,22 +204,22 @@ TEST_F(MarkdownEditorTest, searchHitsFollowTheTextAsItIsDrawnWhileWriting) {
     // The paragraph with the cursor: its source, "Some **strong** needle", is drawn
     const std::string& text = editor.text();
     const md::Layout& drawn = md::cachedLayout(text, md::styleOf(*md::pageBoxOf(*md::markdownLayer(
-                                                              session->getDocument()->getPage(0)), m.leftMargin,
-                                                              TextFlow::MARGIN)),
+                                                              session->getDocument()->getPage(0)), m.left,
+                                                              PageMargins::FULL)),
                                                text.size());
     ASSERT_GE(drawn.rawItem, 0);
     const md::Item& raw = drawn.items[static_cast<size_t>(drawn.rawItem)];
     PangoRectangle first;
     pango_layout_index_to_pos(raw.layout.get(), static_cast<int>(text.find("needle") - drawn.rawBegin), &first);
     const QRectF hit = hitOf();
-    EXPECT_NEAR(hit.x(), m.leftMargin + raw.x + first.x / double(PANGO_SCALE), 0.5)
+    EXPECT_NEAR(hit.x(), m.left + raw.x + first.x / double(PANGO_SCALE), 0.5)
             << "on the word as it is drawn while writing (after \"**strong**\")";
-    EXPECT_NEAR(hit.y(), TextFlow::MARGIN + raw.y + first.y / double(PANGO_SCALE), 0.5);
+    EXPECT_NEAR(hit.y(), PageMargins::FULL + raw.y + first.y / double(PANGO_SCALE), 0.5);
 
     // Done: drawn formatted, and the hit goes there
     view->endTextEditing();
     const auto formatted = md::findText(*md::pageBoxOf(*md::markdownLayer(session->getDocument()->getPage(0)),
-                                                        m.leftMargin, TextFlow::MARGIN),
+                                                        m.left, PageMargins::FULL),
                                         "needle");
     ASSERT_EQ(formatted.size(), 1u);
     EXPECT_LT(formatted[0].x, hit.x() - 5) << "(\"strong \" is drawn before it, not \"**strong** \")";

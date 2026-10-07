@@ -12,8 +12,6 @@ file(COPY "${CMAKE_CURRENT_LIST_DIR}/../packaging/xournal-qt.svg" DESTINATION "$
 add_library(xqt-quick STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/DocumentCanvasItem.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/DocumentCanvasItem.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TextFlowEditor.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TextFlowEditor.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TouchGestures.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TouchGestures.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/AdaptiveLayout.h
@@ -256,7 +254,6 @@ set(XQT_QML_FILES
     src/app/qml/OutlineList.qml
     src/app/qml/AnnotationList.qml
     src/app/qml/HistoryPanel.qml
-    src/app/qml/TextFlowPanel.qml
     src/app/qml/MarkdownPanel.qml
     src/app/qml/EmojiSuggestions.qml
     src/app/qml/EmojiPicker.qml

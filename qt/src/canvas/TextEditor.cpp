@@ -33,7 +33,7 @@
 #include "CanvasPage.h"
 #include "Grapheme.h"
 #include "MdBox.h"
-#include "TextFlow.h"
+#include "session/PageMargins.h"
 #include "session/DocumentSession.h"
 #include "session/ElementTimes.h"
 #include "session/StickyNote.h"
@@ -104,10 +104,10 @@ TextEditor::TextEditor(DocumentSession& session, CanvasPage& page, double x, dou
         if (markdown) {
             // A Markdown text box: its own size, and as wide as there is room (up to the right margin)
             textElement->setFont(XojFont(session.getSettings()->getFont().getName(), how.markdownSize));
-            double right = TextFlow::MARGIN;
+            double right = PageMargins::FULL;
             {
                 std::shared_lock lock(*session.getDocument());
-                right = TextFlow::styleFor(pageRef, TextFlow::Style{}).rightMargin;
+                right = PageMargins::of(pageRef).right;
             }
             textElement->setWrap(std::max(100.0, pageRef->getWidth() - right - x));
         } else {

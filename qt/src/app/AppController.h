@@ -84,7 +84,6 @@ class LayersModel;
 class ShortcutsModel;
 class OutlineModel;
 class AnnotationsModel;
-class TextFlowSession;
 class MarkdownSession;
 class MarkdownEditor;
 class PageClipboard;
@@ -235,8 +234,6 @@ class AppController: public QObject {
     /// The adjustable width of the tool (points; 0: the tool has no sizes). Setting it selects it (size 5).
     Q_PROPERTY(double customWidth READ customWidth WRITE setCustomWidth NOTIFY toolChanged)
     Q_PROPERTY(QVariantList palette READ palette CONSTANT)
-    /// The colors of the deprecated text mode's color row (TextFlowPanel): upstream's palette without white
-    Q_PROPERTY(QVariantList toolbarColors READ toolbarColors CONSTANT)
     /// Color of PDF text highlights, one of three presets
     Q_PROPERTY(QColor pdfHighlightColor READ pdfHighlightColor WRITE setPdfHighlightColor NOTIFY pdfTextModeChanged)
     Q_PROPERTY(QVariantList pdfHighlightColors READ pdfHighlightColors CONSTANT)
@@ -247,10 +244,6 @@ class AppController: public QObject {
     Q_PROPERTY(QString colorPalette READ colorPalette WRITE setColorPalette NOTIFY colorPaletteChanged)
     /// The role of the color in hand when it was taken from a palette: "marker:warnings" (else "")
     Q_PROPERTY(QString colorRole READ colorRole NOTIFY toolChanged)
-    /// The text mode edits the typed text of a page (textFlowPage, 0-based); how far it goes below the page (points)
-    Q_PROPERTY(bool textFlowActive READ textFlowActive NOTIFY textFlowChanged)
-    Q_PROPERTY(int textFlowPage READ textFlowPage NOTIFY textFlowChanged)
-    Q_PROPERTY(double textFlowOverflow READ textFlowOverflow NOTIFY textFlowChanged)
     /// A Markdown box is being edited (markdownPage, 0-based); how far it goes below the page (points)
     Q_PROPERTY(bool markdownActive READ markdownActive NOTIFY markdownChanged)
     /// Markdown is being written on the page itself (formatted while typing), not in the panel beside it.
@@ -474,7 +467,6 @@ public:
     bool hasFillColor() const;
     int size() const;
     QVariantList palette() const;
-    QVariantList toolbarColors() const;
     /// The tools' own widths and which are chosen (settings "customWidths": "pen=8.5*,highlighter=42.5,...")
     void loadCustomWidths();
     void storeCustomWidths();
@@ -519,17 +511,8 @@ public:
     Q_INVOKABLE void takeToolOfType(const QString& type);
     bool toolbarHidden() const;
     void setToolbarHidden(bool hidden);
-    bool textFlowActive() const;
-    int textFlowPage() const { return flowPage; }
-    double textFlowOverflow() const { return flowOverflow; }
-    /// Text mode: start on the current page; returns its blocks (TextFlow::toVariant) for the editor.
-    Q_INVOKABLE QVariantList beginTextFlow();
-    /// The blocks as typed: the page follows.
-    Q_INVOKABLE void updateTextFlow(const QVariantList& blocks);
-    /// Done (keep: one undo step) or cancel.
-    Q_INVOKABLE void endTextFlow(bool keep);
-    /// The text font (text tool) for the editor.
-    Q_INVOKABLE QString textFlowFamily() const;
+    /// The text font's family (the text tool's font without its style)
+    QString textFontFamily() const;
     bool markdownActive() const;
     bool textMarkdown() const;
     QString darkPagesMode() const;
@@ -1752,7 +1735,6 @@ Q_SIGNALS:
     void printRequested(const QList<int>& pages);
     void chapterRequested(int page);
     void toolbarHiddenChanged();
-    void textFlowChanged();
     void markdownChanged();
     void markdownOnPageChanged();
     void markdownFormatChanged();
@@ -1990,10 +1972,6 @@ private:
     std::unique_ptr<xqt::LayersModel> layers;
     std::unique_ptr<xqt::ShortcutsModel> ownShortcuts;
     xqt::ShortcutsModel* shortcuts = nullptr;  ///< the main window's
-    std::unique_ptr<xqt::TextFlowSession> flow;
-    xqt::DocumentSession* flowSession = nullptr;
-    int flowPage = -1;
-    double flowOverflow = 0;
     std::unique_ptr<xqt::MarkdownSession> markdown;
     xqt::DocumentSession* mdSession = nullptr;
     int mdPage = -1;

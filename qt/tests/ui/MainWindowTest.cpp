@@ -110,7 +110,6 @@
 #include "util/PathUtil.h"
 
 #include "AppController.h"
-#include "TextFlow.h"
 #include "MarkdownFile.h"
 #include "../SearchHits.h"
 #include "config-test.h"
@@ -6826,75 +6825,6 @@ TEST_F(MainWindowTest, markdownCheckBoxesAreTapped) {
     key(Qt::Key_Z, Qt::ControlModifier);
     EXPECT_EQ(editor->text(), before) << "undone in the text being written";
     key(Qt::Key_Escape);
-}
-
-// DEPRECATED text mode (qt/docs/text-mode.md): no longer offered in the UI, its panel opened directly here
-TEST_F(MainWindowTest, textModeTypesThePageText) {
-    auto* panel = find<QQuickItem>("textFlowPanel");
-    ASSERT_NE(panel, nullptr);
-    QMetaObject::invokeMethod(panel, "open");
-    ASSERT_TRUE(panel->isVisible());
-    EXPECT_TRUE(controller->textFlowActive());
-    auto* area = find<QQuickItem>("textFlowArea");
-    ASSERT_TRUE(area->hasActiveFocus());
-    // Beside the pages, not over them
-    auto* canvasItem = find<QQuickItem>("canvas");
-    EXPECT_LE(canvasItem->mapToScene({canvasItem->width(), 0}).x(), panel->mapToScene({0, 0}).x() + 0.5);
-    EXPECT_GT(canvasItem->width(), 100);
-
-    type("# Lecture 5");
-    key(Qt::Key_Return);  // after a heading: a paragraph
-    type("Some text.");
-    key(Qt::Key_Return);
-    type("- first");
-    key(Qt::Key_Return);  // the list goes on
-    type("second");
-    key(Qt::Key_Return);
-    key(Qt::Key_Return);  // an empty item ends the list
-    type("After the list.");
-    wait(300);
-
-    // The page: Xournal++ text boxes in the layer "Text"
-    auto* session = controller->tabManager().currentSession();
-    PageRef page = session->getDocument()->getPage(0);
-    Layer* layer = xqt::TextFlow::textLayer(page);
-    ASSERT_NE(layer, nullptr);
-    std::vector<std::string> texts;
-    for (const auto& e: layer->getElementsView()) {
-        if (e->getType() == ELEMENT_TEXT) {
-            texts.push_back(static_cast<const Text*>(e)->getText());
-        }
-    }
-    EXPECT_EQ(texts, (std::vector<std::string>{"Lecture 5", "Some text.", "•", "first", "•", "second", "After the list."}));
-    const auto blocks = xqt::TextFlow::read(page, xqt::TextFlow::Style{});
-    ASSERT_EQ(blocks.size(), 5u);
-    EXPECT_EQ(blocks[0].kind, xqt::TextBlock::Kind::Heading1);
-    EXPECT_EQ(blocks[2].kind, xqt::TextBlock::Kind::Bullet);
-    EXPECT_EQ(blocks[4].kind, xqt::TextBlock::Kind::Paragraph);
-    EXPECT_TRUE(controller->modified()) << "unsaved changes while typing";
-    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
-        wait(1500);  // (the software renderer is slow)
-        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
-    }
-
-    click(find<QQuickItem>("textFlowDone"));
-    EXPECT_FALSE(panel->isVisible());
-    EXPECT_FALSE(controller->textFlowActive());
-    // One step for the whole text; undo / redo lead the toolbox
-    auto* undoButton = find<QQuickItem>("toolboxUndoButton");
-    ASSERT_NE(undoButton, nullptr);
-    EXPECT_TRUE(find<QQuickItem>("toolboxHead")->isAncestorOf(undoButton));
-    click(undoButton);
-    EXPECT_TRUE(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).empty());
-    click(find<QQuickItem>("toolboxRedoButton"));
-    EXPECT_EQ(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).size(), 5u);
-
-    // Cancel restores the page
-    QMetaObject::invokeMethod(panel, "open");
-    type("x");
-    wait(300);
-    click(find<QQuickItem>("textFlowCancel"));
-    EXPECT_EQ(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).size(), 5u);
 }
 
 // --- Hybrid PDF (qt/docs/hybrid-pdf.md) -----------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the margins of the page's own text (the page's Markdown text, the text mode, a chapter heading).
+ * xournal-qt: the margins of the page's own text (the page's Markdown text, a chapter heading).
  *
  * 2 cm on A5 and bigger pages, as before. A smaller page (A6, A7 flashcards) has margins in proportion to its short
  * side, the proportion A5 has (2 cm of 148 mm, 13.5 %), at least 5 mm: A6 about 14 mm, A7 10 mm. A ruled page with a

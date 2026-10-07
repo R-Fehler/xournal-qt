@@ -18,7 +18,7 @@
 #include "MarkdownSession.h"
 #include "MdBox.h"
 #include "MdPaginate.h"
-#include "TextFlow.h"
+#include "session/PageMargins.h"
 #include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
 #include "session/TextDocument.h"
@@ -26,7 +26,7 @@
 
 namespace xqt::MarkdownFile {
 
-static_assert(TextFile::PAGE_MARGIN == TextFlow::MARGIN, "the session finds the page's text at the margins");
+static_assert(TextFile::PAGE_MARGIN == PageMargins::FULL, "the session finds the page's text at the margins");
 
 namespace {
 /// Receives the events of the documents made here until a session owns them. It has no listeners.
@@ -37,7 +37,7 @@ DocumentHandler& handler() {
 
 /// Where the text goes on a page: the page's text of MarkdownSession (at the margins of a plain page).
 md::Frame frame() {
-    return {PAGE_WIDTH - 2 * TextFlow::MARGIN, PAGE_HEIGHT - 2 * TextFlow::MARGIN};
+    return {PAGE_WIDTH - 2 * PageMargins::FULL, PAGE_HEIGHT - 2 * PageMargins::FULL};
 }
 }  // namespace
 
@@ -128,7 +128,7 @@ std::unique_ptr<Document> textDocument(const TextFile& file, bool continuous) {
     return continuous ? continuousDocument(file.text(), style(file)) : document(file.text(), style(file));
 }
 
-double continuousHeight(double textHeight) { return std::max(PAGE_HEIGHT, textHeight + 2 * TextFlow::MARGIN); }
+double continuousHeight(double textHeight) { return std::max(PAGE_HEIGHT, textHeight + 2 * PageMargins::FULL); }
 
 void relayout(DocumentSession& session, bool continuous) {
     if (!session.textFile()) {
@@ -177,7 +177,7 @@ std::unique_ptr<Document> make(const std::string& source, const md::Style& s, si
             layer->setName(std::string(xoj::markdown::LAYER_NAME));
             page->getLayers().insert(page->getLayers().begin(), layer);  // (the page owns it; at the bottom)
             auto box = std::make_unique<Text>();
-            box->setTransformation(xoj::util::Matrix::TRANSLATION(TextFlow::MARGIN, TextFlow::MARGIN));
+            box->setTransformation(xoj::util::Matrix::TRANSLATION(PageMargins::FULL, PageMargins::FULL));
             box->setFont(XojFont(s.family, s.size));
             box->setColor(s.color);
             box->setWrap(f.width);
@@ -215,7 +215,7 @@ std::unique_ptr<Document> continuousDocument(const std::string& source, const md
     layer->setName(std::string(xoj::markdown::LAYER_NAME));
     page->getLayers().insert(page->getLayers().begin(), layer);
     auto box = std::make_unique<Text>();
-    box->setTransformation(xoj::util::Matrix::TRANSLATION(TextFlow::MARGIN, TextFlow::MARGIN));
+    box->setTransformation(xoj::util::Matrix::TRANSLATION(PageMargins::FULL, PageMargins::FULL));
     box->setFont(XojFont(s.family, s.size));
     box->setColor(s.color);
     box->setWrap(f.width);
@@ -237,7 +237,7 @@ std::vector<size_t> pageStarts(Document& doc) {
         std::shared_lock lock(doc);
         for (size_t i = 0; i < doc.getPageCount(); ++i) {
             const Layer* layer = md::markdownLayer(doc.getPage(i));
-            const Text* box = layer ? md::pageBoxOf(*layer, TextFlow::MARGIN, TextFlow::MARGIN) : nullptr;
+            const Text* box = layer ? md::pageBoxOf(*layer, PageMargins::FULL, PageMargins::FULL) : nullptr;
             const std::string slice = box ? box->getText() : std::string();
             if (i > 0 && !md::continues(slice)) {
                 break;  // the text ends before this page

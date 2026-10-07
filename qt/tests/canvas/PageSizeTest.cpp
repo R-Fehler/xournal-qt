@@ -45,7 +45,6 @@
 #include "MdBox.h"
 #include "MdPaginate.h"
 #include "PageResize.h"
-#include "TextFlow.h"
 
 using namespace xqt;
 
@@ -464,7 +463,7 @@ TEST_F(PageSizeTest, thePagesTextFlowsAnewOnTheNewSize) {
     EXPECT_EQ(pageCount(), a4Pages) << "one step: the cards added go";
     EXPECT_TRUE(sizeIs(0, A4_W, A4_H));
     EXPECT_EQ(pageTextFrom(0), before);
-    EXPECT_NEAR(TextDocument::pageBoxOf(page(0))->getWrap(), A4_W - PageMargins::of(page(0)).left - TextFlow::MARGIN,
+    EXPECT_NEAR(TextDocument::pageBoxOf(page(0))->getWrap(), A4_W - PageMargins::of(page(0)).left - PageMargins::FULL,
                 1e-5);
     undo->redo();
     EXPECT_EQ(pageCount(), cards);
@@ -478,7 +477,7 @@ TEST_F(PageSizeTest, thePagesTextFlowsAnewOnTheNewSize) {
     ASSERT_EQ(pagesize::apply(*session, allCards, A4_W, A4_H), cards);
     EXPECT_EQ(pageCount(), a4Pages);
     EXPECT_EQ(pageTextFrom(0), before);
-    EXPECT_NEAR(TextDocument::pageBoxOf(page(0))->getTransformation().shift.y, TextFlow::MARGIN, 1e-9);
+    EXPECT_NEAR(TextDocument::pageBoxOf(page(0))->getTransformation().shift.y, PageMargins::FULL, 1e-9);
     undo->undo();
     EXPECT_EQ(pageCount(), cards) << "the cards come back";
     EXPECT_EQ(pageTextFrom(0), before);

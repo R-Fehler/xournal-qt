@@ -172,8 +172,6 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/HoverPointer.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TextEditor.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TextEditor.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TextFlow.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TextFlow.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownSession.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownSession.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/FindReplace.h
@@ -270,7 +268,6 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/DocumentLayoutTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/ScrollLockTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/GeometryToolPictureTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TextFlowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownSessionTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownEditorTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownBoxResizeTest.cpp

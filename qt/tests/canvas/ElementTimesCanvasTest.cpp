@@ -37,7 +37,6 @@
 #include "CanvasView.h"
 #include "StickyNotes.h"
 #include "TextEditor.h"
-#include "TextFlow.h"
 
 using namespace xqt;
 
@@ -221,32 +220,4 @@ TEST_F(ElementTimesCanvasTest, textsImagesAndNotes) {
     }
     ASSERT_TRUE(note);
     EXPECT_EQ(note->getElementsView().front()->getCreated(), T0 + 12000);
-}
-
-// The page's own text is laid out anew on every change: it keeps the time it was begun, also when written in again
-// later
-TEST_F(ElementTimesCanvasTest, thePagesTextKeepsTheTimeItWasBegun) {
-    TextFlow::Style style;
-    TextBlock b;
-    b.kind = TextBlock::Kind::Paragraph;
-    b.text = QStringLiteral("one");
-    TextFlowSession flow(*session);
-    flow.begin(0, style);
-    clock = T0 + 300;
-    flow.update({b});
-    clock = T0 + 900;
-    b.text = QStringLiteral("one two");
-    flow.update({b});
-    flow.finish();
-    clock = T0 + 50000;
-    flow.begin(0, style);
-    b.text = QStringLiteral("one two three");
-    flow.update({b});
-    flow.finish();
-    const Layer* layer = TextFlow::textLayer(session->getDocument()->getPage(0));
-    ASSERT_TRUE(layer);
-    ASSERT_GT(layer->getElementsView().size(), 0u);
-    for (const Element* e: layer->getElementsView()) {
-        EXPECT_EQ(e->getCreated(), T0 + 300);
-    }
 }

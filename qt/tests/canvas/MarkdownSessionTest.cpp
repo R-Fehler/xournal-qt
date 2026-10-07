@@ -30,7 +30,6 @@
 #include "MarkdownSession.h"
 #include "MdBox.h"
 #include "MdPaginate.h"
-#include "TextFlow.h"
 
 using namespace xqt;
 
@@ -72,11 +71,11 @@ TEST_F(MarkdownSessionTest, boxAtTheBottomAndOneUndoStep) {
     ASSERT_NE(box, nullptr);
     EXPECT_EQ(box->getText(), "# Title\n\nSome *text*.");
     // From the top-left margin (beside the margin line of the default lined page) to the right margin
-    const auto margins = TextFlow::styleFor(page(), TextFlow::Style{});
-    EXPECT_GT(margins.leftMargin, TextFlow::MARGIN);
-    EXPECT_DOUBLE_EQ(box->getTransformation().shift.x, margins.leftMargin);
-    EXPECT_DOUBLE_EQ(box->getTransformation().shift.y, TextFlow::MARGIN);
-    EXPECT_NEAR(box->getWrap(), page()->getWidth() - margins.leftMargin - margins.rightMargin, 1e-9);
+    const auto margins = PageMargins::of(page());
+    EXPECT_GT(margins.left, PageMargins::FULL);
+    EXPECT_DOUBLE_EQ(box->getTransformation().shift.x, margins.left);
+    EXPECT_DOUBLE_EQ(box->getTransformation().shift.y, PageMargins::FULL);
+    EXPECT_NEAR(box->getWrap(), page()->getWidth() - margins.left - margins.right, 1e-9);
 
     session->getUndoRedoHandler()->undo();
     EXPECT_EQ(source(), "") << "one step for the whole edit";
@@ -96,9 +95,9 @@ TEST_F(MarkdownSessionTest, boxAtTheBottomAndOneUndoStep) {
 // cards of the same size, and text written at 2 cm before moves to the new margins when it is edited.
 TEST_F(MarkdownSessionTest, theTextOfASmallPageHasSmallerMargins) {
     const double mm = 72.0 / 25.4;
-    EXPECT_DOUBLE_EQ(PageMargins::forSize(210 * mm, 297 * mm), TextFlow::MARGIN) << "A4";
-    EXPECT_DOUBLE_EQ(PageMargins::forSize(148 * mm, 210 * mm), TextFlow::MARGIN) << "A5";
-    EXPECT_DOUBLE_EQ(PageMargins::forSize(841 * mm, 1189 * mm), TextFlow::MARGIN) << "A0";
+    EXPECT_DOUBLE_EQ(PageMargins::forSize(210 * mm, 297 * mm), PageMargins::FULL) << "A4";
+    EXPECT_DOUBLE_EQ(PageMargins::forSize(148 * mm, 210 * mm), PageMargins::FULL) << "A5";
+    EXPECT_DOUBLE_EQ(PageMargins::forSize(841 * mm, 1189 * mm), PageMargins::FULL) << "A0";
     EXPECT_NEAR(PageMargins::forSize(105 * mm, 148 * mm) / mm, 14.2, 0.05) << "A6";
     EXPECT_NEAR(PageMargins::forSize(74 * mm, 105 * mm) / mm, 10.0, 0.05) << "A7";
     EXPECT_NEAR(PageMargins::forSize(105 * mm, 74 * mm) / mm, 10.0, 0.05) << "A7 landscape: by the short side";
@@ -109,11 +108,11 @@ TEST_F(MarkdownSessionTest, theTextOfASmallPageHasSmallerMargins) {
     card->setSize(74 * mm, 105 * mm);
     card->setBackgroundType(PageType(PageTypeFormat::Plain));
     const double m = PageMargins::forSize(card->getWidth(), card->getHeight());
-    const auto margins = TextFlow::styleFor(card, TextFlow::Style{});
-    EXPECT_DOUBLE_EQ(margins.leftMargin, m);
-    EXPECT_DOUBLE_EQ(margins.topMargin, m);
-    EXPECT_DOUBLE_EQ(margins.rightMargin, m);
-    EXPECT_DOUBLE_EQ(margins.bottomMargin, m);
+    const auto margins = PageMargins::of(card);
+    EXPECT_DOUBLE_EQ(margins.left, m);
+    EXPECT_DOUBLE_EQ(margins.top, m);
+    EXPECT_DOUBLE_EQ(margins.right, m);
+    EXPECT_DOUBLE_EQ(margins.bottom, m);
     MarkdownSession edit(*session);
     edit.begin(0, style);
     edit.update("**Mitochondrion**\n\nthe powerhouse of the cell");
@@ -189,8 +188,8 @@ TEST_F(MarkdownSessionTest, savedAsAnOrdinaryTextAndLoaded) {
     const Text* box = md::boxOf(*layer);
     ASSERT_NE(box, nullptr);
     EXPECT_EQ(box->getText(), src);
-    const auto margins = TextFlow::styleFor(p, TextFlow::Style{});
-    EXPECT_NEAR(box->getWrap(), p->getWidth() - margins.leftMargin - margins.rightMargin, 0.01)
+    const auto margins = PageMargins::of(p);
+    EXPECT_NEAR(box->getWrap(), p->getWidth() - margins.left - margins.right, 0.01)
             << "the width is the wrap width";
     EXPECT_EQ(md::styleOf(*box).family, style.family);
 }

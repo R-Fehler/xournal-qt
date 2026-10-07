@@ -27,7 +27,7 @@
 #include "MarkdownEditor.h"
 #include "MdFormat.h"
 #include "TextEditor.h"
-#include "TextFlow.h"
+#include "session/PageMargins.h"
 
 using namespace xqt;
 
@@ -74,8 +74,8 @@ protected:
     }
     /// The page's Markdown text, written on the page.
     MarkdownEditor& startMarkdown() {
-        const auto m = TextFlow::styleFor(session->getDocument()->getPage(0), TextFlow::Style{});
-        view->startMarkdown(0, true, m.leftMargin + 5, TextFlow::MARGIN + 5);
+        const auto m = PageMargins::of(session->getDocument()->getPage(0));
+        view->startMarkdown(0, true, m.left + 5, PageMargins::FULL + 5);
         EXPECT_NE(view->getMarkdownEditor(), nullptr);
         return *view->getMarkdownEditor();
     }

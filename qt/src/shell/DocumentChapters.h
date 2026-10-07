@@ -3,7 +3,7 @@
  *
  * They come from the document itself, so nothing is stored beside it and Xournal++ keeps everything:
  *  - a text that begins with "# ", "## " or "### " (the level is the number of marks), and
- *  - the headings of the text mode (bold, 24 / 18 / 15 pt), and
+ *  - a bold text of 24, 18 or 15 pt (a heading of levels 1-3), and
  *  - the headings 1-3 of Markdown boxes.
  * The contents sidebar and the contents overview show them when the document has no PDF table of contents.
  *
@@ -29,7 +29,7 @@ std::vector<Chapter> find(Document& document);
 
 /// The text of a heading for the given level, as `find` recognizes it again.
 std::string headingText(const std::string& title, int level);
-/// Size of a heading of that level (the text mode uses the same ones).
+/// Size of a heading of that level.
 double headingSize(int level);
 
 }  // namespace xqt::DocumentChapters

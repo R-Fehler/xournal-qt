@@ -39,7 +39,7 @@
 #include "MdImages.h"
 #include "MdLayout.h"
 #include "CanvasPage.h"
-#include "TextFlow.h"
+#include "session/PageMargins.h"
 #include "model/Layer.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
@@ -263,8 +263,8 @@ TEST_F(TextDocumentTest, aTapAnywhereOnAPagePutsTheCursorIntoTheText) {
     EXPECT_GE(cursor, starts[1]);
     EXPECT_LE(cursor, starts[2]);
     // Another tap on the first page moves it there
-    view->textPress(*view->canvasPageOf(session->getDocument()->getPage(0).get()), TextFlow::MARGIN + 1,
-                    TextFlow::MARGIN + 1);
+    view->textPress(*view->canvasPageOf(session->getDocument()->getPage(0).get()), PageMargins::FULL + 1,
+                    PageMargins::FULL + 1);
     EXPECT_LT(view->getMarkdownEditor()->cursorPosition(), starts[1]);
 }
 
@@ -399,7 +399,7 @@ TEST_F(TextDocumentTest, aPlainTextFileIsWrittenAsItIsWithoutMarkdown) {
     {
         const Layer* layer = md::markdownLayer(session->getDocument()->getPage(0));
         ASSERT_NE(layer, nullptr);
-        box = md::pageBoxOf(*layer, TextFlow::MARGIN, TextFlow::MARGIN);
+        box = md::pageBoxOf(*layer, PageMargins::FULL, PageMargins::FULL);
     }
     ASSERT_NE(box, nullptr);
     EXPECT_TRUE(md::isPlain(box->getText()));

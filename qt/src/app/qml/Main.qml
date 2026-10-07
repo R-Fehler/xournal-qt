@@ -201,10 +201,10 @@ ApplicationWindow {
         return y
     }
 
-    // --- the source panels: the Markdown source (and the deprecated text flow) beside or below the page ------------
+    // --- the source panel: the Markdown source beside or below the page --------------------------------------------
     // (qt/docs/adaptive-layout.md, "Panels")
     /// The panel open now, or null
-    readonly property Item sourcePanel: markdownPanel.visible ? markdownPanel : textFlowPanel.visible ? textFlowPanel : null
+    readonly property Item sourcePanel: markdownPanel.visible ? markdownPanel : null
     /// Below the page (the page above, its source below, a divider between them) in a portrait tablet or phone, and in
     /// any portrait window too narrow for a panel beside the page; else beside it, at the right (a desktop, narrow or
     /// wide, a phone held sideways). "Adapt the layout" off: beside it, as before.
@@ -1810,8 +1810,6 @@ ApplicationWindow {
         // shape
         ToolCycleButton { id: snipTool; objectName: "snipButton"; parent: toolBank; group: "snip"; property bool offered: !win.textDoc }
         // Writing on the page with the keyboard: Markdown, formatted while typing (hold: its source beside the page).
-        // DEPRECATED (2026-09-26): the text mode (TextFlowPanel, TextFlow) is no longer offered here; its code stays
-        // for now (qt/docs/text-mode.md).
         IconButton {
             id: writeButton
             objectName: "textModeButton"
@@ -1821,12 +1819,11 @@ ApplicationWindow {
             iconName: "xqt-page-text"
             label: qsTr("Write on the page")
             tip: qsTr("Write on the page: Markdown, shown formatted (Ctrl+Alt+M). Hold: its source beside the page")
-            checked: textFlowPanel.visible || markdownPanel.visible || app.markdownOnPage
+            checked: markdownPanel.visible || app.markdownOnPage
             ownHold: true
             readonly property string holdText: qsTr("Markdown source beside the page…")
             onClicked: {
-                if (textFlowPanel.visible) textFlowPanel.close(true)
-                else if (markdownPanel.visible) markdownPanel.close(true)
+                if (markdownPanel.visible) markdownPanel.close(true)
                 else if (app.markdownOnPage) app.endMarkdownOnPage()
                 else app.writeMarkdownOnPage()  // (formatted while typing, on the page)
             }
@@ -2969,16 +2966,6 @@ ApplicationWindow {
             }
         }
     }
-    // Text mode (deprecated): beside the pages (right), or below them in portrait; the canvas makes room
-    TextFlowPanel {
-        id: textFlowPanel
-        atBottom: win.sourceAtBottom
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: win.toolboxBottom
-        anchors.right: win.dockRail ? phoneDock.left : win.sideEdge === "right" ? sideTools.left : parent.right
-        width: !visible ? 0 : atBottom ? referenceSplit.width : win.sourceSideWidth
-        height: atBottom ? win.sourceBottomHeight : parent.height - win.toolboxTop - win.toolboxBottom
-    }
     // Markdown box, or the Markdown of a page: the same place
     MarkdownPanel {
         id: markdownPanel
@@ -3050,12 +3037,10 @@ ApplicationWindow {
         target: app
         // The text tool tapped a Markdown box
         function onMarkdownRequested(page) {
-            if (textFlowPanel.visible) textFlowPanel.close(true)
             if (!markdownPanel.visible || app.markdownPage !== page || !app.markdownIsPageText) markdownPanel.open(page)
         }
         // A Markdown text box (or a place for a new one)
         function onMarkdownBoxRequested(page, x, y) {
-            if (textFlowPanel.visible) textFlowPanel.close(true)
             markdownPanel.openBox(page, x, y)
         }
     }
@@ -5354,7 +5339,7 @@ ApplicationWindow {
     }
 
     // Document shortcuts do nothing while the home screen is shown.
-    readonly property bool docKeys: !app.homeVisible && !app.textFlowActive && !app.markdownActive && !replaying
+    readonly property bool docKeys: !app.homeVisible && !app.markdownActive && !replaying
     // The keys come from the shortcut settings (app.shortcuts); reading its revision keeps the bindings fresh.
     function keysOf(id) { return (app.shortcuts.revision, app.shortcuts.keys(id)) }
     Shortcut { sequences: win.keysOf("undo"); enabled: docKeys; onActivated: app.undo() }
@@ -5502,7 +5487,6 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("forward"); enabled: docKeys; onActivated: app.navigateForward() }
     Shortcut { sequences: win.keysOf("pageGrid"); enabled: docKeys; onActivated: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
     Shortcut { sequences: win.keysOf("contents"); enabled: docKeys; onActivated: contentsOverview.visible ? contentsOverview.close() : contentsOverview.open() }
-    // (DEPRECATED: the text mode's Ctrl+Alt+E is gone with it; TextFlowPanel stays, not offered)
     Shortcut {
         // Markdown on the page (formatted while typing); pressed again while writing there: its source beside the
         // page

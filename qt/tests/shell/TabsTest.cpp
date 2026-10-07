@@ -343,16 +343,9 @@ TEST(Windows, closingAWindowKeepsDocumentsWithUnsavedChanges) {
     QCoreApplication::processEvents();
 }
 
-// (the colors of the deprecated text mode's color row)
-TEST(ToolbarColors, orangeByDefault) {
+// Highlight colors of PDF text: three presets, yellow first
+TEST(PdfHighlightColors, threePresetsYellowFirst) {
     AppController c;
-    const QVariantList defaults = c.toolbarColors();
-    ASSERT_EQ(defaults.size(), 10) << "the Xournal++ palette without white";
-    EXPECT_EQ(defaults[8].value<QColor>(), QColor(255, 128, 0)) << "orange";
-    EXPECT_EQ(defaults[9].value<QColor>(), QColor(255, 255, 0)) << "yellow";
-    EXPECT_FALSE(defaults.contains(QColor(Qt::white)));
-
-    // Highlight colors: three presets, yellow first
     ASSERT_EQ(c.pdfHighlightColors().size(), 3);
     EXPECT_EQ(c.pdfHighlightColor(), c.pdfHighlightColors().first().value<QColor>());
     c.setPdfHighlightColor(c.pdfHighlightColors().at(2).value<QColor>());

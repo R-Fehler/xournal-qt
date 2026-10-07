@@ -35,7 +35,7 @@
 #include "MarkdownBoxResize.h"
 #include "MarkdownEditor.h"
 #include "MdBox.h"
-#include "TextFlow.h"
+#include "session/PageMargins.h"
 
 using namespace xqt;
 
@@ -280,8 +280,8 @@ TEST_F(MarkdownBoxResizeTest, theEditOfAnExistingBoxUndoesItsWidth) {
 
 // The page's own Markdown text goes from margin to margin: no handle, while it is written or when it is selected.
 TEST_F(MarkdownBoxResizeTest, thePageTextHasNoHandle) {
-    const auto m = TextFlow::styleFor(page(), TextFlow::Style{});
-    view->startMarkdown(0, true, m.leftMargin + 5, TextFlow::MARGIN + 5);
+    const auto m = PageMargins::of(page());
+    view->startMarkdown(0, true, m.left + 5, PageMargins::FULL + 5);
     MarkdownEditor* editor = view->getMarkdownEditor();
     ASSERT_NE(editor, nullptr);
     type(LONG_TEXT);
@@ -382,8 +382,8 @@ TEST_F(MarkdownBoxResizeTest, theWidthIsSavedAndLoaded) {
 
 // A box resized on a page with the page's own text: the page's text stays as it was (its flow is the page's).
 TEST_F(MarkdownBoxResizeTest, aResizedBoxLeavesThePageTextAlone) {
-    const auto m = TextFlow::styleFor(page(), TextFlow::Style{});
-    view->startMarkdown(0, true, m.leftMargin + 5, TextFlow::MARGIN + 5);
+    const auto m = PageMargins::of(page());
+    view->startMarkdown(0, true, m.left + 5, PageMargins::FULL + 5);
     type("# Page\n" + LONG_TEXT);
     view->endTextEditing();
     ASSERT_EQ(texts().size(), 1u);
@@ -402,5 +402,5 @@ TEST_F(MarkdownBoxResizeTest, aResizedBoxLeavesThePageTextAlone) {
     EXPECT_EQ(pageText->getText(), source);
     EXPECT_DOUBLE_EQ(pageText->getWrap(), pageWidth);
     EXPECT_EQ(session->getDocument()->getPageCount(), pages);
-    EXPECT_EQ(md::pageBoxOf(*md::markdownLayer(page()), m.leftMargin, TextFlow::MARGIN), pageText);
+    EXPECT_EQ(md::pageBoxOf(*md::markdownLayer(page()), m.left, PageMargins::FULL), pageText);
 }

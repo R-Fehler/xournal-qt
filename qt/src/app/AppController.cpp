@@ -112,7 +112,6 @@
 #include "MdPassages.h"
 #include "session/FuzzyQuery.h"
 #include "session/TextMatch.h"
-#include "TextFlow.h"
 #include "session/ArchivePdf.h"
 #include "session/HybridPdf.h"
 #include "session/MergedPdf.h"
@@ -447,7 +446,6 @@ AppController::~AppController() {
     for (auto& c: currentConnections) {
         disconnect(c);
     }
-    flow.reset();  // (before the sessions)
     timelineControl.reset();  // (a replay ends: its view shows the whole document again)
     audioControl.reset();  // (a recording ends, and its document is told, before the sessions go)
     pages->setSession(nullptr);
@@ -679,68 +677,13 @@ DocumentSession* AppController::session() const { return tabs->currentSession();
 bool AppController::textPagesFixed() const { return session() && session()->textFile() && !session()->hasFilePath(); }
 CanvasView* AppController::canvas() const { return tabs->currentView(); }
 
-bool AppController::textFlowActive() const { return flow && flow->active(); }
-
-QString AppController::textFlowFamily() const {
+QString AppController::textFontFamily() const {
     QString family = QString::fromStdString(app->getSettings()->getFont().getName());
     // (a font name may have a style, e.g. "Sans Bold": the family only)
     for (const char* style: {" Bold", " Italic", " Regular"}) {
         family.remove(QLatin1String(style));
     }
     return family.trimmed().isEmpty() ? QStringLiteral("Sans") : family.trimmed();
-}
-
-QVariantList AppController::beginTextFlow() {
-    endTextFlow(true);
-    endMarkdown(true);
-    if (!session()) {
-        return {};
-    }
-    flowSession = session();
-    flow = std::make_unique<TextFlowSession>(*flowSession);
-    TextFlow::Style style;
-    style.family = textFlowFamily().toStdString();
-    style.bodySize = app->getSettings()->getFont().getSize();
-    flowPage = static_cast<int>(flowSession->getCurrentPageNo());
-    QVariantList list;
-    for (const auto& b: flow->begin(static_cast<size_t>(flowPage), style)) {
-        list.append(TextFlow::toVariant(b));
-    }
-    flowOverflow = 0;
-    Q_EMIT textFlowChanged();
-    return list;
-}
-
-void AppController::updateTextFlow(const QVariantList& blocks) {
-    if (!textFlowActive()) {
-        return;
-    }
-    std::vector<TextBlock> list;
-    for (const QVariant& v: blocks) {
-        list.push_back(TextFlow::fromVariant(v.toMap()));
-    }
-    const double overflow = flow->update(list);
-    if (overflow != flowOverflow) {
-        flowOverflow = overflow;
-        Q_EMIT textFlowChanged();
-    }
-}
-
-void AppController::endTextFlow(bool keep) {
-    if (!flow) {
-        return;
-    }
-    if (keep) {
-        flow->finish();
-    } else {
-        flow->cancel();
-    }
-    flow.reset();
-    flowSession = nullptr;
-    flowPage = -1;
-    flowOverflow = 0;
-    Q_EMIT textFlowChanged();
-    Q_EMIT undoRedoChanged();
 }
 
 bool AppController::markdownActive() const { return markdown && markdown->active(); }
@@ -762,7 +705,6 @@ bool AppController::writeMarkdownOnPage() {
         return false;
     }
     endMarkdown(true);
-    endTextFlow(true);
     const size_t page = std::min(s->getCurrentPageNo(), s->getDocument()->getPageCount() - 1);
     double w = 0;
     double h = 0;
@@ -797,7 +739,6 @@ QVariantMap AppController::takeMarkdownFromPage() {
 
 QString AppController::startMarkdown(int page, std::optional<QPointF> at) {
     endMarkdown(true);
-    endTextFlow(true);
     // The document with the keys: the reference while it is written in, else the notes
     DocumentSession* target = editedReference() ? &editedReference()->getSession() : session();
     if (!target || target->isReadOnly() || target->textFile()) {
@@ -806,11 +747,11 @@ QString AppController::startMarkdown(int page, std::optional<QPointF> at) {
     mdSession = target;
     markdown = std::make_unique<MarkdownSession>(*mdSession);
     md::Style style;
-    style.family = textFlowFamily().toStdString();
+    style.family = textFontFamily().toStdString();
     style.size = markdownFontSize();
     style.color = app->getToolHandler()->getColor();
     if (!at) {
-        style.color = Color(0, 0, 0);  // (the page's text: black, as the text mode)
+        style.color = Color(0, 0, 0);  // (the page's text: black)
     }
     mdPage = page >= 0 ? page : static_cast<int>(mdSession->getCurrentPageNo());
     const QString source = QString::fromStdString(
@@ -860,9 +801,6 @@ void AppController::endMarkdown(bool keep) {
 }
 
 void AppController::currentTabChanged() {
-    if (flow && flowSession != session()) {
-        endTextFlow(true);  // another document: the text mode ends (kept)
-    }
     if (markdown && mdSession != session()) {
         endMarkdown(true);  // another document: editing the box ends (kept)
     }
@@ -1808,17 +1746,6 @@ QVariantList AppController::palette() const {
     QVariantList list;
     for (size_t i = 0; i < colors->size(); ++i) {
         list.append(toQColor(colors->getColorAt(i).getColor()));
-    }
-    return list;
-}
-
-QVariantList AppController::toolbarColors() const {
-    // Upstream's palette (black, green, light blue, light green, blue, gray, red, magenta, orange, yellow), not white
-    QVariantList list;
-    for (const QVariant& c: palette()) {
-        if (c.value<QColor>() != QColor(Qt::white)) {
-            list.append(c);
-        }
     }
     return list;
 }
@@ -3113,9 +3040,6 @@ bool AppController::compareConflict(const QString& document, const QString& copy
 }
 
 void AppController::closeTab(int index) {
-    if (flow && flowSession == tabs->session(index)) {
-        endTextFlow(true);
-    }
     if (markdown && mdSession == tabs->session(index)) {
         endMarkdown(true);
     }
