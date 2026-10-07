@@ -40,7 +40,7 @@ Item {
         if (back && backTakers > 0) return ""
         if (win.layout.sidebarDrawerOpen && sidebar.visible) return "drawer"
         if (docKeys && app.curtainHandles) return "curtain"
-        if (docKeys && (app.hasSelection || app.noteSelected || app.pdfTextIsSelected)) return "selection"
+        if (docKeys && (app.edit.hasSelection || app.edit.noteSelected || app.edit.pdfTextIsSelected)) return "selection"
         if (app.snip !== "") return "snip"
         if (app.todoStamp) return "stamp"
         if (win.modes.replaying && !app.homeVisible) return "replay"
@@ -55,8 +55,8 @@ Item {
         case "drawer": win.layout.showSidebar(false); break
         case "curtain": app.curtainHandles = false; break
         case "selection":
-            if (app.hasSelection || app.noteSelected) app.clearSelection()
-            if (app.pdfTextIsSelected) app.edit.clearPdfTextSelection()
+            if (app.edit.hasSelection || app.edit.noteSelected) app.clearSelection()
+            if (app.edit.pdfTextIsSelected) app.edit.clearPdfTextSelection()
             break
         case "snip": app.cancelSnip(); break
         case "stamp": app.cancelTodoStamp(); break
@@ -138,7 +138,7 @@ Item {
     readonly property bool presentKeys: toolKeys && app.presenting
     Shortcut { sequences: ["Space", "Right", "Down", "PgDown"]; enabled: windowShortcuts.presentKeys; onActivated: app.nextPage() }
     Shortcut { sequences: ["Left", "Up", "PgUp"]; enabled: windowShortcuts.presentKeys; onActivated: app.previousPage() }
-    Shortcut { sequence: "Backspace"; enabled: windowShortcuts.presentKeys && !app.hasSelection; onActivated: app.previousPage() }
+    Shortcut { sequence: "Backspace"; enabled: windowShortcuts.presentKeys && !app.edit.hasSelection; onActivated: app.previousPage() }
     Shortcut { sequence: "Home"; enabled: windowShortcuts.presentKeys; onActivated: app.firstPage() }
     Shortcut { sequence: "End"; enabled: windowShortcuts.presentKeys; onActivated: app.lastPage() }
 
@@ -251,21 +251,21 @@ Item {
     Shortcut { sequences: win.keysOf("replace"); onActivated: app.homeVisible ? homeView.focusSearch() : searchBar.openReplace() }
     // Selected elements (the page sidebar and grid handle these keys themselves when they have the focus)
     Shortcut { sequences: win.keysOf("copy"); enabled: docKeys; onActivated: app.copySelection() }
-    Shortcut { sequences: win.keysOf("cut"); enabled: docKeys; onActivated: app.cutSelection() }
+    Shortcut { sequences: win.keysOf("cut"); enabled: docKeys; onActivated: app.keyTarget.cutSelection() }
     Shortcut { sequences: win.keysOf("paste"); enabled: docKeys; onActivated: app.pasteElements() }
-    Shortcut { sequences: win.keysOf("deleteSelection"); enabled: docKeys && (app.hasSelection || app.noteSelected); onActivated: app.deleteSelection() }
+    Shortcut { sequences: win.keysOf("deleteSelection"); enabled: docKeys && (app.edit.hasSelection || app.edit.noteSelected); onActivated: app.keyTarget.deleteSelection() }
     Shortcut { sequences: win.keysOf("selectAll"); enabled: docKeys; onActivated: app.selectAllOnPage() }
-    Shortcut { sequences: win.keysOf("group"); enabled: docKeys; onActivated: app.groupSelection() }
-    Shortcut { sequences: win.keysOf("ungroup"); enabled: docKeys; onActivated: app.ungroupSelection() }
+    Shortcut { sequences: win.keysOf("group"); enabled: docKeys; onActivated: app.keyTarget.groupSelection() }
+    Shortcut { sequences: win.keysOf("ungroup"); enabled: docKeys; onActivated: app.keyTarget.ungroupSelection() }
     // The page (the first selected page) as a high-resolution picture on the clipboard (qt/docs/features/page-files.md)
     Shortcut { sequences: win.keysOf("copyPageImage"); enabled: docKeys && !win.textDoc; onActivated: app.copyPagesAsImage(app.pages.selectionCount > 0 ? app.pages.selectedPages() : []) }
     Shortcut { sequences: win.keysOf("findNext"); enabled: docKeys; onActivated: app.searchNext() }
     Shortcut { sequences: win.keysOf("findPrevious"); enabled: docKeys; onActivated: app.searchPrevious() }
-    Shortcut { sequences: win.keysOf("zoomIn"); enabled: docKeys; onActivated: app.zoomIn() }
-    Shortcut { sequences: win.keysOf("zoomOut"); enabled: docKeys; onActivated: app.zoomOut() }
-    Shortcut { sequences: win.keysOf("fitWidth"); enabled: docKeys; onActivated: app.fitWidth() }
+    Shortcut { sequences: win.keysOf("zoomIn"); enabled: docKeys; onActivated: app.keyTarget.zoomIn() }
+    Shortcut { sequences: win.keysOf("zoomOut"); enabled: docKeys; onActivated: app.keyTarget.zoomOut() }
+    Shortcut { sequences: win.keysOf("fitWidth"); enabled: docKeys; onActivated: app.keyTarget.fitWidth() }
     Shortcut { sequences: win.keysOf("rotateRight"); enabled: docKeys && app.canRotateCanvas; onActivated: app.rotateCanvas(90) }
     Shortcut { sequences: win.keysOf("rotateLeft"); enabled: docKeys && app.canRotateCanvas; onActivated: app.rotateCanvas(-90) }
-    Shortcut { sequences: win.keysOf("realSize"); enabled: docKeys; onActivated: app.zoomToRealSize() }
+    Shortcut { sequences: win.keysOf("realSize"); enabled: docKeys; onActivated: app.keyTarget.zoomToRealSize() }
     Shortcut { sequences: win.keysOf("quit"); onActivated: win.close() }
 }

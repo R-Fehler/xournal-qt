@@ -823,7 +823,7 @@ ApplicationWindow {
         id: imageDialog
         title: qsTr("Insert image")
         nameFilters: [qsTr("Images (*.png *.jpg *.jpeg *.gif *.bmp *.webp *.svg)"), qsTr("All files (*)")]
-        onAccepted: app.insertImage(selectedFile)
+        onAccepted: app.edit.insertImage(selectedFile)
     }
     StartupFlow { id: startupFlow }
     Component.onCompleted: startupFlow.start()
@@ -989,11 +989,11 @@ ApplicationWindow {
         // On PDF text a long press (or right click) selects the word, and its actions offer paste as well; elsewhere
         // it offers what can be done here
         function onContextRequested(viewPos) {
-            if (app.selectPdfTextAt(viewPos.x, viewPos.y)) {
+            if (app.edit.selectPdfTextAt(viewPos.x, viewPos.y)) {
                 pdfTextBar.offerPaste(viewPos)
                 return
             }
-            contextPill.openAt(viewPos, app.pdfTextIsSelected)
+            contextPill.openAt(viewPos, app.edit.pdfTextIsSelected)
         }
     }
     BackgroundDialog { id: backgroundDialog }

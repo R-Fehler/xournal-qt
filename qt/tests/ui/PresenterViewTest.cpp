@@ -23,6 +23,7 @@
 #include <QTest>
 #include <gtest/gtest.h>
 
+#include "shell/CanvasActions.h"
 #include "model/Document.h"
 #include "model/Layer.h"
 #include "model/XojPage.h"
@@ -366,7 +367,7 @@ TEST_F(PresenterView, theAudienceFollowsThePresentersZoom) {
     // Zoomed in on the slide (the zoom pill's +): the audience sees that part, at its screen's shape
     const QPointF middle = view->pageViewRect(0).topLeft() + QPointF(slideWidth / 2, slideHeight / 3) * vc.zoom();
     vc.setZoom(vc.zoom() * 3, middle);
-    controller->zoomIn();
+    controller->keyTarget().zoomIn();
     wait(100);
     const QRectF part = console->shownRect();
     EXPECT_NE(part, slide);

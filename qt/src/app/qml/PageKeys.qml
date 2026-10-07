@@ -21,8 +21,8 @@ QtObject {
             app.deletePages(sel)
             return true
         // (a selected sticky note is copied or cut rather than the pages, a copied one pasted on the current page)
-        case Qt.Key_C: if (ctrl) { if (app.noteSelected || app.notesSelectedTogether) app.copyStickyNote(); else app.copyPages(sel); return true } break
-        case Qt.Key_X: if (ctrl) { if (app.noteSelected || app.notesSelectedTogether) app.cutStickyNote(); else app.cutPages(sel); return true } break
+        case Qt.Key_C: if (ctrl) { if (app.edit.noteSelected || app.notesSelectedTogether) app.edit.copyStickyNote(); else app.copyPages(sel); return true } break
+        case Qt.Key_X: if (ctrl) { if (app.edit.noteSelected || app.notesSelectedTogether) app.edit.cutStickyNote(); else app.cutPages(sel); return true } break
         case Qt.Key_V: if (ctrl) { if (app.pastesNoteBeforePages()) app.pasteElements(); else app.pastePages(-1); return true } break
         case Qt.Key_D: if (ctrl) { app.duplicatePages(sel); return true } break
         case Qt.Key_A: if (ctrl) { app.pages.selectAll(); return true } break

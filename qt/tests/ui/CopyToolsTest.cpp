@@ -22,6 +22,7 @@
 #include <QTest>
 #include <gtest/gtest.h>
 
+#include "shell/CanvasActions.h"
 #include "hwr/FakeRecognizer.h"
 #include "hwr/HandwritingSearch.h"
 #include "model/Document.h"
@@ -245,7 +246,7 @@ TEST_F(CopyToolsTest, theSelectionPillCopiesTheHandwritingAsText) {
     handwriting(true);
     makeNotes();
     controller->selectAllOnPage();
-    until([&] { return controller->hasSelection(); });
+    until([&] { return controller->edit().hasSelection(); });
     auto* copyText = find<QQuickItem>("selectionCopyText");
     ASSERT_NE(copyText, nullptr);
     until([&] { return copyText->isVisible(); });
@@ -257,7 +258,7 @@ TEST_F(CopyToolsTest, theSelectionPillCopiesTheHandwritingAsText) {
     EXPECT_EQ(clipboardText(), both);
     until([&] { return find<QQuickItem>("inkTextToast")->isVisible(); });
     EXPECT_TRUE(find<QQuickItem>("inkTextToast")->isVisible());
-    EXPECT_TRUE(controller->hasSelection()) << "the selection stays";
+    EXPECT_TRUE(controller->edit().hasSelection()) << "the selection stays";
     // Nothing but a picture selected: no "Copy as text"
     controller->clearSelection();
     until([&] { return !copyText->isVisible(); });

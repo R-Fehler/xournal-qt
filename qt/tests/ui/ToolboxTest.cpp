@@ -29,6 +29,7 @@
 #include <QWheelEvent>
 #include <gtest/gtest.h>
 
+#include "shell/CanvasActions.h"
 #include "audio/AudioDevice.h"
 #include "audio/AudioFiles.h"
 #include "audio/FakeAudio.h"
@@ -449,8 +450,8 @@ TEST_F(ToolboxTest, aTapPicksUpAToolAndTheOneInHandIsLifted) {
 
     // A sticky note entry: a note on the page in its color
     click(entry(nth("sticky")));
-    until([&] { return controller->noteSelected(); });
-    EXPECT_TRUE(controller->noteSelected());
+    until([&] { return controller->edit().noteSelected(); });
+    EXPECT_TRUE(controller->edit().noteSelected());
 
     // The keys: the entry of that type used last
     click(entry(red));

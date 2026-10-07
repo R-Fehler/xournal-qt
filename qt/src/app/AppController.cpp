@@ -283,8 +283,6 @@ void AppController::makeTabs() {
     }
     connect(edits.get(), &CanvasActions::notice, this, [this](const QString& text) { Q_EMIT pageActionDone(text, false); });
     connect(edits.get(), &CanvasActions::selectionChanged, this, &AppController::selectionChanged);
-    connect(edits.get(), &CanvasActions::noteSelectionChanged, this, &AppController::noteSelectionChanged);
-    connect(edits.get(), &CanvasActions::pdfTextSelectionChanged, this, &AppController::pdfTextSelectionChanged);
     connect(edits.get(), &CanvasActions::navigationChanged, this, &AppController::navigationChanged);
     // The reference written in: its text tool makes Markdown text as the notes' does, edited in the same panel
     connect(referenceMode.get(), &ReferenceMode::changed, this, &AppController::applyMarkdownText);
@@ -305,6 +303,7 @@ void AppController::makeTabs() {
     // follow its history then
     connect(referenceMode.get(), &ReferenceMode::undoRedoChanged, this, &AppController::undoRedoChanged);
     connect(referenceMode.get(), &ReferenceMode::focusedChanged, this, &AppController::undoRedoChanged);
+    connect(referenceMode.get(), &ReferenceMode::focusedChanged, this, &AppController::keyTargetChanged);
     connect(referenceMode.get(), &ReferenceMode::changed, this, &AppController::undoRedoChanged);
     connect(tabs.get(), &TabManager::pdfPagesFailed, this, [this](const QString& error) {
         Q_EMIT message(tr("Pasting PDF pages failed"),
@@ -822,14 +821,11 @@ void AppController::connectCurrentDocument() {
     });
 }
 
-bool AppController::hasSelection() const { return edits->hasSelection(); }
 QObject* AppController::editObject() const { return edits.get(); }
+QObject* AppController::keyTargetObject() const { return keyActions(); }
 CanvasActions* AppController::keyActions() const {
     return referenceMode->focused() ? &referenceMode->actions() : edits.get();
 }
-// (the reference with the keys refuses what changes it unless it is written in: CanvasActions::readingOnly)
-bool AppController::groupSelection() { return keyActions()->groupSelection(); }
-bool AppController::ungroupSelection() { return keyActions()->ungroupSelection(); }
 bool AppController::copySelection() {
     if (referenceMode->focused() && (referenceMode->hasSelection() || referenceMode->actions().noteSelected())) {
         return referenceMode->copy();  // (the keys are for the reference while it has the focus)
@@ -839,10 +835,6 @@ bool AppController::copySelection() {
 CanvasView* AppController::editedReference() const {
     return referenceMode->focused() && referenceMode->editing() ? referenceMode->canvas() : nullptr;
 }
-bool AppController::cutSelection() {
-    // (the keys with a reference for reading: nothing is cut, neither there nor in the notes)
-    return keyActions()->cutSelection();
-}
 bool AppController::pasteElements() {
     if (textPagesFixed()) {
         return false;  // (a text file: its pages are its text)
@@ -850,11 +842,9 @@ bool AppController::pasteElements() {
     // (with a reference for reading: into the notes)
     return editedReference() ? referenceMode->actions().pasteElements() : edits->pasteElements();
 }
-void AppController::deleteSelection() { keyActions()->deleteSelection(); }
 void AppController::selectAllOnPage() {
     (editedReference() ? referenceMode->actions() : *edits).selectAllOnPage();
 }
-bool AppController::insertImage(const QUrl& url) { return edits->insertImage(url); }
 
 void AppController::clearSelection() {
     if (canvas()) {
@@ -4221,13 +4211,10 @@ QVariantList AppController::stickyNoteColors() const {
     }
     return colors;
 }
-bool AppController::noteSelected() const { return edits->noteSelected(); }
 bool AppController::notesSelectedTogether() const { return canvas() && canvas()->mixed().active(); }
-bool AppController::copyStickyNote() { return edits->copyStickyNote(); }
-bool AppController::cutStickyNote() { return edits->cutStickyNote(); }
 bool AppController::pastesNoteBeforePages() const {
     return (StickyNotes::clipboardHasNote() || MixedSelection::clipboardHas()) &&
-           (noteSelected() || notesSelectedTogether() || pageClipboard->isEmpty() || !pagesCopiedLast);
+           (edits->noteSelected() || notesSelectedTogether() || pageClipboard->isEmpty() || !pagesCopiedLast);
 }
 bool AppController::pageHasNotes() const {
     return canvas() && canvas()->notes().pageHasNotes(session()->getCurrentPageNo());
@@ -4368,8 +4355,6 @@ void AppController::setSize(int s) {
     Q_EMIT toolChanged();
 }
 
-void AppController::fitWidth() { keyActions()->fitWidth(); }  // (the reference's page in view while it has the keys)
-
 double AppController::canvasRotation() const { return canvas() ? canvas()->getViewController().rotation() : 0.0; }
 
 bool AppController::canRotateCanvas() const { return canvas() && canvas()->rotationAllowed(); }
@@ -4420,8 +4405,6 @@ bool AppController::currentPageDiffers() const {
     return page->getWidth() != other->getWidth() || page->getHeight() != other->getHeight();
 }
 
-void AppController::zoomIn() { keyActions()->zoomIn(); }
-
 void AppController::setZoomPercent(int percent) {
     if (canvas() && percent > 0 && zoomPercent() > 0) {
         auto& vc = canvas()->getViewController();
@@ -4429,10 +4412,6 @@ void AppController::setZoomPercent(int percent) {
                   QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
     }
 }
-
-void AppController::zoomToRealSize() { keyActions()->zoomToRealSize(); }
-
-void AppController::zoomOut() { keyActions()->zoomOut(); }
 
 void AppController::addPageAfterCurrent() {
     if (textPagesFixed()) {
@@ -5041,9 +5020,6 @@ bool AppController::addChapter(int page, const QString& title, int level) {
 
 // (Copy link to other places: AppLinks.cpp)
 
-bool AppController::pdfTextIsSelected() const { return edits->pdfTextIsSelected(); }
-// (x, y: the canvas item's; the same word again: its whole line)
-bool AppController::selectPdfTextAt(qreal x, qreal y) { return edits->selectPdfTextAt(x, y); }
 
 bool AppController::hasPdfBackground() const {
     return session() && !session()->getDocument()->getPdfFilepath().empty();

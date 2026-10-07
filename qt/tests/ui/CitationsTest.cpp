@@ -189,7 +189,7 @@ protected:
         const QPointF onLine = v->pageViewRect(0).topLeft() + QPointF(REF_X + 120, y - 3) * zoom;
         ASSERT_TRUE(v->selectPdfTextAt(onLine, true));
         until([&] { return shown("pdfLookUpButton"); });
-        ASSERT_TRUE(controller->pdfTextIsSelected());
+        ASSERT_TRUE(controller->edit().pdfTextIsSelected());
         EXPECT_TRUE(controller->edit().selectedText().contains(text)) << controller->edit().selectedText().toStdString();
     }
 
@@ -337,7 +337,7 @@ TEST_F(CitationsTest, selectedTextIsSearchedInTheDocumentTheTabsAndTheLibrary) {
     EXPECT_GT(controller->searchHitCount(), 0) << "found on the page it was selected on";
 
     // In the open tabs: the overview opens with its search for the text, run
-    if (!controller->pdfTextIsSelected()) {
+    if (!controller->edit().pdfTextIsSelected()) {
         selectReference();
     }
     click("pdfLookUpButton");
@@ -356,7 +356,7 @@ TEST_F(CitationsTest, selectedTextIsSearchedInTheDocumentTheTabsAndTheLibrary) {
     until([&] { return !shown("tabOverview"); });
 
     // In the library: the home screen, with the library's search for the text
-    if (!controller->pdfTextIsSelected()) {
+    if (!controller->edit().pdfTextIsSelected()) {
         selectReference();
     }
     click("pdfLookUpButton");
@@ -397,7 +397,7 @@ TEST_F(CitationsTest, searchTheWebAsksWithTheEnginesAddress) {
 
     // A custom address, and no more questions
     settings()->set("webSearch", "https://search.example.org/find?lang=de&q={text}");
-    if (!controller->pdfTextIsSelected()) {
+    if (!controller->edit().pdfTextIsSelected()) {
         selectReference();
     }
     click("pdfLookUpButton");
@@ -411,7 +411,7 @@ TEST_F(CitationsTest, searchTheWebAsksWithTheEnginesAddress) {
     ASSERT_EQ(browser.opened.size(), 2);
     EXPECT_EQ(browser.opened.back().host(), "search.example.org");
     EXPECT_EQ(QUrlQuery(browser.opened.back()).queryItemValue("q", QUrl::FullyDecoded), query);
-    if (!controller->pdfTextIsSelected()) {
+    if (!controller->edit().pdfTextIsSelected()) {
         selectReference();
     }
     click("pdfLookUpButton");

@@ -47,7 +47,7 @@ Pane {
         if (!visible) zoomBefore = app.zoomPercent
         area.text = source
         visible = true
-        Qt.callLater(app.fitWidth)  // the whole page beside the panel
+        Qt.callLater(function() { app.keyTarget.fitWidth() })  // the whole page beside the panel
         area.cursorPosition = area.length
         area.forceActiveFocus()
     }
