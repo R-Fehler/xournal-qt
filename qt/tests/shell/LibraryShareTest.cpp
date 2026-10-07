@@ -35,11 +35,12 @@
 #include "session/PdfEncryption.h"
 #include "session/PdfHistory.h"
 #include "shell/InkTextStore.h"
-#include "shell/Library.h"
+#include "shell/FileStamps.h"
+#include "shell/LibraryIndex.h"
 #include "shell/LibraryCache.h"
 #include "shell/LibraryShare.h"
 #include "shell/LibraryUnzip.h"
-#include "shell/Previews.h"
+#include "shell/DocumentCovers.h"
 #include "shell/ZipFile.h"
 #include "support/TestSupport.h"
 
@@ -245,11 +246,11 @@ TEST_F(LibraryShareTest, theAppFormatCarriesFreshReadingsOfExactlyTheSharedDocum
         before[shared / f] = readFile(shared / f);
     }
     // The preview of the notes, drawn in the library
-    PreviewCache::setLibrary(CacheLocation(lib));
+    DocumentCovers::setLibrary(CacheLocation(lib));
     DocumentItem notesItem;
     notesItem.xopp = shared / "notes.xopp";
-    ASSERT_FALSE(PreviewCache::preview(notesItem).isNull());
-    ASSERT_TRUE(PreviewCache::flush());
+    ASSERT_FALSE(DocumentCovers::cover(notesItem).isNull());
+    ASSERT_TRUE(DocumentCovers::flush());
     LibraryShare::Options o;
     o.pdfText = true;
     fs::path zip;
@@ -319,11 +320,11 @@ TEST_F(LibraryShareTest, theAppFormatCarriesFreshReadingsOfExactlyTheSharedDocum
     EXPECT_TRUE(received.inkOf(r.folder / "notes.xopp")) << "the handwriting read before";
     EXPECT_EQ(received.search(QStringLiteral("turbine")).size(), 4u) << "lecture, ext, hist and the attached PDF";
     // Its preview is there without drawing it
-    PreviewCache::setLibrary(CacheLocation(recv));
+    DocumentCovers::setLibrary(CacheLocation(recv));
     DocumentItem receivedNotes;
     receivedNotes.xopp = r.folder / "notes.xopp";
-    EXPECT_FALSE(PreviewCache::stored(receivedNotes).isNull()) << "the preview came with the zip, stamped as unpacked";
-    PreviewCache::setLibrary({});
+    EXPECT_FALSE(DocumentCovers::stored(receivedNotes).isNull()) << "the preview came with the zip, stamped as unpacked";
+    DocumentCovers::setLibrary({});
 }
 
 TEST_F(LibraryShareTest, withoutPdfTextTheReadingsStillGoAlongAndHistoryOnRequest) {

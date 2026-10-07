@@ -100,7 +100,7 @@
 #include "shell/ZipFile.h"
 #include "shell/PagesModel.h"
 #include "shell/RecentFiles.h"
-#include "shell/Previews.h"
+#include "shell/DocumentCovers.h"
 #include "shell/SettingsModel.h"
 #include "shell/SystemApps.h"
 #include "shell/TabManager.h"
@@ -4374,8 +4374,8 @@ TEST_F(MainWindowTest, theCanvasShowsThePreviewUntilThePageIsRendered) {
     ASSERT_NE(canvas, nullptr);
     xqt::CanvasView* view = controller->tabManager().currentView();
     const size_t target = 6;
-    until([&] { return !view->preview(target).isNull(); }, 10000);
-    ASSERT_FALSE(view->preview(target).isNull()) << "page 7 has its preview";
+    until([&] { return !view->standIn(target).isNull(); }, 10000);
+    ASSERT_FALSE(view->standIn(target).isNull()) << "page 7 has its preview";
     auto* render = controller->context().getRenderService();
     // Nothing is being rendered (page 7 in advance, landing after its buffer is gone, would show the page itself)
     render->waitForIdle();
@@ -4384,7 +4384,7 @@ TEST_F(MainWindowTest, theCanvasShowsThePreviewUntilThePageIsRendered) {
     controller->goToPage(static_cast<int>(target));
     int shown = 0;
     until([&] {
-        QMetaObject::invokeMethod(canvas, "previewsShown", Q_RETURN_ARG(int, shown));
+        QMetaObject::invokeMethod(canvas, "standInsShown", Q_RETURN_ARG(int, shown));
         return shown > 0;
     }, 10000);
     EXPECT_GE(shown, 1) << "the preview instead of a white page";
@@ -4392,7 +4392,7 @@ TEST_F(MainWindowTest, theCanvasShowsThePreviewUntilThePageIsRendered) {
     until([&] { return view->getPage(target)->bufferInfo().valid; }, 10000);
     ASSERT_TRUE(view->getPage(target)->bufferInfo().valid);
     until([&] {
-        QMetaObject::invokeMethod(canvas, "previewsShown", Q_RETURN_ARG(int, shown));
+        QMetaObject::invokeMethod(canvas, "standInsShown", Q_RETURN_ARG(int, shown));
         return shown == 0;
     }, 10000);
     EXPECT_EQ(shown, 0) << "rendered: the page itself";
@@ -4435,7 +4435,7 @@ TEST_F(MainWindowTest, fastScrollingComposesFewTilesPerFrameAndShowsPreviews) {
         wait(16);
     }
     QMetaObject::invokeMethod(canvas, "mostTilesInAFrame", Q_RETURN_ARG(int, tiles));
-    QMetaObject::invokeMethod(canvas, "framesWithPreviews", Q_RETURN_ARG(int, previews));
+    QMetaObject::invokeMethod(canvas, "framesWithStandIns", Q_RETURN_ARG(int, previews));
     EXPECT_LE(tiles, 64) << "never a whole page (about 120 tiles) at once";
     EXPECT_GT(previews, 0) << "the pages scrolled past show their preview while their tiles are missing";
     sketches.setDelays(400, 1500);
@@ -5865,7 +5865,7 @@ TEST_F(MainWindowTest, theOverviewShowsTheStoredPreviewOnTheTitlePage) {
     auto* tabs = qobject_cast<QAbstractItemModel*>(controller->tabsModel());
     auto picture = [&] { return tabs->index(controller->currentTab(), 0).data(xqt::TabManager::ThumbnailRole).toString(); };
     EXPECT_EQ(controller->titlePage(), 0);
-    EXPECT_TRUE(picture().startsWith("image://preview/")) << "on page 1, saved: the stored preview";
+    EXPECT_TRUE(picture().startsWith("image://cover/")) << "on page 1, saved: the stored preview";
 
     controller->goToPage(2);
     wait(50);
@@ -5882,7 +5882,7 @@ TEST_F(MainWindowTest, theOverviewShowsTheStoredPreviewOnTheTitlePage) {
     EXPECT_TRUE(item->isVisible());
     click(item);
     EXPECT_EQ(controller->titlePage(), 2);
-    EXPECT_TRUE(picture().startsWith("image://preview/")) << "on its title page now";
+    EXPECT_TRUE(picture().startsWith("image://cover/")) << "on its title page now";
 
     controller->setTitlePage(0);  // (kept in the test's own cache, but tidy anyway)
 }
@@ -5927,14 +5927,14 @@ TEST_F(MainWindowTest, aPdfWithoutXoppHasTitleAndLastPageToo) {
     wait(80);
     auto* tabs = qobject_cast<QAbstractItemModel*>(controller->tabsModel());
     auto picture = [&] { return tabs->index(controller->currentTab(), 0).data(xqt::TabManager::ThumbnailRole).toString(); };
-    EXPECT_TRUE(picture().startsWith("image://preview/")) << "on its first page: the stored preview";
+    EXPECT_TRUE(picture().startsWith("image://cover/")) << "on its first page: the stored preview";
     EXPECT_FALSE(controller->tabManager().currentSession()->hasFilePath()) << "(no .xopp: a PDF as it is)";
     EXPECT_EQ(controller->titlePage(), 0) << "it has a title page";
 
     ASSERT_TRUE(controller->setTitlePage(1));
     controller->goToPage(1);
     wait(50);
-    EXPECT_TRUE(picture().startsWith("image://preview/")) << "on its (new) title page";
+    EXPECT_TRUE(picture().startsWith("image://cover/")) << "on its (new) title page";
 
     // Left on the second page; closed without saving; opened again with "Last page" on
     auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());

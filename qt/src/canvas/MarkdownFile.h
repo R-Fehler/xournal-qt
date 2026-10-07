@@ -4,7 +4,7 @@
  * The file's text is the page's Markdown text of a new document of plain A4 pages: it flows over the pages as a
  * Markdown text written on a page does (MdPaginate.h, MarkdownSession.h), each page holding its part in a box at the
  * page margins. Edited, the text is written back to the file (DocumentSession::setTextFile, TextFile.h), never as a
- * .xopp. The library's preview of a .md is the first page of this document.
+ * .xopp. The library's cover of a .md is the first page of this document.
  *
  * A text or code file shown read-only is one fenced code block (monospaced, highlighted by its extension).
  *

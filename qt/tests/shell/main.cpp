@@ -10,6 +10,15 @@
 #include <gtest/gtest.h>
 
 #include "session/AppContext.h"
+#include "shell/ImageWorkers.h"
+
+namespace {
+/// A test that shut the application down (AppController::shutdown) stopped the image workers: the next one gets them
+/// again (when the tests run in one process).
+class ReopenImageWorkers final: public ::testing::EmptyTestEventListener {
+    void OnTestStart(const ::testing::TestInfo& /*info*/) override { xqt::ImageWorkers::reopen(); }
+};
+}  // namespace
 
 int main(int argc, char* argv[]) {
     qputenv("QT_QPA_PLATFORM", "offscreen");
@@ -23,5 +32,6 @@ int main(int argc, char* argv[]) {
     setlocale(LC_NUMERIC, "C");
     xqt::AppContext::installQtUiThreadDispatcher();
     ::testing::InitGoogleTest(&argc, argv);
+    ::testing::UnitTest::GetInstance()->listeners().Append(new ReopenImageWorkers);
     return RUN_ALL_TESTS();
 }

@@ -97,7 +97,7 @@ bool writeManifest(const Plan& plan, const fs::path& file);
 std::optional<Plan> readManifest(const fs::path& file);
 
 /// Step 4, what the shell keeps by path: each library's folder in the config (its settings and reading positions)
-/// and in the app cache (previews, search index) go to the key of its new path; the reading positions of documents
+/// and in the app cache (covers, search index) go to the key of its new path; the reading positions of documents
 /// outside the current library, and the tabs of the session journals given, follow. Safe to repeat.
 void relocateState(const Plan& plan, const std::vector<fs::path>& journals);
 /// The session journals there are (the one of the default library and those of the others).

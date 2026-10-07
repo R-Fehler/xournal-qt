@@ -30,7 +30,7 @@
 #include "session/HybridPdf.h"
 #include "session/TextDocument.h"
 #include "shell/DocumentFiles.h"
-#include "shell/Library.h"
+#include "shell/LibraryIndex.h"
 #include "shell/TabManager.h"
 
 #include "AppController.h"

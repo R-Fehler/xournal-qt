@@ -35,7 +35,7 @@
 #include "shell/MdSnippets.h"
 #include "shell/PageSketches.h"
 #include "shell/PresenterConsole.h"
-#include "shell/Previews.h"
+#include "shell/DocumentCovers.h"
 #include "shell/SettingsModel.h"
 #include "shell/TabManager.h"
 #include "shell/Thumbnails.h"

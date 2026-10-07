@@ -28,7 +28,7 @@
 #include "InkTextStore.h"
 #include "LibraryCache.h"
 #include "LinkRewrite.h"
-#include "Previews.h"
+#include "DocumentCovers.h"
 #include "ZipFile.h"
 #include "config.h"
 
@@ -809,12 +809,12 @@ public:
             ink.stamp = ownStamp.isEmpty() ? pdfStamp : ownStamp;
             packs.ink.insert(name, InkTextStore::encode(ink));
         }
-        if (auto preview = PreviewCache::storedEntry(item);
-            preview && preview->value(QStringLiteral("stamp")).toString().endsWith(QLatin1String("title=0"))) {
-            const QString stamp = PreviewCache::stampWith(
+        if (auto cover = DocumentCovers::storedEntry(item);
+            cover && cover->value(QStringLiteral("stamp")).toString().endsWith(QLatin1String("title=0"))) {
+            const QString stamp = DocumentCovers::stampWith(
                     item, [this](const fs::path& f) { return stampOf(f); }, 0);
-            packs.previews.insert(name, QCborMap{{QStringLiteral("stamp"), stamp},
-                                                 {QStringLiteral("png"), preview->value(QStringLiteral("png"))}});
+            packs.covers.insert(name, QCborMap{{QStringLiteral("stamp"), stamp},
+                                                 {QStringLiteral("png"), cover->value(QStringLiteral("png"))}});
         }
         ++s.readings;
     }
@@ -827,7 +827,7 @@ public:
             Packs::write(cache, LibraryIndex::NOTES_PACK, LibraryIndex::FORMAT, packs.notes, true);
             Packs::write(cache, LibraryIndex::PDF_TEXT_PACK, LibraryIndex::FORMAT, packs.text, true);
             Packs::write(cache, InkTextStore::PACK, InkTextStore::FORMAT, packs.ink, true);
-            Packs::write(cache, PreviewCache::PACK, PreviewCache::FORMAT, packs.previews, false);
+            Packs::write(cache, DocumentCovers::PACK, DocumentCovers::FORMAT, packs.covers, false);
         }
         QCborMap files;
         for (const Out& o: outs) {
@@ -891,7 +891,7 @@ public:
 
 private:
     struct FolderPacks {
-        QCborMap notes, text, ink, previews;
+        QCborMap notes, text, ink, covers;
     };
     const LibraryShare::Plan& p;
     fs::path work;

@@ -8,9 +8,7 @@
 #include <mutex>
 #include <shared_mutex>
 
-#include <QCryptographicHash>
 #include <QPainter>
-#include <QThreadPool>
 
 #include "model/Document.h"
 #include "model/XojPage.h"
@@ -20,7 +18,11 @@
 #include "session/DocumentSession.h"
 #include "session/DocumentTextIndex.h"
 
-#include "Library.h"
+#include "AsyncImage.h"
+#include "FileStamps.h"
+#include "ImageMemory.h"
+#include "ImageWorkers.h"
+#include "LibraryIndex.h"
 #include "MarkdownFile.h"
 #include "MdImages.h"
 #include "Thumbnails.h"
@@ -28,8 +30,6 @@
 namespace xqt {
 
 namespace {
-constexpr size_t MAX_DOCUMENTS = 12;
-constexpr qsizetype MAX_IMAGE_BYTES = 128 * 1024 * 1024;
 
 /// A loaded document; its mutex lets one thread at a time draw or search it.
 struct CachedDocument {
@@ -44,8 +44,8 @@ struct Caches {
     std::mutex mtx;
     /// Most recently used first.
     std::list<std::pair<QString, std::shared_ptr<CachedDocument>>> documents;  ///< key: path + stamp
-    std::list<std::pair<QString, QImage>> images;                               ///< key: document, page, width
-    qsizetype imageBytes = 0;
+    /// Drawn pages without marks, by document, page and width (the one drawn last stays even if it is bigger)
+    LruImageCache<QString> images{ImageMemory::HIT_PAGE_BYTES, 1};
     std::atomic<int> renders{0};
 
     std::shared_ptr<CachedDocument> document(const QString& key) {
@@ -57,35 +57,17 @@ struct Caches {
             }
         }
         documents.emplace_front(key, std::make_shared<CachedDocument>());
-        while (documents.size() > MAX_DOCUMENTS) {
+        while (documents.size() > ImageMemory::HIT_PAGE_DOCUMENTS) {
             documents.pop_back();  // still used by a running render: kept alive by its shared_ptr
         }
         return documents.front().second;
     }
-    QImage image(const QString& key) {
-        std::lock_guard lock(mtx);
-        for (auto it = images.begin(); it != images.end(); ++it) {
-            if (it->first == key) {
-                images.splice(images.begin(), images, it);
-                return images.front().second;
-            }
-        }
-        return {};
-    }
-    void store(const QString& key, const QImage& img) {
-        std::lock_guard lock(mtx);
-        images.emplace_front(key, img);
-        imageBytes += img.sizeInBytes();
-        while (imageBytes > MAX_IMAGE_BYTES && images.size() > 1) {
-            imageBytes -= images.back().second.sizeInBytes();
-            images.pop_back();
-        }
-    }
     void clear() {
-        std::lock_guard lock(mtx);
-        documents.clear();
+        {
+            std::lock_guard lock(mtx);
+            documents.clear();
+        }
         images.clear();
-        imageBytes = 0;
     }
 };
 Caches& caches() {
@@ -93,32 +75,6 @@ Caches& caches() {
     return c;
 }
 
-QThreadPool& pool() {
-    static QThreadPool* p = [] {
-        auto* tp = new QThreadPool;
-        tp->setMaxThreadCount(std::max(2, std::min(4, QThread::idealThreadCount() / 2)));
-        return tp;
-    }();
-    return *p;
-}
-
-QString encode(const QString& s) {
-    return QString::fromLatin1(s.toUtf8().toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
-}
-QString decode(const QString& s) {
-    return QString::fromUtf8(
-            QByteArray::fromBase64(s.toLatin1(), QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
-}
-
-class HitPageResponse final: public QQuickImageResponse {
-public:
-    QQuickTextureFactory* textureFactory() const override {
-        return QQuickTextureFactory::textureFactoryForImage(image);
-    }
-    void cancel() override { cancelled = true; }
-    QImage image;
-    std::atomic<bool> cancelled{false};
-};
 }  // namespace
 
 namespace {
@@ -136,10 +92,8 @@ std::vector<textmatch::Term> HitPageProvider::termsOf(const QString& marks) {
 }
 
 QString HitPageProvider::baseUrl(const DocumentItem& item, const QString& marks) {
-    const QString stamp = QString::fromLatin1(
-            QCryptographicHash::hash(documentStamp(item).toUtf8(), QCryptographicHash::Md5).toHex().left(8));
-    return QStringLiteral("image://hitpage/") + encode(QString::fromStdString(item.main().string())) + '/' + stamp +
-           '/' + encode(marks.startsWith(TERMS) ? marks : LibraryIndex::simplified(marks).trimmed());
+    return QStringLiteral("image://hitpage/") + urlEncodePath(item.main()) + '/' + urlStamp(documentStamp(item).toUtf8()) +
+           '/' + urlEncode(marks.startsWith(TERMS) ? marks : LibraryIndex::simplified(marks).trimmed());
 }
 
 namespace {
@@ -220,11 +174,11 @@ QImage HitPageProvider::render(const fs::path& file, int pageNo, const QString& 
         pageWidth = doc->getPage(static_cast<size_t>(pageNo))->getWidth();
     }
     const QString imageKey = docKey + '|' + QString::number(pageNo) + '|' + QString::number(width);
-    QImage img = caches().image(imageKey);
+    QImage img = caches().images.find(imageKey);
     if (img.isNull()) {
         img = ThumbnailProvider::renderDocument(*doc, static_cast<size_t>(pageNo), width);
         ++caches().renders;
-        caches().store(imageKey, img);
+        caches().images.put(imageKey, img);
     }
     if (pageWidth <= 0) {
         return img;
@@ -261,17 +215,12 @@ void HitPageProvider::clearCaches() { caches().clear(); }
 
 int HitPageProvider::renderCount() { return caches().renders; }
 
-void HitPageProvider::shutdown() {
-    pool().clear();
-    pool().waitForDone();
-}
-
 QQuickImageResponse* HitPageProvider::requestImageResponse(const QString& id, const QSize& requestedSize) {
-    auto* response = new HitPageResponse;
+    auto* response = new AsyncImageResponse;
     // id: <path>/<stamp>/<query>/<page>
     const QStringList parts = id.split('/');
-    const fs::path file(decode(parts.value(0)).toStdString());
-    const QString query = decode(parts.value(2));
+    const fs::path file = urlDecodePath(parts.value(0));
+    const QString query = urlDecode(parts.value(2));
     const int page = parts.value(3).toInt();
     const int width = requestedSize.width() > 0 ? requestedSize.width() : 200;
     // (…/<page>/area/<x>,<y>,<w>,<h>: an area of the page, areaUrl)
@@ -279,18 +228,8 @@ QQuickImageResponse* HitPageProvider::requestImageResponse(const QString& id, co
     const QRectF rect = area.size() == 4 ? QRectF(area[0].toDouble(), area[1].toDouble(), area[2].toDouble(),
                                                   area[3].toDouble())
                                          : QRectF();
-    pool().start([response, file, query, page, width, rect] {
-        QImage img;
-        if (!response->cancelled) {  // scrolled away meanwhile: not drawn
-            img = rect.isValid() ? renderArea(file, page, rect, width) : render(file, page, query, width);
-        }
-        QMetaObject::invokeMethod(
-                response,
-                [response, img = std::move(img)]() mutable {
-                    response->image = std::move(img);
-                    Q_EMIT response->finished();
-                },
-                Qt::QueuedConnection);
+    ImageWorkers::respond(ImageWorkers::Pool::HitPages, response, [file, query, page, width, rect] {
+        return rect.isValid() ? renderArea(file, page, rect, width) : render(file, page, query, width);
     });
     return response;
 }

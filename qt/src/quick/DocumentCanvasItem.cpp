@@ -118,7 +118,7 @@ public:
     void clearTiles() {
         for (auto* t: tiles) {
             // Only the composed tiles are in the scene graph. Removing a node that is not a child is not checked in a
-            // release build of Qt and empties this node's list of children (the page, its tiles and preview vanish).
+            // release build of Qt and empties this node's list of children (the page, its tiles and stand-in vanish).
             if (t->parent() == this) {
                 removeChildNode(t);
             }
@@ -128,43 +128,43 @@ public:
         composed.clear();
         cols = rows = 0;
     }
-    /// The page's preview (drawn in advance) over the whole page, until it is rendered; null image: none
-    /// `cpuDark`: the preview turned dark on the CPU first (dark pages on the software renderer; on the GPU the
-    /// caller sets the preview's material)
-    void showPreview(QQuickWindow* window, const QImage& image, QSizeF size, bool cpuDark = false) {
+    /// The page's stand-in (drawn in advance) over the whole page, until it is rendered; null image: none
+    /// `cpuDark`: the stand-in turned dark on the CPU first (dark pages on the software renderer; on the GPU the
+    /// caller sets the stand-in's material)
+    void showStandIn(QQuickWindow* window, const QImage& image, QSizeF size, bool cpuDark = false) {
         if (image.isNull()) {
-            hidePreview();
+            hideStandIn();
             return;
         }
-        if (!preview) {
-            preview = new TileNode;
-            preview->setFiltering(QSGTexture::Linear);
+        if (!standIn) {
+            standIn = new TileNode;
+            standIn->setFiltering(QSGTexture::Linear);
         }
 
-        if (previewKey != image.cacheKey() || previewDark != cpuDark) {
-            xqt::Perf::add(xqt::Perf::Previews);
-            QSGTexture* previous = preview->texture();
+        if (standInKey != image.cacheKey() || standInDark != cpuDark) {
+            xqt::Perf::add(xqt::Perf::StandIns);
+            QSGTexture* previous = standIn->texture();
             QImage shown = image;
             if (cpuDark) {
                 xqt::dark::apply(shown, tone.paper);
             }
-            preview->setTexture(window->createTextureFromImage(shown, QQuickWindow::TextureIsOpaque));
+            standIn->setTexture(window->createTextureFromImage(shown, QQuickWindow::TextureIsOpaque));
             delete previous;
-            previewKey = image.cacheKey();
-            previewDark = cpuDark;
+            standInKey = image.cacheKey();
+            standInDark = cpuDark;
         }
-        preview->setRect(QRectF(QPointF(0, 0), size));
-        if (!preview->parent()) {
+        standIn->setRect(QRectF(QPointF(0, 0), size));
+        if (!standIn->parent()) {
             // With its texture (the software renderer needs one), and under the tiles
-            insertChildNodeAfter(preview, placeholder);
+            insertChildNodeAfter(standIn, placeholder);
         }
     }
-    void hidePreview() {
-        if (preview) {
-            removeChildNode(preview);
-            delete preview;
-            preview = nullptr;
-            previewKey = 0;
+    void hideStandIn() {
+        if (standIn) {
+            removeChildNode(standIn);
+            delete standIn;
+            standIn = nullptr;
+            standInKey = 0;
         }
     }
     std::vector<bool> composed;  ///< tiles that have their picture (the others are not in the scene graph)
@@ -174,9 +174,9 @@ public:
     quint64 searchRevision = ~quint64(0);
     double searchScale = 0;
     std::vector<TileNode*> tiles;
-    TileNode* preview = nullptr;
-    qint64 previewKey = 0;
-    bool previewDark = false;
+    TileNode* standIn = nullptr;
+    qint64 standInKey = 0;
+    bool standInDark = false;
     /// Dark pages: how the page is shown (CanvasPage::darkTone; not dark: as it is), and whether its tiles are turned
     /// dark on the GPU (else on the CPU when composed)
     xqt::CanvasPage::DarkTone tone;
@@ -1935,7 +1935,7 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
     const QRectF viewRect(QPointF(0, 0), vc.viewSize());
 
     // Composing and uploading tiles is what a scroll pays for: while the view moves, only a few per frame (the rest
-    // of a page shows its preview and follows in the next frames), when it stands still more.
+    // of a page shows its stand-in and follows in the next frames), when it stands still more.
     const QPointF scroll = canvasView->getViewController().scrollPosition();
     const bool moving = (scroll - lastScroll).manhattanLength() > 2 || zoom != lastZoom;
     lastScroll = scroll;
@@ -2000,7 +2000,7 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
                 node->placeholder->setColor(paper);
             }
         }
-        // A tile (or the preview) on the GPU: dark with the pictures in it kept, or as it is
+        // A tile (or the stand-in) on the GPU: dark with the pictures in it kept, or as it is
         const auto gpuTone = [&](TileNode* tile, std::vector<QRectF> keepRects) {
             tile->setDark(toneOnGpu ? darkTable : nullptr);
             if (toneOnGpu) {
@@ -2028,10 +2028,10 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             node->setMatrix(m);
             node->placeholder->setRect(QRectF(QPointF(0, 0), r.size()));
             node->shadow->setRect(QRectF(QPointF(2, 2), r.size()));
-            // Not rendered yet: its preview (drawn in advance, never in front of the page), else white
-            node->showPreview(window(), canvasView->preview(i), r.size(), cpuDark);
-            if (node->preview) {
-                gpuTone(node->preview, {});
+            // Not rendered yet: its stand-in (drawn in advance, never in front of the page), else white
+            node->showStandIn(window(), canvasView->standIn(i), r.size(), cpuDark);
+            if (node->standIn) {
+                gpuTone(node->standIn, {});
             }
             continue;
         }
@@ -2110,7 +2110,7 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             }
         }
         // Only the tiles that are in view, and only as many as this frame allows: a page is a few dozen tiles (about
-        // 30 MB), and a fast scroll passes many pages. What is not composed yet shows the page's preview.
+        // 30 MB), and a fast scroll passes many pages. What is not composed yet shows the page's stand-in.
         int missing = 0;
         for (int t = 0; t < static_cast<int>(node->tiles.size()); ++t) {
             if (node->composed[static_cast<size_t>(t)]) {
@@ -2150,7 +2150,7 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             }
         }
         // A big page drawn in part whose part in view is not all drawn (scrolled on; drawn anew in a moment): the
-        // preview under the tiles
+        // stand-in under the tiles
         bool uncovered = false;
         if (!info.whole) {
             const QRectF inView = r.intersected(viewRect);
@@ -2159,13 +2159,13 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             uncovered = !inView.isEmpty() && !drawn.adjusted(-1, -1, 1, 1).contains(inView);
         }
         if (missing > 0 || uncovered) {
-            node->showPreview(window(), canvasView->preview(i), bufferLogical, cpuDark);
-            if (node->preview) {
-                gpuTone(node->preview, {});
+            node->showStandIn(window(), canvasView->standIn(i), bufferLogical, cpuDark);
+            if (node->standIn) {
+                gpuTone(node->standIn, {});
             }
             more = true;
         } else {
-            node->hidePreview();
+            node->hideStandIn();
         }
     }
     // Pages that scrolled out of view: free their textures.
@@ -2174,13 +2174,13 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
         delete node;
     }
     mostTiles = std::max(mostTiles.load(), budgetOfTheFrame - tileBudget);
-    int previews = 0;  // pages shown by their preview, whole or in part (tests)
+    int standIns = 0;  // pages shown by their stand-in, whole or in part (tests)
     for (const auto& [page, node]: keep) {
-        previews += node->preview != nullptr;
+        standIns += node->standIn != nullptr;
     }
     root->pages = std::move(keep);
-    shownPreviews = previews;
-    previewFrames += previews > 0;
+    shownStandIns = standIns;
+    standInFrames += standIns > 0;
     if (more) {  // the next frame composes further tiles
         QMetaObject::invokeMethod(this, "update", Qt::QueuedConnection);
     }

@@ -31,9 +31,10 @@
 #include "shell/DocumentPlaces.h"
 #include "shell/HitPages.h"
 #include "shell/Library.h"
+#include "shell/LibraryIndex.h"
 #include "shell/LibraryCache.h"
 #include "shell/LibraryModel.h"
-#include "shell/Previews.h"
+#include "shell/DocumentCovers.h"
 #include "shell/RecentFiles.h"
 
 #include "session/DocumentSearch.h"
@@ -322,23 +323,23 @@ TEST_F(LibraryTest, indexFindsTextAndNames) {
 
 TEST_F(LibraryTest, previewsAreRenderedOnceAndStoredInTheLibrary) {
     makePdf(root / "lecture.pdf");
-    PreviewCache::setLibrary(CacheLocation(root));
+    DocumentCovers::setLibrary(CacheLocation(root));
     const DocumentItem item = DocumentFiles::itemOf(root / "lecture.pdf");
-    EXPECT_TRUE(PreviewCache::stored(item).isNull()) << "not made yet";
-    const QImage img = PreviewCache::preview(item);
-    EXPECT_EQ(img.width(), PreviewCache::WIDTH);
+    EXPECT_TRUE(DocumentCovers::stored(item).isNull()) << "not made yet";
+    const QImage img = DocumentCovers::cover(item);
+    EXPECT_EQ(img.width(), DocumentCovers::WIDTH);
     EXPECT_GT(img.height(), 0);
-    EXPECT_TRUE(PreviewCache::url(item).startsWith("image://preview/"));
-    PreviewCache::flush();
-    EXPECT_EQ(packKeys(root, PreviewCache::PACK, PreviewCache::FORMAT), QStringList{"lecture.pdf"})
+    EXPECT_TRUE(DocumentCovers::url(item).startsWith("image://cover/"));
+    DocumentCovers::flush();
+    EXPECT_EQ(packKeys(root, DocumentCovers::PACK, DocumentCovers::FORMAT), QStringList{"lecture.pdf"})
             << "in the pack of its folder";
     // Stored: read back (not drawn again)
-    PreviewCache::setLibrary(CacheLocation(root));
-    EXPECT_EQ(PreviewCache::stored(item).size(), img.size());
-    PreviewCache::prune({});
-    PreviewCache::flush();
+    DocumentCovers::setLibrary(CacheLocation(root));
+    EXPECT_EQ(DocumentCovers::stored(item).size(), img.size());
+    DocumentCovers::prune({});
+    DocumentCovers::flush();
     EXPECT_FALSE(fs::exists(root / DocumentFiles::META_DIR / "previews.pack"));
-    PreviewCache::setLibrary({});
+    DocumentCovers::setLibrary({});
 }
 
 TEST_F(LibraryTest, previewsOfAFolderAreOnePackReadWhenFirstWanted) {
@@ -346,41 +347,41 @@ TEST_F(LibraryTest, previewsOfAFolderAreOnePackReadWhenFirstWanted) {
     makePdf(root / "Physics" / "b.pdf");
     makeWordPdf(root / "Physics" / "c.pdf", "zebra");
     makePdf(root / "top.pdf");
-    PreviewCache::setLibrary(CacheLocation(root));
-    PreviewCache::setWriteDelays(50, 500);
+    DocumentCovers::setLibrary(CacheLocation(root));
+    DocumentCovers::setWriteDelays(50, 500);
     for (const auto& item: DocumentFiles::scanRecursive(root)) {
-        ASSERT_FALSE(PreviewCache::preview(item).isNull());
+        ASSERT_FALSE(DocumentCovers::cover(item).isNull());
     }
     waitFor([&] { return fs::exists(root / "Physics" / DocumentFiles::META_DIR / "previews.pack"); });
-    PreviewCache::flush();
-    EXPECT_EQ(packKeys(root / "Physics", PreviewCache::PACK, PreviewCache::FORMAT),
+    DocumentCovers::flush();
+    EXPECT_EQ(packKeys(root / "Physics", DocumentCovers::PACK, DocumentCovers::FORMAT),
               (QStringList{"a.pdf", "b.pdf", "c.pdf"}));
-    EXPECT_EQ(packKeys(root, PreviewCache::PACK, PreviewCache::FORMAT), QStringList{"top.pdf"});
+    EXPECT_EQ(packKeys(root, DocumentCovers::PACK, DocumentCovers::FORMAT), QStringList{"top.pdf"});
 
     // Read once per folder
-    PreviewCache::setLibrary(CacheLocation(root));
-    const int reads = PreviewCache::packsRead();
-    const QImage a = PreviewCache::stored(DocumentFiles::itemOf(root / "Physics" / "a.pdf"));
-    const QImage c = PreviewCache::stored(DocumentFiles::itemOf(root / "Physics" / "c.pdf"));
+    DocumentCovers::setLibrary(CacheLocation(root));
+    const int reads = DocumentCovers::packsRead();
+    const QImage a = DocumentCovers::stored(DocumentFiles::itemOf(root / "Physics" / "a.pdf"));
+    const QImage c = DocumentCovers::stored(DocumentFiles::itemOf(root / "Physics" / "c.pdf"));
     EXPECT_FALSE(a.isNull());
     EXPECT_NE(a, c);
-    EXPECT_EQ(PreviewCache::packsRead(), reads + 1);
+    EXPECT_EQ(DocumentCovers::packsRead(), reads + 1);
 
     // A changed document: its new preview takes the place of the old one
     fs::remove(root / "Physics" / "a.pdf");
     makeWordPdf(root / "Physics" / "a.pdf", "giraffe");
     const DocumentItem changed = DocumentFiles::itemOf(root / "Physics" / "a.pdf");
-    EXPECT_TRUE(PreviewCache::stored(changed).isNull()) << "the stored one is of the old file";
-    EXPECT_NE(PreviewCache::preview(changed), a);
+    EXPECT_TRUE(DocumentCovers::stored(changed).isNull()) << "the stored one is of the old file";
+    EXPECT_NE(DocumentCovers::cover(changed), a);
     // Renamed in the app: the preview goes along
     fs::rename(root / "Physics" / "b.pdf", root / "b.pdf");
-    PreviewCache::moved({{root / "Physics" / "b.pdf", root / "b.pdf"}});
-    EXPECT_FALSE(PreviewCache::stored(DocumentFiles::itemOf(root / "b.pdf")).isNull());
-    PreviewCache::flush();
-    EXPECT_EQ(packKeys(root / "Physics", PreviewCache::PACK, PreviewCache::FORMAT), (QStringList{"a.pdf", "c.pdf"}));
-    EXPECT_EQ(packKeys(root, PreviewCache::PACK, PreviewCache::FORMAT), (QStringList{"b.pdf", "top.pdf"}));
-    PreviewCache::setWriteDelays(WriteScheduler::QUIET_MS, WriteScheduler::MAX_DELAY_MS);
-    PreviewCache::setLibrary({});
+    DocumentCovers::moved({{root / "Physics" / "b.pdf", root / "b.pdf"}});
+    EXPECT_FALSE(DocumentCovers::stored(DocumentFiles::itemOf(root / "b.pdf")).isNull());
+    DocumentCovers::flush();
+    EXPECT_EQ(packKeys(root / "Physics", DocumentCovers::PACK, DocumentCovers::FORMAT), (QStringList{"a.pdf", "c.pdf"}));
+    EXPECT_EQ(packKeys(root, DocumentCovers::PACK, DocumentCovers::FORMAT), (QStringList{"b.pdf", "top.pdf"}));
+    DocumentCovers::setWriteDelays(WriteScheduler::QUIET_MS, WriteScheduler::MAX_DELAY_MS);
+    DocumentCovers::setLibrary({});
 }
 
 /// A preview as stored (PNG) and as drawn compare equal.
@@ -393,51 +394,51 @@ TEST_F(LibraryTest, previewsPackIsRewrittenOnlyWhenTheFirstPageChanged) {
     fs::copy_file(fixture(u8"load/pages.xopp"), xopp);
     makePdf(root / "other.pdf");
     const fs::path pack = root / DocumentFiles::META_DIR / "previews.pack";
-    PreviewCache::setLibrary(CacheLocation(root));
-    const QImage first = PreviewCache::preview(DocumentFiles::itemOf(xopp));
+    DocumentCovers::setLibrary(CacheLocation(root));
+    const QImage first = DocumentCovers::cover(DocumentFiles::itemOf(xopp));
     ASSERT_FALSE(first.isNull());
-    ASSERT_FALSE(PreviewCache::preview(DocumentFiles::itemOf(root / "other.pdf")).isNull());
-    PreviewCache::flush();
+    ASSERT_FALSE(DocumentCovers::cover(DocumentFiles::itemOf(root / "other.pdf")).isNull());
+    DocumentCovers::flush();
     ASSERT_TRUE(fs::exists(pack));
     const auto packTime = fs::last_write_time(pack);
-    const int writes = PreviewCache::packsWritten();
-    const int stampWrites = PreviewCache::stampPacksWritten();
+    const int writes = DocumentCovers::packsWritten();
+    const int stampWrites = DocumentCovers::stampPacksWritten();
 
     // Page 3 edited: the preview is drawn again (a new stamp), looks the same, and previews.pack is left alone
     QThread::msleep(20);  // (a new modification time)
     addText(xopp, 2, "unicorn");
     const DocumentItem edited = DocumentFiles::itemOf(xopp);
-    EXPECT_TRUE(PreviewCache::stored(edited).isNull()) << "not known yet whether the stored one still fits";
-    EXPECT_EQ(argb(PreviewCache::preview(edited)), argb(first));
-    PreviewCache::flush();
-    EXPECT_EQ(PreviewCache::packsWritten(), writes) << "previews.pack not written again";
-    EXPECT_EQ(PreviewCache::stampPacksWritten(), stampWrites + 1);
+    EXPECT_TRUE(DocumentCovers::stored(edited).isNull()) << "not known yet whether the stored one still fits";
+    EXPECT_EQ(argb(DocumentCovers::cover(edited)), argb(first));
+    DocumentCovers::flush();
+    EXPECT_EQ(DocumentCovers::packsWritten(), writes) << "previews.pack not written again";
+    EXPECT_EQ(DocumentCovers::stampPacksWritten(), stampWrites + 1);
     EXPECT_EQ(fs::last_write_time(pack), packTime);
     const fs::path stamps = root / DocumentFiles::META_DIR / "preview-stamps.pack";
     EXPECT_TRUE(fs::exists(stamps)) << "the new stamp is kept in the small pack";
     std::error_code sizeError;
     EXPECT_LT(fs::file_size(stamps, sizeError), 1024u);
-    EXPECT_EQ(argb(PreviewCache::stored(edited)), argb(first)) << "the stored preview is valid for the new version";
+    EXPECT_EQ(argb(DocumentCovers::stored(edited)), argb(first)) << "the stored preview is valid for the new version";
     // ... also when the library is opened again (kept on disk)
-    PreviewCache::setLibrary(CacheLocation(root));
-    EXPECT_EQ(argb(PreviewCache::stored(edited)), argb(first));
-    EXPECT_FALSE(PreviewCache::stored(DocumentFiles::itemOf(root / "other.pdf")).isNull());
-    EXPECT_EQ(PreviewCache::packsWritten(), writes);
+    DocumentCovers::setLibrary(CacheLocation(root));
+    EXPECT_EQ(argb(DocumentCovers::stored(edited)), argb(first));
+    EXPECT_FALSE(DocumentCovers::stored(DocumentFiles::itemOf(root / "other.pdf")).isNull());
+    EXPECT_EQ(DocumentCovers::packsWritten(), writes);
 
     // Page 1 edited: a new preview, written into previews.pack
     QThread::msleep(20);
     addText(xopp, 0, "giraffe");
     const DocumentItem firstPage = DocumentFiles::itemOf(xopp);
-    const QImage changed = PreviewCache::preview(firstPage);
+    const QImage changed = DocumentCovers::cover(firstPage);
     EXPECT_NE(argb(changed), argb(first));
-    PreviewCache::flush();
-    EXPECT_EQ(PreviewCache::packsWritten(), writes + 1);
+    DocumentCovers::flush();
+    EXPECT_EQ(DocumentCovers::packsWritten(), writes + 1);
     EXPECT_NE(fs::last_write_time(pack), packTime);
     EXPECT_FALSE(fs::exists(stamps)) << "folded into previews.pack";
-    PreviewCache::setLibrary(CacheLocation(root));
-    EXPECT_EQ(argb(PreviewCache::stored(firstPage)), argb(changed));
-    EXPECT_FALSE(PreviewCache::stored(DocumentFiles::itemOf(root / "other.pdf")).isNull());
-    PreviewCache::setLibrary({});
+    DocumentCovers::setLibrary(CacheLocation(root));
+    EXPECT_EQ(argb(DocumentCovers::stored(firstPage)), argb(changed));
+    EXPECT_FALSE(DocumentCovers::stored(DocumentFiles::itemOf(root / "other.pdf")).isNull());
+    DocumentCovers::setLibrary({});
 }
 
 TEST_F(LibraryTest, recentFilesShowExistingDocumentsOnce) {
@@ -717,17 +718,17 @@ TEST_F(LibraryTest, titleAndLastPagesAreKeptPerLibraryInTheConfig) {
 
     // The preview shows the title page (a new URL: QML shows it anew); the first page keeps the URL it always had
     const DocumentItem lecture = DocumentFiles::itemOf(root / "lecture.pdf");
-    const QString firstUrl = PreviewCache::url(lecture);
-    const QImage first = PreviewCache::preview(lecture);
+    const QString firstUrl = DocumentCovers::url(lecture);
+    const QImage first = DocumentCovers::cover(lecture);
     ASSERT_FALSE(first.isNull());
     DocumentPlaces::setTitlePage(lecture.main(), 1);
-    EXPECT_NE(PreviewCache::url(lecture), firstUrl);
-    EXPECT_TRUE(PreviewCache::stored(lecture).isNull()) << "the stored one shows another page";
-    const QImage second = PreviewCache::preview(lecture);
+    EXPECT_NE(DocumentCovers::url(lecture), firstUrl);
+    EXPECT_TRUE(DocumentCovers::stored(lecture).isNull()) << "the stored one shows another page";
+    const QImage second = DocumentCovers::cover(lecture);
     ASSERT_FALSE(second.isNull());
     EXPECT_NE(first, second) << "another page";
     DocumentPlaces::setTitlePage(lecture.main(), 0);
-    EXPECT_EQ(PreviewCache::url(lecture), firstUrl);
+    EXPECT_EQ(DocumentCovers::url(lecture), firstUrl);
 }
 
 // Reading positions are not cache: removing the cache folders keeps them.
@@ -1342,8 +1343,8 @@ TEST_F(LibraryTest, theCacheMovesToTheAppCacheAndBack) {
     model.setLibrary(std::make_unique<Library>(root));
     model.searchIndex()->flush();
     const DocumentItem sheet = DocumentFiles::itemOf(root / "Physics" / "sheet.pdf");
-    ASSERT_FALSE(PreviewCache::preview(sheet).isNull());
-    PreviewCache::flush();
+    ASSERT_FALSE(DocumentCovers::cover(sheet).isNull());
+    DocumentCovers::flush();
     EXPECT_FALSE(model.cacheInAppCache()) << "in the folders by default";
     const fs::path app = Library(root).cacheLocation().appCacheDir();
     EXPECT_EQ(model.appCachePath().toStdString(), app.string());
@@ -1359,7 +1360,7 @@ TEST_F(LibraryTest, theCacheMovesToTheAppCacheAndBack) {
     model.searchIndex()->waitForDone();
     EXPECT_EQ(model.searchIndex()->documentsRead(), 0) << "moved, not made anew";
     EXPECT_EQ(model.searchIndex()->search("zebra").size(), 1u);
-    EXPECT_FALSE(PreviewCache::stored(sheet).isNull());
+    EXPECT_FALSE(DocumentCovers::stored(sheet).isNull());
     // New entries go there too
     fs::copy_file(fixture(u8"load/pages.xopp"), root / "Physics" / "Mechanics" / "more.xopp");
     model.refresh();
@@ -1409,6 +1410,24 @@ TEST_F(LibraryTest, theCacheDefaultsToTheFoldersOnTheDesktopAndToTheAppCacheOnAn
     EXPECT_EQ(Library(root).cacheMode(), CacheLocation::Mode::AppCache);
     fs::remove_all(Library(root).cacheLocation().appCacheDir());
     fs::remove(Library(root).configDir() / "library.json");
+}
+
+// The library's settings ("library.json": the cache mode, the "Show" filter) are read once per Library, not on every
+// getter (cacheInAppCache is a property QML reads); what it writes is kept too.
+TEST_F(LibraryTest, theLibrarySettingsAreReadOnce) {
+    const Library lib(root);
+    lib.setCacheMode(CacheLocation::Mode::AppCache);
+    ShowFilter f;
+    f.images = false;
+    lib.setShowFilter(f);
+    const fs::path file = lib.configDir() / "library.json";
+    ASSERT_TRUE(fs::exists(file));
+    EXPECT_EQ(Library(root).cacheMode(), CacheLocation::Mode::AppCache) << "on disk for the next one";
+    fs::remove(file);
+    EXPECT_EQ(lib.cacheMode(), CacheLocation::Mode::AppCache) << "kept, not read again";
+    EXPECT_TRUE(lib.hasCacheSetting());
+    EXPECT_FALSE(lib.showFilter().images);
+    EXPECT_FALSE(Library(root).hasCacheSetting()) << "a new one reads the file";
 }
 
 // A library with cache folders of its own (from a desktop, or from before the default) opened where the default is
@@ -1491,8 +1510,8 @@ TEST_F(LibraryTest, removingTheCacheLeavesOtherFilesAndTheReadingPositions) {
 
     // Nothing is made again until the library is opened again
     model.refresh();
-    ASSERT_FALSE(PreviewCache::preview(DocumentFiles::itemOf(root / "lecture.pdf")).isNull());
-    PreviewCache::flush();
+    ASSERT_FALSE(DocumentCovers::cover(DocumentFiles::itemOf(root / "lecture.pdf")).isNull());
+    DocumentCovers::flush();
     processEventsFor(100);
     EXPECT_FALSE(fs::exists(root / DocumentFiles::META_DIR));
     model.setLibrary(std::make_unique<Library>(root));
@@ -1807,8 +1826,8 @@ TEST_F(LibraryTest, benchLibraryCache) {
     const fs::path appCache;
     auto openIndex = [&] { return std::make_unique<LibraryIndex>(root); };
     auto flushIndex = [&](LibraryIndex& index) { index.flush(); };
-    auto flushPreviews = [&] { PreviewCache::flush(); };
-    PreviewCache::setLibrary(CacheLocation(root));
+    auto flushPreviews = [&] { DocumentCovers::flush(); };
+    DocumentCovers::setLibrary(CacheLocation(root));
     DocumentPlaces::setLibrary(root, Library(root).placesFile());
 
     {
@@ -1821,7 +1840,7 @@ TEST_F(LibraryTest, benchLibraryCache) {
     }
     t.restart();
     for (const auto& item: items) {
-        PreviewCache::preview(item);
+        DocumentCovers::cover(item);
     }
     flushPreviews();
     std::cout << "previews: " << t.elapsed() << " ms\n";
@@ -1867,7 +1886,7 @@ TEST_F(LibraryTest, benchLibraryCache) {
     auto [indexBytes, indexFiles] = written(before, snapshot(cacheFiles(root, appCache)));
     std::cout << "after editing one .xopp, the index wrote " << indexBytes / 1024.0 << " KiB in " << indexFiles
               << " files\n";
-    PreviewCache::preview(DocumentFiles::itemOf(edited));
+    DocumentCovers::cover(DocumentFiles::itemOf(edited));
     flushPreviews();
     auto [allBytes, allFiles] = written(before, snapshot(cacheFiles(root, appCache)));
     std::cout << "with its preview (page 3 edited: drawn again, looks the same): " << allBytes / 1024.0 << " KiB in "
@@ -1880,7 +1899,7 @@ TEST_F(LibraryTest, benchLibraryCache) {
     index->update(DocumentFiles::scanRecursive(root));
     index->waitForDone();
     flushIndex(*index);
-    PreviewCache::preview(DocumentFiles::itemOf(edited));
+    DocumentCovers::cover(DocumentFiles::itemOf(edited));
     flushPreviews();
     auto [firstBytes, firstFiles] = written(beforeFirst, snapshot(cacheFiles(root, appCache)));
     std::cout << "page 1 edited, index and preview: " << firstBytes / 1024.0 << " KiB in " << firstFiles

@@ -4,7 +4,7 @@
  *
  * Three formats:
  *  - xournal-qt (as is): the documents as they are, with the library's readings of exactly these documents written
- *    fresh into the zip's cache folders (".xournal_library/" packs: the handwriting read, the first-page previews, the
+ *    fresh into the zip's cache folders (".xournal_library/" packs: the handwriting read, the covers, the
  *    notes with the text of text elements, and on request the PDF text), so the recipient's search is fast at once.
  *    Nothing else of the cache goes along: no entries of other documents, no autosaves, no stale entries;
  *  - for Xournal++: notes as .xopp + PDF (a PDF with notes becomes "name.xopp" + "name.xopp.bg.pdf");
@@ -39,7 +39,8 @@
 #include <QVariantMap>
 
 #include "DocumentFiles.h"
-#include "Library.h"
+#include "FileStamps.h"
+#include "LibraryIndex.h"
 #include "filesystem.h"
 
 namespace xqt {
@@ -59,7 +60,7 @@ public:
     enum class Format { App, Xournal, Pdf };
     struct Options {
         Format format = Format::App;
-        bool readings = true;     ///< handwriting readings, previews, notes (xournal-qt format)
+        bool readings = true;     ///< handwriting readings, covers, notes (xournal-qt format)
         bool pdfText = false;     ///< also the PDF text ("faster search, bigger file")
         bool history = false;     ///< PDFs with notes with their version history
         bool recordings = true;

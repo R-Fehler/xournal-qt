@@ -1,4 +1,4 @@
-#include "Previews.h"
+#include "DocumentCovers.h"
 
 #include "DocumentPlaces.h"
 
@@ -12,7 +12,7 @@
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QFile>
-#include <QThreadPool>
+#include <QThread>
 
 #include "model/Document.h"
 #include "session/DocumentImages.h"
@@ -20,19 +20,20 @@
 #include "session/FileIo.h"
 #include "util/PathUtil.h"
 
+#include "AsyncImage.h"
 #include "ImageFile.h"
-#include "Library.h"
+#include "ImageMemory.h"
+#include "ImageWorkers.h"
+#include "FileStamps.h"
 #include "MarkdownFile.h"
 #include "Thumbnails.h"
 
 namespace xqt {
 
-const QString PreviewCache::PACK = QStringLiteral("previews");
-const QString PreviewCache::STAMPS_PACK = QStringLiteral("preview-stamps");
+const QString DocumentCovers::PACK = QStringLiteral("previews");
+const QString DocumentCovers::STAMPS_PACK = QStringLiteral("preview-stamps");
 
 namespace {
-/// PNG kept in memory at most (the folders used least recently go first)
-constexpr qint64 BUDGET = 48ll * 1024 * 1024;
 /// A folder's pack of this size or more is not read on the UI thread just for a placeholder (stored())
 constexpr qint64 BIG_PACK = 4ll * 1024 * 1024;
 
@@ -41,7 +42,7 @@ struct Stored {
     QByteArray png;
     QString packStamp;  ///< its stamp in previews.pack (older when a newer version looked the same: see STAMPS_PACK)
 };
-/// The previews of the documents directly in one folder, as in its pack.
+/// The covers of the documents directly in one folder, as in its pack.
 struct Folder {
     std::map<QString, Stored> entries;  ///< by file name
     bool dirty = false;        ///< previews.pack is to be written
@@ -64,27 +65,9 @@ State& state() {
     static State s;
     return s;
 }
-QThreadPool& pool() {
-    static QThreadPool* p = [] {
-        auto* tp = new QThreadPool;
-        tp->setMaxThreadCount(std::max(1, std::min(3, QThread::idealThreadCount() / 2)));
-        return tp;
-    }();
-    return *p;
-}
-/// Writes the packs (not held up by the previews being drawn)
-QThreadPool& writer() {
-    static QThreadPool* p = [] {
-        auto* tp = new QThreadPool;
-        tp->setMaxThreadCount(1);
-        return tp;
-    }();
-    return *p;
-}
-
 int titleOf(const DocumentItem& item) { return DocumentPlaces::titlePage(DocumentPlaces::keyOf(item)); }
 
-/// What a stored preview shows: the document's files as they are, and its title page.
+/// What a stored cover shows: the document's files as they are, and its title page.
 QString stampOf(const DocumentItem& item) {
     return documentStamp(item) + QStringLiteral("title=") + QString::number(titleOf(item));
 }
@@ -105,10 +88,10 @@ void take(State& s, Folder& f, std::map<QString, Stored>::iterator it) {
     f.entries.erase(it);
 }
 
-/// Keep the memory for previews under the budget: the folders used least recently go (not those still to be
+/// Keep the memory for covers under the budget: the folders used least recently go (not those still to be
 /// written, nor `keep`). The lock is held.
 void trim(State& s, const fs::path& keep) {
-    while (s.bytes > BUDGET) {
+    while (s.bytes > ImageMemory::COVER_BYTES) {
         auto oldest = s.folders.end();
         for (auto it = s.folders.begin(); it != s.folders.end(); ++it) {
             if (!it->second.dirty && !it->second.stampsDirty && it->first != keep && (oldest == s.folders.end() || it->second.used < oldest->second.used)) {
@@ -147,21 +130,21 @@ bool ensureLoaded(const fs::path& folder, bool big) {
     }
     fs::path dir = location.dirOf(folder);
     std::error_code ec;
-    if (!fs::exists(Packs::fileOf(dir, PreviewCache::PACK), ec)) {
+    if (!fs::exists(Packs::fileOf(dir, DocumentCovers::PACK), ec)) {
         // where it may have been kept before (a folder that cannot be written now, the other cache location)
         const fs::path other = dir == location.inFolder(folder) ? location.mirrorOf(folder) : location.inFolder(folder);
-        if (!other.empty() && fs::exists(Packs::fileOf(other, PreviewCache::PACK), ec)) {
+        if (!other.empty() && fs::exists(Packs::fileOf(other, DocumentCovers::PACK), ec)) {
             dir = other;
         }
     }
     if (!big) {
-        const auto size = fs::file_size(Packs::fileOf(dir, PreviewCache::PACK), ec);
+        const auto size = fs::file_size(Packs::fileOf(dir, DocumentCovers::PACK), ec);
         if (!ec && static_cast<qint64>(size) >= BIG_PACK) {
             return false;
         }
     }
     Folder f;
-    if (auto entries = Packs::read(dir, PreviewCache::PACK, PreviewCache::FORMAT)) {
+    if (auto entries = Packs::read(dir, DocumentCovers::PACK, DocumentCovers::FORMAT)) {
         ++s.reads;
         for (auto it = entries->cbegin(); it != entries->cend(); ++it) {
             const QString name = it.key().toString();
@@ -176,9 +159,9 @@ bool ensureLoaded(const fs::path& folder, bool big) {
             f.entries[name] = std::move(stored);
         }
     }
-    // Previews that newer versions of their documents showed the same (only if previews.pack has what they were
+    // Covers that newer versions of their documents showed the same (only if previews.pack has what they were
     // compared with)
-    if (auto stamps = Packs::read(dir, PreviewCache::STAMPS_PACK, PreviewCache::FORMAT)) {
+    if (auto stamps = Packs::read(dir, DocumentCovers::STAMPS_PACK, DocumentCovers::FORMAT)) {
         for (auto it = stamps->cbegin(); it != stamps->cend(); ++it) {
             const QCborMap e = it.value().toMap();
             auto entry = f.entries.find(it.key().toString());
@@ -216,7 +199,7 @@ QByteArray lookup(const DocumentItem& item, const QString& stamp) {
     return it != f->second.entries.end() && it->second.stamp == stamp ? it->second.png : QByteArray();
 }
 
-/// The stored preview of a document, whatever version it shows.
+/// The stored cover of a document, whatever version it shows.
 QByteArray lookupAny(const DocumentItem& item) {
     auto& s = state();
     std::lock_guard lock(s.mtx);
@@ -241,8 +224,8 @@ bool samePicture(const QByteArray& stored, const QByteArray& png, const QImage& 
            old.convertToFormat(QImage::Format_ARGB32) == img.convertToFormat(QImage::Format_ARGB32);
 }
 
-/// The stored preview `png` is right for this version of the document too: only the stamps pack is written (the
-/// folder's previews.pack is left alone). Returns false if the preview changed meanwhile.
+/// The stored cover `png` is right for this version of the document too: only the stamps pack is written (the
+/// folder's previews.pack is left alone). Returns false if the cover changed meanwhile.
 bool confirm(const DocumentItem& item, const QString& stamp, const QByteArray& png) {
     auto& s = state();
     std::lock_guard lock(s.mtx);
@@ -283,7 +266,7 @@ bool writeChanged() {
     struct Job {
         fs::path folder;
         std::map<QString, Stored> entries;
-        bool previews = false;  ///< previews.pack (else only the stamps pack)
+        bool covers = false;  ///< previews.pack (else only the stamps pack)
     };
     std::vector<Job> jobs;
     CacheLocation location;
@@ -298,7 +281,7 @@ bool writeChanged() {
                 // Only newer versions that look the same: their stamps go into the small pack, unless previews.pack
                 // is not where it is written (read from the other cache location: it moves now)
                 std::error_code ec;
-                f.dirty = !fs::exists(Packs::fileOf(location.dirOf(folder), PreviewCache::PACK), ec);
+                f.dirty = !fs::exists(Packs::fileOf(location.dirOf(folder), DocumentCovers::PACK), ec);
             }
             if (f.dirty) {
                 for (auto& [name, stored]: f.entries) {
@@ -319,34 +302,34 @@ bool writeChanged() {
             if (!fs::exists(job.folder / name.toStdString(), ec)) {
                 continue;  // (gone meanwhile: left out)
             }
-            if (job.previews) {
+            if (job.covers) {
                 pack.insert(name, QCborMap{{QStringLiteral("stamp"), stored.stamp}, {QStringLiteral("png"), stored.png}});
             } else if (stored.stamp != stored.packStamp) {
                 stamps.insert(name, QCborMap{{QStringLiteral("stamp"), stored.stamp}, {QStringLiteral("of"), stored.packStamp}});
             }
         }
         const fs::path dir = location.dirOf(job.folder);
-        if (!job.previews) {
+        if (!job.covers) {
             // (a few bytes per document; previews.pack is left alone)
-            ok = Packs::write(dir, PreviewCache::STAMPS_PACK, PreviewCache::FORMAT, stamps, false) && ok;
+            ok = Packs::write(dir, DocumentCovers::STAMPS_PACK, DocumentCovers::FORMAT, stamps, false) && ok;
             ++s.stampWrites;
             continue;
         }
         if (pack.isEmpty()) {
-            Packs::remove(dir, PreviewCache::PACK);
-            Packs::remove(dir, PreviewCache::STAMPS_PACK);
+            Packs::remove(dir, DocumentCovers::PACK);
+            Packs::remove(dir, DocumentCovers::STAMPS_PACK);
             fs::remove(dir, ec);  // (only if nothing else is in it)
         } else {
             // (PNG: compressed already)
-            ok = Packs::write(dir, PreviewCache::PACK, PreviewCache::FORMAT, pack, false) && ok;
-            Packs::remove(dir, PreviewCache::STAMPS_PACK);  // (all stamps are in previews.pack now)
+            ok = Packs::write(dir, DocumentCovers::PACK, DocumentCovers::FORMAT, pack, false) && ok;
+            Packs::remove(dir, DocumentCovers::STAMPS_PACK);  // (all stamps are in previews.pack now)
         }
         ++s.writes;
     }
     return ok;
 }
 
-/// The file name under which previews were stored as PNG files: from the path, the files and the title page (the
+/// The file name under which covers were stored as PNG files: from the path, the files and the title page (the
 /// first page keeps the name it had before there were title pages).
 QString pngName(const DocumentItem& item) {
     const int title = titleOf(item);
@@ -367,7 +350,7 @@ bool inLibrary(const DocumentItem& item) {
 
 QImage render(const DocumentItem& item) {
     if (item.xopp.empty() && !item.image.empty()) {
-        return ImageFile::read(item.image, PreviewCache::WIDTH);  // an image alone: a thumbnail of it
+        return ImageFile::read(item.image, DocumentCovers::WIDTH);  // an image alone: a thumbnail of it
     }
     if (!item.md.empty() || item.kind() == DocumentItem::Kind::Text) {
         // A Markdown file: its title page as it opens (enough of its text for the pages up to it); a text file the
@@ -381,7 +364,7 @@ QImage render(const DocumentItem& item) {
         auto doc = MarkdownFile::document(item.md.empty() ? MarkdownFile::readAsPlainText(item.other, bytes)
                                                           : MarkdownFile::read(item.md, bytes),
                                           title + 1);
-        return ThumbnailProvider::renderDocument(*doc, std::min(title, doc->getPageCount() - 1), PreviewCache::WIDTH);
+        return ThumbnailProvider::renderDocument(*doc, std::min(title, doc->getPageCount() - 1), DocumentCovers::WIDTH);
     }
     auto loaded = DocumentSession::loadFile(item.main());
     if (!loaded.document || loaded.document->getPageCount() == 0) {
@@ -389,22 +372,15 @@ QImage render(const DocumentItem& item) {
     }
     const size_t title = static_cast<size_t>(std::max(0, titleOf(item)));
     return ThumbnailProvider::renderDocument(*loaded.document, std::min(title, loaded.document->getPageCount() - 1),
-                                             PreviewCache::WIDTH);
+                                             DocumentCovers::WIDTH);
 }
 
-class PreviewResponse final: public QQuickImageResponse {
-public:
-    QQuickTextureFactory* textureFactory() const override {
-        return QQuickTextureFactory::textureFactoryForImage(image);
-    }
-    QImage image;
-};
 }  // namespace
 
-void PreviewCache::setLibrary(const CacheLocation& location) {
+void DocumentCovers::setLibrary(const CacheLocation& location) {
     auto& s = state();
     if (!s.scheduler && QCoreApplication::instance()) {
-        s.scheduler = new WriteScheduler([] { writer().start([] { writeChanged(); }); });  // (lives as long as the app)
+        s.scheduler = new WriteScheduler([] { ImageWorkers::start(ImageWorkers::Pool::CoverFiles, [] { writeChanged(); }); });  // (lives as long as the app)
         s.scheduler->moveToThread(QCoreApplication::instance()->thread());
     }
     flush();  // what the library before has not written yet
@@ -415,11 +391,11 @@ void PreviewCache::setLibrary(const CacheLocation& location) {
     s.discarded = false;
 }
 
-fs::path PreviewCache::outsideFile(const DocumentItem& item) {
+fs::path DocumentCovers::outsideFile(const DocumentItem& item) {
     return Util::getCacheSubfolder("previews") / (pngName(item).toStdString() + ".png");
 }
 
-QImage PreviewCache::stored(const DocumentItem& item) {
+QImage DocumentCovers::stored(const DocumentItem& item) {
     QImage img;
     if (!inLibrary(item)) {
         img.load(QString::fromStdString(outsideFile(item).string()), "PNG");
@@ -433,7 +409,7 @@ QImage PreviewCache::stored(const DocumentItem& item) {
     return img;
 }
 
-QImage PreviewCache::preview(const DocumentItem& item) {
+QImage DocumentCovers::cover(const DocumentItem& item) {
     if (!inLibrary(item)) {
         const QString cached = QString::fromStdString(outsideFile(item).string());
         QImage img;
@@ -441,7 +417,7 @@ QImage PreviewCache::preview(const DocumentItem& item) {
             return img;
         }
         // Only one document is read and drawn at a time: reading a document (upstream's loader and poppler) is
-        // not made for several threads, and two workers asked for the same preview would write the same file.
+        // not made for several threads, and two workers asked for the same cover would write the same file.
         static std::mutex outsideMutex;
         std::lock_guard renderLock(outsideMutex);
         if (img.load(cached, "PNG")) {
@@ -467,7 +443,7 @@ QImage PreviewCache::preview(const DocumentItem& item) {
         return img;  // another worker made it while we waited
     }
     // The document changed (or its title page): drawn again. If it looks as before (e.g. a later page was
-    // edited), the stored preview is kept and only marked valid for this version, so the folder's previews.pack
+    // edited), the stored cover is kept and only marked valid for this version, so the folder's previews.pack
     // (big, uploaded whole by sync clients) is not written again.
     const QByteArray before = lookupAny(item);
     img = render(item);
@@ -483,19 +459,13 @@ QImage PreviewCache::preview(const DocumentItem& item) {
     return img;
 }
 
-QString PreviewCache::url(const DocumentItem& item) {
-    const QByteArray path = QByteArray::fromStdString(item.main().string())
-                                    .toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals);
+QString DocumentCovers::url(const DocumentItem& item) {
     // The stamp only makes the URL change with the files (QML caches images by URL).
-    const QString stamp = QString::fromLatin1(
-            QCryptographicHash::hash(documentStamp(item).toUtf8() + '\n' + QByteArray::number(titleOf(item)),
-                                     QCryptographicHash::Md5)
-                    .toHex()
-                    .left(8));
-    return QStringLiteral("image://preview/") + QString::fromLatin1(path) + '/' + stamp;
+    return QStringLiteral("image://cover/") + urlEncodePath(item.main()) + '/' +
+           urlStamp(documentStamp(item).toUtf8() + '\n' + QByteArray::number(titleOf(item)));
 }
 
-void PreviewCache::prune(const std::vector<DocumentItem>& items) {
+void DocumentCovers::prune(const std::vector<DocumentItem>& items) {
     std::set<fs::path> alive;
     for (const auto& item: items) {
         alive.insert(item.main());
@@ -519,7 +489,7 @@ void PreviewCache::prune(const std::vector<DocumentItem>& items) {
     }
 }
 
-void PreviewCache::forget(const DocumentItem& item) {
+void DocumentCovers::forget(const DocumentItem& item) {
     std::error_code ec;
     fs::remove(outsideFile(item), ec);
     if (!inLibrary(item) || !ensureLoaded(item.folder(), false)) {
@@ -540,7 +510,7 @@ void PreviewCache::forget(const DocumentItem& item) {
     changed(s);
 }
 
-std::optional<QCborMap> PreviewCache::storedEntry(const DocumentItem& item) {
+std::optional<QCborMap> DocumentCovers::storedEntry(const DocumentItem& item) {
     if (!inLibrary(item) || !ensureLoaded(item.folder(), true)) {
         return std::nullopt;
     }
@@ -552,12 +522,12 @@ std::optional<QCborMap> PreviewCache::storedEntry(const DocumentItem& item) {
     return QCborMap{{QStringLiteral("stamp"), stamp}, {QStringLiteral("png"), png}};
 }
 
-QString PreviewCache::stampWith(const DocumentItem& item, const std::function<QString(const fs::path&)>& stampOf,
+QString DocumentCovers::stampWith(const DocumentItem& item, const std::function<QString(const fs::path&)>& stampOf,
                                 int titlePage) {
     return documentStamp(item, stampOf) + QStringLiteral("title=") + QString::number(titlePage);
 }
 
-void PreviewCache::adopt(const DocumentItem& item, const std::vector<std::pair<QString, QString>>& changes) {
+void DocumentCovers::adopt(const DocumentItem& item, const std::vector<std::pair<QString, QString>>& changes) {
     if (changes.empty() || !inLibrary(item) || !ensureLoaded(item.folder(), true)) {
         return;
     }
@@ -589,12 +559,12 @@ void PreviewCache::adopt(const DocumentItem& item, const std::vector<std::pair<Q
     }
 }
 
-void PreviewCache::moved(const std::vector<std::pair<fs::path, fs::path>>& moves) {
+void DocumentCovers::moved(const std::vector<std::pair<fs::path, fs::path>>& moves) {
     auto& s = state();
     for (const auto& [from, to]: moves) {
         std::error_code ec;
         if (fs::is_directory(to, ec)) {
-            // A folder: its packs came along; the previews in memory get their new folders
+            // A folder: its packs came along; the covers in memory get their new folders
             std::lock_guard lock(s.mtx);
             std::vector<fs::path> moved;
             for (const auto& [folder, f]: s.folders) {
@@ -618,7 +588,7 @@ void PreviewCache::moved(const std::vector<std::pair<fs::path, fs::path>>& moves
         if (!item.valid() || item.main() != to) {
             continue;
         }
-        // A document: its preview goes with it into its new folder (still right if its files kept their size and
+        // A document: its cover goes with it into its new folder (still right if its files kept their size and
         // time), if both packs are in memory or small
         if (!ensureLoaded(from.parent_path(), false) || !ensureLoaded(to.parent_path(), false)) {
             continue;
@@ -636,25 +606,25 @@ void PreviewCache::moved(const std::vector<std::pair<fs::path, fs::path>>& moves
         Stored stored = it->second;
         take(s, source->second, it);
         source->second.dirty = true;
-        // (the stamp has the size and time: a .xopp written again with its PDF's new path gets a new preview)
+        // (the stamp has the size and time: a .xopp written again with its PDF's new path gets a new cover)
         add(s, target->second, QString::fromStdString(to.filename().string()), std::move(stored));
         target->second.dirty = true;
         changed(s);
     }
 }
 
-bool PreviewCache::flush() {
+bool DocumentCovers::flush() {
     auto& s = state();
-    writer().waitForDone();
+    ImageWorkers::waitForDone(ImageWorkers::Pool::CoverFiles);
     if (s.scheduler && QThread::currentThread() == s.scheduler->thread()) {
         s.scheduler->cancel();
     }
     return writeChanged();
 }
 
-void PreviewCache::discard() {
+void DocumentCovers::discard() {
     auto& s = state();
-    writer().waitForDone();
+    ImageWorkers::waitForDone(ImageWorkers::Pool::CoverFiles);
     if (s.scheduler) {
         s.scheduler->cancel();
     }
@@ -664,39 +634,23 @@ void PreviewCache::discard() {
     s.bytes = 0;
 }
 
-void PreviewCache::setWriteDelays(int quietMs, int maxDelayMs) {
+void DocumentCovers::setWriteDelays(int quietMs, int maxDelayMs) {
     if (auto* scheduler = state().scheduler) {
         scheduler->setDelays(quietMs, maxDelayMs);
     }
 }
 
-int PreviewCache::packsRead() { return state().reads.load(); }
-int PreviewCache::packsWritten() { return state().writes.load(); }
-int PreviewCache::stampPacksWritten() { return state().stampWrites.load(); }
+int DocumentCovers::packsRead() { return state().reads.load(); }
+int DocumentCovers::packsWritten() { return state().writes.load(); }
+int DocumentCovers::stampPacksWritten() { return state().stampWrites.load(); }
 
-void PreviewProvider::shutdown() {
-    pool().clear();
-    pool().waitForDone();
-    PreviewCache::flush();
-}
-
-QQuickImageResponse* PreviewProvider::requestImageResponse(const QString& id, const QSize& /*requestedSize*/) {
-    auto* response = new PreviewResponse;
-    const fs::path file(QByteArray::fromBase64(id.section('/', 0, 0).toLatin1(),
-                                               QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals)
-                                .toStdString());
-    pool().start([response, file] {
-        QImage img;
-        if (const DocumentItem item = DocumentFiles::itemOf(file, DocumentFiles::TextFiles); item.valid()) {
-            img = PreviewCache::preview(item);
-        }
-        QMetaObject::invokeMethod(
-                response,
-                [response, img = std::move(img)]() mutable {
-                    response->image = std::move(img);
-                    Q_EMIT response->finished();
-                },
-                Qt::QueuedConnection);
+QQuickImageResponse* CoverProvider::requestImageResponse(const QString& id, const QSize& /*requestedSize*/) {
+    auto* response = new AsyncImageResponse;
+    const fs::path file = urlDecodePath(id.section('/', 0, 0));
+    // (a response QML cancelled before its worker began, e.g. a card flung past, does not load its document)
+    ImageWorkers::respond(ImageWorkers::Pool::Covers, response, [file] {
+        const DocumentItem item = DocumentFiles::itemOf(file, DocumentFiles::TextFiles);
+        return item.valid() ? DocumentCovers::cover(item) : QImage();
     });
     return response;
 }

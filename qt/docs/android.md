@@ -90,7 +90,7 @@ and while the app has the access; else the app's folder (`AppController::chooseL
   ([LibraryMigration](../src/shell/LibraryMigration.h)): every file is copied into a hidden
   `.xqt-moving-<name>` folder next to its place, read back and compared (size and SHA-1), and only when all of it
   arrived do the folders get their names and the app switches over. Recent files, the library shown, the reading
-  positions and title pages, the library's settings and its cache (previews, search index), the session journal
+  positions and title pages, the library's settings and its cache (covers, search index), the session journal
   (open tabs), the open tabs themselves and the last folders of the file dialogs follow. The old copies are deleted
   last, each only if it is still the file that was copied (size and time); a file changed meanwhile stays. If the
   app is ended before that, the next start finishes it (`library-move.json` in the config folder). A library whose
@@ -207,7 +207,7 @@ upload them. Autosaving off (Settings) writes nothing.
 
 **What the app keeps privately** (`/data/user/0/org.xournalqt.app/`, `adb shell run-as org.xournalqt.app ls files`):
 settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-qt/` (copied from the APK at start),
-`files/fonts.conf` and `files/fonts/` (fonts of your own for text boxes), caches in `cache/`. The library cache (previews, search
+`files/fonts.conf` and `files/fonts/` (fonts of your own for text boxes), caches in `cache/`. The library cache (covers, search
 index) is in `cache/xournal-qt/libraries/` too: on Android a library keeps its cache in the app cache by default, not
 in hidden `.xournal_library` folders next to the documents that a sync app would upload ([library.md](library.md),
 "Where the cache is kept"; Settings → Storage switches it per library). Android may clear the app cache when storage

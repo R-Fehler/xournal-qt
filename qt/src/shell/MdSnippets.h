@@ -25,8 +25,6 @@ namespace xqt {
 
 class MdSnippetProvider final: public QQuickAsyncImageProvider {
 public:
-    /// Let the workers finish before the application goes away (they draw with Pango and Cairo).
-    static void shutdown();
     QQuickImageResponse* requestImageResponse(const QString& id, const QSize& requestedSize) override;
 
     /// URL of the cards of a Markdown file for a search; append "/<passage>" (0-based, see md::passages).

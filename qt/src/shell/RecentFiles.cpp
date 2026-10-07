@@ -13,7 +13,7 @@
 #include "session/FileIo.h"
 
 #include "DocumentPlaces.h"
-#include "Previews.h"
+#include "DocumentCovers.h"
 
 namespace xqt {
 
@@ -304,7 +304,7 @@ QVariant RecentFiles::data(const QModelIndex& i, int role) const {
             case HasXoppRole:
             case SelectedRole:
                 return false;
-            case PreviewRole:
+            case CoverRole:
             case PdfKindRole:
                 return QString();
             case VersionsRole:
@@ -332,8 +332,8 @@ QVariant RecentFiles::data(const QModelIndex& i, int role) const {
             }
             return folder;
         }
-        case PreviewRole:
-            return PreviewCache::url(r.item);
+        case CoverRole:
+            return DocumentCovers::url(r.item);
         case OpenedRole:
             return r.opened;
         case HasPdfRole:
@@ -364,7 +364,7 @@ void RecentFiles::pdfKindsChanged() {
 }
 
 QHash<int, QByteArray> RecentFiles::roleNames() const {
-    return {{NameRole, "name"},     {PathRole, "path"},     {LocationRole, "location"}, {PreviewRole, "preview"},
+    return {{NameRole, "name"},     {PathRole, "path"},     {LocationRole, "location"}, {CoverRole, "preview"},
             {OpenedRole, "opened"}, {HasPdfRole, "hasPdf"}, {HasXoppRole, "hasXopp"},   {SelectedRole, "selected"}, {LastPageRole, "lastPage"},
             {KindRole, "kind"}, {IsLibraryRole, "isLibrary"}, {PdfKindRole, "pdfKind"}, {VersionsRole, "versions"}};
 }

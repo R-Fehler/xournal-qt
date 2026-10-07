@@ -62,7 +62,7 @@ void ReferenceMode::setPagesShown(bool shown) {
     gridShown = shown;
     pages->setSession(shown ? shownSession : nullptr);
     if (!shown && tabs.currentSession()) {
-        // (the grid made the reference's previews come first; the main document's again)
+        // (the grid made the reference's sketches come first; the main document's again)
         PageSketches::instance().focus(ThumbnailProvider::idOf(tabs.currentSession()));
     }
     Q_EMIT pagesShownChanged();

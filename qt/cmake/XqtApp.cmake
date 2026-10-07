@@ -47,6 +47,12 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PresenterConsole.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/AsyncImage.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/AsyncImage.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageMemory.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageMemory.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageWorkers.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageWorkers.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PageSketches.h
@@ -86,6 +92,15 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HandwritingSettings.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Library.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Library.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/FileStamps.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/FileStamps.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryIndex.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryIndexEntry.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryIndex.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryIndexPacks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryIndexRead.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryIndexSearch.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryIndexQueries.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryArchive.h
@@ -132,8 +147,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/MdSnippets.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/MdSnippets.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Previews.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Previews.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentCovers.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentCovers.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentPlaces.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentPlaces.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/RecentFiles.h
@@ -500,6 +515,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryCacheTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CliTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ThumbnailsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ImageWorkersTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CanvasMemoryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PastedPdfPagesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PdfOnlyModeTest.cpp

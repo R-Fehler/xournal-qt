@@ -142,14 +142,14 @@ public:
     qreal contentY() const;
     /// Scroll so that the content position (x, y) is at the top-left corner.
     Q_INVOKABLE void scrollTo(qreal x, qreal y);
-    /// Pages the last frame showed by their preview, whole or in part (tests)
-    Q_INVOKABLE int previewsShown() const { return shownPreviews; }
-    /// Most tiles composed and uploaded in one frame so far, and frames that showed a preview (tests)
+    /// Pages the last frame showed by their stand-in, whole or in part (tests)
+    Q_INVOKABLE int standInsShown() const { return shownStandIns; }
+    /// Most tiles composed and uploaded in one frame so far, and frames that showed a stand-in (tests)
     Q_INVOKABLE int mostTilesInAFrame() const { return mostTiles; }
-    Q_INVOKABLE int framesWithPreviews() const { return previewFrames; }
+    Q_INVOKABLE int framesWithStandIns() const { return standInFrames; }
     Q_INVOKABLE void forgetTileCount() {
         mostTiles = 0;
-        previewFrames = 0;
+        standInFrames = 0;
     }
     /// What the frames cost so far (tests, benchmarks): the frames, their time in the scene graph sync (composing
     /// and uploading happen there, and the UI thread waits for it), the page tiles composed and the pixels uploaded.
@@ -333,9 +333,9 @@ private:
     HoverMarkItem* hoverMark = nullptr;
     std::optional<QCursor> windowCursorBeforePen;  ///< the window's cursor before the pen took it (showCursorForPen)
     QPointer<xqt::AppContext> pointerApp;          ///< whose settings and tools it follows
-    std::atomic<int> shownPreviews{0};
+    std::atomic<int> shownStandIns{0};
     std::atomic<int> mostTiles{0};
-    std::atomic<int> previewFrames{0};
+    std::atomic<int> standInFrames{0};
     std::atomic<qint64> statFrames{0}, statSyncNanos{0}, statTiles{0}, statPixels{0};
     QPointF lastScroll;  ///< of the last frame (scene graph thread): whether the view is moving
     double lastZoom = 0;

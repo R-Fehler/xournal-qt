@@ -24,7 +24,7 @@
 #include "session/DocumentMode.h"
 #include "session/FuzzyQuery.h"
 #include "session/WordMatch.h"
-#include "shell/Thumbnails.h"
+#include "shell/ImageMemory.h"
 
 #include "CanvasMemory.h"
 #include "CanvasView.h"
@@ -67,7 +67,7 @@ constexpr int DEFAULT_NEAR_HEIGHT_PERCENT = 100;
 }  // namespace
 
 int SettingsModel::previewMemory(Settings& s) {
-    int mb = static_cast<int>(ThumbnailProvider::DEFAULT_CACHE_MB);
+    int mb = static_cast<int>(ImageMemory::DEFAULT_PREVIEW_MB);
     s.getCustomElement("xournalQt").getInt("previewMemory", mb);
     return mb;
 }
@@ -104,7 +104,7 @@ bool SettingsModel::handWhenOpening(Settings& s) {
 int SettingsModel::systemMemory() const { return static_cast<int>(CanvasMemory::systemMemory() / (1024 * 1024)); }
 
 void SettingsModel::applyPreviewMemory(Settings& s) {
-    ThumbnailProvider::setCacheLimit(static_cast<qint64>(previewMemory(s)) * 1024 * 1024);
+    ImageMemory::setPreviewMemory(static_cast<qint64>(previewMemory(s)) * ImageMemory::MB);
 }
 
 PageType SettingsModel::paperType(PageType base, Color color, bool textured) {

@@ -16,7 +16,7 @@ A **library** is a plain folder of documents that a window works in, like a work
   with it, "Open a folder as library…" is the app's own folder list, which also offers the Download folder.
 - The Downloads folder is offered there too, as a quick library: all downloaded papers at once (on Android the
   phone's `Download` folder; without "All files access" tapping it asks for that first). Like every library
-  it keeps its cache (previews, search index) in `.xournal_library/` folders, so opening it again is as fast as
+  it keeps its cache (covers, search index) in `.xournal_library/` folders, so opening it again is as fast as
   any other library. A note in the library says that its files are
   short-lived, and importing or copying documents into it from elsewhere asks first.
 - "Copy to…" / "Move to…" can go into another library: the dialog has a library choice above the folders.
@@ -34,7 +34,7 @@ A **library** is a plain folder of documents that a window works in, like a work
   pair is one card that opens the hybrid PDF (such pairs look into the PDF; lone PDFs do not). A `.xopp` changed more
   than a minute after the hybrid PDF (edited in Xournal++) is listed as a document of its own beside it.
   Its search text is its pages' text plus its text elements.
-- **Markdown files** (`.md`) are documents: a card with a preview of their start, opened for editing (below). Their
+- **Markdown files** (`.md`) are documents: a card with a cover of their start, opened for editing (below). Their
   pictures in `name.assets/` next to them are part of them: that folder is not listed (nor its pictures, in any view
   or the index); renaming, moving, copying, the trash and sharing take it along, and a new name rewrites the
   links to it in the `.md` (and in its open tab) ([md-images.md](md-images.md)). A `name.assets` folder without its
@@ -105,7 +105,7 @@ the tooltip and the accessible name say it in words):
 ### Renaming
 
 One rename for every place it is offered (qt/rename): `DocumentFiles::rename` renames the document's files, and then
-the search index entry, the reading places and title page (`DocumentPlaces`), the previews, the open tabs, the recent
+the search index entry, the reading places and title page (`DocumentPlaces`), the covers, the open tabs, the recent
 list and the links to and from it follow (`LibraryModel::followMoves`, `AppController::filesChanged`,
 [links.md](links.md)). What is renamed with it:
 
@@ -283,20 +283,21 @@ A cache folder holds a few **packs**, one file each, split by how often they cha
 - `pdf-text.pack`: per document, the text of the PDF pages it shows, tied to the PDF's size and time. Big; written
   only when a PDF changed or a document came or went. A document with over 1 MB of PDF text gets a file of its own,
   `pdf-text-<hash>.pack`, written only when that text changes.
-- `previews.pack`: the first-page previews (PNG, 360 px wide, drawn like the page thumbnails, of the title page; a
+- `previews.pack`: the covers (PNG, 360 px wide, drawn like the page thumbnails, of the title page; a
   Markdown file: its first page as it opens, an image: the image scaled down and turned upright by its orientation tag),
   each with the size and time of the document's files and its title page, so a changed document gets a new
-  preview. A document saved again is drawn again and compared with its stored preview (the PNG, else the pixels):
+  cover. A document saved again is drawn again and compared with its stored cover (the PNG, else the pixels):
   when it looks the same (a later page was edited), `previews.pack` is not written (0.3–0.6 MB that a sync client
   would upload on every save); the new stamp goes into `preview-stamps.pack` instead, a few bytes per document
   (its new stamp and the one in `previews.pack` it was compared with; ignored when that does not match). The next
   time `previews.pack` is written for any reason, it takes the new stamps and `preview-stamps.pack` is removed.
-  (Not kept in `notes.pack`: a preview is drawn when its card is shown, often long after the index wrote
-  `notes.pack`, which would then be written twice, and the index would depend on the previews.)
+  (Not kept in `notes.pack`: a cover is drawn when its card is shown, often long after the index wrote
+  `notes.pack`, which would then be written twice, and the index would depend on the covers.)
   Not compressed again (PNG is). A folder's pack is read when its first card is shown and kept in memory
-  (up to 48 MB of previews; the folders used least recently go first); new previews are written a few seconds
-  later. Renamed or moved in the app, a document takes its preview along. Previews of documents outside a library
-  (recent files) are PNG files in `~/.cache/xournal-qt/previews`.
+  (up to 48 MB of covers; the folders used least recently go first); new covers are written a few seconds
+  later. Renamed or moved in the app, a document takes its cover along. Covers of documents outside a library
+  (recent files) are PNG files in `~/.cache/xournal-qt/previews`. What the words cover, sketch, thumbnail and
+  stand-in mean, and the memory and workers of these pictures: [image-caches.md](image-caches.md).
 
 A pack is CBOR (Qt's `QCborValue`) compressed with zlib, behind a header with a format number: a pack of another
 format is read anew. It is always written whole, under another name first (`QSaveFile`), never changed in place:
@@ -310,7 +311,7 @@ the background after the documents are indexed (`LibraryIndex::fillHashes`; a do
 at the next update). When a document has an entry whose file has the same name and size but **another time** (a library
 copied by hand, unzipped by any app, synced by an app that does not keep times), the file's hash is computed and
 compared: the same content takes the entry over with the new stamps (`LibraryIndex::adopt`), and its handwriting
-(`InkTextStore::restamp`) and its stored preview (`PreviewCache::adopt`) follow; nothing is read again and nothing is
+(`InkTextStore::restamp`) and its stored cover (`DocumentCovers::adopt`) follow; nothing is read again and nothing is
 recognised again. Never on name and size alone: another content (the same size) is read as usual. A preview asked for
 before the index got to its folder is drawn again (and found to look the same: only the small stamps pack is
 written). Measured hash speed on the development machine: about 700 MB/s (BLAKE2b; SHA-256 was 140 MB/s in Qt's
@@ -358,7 +359,7 @@ loaded, drawn pages stay in memory (up to 128 MB) without marks, and the marks a
 Measured on a 300-page text PDF: 3–13 ms per page (13 ms with ~700 marks of a one-letter search), 1–2 ms when only
 the search changed.
 
-Code: `qt/src/shell/Library.*` (library, search index), `Previews.*`, `LibraryModel.*`, `RecentFiles.*`.
+Code: `qt/src/shell/Library.*` (library), `LibraryIndex*` (search index), `FileStamps.*`, `DocumentCovers.*`, `LibraryModel.*`, `RecentFiles.*`.
 
 ## Sharing a folder or the library
 
@@ -374,16 +375,16 @@ named like the folder (or the library), so any unzip makes one folder; the user'
 | Plain PDFs | every notes document (a `.xopp`, a PDF with notes) as a PDF with the ink drawn into its pages (upstream's PDF export); the rest as it is; a README |
 
 The dialog's choices (and their defaults):
-- **Handwriting readings and previews** (on; xournal-qt format): the zip's folders get `.xournal_library/` packs
+- **Handwriting readings and covers** (on; xournal-qt format): the zip's folders get `.xournal_library/` packs
   written fresh for the shared documents only: `notes.pack` (their notes, text elements, Markdown passages, bookmarks,
   to-dos, tags, links, with the content hashes), `ink-text.pack` (the handwriting read), `previews.pack` (their card
   pictures, when the title page is the first page). Each entry is taken from the library's cache only when it is up to
-  date with the file as it is now (`LibraryIndex::snapshot`, `PreviewCache::storedEntry`), and it is stamped for the
+  date with the file as it is now (`LibraryIndex::snapshot`, `DocumentCovers::storedEntry`), and it is stamped for the
   file as it is in the zip: its size and its time in whole seconds, which is the time the receiving app gives the
   unpacked file. Entries of other documents, stale entries, autosaves, clean copies and other caches never go along.
   A protected PDF has no readings (the library does not read it).
   - **PDF text too** (off: "faster search, bigger file"): `pdf-text.pack` as well. Without it, the recipient's library
-    reads the PDF text of documents that show PDF pages (their handwriting and previews are kept).
+    reads the PDF text of documents that show PDF pages (their handwriting and covers are kept).
 - **Version history** (off): PDFs with notes that keep versions go as a copy written anew in one piece, without them
   (as Share sends one: `HybridPdf::compact`), as do PDFs with notes saved incrementally (older revisions may hold
   deleted ink). On: they go as they are.

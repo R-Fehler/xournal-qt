@@ -37,11 +37,11 @@
 #include "session/PdfEncryption.h"
 #include "shell/DocumentFiles.h"
 #include "shell/HitPages.h"
-#include "shell/Library.h"
+#include "shell/LibraryIndex.h"
 #include "shell/LibraryModel.h"
 #include "shell/MdSnippets.h"
 #include "shell/PageSketches.h"
-#include "shell/Previews.h"
+#include "shell/DocumentCovers.h"
 #include "shell/RecentFiles.h"
 #include "shell/SettingsModel.h"
 #include "shell/SystemApps.h"
@@ -387,8 +387,8 @@ TEST_F(PdfPasswordTest, protectingRemovesEverythingTheCachesKeptOfIt) {
     until([&] { return !index->search(QString::fromStdString(marker)).empty(); }, 20000);
     ASSERT_FALSE(index->search(QString::fromStdString(marker)).empty()) << "indexed";
     index->flush();
-    EXPECT_FALSE(xqt::PreviewCache::preview(item).isNull());
-    xqt::PreviewCache::flush();
+    EXPECT_FALSE(xqt::DocumentCovers::cover(item).isNull());
+    xqt::DocumentCovers::flush();
     until([&] { return storedPagesOf(cache, pdf) > 0; }, 20000);
     EXPECT_GT(storedPagesOf(cache, pdf), 0u) << "pictures of its pages stored";
     ASSERT_TRUE(controller->sharePdfCopy(QUrl(), false));
@@ -404,11 +404,11 @@ TEST_F(PdfPasswordTest, protectingRemovesEverythingTheCachesKeptOfIt) {
     until([&] { return controller->protectedDocument(); });
     ASSERT_TRUE(controller->protectedDocument());
     index->flush();
-    xqt::PreviewCache::flush();
+    xqt::DocumentCovers::flush();
     const auto found = leaks(dirs, marker);
     EXPECT_TRUE(found.empty()) << "readable in " << (found.empty() ? std::string() : found.front().string());
     EXPECT_EQ(storedPagesOf(cache, pdf), 0u) << "no picture of its pages";
-    EXPECT_TRUE(xqt::PreviewCache::stored(item).isNull()) << "no picture of its card";
+    EXPECT_TRUE(xqt::DocumentCovers::stored(item).isNull()) << "no picture of its card";
     EXPECT_EQ(readable(packs / "previews.pack").find("lecture.pdf"), std::string::npos) << "not in the pack either";
     EXPECT_TRUE(index->lockedOf(pdf));
     EXPECT_TRUE(index->search(QString::fromStdString(marker)).empty());

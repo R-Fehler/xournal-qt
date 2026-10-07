@@ -18,7 +18,7 @@
 #include "session/FileIo.h"
 #include "session/FuzzyQuery.h"
 
-#include "Library.h"
+#include "LibraryIndex.h"
 #include "LibraryModel.h"
 #include "NetFetch.h"
 #include "SystemApps.h"

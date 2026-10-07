@@ -17,7 +17,7 @@
 
 #include "model/PageRef.h"
 
-#include "Library.h"
+#include "LibraryIndex.h"
 
 class Document;
 class Layer;

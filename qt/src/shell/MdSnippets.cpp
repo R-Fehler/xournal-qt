@@ -6,17 +6,19 @@
 #include <memory>
 #include <mutex>
 
-#include <QCryptographicHash>
 #include <QPainter>
-#include <QThreadPool>
 
 #include <cairo.h>
 
 #include "session/DocumentImages.h"
 #include "session/TextMatch.h"
 
+#include "AsyncImage.h"
+#include "FileStamps.h"
 #include "HitPages.h"
-#include "Library.h"
+#include "ImageMemory.h"
+#include "ImageWorkers.h"
+#include "LibraryIndex.h"
 #include "MarkdownFile.h"
 #include "MdLayout.h"
 #include "MdPassages.h"
@@ -24,7 +26,6 @@
 namespace xqt {
 
 namespace {
-constexpr size_t MAX_FILES = 8;
 /// The width a card's text is laid out for (points), and the space around it
 constexpr double TEXT_WIDTH = 220;
 constexpr double PADDING = 6;
@@ -60,7 +61,7 @@ struct Caches {
         ++parses;
         std::lock_guard lock(mtx);
         files.emplace_front(key, parsed);
-        while (files.size() > MAX_FILES) {
+        while (files.size() > ImageMemory::SNIPPET_FILES) {
             files.pop_back();
         }
         return parsed;
@@ -73,23 +74,6 @@ struct Caches {
 Caches& caches() {
     static Caches c;
     return c;
-}
-
-QThreadPool& pool() {
-    static QThreadPool* p = [] {
-        auto* tp = new QThreadPool;
-        tp->setMaxThreadCount(std::max(1, std::min(2, QThread::idealThreadCount() / 2)));
-        return tp;
-    }();
-    return *p;
-}
-
-QString encode(const QString& s) {
-    return QString::fromLatin1(s.toUtf8().toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
-}
-QString decode(const QString& s) {
-    return QString::fromUtf8(
-            QByteArray::fromBase64(s.toLatin1(), QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
 }
 
 /// The places of the matches of `query` in a passage's text, as the index finds them (in its simplified text):
@@ -127,22 +111,11 @@ std::vector<std::pair<size_t, size_t>> matchesIn(const md::Passage& p, const QSt
     return out;
 }
 
-class SnippetResponse final: public QQuickImageResponse {
-public:
-    QQuickTextureFactory* textureFactory() const override {
-        return QQuickTextureFactory::textureFactoryForImage(image);
-    }
-    void cancel() override { cancelled = true; }
-    QImage image;
-    std::atomic<bool> cancelled{false};
-};
 }  // namespace
 
 QString MdSnippetProvider::baseUrl(const DocumentItem& item, const QString& query) {
-    const QString stamp = QString::fromLatin1(
-            QCryptographicHash::hash(documentStamp(item).toUtf8(), QCryptographicHash::Md5).toHex().left(8));
-    return QStringLiteral("image://mdsnippet/") + encode(QString::fromStdString(item.main().string())) + '/' + stamp +
-           '/' + encode(query.startsWith(QChar(0x1f)) ? query : LibraryIndex::simplified(query).trimmed());
+    return QStringLiteral("image://mdsnippet/") + urlEncodePath(item.main()) + '/' + urlStamp(documentStamp(item).toUtf8()) +
+           '/' + urlEncode(query.startsWith(QChar(0x1f)) ? query : LibraryIndex::simplified(query).trimmed());
 }
 
 QImage MdSnippetProvider::render(const fs::path& file, int passage, const QString& query, int width, int maxHeight) {
@@ -207,32 +180,17 @@ void MdSnippetProvider::clearCaches() { caches().clear(); }
 
 int MdSnippetProvider::parseCount() { return caches().parses; }
 
-void MdSnippetProvider::shutdown() {
-    pool().clear();
-    pool().waitForDone();
-}
-
 QQuickImageResponse* MdSnippetProvider::requestImageResponse(const QString& id, const QSize& requestedSize) {
-    auto* response = new SnippetResponse;
+    auto* response = new AsyncImageResponse;
     // id: <path>/<stamp>/<query>/<passage>
     const QStringList parts = id.split('/');
-    const fs::path file(decode(parts.value(0)).toStdString());
-    const QString query = decode(parts.value(2));
+    const fs::path file = urlDecodePath(parts.value(0));
+    const QString query = urlDecode(parts.value(2));
     const int passage = parts.value(3).toInt();
     const int width = requestedSize.width() > 0 ? requestedSize.width() : 240;
     const int maxHeight = std::max(0, requestedSize.height());
-    pool().start([response, file, query, passage, width, maxHeight] {
-        QImage img;
-        if (!response->cancelled) {  // scrolled away meanwhile: not drawn
-            img = render(file, passage, query, width, maxHeight);
-        }
-        QMetaObject::invokeMethod(
-                response,
-                [response, img = std::move(img)]() mutable {
-                    response->image = std::move(img);
-                    Q_EMIT response->finished();
-                },
-                Qt::QueuedConnection);
+    ImageWorkers::respond(ImageWorkers::Pool::Snippets, response, [file, query, passage, width, maxHeight] {
+        return render(file, passage, query, width, maxHeight);
     });
     return response;
 }

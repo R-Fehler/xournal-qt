@@ -19,7 +19,7 @@
 #include "session/Tags.h"
 #include "session/TextFile.h"
 #include "shell/DocumentFiles.h"
-#include "shell/Library.h"
+#include "shell/LibraryIndex.h"
 #include "shell/LibraryModel.h"
 #include "shell/LibraryTags.h"
 #include "shell/TabManager.h"

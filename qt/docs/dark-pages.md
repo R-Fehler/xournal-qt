@@ -67,10 +67,10 @@ pixel as it is.
 - LaTeX formulas (TexImage) are not kept: they are black text.
 - Thumbnails and sketches are turned dark whole (pictures included): they are small.
 
-### Ink in progress, the selection, previews
+### Ink in progress, the selection, stand-ins
 
 The stroke being drawn is composed into its tiles and passes the same shader. The selection's picture (moved or
-turned) is turned dark on the CPU when it is drawn (it is drawn only when it changes). A page's preview (shown before
+turned) is turned dark on the CPU when it is drawn (it is drawn only when it changes). A page's stand-in (shown before
 it is rendered) gets the same material; the white placeholder becomes the dark paper.
 
 ## Page colors

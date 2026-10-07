@@ -39,7 +39,7 @@ How xournal-qt behaves when the screen is scaled by a fraction, what was checked
 | Pointer: cursor pixmaps (`HoverPointer`) | `ceil(side * dpr)` pixels with `setDevicePixelRatio(dpr)`; the cursor key includes the dpr; refreshed on `ItemDevicePixelRatioHasChanged`. | Right (`theDotCursorHasTheScreensPixels`) |
 | Pointer: the dot drawn for pens without a platform cursor | Picture squeezed into 8 logical pixels where `8 * dpr` is not whole (1.1, 1.33, 1.67). | **Fixed** (910cd42) |
 | Thumbnails, page grid, overviews, page hits, annotation pictures | QML gave `sourceSize = width * Screen.devicePixelRatio`, and Qt Quick multiplies an image provider's `sourceSize` by the dpr again: drawn at dpr² (2.25x as wide at 150 %, 4x at 200 %). | **Fixed** (27d9c1d) |
-| Sketches and previews (`PageSketches`, `PreviewCache`) | Fixed widths (they are placeholders and library cards); the dpr is not in their keys, nor needs to be. | Right; library card previews (360 px) are a little soft on 2x screens (not fractional-specific) |
+| Sketches, stand-ins and covers (`PageSketches`, `DocumentCovers`) | Fixed widths (they are placeholders and library cards); the dpr is not in their keys, nor needs to be. | Right; library card covers (360 px) are a little soft on 2x screens (not fractional-specific) |
 | Thumbnail cache keys | The requested width (in steps of 64) is the key, and it now carries the dpr once. | Right |
 | QML icons | SVG `Image`s with a `sourceSize` in logical pixels: Qt renders SVG at `sourceSize * dpr`. | Right |
 | QML 1 px lines and square frames | Drawn without antialiasing: 1.25 or 1.5 device pixels cover 1 or 2 rows depending on the position. | **Fixed** for the app's own separators and page frames (2a32f03, `Hairline.qml`, `DevicePixels.js`) |

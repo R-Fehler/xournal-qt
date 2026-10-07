@@ -26,7 +26,7 @@
 #include "session/DocumentLink.h"
 #include "session/DocumentSession.h"
 #include "shell/DocumentLinks.h"
-#include "shell/Library.h"
+#include "shell/LibraryIndex.h"
 #include "shell/LibraryModel.h"
 #include "shell/ReferenceMode.h"
 #include "shell/DocumentFiles.h"

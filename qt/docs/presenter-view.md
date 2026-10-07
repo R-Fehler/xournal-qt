@@ -63,7 +63,7 @@ presenting is as before.
 - `PresenterConsole` (`qt/src/shell`, `app.presenter`): owned by `AppController`, told the presented view by
   `AppController::updatePresentedView` (presenting, another tab, the tab closed). With two screens and the setting on,
   it makes the **audience's view**: a second `CanvasView` of the presented document, as the self-reference does
-  ([reference-view.md](reference-view.md)): one session, one undo history, previews and thumbnails per document, and
+  ([reference-view.md](reference-view.md)): one session, one undo history, sketches, stand-ins and thumbnails per document, and
   the rendered pages of every view under `CanvasMemory`'s one limit (nothing new to own). The audience's view is for
   reading only and its canvas item takes no input. It goes before the presented view's session can go (a tab is
   closed: the current-tab change comes first).

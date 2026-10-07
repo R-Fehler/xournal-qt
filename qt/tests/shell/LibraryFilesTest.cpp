@@ -37,10 +37,11 @@
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentPlaces.h"
 #include "shell/Library.h"
+#include "shell/LibraryIndex.h"
 #include "shell/LibraryCache.h"
 #include "shell/LibraryModel.h"
 #include "shell/MdSnippets.h"
-#include "shell/Previews.h"
+#include "shell/DocumentCovers.h"
 
 #include "MarkdownFile.h"
 #include "MdPassages.h"
@@ -507,21 +508,21 @@ TEST_F(LibraryFilesTest, markdownFilesShowTheirFirstPageAndImagesAThumbnail) {
     writeFile(root / "notes.md", "# Kalman filter\n\nPrediction and **update**.\n\n- one\n- two\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n```cpp\nint x = 1;\n```\n");
     makeImage(root / "wide.png", 800, 400, Qt::black);
     makeSidewaysPhoto(root / "photo.jpg", 80, 40);  // its orientation tag turns it upright
-    PreviewCache::setLibrary(CacheLocation(root));
+    DocumentCovers::setLibrary(CacheLocation(root));
 
-    const QImage md = PreviewCache::preview(DocumentFiles::itemOf(root / "notes.md"));
-    ASSERT_EQ(md.width(), PreviewCache::WIDTH);
-    EXPECT_NEAR(md.height(), PreviewCache::WIDTH * MarkdownFile::PAGE_HEIGHT / MarkdownFile::PAGE_WIDTH, 2) << "an A4 page";
+    const QImage md = DocumentCovers::cover(DocumentFiles::itemOf(root / "notes.md"));
+    ASSERT_EQ(md.width(), DocumentCovers::WIDTH);
+    EXPECT_NEAR(md.height(), DocumentCovers::WIDTH * MarkdownFile::PAGE_HEIGHT / MarkdownFile::PAGE_WIDTH, 2) << "an A4 page";
     EXPECT_GT(darkPixels(md, QRect(0, 0, md.width(), md.height() / 8)), 50) << "the heading at the top";
     EXPECT_EQ(darkPixels(md, QRect(0, md.height() / 2, md.width(), md.height() / 2)), 0);
 
-    const QImage wide = PreviewCache::preview(DocumentFiles::itemOf(root / "wide.png"));
-    EXPECT_EQ(wide.size(), QSize(PreviewCache::WIDTH, PreviewCache::WIDTH / 2));
-    const QImage photo = PreviewCache::preview(DocumentFiles::itemOf(root / "photo.jpg"));
+    const QImage wide = DocumentCovers::cover(DocumentFiles::itemOf(root / "wide.png"));
+    EXPECT_EQ(wide.size(), QSize(DocumentCovers::WIDTH, DocumentCovers::WIDTH / 2));
+    const QImage photo = DocumentCovers::cover(DocumentFiles::itemOf(root / "photo.jpg"));
     EXPECT_EQ(photo.size(), QSize(40, 80)) << "upright (and not made bigger)";
 
-    PreviewCache::flush();
-    PreviewCache::setLibrary({});
+    DocumentCovers::flush();
+    DocumentCovers::setLibrary({});
 }
 
 TEST_F(LibraryFilesTest, aMarkdownFileFlowsOverA4Pages) {

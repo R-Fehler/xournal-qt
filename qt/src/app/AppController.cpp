@@ -78,10 +78,11 @@
 #include "shell/ContentFiles.h"
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentPlaces.h"
-#include "shell/HitPages.h"
-#include "shell/MdSnippets.h"
-#include "shell/Previews.h"
+#include "shell/ImageWorkers.h"
+#include "shell/DocumentCovers.h"
+#include "shell/FileStamps.h"
 #include "shell/Library.h"
+#include "shell/LibraryIndex.h"
 #include "shell/LibraryArchive.h"
 #include "shell/LibraryShare.h"
 #include "shell/LibraryUnzip.h"
@@ -659,9 +660,8 @@ void AppController::shutdown() {
         tabs->session(i)->waitForSaves();
     }
     // The image workers draw with Qt: they must be done before the application takes its plugins away
-    PreviewProvider::shutdown();
-    HitPageProvider::shutdown();
-    MdSnippetProvider::shutdown();
+    ImageWorkers::shutdown();
+    DocumentCovers::flush();  // (the covers not written yet)
     settingsView->end();  // settings screen still open: save its changes
     if (recovery) {
         recovery->finish();  // a normal exit: reopen these tabs next time

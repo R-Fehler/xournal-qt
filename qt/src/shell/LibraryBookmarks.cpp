@@ -7,7 +7,7 @@
 
 #include "DocumentPlaces.h"
 #include "HitPages.h"
-#include "Library.h"
+#include "LibraryIndex.h"
 #include "LibraryModel.h"
 
 namespace xqt {

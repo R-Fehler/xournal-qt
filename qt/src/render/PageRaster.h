@@ -109,7 +109,7 @@ public:
 
     const PageRef& getPage() const { return page; }
     /// Whether this thread is drawing a page for the screen right now: what only the screen shows (a sticky note that
-    /// peeks, the corner of a covering one) asks this. Thumbnails, previews and exports are not for the screen.
+    /// peeks, the corner of a covering one) asks this. Thumbnails, sketches, stand-ins, covers and exports are not for the screen.
     static bool drawingForScreen();
     /// While it lives, this thread draws for the screen (drawingForScreen): a picture of what the screen shows (a snip,
     /// RegionRender.h) is drawn so.

@@ -10,7 +10,7 @@
 #include "CanvasView.h"
 #include "DocumentFiles.h"
 #include "DocumentPlaces.h"
-#include "Previews.h"
+#include "DocumentCovers.h"
 #include "session/VersionCache.h"
 #include "PageSketches.h"
 #include "Thumbnails.h"
@@ -47,9 +47,9 @@ TabManager::TabManager(AppContext& app, QObject* parent): QAbstractListModel(par
         for (const auto& t: tabs) {
             if (ThumbnailProvider::idOf(t.session.get()) == id) {
                 tabDataChanged(t.session.get(), {SketchRole});
-                t.view->previewsChanged();
+                t.view->standInsChanged();
                 if (t.selfView) {
-                    t.selfView->previewsChanged();
+                    t.selfView->standInsChanged();
                 }
             }
         }
@@ -105,13 +105,13 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
         case CurrentRole:
             return index.row() == current;
         case ThumbnailRole:
-            // On its title page and saved as it is: the stored preview of the library (nothing to draw)
+            // On its title page and saved as it is: the library's stored cover (nothing to draw)
             // (also a PDF that has no .xopp yet)
             if (const fs::path file = s->documentFile(); !file.empty() && !s->isModified()) {
                 const DocumentItem item = DocumentFiles::itemOf(file, DocumentFiles::TextFiles);
                 if (item.valid() && s->getCurrentPageNo() ==
                                             static_cast<size_t>(DocumentPlaces::titlePage(DocumentPlaces::keyOf(item)))) {
-                    return PreviewCache::url(item);
+                    return DocumentCovers::url(item);
                 }
             }
             // Else the tab's current page as it is now (for the tab overview), see ThumbnailProvider.
@@ -232,8 +232,8 @@ void TabManager::listenTo(Tab& tab) {
     connect(s, &DocumentSession::filePathChanged, this,
             [this, s] { tabDataChanged(s, {TitleRole, FilePathRole, ThumbnailRole}); });
     const quint64 id = ThumbnailProvider::registerSession(s);
-    // Pages not rendered yet show their preview on the canvas
-    tab.view->setPreviewSource([id, s](size_t page) { return PageSketches::instance().preview(id, s->pageId(page)); });
+    // Pages not rendered yet show their stand-in on the canvas
+    tab.view->setStandInSource([id, s](size_t page) { return PageSketches::instance().standIn(id, s->pageId(page)); });
     auto thumbnailChanged = [this, s] { tabDataChanged(s, {ThumbnailRole, PageCountRole, SketchRole}); };
     connect(s, &DocumentSession::pageRevisionsChanged, this, thumbnailChanged);
     connect(&s->search(), &DocumentSearch::changed, this, [this, s] { searchChanged(s, false); });
@@ -440,8 +440,8 @@ void TabManager::setReference(int index, int reference) {
         // A second view of the same document (its own page, zoom and selection), where the tab's view is
         tab.selfView = std::make_unique<CanvasView>(*tab.session);
         const quint64 id = ThumbnailProvider::idOf(ref);
-        tab.selfView->setPreviewSource(
-                [id, ref](size_t page) { return PageSketches::instance().preview(id, ref->pageId(page)); });
+        tab.selfView->setStandInSource(
+                [id, ref](size_t page) { return PageSketches::instance().standIn(id, ref->pageId(page)); });
         tab.selfView->getViewController().scrollToPage(tab.view->currentPageNo());  // (once it has a size)
     }
     referenceMarksChanged();

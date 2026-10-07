@@ -7,7 +7,7 @@
  *   others (pages rendered in advance) go to two background workers at idle priority (Linux: SCHED_IDLE), which only
  *   run when a core has nothing else to do, so they neither delay the visible pages nor keep a busy laptop busier;
  * - the visible pages first: while one is queued or being rendered, the background workers start nothing new, and
- *   the other workers of the application (page previews, thumbnails) can wait for them (waitForVisiblePages);
+ *   the other workers of the application (sketches and stand-ins, thumbnails) can wait for them (waitForVisiblePages);
  * - blockRerenderZoom(): like upstream Scheduler::blockRerenderZoom, full re-renders wait until the zoom has been
  *   stable for 300 ms, so that pinch/zoom gestures only scale the existing buffers. unblockRerenderZoom(): the
  *   gesture ended (fingers lifted), no need to wait.

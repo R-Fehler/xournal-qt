@@ -11,7 +11,7 @@
  *
  * It belongs to the view (a tab), not to the document: it is drawn only on the screen, by the canvas item, as a node of
  * its own over the pages (moving it changes only that node), and never saved, printed, exported or shown in the
- * thumbnails and previews. Nothing is drawn on it either: input that starts on the black writes nothing, erases
+ * thumbnails, sketches and stand-ins. Nothing is drawn on it either: input that starts on the black writes nothing, erases
  * nothing and follows no link (only the handles act; a tap shows them).
  *
  * With its handles hidden, its edges can still be pushed (a press on the black close to an edge): the curtain pulled

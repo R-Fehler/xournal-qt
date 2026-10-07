@@ -8,7 +8,7 @@ XQT_PERF=1 build-release/xournal-qt 2> /tmp/xqt-perf.log
 
 ```
 xqt-perf 1.0 s: input mouse 312 (claimed 0, hit test 0.05/0.31 ms) touch 0 pen 0 | scroll 312 -> visibility 61
-(0.42/2.10 ms) | frames 59 sync 3.1/18.4 ms | tiles 480 previews 7 | geometry 0 (displays 0) | sharp 2 after 180/240 ms
+(0.42/2.10 ms) | frames 59 sync 3.1/18.4 ms | tiles 480 stand-ins 7 | geometry 0 (displays 0) | sharp 2 after 180/240 ms
 ```
 
 Per second:
@@ -21,7 +21,7 @@ Per second:
   every 8 ms; a jump (to a page, a fit) right away. The times are the average and the worst one.
 - **frames**: frames of the canvas and the time of their scene graph sync (composing and uploading page tiles happens
   there, and it blocks the UI thread), average and worst.
-- **tiles**: page tiles composed and uploaded (256 x 256 px each), **previews** the page previews uploaded for pages
+- **tiles**: page tiles composed and uploaded (256 x 256 px each), **stand-ins** the page stand-ins uploaded for pages
   that are not rendered yet.
 - **geometry**: pictures of the setsquare or compass drawn (the canvas moves, turns and sizes them on the GPU; they are
   drawn anew only for a new size or zoom, once that has been stable for 150 ms), and in brackets its small angle
@@ -38,7 +38,7 @@ What the numbers say:
 - `scroll` much higher than `frames`: the input sends more than the canvas can show (a mouse sends more moves than
   there are frames); `visibility` should stay near `frames`.
 - `sharp` high after a zoom or a jump: the page in view waits for its render (a heavy page, or other work in front
-  of it); pages rendered in advance, previews and thumbnails wait while a page in view is rendered.
+  of it); pages rendered in advance, sketches, stand-ins and thumbnails wait while a page in view is rendered.
 - `mouse` high with a large `hit test` worst time: the hit test of the item under the pointer is expensive.
 
 ## Window changes (`XQT_LOG_WINDOW=1`)

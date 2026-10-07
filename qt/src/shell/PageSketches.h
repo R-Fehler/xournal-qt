@@ -4,26 +4,27 @@
  *    show a page's sketch at once - a synchronous image provider, "image://sketch/<session>/<page id>/<revision>",
  *    from memory only - and the sharp thumbnail on top of it when that is drawn (ThumbnailProvider). Flying through
  *    hundreds of pages shows pages that get sharp, never blank ones;
- *  - previews (768 px; 512 or 384 px when many pages are open): the canvas shows a page's preview until the page is
+ *  - stand-ins (768 px; 512 or 384 px when many pages are open): the canvas shows a page's stand-in until the page is
  *    rendered, and thumbnails up to their width are scaled from them instead of being drawn.
- * Poppler costs nearly the same at any width (parsing, decoding images), so a page is drawn once at the preview width
+ * Poppler costs nearly the same at any width (parsing, decoding images), so a page is drawn once at the stand-in width
  * and its sketch is scaled from that. Nothing is ever drawn in front of the canvas or of a sharp thumbnail.
  *
- * Pages are drawn by two low-priority workers, so the canvas and the sharp thumbnails go first; nothing new is
+ * Pages are drawn by two workers at idle priority (ImageWorkers.h), so the canvas goes first; nothing new is
  * started while the canvas renders the pages in view (RenderService::visiblePagesBusy). Each draws the PDF
  * with an instance of its own (poppler draws one page of an instance at a time: the canvas does not wait for them),
  * kept while there is something to draw. What comes first:
- *  - pages without a sketch, then pages without a preview, then outdated ones; the document shown last first (in any
+ *  - pages without a sketch, then pages without a stand-in, then outdated ones; the document shown last first (in any
  *    window), then the others in the order they were shown; in a document the current page first, then outwards;
  *  - from a bigger picture of the page if there is one (scaled down), else drawn;
  *  - a changed page keeps its old pictures until the new ones are there; they are drawn again once the edits paused.
- * On disk: the previews of pages as they are in the document's file are stored (JPEG, in the user's cache, a folder
+ * On disk: the stand-ins of pages as they are in the document's file are stored (JPEG, in the user's cache, a folder
  * per document named by its files' sizes and times), so the next opening reads them instead of drawing: a document
  * opened before shows all its pages at once. Pages as saved are known from the opening, a saving, or an undo back to
  * the saved state; changed pages are not stored. The folders used longest ago go first beyond 1 GB. The title page
- * of a library document gets the library's stored preview right away (before anything is drawn or read).
- * Memory, with 16 bits per pixel: the sketches take a quarter of the memory for page previews (setBudget), the
- * previews a tenth of the memory for rendered pages (CanvasMemory::previewBudget). Each size is the biggest at which
+ * of a library document gets the library's stored cover (DocumentCovers) as its stand-in right away (before anything
+ * is drawn or read).
+ * Memory, with 16 bits per pixel: the sketches take a quarter of the memory for page previews (setBudget, from
+ * ImageMemory), the stand-ins a tenth of the memory for rendered pages (CanvasMemory::standInBudget). Each size is the biggest at which
  * all pages of all open documents fit; if even the smallest does not fit, the documents shown last get theirs.
  *
  * @license GNU GPLv2 or later
@@ -58,7 +59,7 @@ class PageSketches final: public QObject {
 public:
     static PageSketches& instance();
     static constexpr std::array<int, 3> WIDTHS{128, 96, 64};
-    static constexpr std::array<int, 3> PREVIEW_WIDTHS{768, 512, 384};
+    static constexpr std::array<int, 3> STAND_IN_WIDTHS{768, 512, 384};
 
     /// Sessions come and go with ThumbnailProvider::registerSession / unregisterSession.
     void add(quint64 id, DocumentSession* session);
@@ -69,19 +70,19 @@ public:
     /// URL of a page's sketch (for QML); empty while it has none.
     QString url(quint64 session, quint64 pageId) const;
     QImage image(quint64 session, quint64 pageId) const;
-    /// The page's preview (of any revision: the canvas shows it until the page is rendered); null: none
-    QImage preview(quint64 session, quint64 pageId) const;
-    /// The biggest picture of this revision of a page, preview or sketch, if there is one (any thread).
+    /// The page's stand-in (of any revision: the canvas shows it until the page is rendered); null: none
+    QImage standIn(quint64 session, quint64 pageId) const;
+    /// The biggest picture of this revision of a page, stand-in or sketch, if there is one (any thread).
     QImage imageOfRevision(quint64 session, quint64 revision) const;
-    /// A sharp thumbnail was drawn (any thread): the page's sketch (and preview) is made from it, if it needs one.
+    /// A sharp thumbnail was drawn (any thread): the page's sketch (and stand-in) is made from it, if it needs one.
     void offer(quint64 session, quint64 pageId, quint64 revision, const QImage& sharp);
 
     void setBudget(qint64 bytes);
     qint64 bytes() const;          ///< of the sketches
-    qint64 previewBytes() const;
-    /// Widths of the sketches and of the previews now
+    qint64 standInBytes() const;
+    /// Widths of the sketches and of the stand-ins now
     int width() const { return sketches.level; }
-    int previewWidth() const { return previews.level; }
+    int standInWidth() const { return standIns.level; }
     /// Nothing to do, nothing planned (tests)
     bool idle() const;
     /// Pages drawn (not scaled from another picture) so far (tests)
@@ -90,11 +91,11 @@ public:
     void setDelays(int shown, int edited);
     /// Pages read from disk so far (tests)
     int readCount() const { return reads; }
-    /// Folder of the stored previews of a session's document (empty: none, e.g. not saved or changed; tests)
+    /// Folder of the stored stand-ins of a session's document (empty: none, e.g. not saved or changed; tests)
     fs::path diskFolder(quint64 session) const;
-    /// Delete the stored previews used longest ago beyond `bytes` (any thread; runs once after the start with 1 GB)
+    /// Delete the stored stand-ins used longest ago beyond `bytes` (any thread; runs once after the start with 1 GB)
     static void trimDisk(qint64 bytes);
-    /// Delete the stored previews of every version of this document (it was protected with a password: no picture of
+    /// Delete the stored stand-ins of every version of this document (it was protected with a password: no picture of
     /// its pages stays on disk; qt/docs/hybrid-pdf.md, "Encrypted PDFs"). Returns how many folders.
     int forgetFile(const fs::path& file);
     static constexpr qint64 DISK_LIMIT = qint64(1024) * 1024 * 1024;
@@ -131,10 +132,10 @@ private:
         quint64 session = 0;
         quint64 pageId = 0;
         quint64 revision = 0;
-        bool preview = false;  ///< the page gets a preview too
-        bool write = false;    ///< only store its preview on disk
+        bool standIn = false;  ///< the page gets a stand-in too
+        bool write = false;    ///< only store its stand-in on disk
     };
-    /// A session's document as it is on disk: its folder of stored previews, the pages as saved (page id ->
+    /// A session's document as it is on disk: its folder of stored stand-ins, the pages as saved (page id ->
     /// revision and place in the file) and the places stored or read already
     struct Disk {
         fs::path folder;
@@ -143,26 +144,26 @@ private:
     };
     /// The document is as saved (opened, saved, undone back): remember its pages as they are (GUI thread)
     void capture(quint64 id);
-    /// The library's stored preview of the title page, until the page is drawn (GUI thread)
+    /// The library's stored cover as the title page's stand-in, until the page is drawn (GUI thread)
     void seedTitlePage(quint64 id);
-    /// File of a page's stored preview if the page is as saved (under mtx; empty: not)
+    /// File of a page's stored stand-in if the page is as saved (under mtx; empty: not)
     fs::path diskFile(quint64 session, quint64 pageId, quint64 revision) const;
     void markStored(quint64 session, quint64 pageId);
-    static constexpr int WORKERS = 2;
+    static constexpr int WORKERS = 2;  ///< jobs at a time (drawing or storing; ImageWorkers' Sketches pool has 2)
     /// A PDF instance of the session's document for a worker (loaded if none is spare; null: use the document's)
     std::unique_ptr<XojPdfDocument> takePdf(quint64 session, const fs::path& path, size_t pages);
     void givePdf(quint64 session, const fs::path& path, std::unique_ptr<XojPdfDocument> pdf);
     void planSoon(int ms);
     void plan();
     void next();
-    /// Store what was drawn (any thread): the preview if wanted, and the sketch scaled from it
-    void store(quint64 session, quint64 pageId, quint64 revision, const QImage& image, bool preview);
+    /// Store what was drawn (any thread): the stand-in if wanted, and the sketch scaled from it
+    void store(quint64 session, quint64 pageId, quint64 revision, const QImage& image, bool standIn);
     void announce(quint64 session);
 
     // Worker and GUI thread
     mutable std::mutex mtx;
     Tier sketches;
-    Tier previews;
+    Tier standIns;
     std::atomic<int> draws{0};
     std::atomic<int> reads{0};
     std::map<quint64, Disk> disks;

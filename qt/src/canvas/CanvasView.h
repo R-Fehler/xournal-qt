@@ -228,12 +228,12 @@ public:
 
     /// A small picture of a page drawn in advance (PageSketches), shown until the page is rendered; null: none.
     /// Nothing is rendered for it: a page is rendered sharp straight away.
-    void setPreviewSource(std::function<QImage(size_t page)> source) { previewSource = std::move(source); }
-    QImage preview(size_t page) const { return previewSource ? previewSource(page) : QImage(); }
+    void setStandInSource(std::function<QImage(size_t page)> source) { standInSource = std::move(source); }
+    QImage standIn(size_t page) const { return standInSource ? standInSource(page) : QImage(); }
     /// The pictures of the PDF's pages (dark pages keep them: PagePictures.h); made when first asked for
     PdfPictures& pdfPictures();
-    /// Previews came: pages without a buffer show them
-    void previewsChanged() { Q_EMIT updateRequested(); }
+    /// Stand-ins came: pages without a buffer show them
+    void standInsChanged() { Q_EMIT updateRequested(); }
 
     // --- XournalView (shadow) ---------------------------------------------------------------------------------
     size_t getCurrentPage() const override;
@@ -744,7 +744,7 @@ private:
     ClockTimer visibilityTimer;
     /// Visibility updates so far (tests)
     quint64 visibilityCount = 0;
-    std::function<QImage(size_t)> previewSource;
+    std::function<QImage(size_t)> standInSource;
     /// XQT_PERF: pages in view waiting for their render at the current zoom, since when (ms since the epoch)
     std::unordered_map<const CanvasPage*, qint64> sharpWanted;
     double dpr = 1.0;

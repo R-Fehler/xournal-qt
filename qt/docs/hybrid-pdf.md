@@ -154,7 +154,7 @@ Code: `qt/src/session/HybridPdf.h` (the API) and its parts (qpdf and cairo), tes
    size and time), so ordinary PDFs open as before. The clean copy (`~/.cache/xournal-qt/hybrid-pdf/<hash of the
    path>-<size>-<time>/base.pdf`, with the extracted `document.xopp` and a `changed.txt`) is made once per version
    of the file and is the document's background PDF; the file path of the document is the hybrid PDF, so the tab,
-   recent files and Ctrl+S use it. Library, previews and search load it the same way.
+   recent files and Ctrl+S use it. Library, covers and search load it the same way.
    - Our annotations are removed from the clean copy; annotations of other apps stay in it (poppler shows them)
      and are written again on save, also on pages with a generated background (the session remembers which page of
      the clean copy each page was, so they follow a page that is moved). The clean copy is the document's PDF even
@@ -475,7 +475,7 @@ with every object serialised through qpdf (`unparseResolved`, a stream's diction
 - **Crash safety.** The update is written to a copy of the file (`.name.pdf.<pid>-<n>.part` next to it; copying uses
   `copy_file_range` or a reflink where the file system has one: about 10 ms for 10 MB here), flushed to the disk
   (`fsync`) and renamed over the file. A crash, a full disk or any failure at any point leaves the previous revision
-  exactly as it was, and readers of the file meanwhile (the library's index and previews, other apps, a sync
+  exactly as it was, and readers of the file meanwhile (the library's index and covers, other apps, a sync
   client) never see a half-written update: appending in place would leave a tail without `startxref` after a crash,
   which readers repair in different ways, and could be read half-written. The price is the copy; the new bytes on
   the disk are the update's. Temporary files a crash left behind are removed by the next save of that file (after
@@ -817,7 +817,7 @@ The author (2026-10-05): "support pdf encryption and opening of encrypted PDFs u
   the file forgets it: opening it again asks again.
 - poppler gets it through upstream's `Document::password` (a seam: `setPdfPassword`), qpdf through
   `PdfEncryption::openQpdf` everywhere the session's files are read (`HybridPdf`, `MergedPdf`, `PdfRevisions`).
-- Only code that works for an open document reads through the registry. The library's index, its previews, the tags
+- Only code that works for an open document reads through the registry. The library's index, its covers, the tags
   and titles of cards, and every other background reader open files without a password: they never read a protected
   PDF, also while it is open (decided: the library does not index it, not even in memory). The card shows a lock
   ("Protected with a password"; `LibraryIndex::lockedOf`, stored in the folder's notes).
@@ -866,7 +866,7 @@ The author (2026-10-05): "support pdf encryption and opening of encrypted PDFs u
   (`AppController::forgetDerivatives`, also when the password is changed or removed): clean copies of every version
   with their `.xopp`, pictures and recordings (`HybridPdf::forgetCopies`), the stored pictures of its pages of every
   version (`PageSketches::forgetFile`: their folders are named after the document first, `<hash of its path>-…`;
-  folders of the older naming are removed at the next start), its card's picture (the library's previews pack, or the
+  folders of the older naming are removed at the next start), its card's picture (the library's covers pack, or the
   one for Recent), its library entry (text, title, tags, to-dos: an empty, locked entry written at once,
   `LibraryIndex::documentProtected`) and its handwriting, versions cut out of it (tabs showing them are closed),
   the original kept in PDF files mode, the Markdown work folder, copies shared from it. A `name.original.pdf` kept
@@ -893,8 +893,8 @@ For a protected document (its file, or the PDF its `.xopp` annotates):
 | crash (emergency) save | not written (no qpdf in a crash handler); the last autosave is what is recovered |
 | clean copy, merged PDF of pasted pages, the copy a save reads pages from | encrypted like the file (qpdf keeps the encryption it read) |
 | the embedded `.xopp` | in memory only, when opening and saving |
-| page previews on disk (PageSketches) | not stored; thumbnails and previews stay in memory |
-| the library's text index, tags, card preview | not read (the file opens only with the password) |
+| page stand-ins on disk (PageSketches) | not stored; thumbnails, sketches and stand-ins stay in memory |
+| the library's text index, tags, card cover | not read (the file opens only with the password) |
 | the document's search | in memory (its own poppler instance gets the password) |
 | handwriting | recognised in memory, never handed to the library's cache |
 | version cache, "Show beside the document" | a version is a prefix of the encrypted file, opened with the password |

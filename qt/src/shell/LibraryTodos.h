@@ -27,6 +27,7 @@
 #include "filesystem.h"
 #include "DocumentFiles.h"
 #include "Library.h"
+#include "LibraryIndex.h"
 #include "Todos.h"
 
 namespace xqt {
