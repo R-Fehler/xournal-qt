@@ -84,7 +84,7 @@ bool AppController::openWithPassword(const QString& password) {
     if (p.recovering) {
         // A protected document's autosave: recovered as unsaved changes of its document
         if (result.document) {
-            tabs->addTab(std::make_unique<DocumentSession>(*app, std::move(result.document)));
+            tabs->addTab(std::make_unique<DocumentSession>(context(), std::move(result.document)));
             DocumentSession* s = tabs->currentSession();
             s->setPermissions(result.allowPrint, result.allowCopy);
             s->markRecovered(p.recoverTo);

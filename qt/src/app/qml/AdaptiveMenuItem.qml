@@ -11,7 +11,7 @@ MenuItem {
     property bool offered: true
     visible: offered
     height: offered ? implicitHeight : 0
-    readonly property int rowHeight: typeof win !== "undefined" && win && win.adaptive ? win.adaptive.minTarget : 48
+    readonly property int rowHeight: win.adaptive.minTarget
     implicitHeight: Math.max(rowHeight, implicitContentHeight + topPadding + bottomPadding,
                              implicitIndicatorHeight + topPadding + bottomPadding)
     verticalPadding: 6

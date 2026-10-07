@@ -442,7 +442,7 @@ TEST_F(ReferenceWindowTest, pdfTextOfTheReferenceIsCopiedForTheNotes) {
     QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier, reference->mapToScene(onWord).toPoint());
     wait(100);
     EXPECT_TRUE(view->hasPdfTextSelection());
-    EXPECT_FALSE(controller->pdfTextIsSelected()) << "the main document selected something";
+    EXPECT_FALSE(controller->edit().pdfTextIsSelected()) << "the main document selected something";
     // Ctrl+C with the reference in hand
     QGuiApplication::clipboard()->clear();
     key(Qt::Key_C, Qt::ControlModifier);
@@ -740,7 +740,7 @@ TEST_F(ReferenceWindowTest, pdfTextOfTheReferenceHasItsKnobsAndPillOnItsSide) {
     ASSERT_NE(handles, nullptr);
     until([&] { return bar->isVisible(); });
     ASSERT_TRUE(ref().actions().pdfTextIsSelected());
-    EXPECT_FALSE(controller->pdfTextIsSelected()) << "the notes have nothing selected";
+    EXPECT_FALSE(controller->edit().pdfTextIsSelected()) << "the notes have nothing selected";
     EXPECT_FALSE(findItem("pdfTextBar")->isVisible()) << "the notes' pill is shown";
     EXPECT_FALSE(findItem("pdfTextHandles")->isVisible());
     EXPECT_TRUE(shownOver(bar, reference)) << "the text pill is not over the reference";
@@ -796,7 +796,7 @@ TEST_F(ReferenceWindowTest, aKnobOfTheReferenceMovesTheReferencesSelectionOnly) 
     wait(100);
     ASSERT_TRUE(ref().actions().pdfTextIsSelected());
     EXPECT_GT(ref().actions().pdfSelectionEnds().right(), before.right() + 30) << "the knob did not move the selection";
-    EXPECT_FALSE(controller->pdfTextIsSelected()) << "the notes got a selection";
+    EXPECT_FALSE(controller->edit().pdfTextIsSelected()) << "the notes got a selection";
     EXPECT_FALSE(tabs().session(ref().tab())->isModified());
 }
 
@@ -862,7 +862,7 @@ TEST_F(ReferenceWindowTest, aSelectionInTheReferenceHasItsBarOnItsSide) {
     drag(onReferencePage(0, QPointF(80, 80)), onReferencePage(0, QPointF(230, 180)));
     ASSERT_NE(ref().canvas()->getSelection(), nullptr);
     EXPECT_TRUE(ref().hasSelection());
-    EXPECT_FALSE(controller->hasSelection());
+    EXPECT_FALSE(controller->edit().hasSelection());
     auto* bar = findItem("referenceSelectionBar");
     until([&] { return bar->isVisible(); });
     EXPECT_TRUE(shownOver(bar, reference)) << "the selection's bar is not on the reference";
@@ -1128,7 +1128,7 @@ TEST_F(ReferenceWindowTest, pageKeysActOnTheSideWithTheKeysAndPresentingShowsThe
 TEST_F(ReferenceWindowTest, fittedToTheWidthNeitherHalfScrollsSideways) {
     ref().showTab(1);
     wait(100);
-    controller->fitWidth();
+    controller->keyTarget().fitWidth();
     ref().actions().fitWidth();
     wait(100);
     for (QQuickItem* c: {main, reference}) {

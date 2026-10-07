@@ -15,6 +15,7 @@
 #include <QTest>
 #include <gtest/gtest.h>
 
+#include "shell/CanvasActions.h"
 #include "shell/ShortcutsModel.h"
 
 #include "AppController.h"
@@ -64,9 +65,9 @@ protected:
 TEST_P(EscapeOrBackTest, fullScreenWithASelectedNote) {
     ASSERT_NO_FATAL_FAILURE(fullScreen());
     ASSERT_TRUE(controller->insertStickyNote());
-    ASSERT_TRUE(until([&] { return controller->noteSelected(); }));
+    ASSERT_TRUE(until([&] { return controller->edit().noteSelected(); }));
     press();
-    EXPECT_FALSE(controller->noteSelected()) << "the note first";
+    EXPECT_FALSE(controller->edit().noteSelected()) << "the note first";
     EXPECT_TRUE(flag("fullScreenMode")) << "full screen stays";
     press();
     EXPECT_FALSE(flag("fullScreenMode")) << "then full screen";
@@ -115,9 +116,9 @@ TEST_P(EscapeOrBackTest, presentingWithASelectionASnipOrTheStamp) {
     QMetaObject::invokeMethod(window, "startPresenting", Q_ARG(QVariant, false));
     ASSERT_TRUE(until([&] { return controller->presenting(); }));
     ASSERT_TRUE(controller->insertStickyNote());
-    ASSERT_TRUE(until([&] { return controller->noteSelected(); }));
+    ASSERT_TRUE(until([&] { return controller->edit().noteSelected(); }));
     press();
-    EXPECT_FALSE(controller->noteSelected()) << "the note first";
+    EXPECT_FALSE(controller->edit().noteSelected()) << "the note first";
     EXPECT_TRUE(controller->presenting());
 
     controller->startSnip("lasso");

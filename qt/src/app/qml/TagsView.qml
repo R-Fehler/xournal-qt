@@ -17,7 +17,7 @@ FocusScope {
     /// Room below the last tag (the home screen's floating "+" on a phone)
     property real bottomSpace: 0
     /// A phone class: taller rows
-    readonly property bool phone: typeof win !== "undefined" && win && win.adaptive ? win.adaptive.phoneLayout : false
+    readonly property bool phone: win.adaptive.phoneLayout
     readonly property int rowHeight: phone ? 52 : 40
     /// A tag was chosen: the library shows its documents
     signal tagChosen(string tag)

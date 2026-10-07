@@ -616,7 +616,7 @@ TEST_F(MainWindowTest, twoA4PagesSideBySideOnTheUnfoldedFold) {
     }
     if (vc.zoom() > vc.minZoom()) {  // (the shortcut's key may differ on this platform: the same command)
         for (int i = 0; i < 30; ++i) {
-            controller->zoomOut();
+            controller->keyTarget().zoomOut();
         }
     }
     EXPECT_DOUBLE_EQ(vc.zoom(), vc.minZoom());
@@ -3510,7 +3510,7 @@ TEST_F(MainWindowTest, pageAndLayoutShortcutsInThePill) {
     EXPECT_FALSE(controller->pairedPages()) << "and back";
 
     // Fitting: the whole page is smaller than the width of one
-    controller->fitWidth();
+    controller->keyTarget().fitWidth();
     wait(30);
     const int wide = controller->zoomPercent();
     controller->fitHeight();
@@ -4497,10 +4497,10 @@ TEST_F(MainWindowTest, theToolboxHasAStickyNote) {
     until([&] { return (button = toolEntry(sticky)) && button->isVisible(); });
     ASSERT_NE(button, nullptr);
     ASSERT_TRUE(button->isVisible());
-    EXPECT_FALSE(controller->noteSelected());
+    EXPECT_FALSE(controller->edit().noteSelected());
     click(button);
-    until([&] { return controller->noteSelected(); });
-    EXPECT_TRUE(controller->noteSelected()) << "a note is placed and selected";
+    until([&] { return controller->edit().noteSelected(); });
+    EXPECT_TRUE(controller->edit().noteSelected()) << "a note is placed and selected";
 }
 
 TEST_F(MainWindowTest, theStickyNoteButtonPlacesANoteWithItsPill) {
@@ -4513,8 +4513,8 @@ TEST_F(MainWindowTest, theStickyNoteButtonPlacesANoteWithItsPill) {
     until([&] { return (item = toolEntry(sticky)) && item->isVisible(); });
     ASSERT_NE(item, nullptr);
     click(item);
-    until([&] { return controller->noteSelected(); });
-    ASSERT_TRUE(controller->noteSelected()) << "the new note is selected";
+    until([&] { return controller->edit().noteSelected(); });
+    ASSERT_TRUE(controller->edit().noteSelected()) << "the new note is selected";
     EXPECT_EQ(controller->tool(), QStringLiteral("selectRect")) << "to be moved and resized right away";
 
     // Its pill: colors, cover, delete
@@ -4540,7 +4540,7 @@ TEST_F(MainWindowTest, theStickyNoteButtonPlacesANoteWithItsPill) {
     EXPECT_TRUE(pageNotes->isVisible()) << "a page with notes";
     click(pageNotes);
     EXPECT_TRUE(controller->pageNotesHidden());
-    EXPECT_FALSE(controller->noteSelected()) << "a hidden note is not selected";
+    EXPECT_FALSE(controller->edit().noteSelected()) << "a hidden note is not selected";
     click(pageNotes);
     EXPECT_FALSE(controller->pageNotesHidden());
 
@@ -4576,7 +4576,7 @@ TEST_F(MainWindowTest, theNotePillWritesTheNotesTextAndPutsAnImageOnIt) {
     until([&] { return view->getMarkdownEditor() != nullptr; });
     ASSERT_NE(view->getMarkdownEditor(), nullptr);
     EXPECT_TRUE(controller->markdownOnPage()) << "written on the page, with the formatting bar";
-    EXPECT_FALSE(controller->noteSelected());
+    EXPECT_FALSE(controller->edit().noteSelected());
     type("Hello");
     EXPECT_EQ(view->getMarkdownEditor()->text(), "Hello");
     if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
@@ -4612,7 +4612,7 @@ TEST_F(MainWindowTest, theNotePillWritesTheNotesTextAndPutsAnImageOnIt) {
     ASSERT_TRUE(picture.save(tmp.filePath("picture.png")));
     view->notes().select(*view->getPage(0), note);
     const size_t before = note->getElementsView().size();
-    ASSERT_TRUE(controller->insertImage(QUrl::fromLocalFile(tmp.filePath("picture.png"))));
+    ASSERT_TRUE(controller->edit().insertImage(QUrl::fromLocalFile(tmp.filePath("picture.png"))));
     controller->clearSelection();
     ASSERT_EQ(note->getElementsView().size(), before + 1);
     EXPECT_EQ(note->getElementsView().back()->getType(), ELEMENT_IMAGE);
@@ -4640,7 +4640,7 @@ TEST_F(MainWindowTest, aStickyNoteIsMovedToAnotherPageByCutAndPaste) {
         return mime && mime->hasFormat(xqt::sticky::CLIPBOARD_MIME);
     };
     ASSERT_TRUE(controller->insertStickyNote());
-    until([&] { return controller->noteSelected(); });
+    until([&] { return controller->edit().noteSelected(); });
     auto* pill = find<QQuickItem>("notePill");
     ASSERT_NE(pill, nullptr);
     until([&] { return pill->isVisible(); });
@@ -4651,7 +4651,7 @@ TEST_F(MainWindowTest, aStickyNoteIsMovedToAnotherPageByCutAndPaste) {
     QGuiApplication::clipboard()->clear();
     click(findItem("noteCopy"));
     EXPECT_TRUE(clipboardHasNote());
-    EXPECT_TRUE(controller->noteSelected());
+    EXPECT_TRUE(controller->edit().noteSelected());
     EXPECT_EQ(notesOn(0).size(), 1u);
 
     // Ctrl+X: off its page; on the third page Ctrl+V puts it there, at the same place, selected
@@ -4659,21 +4659,21 @@ TEST_F(MainWindowTest, aStickyNoteIsMovedToAnotherPageByCutAndPaste) {
     key(Qt::Key_X, Qt::ControlModifier);
     EXPECT_TRUE(clipboardHasNote());
     EXPECT_EQ(notesOn(0).size(), 0u);
-    EXPECT_FALSE(controller->noteSelected());
+    EXPECT_FALSE(controller->edit().noteSelected());
     controller->goToPage(2);
     until([&] { return s->getCurrentPageNo() == 2; });
     ASSERT_EQ(s->getCurrentPageNo(), 2u);
     key(Qt::Key_V, Qt::ControlModifier);
     ASSERT_EQ(notesOn(2).size(), 1u);
     EXPECT_EQ(*xqt::sticky::lookOf(*notesOn(2).front()), look);
-    EXPECT_TRUE(controller->noteSelected());
+    EXPECT_TRUE(controller->edit().noteSelected());
     until([&] { return pill->isVisible(); });
     EXPECT_TRUE(pill->isVisible()) << "its pill, at the pasted note";
 
     // The pill's Cut: gone again, one undo step brings it back
     click(findItem("noteCut"));
     EXPECT_EQ(notesOn(2).size(), 0u);
-    EXPECT_FALSE(controller->noteSelected());
+    EXPECT_FALSE(controller->edit().noteSelected());
     controller->undo();
     EXPECT_EQ(notesOn(2).size(), 1u);
     controller->undo();  // (the paste)
@@ -4692,7 +4692,7 @@ TEST_F(MainWindowTest, aStickyNoteIsMovedToAnotherPageByCutAndPaste) {
     key(Qt::Key_V, Qt::ControlModifier);
     EXPECT_EQ(notesOn(1).size(), 1u) << "the note pasted onto the page clicked";
     EXPECT_EQ(controller->pageCount(), pages) << "no pages pasted";
-    ASSERT_TRUE(controller->noteSelected());
+    ASSERT_TRUE(controller->edit().noteSelected());
     key(Qt::Key_C, Qt::ControlModifier);
     EXPECT_EQ(controller->copiedPages(), 0) << "the note copied, not the page";
     key(Qt::Key_X, Qt::ControlModifier);
@@ -5087,10 +5087,10 @@ TEST_F(MainWindowTest, theCanvasKeepsItsInputWhilePdfTextIsSelected) {
             view->pageViewRect(0).topLeft() + hit.center() * view->getViewController().zoom();
     const QPoint onWordInWindow = canvasItem->mapToScene(onWord).toPoint();
 
-    QSignalSpy changed(controller.get(), &AppController::pdfTextSelectionChanged);
-    ASSERT_TRUE(controller->selectPdfTextAt(onWord.x(), onWord.y())) << "the word under the finger";
+    QSignalSpy changed(&controller->edit(), &xqt::CanvasActions::pdfTextSelectionChanged);
+    ASSERT_TRUE(controller->edit().selectPdfTextAt(onWord.x(), onWord.y())) << "the word under the finger";
     until([&] { return handles->isVisible(); });
-    ASSERT_TRUE(controller->pdfTextIsSelected());
+    ASSERT_TRUE(controller->edit().pdfTextIsSelected());
     EXPECT_TRUE(handles->isVisible()) << "the knobs are shown";
     EXPECT_GE(changed.count(), 1) << "the UI is told that something is selected";
 
@@ -5104,16 +5104,16 @@ TEST_F(MainWindowTest, theCanvasKeepsItsInputWhilePdfTextIsSelected) {
     QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, far);
     QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, far);
     wait(50);
-    EXPECT_FALSE(controller->pdfTextIsSelected()) << "a press beside the text unselects it";
+    EXPECT_FALSE(controller->edit().pdfTextIsSelected()) << "a press beside the text unselects it";
     until([&] { return !handles->isVisible(); });
     EXPECT_FALSE(handles->isVisible());
     EXPECT_EQ(elements(), before) << "that press only unselects, it does not draw";
 
     // Copying ends the selection as well, and the canvas draws again afterwards (it used to be frozen)
-    ASSERT_TRUE(controller->selectPdfTextAt(onWord.x(), onWord.y()));
+    ASSERT_TRUE(controller->edit().selectPdfTextAt(onWord.x(), onWord.y()));
     until([&] { return handles->isVisible(); });
     EXPECT_TRUE(controller->edit().copyPdfText());
-    EXPECT_FALSE(controller->pdfTextIsSelected());
+    EXPECT_FALSE(controller->edit().pdfTextIsSelected());
     until([&] { return !handles->isVisible(); });
     EXPECT_FALSE(handles->isVisible()) << "nothing is selected: the knobs are gone";
     QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, far);
@@ -5146,7 +5146,7 @@ TEST_F(MainWindowTest, theSelectedPdfTextTakesItsHandlesAndActionsAlong) {
     const QRectF hit = placed.front().rect;
     session->search().clear();
     const QPointF onWord = view->pageViewRect(0).topLeft() + hit.center() * view->getViewController().zoom();
-    ASSERT_TRUE(controller->selectPdfTextAt(onWord.x(), onWord.y()));
+    ASSERT_TRUE(controller->edit().selectPdfTextAt(onWord.x(), onWord.y()));
     until([&] { return bar->isVisible(); });
     ASSERT_TRUE(bar->isVisible());
     EXPECT_FALSE(bar->property("away").toBool()) << "the text is in view";
@@ -5184,7 +5184,7 @@ TEST_F(MainWindowTest, theSelectedPdfTextTakesItsHandlesAndActionsAlong) {
     const QRectF box = controller->edit().pdfSelectionBox();
     EXPECT_GE(box.y(), 0);
     EXPECT_LE(box.y(), canvasItem->height());
-    EXPECT_TRUE(controller->pdfTextIsSelected()) << "and it is still the same selection";
+    EXPECT_TRUE(controller->edit().pdfTextIsSelected()) << "and it is still the same selection";
 }
 
 // A long press on the text of a PDF selects its word; the actions for that text then offer paste as well (at the
@@ -5224,7 +5224,7 @@ TEST_F(MainWindowTest, aLongPressOnPdfTextAlsoOffersPaste) {
     QTest::touchEvent(window, finger).release(1, onWordInWindow);
     wait(50);
     until([&] { return bar->isVisible(); });
-    ASSERT_TRUE(controller->pdfTextIsSelected()) << "the word is selected";
+    ASSERT_TRUE(controller->edit().pdfTextIsSelected()) << "the word is selected";
     ASSERT_TRUE(bar->isVisible()) << "with its actions";
     QQuickItem* paste = findItem("pdfTextPaste");
     ASSERT_NE(paste, nullptr);
@@ -5236,8 +5236,8 @@ TEST_F(MainWindowTest, aLongPressOnPdfTextAlsoOffersPaste) {
     const auto& box = pasted->getBoundingBox();
     EXPECT_TRUE(QRectF(box.x, box.y, box.width, box.height).adjusted(-40, -40, 40, 40).contains(hit.center()))
             << "where the finger was";
-    until([&] { return !controller->pdfTextIsSelected(); });
-    EXPECT_FALSE(controller->pdfTextIsSelected()) << "pasting ends the text selection";
+    until([&] { return !controller->edit().pdfTextIsSelected(); });
+    EXPECT_FALSE(controller->edit().pdfTextIsSelected()) << "pasting ends the text selection";
     controller->clearSelection();
     wait(50);
 
@@ -5256,7 +5256,7 @@ TEST_F(MainWindowTest, aLongPressOnPdfTextAlsoOffersPaste) {
     // A text selected by dragging over it with the text tool (not a long press): no paste either, there is no place
     // pressed to paste at
     QGuiApplication::clipboard()->setText("pasted again");
-    ASSERT_TRUE(controller->selectPdfTextAt(onWord.x(), onWord.y()));
+    ASSERT_TRUE(controller->edit().selectPdfTextAt(onWord.x(), onWord.y()));
     until([&] { return bar->isVisible(); });
     EXPECT_FALSE(paste->isVisible());
     controller->edit().clearPdfTextSelection();
@@ -5278,7 +5278,7 @@ TEST_F(MainWindowTest, aLongPressOnPdfTextAlsoOffersPaste) {
     wait(800);
     tablet(QEvent::TabletRelease, Qt::LeftButton, Qt::NoButton, 0.0);
     until([&] { return bar->isVisible(); });
-    ASSERT_TRUE(controller->pdfTextIsSelected()) << "the pen held on the word selects it";
+    ASSERT_TRUE(controller->edit().pdfTextIsSelected()) << "the pen held on the word selects it";
     EXPECT_TRUE(paste->isVisible()) << "and paste is offered";
     EXPECT_EQ(elements(), withPasted) << "no dot left by the pen";
     controller->edit().clearPdfTextSelection();
@@ -6369,7 +6369,7 @@ TEST_F(MainWindowTest, markdownTextBoxesAreSelectedAndMoved) {
     // A rectangle around it selects it
     controller->selectTool("selectRect");
     drag(pagePoint(before.x - 10, before.y - 10), pagePoint(before.x + before.width + 10, before.y + before.height + 10));
-    ASSERT_TRUE(controller->hasSelection());
+    ASSERT_TRUE(controller->edit().hasSelection());
     EXPECT_EQ(page->getSelectedLayer(), layer) << "while it is selected";
     if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
         wait(1500);  // (the software renderer is slow)
@@ -6382,7 +6382,7 @@ TEST_F(MainWindowTest, markdownTextBoxesAreSelectedAndMoved) {
     // A tap elsewhere ends the selection (with any tool: it only deselects)
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(420, 430));
     wait(50);
-    EXPECT_FALSE(controller->hasSelection());
+    EXPECT_FALSE(controller->edit().hasSelection());
     EXPECT_EQ(page->getSelectedLayer(), penLayer) << "the pen writes into its layer again";
     ASSERT_EQ(layer->getElements().size(), 1u);
     const auto* moved = static_cast<const Text*>(layer->getElements().front().get());
@@ -6405,8 +6405,8 @@ TEST_F(MainWindowTest, markdownTextBoxesAreSelectedAndMoved) {
     }
     QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, a);
     wait(50);
-    ASSERT_TRUE(controller->hasSelection());
-    controller->deleteSelection();
+    ASSERT_TRUE(controller->edit().hasSelection());
+    controller->keyTarget().deleteSelection();
     EXPECT_TRUE(layer->getElements().empty());
     EXPECT_EQ(page->getSelectedLayer(), penLayer);
     controller->undo();
@@ -10187,7 +10187,7 @@ TEST_F(MainWindowTest, theCanvasTurnsInQuarterStepsAndComesBackUpright) {
 
     // The fits turn it upright as well
     controller->rotateCanvas(90);
-    controller->fitWidth();
+    controller->keyTarget().fitWidth();
     EXPECT_EQ(vc.rotation(), 0);
     controller->rotateCanvas(-90);
     controller->fitPage();

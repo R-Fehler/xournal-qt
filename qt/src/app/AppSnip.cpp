@@ -63,7 +63,7 @@ void AppController::armSnip(bool lasso, int purpose) {
     }
     snipTool = lasso ? TOOL_SELECT_REGION : TOOL_SELECT_RECT;
     snip::disarm();  // (the tool changes: not the end of this snip)
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     th->selectTool(snipTool);
     th->fireToolChanged();
     snip::arm(lasso ? snip::Shape::Lasso : snip::Shape::Rectangle, static_cast<snip::Purpose>(purpose));
@@ -77,7 +77,7 @@ void AppController::endSnip(bool restore) {
     const QString previous = std::exchange(snipPreviousTool, QString());
     const bool wasArmed = snip::isArmed();
     snip::disarm();
-    if (restore && !previous.isEmpty() && app->getToolHandler()->getToolType() == snipTool) {
+    if (restore && !previous.isEmpty() && context().getToolHandler()->getToolType() == snipTool) {
         selectTool(previous);
     }
     if (wasArmed || restore) {
@@ -87,7 +87,7 @@ void AppController::endSnip(bool restore) {
 
 void AppController::followSnipTool() {
     // Another tool chosen (a key, a button, a menu): the snip ends, that tool stays
-    if (snip::isArmed() && app->getToolHandler()->getToolType() != snipTool) {
+    if (snip::isArmed() && context().getToolHandler()->getToolType() != snipTool) {
         snipPreviousTool.clear();
         snip::disarm();
         Q_EMIT snipChanged();
@@ -96,7 +96,7 @@ void AppController::followSnipTool() {
 
 QString AppController::snipResolution() const {
     std::string set;
-    app->getSettings()->getCustomElement("xournalQt").getString("snipResolution", set);
+    context().getSettings()->getCustomElement("xournalQt").getString("snipResolution", set);
     return set == "high" || set == "veryHigh" ? QString::fromStdString(set) : QStringLiteral("screen");
 }
 
@@ -104,8 +104,8 @@ void AppController::setSnipResolution(const QString& resolution) {
     if (resolution == snipResolution()) {
         return;
     }
-    app->getSettings()->getCustomElement("xournalQt").setString("snipResolution", resolution.toStdString());
-    app->getSettings()->customSettingsChanged();
+    context().getSettings()->getCustomElement("xournalQt").setString("snipResolution", resolution.toStdString());
+    context().getSettings()->customSettingsChanged();
     applySnipResolution();
 }
 

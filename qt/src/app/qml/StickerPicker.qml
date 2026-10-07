@@ -18,7 +18,7 @@ import "Popups.js" as Popups
 Popup {
     id: picker
     // (open: Android's back key is its; Zen's Back waits, qt/top-bar)
-    onOpenedChanged: if (typeof win !== "undefined" && win && win.takeBack !== undefined) win.takeBack(opened)
+    onOpenedChanged: win.takeBack(opened)
     objectName: key + "Picker"
     /// "stickers" or "templates"
     property string mode: "stickers"
@@ -37,7 +37,7 @@ Popup {
     property real ownerY: 0
     readonly property var model: templates ? app.templates : app.stickers
     /// A bottom sheet in the phone classes (Main.qml's sheet geometry)
-    readonly property bool asSheet: typeof win !== "undefined" && win !== null && win.layout.phoneLayout === true
+    readonly property bool asSheet: win.layout.phoneLayout
     /// Something is selected that can become a sticker (asked when it opens)
     property bool canSave: false
     parent: asSheet || !owner ? Overlay.overlay : owner
@@ -108,7 +108,7 @@ Popup {
         close()
         if (templates) {
             // (the window's dialog: one for the page menus, the add-page button's list and this)
-            if (typeof win !== "undefined" && win) win.openTemplateSave(app.pageNumber - 1)
+            win.actions.openTemplateSave(app.pageNumber - 1)
             return
         }
         if (!saveLoader.item.openForSelection())

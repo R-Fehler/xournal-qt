@@ -12,7 +12,7 @@ import QtQuick.Window
 Item {
     id: panel
     /// Its buttons: a finger's size in the touch profile (audit F14)
-    readonly property int target: typeof win !== "undefined" && win && win.adaptive.touchProfile ? win.adaptive.minTarget : 36
+    readonly property int target: win.adaptive.touchProfile ? win.adaptive.minTarget : 36
     /// An annotation was tapped: its place is shown (the sidebar as a drawer closes then)
     signal picked()
     readonly property var model: app.annotations

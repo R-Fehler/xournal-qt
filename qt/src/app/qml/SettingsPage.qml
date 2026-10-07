@@ -13,31 +13,25 @@ import QtQuick.Dialogs
 Popup {
     id: sheet
     // (open: Android's back key is its; Zen's Back waits, qt/top-bar)
-    onOpenedChanged: if (typeof win !== "undefined" && win && win.takeBack !== undefined) win.takeBack(opened)
+    onOpenedChanged: win.takeBack(opened)
     modal: true
     focus: true
     parent: Overlay.overlay
     readonly property var win: ApplicationWindow.window
-    readonly property var adaptive: win && win.adaptive ? win.adaptive : null
+    readonly property var adaptive: win.adaptive
     /// A phone: the whole screen, the sections as a list
-    readonly property bool phone: adaptive !== null && adaptive.phoneLayout
+    readonly property bool phone: adaptive.phoneLayout
     /// The rows put their label above the control
     readonly property bool narrow: width < 600
     /// On a phone: a section is shown (else the list of them)
     property bool sectionShown: false
-    /// The window's safe area and the soft keyboard (Main.qml: win.insets, win.insets.keyboardTop)
-    readonly property bool inWindow: win !== null && win !== undefined && win.insets !== undefined
-    readonly property real keyboardTop: {
-        if (inWindow) return win.insets.keyboardOpen ? win.insets.keyboardTop : Infinity
-        const r = Qt.inputMethod.keyboardRectangle
-        return Qt.inputMethod.visible && r.height > 0 ? r.y / (Qt.platform.os === "android" ? Screen.devicePixelRatio : 1)
-                                                      : Infinity
-    }
-    readonly property real safeTop: inWindow ? win.insets.top : 0
-    readonly property real safeLeft: inWindow ? win.insets.left : 0
-    readonly property real safeRight: inWindow ? win.insets.right : 0
+    /// The window's safe area and the soft keyboard (Main.qml: win.insets)
+    readonly property real keyboardTop: win.insets.keyboardOpen ? win.insets.keyboardTop : Infinity
+    readonly property real safeTop: win.insets.top
+    readonly property real safeLeft: win.insets.left
+    readonly property real safeRight: win.insets.right
     /// Above the soft keyboard while it is open, else above the navigation bar
-    readonly property real roomBottom: parent ? Math.min(parent.height - (inWindow ? win.insets.bottom : 0), keyboardTop) : 700
+    readonly property real roomBottom: parent ? Math.min(parent.height - win.insets.bottom, keyboardTop) : 700
     readonly property real parentWidth: parent ? parent.width - safeLeft - safeRight : 900
     x: safeLeft + (phone ? 0 : Math.round((parentWidth - width) / 2))
     y: phone ? safeTop : Math.round(Math.max(safeTop + 24, ((parent ? parent.height : 700) - height) / 2))
@@ -51,18 +45,34 @@ Popup {
     onAboutToShow: sectionShown = false
     onPhoneChanged: if (!phone) sectionShown = false
 
-    /// The sections, in the order of the tabs (Shortcuts near the end: it matters little without a keyboard; Help last)
-    readonly property var sectionNames: [qsTr("Pen"), qsTr("Touch"), qsTr("Stabilizer"), qsTr("Documents"),
-        qsTr("Display"), qsTr("Search"), qsTr("New pages"), qsTr("Storage"), qsTr("Shortcuts"), qsTr("Help")]
-    readonly property int shortcutsSection: 8
-    /// Search, with the handwriting search (copying handwriting as text points there when it is off)
-    readonly property int searchSection: 5
-    function showSection(index) {
-        sections.currentIndex = index
+    /// The sections: the tabs (on a phone: the list) and the pages of the StackLayout below, in this order (Shortcuts
+    /// near the end: it matters little without a keyboard; Help last). `key` names a section for showSection().
+    readonly property var sections: [
+        {key: "pen", title: qsTr("Pen")},
+        {key: "touch", title: qsTr("Touch")},
+        {key: "stabilizer", title: qsTr("Stabilizer")},
+        {key: "documents", title: qsTr("Documents")},
+        {key: "display", title: qsTr("Display")},
+        {key: "search", title: qsTr("Search")},
+        {key: "newPages", title: qsTr("New pages")},
+        {key: "storage", title: qsTr("Storage")},
+        {key: "shortcuts", title: qsTr("Shortcuts")},
+        {key: "help", title: qsTr("Help")}
+    ]
+    function sectionIndex(key) {
+        for (let i = 0; i < sections.length; ++i) {
+            if (sections[i].key === key) return i
+        }
+        return -1
+    }
+    /// Show the section `key` (on a phone: open it from the list)
+    function showSection(key) {
+        tabs.currentIndex = sectionIndex(key)
         sectionShown = true
     }
-    function showShortcuts() { showSection(shortcutsSection) }
-    function showSearch() { showSection(searchSection) }
+    function showShortcuts() { showSection("shortcuts") }
+    /// Search, with the handwriting search (copying handwriting as text points there when it is off)
+    function showSearch() { showSection("search") }
     /// Help (qt/docs/features/onboarding.md): the window shows the introduction, the tutorial, the question whether to
     /// start the tutorial again (the sheet is closed first)
     signal introRequested()
@@ -100,13 +110,13 @@ Popup {
                 visible: sheet.phone
                 iconName: sheet.sectionShown ? "xqt-chevron-left" : "xqt-close"
                 tip: sheet.sectionShown ? qsTr("Back") : qsTr("Close")
-                implicitWidth: Math.max(48, sheet.adaptive ? sheet.adaptive.minTarget : 48)
+                implicitWidth: Math.max(48, sheet.adaptive.minTarget)
                 implicitHeight: implicitWidth
                 onClicked: sheet.sectionShown ? sheet.sectionShown = false : sheet.close()
             }
             Label {
                 objectName: "settingsTitle"
-                text: sheet.phone && sheet.sectionShown ? sheet.sectionNames[sections.currentIndex] : qsTr("Settings")
+                text: sheet.phone && sheet.sectionShown ? sheet.sections[tabs.currentIndex].title : qsTr("Settings")
                 font.pixelSize: sheet.phone ? 20 : 22
                 font.weight: Font.DemiBold
                 elide: Text.ElideRight
@@ -134,18 +144,18 @@ Popup {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            model: sheet.sectionNames
+            model: sheet.sections
             ScrollBar.vertical: ScrollBar {}
             delegate: ItemDelegate {
                 required property int index
-                required property string modelData
+                required property var modelData
                 objectName: "settingsSection" + index
                 width: ListView.view.width
-                height: Math.max(56, sheet.adaptive ? sheet.adaptive.minTarget + 8 : 56)
+                height: Math.max(56, sheet.adaptive.minTarget + 8)
                 leftPadding: 24
-                text: modelData
+                text: modelData.title
                 font.pixelSize: 16
-                onClicked: sheet.showSection(index)
+                onClicked: sheet.showSection(modelData.key)
                 Image {
                     anchors.right: parent.right
                     anchors.rightMargin: 16
@@ -158,22 +168,21 @@ Popup {
             }
         }
         TabBar {
-            id: sections
+            id: tabs
             visible: !sheet.phone
             Layout.fillWidth: true
             Layout.leftMargin: 12
             Layout.rightMargin: 12
             Material.background: "transparent"
-            TabButton { text: qsTr("Pen"); width: implicitWidth }
-            TabButton { objectName: "touchTab"; text: qsTr("Touch"); width: implicitWidth }
-            TabButton { text: qsTr("Stabilizer"); width: implicitWidth }
-            TabButton { objectName: "documentsTab"; text: qsTr("Documents"); width: implicitWidth }
-            TabButton { objectName: "displayTab"; text: qsTr("Display"); width: implicitWidth }
-            TabButton { objectName: "searchTab"; text: qsTr("Search"); width: implicitWidth }
-            TabButton { text: qsTr("New pages"); width: implicitWidth }
-            TabButton { objectName: "storageTab"; text: qsTr("Storage"); width: implicitWidth }
-            TabButton { objectName: "shortcutsTab"; text: qsTr("Shortcuts"); width: implicitWidth }
-            TabButton { objectName: "helpTab"; text: qsTr("Help"); width: implicitWidth }
+            Repeater {
+                model: sheet.sections
+                TabButton {
+                    required property var modelData
+                    objectName: modelData.key + "Tab"
+                    text: modelData.title
+                    width: implicitWidth
+                }
+            }
         }
         Hairline { Layout.fillWidth: true; color: "#e0e0e0"; visible: !sheet.phone || sheet.sectionShown }
 
@@ -182,8 +191,9 @@ Popup {
             visible: !sheet.phone || sheet.sectionShown
             Layout.fillWidth: true
             Layout.fillHeight: true
-            currentIndex: sections.currentIndex
+            currentIndex: tabs.currentIndex
 
+            // (one page per section, in the order of `sections`)
             // --- Pen ---
             SettingsPen {}
 

@@ -27,9 +27,9 @@ Item {
     AdaptiveDialog {
         id: renameDialog
         objectName: "renameDialog"
-        title: home.menuFolder ? qsTr("Rename folder") : qsTr("Rename document")
+        title: home.menuTarget.folder ? qsTr("Rename folder") : qsTr("Rename document")
         preferredWidth: 440
-        onAboutToShow: { renameField.text = home.menuName; renameField.selectAll(); renameField.forceActiveFocus() }
+        onAboutToShow: { renameField.text = home.menuTarget.name; renameField.selectAll(); renameField.forceActiveFocus() }
         ColumnLayout {
             width: renameDialog.availableWidth
             TextField {
@@ -41,17 +41,17 @@ Item {
                 Keys.onEnterPressed: renameDialog.accept()
             }
             Label {
-                visible: !home.menuFolder
+                visible: !home.menuTarget.folder
                 Layout.fillWidth: true
                 wrapMode: Text.Wrap
                 font.pixelSize: 12
                 color: "#6b6f75"
-                text: home.menuKind === "other" || home.menuKind === "text" ? qsTr("The whole file name, with its extension.")
+                text: home.menuTarget.kind === "other" || home.menuTarget.kind === "text" ? qsTr("The whole file name, with its extension.")
                                                                               : qsTr("The Xournal file and its PDF are renamed together.")
             }
         }
         standardButtons: Dialog.Ok | Dialog.Cancel
-        onAccepted: if (renameField.text.trim() !== "" && home.menuModel) home.menuModel.rename(home.menuRow, renameField.text)
+        onAccepted: if (renameField.text.trim() !== "" && home.menuTarget.model) home.menuTarget.model.rename(home.menuTarget.row, renameField.text)
     }
 
     AdaptiveDialog {
@@ -188,16 +188,16 @@ Item {
             Label {
                 Layout.fillWidth: true
                 wrapMode: Text.Wrap
-                text: home.menuPaths.length > 1
-                      ? qsTr("%1 go to the trash (documents with their PDFs, folders with everything in them).").arg(home.countText(home.menuPaths.length))
+                text: home.menuTarget.paths.length > 1
+                      ? qsTr("%1 go to the trash (documents with their PDFs, folders with everything in them).").arg(home.countText(home.menuTarget.paths.length))
                       : qsTr("“%1” goes to the trash (a document with its PDF, a folder with everything in it).")
-                            .arg(home.menuPaths.length === 1 ? home.menuPaths[0].substring(home.menuPaths[0].lastIndexOf("/") + 1) : "")
+                            .arg(home.menuTarget.paths.length === 1 ? home.menuTarget.paths[0].substring(home.menuTarget.paths[0].lastIndexOf("/") + 1) : "")
             }
         }
         standardButtons: Dialog.Ok | Dialog.Cancel
         onAccepted: {
-            app.library.trashPaths(home.menuPaths)
-            if (home.menuModel === app.recent) app.recent.clearSelection()
+            app.library.trashPaths(home.menuTarget.paths)
+            if (home.menuTarget.model === app.recent) app.recent.clearSelection()
         }
     }
 

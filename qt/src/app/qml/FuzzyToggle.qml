@@ -16,7 +16,7 @@ ToolButton {
     checked: fuzzy
     onToggled: setFuzzy(checked)
     // (a finger's size in the touch profile: audit F14)
-    implicitHeight: typeof win !== "undefined" && win && win.adaptive.touchProfile ? win.adaptive.minTarget : 36
+    implicitHeight: win.adaptive.touchProfile ? win.adaptive.minTarget : 36
     leftPadding: 6
     rightPadding: 6
     font.pixelSize: 13

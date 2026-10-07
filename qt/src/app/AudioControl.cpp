@@ -111,13 +111,16 @@ QString pagesText(const std::vector<size_t>& pages) {
     }
     return parts.join(QStringLiteral(", "));
 }
+/// A document's title in the recording's notification: its file's name
+QString titleOf(const DocumentSession* s) {
+    return s && s->hasFilePath() ? QString::fromStdU16String(s->getFilePath().filename().u16string())
+                                 : QCoreApplication::translate("AudioControl", "Untitled");
+}
 }  // namespace
 
-AudioControl::AudioControl(std::function<DocumentSession*()> c, std::function<QString(DocumentSession*)> t,
-                           QObject* parent):
+AudioControl::AudioControl(const WindowContext& w, QObject* parent):
         QObject(parent),
-        current(std::move(c)),
-        titleOf(std::move(t)),
+        window(w),
         recorder(std::make_unique<audio::Recorder>()),
         player(std::make_unique<audio::Player>()) {
     leadIn = QSettings().value(LEAD_IN_KEY, 2000).toInt();

@@ -36,7 +36,7 @@ Popup {
     property bool pasteAvailable: false
     readonly property bool reading: canvasItem.readingOnly
     /// Something to copy, cut or delete: selected elements, or a selected sticky note (the notes' canvas)
-    readonly property bool selected: target.hasSelection || (target === app.edit && app.noteSelected)
+    readonly property bool selected: target.hasSelection || (target === app.edit && app.edit.noteSelected)
 
     function openAt(viewPos, pdfText) {
         at = viewPos

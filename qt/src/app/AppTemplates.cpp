@@ -202,7 +202,7 @@ std::vector<PageRef> AppController::templatePagesFor(PageClipboard& copy, bool w
         color = current->getBackgroundColor();
     }
     if (type.isSpecial()) {
-        const auto& settings = app->getSettings()->getPageTemplateSettings();
+        const auto& settings = context().getSettings()->getPageTemplateSettings();
         type = settings.getBackgroundType();
         color = settings.getBackgroundColor();
         if (type.isSpecial()) {
@@ -270,7 +270,7 @@ bool AppController::createDocumentFromTemplate(const QString& name, bool inLibra
             Q_EMIT templateInserted(path, 0, error);
             return;
         }
-        auto s = std::make_unique<DocumentSession>(*app);
+        auto s = std::make_unique<DocumentSession>(context());
         DocumentSession* created = s.get();
         tabs->addTab(std::move(s));
         setHomeVisible(false);

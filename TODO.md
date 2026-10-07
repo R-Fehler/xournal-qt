@@ -21,14 +21,14 @@ All four waves are merged (2026-10-07). The architecture overview:
 `qt/scripts/architecture/generate.py` (`--check` runs in CI).
 
 ### What the merged blocks left (checked against the code, 2026-10-07)
-- [ ] App: `WindowActions` — Main's search forwards and the Connections that only open dialogs (qml B3); a
-  `WindowContext` for the feature objects; `AppController::app` → `context` (mechanical); the facade names of the
-  canvas actions (`app.copySelection`, `app.zoomIn`, …) and the per-document properties move with their features
-  (app-cpp E–N).
-- [ ] QML: the 40 `typeof win` guards (qml B6); HomeView's one `DocumentGrid` with the favourites in C++, its menu
-  target object and the search field's `type(text)` (qml B7); SettingsPage's section model (names written twice,
-  magic indices) and its own keyboard fallback (qml B8); the cards' role `preview` → `cover` (LibraryModel's
-  `CoverRole` is still named "preview" for QML).
+- [ ] App: the canvas names with rules of their own still on `app`: `copySelection` (the reference's own copy),
+  `pasteElements` (a text file's fixed pages, the reference only when written in), `selectAllOnPage`,
+  `clearSelection`, `navigateBack/Forward` and `canGoBack/Forward` (across documents: AppLinks), `goToPage`
+  (test-only), and the per-document properties (`pageNumber`, `pageCount`, `zoomPercent`, …): with their feature
+  objects (app-cpp E–N, which get a `WindowContext`). MoreMenu/AppButtons/ToolboxMenus still name dialog ids (qml B3:
+  `actions.*` for them).
+- [ ] Shell: the favourite as a role of `RecentFiles` (the Recent grid still asks `app.isFavouriteFile` with
+  HomeView's `favouriteRevision` counter); `Stickers`' `CoverRole` is still "preview" for the sticker picker.
 - [ ] Shell: `readJsonObject` (`shell/JsonFile.h`) next to `fileio::readFile`, and PdfHistory's `gzip`/`gunzip`
   internal, once the session block is merged; "preview" in MainWindowTest test names (with the tests block).
 - [ ] Session: **the plain autosave still runs on the UI thread** (risk 7; `DocumentSession::autosave` builds the XML

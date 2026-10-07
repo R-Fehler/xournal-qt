@@ -22,7 +22,7 @@ Item {
     readonly property string markedName: Fuzzy.marked(name, nameMarks, "#c2410c")
     property string path
     property string subtitle
-    property string preview
+    property string cover
     property bool isFolder: false
     /// A folder opened as a library (Recent): the folder with a library mark
     property bool isLibrary: false
@@ -73,7 +73,7 @@ Item {
     /// A narrow card (two columns on a phone): the name on up to two lines instead of cut short in the middle
     property bool twoLineName: false
     /// Fingers in use (the window's touch profile): the ⋮ as big as a finger needs
-    readonly property bool touch: typeof win !== "undefined" && win && win.adaptive ? win.adaptive.touchProfile : false
+    readonly property bool touch: win.adaptive.touchProfile
     property bool selected: false
     /// Items are being selected: the circles are shown on all cards.
     property bool selectionMode: false
@@ -143,7 +143,7 @@ Item {
                     anchors.margins: 6
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true
-                    source: card.isFolder || !card.active || card.kind === "other" ? "" : card.preview
+                    source: card.isFolder || !card.active || card.kind === "other" ? "" : card.cover
                     sourceSize.width: 360
                     // Paper look: a little shadow around the page
                     Rectangle {
@@ -158,7 +158,7 @@ Item {
                 }
                 BusyIndicator {
                     anchors.centerIn: parent
-                    visible: previewImage.visible && card.preview !== "" && previewImage.status === Image.Loading
+                    visible: previewImage.visible && card.cover !== "" && previewImage.status === Image.Loading
                     running: visible
                     implicitWidth: 36
                     implicitHeight: 36

@@ -11,7 +11,7 @@ import XournalQt.Canvas
 Popup {
     id: picker
     // (open: Android's back key is its; Zen's Back waits, qt/top-bar)
-    onOpenedChanged: if (typeof win !== "undefined" && win && win.takeBack !== undefined) win.takeBack(opened)
+    onOpenedChanged: win.takeBack(opened)
     objectName: "emojiPicker"
     signal picked(string emoji)
     /// The item it opens beside (not a sheet), and where in its coordinates
@@ -19,7 +19,7 @@ Popup {
     property real ownerX: 0
     property real ownerY: 0
     /// A bottom sheet in the phone classes (Main.qml's sheet geometry)
-    readonly property bool asSheet: typeof win !== "undefined" && win !== null && win.layout.phoneLayout === true
+    readonly property bool asSheet: win.layout.phoneLayout
     parent: asSheet ? Overlay.overlay : owner
     modal: asSheet
     dim: asSheet

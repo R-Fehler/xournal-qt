@@ -65,7 +65,7 @@ protected:
     size_t pageCount() const { return current()->getDocument()->getPageCount(); }
     QUrl url(const fs::path& p) const { return QUrl::fromLocalFile(QString::fromStdString(p.string())); }
     void openPageFiles(const char* what, const QVariantList& pages) {
-        QMetaObject::invokeMethod(window, "openPageFiles", Q_ARG(QVariant, QString(what)), Q_ARG(QVariant, pages));
+        QMetaObject::invokeMethod(window->property("actions").value<QObject*>(), "openPageFiles", Q_ARG(QVariant, QString(what)), Q_ARG(QVariant, pages));
     }
     QObject* opened(const char* dialog) {
         auto* d = find<QObject>(dialog);

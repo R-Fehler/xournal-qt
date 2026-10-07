@@ -183,10 +183,10 @@ The details:
   (`LibraryIndex::titleSearch`), so a big library does not stall the window.
 - arXiv: `ArxivSheet.qml` (with the opt-in dialog), `Citations` (search, look-up, download), `NetFetch` /
   `ArxivQueue` (`qt/src/shell/NetFetch.*`). Only the first arXiv ID of a selection is offered in the menu.
-- The searches of selected text: `LookUpMenu.qml` calls `win.searchInDocument`
-  (opens the search bar, sets `app.searchQuery`: the bar follows a search set from elsewhere), `win.searchOpenTabs`
-  (`TabOverview.searchFor`) and `win.searchLibraryFor` (`HomeView.searchFor`). The Markdown source beside the page
-  has no look-up menu, so no searches either.
+- The searches of selected text: `LookUpMenu.qml` calls `win.actions.searchInDocument` (`WindowActions.qml`; it
+  opens the search bar, sets `app.searchQuery`: the bar follows a search set from elsewhere),
+  `win.actions.searchOpenTabs` (`TabOverview.searchFor`) and `win.actions.searchLibraryFor` (`HomeView.searchFor`).
+  The Markdown source beside the page has no look-up menu, so no searches either.
 - Tests: `CitationTest` (session: queries, addresses, every web search engine, a custom search address and its
   validation, the 200-character cut, the escaping), 15 real bibliography entries, title words and scores, arXiv
   IDs, the saved Atom answers, download names), `CitationLibraryTest` and `ArxivTest` (shell: titles in the index,

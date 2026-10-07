@@ -43,9 +43,8 @@ QString dateText(qint64 when) {
 }
 }  // namespace
 
-TimelineControl::TimelineControl(std::function<DocumentSession*()> s, std::function<CanvasView*()> c, AudioControl* a,
-                                 QObject* parent):
-        QObject(parent), currentSession(std::move(s)), currentCanvas(std::move(c)), audio(a) {
+TimelineControl::TimelineControl(const WindowContext& w, AudioControl* a, QObject* parent):
+        QObject(parent), window(w), audio(a) {
     clock.setInterval(FRAME_MS);
     clock.setTimerType(Qt::PreciseTimer);
     connect(&clock, &QTimer::timeout, this, &TimelineControl::tick);

@@ -372,13 +372,13 @@ TEST(ReferenceMode, keysActOnTheReferenceWhileItHasTheFocus) {
     mainVc.setViewSize(QSizeF(500, 600));
     refVc.setViewSize(QSizeF(500, 600));
     const double mainZoom = mainVc.zoom(), refZoom = refVc.zoom();
-    t.c.zoomIn();
+    t.c.keyTarget().zoomIn();
     EXPECT_GT(mainVc.zoom(), mainZoom);
     EXPECT_DOUBLE_EQ(refVc.zoom(), refZoom);
     t.ref().setFocused(true);
-    t.c.zoomIn();
+    t.c.keyTarget().zoomIn();
     EXPECT_GT(refVc.zoom(), refZoom) << "the focused reference did not zoom";
-    t.c.fitWidth();
+    t.c.keyTarget().fitWidth();
     EXPECT_NEAR(refVc.zoom(), refZoom, 1e-9);
     // Without a reference nothing has the focus there
     t.ref().close();

@@ -54,7 +54,7 @@ AdaptiveMenu {
                 Layout.fillWidth: true
             }
         }
-        onTriggered: run ? run() : win.openWebAddress(url, purpose)
+        onTriggered: run ? run() : win.actions.openWebAddress(url, purpose)
     }
 
     // The searches here, with the text
@@ -62,26 +62,26 @@ AdaptiveMenu {
         objectName: menu.named("lookUpSearchDocument")
         text: menu.inReference && !app.reference.self ? qsTr("Search in “%1”").arg(app.title) : qsTr("Search in this document")
         enabled: menu.query !== ""
-        onTriggered: win.searchInDocument(menu.query)
+        onTriggered: win.actions.searchInDocument(menu.query)
     }
     AdaptiveMenuItem {
         objectName: menu.named("lookUpSearchTabs")
         text: qsTr("Search in open tabs")
         enabled: menu.query !== ""
-        onTriggered: win.searchOpenTabs(menu.query)
+        onTriggered: win.actions.searchOpenTabs(menu.query)
     }
     AdaptiveMenuItem {
         objectName: menu.named("lookUpSearchLibrary")
         text: qsTr("Search in the library")
         enabled: menu.query !== "" && app.library.available
-        onTriggered: win.searchLibraryFor(menu.query)
+        onTriggered: win.actions.searchLibraryFor(menu.query)
     }
     MenuSeparator {}
     AdaptiveMenuItem {
         objectName: menu.named("lookUpFindPaper")
         text: qsTr("Find this paper in the library")
         enabled: menu.text !== ""
-        onTriggered: win.findPaper(menu.text)
+        onTriggered: win.actions.findPaper(menu.text)
     }
     // An arXiv ID in the text (the first one): its paper into the library (the arXiv sheet looks up its title first,
     // to name the file, showing that address again with its button), and its page in the browser
@@ -89,7 +89,7 @@ AdaptiveMenu {
         objectName: menu.named("lookUpArxiv")
         label: menu.arxivIds.length > 0 ? qsTr("arXiv %1: into the library…").arg(menu.arxivIds[0].full) : ""
         url: menu.arxivIds.length > 0 ? menu.arxivIds[0].lookUpUrl : ""
-        run: function() { win.arxivPaper(menu.arxivIds[0].full) }
+        run: function() { win.actions.arxivPaper(menu.arxivIds[0].full) }
     }
     WebItem {
         objectName: menu.named("lookUpArxivPage")

@@ -22,21 +22,21 @@ Rectangle {
     // --- the layout for the window's size
     // (qt/docs/features/adaptive-layout.md, "The home screen and the tab overview")
     /// The window's layout (Main.qml's `win.adaptive`), if there is one
-    readonly property var adaptive: typeof win !== "undefined" && win ? win.adaptive : null
-    readonly property string layoutClass: adaptive ? adaptive.layoutClass : "desktopWide"
+    readonly property var adaptive: win.adaptive
+    readonly property string layoutClass: adaptive.layoutClass
     /// A phone class: the "+" floats at the bottom, the actions on a selection are a bar at the bottom
-    readonly property bool phoneLayout: adaptive !== null && adaptive.phoneLayout
+    readonly property bool phoneLayout: adaptive.phoneLayout
     /// A phone held sideways (or another short window of a phone class): one header row with the breadcrumbs in it,
     /// shorter cards
     readonly property bool shortLayout: phoneLayout && (layoutClass === "phoneShort"
-                                                        || (adaptive !== null && adaptive.orientation === "landscape"))
+                                                        || (adaptive.orientation === "landscape"))
     /// A phone held upright: the switch Library / Recent / Bookmarks in a row of its own, across the width
     readonly property bool portraitPhone: phoneLayout && !shortLayout
-    readonly property bool touch: adaptive !== null && adaptive.touchProfile
+    readonly property bool touch: adaptive.touchProfile
     /// What a finger needs (48 with the touch profile, else 40)
-    readonly property int minTarget: adaptive ? adaptive.minTarget : 40
+    readonly property int minTarget: adaptive.minTarget
     /// The part of its bottom under the navigation bar (not where the soft keyboard's room is below it)
-    readonly property real safeBottom: typeof win !== "undefined" && win && win.insets.contentBottomInset ? win.insets.contentBottomInset : 0
+    readonly property real safeBottom: win.insets.contentBottomInset
     /// Room below the last cards for the floating "+" of a phone
     readonly property real fabSpace: phoneLayout ? 72 : 0
 
@@ -234,25 +234,28 @@ Rectangle {
         libraryDialogs.transferDialog.open()
     }
     function askTrash(model, paths) {
-        home.menuModel = model
-        home.menuPaths = paths
+        home.menuTarget.model = model
+        home.menuTarget.paths = paths
         libraryDialogs.trashDialog.open()
     }
-    // Menu, rename and trash work on a row of the library or the recent list.
-    property var menuModel: null
-    property int menuRow: -1
-    property string menuName: ""
-    property string menuPath: ""
-    property bool menuFolder: false
-    /// The kind of the row ("notes", "pdf", "md", "image", "text", "other"; a folder: "")
-    property string menuKind: ""
-    /// What the menu applies to: the row, or all selected items if the row is one of them.
-    property var menuPaths: []
-    readonly property bool menuMany: menuPaths.length > 1
+    /// What the item menu, rename and trash work on: a row of the library or the recent list
+    readonly property QtObject menuTarget: QtObject {
+        property var model: null
+        property int row: -1
+        property string name: ""
+        property string path: ""
+        property bool folder: false
+        /// The kind of the row ("notes", "pdf", "md", "image", "text", "other"; a folder: "")
+        property string kind: ""
+        /// What the menu applies to: the row, or all selected items if the row is one of them.
+        property var paths: []
+        readonly property bool many: paths.length > 1
+    }
     function showMenu(model, row, name, path, isFolder, item, x, y, kind) {
-        menuModel = model; menuRow = row; menuName = name; menuPath = path; menuFolder = isFolder
-        menuKind = kind || ""
-        menuPaths = model.pathsFor(row)
+        menuTarget.model = model; menuTarget.row = row; menuTarget.name = name; menuTarget.path = path
+        menuTarget.folder = isFolder
+        menuTarget.kind = kind || ""
+        menuTarget.paths = model.pathsFor(row)
         itemMenu.openMenu(Qt.point(x, y), item)
     }
     /// At the start, after the other questions (Main.qml): the offer, once
@@ -477,7 +480,7 @@ Rectangle {
 
     TagsDialog { id: homeTagsDialog }
 
-    LibraryItemMenu { id: itemMenu }
+    LibraryItemMenu { id: itemMenu; target: home.menuTarget }
 
     LibraryDialogs { id: libraryDialogs }
 

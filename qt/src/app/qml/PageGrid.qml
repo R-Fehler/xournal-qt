@@ -347,7 +347,6 @@ Rectangle {
             IconButton {
                 id: filesButton
                 objectName: "pageGridFilesButton"
-                visible: typeof win !== "undefined" && win !== null && win.openPageFiles !== undefined
                 iconName: "xqt-more"
                 tip: qsTr("Copy as image, extract, split, export as pictures, insert from a file")
                 implicitWidth: 44; implicitHeight: 44
@@ -367,26 +366,26 @@ Rectangle {
                         objectName: "pageGridExtractItem"
                         text: qsTr("Extract to a new document…")
                         icon.source: app.iconUrl("xqt-file-output")
-                        onTriggered: win.openPageFiles("extract", filesMenu.chosen)
+                        onTriggered: win.actions.openPageFiles("extract", filesMenu.chosen)
                     }
                     AdaptiveMenuItem {
                         objectName: "pageGridSplitItem"
                         text: qsTr("Split…")
                         icon.source: app.iconUrl("xqt-page-break")
-                        onTriggered: win.openPageFiles("split", filesMenu.chosen)
+                        onTriggered: win.actions.openPageFiles("split", filesMenu.chosen)
                     }
                     AdaptiveMenuItem {
                         objectName: "pageGridImagesItem"
                         text: qsTr("Export as pictures…")
                         icon.source: app.iconUrl("xqt-file-image")
-                        onTriggered: win.openPageFiles("images", filesMenu.chosen)
+                        onTriggered: win.actions.openPageFiles("images", filesMenu.chosen)
                     }
                     AdaptiveMenuItem {
                         objectName: "pageGridInsertFileItem"
                         offered: app.canInsertTemplate
                         text: qsTr("Insert pages from a file…")
                         icon.source: app.iconUrl("xqt-import")
-                        onTriggered: win.openPageFiles("insert", filesMenu.chosen)
+                        onTriggered: win.actions.openPageFiles("insert", filesMenu.chosen)
                     }
                 }
             }

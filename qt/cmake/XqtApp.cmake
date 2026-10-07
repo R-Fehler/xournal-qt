@@ -179,6 +179,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/BackgroundJobs.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/CurrentDocument.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/CurrentDocument.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowContext.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowContext.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTextFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppQuickNote.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp
@@ -240,6 +242,7 @@ set(XQT_QML_FILES
     src/app/qml/ChromeLayout.qml
     # (the parts of the window, each instantiated once in Main.qml)
     src/app/qml/SaveFlow.qml
+    src/app/qml/WindowActions.qml
     src/app/qml/ShareFlow.qml
     src/app/qml/ExportFlow.qml
     src/app/qml/ProtectionDialogs.qml
@@ -321,6 +324,7 @@ set(XQT_QML_FILES
     src/app/qml/LibrarySearchField.qml
     src/app/qml/LibraryGridPage.qml
     src/app/qml/RecentGridPage.qml
+    src/app/qml/DocumentGrid.qml
     src/app/qml/HomeSelectionActions.qml
     src/app/qml/MoveDragOverlay.qml
     src/app/qml/LibraryItemMenu.qml

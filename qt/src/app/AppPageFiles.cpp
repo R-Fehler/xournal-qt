@@ -591,7 +591,7 @@ QByteArray pngOf(const QImage& image) {
 
 int AppController::pageImageDpi() const {
     int dpi = 0;
-    app->getSettings()->getCustomElement(SETTINGS).getInt("pageImagesDpi", dpi);
+    context().getSettings()->getCustomElement(SETTINGS).getInt("pageImagesDpi", dpi);
     return dpi >= 36 && dpi <= 1200 ? dpi : DEFAULT_DPI;
 }
 
@@ -600,8 +600,8 @@ void AppController::setPageImageDpi(int dpi) {
     if (dpi == pageImageDpi()) {
         return;
     }
-    app->getSettings()->getCustomElement(SETTINGS).setInt("pageImagesDpi", dpi);
-    app->getSettings()->customSettingsChanged();
+    context().getSettings()->getCustomElement(SETTINGS).setInt("pageImagesDpi", dpi);
+    context().getSettings()->customSettingsChanged();
     Q_EMIT pageImageDpiChanged();
 }
 
@@ -620,7 +620,7 @@ QVariantMap AppController::imageExportDraft() const {
     }
     draft.insert(QStringLiteral("name"), QString::fromStdString(stemOf(*s)));
     std::string folder;
-    app->getSettings()->getCustomElement(SETTINGS).getString("pageImagesFolder", folder);
+    context().getSettings()->getCustomElement(SETTINGS).getString("pageImagesFolder", folder);
     if (folder.empty()) {
         folder = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation).toStdString();
     }
@@ -715,8 +715,8 @@ bool AppController::exportPageImages(const QList<int>& list, const QUrl& folderU
     dpi = std::clamp(dpi, 36, 1200);
     const bool jpeg = format.compare(QLatin1String("jpg"), Qt::CaseInsensitive) == 0 ||
                       format.compare(QLatin1String("jpeg"), Qt::CaseInsensitive) == 0;
-    app->getSettings()->getCustomElement(SETTINGS).setString("pageImagesFolder", folder.string());
-    app->getSettings()->customSettingsChanged();
+    context().getSettings()->getCustomElement(SETTINGS).setString("pageImagesFolder", folder.string());
+    context().getSettings()->customSettingsChanged();
     setPageImageDpi(dpi);  // (also for "Copy page as image")
 
     PagePictures pictures = picturesOf(*s, pageList(list));

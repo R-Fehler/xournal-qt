@@ -48,6 +48,8 @@
 #include "session/PdfEncryption.h"
 #include "session/TextMatch.h"
 
+#include "WindowContext.h"
+
 class QQuickTextDocument;
 class QWindow;
 
@@ -297,8 +299,10 @@ class AppController: public QObject {
     /// What acts on the current document's canvas (xqt::CanvasActions): its selection, sticky notes, PDF text, the
     /// clipboard, page, zoom and Back; the pills of the notes take it as their target (the reference's: app.reference.edit)
     Q_PROPERTY(QObject* edit READ editObject CONSTANT)
-    /// Elements are selected on the canvas (select tools).
-    Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
+    /// What the keys act on (a CanvasActions): the reference's canvas while it has the focus, else the current
+    /// document's (app.edit). Group, ungroup, cut, delete, zoom and the fits of the keys and the view pill go here; the
+    /// reference refuses what changes it unless it is written in (CanvasActions::readingOnly).
+    Q_PROPERTY(QObject* keyTarget READ keyTargetObject NOTIFY keyTargetChanged)
     /// The snip tool (qt/docs/features/snip.md) is armed: "rect" or "lasso" ("": not). The next rectangle or lasso
     /// dragged on a page copies its picture to the clipboard, then the tool used before comes back.
     Q_PROPERTY(QString snip READ snipShape NOTIFY snipChanged)
@@ -596,14 +600,12 @@ public:
     bool searchRegex() const { return replaceOptions.regex; }
     void setSearchRegex(bool on);
     bool canReplace() const;
-    bool hasSelection() const;
-    /// What acts on the current document's canvas (the pills; the keys go through keyActions)
+    /// What acts on the current document's canvas (the pills; the keys go through keyTarget)
     xqt::CanvasActions& edit() const { return *edits; }
     QObject* editObject() const;
-    /// Group (Ctrl+G) / ungroup (Ctrl+Shift+G) what is selected (the reference while it has the keys and is written
-    /// in): one undo step (qt/docs/features/groups.md)
-    Q_INVOKABLE bool groupSelection();
-    Q_INVOKABLE bool ungroupSelection();
+    /// What the keys act on now (app.keyTarget)
+    xqt::CanvasActions& keyTarget() const { return *keyActions(); }
+    QObject* keyTargetObject() const;
     bool canGoBack() const;
     QString pdfTextMode() const { return pdfMode; }
     void setPdfTextMode(const QString& mode);
@@ -766,14 +768,11 @@ public:
     Q_INVOKABLE void redoPages();
 
     // --- selected elements on the canvas ---
+    // (group, ungroup, cut, delete: app.keyTarget; inserting an image: app.edit)
     Q_INVOKABLE bool copySelection();
-    Q_INVOKABLE bool cutSelection();
     /// Paste elements (copied in this or another tab, or another Xournal Qt window) as a selection.
     Q_INVOKABLE bool pasteElements();
-    Q_INVOKABLE void deleteSelection();
     Q_INVOKABLE void selectAllOnPage();
-    /// Insert an image file on the current page (as a selection).
-    Q_INVOKABLE bool insertImage(const QUrl& file);
     Q_INVOKABLE void clearSelection();
 
     // --- search ---
@@ -1163,8 +1162,7 @@ public:
     Q_INVOKABLE void keepHybridData();
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
-    /// The fits also turn the canvas upright again (qt/docs/features/canvas-rotation.md)
-    Q_INVOKABLE void fitWidth();
+    /// The fits also turn the canvas upright again (qt/docs/features/canvas-rotation.md; the width: app.keyTarget)
     /// The height of the current page fills the view, or the whole page fits into it.
     Q_INVOKABLE void fitHeight();
     Q_INVOKABLE void fitPage();
@@ -1177,12 +1175,8 @@ public:
     /// The current page has another size than the page before or after it (then fitting it alone helps).
     Q_PROPERTY(bool currentPageDiffers READ currentPageDiffers NOTIFY pageChanged)
     bool currentPageDiffers() const;
-    Q_INVOKABLE void zoomIn();
-    /// Zoom to this (around the middle of the view), e.g. back to what it was.
+    /// Zoom to this (around the middle of the view), e.g. back to what it was. (In and out, 100 %: app.keyTarget)
     Q_INVOKABLE void setZoomPercent(int percent);
-    Q_INVOKABLE void zoomOut();
-    /// 100 %: the pages as large as the paper, after the screen's calibration (Settings -> Screen)
-    Q_INVOKABLE void zoomToRealSize();
     Q_INVOKABLE void addPageAfterCurrent();
 
     // --- pages of the current document (index: 0-based page) ---
@@ -1217,12 +1211,7 @@ public:
     /// The files of the documents shown (the tab's, the reference's): the paper of a reference is not looked for in
     /// the document the reference is in.
     Q_INVOKABLE QStringList shownDocumentFiles() const;
-    /// Select the word of the PDF at this place on the canvas (again at the same word: its whole line).
-    Q_INVOKABLE bool selectPdfTextAt(qreal x, qreal y);
-    /// (dragging its ends, copying and marking it: edit, CanvasActions)
-    /// PDF text is selected right now (then only copying and marking it make sense).
-    Q_PROPERTY(bool pdfTextIsSelected READ pdfTextIsSelected NOTIFY pdfTextSelectionChanged)
-    bool pdfTextIsSelected() const;
+    /// (PDF text: selecting, its ends, copying and marking it: app.edit)
     /// Insert `count` new pages before `position` (0-based; page count: at the end): background `background` (index
     /// in the settings' pageBackgrounds), paper `paper` (index in paperFormats; -1: the size of the current page),
     /// portrait or landscape. One step to undo.
@@ -1436,17 +1425,10 @@ public:
     /// The pastel colors a note can have
     Q_PROPERTY(QVariantList stickyNoteColors READ stickyNoteColors CONSTANT)
     QVariantList stickyNoteColors() const;
-    /// A sticky note is selected (its pill: colors, cover, delete)
-    Q_PROPERTY(bool noteSelected READ noteSelected NOTIFY noteSelectionChanged)
-    bool noteSelected() const;
     /// Several notes are selected, or notes with elements of the page (the selection's pill;
     /// qt/docs/features/sticky-notes.md, "Several notes at once")
     Q_PROPERTY(bool notesSelectedTogether READ notesSelectedTogether NOTIFY selectionChanged)
     bool notesSelectedTogether() const;
-    /// The selected note onto the clipboard, whole (Ctrl+C / Ctrl+X go through copySelection / cutSelection); several
-    /// notes selected together: all of them (and the elements with them). The note's pill: edit (CanvasActions).
-    Q_INVOKABLE bool copyStickyNote();
-    Q_INVOKABLE bool cutStickyNote();
     /// Ctrl+V in the page sidebar or grid pastes the copied note rather than the copied pages: a note is on the
     /// clipboard and it was copied after the pages (or a note is selected, or no pages are copied)
     Q_INVOKABLE bool pastesNoteBeforePages() const;
@@ -1535,7 +1517,10 @@ public:
     /// Call before quitting: writes settings.
     void shutdown();
 
-    xqt::AppContext& context() const { return *app; }
+    /// The settings, tools and rendering, shared by all windows of the process (AppServices::context)
+    xqt::AppContext& context() const;
+    /// What the window's feature objects get from it (its services, tabs and current document); made after the tabs
+    xqt::WindowContext windowContext() const;
     xqt::TabManager& tabManager() const { return *tabs; }
     /// The current tab's document and view, with their signals (what follows "the current document" connects here)
     xqt::CurrentDocument& currentDocument() const { return *current; }
@@ -1580,8 +1565,6 @@ Q_SIGNALS:
     void zoomChanged();
     void canvasRotationChanged();
     void pageChanged();
-    /// A sticky note was selected or unselected, or the selected one changed
-    void noteSelectionChanged();
     /// Sticky notes came, went, were hidden or shown (on the current page, or it is another page now)
     void notesChanged();
     /// Messages from the core (XojMsgBox) and file errors, shown by QML.
@@ -1645,8 +1628,8 @@ Q_SIGNALS:
     void darkPagesChanged();
     void navigationChanged();
     void pdfTextModeChanged();
-    /// Something was selected or unselected: `pdfTextIsSelected` and the ends of the selection are different now.
-    void pdfTextSelectionChanged();
+    /// The keys act on another canvas (the reference took the focus, or gave it back)
+    void keyTargetChanged();
     void titlePageChanged();
     void bookmarksChanged();
     void favouriteChanged();
@@ -1869,8 +1852,6 @@ private:
     void reopenTabs(const std::vector<std::pair<fs::path, int>>& tabs, int current,
                     const std::map<size_t, std::pair<fs::path, fs::path>>& recovered);
 
-    /// Shared by all windows of the process (settings, tools, rendering)
-    std::shared_ptr<xqt::AppContext> app;
     std::shared_ptr<Palette> colors;
     AppController* primary = nullptr;  ///< the main window's controller (nullptr: this is the main window)
     bool windowGone = false;           ///< its window was closed (it is on its way out)

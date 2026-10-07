@@ -82,7 +82,7 @@ Pane {
                 tip: qsTr("Fit the width")
                 onClicked: {
                     zenPill.opened = false
-                    app.fitWidth()
+                    app.keyTarget.fitWidth()
                 }
             }
             IconButton {

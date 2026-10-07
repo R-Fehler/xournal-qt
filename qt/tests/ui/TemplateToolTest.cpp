@@ -120,7 +120,7 @@ protected:
 TEST_F(TemplateToolTest, thePageMenusDialogSavesThePageIntoTheLibrarysTemplates) {
     makeSource();
     ASSERT_NE(find("saveTemplateItem"), nullptr) << "⋮ › Page";
-    QMetaObject::invokeMethod(window, "openTemplateSave", Q_ARG(QVariant, 0));
+    QMetaObject::invokeMethod(window->property("actions").value<QObject*>(), "openTemplateSave", Q_ARG(QVariant, 0));
     auto* dialog = find<QObject>("templateSaveDialog");
     ASSERT_NE(dialog, nullptr);
     until([&] { return dialog->property("opened").toBool(); });

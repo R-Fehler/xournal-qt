@@ -516,7 +516,7 @@ TEST(ToolboxApply, anEntryGivesTheToolAllItsSettings) {
     const QString note = nth(m, "sticky");
     m->update(note, {{"color", "#ffcc80"}});
     ASSERT_TRUE(c.applyToolEntry(note));
-    EXPECT_TRUE(c.noteSelected());
+    EXPECT_TRUE(c.edit().noteSelected());
     EXPECT_EQ(c.edit().noteColor(), QColor("#ffcc80"));
     EXPECT_NE(m->active(), note);
     c.shutdown();

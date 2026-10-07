@@ -342,11 +342,11 @@ Pane {
                 title: qsTr("Zoom")
                 /// A fit chosen in the page grid of the phone chrome: back to the page, to see it
                 function done() { if (pageGrid.visible && pageGrid.phoneTools) pageGrid.close() }
-                AdaptiveMenuItem { objectName: "fitWidthItem"; text: qsTr("Fit the width") + win.keyNote("fitWidth"); icon.source: app.iconUrl("xqt-fit-width"); onTriggered: { app.fitWidth(); fitMenu.done() } }
+                AdaptiveMenuItem { objectName: "fitWidthItem"; text: qsTr("Fit the width") + win.keyNote("fitWidth"); icon.source: app.iconUrl("xqt-fit-width"); onTriggered: { app.keyTarget.fitWidth(); fitMenu.done() } }
                 AdaptiveMenuItem {
                     objectName: "realSizeItem"
                     text: qsTr("Real size, 100 %") + win.keyNote("realSize")
-                    onTriggered: { app.zoomToRealSize(); fitMenu.done() }
+                    onTriggered: { app.keyTarget.zoomToRealSize(); fitMenu.done() }
                 }
                 AdaptiveMenuItem { objectName: "fitHeightItem"; text: qsTr("Fit the height"); onTriggered: { app.fitHeight(); fitMenu.done() } }
                 AdaptiveMenuItem {

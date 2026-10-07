@@ -69,7 +69,7 @@ void AppController::setUpDarkPages() {
 
 QString AppController::darkPagesMode() const {
     std::string mode;
-    app->getSettings()->getCustomElement(CUSTOM).getString("darkPages", mode);
+    context().getSettings()->getCustomElement(CUSTOM).getString("darkPages", mode);
     return mode == "on" || mode == "system" ? QString::fromStdString(mode) : QStringLiteral("off");
 }
 
@@ -78,8 +78,8 @@ void AppController::setDarkPagesMode(const QString& mode) {
     if (m == darkPagesMode()) {
         return;
     }
-    app->getSettings()->getCustomElement(CUSTOM).setString("darkPages", m.toStdString());
-    app->getSettings()->customSettingsChanged();
+    context().getSettings()->getCustomElement(CUSTOM).setString("darkPages", m.toStdString());
+    context().getSettings()->customSettingsChanged();
     darkRelay().setObjectName(m);  // (every window: darkPagesChanged)
 }
 
@@ -131,8 +131,8 @@ bool AppController::printUsesDarkPaper(const QString& range) const {
 }
 
 PageType AppController::paperTypeOf(int background, const QColor& paperColor, int textured, Color& c) const {
-    const auto& types = app->getPageTypes()->getPageTypes();
-    const auto& tpl = app->getSettings()->getPageTemplateSettings();
+    const auto& types = context().getPageTypes()->getPageTypes();
+    const auto& tpl = context().getSettings()->getPageTemplateSettings();
     c = paperColor.isValid() ? toXojColor(paperColor) : tpl.getBackgroundColor();
     const bool grain = textured < 0 ? paper::textured(tpl.getBackgroundType().config) : textured > 0;
     return SettingsModel::paperType(types[static_cast<size_t>(background)]->page, c, grain);
@@ -147,10 +147,10 @@ void AppController::inkForPaper(const QColor& paper) {
     const ColorPalette* current = palettes.palette(colorPalette());
     if (current && current->dark != darkPaper) {
         std::string light;
-        app->getSettings()->getCustomElement(CUSTOM).getString("lightPalette", light);
+        context().getSettings()->getCustomElement(CUSTOM).getString("lightPalette", light);
         QString next;
         if (darkPaper) {
-            app->getSettings()->getCustomElement(CUSTOM).setString("lightPalette", current->id.toStdString());
+            context().getSettings()->getCustomElement(CUSTOM).setString("lightPalette", current->id.toStdString());
             const auto it = std::find_if(palettes.palettes().begin(), palettes.palettes().end(),
                                          [](const ColorPalette& p) { return p.dark; });
             next = it != palettes.palettes().end() ? it->id : QString();
@@ -162,7 +162,7 @@ void AppController::inkForPaper(const QColor& paper) {
             setColorPalette(next);
         }
     }
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     QMap<QString, QString> roles = colorRoles();
     bool changed = false;
     for (const auto& [tool, type]:
