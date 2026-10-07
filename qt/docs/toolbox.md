@@ -247,8 +247,8 @@ together ([zen.md](zen.md) has the whole of it).
     invisible. A tap there goes to the previous or the next page (in full screen to its top, presenting: the slide); a
     short arrow appears at that edge. The page finds the taps itself (`DocumentCanvas.edgeTapWidth`, `edgeTapped`;
     `CanvasView::edgeTap`): a tap that is a link or opens a covering note does that instead, a swipe or a drag
-    scrolls, and taps in a row turn page after page (no double tap there). The fields in `Main.qml`
-    (`readingTapFields`) only show the hint and let the presses through (`inputTransparent`). In Zen a finger's tap
+    scrolls, and taps in a row turn page after page (no double tap there). The fields (`ReadingFields.qml`,
+    `readingTapFields`) only show the hint and let the presses through (`inputTransparent`). In Zen a finger's tap
     in the middle opens the dot's pill (`middleTapped`);
   - **no lock** any more (the `readOnlyMark` of 0.7.0): the first stroke tried says so once, at the pen, for a moment
     ("Read only — tap the dot to write"; outside Zen where to turn it off; `CanvasView::writingRefused`,
@@ -356,7 +356,7 @@ unused); the shell, canvas and UI tests run with the toolbox.
 | `qt/src/app/qml/Toolbox.qml` | a bar (`bar`: "rail" or "top"): head, the items (entries, app items lent to it, groups and their list), tail; scrolling (the cut, the fades, the tool in hand into view, the place per class); carrying an item within it and to the other bar (`peer`, `reach`, `dragOver`, `dropHere`, `leaveBars`), the ring of a group; the grip (the rail) |
 | `qt/src/app/qml/ToolEntryButton.qml` | one tool: its icon and a sample of its ink; lifted in hand; the hold, the carrying, the wheel; a group's face (dots), the ring |
 | `qt/src/app/qml/ToolEntryEditor.qml` | the editor (and the draft of a new tool, for either bar) |
-| `Main.qml` | where the rail is (`toolboxDocked`, `toolboxFloating`, `toolboxInDock`, `toolboxEdge`) and the top bar (`topBarPane`, `win.topBarShown`), the window's buttons of the app items (`toolArea.slots`), ⋮ (`moreMenu`, its `CommandItem`s), the menus (`toolEntryMenu` for tools, app items and groups, the catalog `toolTypeMenu`, `catalogRows()`, `toolboxMoreMenu` with `topBarCommands()`), "Grouped · Undo", "Removed · Undo", the format bar's undo / redo, Zen and read only (`win.zen`, `win.readOnly`, `win.reading`, `readingTapFields`, `zenDot`, `zenPill`, `readOnlyNote`, `zenBackShortcut`; [zen.md](zen.md)) |
+| `Main.qml` and its parts | `Main.qml`: where the rail is (`toolboxDocked`, `toolboxFloating`, `toolboxInDock`, `toolboxEdge`) and the top bar (`topBarPane`, `win.topBarShown`), the format bar's undo / redo, Zen and read only (`win.zen`, `win.readOnly`, `win.reading`); `AppButtons.qml`: the window's buttons of the app items (`toolArea.slots`); `MoreMenu.qml`: ⋮ (`moreMenu`, its `CommandItem`s); `ToolboxMenus.qml`: the menus (`toolEntryMenu` for tools, app items and groups, the catalog `toolTypeMenu`, `catalogRows()`, `toolboxMoreMenu` with `topBarCommands()`), "Grouped · Undo", "Removed · Undo"; `ReadingFields.qml`, `ZenDot.qml`, `ZenPill.qml`, `ReadOnlyNote.qml`; `zenBackShortcut` in `WindowShortcuts.qml` ([zen.md](zen.md)) |
 | `PhoneDock.qml`, `PhoneAppBar.qml` | the dock hosts the rail; the app bar hosts the top bar (`toolsSlot`) and, held sideways, the page number |
 | `MarkdownFormatBar.qml` | a text document's commands (`commandsSlot`, `holdsCommands`): the row scrolls as the bars do |
 | `qt/src/canvas/ViewController.*`, `CanvasView`, `DocumentCanvasItem.snapVertically` | snapping up and down while reading |

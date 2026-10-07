@@ -72,7 +72,7 @@ ask the user whether they also want to paste a link to the source document and p
 | `CanvasView::pasteElements`, `insertImage` (`size`), `offerSnipLink` / `addSnipLink`, `MarkdownEditor` (Ctrl+V) | Pasting, the offer, the link. |
 | `qt/src/app/AppSnip.cpp` | Arming (`startSnip`, `cancelSnip`), the clipboard, giving the tool back, `addSnipLink`. |
 | `Snip.h` (`Resolution`, `minDpi`, `maxPixels`), `AppController::snipResolution` | The resolution (the setting `snipResolution`). |
-| `ToolGroups.qml` (`snip`, `snipResolutions`), `Main.qml` (`snipButton`, `imageMenu`, the snackbar's offer, Shift+S / Shift+L, Escape), `ToolCycleButton.qml` (the resolution in its list), `ToolEntryEditor.qml`, `SettingsPage.qml` | The UI. |
+| `ToolGroups.qml` (`snip`, `snipResolutions`), `AppButtons.qml` (`snipButton`, `imageMenu`), `DocumentNotices.qml` (the snackbar's offer), `WindowShortcuts.qml` (Shift+S / Shift+L, Escape), `ToolCycleButton.qml` (the resolution in its list), `ToolEntryEditor.qml`, `SettingsPage.qml` | The UI. |
 
 Tests: `RegionRender.*` (`-L unit`: the ink and the PDF in the area at their place, only the part on the page, the
 background alone, the lasso's transparency, the scale and the size limit), `CopyToolsTest.snipHasAButtonOfItsOwn`

@@ -183,7 +183,7 @@ time; the Annotations panel shows the same offer at its top while there are some
 Code: `qt/src/session/AdoptAnnotations.*` (scan, convert, the copy without them: qpdf, poppler for stamps),
 `qt/src/session/DocumentAdopt.cpp` (the document takes them; the undo step), `PdfPageKeeper::takeBackground`,
 `qt/src/app/AppAdopt.cpp` (scan on opening at idle priority, the question once per file, the conversion on a worker),
-`Main.qml` (the dialog, ⋮ → Document), `AnnotationList.qml` (the panel's line). "Asked once" is remembered with the
+`DocumentNotices.qml` (the dialog), `MoreMenu.qml` (⋮ → Document), `AnnotationList.qml` (the panel's line). "Asked once" is remembered with the
 document's places (`DocumentPlaces::adoptionOffered`: the number of annotations when asked; more later: asked again).
 
 - **Which document pages**: every page showing a PDF page of the background (a PDF page shown twice gets the marks

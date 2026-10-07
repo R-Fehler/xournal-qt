@@ -104,7 +104,7 @@ the text has a bookmark of its own (the page's).
 | `qt/src/session/DocumentMode.*` | the `newTextDocuments` setting |
 | `qt/src/app/AppTextFiles.cpp` | `createTextDocument`, `openAsPdfDocument`, `exportMarkdown` |
 | `qt/src/canvas/CanvasView.cpp`, `qt/src/quick/DocumentCanvasItem.cpp` | typing into the flow |
-| `qt/src/app/qml/HomeView.qml`, `Main.qml`, `SettingsPage.qml` | the menus and the setting |
+| `qt/src/app/qml/HomeView.qml`, `MoreMenu.qml`, `ExportFlow.qml`, `SettingsPage.qml` | the menus, the export and the setting |
 | `qt/tests/canvas/PdfTextDocumentTest.cpp`, `qt/tests/shell/TextPdfTest.cpp`, `qt/tests/ui/MainWindowTest.cpp` | the tests |
 
 ## Not yet
