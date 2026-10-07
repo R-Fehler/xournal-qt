@@ -201,7 +201,7 @@ The author accepted the plan with its proposals:
     is nothing to compare; the name and the page's text cover the cases seen so far. A `pdfid=` key could be added
     to the fragment later.
 
-### 5. The hybrid PDF (`HybridPdf.cpp`: `linkFor`, `annotateLinks`; `md::linkBoxes`; test `HybridPdfTest.linksOf…`)
+### 5. The hybrid PDF (`HybridPrepare.cpp`: `linkFor`; `HybridFullWrite.cpp`: `annotateLinks`; `md::linkBoxes`; test `HybridPdfTest.linksOf…`)
 - Saving a PDF with notes writes each link of the Markdown boxes and link markers as a `/Link` annotation over the
   link text (a box per line it is on), so other viewers follow it:
   - a link to a PDF: `/GoToR` with `/F` the PDF relative to the hybrid PDF and `/D [page /Fit]`, `/NewWindow true`
