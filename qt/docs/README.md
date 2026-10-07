@@ -64,7 +64,7 @@ its `xournalQt` part), in a config folder of its own (`~/.config/xournal-qt`).
 | [development/](development/README.md) | [building](development/building.md) (Linux, the cloud container, Android, Windows, macOS), [CI](development/ci.md) (the workflows, the block tests, the link check), [workflow](development/workflow.md) (blocks, worktrees, merging, where to record what), [releasing](development/releasing.md), [performance logging](development/performance-logging.md) |
 | [testing/](testing/README.md) | the testing guide; the [device checklist](testing/device-checklist.md): what only a real device can show |
 | [features/](features/README.md) | one doc per feature |
-| [architecture/](architecture/README.md) | the architecture overview (generated from `architecture.yaml`), and [image caches](architecture/image-caches.md) |
+| [architecture/](architecture/README.md) | the architecture overview (generated from `architecture.yaml`), [image caches](architecture/image-caches.md), the [glossary](architecture/glossary.md) and [where data lives on disk](architecture/data-on-disk.md) |
 | [decisions/](decisions/README.md) | the architecture decision records |
 | [agents/](agents/block-brief.md) | the brief every block agent gets, and the integrator's routine; [the handover](agents/handover-2026-10.md) from the cloud sessions to a local machine |
 | [user/](user/) | guides for users |

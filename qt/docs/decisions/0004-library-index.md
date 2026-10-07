@@ -14,7 +14,8 @@ stays cheap).
 
 ## Decision
 - **Cache, never data.** Everything in the index can be deleted at any time and is read again from the documents.
-  What is not cache (the reading positions, title pages, a library's settings) lives in the config folder.
+  What is not cache (the reading positions, title pages, a library's settings) lives in the config folder
+  ([data-on-disk.md](../architecture/data-on-disk.md)).
 - **One cache folder per folder with documents**, holding only the documents directly in it, keyed by **file name**:
   a folder moved or renamed by any program keeps its cache, and a subfolder opened as a library finds its caches
   there. Opening a library reads the caches of all its folders and merges them.
