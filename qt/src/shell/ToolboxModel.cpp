@@ -818,18 +818,6 @@ QString ToolboxModel::recentOfType(const QString& type) const {
     return {};
 }
 
-QString ToolboxModel::recentAmong(const QStringList& ids) const {
-    if (ids.contains(activeId)) {
-        return activeId;
-    }
-    for (const QString& id: recent) {
-        if (ids.contains(id)) {
-            return id;
-        }
-    }
-    return ids.value(0);
-}
-
 void ToolboxModel::reset() {
     railList = defaultEntries();
     topList.clear();

@@ -56,8 +56,6 @@ public:
     void setChoice(Choice choice);
     /// The language decided for the document ("en", "de"; "": none yet, both read).
     QString decided() const;
-    /// Lines both models read for the decision so far (tests).
-    int probed() const;
 
     // --- the worker (MultiRecognizer): `models` are the languages of each model, by its bit ---
     /// The models that read a line first.

@@ -60,7 +60,6 @@ public:
     /// own, so that the visible pages do not wait for poppler (which renders one page of an instance at a time).
     virtual PdfCache* rasterPdfCache(bool background = false) const = 0;
     virtual RasterParams rasterParams() const = 0;
-    virtual bool rasterMarkAudioStrokes() const { return false; }
     /// Which elements are drawn (the replay of the timeline, render/ElementFilter.h; nullptr: all). Any thread.
     virtual std::shared_ptr<const render::ElementFilter> rasterFilter() const { return nullptr; }
     /// A PDF page that is not in the document's PDF yet (pasted pages being merged, see PdfPageKeeper): drawn from

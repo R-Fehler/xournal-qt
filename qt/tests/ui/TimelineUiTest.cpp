@@ -136,7 +136,7 @@ protected:
         wait(300);  // (the size class, then the plans settle)
     }
     /// Tools outside the toolbox (qt/docs/toolbox.md): undo and redo in the command bar, the phone dock's own buttons
-    /// (a text document's). None of it is there beside the toolbox. (The classic tool bar was removed in 0.8.0.)
+    /// (a text document's). None of it is there beside the toolbox.
     QStringList classicToolsShown() const {
         QStringList out;
         for (const char* name: {"toolUndoButton", "toolRedoButton", "dockToolsButton", "dockUndoButton"}) {

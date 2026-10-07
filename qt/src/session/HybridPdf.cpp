@@ -3817,6 +3817,31 @@ bool writeVersion(const fs::path& pdf, int id, const fs::path& out, std::string&
     return false;
 }
 
+namespace {
+/// The file changed in a way that keeps its clean copy (only the marker): the cache entry of the version `was` serves
+/// the version it is now.
+void keepCacheEntry(const fs::path& pdf, const std::string& was) {
+    std::error_code ec;
+    const fs::path from = entryOf(pdf, was);
+    const fs::path to = entryOf(pdf, stampOf(pdf));
+    if (from == to || !fs::exists(from / CHECK_NAME, ec) || fs::exists(to / CHECK_NAME, ec)) {
+        return;
+    }
+    fs::create_directories(to, ec);
+    for (auto it = fs::directory_iterator(from, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+        if (it->path().filename() == CHECK_NAME || !it->is_regular_file()) {
+            continue;
+        }
+        std::error_code lec;
+        fs::create_hard_link(it->path(), to / it->path().filename(), lec);
+        if (lec) {
+            fs::copy_file(it->path(), to / it->path().filename(), fs::copy_options::overwrite_existing, lec);
+        }
+    }
+    fs::copy_file(from / CHECK_NAME, to / CHECK_NAME, fs::copy_options::overwrite_existing, ec);  // (last: complete)
+}
+}  // namespace
+
 bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, std::string& error) {
     try {
         PdfHistory::Listed listed = PdfHistory::list(pdf);
@@ -3867,27 +3892,6 @@ bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, 
         error = e.what();
     }
     return false;
-}
-
-void keepCacheEntry(const fs::path& pdf, const std::string& was) {
-    std::error_code ec;
-    const fs::path from = entryOf(pdf, was);
-    const fs::path to = entryOf(pdf, stampOf(pdf));
-    if (from == to || !fs::exists(from / CHECK_NAME, ec) || fs::exists(to / CHECK_NAME, ec)) {
-        return;
-    }
-    fs::create_directories(to, ec);
-    for (auto it = fs::directory_iterator(from, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
-        if (it->path().filename() == CHECK_NAME || !it->is_regular_file()) {
-            continue;
-        }
-        std::error_code lec;
-        fs::create_hard_link(it->path(), to / it->path().filename(), lec);
-        if (lec) {
-            fs::copy_file(it->path(), to / it->path().filename(), fs::copy_options::overwrite_existing, lec);
-        }
-    }
-    fs::copy_file(from / CHECK_NAME, to / CHECK_NAME, fs::copy_options::overwrite_existing, ec);  // (last: complete)
 }
 
 Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, size_t pdfPageCount,

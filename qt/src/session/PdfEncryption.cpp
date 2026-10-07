@@ -343,17 +343,6 @@ bool isPasswordError(const std::exception& e) {
     return q && q->getErrorCode() == qpdf_e_password;
 }
 
-bool loadPoppler(XojPdfDocument& pdf, const fs::path& file) {
-    GError* error = nullptr;
-    std::string pw = passwordOf(file);
-    const bool ok = pdf.load(file, pw, &error);
-    scrub(pw);
-    if (error) {
-        g_error_free(error);
-    }
-    return ok;
-}
-
 // --- Encrypter ------------------------------------------------------------------------------------------------
 
 Encrypter::Encrypter(QPDF& pdf) {

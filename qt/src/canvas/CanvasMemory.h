@@ -62,7 +62,6 @@ public:
     void planNow();
     /// Rendered pages of all views (bytes)
     qint64 bytes() const;
-    void setPlanDelay(int ms) { planTimer.setInterval(ms); }
     /// A plan is waiting for the reader to pause (tests)
     bool planPending() const { return planTimer.isActive(); }
 

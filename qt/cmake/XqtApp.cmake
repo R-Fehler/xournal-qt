@@ -299,7 +299,6 @@ set(XQT_QML_FILES
     src/app/qml/UnusedImagesDialog.qml
     src/app/qml/FindPaperSheet.qml
     src/app/qml/ArxivSheet.qml
-    src/app/qml/BottomSheet.qml
     src/app/qml/PhoneAppBar.qml
     src/app/qml/PhoneDock.qml
     src/app/qml/StickerButton.qml

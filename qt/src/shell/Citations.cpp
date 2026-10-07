@@ -85,7 +85,6 @@ bool Citations::openWeb(const QString& url) {
     if (!cite::isWebAddress(u) || !SystemApps::instance().openWebAddress(u)) {
         return false;
     }
-    Q_EMIT webOpened(url);
     return true;
 }
 

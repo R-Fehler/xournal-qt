@@ -71,7 +71,6 @@ public:
 
     /// The readings of one picture (inkOf: height x width, ink 1), best first (tests).
     std::optional<std::vector<Beam>> readPicture(const std::vector<float>& ink, int width, const Context& context);
-    const CtcManifest& manifestRead() const { return manifest; }
     bool loaded() const;
 
 private:

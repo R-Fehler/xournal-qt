@@ -137,7 +137,7 @@ public:
     /// Plays the recording `name` of the current document from `fromMs`.
     Q_INVOKABLE bool play(const QString& name, qint64 fromMs = 0);
     /// Plays what ink written at `ts` in `name` was written with: from the lead-in before it.
-    Q_INVOKABLE bool playMoment(const QString& name, qint64 ts);
+    bool playMoment(const QString& name, qint64 ts);
     Q_INVOKABLE void pausePlayback();
     Q_INVOKABLE void resumePlayback();
     Q_INVOKABLE void stopPlayback();

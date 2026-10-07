@@ -14,7 +14,7 @@
  *    grouped - a stroke joins the group written just before it when it is near it, groups that overlap become one,
  *    dots join the group next to them - each with the PDF text it is on (underlined, circled, struck through, written
  *    over), which the panel and the Markdown show as "on “…”";
- *  - notes from a NoteSource (sticky notes, another block).
+ *  - the sticky notes (their texts, or "(handwriting)"; what is on a note is not listed as a box or ink of the page).
  *
  * Reading is split so that a big document stays cheap: read() takes what a page shows under the document's read
  * lock (plain values, no drawing), itemsOf() works out the items without the lock (the PDF text with a poppler
@@ -55,7 +55,7 @@ enum class Kind : uint8_t {
     Markdown,      ///< a Markdown box
     Ink,           ///< handwriting (a group of strokes)
     Link,          ///< a link marker
-    Note,          ///< a sticky note (NoteSource)
+    Note,          ///< a sticky note
 };
 constexpr int KIND_COUNT = 7;
 /// "highlight", "pdfHighlight", "text", "markdown", "ink", "link", "note"
@@ -96,7 +96,7 @@ struct PageContent {
     };
     std::vector<Mark> marks;  ///< the highlighter's strokes
     std::vector<Mark> ink;    ///< the pen's strokes, in the order they were written
-    std::vector<Item> notes;  ///< from the NoteSource
+    std::vector<Item> notes;  ///< the sticky notes
 };
 
 /// What the page shows (visible layers). The caller holds the document lock (shared); any thread.
@@ -106,12 +106,6 @@ PageContent read(const XojPage& page);
 std::vector<Item> itemsOf(const PageContent& content, size_t index, PdfLayoutReader* pdf);
 /// All pages (tests, and what the panel does page by page): takes the document's read lock page by page.
 std::vector<Item> collect(Document& doc, PdfLayoutReader* pdf);
-
-/// Where sticky notes come from: called for every page read, under the document's read lock; it appends
-/// its notes (kind Note, with their place and text). By default the sticky notes of qt/sticky-notes (their texts, or
-/// "(handwriting)"); what is on a note is not listed as a box or ink of the page. Empty: no notes.
-using NoteSource = std::function<void(const XojPage& page, std::vector<Item>& notes)>;
-void setNoteSource(NoteSource source);
 
 /// The part of a page the picture of an item shows: the item with some room around it (PICTURE_MARGIN), at least
 /// PICTURE_MIN_WIDTH × PICTURE_MIN_HEIGHT (a dot shows where it is).

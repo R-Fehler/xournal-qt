@@ -217,14 +217,10 @@ protected:
         return {};
     }
     QQuickItem* toolEntry(const QString& id) const { return findItem(("toolEntry_" + id).toUtf8().constData()); }
-    /// The entry's button on the rail, or the stack that shows it where its section is folded (a short rail)
+    /// The entry's button on the rail, if it is shown
     QQuickItem* onRail(const QString& id) const {
         QQuickItem* b = toolEntry(id);
-        if (b && b->isVisible()) {
-            return b;
-        }
-        QQuickItem* stack = findItem(("toolStack_" + id).toUtf8().constData());
-        return stack && stack->isVisible() ? stack : nullptr;
+        return b && b->isVisible() ? b : nullptr;
     }
     /// An entry of a menu by its name (entries made by a Repeater are not found through the objects' parents)
     static QObject* entryOf(QObject* menu, const char* name) {
@@ -3410,7 +3406,7 @@ TEST_F(MainWindowTest, fourOrFiveFingersShowThePagesOrTheDocuments) {
 }
 
 // The toolbox docked at the left or right side, or the top (⋮ → View → Toolbox position; the right by default); the
-// page sidebar stays right of it at the left. (The classic tool bar's places went with it in 0.8.0.)
+// page sidebar stays right of it at the left.
 TEST_F(MainWindowTest, theToolboxMovesToTheLeftOrRightOrTheTop) {
     auto* box = find<QQuickItem>("toolbox");
     auto* canvas = find<QQuickItem>("canvas");
@@ -3439,13 +3435,12 @@ TEST_F(MainWindowTest, theToolboxMovesToTheLeftOrRightOrTheTop) {
 }
 
 // Full screen (F11): no tab strip, command bar or page sidebar; the toolbox floats over the page and the view pill
-// stays. A tool is taken there as in the window. (The classic tool square of full screen went in 0.8.0.)
+// stays. A tool is taken there as in the window.
 TEST_F(MainWindowTest, fullScreenShowsTheToolboxFloatingOverThePage) {
     auto* box = find<QQuickItem>("toolbox");
     ASSERT_NE(box, nullptr);
     until([&] { return box->isVisible(); });
     EXPECT_FALSE(box->property("floating").toBool());
-    EXPECT_EQ(find<QQuickItem>("quickToolSquare"), nullptr);
     key(Qt::Key_F11);
     EXPECT_TRUE(window->property("fullScreenMode").toBool());
     until([&] { return box->isVisible() && box->property("floating").toBool(); });
@@ -3791,7 +3786,7 @@ TEST_F(MainWindowTest, theToolBarCanBePutAway) {
 }
 
 // The little tab points up, towards the bar it puts away, and the strip that brings the bar back is at the top edge,
-// pointing into the pages (where the bar will come from). (The classic tool bar could be at a side; it went in 0.8.0.)
+// pointing into the pages (where the bar will come from).
 TEST_F(MainWindowTest, theToolBarTabAndStripFollowTheDockSide) {
     auto* toggle = find<QQuickItem>("toolbarToggle");
     auto* show = find<QQuickItem>("toolbarShow");
@@ -5418,15 +5413,12 @@ TEST_F(MainWindowTest, aLongPressOnPdfTextAlsoOffersPaste) {
 }
 
 // The eraser is a tool of the toolbox: a tap takes it with its kind (standard, whiteout, whole strokes) and its size,
-// as its editor (a tap on it in hand) sets them; E takes it as it erased last. (The classic bar's cycling eraser button
-// went in 0.8.0.)
+// as its editor (a tap on it in hand) sets them; E takes it as it erased last.
 TEST_F(MainWindowTest, theEraserEntryErasesTheWayItsEditorSays) {
     auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
     settings->set("eraserMode", "default");
     window->resize(1920, 1200);  // (every tool of the rail on its own)
     wait(100);
-    EXPECT_EQ(find<QObject>("eraserMenu"), nullptr) << "no menu of its own any more";
-    EXPECT_EQ(find<QObject>("eraserButton"), nullptr) << "the classic eraser button is gone";
     const QString eraser = toolEntryId("eraser");
     ASSERT_FALSE(eraser.isEmpty());
     controller->takeToolOfType("pen");
@@ -5479,10 +5471,6 @@ TEST_F(MainWindowTest, cyclingToolButtons) {
     auto* select = find<QQuickItem>("selectButton");
     ASSERT_NE(select, nullptr);
     until([&] { return select->isVisible(); });
-    EXPECT_EQ(find<QObject>("setsquareItem"), nullptr) << "no shapes menu";
-    EXPECT_EQ(find<QObject>("snapGridItem"), nullptr);
-    EXPECT_EQ(find<QObject>("penButton"), nullptr) << "the classic pen button is gone";
-    EXPECT_EQ(find<QObject>("shapeButton"), nullptr);
     click(select);
     EXPECT_EQ(controller->tool(), "selectRect");
     EXPECT_TRUE(select->property("checked").toBool());
@@ -5531,7 +5519,7 @@ TEST_F(MainWindowTest, cyclingToolButtons) {
 
 // The pen's options (qt/pen-styles): the editor of a pen of the toolbox offers upstream's line styles and the filling
 // (the highlighter has no line styles, as upstream; its filling stays); the entry keeps the style chosen, also over a
-// restart. (The classic pen button's menu went in 0.8.0.)
+// restart.
 TEST_F(MainWindowTest, thePensEditorOffersItsLineStyles) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     window->resize(1920, 1200);
@@ -5594,8 +5582,7 @@ TEST_F(MainWindowTest, thePensEditorOffersItsLineStyles) {
 }
 
 // The laser pointer (qt/pen-styles): upstream's laser pen and highlighter are a tool of the toolbox (the laser entry,
-// drawn with the pen or the highlighter), one tap away on the rail that floats while presenting. (The classic tool
-// square's laser button and the pen pill went in 0.8.0.)
+// drawn with the pen or the highlighter), one tap away on the rail that floats while presenting.
 TEST_F(MainWindowTest, theLaserPointerIsAtHandWhilePresenting) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     window->resize(1920, 1200);
@@ -6170,8 +6157,6 @@ TEST_F(MainWindowTest, theWritingButtonWritesMarkdownOnThePageItsSourceIsInItsMe
     xqt::CanvasView* view = controller->tabManager().currentView();
     ASSERT_NE(view, nullptr);
 
-    EXPECT_EQ(find<QObject>("textModeItem"), nullptr) << "the text mode is deprecated: not offered any more";
-    EXPECT_TRUE(button->property("markdownMode").toBool());
     // Markdown chosen in the button's menu: written on the page, formatted while typing (not beside it)
     QMetaObject::invokeMethod(find<QObject>("markdownItem"), "triggered");
     until([&] { return view->getMarkdownEditor() != nullptr; });
@@ -6243,7 +6228,6 @@ TEST_F(MainWindowTest, markdownBoxIsWrittenAndOpenedAgainWithTheTextTool) {
     click(find<QQuickItem>("markdownDone"));
     EXPECT_FALSE(panel->isVisible());
     EXPECT_FALSE(controller->markdownActive());
-    EXPECT_TRUE(find<QQuickItem>("textModeButton")->property("markdownMode").toBool()) << "the button's mode now";
 
     // The text tool on the box opens it again (not the text of the source in a text box)
     controller->selectTool("text");
@@ -6995,7 +6979,6 @@ TEST_F(MainWindowTest, notesGoIntoThePdfItselfIfWanted) {
 // chosen type; the file name follows the type. There is no separate "Save as hybrid PDF…" any more, and "Export as
 // plain PDF…" says that it flattens.
 TEST_F(MainWindowTest, saveAsOffersXoppAndPdfWithNotes) {
-    EXPECT_EQ(find("saveHybridItem"), nullptr) << "replaced by the type in Save as";
     auto* exportItem = find("exportPdfItem");
     ASSERT_NE(exportItem, nullptr);
     EXPECT_EQ(exportItem->property("text").toString(), QString::fromUtf8("Export as plain PDF…"));
@@ -8215,7 +8198,6 @@ TEST_F(MainWindowTest, presentingWithoutControls) {
     ASSERT_NE(dot, nullptr);
     ASSERT_NE(pill, nullptr);
     ASSERT_NE(number, nullptr);
-    EXPECT_EQ(findItem("presentCornerMark"), nullptr) << "presenting's own corner field is gone (the Zen dot)";
     EXPECT_FALSE(dot->isVisible()) << "no dot while editing";
     auto clean = [&] { return window->property("presentClean").toBool(); };
 

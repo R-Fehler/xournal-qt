@@ -47,8 +47,6 @@ public:
     int sampleRate() const;
     /// Samples written so far: the recording's length is samplesWritten() / sampleRate().
     int64_t samplesWritten() const;
-    /// The file's size so far.
-    uint64_t bytesWritten() const;
     /// Why open, write or close failed.
     const std::string& error() const;
 

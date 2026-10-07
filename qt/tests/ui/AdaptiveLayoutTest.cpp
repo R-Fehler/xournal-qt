@@ -245,8 +245,7 @@ protected:
     }
     QString sizeClass() const { return adaptive->property("sizeClass").toString(); }
     /// The compact chrome (full screen's: the tab dots, the floating toolbox, the view pill) in the window as it is:
-    /// full screen, then the window back at its size. (The chrome chosen for a size class, Settings → Display →
-    /// "Controls at this size", is gone since 0.8.0; the tests still look at the compact chrome at every size.)
+    /// full screen, then the window back at its size.
     void compactChrome(bool on) {
         const QSize size = window->size();
         window->setProperty("fullScreenMode", on);
@@ -395,14 +394,13 @@ protected:
             EXPECT_LE(sceneRect(item).bottom(), window->height() - safeBottom + 0.5)
                     << at << ": " << name.toStdString() << " above the bottom safe area";
         }
-        EXPECT_EQ(named("toolboxAllButton"), nullptr) << at << ": no \"My tools\": the catalog";
         if (sideways) {
             EXPECT_TRUE(shownInWindow(findItem("phonePageButton"))) << at << ": held sideways, the page number in the app bar";
         }
     }
     /// ⋮ inside the window, not in a scrolling area; the toolbox docked with undo and redo at its head and the tools
     /// that are never hidden on it (on their own, or in a stack of a short rail); the commands in the bar or in "more
-    /// tools". The phone chrome: checkPhoneChrome. (The classic tool bar's colors and widths went in 0.8.0.)
+    /// tools". The phone chrome: checkPhoneChrome.
     void checkToolBar(const std::string& at) {
         if (phoneChrome()) {
             checkPhoneChrome(at);
@@ -1725,7 +1723,6 @@ TEST_F(AdaptiveLayoutTest, chromeModeApartFromTheWindowState) {
     resize(1400, 850);  // (the off-screen "screen" is 800 x 600: full screen made the window that small)
     window->requestActivate();  // (the keys: the window has them again after full screen)
     until([&] { return window->isActive(); });
-    EXPECT_EQ(findItem("chromeChoiceRow"), nullptr) << "no chrome chosen per size class any more (0.8.0)";
 
     // Zen: apart from the chrome and the window's state; nothing around the page
     QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, true));
@@ -1899,7 +1896,7 @@ TEST_F(AdaptiveLayoutTest, settingsOnAPhoneAreAListOfSections) {
 }
 
 // The compact chrome's toolbox floats inside a short window (F6.4, F9.4), on a phone too; its ⋯ menu (Present, "Show the
-// tabs and the tool bar") stays inside the window. (The classic tool square and its quick tools went in 0.8.0.)
+// tabs and the tool bar") stays inside the window.
 TEST_F(AdaptiveLayoutTest, theFloatingToolboxFitsAShortWindow) {
     openDocument();
     for (const WindowSize& s: {WindowSize{1024, 700, "small-desktop"}, WindowSize{1280, 500, "short-wide"},
@@ -2827,7 +2824,6 @@ TEST_F(PhoneChromeTest, presentingWithoutControlsHasTheZenDot) {
     resize(1280, 800);
     auto* dot = findItem("zenDot");
     ASSERT_NE(dot, nullptr);
-    EXPECT_EQ(findItem("presentCornerMark"), nullptr) << "presenting's own corner field is gone";
     QMetaObject::invokeMethod(window, "startPresenting", Q_ARG(QVariant, false));
     wait(100);
     EXPECT_FALSE(dot->isVisible()) << "with the controls: no dot";
@@ -3586,8 +3582,7 @@ protected:
 
 // The colors of a tool (qt/docs/color-palettes.md): its editor shows the roles of the chosen palette, with their names
 // (only the roles that palette defines), and the palette can be chosen there; a color taken from it remembers its
-// role, and the tool follows when another palette is chosen. (The classic tool bar's chooser with a tab per palette
-// went in 0.8.0.)
+// role, and the tool follows when another palette is chosen.
 TEST_F(ColorChooserTest, theEditorOffersThePalettesRoles) {
     openDocument();
     setUpPalettes();

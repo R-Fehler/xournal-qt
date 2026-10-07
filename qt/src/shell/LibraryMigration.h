@@ -128,7 +128,6 @@ class LibraryMove: public QObject {
     Q_PROPERTY(int files READ files NOTIFY progressChanged)
     Q_PROPERTY(int totalFiles READ totalFiles NOTIFY progressChanged)
     Q_PROPERTY(qint64 bytes READ bytes NOTIFY progressChanged)
-    Q_PROPERTY(qint64 totalBytes READ totalBytes NOTIFY progressChanged)
 public:
     explicit LibraryMove(QObject* parent = nullptr);
     ~LibraryMove() override;

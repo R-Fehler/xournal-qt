@@ -372,13 +372,10 @@ void TabManager::noteUsed() {
     }
     std::erase(used, s);
     used.insert(used.begin(), s);
-    Q_EMIT usedOrderChanged();
 }
 
 void TabManager::forgetUsed(const DocumentSession* s) {
-    if (std::erase(used, s) > 0) {
-        Q_EMIT usedOrderChanged();
-    }
+    std::erase(used, s);
 }
 
 std::vector<int> TabManager::usedOrder() const {

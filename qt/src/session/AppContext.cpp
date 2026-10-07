@@ -117,7 +117,7 @@ void AppContext::installQtUiThreadDispatcher() {
 }
 
 void AppContext::toolColorChanged() { Q_EMIT toolPropertiesChanged(); }
-void AppContext::changeColorOfSelection() { Q_EMIT selectionColorChangeRequested(); }
+void AppContext::changeColorOfSelection() {}  // (a selection is recolored by the canvas that holds it)
 void AppContext::toolSizeChanged() { Q_EMIT toolPropertiesChanged(); }
 void AppContext::toolFillChanged() { Q_EMIT toolPropertiesChanged(); }
 void AppContext::toolLineStyleChanged() { Q_EMIT toolPropertiesChanged(); }

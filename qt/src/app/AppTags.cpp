@@ -122,10 +122,10 @@ bool AppController::setDocumentTags(const QString& path, const QStringList& want
         }
     }
     QPointer<AppController> self(this);
-    QThreadPool::globalInstance()->start([self, file, list, path, title] {
+    QThreadPool::globalInstance()->start([self, file, list, title] {
         std::string error;
         const bool ok = pdfkeywords::write(file, list, error);
-        QMetaObject::invokeMethod(qApp, [self, ok, error, file, path, title] {
+        QMetaObject::invokeMethod(qApp, [self, ok, error, file, title] {
             if (!self) {
                 return;
             }
@@ -140,7 +140,6 @@ bool AppController::setDocumentTags(const QString& path, const QStringList& want
                 }
             }
             self->library->refresh();
-            Q_EMIT self->documentTagsWritten(path);
         });
     });
     return true;

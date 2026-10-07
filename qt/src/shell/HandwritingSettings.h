@@ -41,10 +41,9 @@ class HandwritingSettings final: public QObject {
     Q_PROPERTY(QString status READ status NOTIFY changed)
     /// Per language (English, German): its model, as a map (see models())
     Q_PROPERTY(QVariantList models READ models NOTIFY changed)
-    /// Pages of open documents waiting to be read; documents of the library left; the computer is on battery
+    /// Pages of open documents waiting to be read; documents of the library left
     Q_PROPERTY(int pagesWaiting READ pagesWaiting NOTIFY progressChanged)
     Q_PROPERTY(int libraryLeft READ libraryLeft NOTIFY progressChanged)
-    Q_PROPERTY(bool onBattery READ onBattery NOTIFY progressChanged)
 public:
     HandwritingSettings(AppContext& app, hwr::HandwritingSearch& search, LibraryInkJob* library,
                         QObject* parent = nullptr);
@@ -67,6 +66,7 @@ public:
     QVariantMap modelOf(const QString& language) const;
     int pagesWaiting() const;
     int libraryLeft() const;
+    /// The computer is on battery
     bool onBattery() const;
 
     /// Download a language's model into the app's data folder (the user agreed: the address and size were shown).

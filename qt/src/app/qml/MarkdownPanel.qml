@@ -127,7 +127,6 @@ Pane {
 
     // --- editing helpers (on the source) ---------------------------------------------------------------------------
     function lineStart(pos) { return area.text.lastIndexOf("\n", pos - 1) + 1 }
-    function lineEnd(pos) { const i = area.text.indexOf("\n", pos); return i < 0 ? area.length : i }
     readonly property var prefixPattern: /^(\s*)(#{1,6} |[-*+] \[[ xX]\] |[-*+] |\d+[.)] |> )?/
 
     /// What is at the cursor, for the formatting bar

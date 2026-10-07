@@ -112,7 +112,6 @@ QObject* AppController::libraryUnzipObject() const {
             const QString rel = QString::fromStdString(self->library->library()->relative(folder));
             self->library->setFolder(rel);
             self->setHomeVisible(true);
-            Q_EMIT self->zipUnpacked(rel, r.value("files").toInt(), r.value("skipped").toStringList());
             const QStringList skipped = r.value("skipped").toStringList();
             Q_EMIT self->pageActionDone(
                     skipped.isEmpty() ? tr("Unpacked into %1").arg(rel)

@@ -152,11 +152,9 @@ TEST_F(AudioDocumentTest, penStrokesWhileRecordingAreTiedToIt) {
 // A recording is a voice memo of the page it started on (one undo step); removing a recording takes it from the
 // strokes and the memos in one undo step, which brings both back
 TEST_F(AudioDocumentTest, voiceMemosAndRemovingARecording) {
-    QSignalSpy changed(session.get(), &DocumentSession::audioChanged);
     ASSERT_TRUE(session->addVoiceMemo(0, NAME));
     EXPECT_FALSE(session->addVoiceMemo(0, NAME)) << "already one";
     ASSERT_TRUE(session->addVoiceMemo(0, "2026-10-04_11-00-00.ogg"));
-    EXPECT_EQ(changed.count(), 2);
     auto page = session->getDocument()->getPage(0);
     EXPECT_EQ(page->getAudioMemos(), std::string(NAME) + "|2026-10-04_11-00-00.ogg");
     EXPECT_EQ(audio::memosOf(*page), (std::vector<std::string>{NAME, "2026-10-04_11-00-00.ogg"}));
@@ -180,9 +178,7 @@ TEST_F(AudioDocumentTest, voiceMemosAndRemovingARecording) {
         EXPECT_EQ(recs[1].elements, 0u);
     }
 
-    changed.clear();
     EXPECT_EQ(session->removeRecording(NAME), 2u);  // (the stroke and the memo)
-    EXPECT_EQ(changed.count(), 1);
     EXPECT_EQ(audio::audioOf(elements()[0]), nullptr);
     EXPECT_EQ(audio::memosOf(*page), (std::vector<std::string>{"2026-10-04_11-00-00.ogg"}));
     EXPECT_EQ(session->removeRecording(NAME), 0u);

@@ -111,8 +111,6 @@ bool hasExtension(const fs::path& p, const char* ext) {
 }
 }  // namespace
 
-bool DocumentSession::LoadResult::isNewerFileVersion() const { return fileVersion > FILE_FORMAT_VERSION; }
-
 namespace {
 void prepareLoaded(Document& doc) {
     doc.setDocumentHandler(&detachedHandler());  // the LoadHandler's handler dies with it
@@ -190,7 +188,6 @@ auto DocumentSession::loadFile(const fs::path& path, bool attachPdf, const std::
         result.document = loadHandler.loadDocument(path);
         result.missingPdf = loadHandler.getMissingPdfFilename();
         result.attachedPdfMissing = loadHandler.isAttachedPdfMissing();
-        result.fileVersion = loadHandler.getFileVersion();
     };
     try {
         load();
@@ -966,7 +963,6 @@ bool DocumentSession::addVoiceMemo(size_t page, const std::string& name) {
             std::unique_lock lock(*doc);
             target->setAudioMemos(memos);
         }
-        Q_EMIT audioChanged();
     };
     apply(p, after);
     undoRedo->addUndoAction(std::make_unique<audio::MemoUndoAction>(p, std::move(before), std::move(after),
@@ -984,14 +980,10 @@ size_t DocumentSession::removeRecording(const std::string& name) {
         return 0;
     }
     const size_t n = removed.stamps.size() + removed.memos.size();
-    Q_EMIT audioChanged();
     undoRedo->addUndoAction(std::make_unique<audio::RemoveRecordingUndoAction>(
             std::move(removed), [this](const std::function<void()>& f) {
-                {
-                    std::unique_lock lock(*doc);
-                    f();
-                }
-                Q_EMIT audioChanged();
+                std::unique_lock lock(*doc);
+                f();
             }));
     return n;
 }

@@ -119,8 +119,6 @@ const OrtApi* api(QString* why) {
     return l.api;
 }
 
-QString libraryPath() { return loaded().path; }
-
 size_t Tensor::elements() const {
     size_t n = 1;
     for (const int64_t d: shape) {

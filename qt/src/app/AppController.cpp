@@ -908,8 +908,6 @@ void AppController::currentTabChanged() {
                                              [this](const QString& title, const QString& text) {
                                                  Q_EMIT message(title, text, true);
                                              }));
-        currentConnections.push_back(
-                connect(v, &CanvasView::pdfTextSelectionCleared, this, &AppController::pdfTextSelectionCleared));
         // Whoever changes the selection (a press on the page, copying, marking, a page change): the knobs and the
         // pill follow it.
         currentConnections.push_back(
@@ -1656,12 +1654,6 @@ void AppController::setFillColor(const QColor& c) {
                       c.isValid() && c.alpha() > 0 ? std::optional<Color>(toColor(c)) : std::nullopt);
     Q_EMIT toolChanged();
 }
-
-bool AppController::hasFill() const {
-    return app->getToolHandler()->hasCapability(TOOL_CAP_FILL, SelectedTool::active);
-}
-
-bool AppController::hasFillColor() const { return penfill::hasOwnColor(app->getToolHandler()->getToolType()); }
 
 QColor AppController::color() const { return toQColor(app->getToolHandler()->getColor()); }
 int AppController::size() const {
@@ -3732,14 +3724,6 @@ void AppController::trashOldXopp(DocumentSession& s, const fs::path& xopp, const
     Q_EMIT pageActionDone(tr("%1 moved to the trash: the PDF holds everything now").arg(name), false);
 }
 
-void AppController::exportXoppInBackground(const QUrl& url) {
-    fs::path xopp(url.toLocalFile().toStdString());
-    if (xopp.extension() != ".xopp") {
-        xopp += ".xopp";
-    }
-    startSave(SaveWay::ExportXopp, xopp, {});
-}
-
 bool AppController::save() {
     bool ok = false;
     return startSave(SaveWay::Save, {}, [&ok](bool r) { ok = r; }) && (waitForSave(), ok);
@@ -3908,15 +3892,6 @@ void AppController::afterHybridSave(DocumentSession& s) {
     // does not have to make it (seconds for a long PDF)
     QThreadPool::globalInstance()->start([file = s.getFilePath()] { HybridPdf::open(file); });
     library->refresh();
-}
-
-QUrl AppController::suggestedXoppExport() const {
-    if (!session() || !session()->hasFilePath()) {
-        return {};
-    }
-    fs::path xopp = session()->getFilePath();
-    xopp.replace_extension(".xopp");
-    return QUrl::fromLocalFile(QString::fromStdString(xopp.string()));
 }
 
 bool AppController::exportXopp(const QUrl& url) {
@@ -4215,8 +4190,6 @@ QStringList toStringList(const std::vector<std::string>& v) {
 
 void AppController::archiveDone(const fs::path& target, bool ok, const std::string& error, bool pdfa,
                                 const std::vector<std::string>& notPdfA, const std::vector<std::string>& adjusted) {
-    archiveRunning = std::max(0, archiveRunning - 1);
-    Q_EMIT archiveExportsChanged();
     if (!ok) {
         Q_EMIT message(tr("Export failed"), QString::fromStdString(error), true);
         return;
@@ -4243,8 +4216,6 @@ bool AppController::exportArchive(const QUrl& target, const QString& file) {
             Q_EMIT message(tr("Export failed"), tr("The archive PDF cannot be written over the document itself."), true);
             return false;
         }
-        ++archiveRunning;
-        Q_EMIT archiveExportsChanged();
         Q_EMIT pageActionDone(tr("Writing the archive PDF…"), false);
         QThreadPool::globalInstance()->start([self, document, out] {
             HybridPdf::Result r;
@@ -4274,8 +4245,6 @@ bool AppController::exportArchive(const QUrl& target, const QString& file) {
             self->archiveDone(out, r.ok, r.error, r.pdfa, r.notPdfA, r.adjusted);
         }
     };
-    ++archiveRunning;
-    Q_EMIT archiveExportsChanged();
     s->saveInBackground(std::move(request));
     Q_EMIT pageActionDone(tr("Writing the archive PDF…"), false);
     return true;
@@ -5263,16 +5232,6 @@ void AppController::movePageUp(int index) {
     if (session()) {
         goToPage(index);
         session()->movePageTowardsBeginning();
-    }
-}
-
-void AppController::movePageDown(int index) {
-    if (textPagesFixed()) {
-        return;  // (a text file: its pages are its text)
-    }
-    if (session()) {
-        goToPage(index);
-        session()->movePageTowardsEnd();
     }
 }
 

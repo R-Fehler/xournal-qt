@@ -178,8 +178,6 @@ public:
     Q_INVOKABLE QVariantMap prefill(const QString& type) const;
     /// The entry of this type used most recently ("": none of that type); "pen" also finds a shape on the pen
     Q_INVOKABLE QString recentOfType(const QString& type) const;
-    /// Of these entries, the one used most recently (none used: the first)
-    Q_INVOKABLE QString recentAmong(const QStringList& ids) const;
     /// Back to the first tools and the first layout of both bars
     Q_INVOKABLE void reset();
     /// Back to the first layout of both bars; the user's tools stay (on the rail, in their order, out of their groups)

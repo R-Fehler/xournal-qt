@@ -23,7 +23,6 @@ public:
 
     void enableAction(Action a, bool enable) override;
     bool isActionEnabled(Action a) const override;
-    const State& getActionState(Action a) const;
 
     /// Called whenever the enabled flag or the state of an action changed.
     std::function<void(Action)> onChanged;
