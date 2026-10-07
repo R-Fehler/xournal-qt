@@ -2,7 +2,7 @@
  * xournal-qt: renaming the document of a tab (qt/docs/features/library.md, "Renaming"): the tab strip (a double click
  * on the current tab's title, "Rename…" in its menu), "Rename…" in the ⋮ menu, the overview of open documents. It is
  * the library's rename: DocumentFiles::rename (a .xopp with its PDF, a .md with its pictures folder), then the search
- * index, the reading places and previews, the open tabs, the recent list and the links follow, as after a rename in
+ * index, the reading places and covers, the open tabs, the recent list and the links follow, as after a rename in
  * the library. A new document without a file gets the name it is saved under.
  *
  * @license GNU GPLv2 or later
@@ -159,7 +159,7 @@ bool AppController::renameTab(int index, const QString& name) {
         Q_EMIT message(tr("Cannot rename"), QString::fromStdString(r.error), true);
         return false;
     }
-    // What a rename in the library does after it: the search index, reading places and previews (followMoves),
+    // What a rename in the library does after it: the search index, reading places and covers (followMoves),
     // then the open tabs, the recent list and the links (filesChanged)
     library->filesMoved(r);
     filesChanged(r);

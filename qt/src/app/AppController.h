@@ -876,8 +876,8 @@ public:
     Q_INVOKABLE void startTodoStamp();
     Q_INVOKABLE void cancelTodoStamp();
 
-    /// The title page of the current document (its preview in the library and the overview; 0-based, -1: the
-    /// document has no file yet, so there is nowhere to keep it).
+    /// The title page of the current document (its cover in the library and its picture in the overview; 0-based,
+    /// -1: the document has no file yet, so there is nowhere to keep it).
     Q_PROPERTY(int titlePage READ titlePage NOTIFY titlePageChanged)
     int titlePage() const;
     Q_INVOKABLE bool setTitlePage(int page);
@@ -1983,8 +1983,8 @@ private:
     /// The rest of openPath: the loaded file in a new tab.
     bool openLoaded(const fs::path& file, const QString& path, xqt::DocumentSession::LoadResult result, bool shown,
                     std::unique_ptr<xqt::DocumentSession> textSession = nullptr);
-    /// Remove what the app made of `file` in its caches (previews, page pictures, clean copies, versions, the library's
-    /// entry and handwriting, shared copies): after its password was set, changed or removed.
+    /// Remove what the app made of `file` in its caches (its cover, its pages' sketches and stand-ins, clean copies,
+    /// versions, the library's entry and handwriting, shared copies): after its password was set, changed or removed.
     void forgetDerivatives(const fs::path& file, bool locked);
     /// protectDocument, removeProtection
     bool applyProtection(xqt::DocumentSession* s, const xqt::PdfEncryption::Protection* protection);
