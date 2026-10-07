@@ -4,6 +4,20 @@ The fork was developed in Claude Code cloud sessions up to here. From now on, wo
 server (EPYC, GPUs). This page says what state the code is in, what the first session there should do, and what
 only the author can do. Delete it once those steps are done (git keeps it).
 
+## Done on the local machine (2026-10-08)
+
+- The integration branch is in `master-qt`; the leftovers of the refactoring's merged blocks were done as blocks
+  (`qt/app-window`, `qt/shell-rest`, `qt/session-rest`, `qt/canvas-rest` with a ThreadSanitizer run, `qt/docs-rest`,
+  `qt/hwr-gpu`) and merged; 0.9.0 is cut (`v0.9.0`). What they left is in TODO.md.
+- The suite also ran on Qt 6.8.4 and 6.11.2 (conda-forge, `XQT_QT_SPEC=qt6-main=<version> qt/scripts/cloud-env.sh`
+  with `XQT_ENV_ROOT=~/xqt-env68` / `~/xqt-env611`): it found the Back key bug of Qt 6.11 (fixed) and three failures
+  that are in TODO.md → Bugs.
+- The German training runs started on the four GTX 1080 Ti (`~/xqt-logs/run-training.sh`, logs in `~/xqt-logs/`);
+  the data is in `~/hwr-data`, the environment is the conda env `xqt-hwr` (PyTorch from the cu126 index for Pascal).
+
+Still open from this page: the Android top bar on the device (step 4), the training's evaluation and export (step 5),
+and everything under "Only the author can do this".
+
 ## Where things stand
 
 - **`claude/admiring-pascal-hekja6`** is the integration branch: 89 commits ahead of `master-qt`. It holds the
