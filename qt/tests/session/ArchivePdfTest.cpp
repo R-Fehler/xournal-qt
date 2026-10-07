@@ -26,7 +26,8 @@ void makeRawPdf(const fs::path& p, const std::vector<std::pair<std::string, std:
     if (extra) {
         extra(q);
     }
-    QPDFWriter w(q, p.string().c_str());
+    const std::string wFile = p.string();  // (QPDFWriter keeps the pointer)
+    QPDFWriter w(q, wFile.c_str());
     w.write();
 }
 

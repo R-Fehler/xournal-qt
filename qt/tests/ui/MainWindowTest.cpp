@@ -7438,7 +7438,8 @@ TEST_F(MainWindowTest, inkChangedInAnotherAppIsAskedAbout) {
         auto annots = QPDFPageDocumentHelper(q).getAllPages().at(0).getAnnotations();
         ASSERT_EQ(annots.size(), 1u);
         annots[0].getObjectHandle().replaceKey("/Rect", QPDFObjectHandle::parse("[300 300 400 400]"));
-        QPDFWriter w(q, (hybrid + ".tmp").toUtf8().constData());
+        const QByteArray wFile = (hybrid + ".tmp").toUtf8();  // (QPDFWriter keeps the pointer)
+        QPDFWriter w(q, wFile.constData());
         w.write();
         QFile::remove(hybrid);
         QFile::rename(hybrid + ".tmp", hybrid);
@@ -7474,7 +7475,8 @@ TEST_F(MainWindowTest, annotationsOfAnotherAppAreOfferedOnceAndMadeEditable) {
                 "<< /Type /Annot /Subtype /Ink /Rect [90 590 210 710] /C [0 0 1] /BS << /W 2 >> "
                 "/InkList [[100 600 150 650 200 700]] >>"));
         page.replaceKey("/Annots", QPDFObjectHandle::newArray(std::vector<QPDFObjectHandle>{ink}));
-        QPDFWriter w(q, (pdf + ".tmp").toUtf8().constData());
+        const QByteArray wFile = (pdf + ".tmp").toUtf8();  // (QPDFWriter keeps the pointer)
+        QPDFWriter w(q, wFile.constData());
         w.write();
         QFile::remove(pdf);
         QFile::rename(pdf + ".tmp", pdf);

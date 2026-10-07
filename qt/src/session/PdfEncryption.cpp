@@ -188,7 +188,8 @@ bool rewrite(const fs::path& pdf, const std::string& password, const fs::path& t
         if (strip) {
             strip(q);
         }
-        QPDFWriter w(q, file.temp().string().c_str());
+        const std::string wFile = file.temp().string();  // (QPDFWriter keeps the pointer: alive while it writes)
+        QPDFWriter w(q, wFile.c_str());
         w.setObjectStreamMode(qpdf_o_generate);
         w.setDecodeLevel(qpdf_dl_none);  // (the streams as they are: decrypted and encrypted again only)
         Encryption how;

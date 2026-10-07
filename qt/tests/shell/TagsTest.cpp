@@ -99,7 +99,8 @@ void makeTaggedPdf(const fs::path& p, const char* keywords, const std::vector<st
         meta.getDict().replaceKey("/Type", QPDFObjectHandle::newName("/Metadata"));
         meta.getDict().replaceKey("/Subtype", QPDFObjectHandle::newName("/XML"));
         q.getRoot().replaceKey("/Metadata", meta);
-        QPDFWriter w(q, tmp.string().c_str());
+        const std::string wFile = tmp.string();  // (QPDFWriter keeps the pointer)
+        QPDFWriter w(q, wFile.c_str());
         w.write();
     }
     fs::rename(tmp, p);

@@ -8,6 +8,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
 #include <memory>
 #include <string>
 
@@ -39,6 +40,7 @@
 #include "session/DocumentSession.h"
 
 #include "CanvasView.h"
+#include "Clock.h"
 #include "DevicePixels.h"
 #include "DocumentCanvasItem.h"
 #include "HoverPointer.h"
@@ -92,6 +94,7 @@ protected:
         app->getToolHandler()->selectTool(TOOL_PEN);
         session = std::make_unique<DocumentSession>(*app);
         view = std::make_unique<CanvasView>(*session);
+        view->setClock(clock);  // (before the canvas takes the view: its input and its pointer's timers follow it)
 
         engine.loadData(QML);
         ASSERT_FALSE(engine.rootObjects().isEmpty());
@@ -110,12 +113,20 @@ protected:
         session.reset();
     }
 
+    /// `ms` pass: exactly so on the canvas's clock, a frame at a time (its timers fire in order, each at its time: the
+    /// link's moment, the visibility updates, the zoom settling), and at least so in real time for Qt Quick's own
+    /// (frames, popups). So the canvas's timing does not depend on how busy the machine is.
     void wait(int ms) {
         QElapsedTimer t;
         t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-            app->getRenderService()->waitForIdle();
+        for (int done = 0; done < ms;) {
+            const int step = std::min(8, ms - done);
+            clock.advance(step);
+            done += step;
+            do {
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+                app->getRenderService()->waitForIdle();
+            } while (t.elapsed() < done);
         }
     }
 
@@ -170,6 +181,7 @@ protected:
     }
 
     QTemporaryDir tmp;
+    ManualClock clock;  ///< the canvas's time (Clock.h): wait() moves it on
     std::unique_ptr<AppContext> app;
     std::unique_ptr<DocumentSession> session;
     std::unique_ptr<CanvasView> view;
@@ -424,6 +436,22 @@ TEST_F(CanvasItemInputTest, theMouseOverALinkShowsItsTargetAndAClickFollowsIt) {
     wait(DocumentCanvasItem::LINK_HOVER_MS + 150);
     EXPECT_EQ(canvas->cursor().shape(), Qt::BitmapCursor);
     EXPECT_FALSE(canvas->hoveredLink().isEmpty());
+}
+
+// The moment a pointer rests on a link before its target shows goes by the canvas's clock, as its input does.
+TEST_F(CanvasItemInputTest, theLinksMomentGoesByTheCanvassClock) {
+    const QPointF link = addWebLink(*session, *view, *canvas);
+    wait(100);
+    for (int i = 0; i <= 10; ++i) {
+        QTest::mouseMove(window, (link + QPointF(-30 + 3 * i, 0)).toPoint());
+    }
+    QCoreApplication::processEvents();
+    clock.advance(DocumentCanvasItem::LINK_HOVER_MS - 1);
+    QCoreApplication::processEvents();
+    EXPECT_TRUE(canvas->hoveredLink().isEmpty()) << "not yet";
+    clock.advance(1);
+    QCoreApplication::processEvents();
+    EXPECT_EQ(canvas->hoveredLink().value("uri").toString(), "https://example.org/hover") << "no real time passed";
 }
 
 TEST_F(CanvasItemInputTest, theHoveringPenShowsALinksTargetToo) {

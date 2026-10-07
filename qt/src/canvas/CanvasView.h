@@ -754,8 +754,10 @@ private:
     bool hasDisplay = false;
     /// 100 % from the calibration of the screen the view is on
     void applyZoom100();
-    std::atomic<double> renderZoom{1.0};
-    std::atomic<double> renderDpr{1.0};
+    /// The zoom and the device pixel ratio the renders use (rasterParams), set together on the UI thread
+    /// (updateRenderParams) and read together by the render threads: a render never pairs a new zoom with an old ratio.
+    RasterParams renderParams;
+    mutable std::mutex renderParamsMutex;
     std::unique_ptr<EditSelection> selection;
     /// The links of a page (CanvasPage::linkSpots): looked for in the document
     std::vector<LinkSpot> findLinkSpots(size_t index) const;

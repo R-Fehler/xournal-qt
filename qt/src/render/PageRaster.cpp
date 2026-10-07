@@ -317,7 +317,12 @@ void PageRaster::run(bool background) {
     bool complete = false;
     bool resized = false;
     std::vector<Rectangle<double>> rects;
-    const double width = page->getWidth(), height = page->getHeight();
+    // (the page's size under the document's lock: the UI thread changes it under the lock, e.g. a growing text page)
+    const auto pageSize = [this] {
+        std::shared_lock lock(*host->rasterDocument());
+        return std::pair(page->getWidth(), page->getHeight());
+    };
+    const auto [width, height] = pageSize();
     Placement place;
     {
         std::lock_guard lock(repaintRectMutex);
@@ -361,7 +366,7 @@ void PageRaster::run(bool background) {
         }
         (void)resized;  // the host repaints the whole page in both cases
         notifyUpdated(std::nullopt);
-        if (page->getWidth() != width || page->getHeight() != height) {
+        if (pageSize() != std::pair(width, height)) {
             rerenderPage(true);  // (its size changed while it was drawn: this picture is of the old size)
         }
     } else {

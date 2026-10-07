@@ -92,9 +92,13 @@ TextEditor::TextEditor(DocumentSession& session, CanvasPage& page, double x, dou
             original = existing;
             textElement = existing->cloneText();
             textElement->setMarkdown(false);  // xournal-qt: the source is edited (the layer makes it Markdown again)
-            existing->setInEditing(true);  // the renderer skips it; this editor draws the copy
             content = QString::fromStdString(existing->getText());
         }
+    }
+    if (existing) {
+        // (under the exclusive lock: the render threads read the flag while they draw)
+        std::unique_lock lock(*session.getDocument());
+        existing->setInEditing(true);  // the renderer skips it; this editor draws the copy
     }
     if (!existing) {
         // A new text: a Markdown text box, its own size, and as wide as there is room (up to the right margin)
@@ -614,7 +618,10 @@ void TextEditor::finalizeText() {
             original->getFont().getSize() == textElement->getFont().getSize() &&
             original->getColor() == textElement->getColor()) {
             // Nothing changed: no undo step.
-            original->setInEditing(false);
+            {
+                std::unique_lock lock(*doc);  // (the render threads read the flag)
+                original->setInEditing(false);
+            }
             const auto box = original->getBoundingBox();
             page.rerenderRect(box.x, box.y, box.width, box.height);
             return;

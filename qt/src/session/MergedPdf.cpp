@@ -54,7 +54,8 @@ void mark(QPDF& pdf, Kind kind) {
 void writeAtomically(QPDF& pdf, const fs::path& target) {
     fileio::AtomicFile file(target);
     {
-        QPDFWriter w(pdf, file.temp().string().c_str());
+        const std::string wFile = file.temp().string();  // (QPDFWriter keeps the pointer: alive while it writes)
+        QPDFWriter w(pdf, wFile.c_str());
         w.setObjectStreamMode(qpdf_o_generate);  // smaller: object streams
         // The streams as they are (decoding and compressing them again took half of the time: 9 s for 1,300 pages)
         w.setDecodeLevel(qpdf_dl_none);

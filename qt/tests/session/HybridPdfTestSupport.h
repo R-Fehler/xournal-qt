@@ -254,7 +254,8 @@ void editWithQpdf(const fs::path& file, F&& change) {
     q.processFile(file.string().c_str());
     change(q);
     const fs::path tmp = fs::path(file) += ".tmp";
-    QPDFWriter w(q, tmp.string().c_str());
+    const std::string wFile = tmp.string();  // (QPDFWriter keeps the pointer)
+    QPDFWriter w(q, wFile.c_str());
     w.write();
     fs::rename(tmp, file);
     fs::last_write_time(file, fs::last_write_time(file) + std::chrono::seconds(5));

@@ -1123,12 +1123,14 @@ void CanvasPage::drawAndDeleteToolView(xoj::view::ToolView* v, const Range& rg) 
 }
 
 void CanvasPage::deleteOverlayView(xoj::view::OverlayView* v, const Range& rg) {
+    // (`rg` may be the view's own, e.g. the laser pointer's extents: taken before the view goes)
+    const Range dirty = rg;
     auto it = std::find_if(overlayViews.begin(), overlayViews.end(), [v](const auto& p) { return p.get() == v; });
     if (it != overlayViews.end()) {
         overlayViews.erase(it);
     }
-    if (!rg.empty()) {
-        flagDirtyRegion(rg);
+    if (!dirty.empty()) {
+        flagDirtyRegion(dirty);
     }
 }
 

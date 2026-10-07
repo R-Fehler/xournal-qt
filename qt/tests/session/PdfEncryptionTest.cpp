@@ -73,7 +73,8 @@ void encrypt(const fs::path& in, const fs::path& out, const std::string& user, c
              bool restrict = false) {
     QPDF q;
     q.processFile(in.string().c_str());
-    QPDFWriter w(q, out.string().c_str());
+    const std::string wFile = out.string();  // (QPDFWriter keeps the pointer)
+    QPDFWriter w(q, wFile.c_str());
     w.setR6EncryptionParameters(user.c_str(), owner.c_str(), true, !restrict, true, true, true, true,
                                 restrict ? qpdf_r3p_none : qpdf_r3p_full, true);
     w.write();

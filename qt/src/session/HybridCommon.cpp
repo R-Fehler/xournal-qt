@@ -128,7 +128,8 @@ void writePdfTo(QPDF& pdf, const fs::path& target, ArchiveWrite archive,
                 fileio::Sync sync) {
     fileio::AtomicFile file(target);
     {
-        QPDFWriter w(pdf, file.temp().string().c_str());
+        const std::string wFile = file.temp().string();  // (QPDFWriter keeps the pointer: alive while it writes)
+        QPDFWriter w(pdf, wFile.c_str());
         w.setObjectStreamMode(qpdf_o_generate);
         // The streams of the PDF as they are (decoding and compressing them again doubled the time); new streams
         // without a filter are still compressed

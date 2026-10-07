@@ -180,7 +180,8 @@ TEST(PrintFile, aProtectedDocumentIsPrintedWithOrWithoutItsAnnotations) {
         cairo_surface_destroy(surface);
         QPDF q;
         q.processFile((dir / "white.pdf").string().c_str());
-        QPDFWriter w(q, (dir / "locked.pdf").string().c_str());
+        const std::string wFile = (dir / "locked.pdf").string();  // (QPDFWriter keeps the pointer)
+        QPDFWriter w(q, wFile.c_str());
         w.setR6EncryptionParameters("pw", "owner", true, true, true, true, true, true, qpdf_r3p_full, true);
         w.write();
     }
