@@ -55,6 +55,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageMemory.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageWorkers.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageWorkers.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SessionRegistry.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SessionRegistry.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PageSketches.h
@@ -151,6 +153,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/MdSnippets.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentCovers.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentCovers.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/JsonFile.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/JsonFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentPlaces.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentPlaces.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/RecentFiles.h
@@ -554,7 +558,13 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/FavouritesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TodosTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TagsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryTestSupport.h
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibrarySearchTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryCoversTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryPlacesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryIndexTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryPacksTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFilesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryArchiveTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryShareTest.cpp

@@ -316,7 +316,8 @@ implementation, which is why it is not used).
 **Reading positions are not cache.** The title page and the page each document was left at (and when it was last
 read) are kept in the config folder, `~/.config/xournal-qt/libraries/<key of the library>/pages.json`, by the
 document's path in the library: renaming and moving in the app take them along, and removing the cache folders
-keeps them. (A library folder moved or renamed outside the app gets another key and starts without them.)
+keeps them. Documents outside a library keep theirs in `~/.config/xournal-qt/documents/pages.json`, by their whole
+path. (A library folder moved or renamed outside the app gets another key and starts without them.)
 
 **The search index** is what the library search searches. A background thread keeps it up to date, one document at
 a time:

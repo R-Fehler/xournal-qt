@@ -1,5 +1,5 @@
 // The sticker picker (qt/docs/features/stickers.md): the stickers of the library's Stickers folder ("This library") or
-// of the app-wide set ("All libraries") as a grid of previews, by folder, found by name, sorted by last use, the own
+// of the app-wide set ("All libraries") as a grid of covers, by folder, found by name, sorted by last use, the own
 // order, the name or the date added. A tap pastes the sticker on the current page (and puts it on the clipboard),
 // selected; the card's menu (press and hold, right click) renames, reorders, moves, opens, copies and deletes it. "+
 // Save selection" makes a sticker of what is selected. A bottom sheet in the phone classes; elsewhere it opens beside

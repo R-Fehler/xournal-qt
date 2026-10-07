@@ -5,7 +5,6 @@
 #include <mutex>
 
 #include <QDateTime>
-#include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -14,6 +13,8 @@
 
 #include "DocumentFiles.h"
 #include "session/FileIo.h"
+
+#include "JsonFile.h"
 #include "session/StickerFile.h"
 #include "DocumentCovers.h"
 
@@ -39,13 +40,6 @@ qint64 addedTime(const fs::path& file) {
     return (born.isValid() ? born : info.lastModified()).toMSecsSinceEpoch();
 }
 
-QJsonObject readJson(const fs::path& file) {
-    QFile f(QString::fromStdString(file.string()));
-    if (!f.open(QIODevice::ReadOnly)) {
-        return {};
-    }
-    return QJsonDocument::fromJson(f.readAll()).object();
-}
 
 bool writeJson(const fs::path& file, const QJsonObject& object) {
     std::error_code ec;
@@ -225,7 +219,7 @@ fs::path uniqueTarget(const fs::path& folder, const std::string& name, const std
 
 std::vector<std::string> readOrder(const fs::path& folder, Kind kind) {
     std::vector<std::string> names;
-    for (const QJsonValue& v: readJson(folder / orderFile(kind)).value(QStringLiteral("order")).toArray()) {
+    for (const QJsonValue& v: readJsonObject(folder / orderFile(kind)).value(QStringLiteral("order")).toArray()) {
         if (v.isString()) {
             names.push_back(v.toString().toStdString());
         }
@@ -317,7 +311,7 @@ void LastUsed::load() {
     if (path.empty()) {
         return;
     }
-    const QJsonObject times = readJson(path).value(QStringLiteral("lastUsed")).toObject();
+    const QJsonObject times = readJsonObject(path).value(QStringLiteral("lastUsed")).toObject();
     for (auto it = times.begin(); it != times.end(); ++it) {
         used[it.key().toStdString()] = static_cast<qint64>(it.value().toDouble());
     }

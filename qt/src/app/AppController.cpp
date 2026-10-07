@@ -1250,7 +1250,7 @@ bool AppController::setTitlePage(int page) {
         return false;
     }
     DocumentPlaces::setTitlePage(DocumentPlaces::keyOf(file), page);
-    // Its previews show that page now (they have new names, so they are drawn anew)
+    // Its covers show that page now (they have new names, so they are drawn anew)
     library->refresh();
     recent->refresh();
     tabs->thumbnailChanged(s);
@@ -2218,7 +2218,7 @@ void AppController::startLibrariesMove() {
     const fs::path from = Library::librariesFolder(Library::Home::App);
     const fs::path to = Library::librariesFolder(Library::Home::Shared);
     // What could write into the old place meanwhile: the autosaves and the journal are written first, and the
-    // library (its search index and previews) is let go until the move is done
+    // library (its search index and covers) is let go until the move is done
     autosaveAll();
     if (recovery) {
         recovery->writeNow();
@@ -3649,7 +3649,7 @@ bool AppController::saveAsHybrid(const QUrl& url, const QString& oldXopp) {
 }
 
 void AppController::afterHybridSave(DocumentSession& s) {
-    // The clean copy of the new version, in the background: opening it again (also the library's index and preview)
+    // The clean copy of the new version, in the background: opening it again (also the library's index and cover)
     // does not have to make it (seconds for a long PDF)
     appServices->jobs().start([file = s.getFilePath()] { HybridPdf::open(file); }, BackgroundJobs::Priority::Idle);
     library->refresh();

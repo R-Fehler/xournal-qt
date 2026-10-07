@@ -22,7 +22,7 @@
 #include "session/DocumentSession.h"
 #include "session/HybridPdf.h"
 #include "session/PdfEncryption.h"
-#include "session/PdfHistory.h"
+#include "session/FileIo.h"
 #include "util/Util.h"
 
 #include "InkTextStore.h"
@@ -168,11 +168,9 @@ struct XoppXml {
 
     static XoppXml read(const fs::path& file) {
         XoppXml x;
-        std::ifstream in(file, std::ios::binary);
-        const std::string bytes{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-        if (bytes.size() >= 2 && static_cast<unsigned char>(bytes[0]) == 0x1f &&
-            static_cast<unsigned char>(bytes[1]) == 0x8b) {
-            x.xml = PdfHistory::gunzip(bytes, x.ok);
+        const std::string bytes = fileio::readFile(file);
+        if (fileio::isGzip(bytes)) {
+            x.xml = fileio::gunzip(bytes, x.ok);
         } else {
             x.xml = bytes;
             x.ok = !bytes.empty();
@@ -243,6 +241,15 @@ struct XoppXml {
 fs::path resolve(const std::string& value, const fs::path& folder) {
     const fs::path p = fromU8(value);
     return p.is_absolute() ? p.lexically_normal() : (folder / p).lexically_normal();
+}
+
+/// The bytes of a .xopp with this XML: gzipped, as Xournal++ writes it (empty when it cannot be compressed).
+std::string xoppBytes(const std::string& xml) {
+    try {
+        return fileio::gzip(xml);
+    } catch (const std::exception&) {
+        return {};
+    }
 }
 
 bool writeBytes(const fs::path& file, const std::string& bytes) {
@@ -520,7 +527,7 @@ public:
             addAsIs(file);
         } else {
             const fs::path copy = workFile(rel);
-            if (!writeBytes(copy, PdfHistory::gzip(x.rewritten(values)))) {
+            if (!writeBytes(copy, xoppBytes(x.rewritten(values)))) {
                 s.failed.push_back(rel + ": " + tr("cannot be written").toStdString());
                 return;
             }
@@ -674,7 +681,7 @@ public:
                 }
             }
             if (!values.empty()) {
-                writeBytes(xoppCopy, PdfHistory::gzip(x.rewritten(values)));
+                writeBytes(xoppCopy, xoppBytes(x.rewritten(values)));
             }
             add({xoppRel, xoppCopy, {}, mtimeOf(pdf), false});
             if (isFile(bgCopy)) {

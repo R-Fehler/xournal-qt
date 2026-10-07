@@ -4,8 +4,8 @@
  * ThumbnailProvider is an asynchronous QML image provider ("image://thumbnail/<session>/<page>/<revision>[/...]";
  * the revision is DocumentSession::pageRevision, which names the page itself: it stays with the page when pages
  * before it come or go; anything after it only makes QML ask again). Pages are rendered on worker threads with upstream's DocumentView (like
- * upstream's PreviewJob), under a shared document lock. Sessions are registered while they exist; unregistering
- * waits for their running renders, so a closed tab can be destroyed safely.
+ * upstream's PreviewJob), under a shared document lock, from the sessions of SessionRegistry (a worker acquires its
+ * session there, so a closed tab waits for its running renders and can be destroyed safely).
  *
  * Drawing a page (the PDF by poppler, then the ink) is what takes the time, so:
  *  - drawn thumbnails are kept in memory, up to a limit (ImageMemory; the least recently used go first):
@@ -43,14 +43,8 @@ public:
     ThumbnailProvider() = default;
     QQuickImageResponse* requestImageResponse(const QString& id, const QSize& requestedSize) override;
 
-    /// Make a session's pages available; returns its id for the image URLs.
-    static quint64 registerSession(DocumentSession* session);
-    /// Remove a session; waits until no thumbnail of it is being rendered.
-    static void unregisterSession(DocumentSession* session);
-    static quint64 idOf(const DocumentSession* session);
-    /// A registered session to draw from on a worker: it stays until releaseSession (nullptr: none).
-    static DocumentSession* acquireSession(quint64 id);
-    static void releaseSession(quint64 id);
+    /// The kept thumbnails of a session that went (SessionRegistry::remove).
+    static void dropSession(quint64 session);
 
     /// How much memory the kept thumbnails may take (bytes; their share of the memory for page previews, which
     /// ImageMemory::setPreviewMemory hands out).

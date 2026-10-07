@@ -38,6 +38,7 @@
 #include "CanvasView.h"
 #include "shell/PagesModel.h"
 #include "shell/TabManager.h"
+#include "shell/SessionRegistry.h"
 #include "shell/Thumbnails.h"
 
 #include "AppController.h"
@@ -313,7 +314,7 @@ TEST_F(Sketches, pagesAreDrawnOnceForTheirStandInAndSketch) {
     const int drawn = PageSketches::instance().drawCount(), read = PageSketches::instance().readCount();
     ASSERT_TRUE(sketched());
     DocumentSession* s = c.tabManager().currentSession();
-    const quint64 id = ThumbnailProvider::idOf(s);
+    const quint64 id = SessionRegistry::idOf(s);
     const int pages = pagesOf(c).rowCount();
     for (int p = 0; p < pages; ++p) {
         EXPECT_EQ(PageSketches::instance().standIn(id, s->pageId(static_cast<size_t>(p))).width(), 768) << "page " << p + 1;
@@ -387,7 +388,7 @@ TEST_F(Sketches, standInsAreStoredForTheNextOpening) {
         AppController c;
         openPages(c);
         ASSERT_TRUE(sketched());
-        folder = PageSketches::instance().diskFolder(ThumbnailProvider::idOf(c.tabManager().currentSession()));
+        folder = PageSketches::instance().diskFolder(SessionRegistry::idOf(c.tabManager().currentSession()));
         pages = pagesOf(c).rowCount();
         ASSERT_FALSE(folder.empty());
         EXPECT_EQ(storedFiles(folder), static_cast<size_t>(pages));
@@ -399,7 +400,7 @@ TEST_F(Sketches, standInsAreStoredForTheNextOpening) {
     EXPECT_EQ(PageSketches::instance().drawCount(), drawn) << "nothing drawn";
     EXPECT_EQ(PageSketches::instance().readCount() - read, pages) << "all read";
     DocumentSession* s = c.tabManager().currentSession();
-    EXPECT_EQ(PageSketches::instance().standIn(ThumbnailProvider::idOf(s), s->pageId(3)).width(), 768);
+    EXPECT_EQ(PageSketches::instance().standIn(SessionRegistry::idOf(s), s->pageId(3)).width(), 768);
 }
 
 TEST_F(Sketches, changedPagesAreStoredOnceTheDocumentIsSaved) {
@@ -411,7 +412,7 @@ TEST_F(Sketches, changedPagesAreStoredOnceTheDocumentIsSaved) {
     const QString path = dir.filePath("doc.xopp");
     ASSERT_TRUE(c.saveAs(QUrl::fromLocalFile(path)));
     ASSERT_TRUE(sketched());
-    const quint64 id = ThumbnailProvider::idOf(s);
+    const quint64 id = SessionRegistry::idOf(s);
     const fs::path saved = PageSketches::instance().diskFolder(id);
     ASSERT_FALSE(saved.empty());
     EXPECT_EQ(storedFiles(saved), 4u);
@@ -447,7 +448,7 @@ TEST_F(Sketches, aStandInThatArrivesWhileItsPageWaitsIsStoredAsWell) {
     ASSERT_TRUE(RenderService::visiblePagesBusy());
     ASSERT_TRUE(c.saveAs(QUrl::fromLocalFile(dir.filePath("doc.xopp"))));
     processEventsFor(100);  // (the sketches plan: every page waits)
-    const quint64 id = ThumbnailProvider::idOf(s);
+    const quint64 id = SessionRegistry::idOf(s);
     QImage sharp(1200, 1697, QImage::Format_RGB32);
     sharp.fill(Qt::white);
     PageSketches::instance().offer(id, s->pageId(1), s->pageRevision(1), sharp);
@@ -493,7 +494,7 @@ TEST_F(Sketches, nothingIsDrawnOrStoredAfterShutdown) {
     AppController c;
     openLecture(c);
     DocumentSession* s = c.tabManager().currentSession();
-    const quint64 id = ThumbnailProvider::idOf(s);
+    const quint64 id = SessionRegistry::idOf(s);
     const fs::path folder = PageSketches::instance().diskFolder(id);
     ASSERT_FALSE(folder.empty());
     // Much to draw: big thumbnails of every page in many widths (each drawn), and the pages' sketches
@@ -581,7 +582,7 @@ TEST_F(Sketches, benchReopen) {
                   << " drawn, " << PageSketches::instance().readCount() - read << " read)\n";
         qint64 bytes = 0;
         std::error_code ec;
-        const fs::path folder = PageSketches::instance().diskFolder(ThumbnailProvider::idOf(c.tabManager().currentSession()));
+        const fs::path folder = PageSketches::instance().diskFolder(SessionRegistry::idOf(c.tabManager().currentSession()));
         for (auto it = fs::directory_iterator(folder, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
             bytes += static_cast<qint64>(it->file_size(ec));
         }

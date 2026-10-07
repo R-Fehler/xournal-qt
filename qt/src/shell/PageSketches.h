@@ -61,7 +61,7 @@ public:
     static constexpr std::array<int, 3> WIDTHS{128, 96, 64};
     static constexpr std::array<int, 3> STAND_IN_WIDTHS{768, 512, 384};
 
-    /// Sessions come and go with ThumbnailProvider::registerSession / unregisterSession.
+    /// Sessions come and go with SessionRegistry::add / remove.
     void add(quint64 id, DocumentSession* session);
     void remove(quint64 id);
     /// Shown in a window now: its pages come first.

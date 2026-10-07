@@ -29,10 +29,11 @@ All four waves are merged (2026-10-07). The architecture overview:
   target object and the search field's `type(text)` (qml B7); SettingsPage's section model (names written twice,
   magic indices) and its own keyboard fallback (qml B8); the cards' role `preview` → `cover` (LibraryModel's
   `CoverRole` is still named "preview" for QML).
-- [ ] Shell: the session registry out of `ThumbnailProvider` (only TabManager registers; shell §6.2, block 4 step 3);
-  reading positions of documents outside a library out of the cache folder (shell §6.6); `readJsonObject` (block 9);
-  LibraryShare's `PdfHistory::gzip` → `fileio`; "preview" for covers and stand-ins in app/ comments and MainWindowTest
-  test names; `LibraryTest.cpp` split by topic (block 12).
+- [x] Shell (`qt/shell-rest`): the session registry out of `ThumbnailProvider` (`SessionRegistry`, only TabManager
+  registers); reading positions of documents outside a library in the config folder; `readJsonObject`
+  (`shell/JsonFile.h`); LibraryShare's gzip through `fileio`; "preview" for covers and stand-ins in app/ comments;
+  `LibraryTest.cpp` split by topic. Left: "preview" in MainWindowTest test names (a tests block); `readJsonObject`
+  next to `fileio::readFile` and PdfHistory's `gzip`/`gunzip` wrappers internal once the session block is merged.
 - [ ] Session: `setVersionMessage` still runs qpdf on the UI thread; session block 6's manual `lock()/unlock()` pairs
   and the plain autosave on the UI thread (risk 7); the static `DocumentHandler` copies; the "try incremental, else
   full" block in both `write()` and `writeKeeping()` (with block 7); `PdfBookmarks::write` and `markHistoryIn` on the

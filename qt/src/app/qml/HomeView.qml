@@ -1,5 +1,5 @@
 // Home screen (shown when no document is open, or with the home tab): the library of this window and the recently
-// opened documents, as grids of first-page previews.
+// opened documents, as grids of covers (the picture of each document's title page).
 //  - Library: folders (tap to enter, breadcrumbs to go back) or all documents at once; search in folder names and
 //    the text and names of all documents; new document, import (files or whole folder trees, also by dropping them),
 //    new folder; rename (the menu, F2, or in place: press and hold or double click on a card's title), move (drag

@@ -1,4 +1,4 @@
-// A document or folder in the library / recent grids: first-page preview (or a folder), name and details.
+// A document or folder in the library / recent grids: its cover (or a folder), name and details.
 // Tap to open (while items are selected: to select it too); Ctrl / Shift + click and the circle in the corner select;
 // right click, the ⋮ button or press and hold (without moving) for the menu; press and hold, then move to drag it
 // (with the other selected items) onto a folder (when `dragOverlay` is set). On the title (name and details) a press
@@ -38,13 +38,13 @@ Item {
     /// A document whose file is a PDF: what the PDF is (the library index knows it): "plain", "notes" (a PDF with
     /// notes), "text" (a PDF text document), "archive", "archive-text"; "" while not known
     property string pdfKind
-    /// A PDF with notes that keeps its versions (version history): how many (0: none). A clock on the preview.
+    /// A PDF with notes that keeps its versions (version history): how many (0: none). A clock on the cover.
     property int versions: 0
-    /// A PDF protected with a password: the library does not read it (a lock on the preview).
+    /// A PDF protected with a password: the library does not read it (a lock on the cover).
     property bool locked: false
     readonly property bool pdfText: pdfKind === "text" || pdfKind === "archive-text"
     readonly property bool pdfArchive: pdfKind === "archive" || pdfKind === "archive-text"
-    /// A text or other file: the icon of its type (shown instead of a preview for other files)
+    /// A text or other file: the icon of its type (shown instead of a cover for other files)
     property string fileIcon
     /// A text or other file: its extension in capitals ("DOCX"; "" without one)
     readonly property string extension: {
@@ -62,7 +62,7 @@ Item {
     /// A favourite (starred): a star on the card, tap it to take the star away; the mouse over a card shows an empty
     /// star to add it (qt/docs/features/bookmarks.md)
     property bool favourite: false
-    /// Its tags (qt/docs/features/tags.md): a few on the preview, then "+N"
+    /// Its tags (qt/docs/features/tags.md): a few on the cover, then "+N"
     property var tags: []
     /// How many are shown before "+N"
     readonly property int tagsShown: width < 170 ? 1 : width < 240 ? 2 : 3
@@ -77,7 +77,7 @@ Item {
     property bool selected: false
     /// Items are being selected: the circles are shown on all cards.
     property bool selectionMode: false
-    /// Load the preview (not while the grid is hidden: rendering previews costs time)
+    /// Load the cover (not while the grid is hidden: drawing covers costs time)
     property bool active: true
     /// A dragged document is over this folder.
     property bool dropTarget: false

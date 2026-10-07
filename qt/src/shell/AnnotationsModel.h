@@ -5,7 +5,7 @@
  * It works only while the panel is shown (`active`). Changes are collected (a page's revision changed, pages came or
  * went) and read once the writing pauses, on a background worker at low priority: a page whose revision is the one
  * read before keeps its items, so an edit reads one page again, not the document. The worker holds the session
- * (ThumbnailProvider::acquireSession) only while it reads a page, so closing a document waits for one page at most.
+ * (SessionRegistry::acquire) only while it reads a page, so closing a document waits for one page at most.
  * The items of each open document are kept while it is open (switching tabs back shows them at once).
  *
  * @license GNU GPLv2 or later

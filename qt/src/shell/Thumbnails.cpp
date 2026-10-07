@@ -1,9 +1,6 @@
 #include "Thumbnails.h"
 
 #include <atomic>
-#include <condition_variable>
-#include <map>
-#include <mutex>
 #include <optional>
 #include <shared_mutex>
 
@@ -20,6 +17,7 @@
 #include "ImageMemory.h"
 #include "ImageWorkers.h"
 #include "PageSketches.h"
+#include "SessionRegistry.h"
 #include "view/DocumentView.h"
 #include "view/background/BackgroundFlags.h"
 #include "PageNoteSpace.h"
@@ -28,18 +26,6 @@
 namespace xqt {
 
 namespace {
-struct Registry {
-    std::mutex mtx;
-    std::condition_variable idle;
-    quint64 nextId = 1;
-    std::map<quint64, DocumentSession*> sessions;
-    std::map<quint64, int> busy;  ///< running renders per session
-};
-Registry& registry() {
-    static Registry r;
-    return r;
-}
-
 class ThumbnailResponse final: public AsyncImageResponse {
 public:
     QQuickTextureFactory* textureFactory() const override {
@@ -84,64 +70,8 @@ QImage ThumbnailProvider::keptImage(quint64 session, quint64 revision, int width
 qint64 ThumbnailProvider::cacheBytes() { return cache().bytes(); }
 int ThumbnailProvider::renderCount() { return renders.load(); }
 
-quint64 ThumbnailProvider::registerSession(DocumentSession* session) {
-    auto& r = registry();
-    std::lock_guard lock(r.mtx);
-    for (auto& [id, s]: r.sessions) {
-        if (s == session) {
-            return id;
-        }
-    }
-    const quint64 id = r.nextId++;
-    r.sessions[id] = session;
-    PageSketches::instance().add(id, session);
-    return id;
-}
-
-void ThumbnailProvider::unregisterSession(DocumentSession* session) {
-    auto& r = registry();
-    std::unique_lock lock(r.mtx);
-    for (auto it = r.sessions.begin(); it != r.sessions.end(); ++it) {
-        if (it->second == session) {
-            const quint64 id = it->first;
-            r.sessions.erase(it);
-            r.idle.wait(lock, [&] { return r.busy[id] == 0; });
-            r.busy.erase(id);
-            lock.unlock();
-            cache().removeIf([id](const Key& k) { return k.session == id; });
-            PageSketches::instance().remove(id);
-            return;
-        }
-    }
-}
-
-quint64 ThumbnailProvider::idOf(const DocumentSession* session) {
-    auto& r = registry();
-    std::lock_guard lock(r.mtx);
-    for (auto& [id, s]: r.sessions) {
-        if (s == session) {
-            return id;
-        }
-    }
-    return 0;
-}
-
-DocumentSession* ThumbnailProvider::acquireSession(quint64 id) {
-    auto& r = registry();
-    std::lock_guard lock(r.mtx);
-    auto it = r.sessions.find(id);
-    if (it == r.sessions.end()) {
-        return nullptr;
-    }
-    ++r.busy[id];
-    return it->second;
-}
-
-void ThumbnailProvider::releaseSession(quint64 id) {
-    auto& r = registry();
-    std::lock_guard lock(r.mtx);
-    --r.busy[id];
-    r.idle.notify_all();
+void ThumbnailProvider::dropSession(quint64 session) {
+    cache().removeIf([session](const Key& k) { return k.session == session; });
 }
 
 QImage ThumbnailProvider::render(DocumentSession& session, size_t pageNo, int width) {
@@ -227,14 +157,11 @@ QQuickImageResponse* ThumbnailProvider::requestImageResponse(const QString& id, 
         return response;
     }
 
-    {
-        auto& r = registry();
-        std::lock_guard lock(r.mtx);
-        if (!r.sessions.count(sessionId)) {
-            response->finish({});
-            return response;
-        }
+    if (!SessionRegistry::acquire(sessionId)) {  // (its document is not open)
+        response->finish({});
+        return response;
     }
+    SessionRegistry::release(sessionId);
     // The one asked for last first: that is what is in view now
     static std::atomic<int> order{0};
     ImageWorkers::respond(
@@ -245,7 +172,7 @@ QQuickImageResponse* ThumbnailProvider::requestImageResponse(const QString& id, 
                 RenderService::waitForVisiblePages(std::chrono::milliseconds(500));
                 // The session only now, and only if its document is still open: closing it waits for the thumbnails
                 // being drawn, not for those still queued
-                DocumentSession* session = response->isCancelled() ? nullptr : acquireSession(sessionId);
+                DocumentSession* session = response->isCancelled() ? nullptr : SessionRegistry::acquire(sessionId);
                 if (!session) {
                     return {};  // (scrolled away or closed meanwhile: not drawn)
                 }
@@ -258,7 +185,7 @@ QQuickImageResponse* ThumbnailProvider::requestImageResponse(const QString& id, 
                 } else {
                     img = renderDocument(*session->getDocument(), page, width);  // (an outdated address: not kept)
                 }
-                releaseSession(sessionId);
+                SessionRegistry::release(sessionId);
                 return img;
             },
             ++order);

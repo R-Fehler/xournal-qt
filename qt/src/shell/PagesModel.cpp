@@ -15,7 +15,7 @@
 #include "session/DocumentSession.h"
 
 #include "PageSketches.h"
-#include "Thumbnails.h"
+#include "SessionRegistry.h"
 #include "session/PageBookmarks.h"
 
 namespace xqt {
@@ -43,7 +43,7 @@ void PagesModel::setSession(DocumentSession* s) {
     connections.clear();
     unregisterListener();
     session = s;
-    sessionId = s ? ThumbnailProvider::registerSession(s) : 0;
+    sessionId = s ? SessionRegistry::idOf(s) : 0;  // (registered by its owner, TabManager)
     if (s) {
         PageSketches::instance().focus(sessionId);  // shown here now: its pages are sketched first
         registerListener(s);

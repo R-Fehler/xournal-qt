@@ -4,13 +4,14 @@
 #include <mutex>
 
 #include <QDateTime>
-#include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 
 #include "util/PathUtil.h"
 
 #include "session/FileIo.h"
+
+#include "JsonFile.h"
 
 #include "DocumentFiles.h"
 
@@ -25,9 +26,8 @@ struct Store {
     QJsonObject& load() {
         if (!loaded) {
             loaded = true;
-            QFile f(QString::fromStdString(file.string()));
-            if (!file.empty() && f.open(QIODevice::ReadOnly)) {
-                entries = QJsonDocument::fromJson(f.readAll()).object();
+            if (!file.empty()) {
+                entries = readJsonObject(file);
             }
         }
         return entries;
@@ -61,7 +61,7 @@ std::pair<Store*, QString> find(State& s, const fs::path& document) {
         return {&s.library, QString::fromStdString(document.lexically_normal().lexically_relative(s.root).string())};
     }
     if (!s.outsideSet) {
-        s.outside.file = Util::getCacheSubfolder("documents") / "pages.json";
+        s.outside.file = defaultOutsideFile();
         s.outsideSet = true;
     }
     return {&s.outside, QString::fromStdString(document.lexically_normal().string())};
@@ -125,6 +125,8 @@ void setOutsideFile(const fs::path& file) {
     s.outside = Store{file, {}, false};
     s.outsideSet = true;
 }
+
+fs::path defaultOutsideFile() { return Util::getConfigSubfolder("documents") / "pages.json"; }
 
 int titlePage(const fs::path& document) { return static_cast<int>(get(document, "title", 0)); }
 void setTitlePage(const fs::path& document, int page) { set(document, "title", std::max(0, page), 0); }

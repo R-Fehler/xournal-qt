@@ -260,7 +260,7 @@ Popup {
             font.pixelSize: 12
             color: "#5f6368"
         }
-        // Its preview in the library and in the overview of open documents
+        // Its cover in the library and its picture in the overview of open documents
         PageLine {
             objectName: "titlePageItem"
             visible: app.titlePage >= 0

@@ -388,6 +388,9 @@ blocks:
       - name: AsyncImage
         path: qt/src/shell/AsyncImage.h
         what: the shared response, LRU cache and URL encoding
+      - name: SessionRegistry
+        path: qt/src/shell/SessionRegistry.h
+        what: the open documents the providers draw from (only TabManager registers)
     docs: [qt/docs/architecture/image-caches.md]
   - id: shell-models
     name: Models and settings
