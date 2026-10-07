@@ -318,6 +318,7 @@ set(XQT_QML_FILES
     src/app/qml/LibrarySearchField.qml
     src/app/qml/LibraryGridPage.qml
     src/app/qml/RecentGridPage.qml
+    src/app/qml/DocumentGrid.qml
     src/app/qml/HomeSelectionActions.qml
     src/app/qml/MoveDragOverlay.qml
     src/app/qml/LibraryItemMenu.qml
