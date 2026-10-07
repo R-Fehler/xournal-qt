@@ -181,3 +181,15 @@ def test_cvl_layout(tmp_path):
     _, lines = read_dataset(tmp_path / "out")
     t = {l.text: l.lang for l in lines}
     assert t == {"Imagine a vast": "en", "Die Größe ist": "de"}
+
+
+@pytest.mark.parametrize("tokenised, written", [
+    ("this one , but it 's a good start .", "this one, but it's a good start."),
+    ('of " Lady of Spain " and other big hits .', 'of "Lady of Spain" and other big hits.'),
+    ('" My September Love , " the big hit', '"My September Love," the big hit'),
+    ("( Parlophone ) , a song", "(Parlophone), a song"),
+    ("I do n't|know", "I don't know"),
+    ("You 're a star ... .", "You're a star...."),
+])
+def test_iam_transcriptions_are_written_as_handwritten(tokenised, written):
+    assert sources.iam_text(tokenised) == written

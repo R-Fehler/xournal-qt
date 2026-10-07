@@ -204,9 +204,12 @@ data was used), so a model always says what it learned from.
 | CRNN | – | Trained from scratch here |
 
 Things to check on the first real run:
-- **fhswf's writers.** If its parquet files carry no writer column, the preparer cuts the lines into 15 blocks of
-  consecutive lines and says so. `prepare.py check` shows the writers. If the files name writers (a column or the
-  file names), pass `--writer-column` or `--writer-regex` so that the split is truly by writer.
+- **fhswf's writers.** Its parquet files carry no writer ids. The image names are capture times and the files are in
+  capture order, so `data.yaml` groups the lines by capture day (and the `datasetN` pages): no session is split
+  between train, validation and test. A person who wrote on several days can still be in two splits.
+- **IAM's transcriptions** are tokenised ("start ." , "it 's", `" Lady of Spain "`), in the official files and in
+  Teklia's hub copy alike; `sources.iam_text` writes them as they were handwritten. The hub copy has 10,373 of IAM's
+  13,353 lines (the Aachen splits), 128 px high as JPEG.
 - **CVL's layout** is read from the file names (`<writer>-<text>-<line>.tif` under `lines/`, the word pictures
   `…-<word>-<label>.tif` give the text). The download address may have moved; then download it by hand and use
   `--source`.
