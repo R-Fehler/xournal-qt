@@ -12,65 +12,17 @@
 #include <system_error>
 
 #include <QString>
-#include <qpdf/DLL.h>
-#include <qpdf/QPDFEFStreamObjectHelper.hh>
-#include <qpdf/QPDFEmbeddedFileDocumentHelper.hh>
-#include <qpdf/QPDFFileSpecObjectHelper.hh>
 #include <qpdf/QPDFPageDocumentHelper.hh>
 #include <qpdf/QPDFPageObjectHelper.hh>
 
 #include "ArchivePdf.h"
 #include "MergedPdf.h"
 #include "PdfKeywords.h"
-#include "config.h"
 
 namespace xqt::HybridPdf {
 using namespace detail;
 
 namespace {
-
-/// `relationship`: an archive PDF's associated file (PDF/A-3): how it relates to the PDF (/Source, /Supplement).
-void addEmbedded(QPDF& pdf, const std::string& name, const std::string& data, const std::string& description,
-                 const char* relationship = nullptr, const std::string& mime = {}) {
-    auto stream = QPDFEFStreamObjectHelper::createEFStream(pdf, data);
-    stream.setSubtype(!mime.empty() ? mime : name == DATA_NAME ? ArchivePdf::XOPP_MIME : "image/png");
-    if (relationship) {
-        stream.setModDate(pdfDateNow());
-    }
-    auto spec = QPDFFileSpecObjectHelper::createFileSpec(pdf, name, stream);
-    spec.setDescription(description);
-    if (relationship) {
-        spec.getObjectHandle().replaceKey("/AFRelationship", QPDFObjectHandle::newName(relationship));
-    }
-    QPDFEmbeddedFileDocumentHelper(pdf).replaceEmbeddedFile(name, spec);
-}
-
-/// A recording as an embedded file (its data read from its file when the PDF is written). False if it cannot be read.
-bool addEmbeddedFile(QPDF& pdf, const TextDocument::Attachment& a, bool archive) {
-    long long size = 0;
-    std::string md5;
-    if (!measureFile(a.file, size, md5)) {
-        return false;
-    }
-    auto stream = QPDFEFStreamObjectHelper::createEFStream(pdf, fileProvider(a.file));
-    stream.setSubtype(a.mime);
-    stream.setModDate(pdfDateNow());
-    QPDFObjectHandle params = stream.getObjectHandle().getDict().getKey("/Params");
-    if (!params.isDictionary()) {
-        params = QPDFObjectHandle::newDictionary();
-    }
-    params.replaceKey("/Size", QPDFObjectHandle::newInteger(size));
-    params.replaceKey("/CheckSum", QPDFObjectHandle::newString(md5));
-    params.replaceKey("/ModDate", QPDFObjectHandle::newString(pdfDateNow()));
-    stream.getObjectHandle().getDict().replaceKey("/Params", params);
-    auto spec = QPDFFileSpecObjectHelper::createFileSpec(pdf, a.name, stream);
-    spec.setDescription(a.description);
-    if (archive && !a.relationship.empty()) {
-        spec.getObjectHandle().replaceKey("/AFRelationship", QPDFObjectHandle::newName(a.relationship));
-    }
-    QPDFEmbeddedFileDocumentHelper(pdf).replaceEmbeddedFile(a.name, spec);
-    return true;
-}
 
 /// The base pages in document order, in `out` (the background PDF, or an empty one).
 /// `withSpace`: the pages with space for notes get larger boxes (not the base pages exported for Xournal++, whose
@@ -509,6 +461,7 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
     r.pages = order.size();
     step("base pages");
     PdfBookmarks::write(out, bookmarksOf(prep, order));  // (also the base pages for Xournal++: as they are now)
+    FullSink sink(out);
     if (hybrid) {
         QPDFObjectHandle hashes;
         QPDFObjectHandle flattened = QPDFObjectHandle::newArray();
@@ -525,95 +478,20 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
             r.annotations = prep.annots.size();
         }
         step("annotations");
-        addEmbedded(out, DATA_NAME, prep.xopp,
-                    archive ? "The Xournal++ document of this PDF, with the ink editable (xournal-qt archive PDF)"
-                            : "The Xournal++ document of this PDF (xournal-qt hybrid PDF)",
-                    archive ? "/Source" : nullptr);
-        QPDFObjectHandle files = QPDFObjectHandle::newArray();
-        for (const auto& [name, data]: prep.extras) {
-            addEmbedded(out, name, data, "A file of the Xournal++ document of this PDF", archive ? "/Supplement" : nullptr);
-            files.appendItem(QPDFObjectHandle::newUnicodeString(name));
-        }
-        QPDFObjectHandle audioList = QPDFObjectHandle::newArray();
-        for (const auto& a: prep.attachments) {  // (for other apps: a text document's "name.md"; listed with the
-            if (!a.source.empty()) {             // images, so the clean copy never carries them)
-                if (addEmbeddedFile(out, a, archive)) {  // (a recording: listed in /Audio with its name in the document)
-                    audioList.appendItem(QPDFObjectHandle::newUnicodeString(a.name));
-                    audioList.appendItem(QPDFObjectHandle::newUnicodeString(a.source));
-                }
-                continue;
-            }
-            addEmbedded(out, a.name, a.data, a.description,
-                        archive && !a.relationship.empty() ? a.relationship.c_str() : nullptr, a.mime);
-            files.appendItem(QPDFObjectHandle::newUnicodeString(a.name));
-        }
-        // The handwriting as invisible text, for other PDF viewers (InkTextLayer.h)
-        QPDFObjectHandle inkSigs = QPDFObjectHandle::newArray();
-        QPDFObjectHandle inkFont = QPDFObjectHandle::newNull();
-        for (size_t i = 0; i < order.size() && i < prep.pages.size(); ++i) {
-            const double w = prep.pages[i].width, h = prep.pages[i].height;
-            const std::vector<InkTextLayer::Word>* words = i < prep.inkWords.size() ? &prep.inkWords[i] : nullptr;
-            const std::string sig = words ? inkSigOf(*words, w, h) : std::string();
-            inkSigs.appendItem(QPDFObjectHandle::newString(sig));
-            if (sig.empty()) {
-                continue;
-            }
-            if (!inkFont.isIndirect()) {
-                inkFont = makeInkFont([&](QPDFObjectHandle o) { return out.makeIndirectObject(o); },
-                                      [&](QPDFObjectHandle dict, const std::string& data) {
-                                          QPDFObjectHandle stream = QPDFObjectHandle::newStream(&out, data);
-                                          for (const auto& k: dict.getKeys()) {
-                                              stream.getDict().replaceKey(k, dict.getKey(k));
-                                          }
-                                          return stream;
-                                      });
-            }
-            const std::string cm = placementOf(order[i], AnnotSpec{}, w, h).cm.unparse();
-            QPDFObjectHandle stream = QPDFObjectHandle::newStream(&out, InkTextLayer::contentOf(*words, h, cm));
-            QPDFObjectHandle mark = QPDFObjectHandle::newDictionary();
-            mark.replaceKey("/InkText", QPDFObjectHandle::newString(sig));
-            stream.getDict().replaceKey(MARKER, mark);
-            putInkText(order[i], stream, inkFont);
-        }
+        MarkerContent c;
+        c.archive = archive;
+        c.files = embedFiles(sink, out, prep, archive, nullptr);
+        c.inkText = writeInkText(sink, prep, order, c.inkFont, nullptr);
+        c.annots = hashes;
+        c.flattened = flattened;
+        c.layers = record;
+        c.xoppExport = xoppExport;
+        c.history = history;
         QPDFObjectHandle marker = QPDFObjectHandle::newDictionary();
-        marker.replaceKey("/Version", QPDFObjectHandle::newInteger(archive ? ARCHIVE_FORMAT_VERSION : FORMAT_VERSION));
-        marker.replaceKey("/InkText", inkSigs);
-        if (inkFont.isIndirect()) {
-            marker.replaceKey("/InkFont", inkFont);
-        }
-        if (archive) {
-            marker.replaceKey("/Archive", QPDFObjectHandle::newBool(true));
-            marker.replaceKey("/Flattened", flattened);
-        }
-        marker.replaceKey("/Data", QPDFObjectHandle::newUnicodeString(DATA_NAME));
-        marker.replaceKey("/Files", files);
-        if (audioList.getArrayNItems() > 0) {
-            marker.replaceKey("/Audio", audioList);
-        }
-        marker.replaceKey("/Annots", hashes);
-        QPDFObjectHandle drawnList = QPDFObjectHandle::newArray();  // (the base pages we drew: kept while the same)
-        for (size_t i = 0; i < prep.pages.size(); ++i) {
-            if (prep.pages[i].pdfPage == npos) {
-                drawnList.appendItem(QPDFObjectHandle::newInteger(static_cast<long long>(i)));
-            }
-        }
-        marker.replaceKey("/Drawn", drawnList);
-        marker.replaceKey("/Spaces", spacesList(prep));
-        marker.replaceKey("/Layers", record);
-        if (!xoppExport.empty()) {
-            marker.replaceKey("/XoppExport", QPDFObjectHandle::newUnicodeString(xoppExport));
-        }
-        putHistory(marker, history, [&](const std::string& data) { return QPDFObjectHandle::newStream(&out, data); });
-        out.getRoot().replaceKey(MARKER, out.makeIndirectObject(marker));
+        writeMarker(sink, marker, prep, c);
+        out.getRoot().replaceKey(MARKER, sink.add(marker));
     }
-    QPDFObjectHandle trailer = out.getTrailer();
-    QPDFObjectHandle info = trailer.getKey("/Info");
-    if (!info.isDictionary()) {
-        info = out.makeIndirectObject(QPDFObjectHandle::newDictionary());
-        trailer.replaceKey("/Info", info);
-    }
-    info.replaceKey("/Producer", QPDFObjectHandle::newString(std::string(PROJECT_STRING) + " + QPDF " + QPDF_VERSION));
-    info.replaceKey("/ModDate", QPDFObjectHandle::newString(pdfDateNow()));
+    QPDFObjectHandle info = writeInfo(sink, out, /*modDate=*/true);
     if (hybrid) {
         // The file written over keeps its keywords: its tags (qt/docs/tags.md; given to the file, not to the document,
         // so a background without them would drop them)

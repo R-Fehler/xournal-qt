@@ -214,7 +214,8 @@ bool storeAsDelta(const fs::path& target, const PdfHistory::Listed& listed, std:
         QPDFObjectHandle root = q.getRoot();
         QPDFObjectHandle marker = root.getKey(MARKER);
         QPDFObjectHandle name = marker.getKey("/Data");
-        touchNames(u, root);
+        UpdateSink sink(u);
+        touchNames(sink, root);
         QPDFObjectHandle names = root.getKey("/Names");
         QPDFNameTreeObjectHelper tree(names.getKey("/EmbeddedFiles"), q);
         tree.remove(name.isString() ? name.getUTF8Value() : std::string(DATA_NAME));
@@ -448,7 +449,8 @@ bool writeVersion(const fs::path& pdf, int id, const fs::path& out, std::string&
             IncrementalPdf::Update u(q);
             QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
             QPDFObjectHandle name = marker.getKey("/Data");
-            addDataSpec(q, u, name.isString() ? name.getUTF8Value() : std::string(DATA_NAME), xopp);
+            UpdateSink sink(u);
+            addDataSpec(q, sink, name.isString() ? name.getUTF8Value() : std::string(DATA_NAME), xopp);
             u.touch(marker.isIndirect() ? marker : q.getRoot());
             marker.removeKey(PdfHistory::DELTA_KEY);
             bytes = u.serialize(tail);

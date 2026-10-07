@@ -14,8 +14,6 @@
 #include <set>
 #include <sstream>
 
-#include <QCryptographicHash>
-#include <QFile>
 #include <qpdf/QPDFEmbeddedFileDocumentHelper.hh>
 #include <qpdf/QPDFPageDocumentHelper.hh>
 #include <qpdf/QPDFPageObjectHelper.hh>
@@ -273,35 +271,6 @@ bool removeInkText(QPDFObjectHandle page) {
     return true;
 }
 
-std::string inkSigOf(const std::vector<InkTextLayer::Word>& words, double w, double h) {
-    if (words.empty()) {
-        return {};
-    }
-    return InkTextLayer::sigOf(InkTextLayer::contentOf(words, h, "") + std::to_string(std::lround(w * 10)) + 'x' +
-                               std::to_string(std::lround(h * 10)));
-}
-
-void putInkText(QPDFObjectHandle page, QPDFObjectHandle stream, QPDFObjectHandle font) {
-    QPDFObjectHandle old = page.getKey("/Contents");
-    QPDFObjectHandle contents = QPDFObjectHandle::newArray();
-    contents.appendItem(stream);
-    if (old.isArray()) {
-        for (int i = 0; i < old.getArrayNItems(); ++i) {
-            contents.appendItem(old.getArrayItem(i));
-        }
-    } else if (old.isStream() || old.isDictionary()) {
-        contents.appendItem(old);
-    }
-    page.replaceKey("/Contents", contents);
-    QPDFObjectHandle res = page.getKey("/Resources");
-    res = res.isDictionary() ? res.shallowCopy() : QPDFObjectHandle::newDictionary();
-    QPDFObjectHandle fonts = res.getKey("/Font");
-    fonts = fonts.isDictionary() ? fonts.shallowCopy() : QPDFObjectHandle::newDictionary();
-    fonts.replaceKey(InkTextLayer::FONT_RESOURCE, font);
-    res.replaceKey("/Font", fonts);
-    page.replaceKey("/Resources", res);
-}
-
 std::vector<std::pair<std::string, std::string>> audioListOf(QPDFObjectHandle marker) {
     std::vector<std::pair<std::string, std::string>> out;
     QPDFObjectHandle list = marker.isDictionary() ? marker.getKey("/Audio") : QPDFObjectHandle::newNull();
@@ -312,33 +281,6 @@ std::vector<std::pair<std::string, std::string>> audioListOf(QPDFObjectHandle ma
         }
     }
     return out;
-}
-
-bool measureFile(const fs::path& file, long long& size, std::string& md5) {
-    QFile f(QString::fromStdU16String(file.u16string()));
-    if (!f.open(QIODevice::ReadOnly)) {
-        return false;
-    }
-    QCryptographicHash hash(QCryptographicHash::Md5);
-    if (!hash.addData(&f)) {
-        return false;
-    }
-    size = f.size();
-    md5 = hash.result().toStdString();
-    return true;
-}
-
-std::function<void(Pipeline*)> fileProvider(const fs::path& file) {
-    return [file](Pipeline* p) {
-        QFile f(QString::fromStdU16String(file.u16string()));
-        if (f.open(QIODevice::ReadOnly)) {
-            QByteArray chunk;
-            while (!(chunk = f.read(1 << 16)).isEmpty()) {
-                p->write(reinterpret_cast<const unsigned char*>(chunk.constData()), static_cast<size_t>(chunk.size()));
-            }
-        }
-        p->finish();
-    };
 }
 
 std::vector<std::string> strip(QPDF& pdf, const std::set<std::string>& keep) {

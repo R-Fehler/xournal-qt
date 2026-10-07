@@ -8,6 +8,8 @@
  * - HybridPrepare.cpp: prepare(), everything that needs the document (the .xopp, the drawings by cairo);
  * - HybridFullWrite.cpp: assemble(), the file written in full (plain, PDF with notes, archive PDF);
  * - HybridAppend.cpp: openExisting() and the incremental update of an existing file;
+ * - HybridMarker.cpp: what both writers put into the file the same way (the marker, the document information, the
+ *   text layer of the handwriting, the embedded files), through an ObjectSink;
  * - HybridHistory.cpp: writing the version history (PdfHistory.cpp reads it);
  * - HybridCache.cpp: the clean copies in the app cache;
  * - HybridOpen.cpp: reading the marker, opening, compacting;
@@ -32,7 +34,6 @@
 #include <qpdf/QPDF.hh>
 #include <qpdf/QPDFMatrix.hh>
 #include <qpdf/QPDFObjectHandle.hh>
-#include <qpdf/Pipeline.hh>
 
 #include "model/NoteSpace.h"
 #include "util/Color.h"
@@ -121,61 +122,8 @@ void setSpace(QPDFObjectHandle page, const NoteSpace& s);
 /// Remove the text layer from a page (its stream and its font in the page's resources). Whether it had one.
 bool removeInkText(QPDFObjectHandle page);
 
-/// The font of the text layer, made with `add` (an indirect object of a direct one) and `addStream` (a stream).
-template <typename Add, typename AddStream>
-QPDFObjectHandle makeInkFont(Add add, AddStream addStream) {
-    auto name = QPDFObjectHandle::newName("/XqtGlyphless");
-    QPDFObjectHandle file = addStream(QPDFObjectHandle::newDictionary(), InkTextLayer::glyphlessFont());
-    QPDFObjectHandle descriptor = QPDFObjectHandle::newDictionary();
-    descriptor.replaceKey("/Type", QPDFObjectHandle::newName("/FontDescriptor"));
-    descriptor.replaceKey("/FontName", name);
-    descriptor.replaceKey("/Flags", QPDFObjectHandle::newInteger(4));  // symbolic
-    descriptor.replaceKey("/FontBBox", QPDFObjectHandle::newArray(QPDFObjectHandle::Rectangle(
-                                               0, InkTextLayer::DESCENT, InkTextLayer::ADVANCE, InkTextLayer::ASCENT)));
-    descriptor.replaceKey("/ItalicAngle", QPDFObjectHandle::newInteger(0));
-    descriptor.replaceKey("/Ascent", QPDFObjectHandle::newInteger(InkTextLayer::ASCENT));
-    descriptor.replaceKey("/Descent", QPDFObjectHandle::newInteger(InkTextLayer::DESCENT));
-    descriptor.replaceKey("/CapHeight", QPDFObjectHandle::newInteger(InkTextLayer::ASCENT));
-    descriptor.replaceKey("/StemV", QPDFObjectHandle::newInteger(80));
-    descriptor.replaceKey("/FontFile2", file);
-    QPDFObjectHandle info = QPDFObjectHandle::newDictionary();
-    info.replaceKey("/Registry", QPDFObjectHandle::newString("Adobe"));
-    info.replaceKey("/Ordering", QPDFObjectHandle::newString("Identity"));
-    info.replaceKey("/Supplement", QPDFObjectHandle::newInteger(0));
-    QPDFObjectHandle cid = QPDFObjectHandle::newDictionary();
-    cid.replaceKey("/Type", QPDFObjectHandle::newName("/Font"));
-    cid.replaceKey("/Subtype", QPDFObjectHandle::newName("/CIDFontType2"));
-    cid.replaceKey("/BaseFont", name);
-    cid.replaceKey("/CIDSystemInfo", info);
-    cid.replaceKey("/FontDescriptor", add(descriptor));
-    cid.replaceKey("/DW", QPDFObjectHandle::newInteger(InkTextLayer::ADVANCE));
-    cid.replaceKey("/CIDToGIDMap", addStream(QPDFObjectHandle::newDictionary(), InkTextLayer::cidToGidMap()));
-    QPDFObjectHandle font = QPDFObjectHandle::newDictionary();
-    font.replaceKey("/Type", QPDFObjectHandle::newName("/Font"));
-    font.replaceKey("/Subtype", QPDFObjectHandle::newName("/Type0"));
-    font.replaceKey("/BaseFont", name);
-    font.replaceKey("/Encoding", QPDFObjectHandle::newName("/Identity-H"));
-    font.replaceKey("/DescendantFonts", QPDFObjectHandle::newArray(std::vector<QPDFObjectHandle>{add(cid)}));
-    font.replaceKey("/ToUnicode", addStream(QPDFObjectHandle::newDictionary(), InkTextLayer::toUnicode()));
-    return add(font);
-}
-
-/// The sig of a page's text layer: its words and the page's size (where it goes on the base page is not in it: a page
-/// that moves or gets another space for notes is written again anyway).
-std::string inkSigOf(const std::vector<InkTextLayer::Word>& words, double w, double h);
-
-/// The text layer's stream first in the page's content (the graphics state is the page's own there), its font in the
-/// page's resources (copied: they may be shared).
-void putInkText(QPDFObjectHandle page, QPDFObjectHandle stream, QPDFObjectHandle font);
-
 /// The recordings a marker lists (/Audio: attachment name, then the recording's name in the document, for each).
 std::vector<std::pair<std::string, std::string>> audioListOf(QPDFObjectHandle marker);
-
-/// Size and MD5 of a recording's file (its embedded stream's /Params), read in pieces.
-bool measureFile(const fs::path& file, long long& size, std::string& md5);
-
-/// Gives a file to qpdf in pieces, when the stream is written.
-std::function<void(Pipeline*)> fileProvider(const fs::path& file);
 
 /// Remove our annotations from every page (except `keep`, which lose our mark), our marker and our embedded files.
 /// Returns the /NM of our annotations whose hash differs from the marker's, or that are missing.
@@ -319,6 +267,106 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
 /// background PDF.
 Revision revisionAfterFull(const fs::path& target, const Prepared& prep);
 
+// --- what both writers write the same way (HybridMarker.cpp) -------------------------------------------------------
+
+/// Where the objects a write makes go: a QPDF written in full (FullSink), or an incremental update of a file
+/// (UpdateSink, which also needs to know what of the file changes). The marker, the text layer of the handwriting and
+/// the embedded files are written through it, so both writers write them the same way.
+class ObjectSink {
+public:
+    virtual ~ObjectSink() = default;
+    /// A new indirect object with this (direct) value.
+    virtual QPDFObjectHandle add(QPDFObjectHandle value) = 0;
+    /// A new stream: its dictionary (direct, complete: it may not be changed afterwards) and data.
+    virtual QPDFObjectHandle addStream(QPDFObjectHandle dict, const std::string& data) = 0;
+    /// A new stream of a file's bytes (read when the PDF is written where it can be, else now).
+    virtual QPDFObjectHandle addFileStream(QPDFObjectHandle dict, const fs::path& file) = 0;
+    /// This object of the file is about to be changed.
+    virtual void touch(QPDFObjectHandle object) = 0;
+};
+
+/// A PDF written in full: new objects of `q`; nothing to touch.
+class FullSink final: public ObjectSink {
+public:
+    explicit FullSink(QPDF& q): q(q) {}
+    QPDFObjectHandle add(QPDFObjectHandle value) override;
+    QPDFObjectHandle addStream(QPDFObjectHandle dict, const std::string& data) override;
+    QPDFObjectHandle addFileStream(QPDFObjectHandle dict, const fs::path& file) override;
+    void touch(QPDFObjectHandle) override {}
+
+private:
+    QPDF& q;
+};
+
+/// An incremental update (IncrementalPdf::Update): new objects numbered by it, changed ones touched.
+class UpdateSink final: public ObjectSink {
+public:
+    explicit UpdateSink(IncrementalPdf::Update& u): u(u) {}
+    QPDFObjectHandle add(QPDFObjectHandle value) override { return u.add(value); }
+    QPDFObjectHandle addStream(QPDFObjectHandle dict, const std::string& data) override {
+        return u.addStream(dict, data);
+    }
+    QPDFObjectHandle addFileStream(QPDFObjectHandle dict, const fs::path& file) override;
+    void touch(QPDFObjectHandle object) override { u.touch(object); }
+
+private:
+    IncrementalPdf::Update& u;
+};
+
+/// The name tree of the embedded files, and what holds it, are about to change.
+void touchNames(ObjectSink& sink, QPDFObjectHandle root);
+
+/// The embedded document as a new file specification in the name tree (whose nodes are touched here): after an older
+/// version's .xopp became a delta (version history), and in a version cut out of the file.
+void addDataSpec(QPDF& q, ObjectSink& sink, const std::string& name, const std::string& xopp);
+
+/// The files a PDF with notes carries, as the marker lists them.
+struct Embedded {
+    std::string dataName = DATA_NAME;                              ///< /Data: the name of the embedded document
+    QPDFObjectHandle files = QPDFObjectHandle::newArray();          ///< /Files: the files next to it, for other apps
+    QPDFObjectHandle audio = QPDFObjectHandle::newArray();          ///< /Audio: the recordings (name, source)
+};
+
+/// The embedded files of `prep` into `q`: the .xopp, the files next to it (attached images), the recordings and the
+/// files for other apps (an archive PDF: as associated files, PDF/A-3). Written in full (`had` null): each one new.
+/// Saved again (`had`: the file's marker as it was): what did not change stays, the .xopp and changed files get new
+/// streams in their file specifications, new pictures and recordings are added, recordings renamed; what an
+/// incremental update cannot do (other background images, a recording removed, a new file of an archive PDF) throws,
+/// and the file is written in full instead. `dataMayBeMissing`: the file's last .xopp became a delta (version
+/// history): it is added again.
+Embedded embedFiles(ObjectSink& sink, QPDF& q, const Prepared& prep, bool archive, const QPDFObjectHandle* had,
+                    bool dataMayBeMissing = false);
+
+/// The handwriting as invisible text on the base pages `order`, for other PDF viewers (InkTextLayer.h): a page whose
+/// text layer `keep`s (by its page and sig; null: none) is not touched; the others lose theirs and get their words'
+/// (the font made once, in `font`, which may hold the file's). Returns the marker's /InkText (a sig per page).
+QPDFObjectHandle writeInkText(ObjectSink& sink, const Prepared& prep, const std::vector<QPDFObjectHandle>& order,
+                              QPDFObjectHandle& font, const std::function<bool(size_t, const std::string&)>& keep);
+
+/// What the marker says (qt/docs/hybrid-pdf.md, "The marker").
+struct MarkerContent {
+    bool archive = false;
+    Embedded files;                                             ///< /Data, /Files, /Audio
+    QPDFObjectHandle inkText = QPDFObjectHandle::newNull();     ///< /InkText (writeInkText)
+    QPDFObjectHandle inkFont = QPDFObjectHandle::newNull();     ///< /InkFont (only an indirect one)
+    QPDFObjectHandle annots = QPDFObjectHandle::newNull();      ///< /Annots: our annotations' hashes by name
+    QPDFObjectHandle flattened = QPDFObjectHandle::newNull();   ///< /Flattened: an archive PDF's layers
+    QPDFObjectHandle layers = QPDFObjectHandle::newNull();      ///< /Layers: the record of our layers
+    std::string xoppExport;                                     ///< /XoppExport ("": none)
+    const HistoryMark* history = nullptr;                       ///< /History, /Versions
+    /// An incremental update: the file's size when it was last written in full and the updates since (/Base,
+    /// /Updates); 0: none (written in full)
+    long long base = 0;
+    long long updates = 0;
+};
+
+/// The marker as `c` says (a new dictionary, or the file's marker, touched by the caller); what it does not say goes
+/// (/Audio, /XoppExport, the history, the delta of the version before). /Drawn and /Spaces from `prep`.
+void writeMarker(ObjectSink& sink, QPDFObjectHandle marker, const Prepared& prep, const MarkerContent& c);
+
+/// The document information: /Producer, and (`modDate`) /ModDate now. Returns it.
+QPDFObjectHandle writeInfo(ObjectSink& sink, QPDF& q, bool modDate);
+
 // --- saving again: an incremental update (HybridAppend.cpp) ---------------------------------------------------------
 
 /// The existing hybrid PDF an incremental save appends to (opened before the document is prepared: what it has
@@ -355,12 +403,6 @@ Result appendChanges(Existing& e, const Prepared& prep, bool archive, const Revi
 /// The dictionary `to` becomes `from` (the same object, written again).
 void replaceAll(QPDFObjectHandle to, QPDFObjectHandle from);
 
-/// The name tree of the embedded files, and what holds it, are about to change.
-void touchNames(IncrementalPdf::Update& u, QPDFObjectHandle root);
-
-/// The embedded document as a new file specification in the name tree (whose nodes are touched here): after an older
-/// version's .xopp became a delta (version history), and in a version cut out of the file.
-void addDataSpec(QPDF& q, IncrementalPdf::Update& u, const std::string& name, const std::string& xopp);
 
 // --- the clean copies (HybridCache.cpp) -----------------------------------------------------------------------------
 

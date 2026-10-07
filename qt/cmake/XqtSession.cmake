@@ -88,6 +88,7 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPrepare.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridFullWrite.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridAppend.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridMarker.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridHistory.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridCache.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridOpen.cpp
