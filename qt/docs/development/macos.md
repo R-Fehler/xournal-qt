@@ -4,17 +4,16 @@ The desktop app for Macs with Apple Silicon, built on GitHub Actions and publish
 `xournal-qt.app`. It is **not signed with an Apple Developer ID and not notarized**, so macOS asks before the first
 start (below). Nobody has tried it on a real Mac yet: the CI builds it and starts it off-screen, nothing more.
 
-First build: 2026-09-27, [run 36311706587](https://github.com/R-Fehler/xournal-qt/actions/runs/36311706587) (the
-second CI run of the branch): Qt 6.11.2 from Homebrew, the app 161 MB, the `.dmg` 67 MB. The smoke test exported
-text, strokes, images and a PDF background with the CLI, and the app opened a document off-screen, all from the
-bundle with Homebrew moved away.
+With Qt 6.11 from Homebrew the app is about 161 MB, the `.dmg` about 67 MB. The CI's smoke test exports text,
+strokes, images and a PDF background with the CLI, and the app opens a document off-screen, all from the bundle with
+Homebrew moved away.
 
 ## Getting the .dmg
 
 The workflow **xournal-qt macOS** ([.github/workflows/xqt-macos.yml](../../../.github/workflows/xqt-macos.yml)) runs when
 it is started by hand (Actions → "xournal-qt macOS" → "Run workflow", any branch), for every push to the branch
-`qt/macos-build`, and when another workflow calls it (`workflow_call`, meant for the release workflow; not wired in
-yet). Its run page has the artifacts:
+`qt/macos-build`, and from the release workflow, which puts the `.dmg` into every release
+([releasing.md](releasing.md)). Its run page has the artifacts:
 
 | Artifact | What |
 |---|---|
@@ -94,7 +93,7 @@ The workflow's steps:
      its codecs): the recordings need only `QtMultimedia.framework`, whose audio devices use Core Audio;
    - what macdeployqt leaves out: Homebrew's libraries name some of their own through `@rpath` with an rpath like
      `@loader_path/../lib` (`libpoppler-glib` → `libpoppler`, `libbrotlidec` → `libbrotlicommon`, `libwebp` →
-     `libsharpyuv`), which macdeployqt neither copies nor rewrites (CI run 1: the app did not start). The script points
+     `libsharpyuv`), which macdeployqt neither copies nor rewrites (without the fix the app does not start). The script points
      every such reference at `Contents/Frameworks`, copying the library from Homebrew, until nothing is left, and
      removes the rpaths into Homebrew;
    - a check that every reference of every binary resolves inside the bundle (a failure otherwise: it would not
@@ -129,8 +128,8 @@ does with vcpkg.
 The workflow is a matrix over the architecture (`arm64` on `macos-15`), so an Intel build is one more entry
 (`x86_64` on `macos-15-intel`, GitHub's Intel runner, available until 2027). The entry is in the file, commented
 out, and no Intel run was made: Homebrew no longer publishes bottles for Intel Macs (the current versions of
-`qtbase`, `glib`, `pango`, `cairo`, `poppler` and `qpdf` list bottles for Apple Silicon and Linux only, checked
-2026-09-27 at formulae.brew.sh), so the job would compile Qt and every library from source, for hours, past the
+`qtbase`, `glib`, `pango`, `cairo`, `poppler` and `qpdf` list bottles for Apple Silicon and Linux only, at
+formulae.brew.sh), so the job would compile Qt and every library from source, for hours, past the
 job's time limit.
 An Intel build would need the libraries from elsewhere, as for older macOS versions above: vcpkg (the manifest
 [qt/vcpkg.json](../../vcpkg.json) of the Android build, with the `x64-osx` triplet) and Qt's official binaries
@@ -143,7 +142,7 @@ An Intel build would need the libraries from elsewhere, as for older macOS versi
   `QFileOpenEvent`, not as arguments; main.cpp hands them to `AppController::openPaths`. `Info.plist` declares the
   types: `.xopp` and `.xoj` as the default app (the types Xournal++ declares, imported under its identifiers
   `com.github.xournalpp.xopp` and `net.sourceforge.xournal.xoj`), `.pdf` and `.md` as an alternative ("Open With").
-- **Fonts**: Pango draws with Core Text on macOS, not fontconfig (CI run 1, `text-probe`: the font map is
+- **Fonts**: Pango draws with Core Text on macOS, not fontconfig (`text-probe` in the CI: the font map is
   `PangoCairoCoreTextFontMap`, "Sans 20" is Helvetica), so the app's emoji font is not registered; macOS's own colour
   emoji are used by Pango and Qt alike. Font names in documents map as Core Text maps them, as in upstream Xournal++
   on macOS. No fontconfig configuration is bundled; poppler may want one for PDFs with fonts that are not embedded
@@ -198,5 +197,4 @@ Needed for a first start without "Open Anyway", and for Gatekeeper to trust upda
 - **gdk-pixbuf's loader modules** are not in the bundle; PNG and JPEG are built into Homebrew's gdk-pixbuf (the
   images export of the smoke test works without Homebrew), other formats in `.xopp` image elements (GIF, TIFF, …)
   would not load.
-- **The release workflow** does not call `xqt-macos.yml` yet: a job `macos: uses: ./.github/workflows/xqt-macos.yml`
-  and the `.dmg` renamed into the draft, as for Windows and Android.
+

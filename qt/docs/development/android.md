@@ -22,13 +22,13 @@ paths). Every heavy step runs with at most 4 jobs (`XQT_JOBS`), at `nice 15`, an
 `MemoryMax=6G` (`XQT_MEM`) and a CPU quota of 4 cores, so that the machine stays usable. Gradle gets at most 4
 workers and no daemon.
 
-Measured on the 8-thread 2-in-1 (2026-09-24), with 4 jobs:
+Measured on an 8-thread laptop, with 4 jobs:
 
 | Step | Time |
 |---|---|
 | Dependencies, first build (55 vcpkg packages, host tools included) | about 17 min |
 | Dependencies again from the binary cache (`~/.cache/vcpkg/archives`), e.g. in a new worktree | 7 s |
-| KSyntaxHighlighting (download, ECM, the host indexer, the Android library; 2026-09-24) | about 1 min |
+| KSyntaxHighlighting (download, ECM, the host indexer, the Android library) | about 1 min |
 | App, clean native build + APK, without ccache | 8 min 14 s (Gradle: 22 s) |
 | After changing one `.cpp` file (compile, link, Gradle) | 15 s |
 | After changing only the manifest (Gradle) | 80 s |
@@ -65,7 +65,7 @@ adb shell "am start -n org.xournalqt.app/.XournalActivity --es extraenvvars_QT_L
 ```
 
 (The quotes matter: the phone's shell splits at the semicolons otherwise. The app must not be running already.)
-What the keyboard needs from the page (learnt 2026-09-27 on the Fold 7): the focus stays on it while text is
+What the keyboard needs from the page (found on the Fold 7): the focus stays on it while text is
 written (a closing popup gives the focus back to its button or the window: the page takes it back), it has a Qt
 property `inputMethodHints` (else Qt's Android input drops every letter; only Enter arrives), reset() when it starts
 taking text (the keyboard binds again), an explicit show() on a tap, and `ImEnterKeyType` Default for a multi-line
@@ -75,7 +75,7 @@ Or copy the APK to the phone and open it (allow installing from the file manager
 package `org.xournalqt.app`. A document can be opened at start from adb (debug builds only):
 `adb shell am start -S -n org.xournalqt.app/.XournalActivity -e applicationArguments <path>`.
 
-**Where the documents are** (`qt/android-storage`). The libraries live in the phone's own
+**Where the documents are.** The libraries live in the phone's own
 `Documents/Xournal_Libraries` (`/storage/emulated/0/Documents/Xournal_Libraries/Default` for the default library;
 the folder comes from `Environment.getExternalStoragePublicDirectory`, [Library.cpp](../../src/shell/Library.cpp)
 `PlatformFolders`). There file managers and sync apps (Syncthing) see them, and they stay when the app is uninstalled
@@ -107,7 +107,7 @@ and while the app has the access; else the app's folder (`AppController::chooseL
 - **Installed again**: the libraries are still in `Documents/Xournal_Libraries`. The app starts in its (new, empty)
   folder with the offer; with the access given there is nothing to move, and the phone's folder is used at once.
 - Files can be put into a library with `adb push <file> /sdcard/Documents/Xournal_Libraries/Default/` or over USB.
-- The library cache stays in the app's cache (`qt/android-libraries`): it goes with the app and is read again.
+- The library cache stays in the app's cache: it goes with the app and is read again.
 - **Downloads.** The Downloads quick library (library menu) is the phone's `Download` folder, where browsers and
   mail apps put files (the app's own Download folder stays empty). Without "All files access" tapping it explains
   and asks for the access first, then opens it.
@@ -164,7 +164,7 @@ per-folder packs, the search index, and the folder watcher that sees what the sy
   (`AppController::openLibrary`, `requestStorageAccess`; the Java side is `XournalActivity.hasAllFilesAccess` and
   `requestAllFilesAccess`.) Google Play allows this permission only to some kinds of apps; fine for sideloading and
   F-Droid, to be revisited for Play.
-- **The in-app folder chooser** (`qt/android-storage`, [FolderChooser.qml](../../src/app/qml/FolderChooser.qml)): with
+- **The in-app folder chooser** ([FolderChooser.qml](../../src/app/qml/FolderChooser.qml)): with
   "All files access", "Open a folder as library…" lists the folders itself, from the phone's storage down (tap a
   folder to go in, ↑ to go up), and "Use this folder" opens the one shown. Android's picker refuses the `Download`
   folder, the storage's root and `Android/data` by design; the app can read them by their paths. The storage root
@@ -288,12 +288,12 @@ never in the repository.
 | Crash handlers (`SessionRecovery::installCrashHandlers`) | they replace the system's handlers, and a crash would leave no backtrace in logcat; to be chained later |
 | Lua plugins, X11, gtksourceview | already off in the Qt build |
 | Floating point `std::from_chars` | missing in the NDK's libc++; upstream's `g_ascii_strtod` fallback is used (the same check as upstream's CMake) |
-| Edge to edge (target SDK 35+): the status bar, the gesture bar and a camera cut-out lie over the window, and the window may not be made smaller for the soft keyboard any more | `main.cpp` reads `QWindow::safeAreaMargins()` into `win.insets` (the controls keep clear, the page is drawn under the bars); the window makes room for the keyboard itself (`win.insets.keyboardTop` from `Qt.inputMethod.keyboardRectangle`, in the screen's pixels) and keeps the text cursor above it (qt/safe-areas-keyboard; adaptive-layout.md, "Safe areas and the soft keyboard") |
+| Edge to edge (target SDK 35+): the status bar, the gesture bar and a camera cut-out lie over the window, and the window may not be made smaller for the soft keyboard any more | `main.cpp` reads `QWindow::safeAreaMargins()` into `win.insets` (the controls keep clear, the page is drawn under the bars); the window makes room for the keyboard itself (`win.insets.keyboardTop` from `Qt.inputMethod.keyboardRectangle`, in the screen's pixels) and keeps the text cursor above it (adaptive-layout.md, "Safe areas and the soft keyboard") |
 
 ## Checked so far (without the phone)
 
 - `aapt2 dump badging`: `org.xournalqt.app`, version 0.1.0 (100), min SDK 28, target SDK 36, arm64-v8a, debuggable,
-  label and icon, no permissions (`qt/android-apk`; since `qt/android-libraries`: the storage permissions above).
+  label and icon, the storage permissions above.
 - `llvm-readelf`: the app library needs only system libraries and bundled Qt libraries; LOAD segments are aligned to
   16 KB (Android 15+ devices with 16 KB pages).
 - A headless x86_64 emulator (Android 15 image, which runs arm64 apps through ARM translation) in
@@ -302,7 +302,7 @@ never in the repository.
   boxes with Roboto, Noto Serif and Droid Sans Mono (no boxes), umlauts included, and a PDF through poppler. Use
   `-gpu swangle_indirect`: with `swiftshader_indirect` every other triangle of the window is missing.
 
-- `qt/android-storage` (2026-09-25, emulator): the master-qt APK with a library in its own folder (PDFs, `.xopp`
+- The move of the libraries, on the emulator: an APK of the version before with a library in its own folder (PDFs, `.xopp`
   files, a subfolder, "Opened" from "Open with", its cache in the app cache, Recent and a reading position), then
   the new APK over it with `adb install -r`: the offer after the document-mode question, Android's access page, the
   move (all files identical by MD5, times kept, the old folder gone), Recent, the remembered library, the reading
@@ -312,4 +312,5 @@ never in the repository.
   Downloads quick library asks for it, with it the phone's Download folder opens; the in-app folder chooser picks
   `Documents/Uni` and `Download`; no "Show in file manager" in the library menu.
 
-Not checked: the Fold 7 itself (the author's test), stylus input, the Fold's posture changes.
+Not checked here: the Fold 7 itself (the [device checklist](../testing/device-checklist.md), "Android"), stylus
+input, the Fold's posture changes.
