@@ -67,7 +67,11 @@ are what the views and the search use.
   (`ArchivePdf::update`), so it stays PDF/A. Keywords that are still wanted keep their spelling ("Machine learning"
   stays as written). Nothing else of the file changes; its earlier bytes stay as they were. An encrypted PDF is not
   changed. The app's own saves of a PDF with notes keep the keywords: an incremental save leaves them, a save in full
-  takes them over from the file it writes over.
+  takes them over from the file it writes over. One writer of a file at a time (`fileio::FileWriteLock`): a save of
+  the same PDF that starts while its tags are written waits for them, and the reverse. On a PDF with notes that keeps
+  its versions, the tags' update belongs to the current version (`HybridPdf::keepHistoryIn`): it is not listed as
+  another app's change, the day's version is still replaced by later saves that day, and versions still take a
+  message.
   - Open in a tab without unsaved changes: written, and the tab reads the file again in its place. With unsaved
     changes: refused with "save it first" (the tab's next save would otherwise write the file without them).
   - The dialog lists the file's tags (✕ removes one), a field to add one (Enter), the library's tags as suggestions

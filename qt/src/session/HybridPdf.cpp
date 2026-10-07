@@ -3766,7 +3766,32 @@ void keepCacheEntry(const fs::path& pdf, const std::string& was) {
 }
 }  // namespace
 
+namespace {
+/// The marker's history written again in the update `u` of `q`, which begins at `start`: the update is the current
+/// version's last revision, ours (PdfHistory::list tells our revisions from other apps' by /Start).
+void markHistoryIn(QPDF& q, IncrementalPdf::Update& u, std::vector<PdfHistory::Version> versions, uint64_t start) {
+    versions.back().end = 0;  // (the current version: as its own list says it)
+    QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
+    u.touch(marker.isIndirect() ? marker : q.getRoot());
+    HistoryMark mark{std::move(versions), start};
+    putHistory(marker, &mark,
+               [&](const std::string& data) { return u.addStream(QPDFObjectHandle::newDictionary(), data); });
+}
+}  // namespace
+
+void keepHistoryIn(const fs::path& pdf, QPDF& q, IncrementalPdf::Update& u, uint64_t start) {
+    const QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
+    if (!marker.isDictionary() || !marker.getKey("/History").isDictionary()) {
+        return;  // (not a PDF with notes, or one without history)
+    }
+    const PdfHistory::Listed listed = PdfHistory::list(pdf);
+    if (listed.on && listed.lastIsOurs && !listed.versions.empty()) {
+        markHistoryIn(q, u, listed.versions, start);
+    }
+}
+
 bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, std::string& error) {
+    const fileio::FileWriteLock lock(pdf);
     try {
         PdfHistory::Listed listed = PdfHistory::list(pdf);
         if (!listed.on || !listed.lastIsOurs || listed.versions.empty()) {
@@ -3784,7 +3809,6 @@ bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, 
             error = "There is no such version in the file.";
             return false;
         }
-        listed.versions.back().end = 0;  // (the current version: as its own list says it)
         IncrementalPdf::Tail tail;
         if (!IncrementalPdf::readTail(pdf, tail, error)) {
             return false;
@@ -3795,12 +3819,7 @@ bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, 
             q.setSuppressWarnings(true);
             PdfEncryption::openQpdf(q, pdf);
             IncrementalPdf::Update u(q);
-            QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
-            u.touch(marker.isIndirect() ? marker : q.getRoot());
-            HistoryMark mark{listed.versions, tail.size};
-            putHistory(marker, &mark, [&](const std::string& data) {
-                return u.addStream(QPDFObjectHandle::newDictionary(), data);
-            });
+            markHistoryIn(q, u, listed.versions, tail.size);
             bytes = u.serialize(tail);
         }
         const std::string was = stampOf(pdf);
@@ -3820,6 +3839,7 @@ bool setVersionMessage(const fs::path& pdf, int id, const std::string& message, 
 
 Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, size_t pdfPageCount,
              const fs::path& xoppExport, const WriteOptions& options) {
+    const fileio::FileWriteLock lock(target);  // (its tags or a version's message are not written meanwhile)
     Result r;
     try {
         WorkDir work;
@@ -4135,6 +4155,7 @@ uint64_t recordingBytes(const fs::path& pdf) {
 }
 
 bool compact(const fs::path& pdf, std::string& error, const fs::path& to, bool withoutRecordings) {
+    const fileio::FileWriteLock lock(to.empty() ? pdf : to);
     try {
         const bool archive = isArchive(pdf);
         QPDF q;

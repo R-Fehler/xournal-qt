@@ -113,3 +113,8 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
 - [ ] The text tool on an empty place makes a Markdown text box; on a text box of a Xournal++ file it edits that text
       as it is, and the file opens in Xournal++ afterwards with the edited text.
 - [ ] A fresh profile: snapping off, the pen's side buttons erase; switch snapping on, restart: it stays on.
+
+## Saving and tags (`qt/session-io`)
+
+- [ ] A PDF with notes that keeps its versions, open in a tab: give it a tag (card menu → Tags…) and press Ctrl+S at
+      once: both are in the file; the version list shows no "other app" entry; "Save with a message" works.
