@@ -11,13 +11,9 @@ name: xournal-qt block tests
 
 on:
   push:
+    # (no path filter: a block branch always changes code, and GitHub evaluates path filters of a branch's first
+    # push against the default branch, which did not start the run)
     branches: ['qt/**', master-qt]
-    paths:
-      - 'qt/**'
-      - 'src/**'
-      - 'test/**'
-      - 'cmake/**'
-      - '.github/workflows/xqt-block-tests.yml'
   workflow_dispatch:
 
 concurrency:
