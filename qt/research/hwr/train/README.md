@@ -120,7 +120,7 @@ datasets with their licences, the base model and the scores. Training stops at `
 
 | Step | One 11–12 GB GPU (RTX 3060 / 2080 Ti class) | 4 GPUs |
 |---|---|---|
-| `prepare.py all` | 30–60 min (downloads: fhswf 1.8 GB, CVL 1.6 GB; rendering 350k synthetic lines on 8 cores) | – |
+| `prepare.py all` | 30–60 min (downloads: fhswf 1.8 GB, CVL 4 GB; rendering 350k synthetic lines on 8 cores; about 75 min measured with 24 workers) | – |
 | German TrOCR (40k steps × 48 lines) | 6–10 h | 2–3 h |
 | German CTC (80k steps × 48 lines) | 2–4 h (often limited by the CPU's augmentation) | 1 h |
 | Combined TrOCR / CTC | 9–15 h / 3–5 h | 3–4 h / 1–1.5 h |
@@ -194,7 +194,7 @@ data was used), so a model always says what it learned from.
 |---|---|---|---|
 | `fhswf-german` | ~10.8k German lines, 15 writers | AFL-3.0 | [fhswf/german_handwriting](https://huggingface.co/datasets/fhswf/german_handwriting) |
 | `iam-lines` | ~13k English lines, 657 writers | IAM terms: non-commercial research, free registration | [IAM](https://fki.tic.heia-fr.ch/databases/iam-handwriting-database): your copy (`--source`), or [Teklia/IAM-line](https://huggingface.co/datasets/Teklia/IAM-line) (`--hub`, the default in `data.yaml`) |
-| `cvl-lines` | 310 writers, 1 German and 6 English texts | CVL database terms (research) | [Zenodo 1492267](https://doi.org/10.5281/zenodo.1492267) (`--download`) or your copy |
+| `cvl-lines` | 310 writers, 1 German and 6 English texts | CC BY-NC 4.0 | [Zenodo 1492267](https://doi.org/10.5281/zenodo.1492267) (`--download`) or your copy |
 | `synthetic-de`, `synthetic-en` | text in handwriting fonts | text: Tatoeba CC BY 2.0 FR, Wikipedia CC BY-SA 4.0 / GFDL, the built-in sample GPL-2.0-or-later; fonts: OFL or Apache-2.0 (read from each font file) | `prepare.py fonts`, `prepare.py synthetic` |
 | your ink | your lines, exported by the app | yours | `xournal-qt-cli hwr-lines` (block `qt/hwr-multilang`) |
 

@@ -4,7 +4,7 @@
 |--------|-----------------------------------------------------------|---------------------------------|------------------------|
 | fhswf  | fhswf/german_handwriting: ~10.8k German lines, 15 writers | AFL-3.0                         | Hugging Face hub       |
 | iam    | IAM lines: ~13k English lines, 657 writers                | non-commercial research (free registration) | your copy (official layout), or Teklia/IAM-line on the hub |
-| cvl    | CVL database: 310 writers, 1 German and 6 English texts   | research use (see its record)   | your copy, or Zenodo   |
+| cvl    | CVL database: 310 writers, 1 German and 6 English texts   | CC BY-NC 4.0                    | your copy, or Zenodo   |
 
 All line pictures are framed as the app frames a line (images.frame_line).
 """
@@ -138,7 +138,7 @@ def cvl(out: Path, source: Path | None, cache: Path, download: bool = False, lim
         z = cache / "cvl-database-1-1.zip"
         if not z.exists():
             cache.mkdir(parents=True, exist_ok=True)
-            print(f"downloading {CVL_URL} (about 1.6 GB)", file=sys.stderr)
+            print(f"downloading {CVL_URL} (about 4 GB)", file=sys.stderr)
             urllib.request.urlretrieve(CVL_URL, z)
         source = cache / "cvl"
         if not source.exists():
@@ -168,7 +168,7 @@ def cvl(out: Path, source: Path | None, cache: Path, download: bool = False, lim
     lang_of = {tx: c.most_common(1)[0][0] for tx, c in votes.items()}
     print(f"cvl: languages per text {dict(sorted(lang_of.items()))}", file=sys.stderr)
     info = DatasetInfo(name="cvl-lines", languages=sorted(set(lang_of.values())), kind="scan", noncommercial=True,
-                       licence="CVL Database terms (research use; see https://doi.org/10.5281/zenodo.1492267)",
+                       licence="CC BY-NC 4.0 (CVL Database, https://doi.org/10.5281/zenodo.1492267)",
                        source="https://doi.org/10.5281/zenodo.1492267")
     with DatasetWriter(out, info, overwrite=True) as w:
         for key in sorted(lines):
