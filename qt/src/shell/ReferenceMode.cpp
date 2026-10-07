@@ -15,7 +15,7 @@
 #include "session/AppContext.h"
 #include "PageSketches.h"
 #include "PagesModel.h"
-#include "Thumbnails.h"
+#include "SessionRegistry.h"
 #include "TabManager.h"
 #include "session/DocumentSession.h"
 #include "undo/UndoRedoHandler.h"
@@ -70,7 +70,7 @@ void ReferenceMode::setPagesShown(bool shown) {
     pages->setSession(shown ? shownSession : nullptr);
     if (!shown && tabs.currentSession()) {
         // (the grid made the reference's sketches come first; the main document's again)
-        PageSketches::instance().focus(ThumbnailProvider::idOf(tabs.currentSession()));
+        PageSketches::instance().focus(SessionRegistry::idOf(tabs.currentSession()));
     }
     Q_EMIT pagesShownChanged();
 }

@@ -13,7 +13,7 @@
 #include "DocumentCovers.h"
 #include "session/VersionCache.h"
 #include "PageSketches.h"
-#include "Thumbnails.h"
+#include "SessionRegistry.h"
 #include "model/Document.h"
 #include "model/XojPage.h"
 #include "undo/UndoRedoHandler.h"
@@ -45,7 +45,7 @@ TabManager::TabManager(AppContext& app, QObject* parent): QAbstractListModel(par
     });
     connect(&PageSketches::instance(), &PageSketches::changed, this, [this](qulonglong id) {
         for (const auto& t: tabs) {
-            if (ThumbnailProvider::idOf(t.session.get()) == id) {
+            if (SessionRegistry::idOf(t.session.get()) == id) {
                 tabDataChanged(t.session.get(), {SketchRole});
                 t.view->standInsChanged();
                 if (t.selfView) {
@@ -74,7 +74,7 @@ TabManager::~TabManager() {
     beginResetModel();
     for (auto& t: tabs) {
         rememberPlace(t.session.get());
-        ThumbnailProvider::unregisterSession(t.session.get());
+        SessionRegistry::remove(t.session.get());
         t.selfView.reset();
         t.view.reset();  // the view refers to the session
         t.session.reset();
@@ -116,13 +116,13 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
             }
             // Else the tab's current page as it is now (for the tab overview), see ThumbnailProvider.
             return QString("image://thumbnail/%1/%2/%3")
-                    .arg(ThumbnailProvider::idOf(s))
+                    .arg(SessionRegistry::idOf(s))
                     .arg(s->getCurrentPageNo())
                     .arg(s->pageRevision(s->getCurrentPageNo()));
         case PageCountRole:
             return static_cast<int>(s->getDocument()->getPageCount());
         case SketchRole:
-            return PageSketches::instance().url(ThumbnailProvider::idOf(s), s->pageId(s->getCurrentPageNo()));
+            return PageSketches::instance().url(SessionRegistry::idOf(s), s->pageId(s->getCurrentPageNo()));
         case SearchHitsRole:
             return s->search().hitCount();
         case SearchRunningRole:
@@ -156,7 +156,7 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
                         {"count", hit.count},
                         {"aspect", h / w},
                         {"thumbnail", QString("image://thumbnail/%1/%2/%3")
-                                              .arg(ThumbnailProvider::idOf(s))
+                                              .arg(SessionRegistry::idOf(s))
                                               .arg(page)
                                               .arg(s->pageRevision(page))},
                         {"rects", rects}});
@@ -231,7 +231,7 @@ void TabManager::listenTo(Tab& tab) {
     });
     connect(s, &DocumentSession::filePathChanged, this,
             [this, s] { tabDataChanged(s, {TitleRole, FilePathRole, ThumbnailRole}); });
-    const quint64 id = ThumbnailProvider::registerSession(s);
+    const quint64 id = SessionRegistry::add(s);
     // Pages not rendered yet show their stand-in on the canvas
     tab.view->setStandInSource([id, s](size_t page) { return PageSketches::instance().standIn(id, s->pageId(page)); });
     auto thumbnailChanged = [this, s] { tabDataChanged(s, {ThumbnailRole, PageCountRole, SketchRole}); };
@@ -325,7 +325,7 @@ void TabManager::closeTab(int index) {
     // Destroy after the UI switched away from it (and after running thumbnail renders of it finished). A save that
     // runs is finished first (the UI waits for it before it closes a tab; this is the last resort), then its autosave
     // is not needed any more.
-    ThumbnailProvider::unregisterSession(tab.session.get());
+    SessionRegistry::remove(tab.session.get());
     disconnect(tab.session.get(), nullptr, this, nullptr);
     tab.session->waitForSaves();
     tab.session->deleteAutosaveFile();
@@ -439,7 +439,7 @@ void TabManager::setReference(int index, int reference) {
     if (ref == tab.session.get()) {
         // A second view of the same document (its own page, zoom and selection), where the tab's view is
         tab.selfView = std::make_unique<CanvasView>(*tab.session);
-        const quint64 id = ThumbnailProvider::idOf(ref);
+        const quint64 id = SessionRegistry::idOf(ref);
         tab.selfView->setStandInSource(
                 [id, ref](size_t page) { return PageSketches::instance().standIn(id, ref->pageId(page)); });
         tab.selfView->getViewController().scrollToPage(tab.view->currentPageNo());  // (once it has a size)

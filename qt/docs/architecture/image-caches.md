@@ -55,5 +55,6 @@ annotations, annotation pictures), sized in one table, **all at idle priority**:
 ## Code
 
 `qt/src/shell/`: `ImageMemory.*`, `ImageWorkers.*`, `AsyncImage.*` (the response base, the LRU, the URL encoding),
-`Thumbnails.*`, `PageSketches.*`, `DocumentCovers.*`, `HitPages.*`, `MdSnippets.*`, `AnnotationsModel.*`
+`SessionRegistry.*` (the open documents the providers draw from, by the id in their URLs; only `TabManager`
+registers, the models look the id up), `Thumbnails.*`, `PageSketches.*`, `DocumentCovers.*`, `HitPages.*`, `MdSnippets.*`, `AnnotationsModel.*`
 (`AnnotationImageProvider`); the providers are registered in `qt/src/app/EngineSetup.cpp`.

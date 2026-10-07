@@ -342,6 +342,7 @@ The QML image providers (thumbnails, sketches, covers, hit pages, snippets, anno
 | [`ImageMemory`](../../src/shell/ImageMemory.h) | the limits of all image caches |
 | [`ImageWorkers`](../../src/shell/ImageWorkers.h) | the threads of all image providers |
 | [`AsyncImage`](../../src/shell/AsyncImage.h) | the shared response, LRU cache and URL encoding |
+| [`SessionRegistry`](../../src/shell/SessionRegistry.h) | the open documents the providers draw from (only TabManager registers) |
 
 Depends on:
 

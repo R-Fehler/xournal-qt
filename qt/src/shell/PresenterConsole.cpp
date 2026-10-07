@@ -19,7 +19,7 @@
 #include "AudienceRegion.h"
 #include "CanvasView.h"
 #include "PageSketches.h"
-#include "Thumbnails.h"
+#include "SessionRegistry.h"
 #include "ViewController.h"
 
 namespace xqt {
@@ -208,7 +208,7 @@ void PresenterConsole::update() {
     // A second view of the presented document (as the same document beside itself): its own page and zoom, the
     // session's pages, stand-ins and memory limit
     audience = std::make_unique<CanvasView>(session);
-    const quint64 id = ThumbnailProvider::idOf(&session);
+    const quint64 id = SessionRegistry::idOf(&session);
     audience->setStandInSource([id, s = &session](size_t page) {
         return PageSketches::instance().standIn(id, s->pageId(page));
     });
@@ -355,7 +355,7 @@ QString PresenterConsole::nextPicture() const {
     // (the thumbnail of the page, named by its revision: drawn again when the page changes)
     const DocumentSession& s = presented->getSession();
     return QStringLiteral("image://thumbnail/%1/%2/%3")
-            .arg(ThumbnailProvider::idOf(&s))
+            .arg(SessionRegistry::idOf(&s))
             .arg(next)
             .arg(s.pageRevision(static_cast<size_t>(next)));
 }

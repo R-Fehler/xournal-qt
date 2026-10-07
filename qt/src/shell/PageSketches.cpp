@@ -23,6 +23,7 @@
 #include "ImageWorkers.h"
 #include "FileStamps.h"
 #include "DocumentCovers.h"
+#include "SessionRegistry.h"
 #include "Thumbnails.h"
 #include "DarkPages.h"
 
@@ -553,7 +554,7 @@ void PageSketches::next() {
                 from = s->image;
             }
         }
-        DocumentSession* session = ThumbnailProvider::acquireSession(job.session);
+        DocumentSession* session = SessionRegistry::acquire(job.session);
         if (!session) {
             continue;
         }
@@ -567,11 +568,11 @@ void PageSketches::next() {
                 pdfPages = doc->getPdfPageCount();
             }
         }
-        ThumbnailProvider::releaseSession(job.session);
+        SessionRegistry::release(job.session);
         const bool started = ImageWorkers::start(ImageWorkers::Pool::Sketches, [this, job, target, from, pdfPath, pdfPages, file, stored] {
             // The session again on the worker: a job that is dropped (shutdown) holds none, and a document closed
             // meanwhile is not drawn
-            DocumentSession* session = ThumbnailProvider::acquireSession(job.session);
+            DocumentSession* session = SessionRegistry::acquire(job.session);
             if (!session) {
                 QMetaObject::invokeMethod(
                         this,
@@ -609,7 +610,7 @@ void PageSketches::next() {
                     markStored(job.session, job.pageId);
                 }
             }
-            ThumbnailProvider::releaseSession(job.session);
+            SessionRegistry::release(job.session);
             QMetaObject::invokeMethod(
                     this,
                     [this] {

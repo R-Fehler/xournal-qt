@@ -26,6 +26,9 @@
 #include "shell/SingleInstance.h"
 #include "shell/ShortcutsModel.h"
 #include "shell/TabManager.h"
+#include "shell/AnnotationsModel.h"
+#include "shell/PagesModel.h"
+#include "shell/SessionRegistry.h"
 #include "shell/Thumbnails.h"
 
 #include <QQuickImageResponse>
@@ -138,6 +141,27 @@ TEST(Tabs, closingTabs) {
     EXPECT_EQ(c.tabCount(), 0);
     EXPECT_TRUE(c.homeVisible());
     EXPECT_EQ(c.title(), "");
+}
+
+// The image providers draw from the sessions of SessionRegistry; only their owner (TabManager) registers them, so a
+// session shown in a model that is not a tab's is never left behind in it
+TEST(Tabs, onlyTheTabsRegisterTheirSessionsForPictures) {
+    AppController c;
+    c.newDocument();
+    const quint64 id = SessionRegistry::idOf(c.tabManager().currentSession());
+    EXPECT_NE(id, 0u) << "a tab's session is registered";
+    {
+        DocumentSession other(c.context());
+        PagesModel pages;
+        AnnotationsModel annotations;
+        pages.setSession(&other);
+        annotations.setSession(&other);
+        EXPECT_EQ(SessionRegistry::idOf(&other), 0u) << "the models only look it up";
+        pages.setSession(nullptr);
+        annotations.setSession(nullptr);
+    }
+    c.closeTab(0);
+    EXPECT_EQ(SessionRegistry::acquire(id), nullptr) << "a closed tab's session is gone from it";
 }
 
 TEST(Tabs, modelDataAndMoving) {
@@ -437,7 +461,7 @@ TEST(Tabs, closingATabDoesNotWaitForQueuedWork) {
 
     // The sidebar asks for the thumbnails of all pages (bigger than the previews: they are drawn)
     ThumbnailProvider provider;
-    const quint64 id = ThumbnailProvider::idOf(s);
+    const quint64 id = SessionRegistry::idOf(s);
     std::vector<QQuickImageResponse*> responses;
     int finished = 0;
     for (size_t p = 0; p < s->getDocument()->getPageCount(); ++p) {
@@ -487,7 +511,7 @@ TEST(Tabs, benchClosingABigPdf) {
         view->getViewController().scrollToPage(view->pageCount() / 2);
         DocumentSession* s = c.tabManager().currentSession();
         ThumbnailProvider provider;
-        const quint64 id = ThumbnailProvider::idOf(s);
+        const quint64 id = SessionRegistry::idOf(s);
         std::vector<QQuickImageResponse*> responses;
         int finished = 0;
         for (size_t p = view->pageCount() / 2; p < view->pageCount() / 2 + 60; ++p) {

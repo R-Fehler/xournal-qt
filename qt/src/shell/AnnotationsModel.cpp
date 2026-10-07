@@ -18,7 +18,7 @@
 #include "AsyncImage.h"
 #include "ImageMemory.h"
 #include "ImageWorkers.h"
-#include "Thumbnails.h"
+#include "SessionRegistry.h"
 
 namespace xqt {
 
@@ -69,7 +69,7 @@ void AnnotationsModel::setSession(DocumentSession* s) {
     std::vector<annotations::Item> kept;
     std::vector<quint64> keptRevisions;
     if (session) {
-        sessionId = ThumbnailProvider::registerSession(session);
+        sessionId = SessionRegistry::idOf(session);  // (registered by its owner, TabManager)
         auto& state = states[session];
         if (!state) {
             state = std::make_shared<State>();
@@ -182,7 +182,7 @@ void AnnotationsModel::start() {
                 } else {
                     // Not while the canvas has pages in view to draw
                     RenderService::waitForVisiblePages(std::chrono::milliseconds(300));
-                    DocumentSession* s = ThumbnailProvider::acquireSession(id);
+                    DocumentSession* s = SessionRegistry::acquire(id);
                     if (!s) {
                         gone = true;  // closed meanwhile
                         break;
@@ -192,7 +192,7 @@ void AnnotationsModel::start() {
                         std::shared_lock docLock(*s->getDocument());
                         content = annotations::read(*stamp.page);
                     }
-                    ThumbnailProvider::releaseSession(id);
+                    SessionRegistry::release(id);
                     page.revision = stamp.revision;
                     page.items = annotations::itemsOf(content, i, state->pdf.get());
                     ++state->pagesRead;
@@ -452,7 +452,7 @@ QQuickImageResponse* AnnotationImageProvider::requestImageResponse(const QString
                 RenderService::waitForVisiblePages(std::chrono::milliseconds(300));
                 QImage img;
                 if (!response->isCancelled() && rect.width() > 0 && rect.height() > 0) {
-                    if (DocumentSession* s = ThumbnailProvider::acquireSession(sessionId)) {
+                    if (DocumentSession* s = SessionRegistry::acquire(sessionId)) {
                         if (auto stamp = s->pageOfRevision(revision)) {
                             // (at most 4 pixels per point: a tiny dot is not drawn as a poster)
                             img = annotations::drawArea(*s->getDocument(), stamp->page, rect,
@@ -460,7 +460,7 @@ QQuickImageResponse* AnnotationImageProvider::requestImageResponse(const QString
                             ++pictureRenders;
                             pictureCache().put(key, img);
                         }
-                        ThumbnailProvider::releaseSession(sessionId);
+                        SessionRegistry::release(sessionId);
                     }
                 }
                 return img;

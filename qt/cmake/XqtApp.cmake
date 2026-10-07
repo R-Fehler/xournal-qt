@@ -55,6 +55,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageMemory.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageWorkers.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageWorkers.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SessionRegistry.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SessionRegistry.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PageSketches.h
