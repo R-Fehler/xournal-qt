@@ -24,17 +24,13 @@
 #include "CanvasMemory.h"
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "support/TestSupport.h"
+
+using xqt::test::processEventsFor;
 
 using namespace xqt;
 
 namespace {
-void processEvents(int ms) {
-    QElapsedTimer t;
-    t.start();
-    while (t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-}
 
 /// A new document of 41 plain pages in a view of 800 x 1000 px, at `page`
 CanvasView* openPages(AppController& c, size_t page) {
@@ -43,7 +39,7 @@ CanvasView* openPages(AppController& c, size_t page) {
     CanvasView* view = c.tabManager().currentView();
     view->getViewController().setViewSize(QSizeF(800, 1000));
     view->getViewController().scrollToPage(page);
-    processEvents(20);
+    processEventsFor(20);
     return view;
 }
 
@@ -56,7 +52,7 @@ qint64 pageBytes(CanvasView* view) {
 void settle(AppController& c) {
     for (int round = 0; round < 10; ++round) {
         c.context().getRenderService()->waitForIdle();
-        processEvents(20);
+        processEventsFor(20);
         if (!CanvasMemory::instance().planPending()) {
             return;
         }
@@ -113,7 +109,7 @@ TEST_F(CanvasMemoryTest, aPageRenderedAfterThePlanLeftItOutIsGivenUpAgain) {
     // (the render the first view of the document asked for, landing late)
     view->getPage(0)->getRaster().ensureRendered(false);
     c.context().getRenderService()->waitForIdle();
-    processEvents(20);
+    processEventsFor(20);
     settle(c);
     EXPECT_FALSE(rendered(view, 0)) << "outside the window of the plan";
     for (size_t i = 0; i < view->pageCount(); ++i) {
@@ -182,7 +178,7 @@ TEST_F(CanvasMemoryTest, afterZoomingOnlyNearPagesAreRenderedAgainInAdvance) {
     }
 
     view->getViewController().setZoom(view->getViewController().zoom() * 0.9, QPointF(400, 500));
-    processEvents(350);  // (renders wait until the zoom is stable)
+    processEventsFor(350);  // (renders wait until the zoom is stable)
     CanvasMemory::instance().planNow();
     settle(c);
     const double now = view->getViewController().zoom();
@@ -211,7 +207,7 @@ TEST_F(CanvasMemoryTest, scrollChangesAreCollected) {
     }
     const quint64 atOnce = view->visibilityUpdates() - before;
     EXPECT_LE(atOnce, 3u) << "the visible pages are not looked at for every scroll change";
-    processEvents(40);
+    processEventsFor(40);
     EXPECT_GT(view->visibilityUpdates() - before, atOnce) << "but where it stopped, they are";
 }
 
@@ -243,7 +239,7 @@ TEST_F(CanvasMemoryTest, benchJumps) {
         view->setDevicePixelRatio(2);
         view->getViewController().setViewSize(QSizeF(1100, 1600));
         view->getViewController().fitWidth();
-        processEvents(400);
+        processEventsFor(400);
         CanvasMemory::instance().setLimit(inAdvance ? CanvasMemory::defaultLimit() : 1);
         view->setShown(true);
         const size_t n = view->pageCount();
@@ -252,7 +248,7 @@ TEST_F(CanvasMemoryTest, benchJumps) {
         QElapsedTimer all;
         all.start();
         for (size_t target: {size_t(5), n / 4, n / 2, size_t(12), 3 * n / 4, size_t(30), n - 3}) {
-            processEvents(inAdvance ? 1500 : 300);  // (reading a moment: in advance, pages are rendered meanwhile)
+            processEventsFor(inAdvance ? 1500 : 300);  // (reading a moment: in advance, pages are rendered meanwhile)
             const bool had = view->getPage(target)->bufferInfo().valid;
             view->getViewController().scrollToPage(target);
             QElapsedTimer t;
@@ -299,7 +295,7 @@ TEST_F(CanvasMemoryTest, benchZoomSettle) {
     vc.setViewSize(QSizeF(1100, 1600));
     vc.fitWidth();
     view->setShown(true);
-    processEvents(400);
+    processEventsFor(400);
     const size_t n = view->pageCount();
     auto sharp = [&](size_t page) {
         const auto info = view->getPage(page)->bufferInfo();
@@ -316,28 +312,28 @@ TEST_F(CanvasMemoryTest, benchZoomSettle) {
     motions.push_back({"Ctrl+wheel in", [&] {
                            for (int step = 0; step < 6; ++step) {
                                vc.setZoom(vc.zoom() * 1.1, center);
-                               processEvents(16);
+                               processEventsFor(16);
                            }
                        }});
     motions.push_back({"pinch in", [&] {
                            vc.pinchBegin(center, 200);
                            for (int step = 1; step <= 6; ++step) {
                                vc.pinchUpdate(center, 200 * std::pow(1.1, step));
-                               processEvents(16);
+                               processEventsFor(16);
                            }
                            vc.pinchEnd();
                        }});
     motions.push_back({"Ctrl+wheel out", [&] {
                            for (int step = 0; step < 6; ++step) {
                                vc.setZoom(vc.zoom() * 0.8, center);
-                               processEvents(16);
+                               processEventsFor(16);
                            }
                        }});
     for (size_t target: {size_t(10), n / 3, n / 2, 2 * n / 3, size_t(40)}) {
         for (Motion& motion: motions) {
             vc.fitWidth();
             vc.scrollToPage(target);
-            processEvents(1500);  // (reading a moment: pages are rendered in advance, previews drawn meanwhile)
+            processEventsFor(1500);  // (reading a moment: pages are rendered in advance, previews drawn meanwhile)
             motion.run();
             QElapsedTimer t;
             t.start();
@@ -391,7 +387,7 @@ TEST_F(CanvasMemoryTest, aDocumentInSightKeepsItsPagesBeforeOneInTheBackground) 
     auto show = [](CanvasView* v) {
         v->setShown(true);
         v->getViewController().setViewSize(QSizeF(800, 1000));
-        processEvents(20);
+        processEventsFor(20);
     };
     show(reference);  // (beside the notes from now on)
     CanvasMemory::instance().planNow();
@@ -436,7 +432,7 @@ TEST_F(CanvasMemoryTest, twoViewsOfOneDocumentShareTheLimit) {
         v->getViewController().setViewSize(QSizeF(800, 1000));
     }
     second->getViewController().scrollToPage(30);
-    processEvents(20);
+    processEventsFor(20);
     CanvasMemory::instance().used(second);
     CanvasMemory::instance().planNow();
     settle(c);

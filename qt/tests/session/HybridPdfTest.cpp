@@ -58,23 +58,15 @@
 #include "undo/UndoRedoHandler.h"
 
 #include "config.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+
+using xqt::test::makeTextPdf;
 
 using namespace xqt;
 
 namespace {
-void makeTextPdf(const fs::path& p, const std::vector<std::string>& words) {
-    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
-    cairo_t* cr = cairo_create(s);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, 24);
-    for (const auto& w: words) {
-        cairo_move_to(cr, 72, 100);
-        cairo_show_text(cr, w.c_str());
-        cairo_show_page(cr);
-    }
-    cairo_destroy(cr);
-    cairo_surface_destroy(s);
-}
 
 Stroke* addStroke(Layer* layer, StrokeTool tool, Color color, double width, std::vector<Point> points) {
     auto s = std::make_unique<Stroke>();
@@ -1437,10 +1429,6 @@ TEST_F(ArchivePdfTest, aHybridPdfOfAPdfASourceDoesNotClaimPdfA) {
 // --- saving again: incremental updates (qt/docs/hybrid-pdf.md, "Saving: incremental updates") ------------------------
 
 namespace {
-std::string fileBytes(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
 
 size_t countOf(const std::string& text, const std::string& what) {
     size_t n = 0;
@@ -1518,14 +1506,14 @@ protected:
 // A crash or a full disk while the update is written leaves the file as it was, byte for byte
 TEST_F(IncrementalSaveTest, aFailedAppendLeavesTheFileAsItWas) {
     auto s = savedLecture(path("notes.pdf"));
-    const std::string before = fileBytes(path("notes.pdf"));
+    const std::string before = readFile(path("notes.pdf"));
     drawOn(*s, 0, 500);
     // Before anything of the update is written, and when all of it is written but not yet in place
     for (const uint64_t at: {uint64_t(0), uint64_t(1)}) {
         IncrementalPdf::failWriteAt = [at](uint64_t written) { return written >= at; };
         const auto r = s->save();
         EXPECT_FALSE(r.ok) << "fails at " << at;
-        EXPECT_EQ(fileBytes(path("notes.pdf")), before);
+        EXPECT_EQ(readFile(path("notes.pdf")), before);
         for (auto& e: fs::directory_iterator(tmp.path().toStdString())) {
             EXPECT_NE(e.path().extension(), ".part") << "no temporary file left: " << e.path();
         }
@@ -1538,7 +1526,7 @@ TEST_F(IncrementalSaveTest, aFailedAppendLeavesTheFileAsItWas) {
     const auto r = s->save();
     ASSERT_TRUE(r.ok) << r.error;
     EXPECT_TRUE(r.incremental);
-    EXPECT_EQ(fileBytes(path("notes.pdf")).substr(0, before.size()), before);
+    EXPECT_EQ(readFile(path("notes.pdf")).substr(0, before.size()), before);
     EXPECT_FALSE(fs::exists(stale));
 }
 
@@ -1546,14 +1534,14 @@ TEST_F(IncrementalSaveTest, aFailedAppendLeavesTheFileAsItWas) {
 TEST_F(IncrementalSaveTest, ctrlSAppendsOnlyWhatChanged) {
     const fs::path out = path("lecture.notes.pdf");
     auto s = savedLecture(out);
-    const std::string before = fileBytes(out);
+    const std::string before = readFile(out);
     const auto page1 = annotIds(out, 0);
     const auto page3 = annotIds(out, 2);
     drawOn(*s, 2, 600);  // (page 3, the layer of its text: the ruled page is page 2)
     const auto r = s->save();
     ASSERT_TRUE(r.ok) << r.error;
     EXPECT_TRUE(r.incremental);
-    const std::string after = fileBytes(out);
+    const std::string after = readFile(out);
     EXPECT_EQ(after.substr(0, before.size()), before);
     EXPECT_EQ(r.appended, after.size() - before.size());
     EXPECT_LT(r.appended, 12000u) << "one layer, the .xopp, the marker";
@@ -1749,7 +1737,7 @@ TEST_F(IncrementalSaveTest, manySavesLookAndOpenLikeFullWrites) {
         EXPECT_TRUE(loaded.hybridChanged.empty()) << what;
         EXPECT_EQ(describe(*loaded.document), describeAsXopp(doc, path("same.xopp"))) << what;
     }
-    EXPECT_EQ(countOf(fileBytes(out), "startxref"), revisions);
+    EXPECT_EQ(countOf(readFile(out), "startxref"), revisions);
     if (const char* samples = std::getenv("XQT_INCREMENTAL_SAMPLES")) {  // (for other renderers)
         std::error_code ec;
         fs::create_directories(samples, ec);
@@ -1974,7 +1962,7 @@ TEST_F(IncrementalSaveTest, anArchivePdfStaysPdfAAfterIncrementalSaves) {
     const fs::path full = path("full.archive.pdf");
     ASSERT_TRUE(HybridPdf::writeArchive(*s.getDocument(), full).ok);
     expectSamePages(out, full, 4, "an archive PDF after three incremental saves");
-    EXPECT_EQ(countOf(fileBytes(out), "startxref"), 4u);
+    EXPECT_EQ(countOf(readFile(out), "startxref"), 4u);
     ArchivePdfTest::keepSample(out, "archive-incremental-3.pdf");
     // Reopened: the background is the original page, the ink comes from the data
     auto reopened = DocumentSession::loadFile(out);
@@ -1991,7 +1979,7 @@ TEST_F(IncrementalSaveTest, anArchivePdfStaysPdfAAfterIncrementalSaves) {
 // Pages pasted from another PDF are appended to the file (the pages it has stay as they are)
 TEST_F(IncrementalSaveTest, pastedPdfPagesAreAppended) {
     makeTextPdf(path("other.pdf"), {"pastedone", "pastedtwo"});
-    const std::string other = fileBytes(path("other.pdf"));
+    const std::string other = readFile(path("other.pdf"));
     const fs::path out = path("notes.pdf");
     auto paste = [&](DocumentSession& s, size_t at) {
         std::string error;
@@ -2279,11 +2267,11 @@ TEST_F(IncrementalSaveTest, bookmarksGoIntoTheOutline) {
     }
     // A stroke only: the outline is not touched
     drawOn(*s, 1, 400);
-    const std::string before = fileBytes(out);
+    const std::string before = readFile(out);
     r = s->save();
     ASSERT_TRUE(r.ok) << r.error;
     EXPECT_TRUE(r.incremental);
-    EXPECT_EQ(fileBytes(out).substr(before.size()).find("/Title"), std::string::npos) << "no outline item written";
+    EXPECT_EQ(readFile(out).substr(before.size()).find("/Title"), std::string::npos) << "no outline item written";
     // Renamed, one more: appended
     ASSERT_TRUE(s->setBookmark(0, std::string("Introduction")));
     ASSERT_TRUE(s->setBookmark(1, std::string("Middle")));

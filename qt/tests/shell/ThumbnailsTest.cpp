@@ -41,22 +41,15 @@
 
 #include "AppController.h"
 #include "config-test.h"
+#include "support/TestSupport.h"
+
+using xqt::test::processEventsFor;
+
+using xqt::test::fixturePath;
 
 using namespace xqt;
 
 namespace {
-void processEvents(int ms) {
-    QElapsedTimer t;
-    t.start();
-    while (t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-}
-
-QString fixture(const char8_t* rel) {
-    const auto p = GET_TESTFILE(rel);
-    return QString::fromUtf8(reinterpret_cast<const char*>(p.c_str()));
-}
 
 PagesModel& pagesOf(AppController& c) { return *qobject_cast<PagesModel*>(c.pagesModel()); }
 
@@ -91,12 +84,12 @@ QString sketchOf(AppController& c, int page) {
 
 void openPages(AppController& c) {
     c.newDocument();
-    ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
+    ASSERT_TRUE(c.openPath(fixturePath(u8"load/pages.xopp")));
 }
 
 void openLecture(AppController& c) {
     c.newDocument();
-    ASSERT_TRUE(c.openPath(fixture(u8"packaged_xopp/pdfBackground/old.xopp")));
+    ASSERT_TRUE(c.openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));
 }
 }  // namespace
 
@@ -142,7 +135,7 @@ TEST(Thumbnails, aChangedPageIsDrawnAgain) {
     const int before = ThumbnailProvider::renderCount();
 
     s->firePageChanged(0);
-    processEvents(40);
+    processEventsFor(40);
     const QString changed = urlOf(c, 0);
     EXPECT_NE(changed, url);
     EXPECT_EQ(urlOf(c, 1), other) << "only the changed page";
@@ -185,7 +178,7 @@ TEST(Thumbnails, closingATabForgetsItsThumbnails) {
     request(urlOf(c, 0), 256);
     ASSERT_GT(ThumbnailProvider::cacheBytes(), before);
     c.closeTab(c.tabManager().currentIndex());
-    processEvents(20);
+    processEventsFor(20);
     EXPECT_EQ(ThumbnailProvider::cacheBytes(), before);
 }
 
@@ -257,7 +250,7 @@ TEST_F(Sketches, aChangedPageKeepsItsOldSketchUntilItIsSketchedAgain) {
     const QString before = sketchOf(c, 1);
     PageSketches::instance().setDelays(0, 60000);  // (the edits did not pause yet)
     c.tabManager().currentSession()->firePageChanged(1);
-    processEvents(20);
+    processEventsFor(20);
     EXPECT_EQ(sketchOf(c, 1), before) << "never blank: the old sketch until then";
     PageSketches::instance().setDelays(0, 0);
     c.tabManager().currentSession()->firePageChanged(1);
@@ -307,7 +300,7 @@ TEST_F(Sketches, closingADocumentForgetsItsSketches) {
     ASSERT_GT(PageSketches::instance().bytes(), 0);
     const qint64 before = PageSketches::instance().bytes();
     c.closeTab(c.tabManager().currentIndex());
-    processEvents(20);
+    processEventsFor(20);
     EXPECT_LT(PageSketches::instance().bytes(), before);
 }
 
@@ -427,7 +420,7 @@ TEST_F(Sketches, changedPagesAreStoredOnceTheDocumentIsSaved) {
     ASSERT_TRUE(sketched());
     EXPECT_EQ(contentOf(saved / "0.jpg"), before) << "changed, not saved: the stored page stays as in the file";
 
-    processEvents(20);  // (a new modification time)
+    processEventsFor(20);  // (a new modification time)
     ASSERT_TRUE(c.save());
     ASSERT_TRUE(sketched());
     const fs::path now = PageSketches::instance().diskFolder(id);
@@ -452,7 +445,7 @@ TEST_F(Sketches, aPreviewThatArrivesWhileItsPageWaitsIsStoredAsWell) {
     view->getPage(0)->getRaster().ensureRendered(false);
     ASSERT_TRUE(RenderService::visiblePagesBusy());
     ASSERT_TRUE(c.saveAs(QUrl::fromLocalFile(dir.filePath("doc.xopp"))));
-    processEvents(100);  // (the sketches plan: every page waits)
+    processEventsFor(100);  // (the sketches plan: every page waits)
     const quint64 id = ThumbnailProvider::idOf(s);
     QImage sharp(1200, 1697, QImage::Format_RGB32);
     sharp.fill(Qt::white);

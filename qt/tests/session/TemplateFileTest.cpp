@@ -28,24 +28,13 @@
 #include "session/MergedPdf.h"
 #include "session/StickyNote.h"
 #include "session/TemplateFile.h"
+#include "support/TestSupport.h"
+
+using xqt::test::makeTextPdf;
 
 using namespace xqt;
 
 namespace {
-
-/// A PDF with one page per word, each word as real text.
-void makeTextPdf(const fs::path& p, const std::vector<std::string>& words) {
-    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
-    cairo_t* cr = cairo_create(s);
-    cairo_set_font_size(cr, 24);
-    for (const auto& w: words) {
-        cairo_move_to(cr, 72, 100);
-        cairo_show_text(cr, w.c_str());
-        cairo_show_page(cr);
-    }
-    cairo_destroy(cr);
-    cairo_surface_destroy(s);
-}
 
 ElementPtr stroke() {
     auto s = std::make_unique<Stroke>();

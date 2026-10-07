@@ -22,19 +22,14 @@
 #include "shell/DocumentLinks.h"
 #include "shell/Library.h"
 #include "shell/LinkRewrite.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+using xqt::test::writeFile;
 
 using namespace xqt;
 
 namespace {
-std::string readFile(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-void writeFile(const fs::path& p, const std::string& bytes) {
-    fs::create_directories(p.parent_path());
-    std::ofstream out(p, std::ios::binary);
-    out << bytes;
-}
 
 /// A .xopp with one page whose Markdown layer holds `markdown` (a box, or a link marker).
 void makeNotes(const fs::path& file, const std::string& markdown) {

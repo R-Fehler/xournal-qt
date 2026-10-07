@@ -46,22 +46,18 @@
 #include "undo/UndoRedoHandler.h"
 
 #include "AppController.h"
+#include "UiFixture.h"
 #include "CanvasView.h"
 #include "MdBox.h"
 #include "MdTasks.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+using xqt::test::writeFile;
 
 namespace fs = std::filesystem;
 
 namespace {
-std::string readFile(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-void writeFile(const fs::path& p, const std::string& bytes) {
-    fs::create_directories(p.parent_path());
-    std::ofstream out(p, std::ios::binary);
-    out << bytes;
-}
 
 /// A .xopp whose pages each have one Markdown box with this text
 void writeNotes(const fs::path& file, const std::vector<std::string>& pages) {
@@ -100,7 +96,7 @@ std::string boxesOf(Document& doc) {
     return all;
 }
 
-class TodosUiTest: public ::testing::Test {
+class TodosUiTest: public xqt::test::UiFixture {
 protected:
     void SetUp() override {
         ASSERT_TRUE(tmp.isValid());
@@ -111,53 +107,21 @@ protected:
                             "\n- [ ] a shopping item\n- [x] todo: done one\n",
                     "- [ ] todo: write the report\n"});
         writeFile(root / "Sub" / "plan.md", "# Plan\n\n- [ ] TODO: buy milk\n");
-        controller = std::make_unique<AppController>();
+        makeController();
         controller->setLibraryRoot(root);
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
         QMetaObject::invokeMethod(controller->settingsModel(), "set", Q_ARG(QString, "todoSource"),
                                   Q_ARG(QVariant, "marked"));
         QMetaObject::invokeMethod(controller->settingsModel(), "set", Q_ARG(QString, "todoMarker"),
                                   Q_ARG(QVariant, "todo:"));
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        window->resize(1400, 900);
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));
+        ASSERT_NO_FATAL_FAILURE(loadWindow({.size = QSize(1400, 900)}));
         library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
         todos = qobject_cast<xqt::LibraryTodosModel*>(controller->libraryTodosModel());
         ASSERT_NE(todos, nullptr);
         until([&] { return !library->indexing() && library->searchIndex()->todos().size() == 5; });
         ASSERT_EQ(library->searchIndex()->todos().size(), 5u);
     }
-    void TearDown() override {
-        controller->shutdown();
-        engine.reset();
-        controller.reset();
-    }
 
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    void until(const std::function<bool()>& done, int ms = 5000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
-    }
     void walk(QQuickItem* i, const std::function<void(QQuickItem*)>& f) const {
         f(i);
         for (QQuickItem* c: i->childItems()) {
@@ -172,12 +136,6 @@ protected:
             }
         });
         return found;
-    }
-    void click(QQuickItem* item) {
-        ASSERT_NE(item, nullptr);
-        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
-                          item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
-        wait(50);
     }
     /// The row of the list showing this text (nullptr: none)
     QQuickItem* rowWith(const QString& text) const {
@@ -217,17 +175,6 @@ protected:
         const QPointF at = view()->pageViewRect(0).topLeft() + QPointF(x, y) * view()->getViewController().zoom();
         return canvas->mapToScene(at).toPoint();
     }
-    static QObject* entryOf(QObject* menu, const char* name) {
-        const int n = menu ? menu->property("count").toInt() : 0;
-        for (int i = 0; i < n; ++i) {
-            QQuickItem* it = nullptr;
-            QMetaObject::invokeMethod(menu, "itemAt", Q_RETURN_ARG(QQuickItem*, it), Q_ARG(int, i));
-            if (it && it->objectName() == name) {
-                return it;
-            }
-        }
-        return nullptr;
-    }
     void showTodos() {
         click(findItem("todosPageButton"));
         until([&] { return findItem("todosList") != nullptr; });
@@ -236,9 +183,6 @@ protected:
 
     QTemporaryDir tmp;
     fs::path root;
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
     xqt::LibraryModel* library = nullptr;
     xqt::LibraryTodosModel* todos = nullptr;
 };

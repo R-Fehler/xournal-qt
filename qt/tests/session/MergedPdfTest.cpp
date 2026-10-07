@@ -16,29 +16,15 @@
 
 #include "pdf/base/XojPdfDocument.h"
 #include "session/MergedPdf.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+
+using xqt::test::makeTextPdf;
 
 using namespace xqt;
 
 namespace {
-/// A PDF with one page per word, each word as real text.
-void makeTextPdf(const fs::path& p, const std::vector<std::string>& words) {
-    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
-    cairo_t* cr = cairo_create(s);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, 24);
-    for (const auto& w: words) {
-        cairo_move_to(cr, 72, 100);
-        cairo_show_text(cr, w.c_str());
-        cairo_show_page(cr);
-    }
-    cairo_destroy(cr);
-    cairo_surface_destroy(s);
-}
-
-std::string bytesOf(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
 
 /// The word on each page, as poppler finds it (the first of `candidates` that is on the page, "" if none).
 std::vector<std::string> wordsOf(XojPdfDocument& pdf, const std::vector<std::string>& candidates) {
@@ -89,7 +75,7 @@ TEST_F(MergedPdfTest, pagesOfOtherPdfsAreAppendedWithTheirText) {
     makeTextPdf(path("lecture.pdf"), {"lectureone", "lecturetwo", "lecturethree"});
     makeTextPdf(path("other.pdf"), {"pastedalpha", "pastedbeta"});
     makeTextPdf(path("third.pdf"), {"pastedgamma"});
-    const std::string original = bytesOf(path("lecture.pdf"));
+    const std::string original = readFile(path("lecture.pdf"));
 
     std::string copied;
     ASSERT_TRUE(MergedPdf::extract(path("other.pdf"), {1}, copied).ok);
@@ -108,7 +94,7 @@ TEST_F(MergedPdfTest, pagesOfOtherPdfsAreAppendedWithTheirText) {
               (std::vector<std::string>{"lectureone", "lecturetwo", "lecturethree", "pastedbeta", "pastedgamma"}));
     EXPECT_EQ(MergedPdf::kindOf(path(".lecture.pages.pdf")), MergedPdf::Kind::WithSource);
     EXPECT_EQ(MergedPdf::kindOf(path("lecture.pdf")), MergedPdf::Kind::None) << "the user's PDF is not marked";
-    EXPECT_EQ(bytesOf(path("lecture.pdf")), original) << "the user's PDF is never changed";
+    EXPECT_EQ(readFile(path("lecture.pdf")), original) << "the user's PDF is never changed";
     EXPECT_FALSE(fs::exists(path("..lecture.pages.pdf.part"))) << "no temporary file left";
 }
 

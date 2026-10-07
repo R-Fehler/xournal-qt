@@ -44,15 +44,14 @@
 #include "undo/UndoRedoHandler.h"
 
 #include "AppController.h"
+#include "UiFixture.h"
+#include "support/TestSupport.h"
+
+using xqt::test::writeFile;
 
 namespace fs = std::filesystem;
 
 namespace {
-void writeFile(const fs::path& p, const std::string& bytes) {
-    fs::create_directories(p.parent_path());
-    std::ofstream out(p, std::ios::binary);
-    out << bytes;
-}
 
 /// A .xopp with one typed text
 void writeNotes(const fs::path& file, const std::string& text) {
@@ -84,7 +83,7 @@ void writePdf(const fs::path& p, const char* keywords) {
     cairo_surface_destroy(s);
 }
 
-class TagsUiTest: public ::testing::Test {
+class TagsUiTest: public xqt::test::UiFixture {
 protected:
     void SetUp() override {
         ASSERT_TRUE(tmp.isValid());
@@ -93,49 +92,17 @@ protected:
         writeFile(root / "Sub" / "plan.md", "# Plan\n\nFor #course, also #one #two #three\n");
         writePdf(root / "Sub" / "paper.pdf", "exam");
         writePdf(root / "plain.pdf", "");
-        controller = std::make_unique<AppController>();
+        makeController();
         controller->setLibraryRoot(root);
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        window->resize(1400, 900);
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));
+        ASSERT_NO_FATAL_FAILURE(loadWindow({.size = QSize(1400, 900)}));
         library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
         tags = qobject_cast<xqt::LibraryTagsModel*>(controller->libraryTagsModel());
         ASSERT_NE(tags, nullptr);
         until([&] { return !library->indexing() && library->searchIndex()->tagged().size() == 3; });
         ASSERT_EQ(library->searchIndex()->tagged().size(), 3u);
     }
-    void TearDown() override {
-        controller->shutdown();
-        engine.reset();
-        controller.reset();
-    }
 
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    void until(const std::function<bool()>& done, int ms = 5000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
-    }
     void walk(QQuickItem* i, const std::function<void(QQuickItem*)>& f) const {
         f(i);
         for (QQuickItem* c: i->childItems()) {
@@ -159,12 +126,6 @@ protected:
             }
         });
         return out;
-    }
-    void click(QQuickItem* item) {
-        ASSERT_NE(item, nullptr);
-        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
-                          item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
-        wait(50);
     }
     /// The row of the Tags list for this tag (nullptr: none shown)
     QQuickItem* tagRow(const QString& tag) const {
@@ -201,9 +162,6 @@ protected:
 
     QTemporaryDir tmp;
     fs::path root;
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
     xqt::LibraryModel* library = nullptr;
     xqt::LibraryTagsModel* tags = nullptr;
 };

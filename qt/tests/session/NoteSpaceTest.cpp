@@ -47,7 +47,10 @@
 #include "view/DocumentView.h"
 #include "view/background/BackgroundFlags.h"
 
-#include "../SearchHits.h"
+#include "support/SearchHits.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
 
 using namespace xqt;
 
@@ -82,11 +85,6 @@ Stroke* addStroke(DocumentSession& s, size_t page, std::vector<Point> points, Co
     std::unique_lock lock(*s.getDocument());
     s.getDocument()->getPage(page)->getSelectedLayer()->addElement(std::move(stroke));
     return raw;
-}
-
-std::string bytesOf(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
 /// A page as the app draws it (DocumentView with a PdfCache, as the canvas does), 1 px per point.
@@ -509,14 +507,14 @@ TEST_F(NoteSpaceTest, anIncrementalSaveFollowsAChangeOfTheSpace) {
     addStroke(*s, 1, {Point(72, 108), Point(180, 108)});
     const fs::path out = path("slides.notes.pdf");
     ASSERT_TRUE(s->saveAsHybrid(out).ok);
-    const std::string first = bytesOf(out);
+    const std::string first = readFile(out);
 
     // Space on page 2 (with ink) and page 3 (without): appended
     ASSERT_EQ(notespace::apply(*s, {1, 2}, points(100, 0, 0, 60)), 2u);
     auto r = s->save();
     ASSERT_TRUE(r.ok) << r.error;
     EXPECT_TRUE(r.incremental);
-    EXPECT_TRUE(bytesOf(out).substr(0, first.size()) == first) << "appended";
+    EXPECT_TRUE(readFile(out).substr(0, first.size()) == first) << "appended";
     {
         XojPdfDocument pdf;
         ASSERT_TRUE(pdf.load(out, "", nullptr));

@@ -51,6 +51,11 @@
 #include "undo/UndoRedoHandler.h"
 
 #include "AppController.h"
+#include "UiFixture.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+using xqt::test::gunzip;
 
 namespace fs = std::filesystem;
 
@@ -107,40 +112,10 @@ void addText(xqt::DocumentSession& s, size_t pageNo, const std::string& text) {
     s.getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, layer, raw));
 }
 
-std::string bytesOf(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
-std::string gunzip(const std::string& data) {
-    if (data.size() < 2 || static_cast<unsigned char>(data[0]) != 0x1f || static_cast<unsigned char>(data[1]) != 0x8b) {
-        return {};
-    }
-    z_stream z{};
-    if (inflateInit2(&z, 15 + 32) != Z_OK) {
-        return {};
-    }
-    std::string out;
-    char buf[65536];
-    z.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
-    z.avail_in = static_cast<uInt>(data.size());
-    while (true) {
-        z.next_out = reinterpret_cast<Bytef*>(buf);
-        z.avail_out = sizeof buf;
-        const int rc = inflate(&z, Z_NO_FLUSH);
-        out.append(buf, sizeof buf - z.avail_out);
-        if (rc != Z_OK) {
-            break;
-        }
-    }
-    inflateEnd(&z);
-    return out;
-}
-
 /// What can be read of a file without a password: its bytes, gunzipped, a library pack uncompressed, a PDF's strings
 /// and streams (decoded, an embedded .xopp gunzipped).
 std::string readable(const fs::path& file) {
-    const std::string bytes = bytesOf(file);
+    const std::string bytes = readFile(file);
     std::string all = bytes + gunzip(bytes);
     if (bytes.rfind("XQPK", 0) == 0 && bytes.size() > 6) {
         const QByteArray body = QByteArray::fromStdString(bytes.substr(6));
@@ -220,84 +195,22 @@ struct FakeApps: xqt::SystemApps {
     }
 };
 
-class PdfPasswordTest: public ::testing::Test {
+class PdfPasswordTest: public xqt::test::UiFixture {
 protected:
     void SetUp() override {
         ASSERT_TRUE(tmp.isValid());
         dir = fs::path(tmp.path().toStdString());
         xqt::SystemApps::setInstance(&apps);
-        controller = std::make_unique<AppController>();
+        makeController();
+        untilMs = 10000;
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
         QMetaObject::invokeMethod(controller->settingsModel(), "resetLayoutChoices");
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));
+        ASSERT_NO_FATAL_FAILURE(loadWindow());
         wait(100);
     }
     void TearDown() override {
-        controller->shutdown();
-        engine.reset();
-        controller.reset();
+        closeApp();
         xqt::SystemApps::setInstance(nullptr);
-    }
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    void until(const std::function<bool()>& done, int ms = 10000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
-    }
-    template <typename T = QObject>
-    T* find(const char* name) const {
-        return window->findChild<T*>(name);
-    }
-    QQuickItem* findItem(const char* name) const {
-        std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* i) -> QQuickItem* {
-            if (i->objectName() == name) {
-                return i;
-            }
-            for (QQuickItem* c: i->childItems()) {
-                if (QQuickItem* f = walk(c)) {
-                    return f;
-                }
-            }
-            return nullptr;
-        };
-        return walk(window->contentItem());
-    }
-    void click(QQuickItem* item) {
-        ASSERT_NE(item, nullptr);
-        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
-                          item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
-        wait(50);
-    }
-    static bool waitOpened(QObject* popup, bool opened, int timeoutMs = 5000) {
-        auto done = [&] {
-            return popup->property("opened").toBool() == opened && popup->property("visible").toBool() == opened;
-        };
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < timeoutMs) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-        return done();
     }
     xqt::DocumentSession* session() const { return controller->tabManager().currentSession(); }
     int tabCount() const { return controller->tabManager().count(); }
@@ -305,9 +218,6 @@ protected:
     QTemporaryDir tmp;
     fs::path dir;
     FakeApps apps;
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
 };
 }  // namespace
 

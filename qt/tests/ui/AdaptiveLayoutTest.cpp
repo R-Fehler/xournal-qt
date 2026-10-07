@@ -66,6 +66,7 @@
 
 #include "AdaptiveLayout.h"
 #include "AppController.h"
+#include "UiFixture.h"
 #include "LayoutWalk.h"
 #include "config-test.h"
 
@@ -138,7 +139,7 @@ const Known knownOutside[] = {
 /// A folder deep down in the library: its breadcrumbs are too long for a phone
 const char* const deepFolder = "Physics/Semester 3 (winter)/Quantum mechanics/Exercise sheets";
 
-class AdaptiveLayoutTest: public ::testing::Test {
+class AdaptiveLayoutTest: public xqt::test::UiFixture {
 protected:
     void SetUp() override {
         if (std::string(::testing::UnitTest::GetInstance()->current_test_info()->name()).rfind("allSizes", 0) == 0 &&
@@ -157,27 +158,14 @@ protected:
         fs::copy_file(fs::path(GET_TESTFILE(u8"packaged_xopp/pdfBackground/old.xopp.bg.pdf")), root / "lecture.pdf");
         fs::create_directories(root / deepFolder);
 
-        controller = std::make_unique<AppController>();
+        makeController();
         controller->setLibraryRoot(root);
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
         settings = controller->settingsModel();
         QMetaObject::invokeMethod(settings, "resetLayoutChoices");  // (the tests of a run share the config)
         QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "adaptiveLayout"), Q_ARG(QVariant, true));
         QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "touchProfile"), Q_ARG(QVariant, "auto"));
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        window->requestActivate();
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));
+        ASSERT_NO_FATAL_FAILURE(loadWindow({.activate = true}));
         adaptive = window->property("adaptive").value<QObject*>();
         ASSERT_NE(adaptive, nullptr);
         wait(100);
@@ -186,41 +174,9 @@ protected:
         if (settings) {
             QMetaObject::invokeMethod(settings, "resetLayoutChoices");
         }
-        if (controller) {
-            controller->shutdown();
-        }
-        engine.reset();
-        controller.reset();
+        closeApp();
     }
 
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    void until(const std::function<bool()>& done, int ms = 3000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
-    }
-    QQuickItem* findItem(const char* name) const {
-        std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* i) -> QQuickItem* {
-            if (i->objectName() == name) {
-                return i;
-            }
-            for (QQuickItem* c: i->childItems()) {
-                if (QQuickItem* f = walk(c)) {
-                    return f;
-                }
-            }
-            return nullptr;
-        };
-        return walk(window->contentItem());
-    }
     QPoint centerOf(QQuickItem* item) const {
         return item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint();
     }
@@ -770,9 +726,6 @@ protected:
 
     QTemporaryDir tmp;
     fs::path root;
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
     QObject* adaptive = nullptr;
     QObject* settings = nullptr;
 };
@@ -2562,9 +2515,21 @@ TEST_F(PhoneChromeTest, theAppBarAndTheDockAtAPhonesSizes) {
             if (!phoneChrome() || !bar || !named("phoneDock") || !named("phoneDock")->isVisible()) {
                 return false;
             }
-            for (const char* name: {"phoneHomeButton", "phoneTitle", "phoneTabCount", "moreButton", "toolboxPageButton"}) {
+            for (const char* name: {"phoneHomeButton", "phoneTitle", "phoneTabCount", "moreButton"}) {
                 auto* item = findItem(name);
                 if (!item || !shownInWindow(item)) {
+                    return false;
+                }
+            }
+            // The dock's buttons in it (held sideways the dock is a rail: no page button in it, as checkPhoneChrome
+            // knows)
+            auto* box = named("toolbox");
+            const bool sideways = box && box->property("vertical").toBool();
+            const QRectF dock = sceneRect(named("phoneDock")).adjusted(-1, -1, 1, 1);
+            for (const char* name:
+                 {"toolboxUndoButton", "toolboxRedoButton", sideways ? "toolboxUndoButton" : "toolboxPageButton"}) {
+                auto* item = findItem(name);
+                if (!item || !shownInWindow(item) || !dock.contains(sceneRect(item))) {
                     return false;
                 }
             }

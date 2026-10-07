@@ -26,7 +26,7 @@
 #include "render/RenderService.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
-#include "../SearchHits.h"
+#include "support/SearchHits.h"
 #include "session/DocumentSession.h"
 
 #include "CanvasPage.h"

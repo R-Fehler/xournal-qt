@@ -44,20 +44,16 @@
 
 #include "MarkdownFile.h"
 #include "MdPassages.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+using xqt::test::writeFile;
+
+using xqt::test::waitFor;
 
 using namespace xqt;
 
 namespace {
-
-void writeFile(const fs::path& p, const std::string& content) {
-    fs::create_directories(p.parent_path());
-    std::ofstream(p, std::ios::binary) << content;
-}
-
-std::string readFile(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
 
 std::vector<std::string> names(const std::vector<DocumentItem>& items) {
     std::vector<std::string> n;
@@ -68,14 +64,6 @@ std::vector<std::string> names(const std::vector<DocumentItem>& items) {
 }
 
 QString qstr(const fs::path& p) { return QString::fromStdString(p.string()); }
-
-void waitFor(const std::function<bool()>& cond, int ms = 5000) {
-    QElapsedTimer t;
-    t.start();
-    while (!cond() && t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
-    }
-}
 
 /// A long Markdown text: a heading, then paragraphs; "needle" in paragraphs 5, 40, 41 and 80.
 std::string longMarkdown() {

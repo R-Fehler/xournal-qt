@@ -28,6 +28,9 @@
 #include "shell/LibraryInkJob.h"
 #include "shell/LibraryShare.h"
 #include "shell/LibraryUnzip.h"
+#include "support/TestSupport.h"
+
+using xqt::test::waitFor;
 
 using namespace xqt;
 
@@ -229,14 +232,6 @@ fs::path writeNotes(const QTemporaryDir& dir, const char* name, size_t pages, in
     return file;
 }
 
-bool waitFor(const std::function<bool()>& done, int ms = 10000) {
-    QElapsedTimer t;
-    t.start();
-    while (!done() && t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-    return done();
-}
 }  // namespace
 
 TEST_F(InkLibraryTest, theLibrarysHandwritingIsReadOnMainsPower) {
@@ -262,7 +257,7 @@ TEST_F(InkLibraryTest, theLibrarysHandwritingIsReadOnMainsPower) {
     EXPECT_EQ(fake->calls(), 0);
     mains = true;
     job.check();
-    ASSERT_TRUE(waitFor([&] { return !job.running() && index.inkOf(a) && index.inkOf(b) && index.inkOf(c); }));
+    ASSERT_TRUE(waitFor([&] { return !job.running() && index.inkOf(a) && index.inkOf(b) && index.inkOf(c); }, 10000));
     EXPECT_EQ(fake->calls(), 6);  // (2 x 2 lines, 1, 1)
     EXPECT_TRUE(index.inkOf(a)->complete);
     EXPECT_EQ(index.inkOf(a)->pages.size(), 2u);
@@ -299,7 +294,7 @@ TEST_F(InkLibraryTest, aSharedZipUnpackedWithOtherTimesIsNotReadAgain) {
         job.setIndex(&index);
         job.setEnabled(true);
         job.check();
-        ASSERT_TRUE(waitFor([&] { return !job.running() && index.inkOf(a) && index.inkOf(b); }));
+        ASSERT_TRUE(waitFor([&] { return !job.running() && index.inkOf(a) && index.inkOf(b); }, 10000));
         ASSERT_EQ(fake->calls(), 5);
         job.setIndex(nullptr);
         index.update({itemOf(a), itemOf(b)});  // (the content hashes, after the documents)
@@ -348,7 +343,7 @@ TEST_F(InkLibraryTest, aSharedZipUnpackedWithOtherTimesIsNotReadAgain) {
     received.waitForDone();
     EXPECT_EQ(received.documentsRead(), 1);
     job.check();
-    ASSERT_TRUE(waitFor([&] { return !job.running() && received.inkOf(r.folder / "a.xopp"); }));
+    ASSERT_TRUE(waitFor([&] { return !job.running() && received.inkOf(r.folder / "a.xopp"); }, 10000));
     EXPECT_GT(fake->calls(), before) << "its new handwriting is read";
     LibraryInkJob::setPowerSource({});
 }

@@ -17,7 +17,7 @@
 #include "shell/Library.h"
 #include "shell/LibraryCache.h"
 
-#include "../CitationPdfs.h"
+#include "support/CitationPdfs.h"
 
 using namespace xqt;
 

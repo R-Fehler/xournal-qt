@@ -35,6 +35,7 @@
 
 #include "AppController.h"
 #include "AudioControl.h"
+#include "EngineSetup.h"
 #include "audio/AudioDevice.h"
 #include "hwr/HandwritingSearch.h"
 #include "hwr/ModelInfo.h"
@@ -43,16 +44,10 @@
 #include "hwr/TrocrRecognizer.h"
 #endif
 #include "EmojiFont.h"
-#include "shell/HitPages.h"
-#include "shell/MdSnippets.h"
-#include "shell/AnnotationsModel.h"
 #include "shell/Library.h"
-#include "shell/Previews.h"
 #include "shell/SessionRecovery.h"
 #include "shell/SingleInstance.h"
 #include "shell/SystemApps.h"
-#include "shell/PageSketches.h"
-#include "shell/Thumbnails.h"
 #include "DocumentCanvasItem.h"
 #include "session/AppContext.h"
 #ifdef Q_OS_ANDROID
@@ -282,13 +277,7 @@ int main(int argc, char* argv[]) {
 #endif
 
     QQmlApplicationEngine engine;
-    engine.addImageProvider("thumbnail", new xqt::ThumbnailProvider);  // the engine takes ownership
-    engine.addImageProvider("sketch", new xqt::SketchProvider);
-    engine.addImageProvider("preview", new xqt::PreviewProvider);
-    engine.addImageProvider("hitpage", new xqt::HitPageProvider);
-    engine.addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-    engine.addImageProvider("annotation", new xqt::AnnotationImageProvider);
-    engine.rootContext()->setContextProperty("app", &controller);
+    xqt::setUpEngine(engine, &controller);  // (the image providers and `app`: the UI tests' fixture uses it too)
     AppController::setStartMaximized(true);
     // Undocked documents get a window of their own: the same QML, with their own controller as "app".
     AppController::setWindowFactory([&engine](AppController* window) {

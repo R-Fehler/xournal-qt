@@ -41,6 +41,9 @@
 #include "session/IncrementalPdf.h"
 #include "session/PdfHistory.h"
 #include "session/PdfRevisions.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
 
 using namespace xqt;
 
@@ -73,11 +76,6 @@ int qpdfCheck(const fs::path& pdf, std::string& output) {
     job.run();
     output = out.str() + err.str();
     return job.getExitCode();
-}
-
-std::string fileBytes(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
 /// A stroke on a page, as the pen adds it.
@@ -309,13 +307,13 @@ TEST_F(PdfHistoryTest, neverCompactedWhileOn) {
 TEST_F(PdfHistoryTest, versionZeroIsThePdfAsReceived) {
     const fs::path pdf = path("lecture.pdf");
     auto s = lecture(pdf);
-    const std::string received = fileBytes(pdf);
+    const std::string received = readFile(pdf);
     DocumentMode::setKeepVersionsOfNewPdfs(*app->getSettings(), true);
     EXPECT_TRUE(s->keepsVersions()) << "the setting for new PDFs with notes";
     const auto r = s->saveAsHybrid(pdf);  // (notes saved into the PDF itself)
     ASSERT_TRUE(r.ok) << r.error;
     EXPECT_EQ(r.version, 1);
-    const std::string after = fileBytes(pdf);
+    const std::string after = readFile(pdf);
     EXPECT_EQ(after.substr(0, received.size()), received) << "the PDF as received stays, the notes follow";
     const auto listed = PdfHistory::list(pdf);
     ASSERT_EQ(listed.versions.size(), 2u);
@@ -416,7 +414,7 @@ TEST_F(PdfHistoryTest, anotherAppsRevisionIsKeptAndTheFallbackKeepsTheVersions) 
     EXPECT_TRUE(r.incremental) << "appended, not written anew";
     EXPECT_FALSE(r.replacedVersion);
     EXPECT_EQ(r.version, 3);
-    EXPECT_FALSE(fileBytes(out).empty());
+    EXPECT_FALSE(readFile(out).empty());
     EXPECT_GT(fs::file_size(out), otherEnd);
     listed = PdfHistory::list(out);
     ASSERT_EQ(listed.versions.size(), 3u);
@@ -540,10 +538,10 @@ TEST_F(PdfHistoryTest, olderVersionsAreStoredAsDeltas) {
     // export-xopp: any version as a .xopp of its own
     ASSERT_TRUE(PdfHistory::exportXopp(out, 3, path("v3.xopp"), error)) << error;
     bool ok = false;
-    EXPECT_EQ(countOf(PdfHistory::gunzip(fileBytes(path("v3.xopp")), ok), "<stroke"), strokes[2]);
+    EXPECT_EQ(countOf(PdfHistory::gunzip(readFile(path("v3.xopp")), ok), "<stroke"), strokes[2]);
     EXPECT_TRUE(ok);
     ASSERT_TRUE(PdfHistory::exportXopp(out, -1, path("latest.xopp"), error)) << error;
-    EXPECT_EQ(countOf(PdfHistory::gunzip(fileBytes(path("latest.xopp")), ok), "<stroke"), strokes.back());
+    EXPECT_EQ(countOf(PdfHistory::gunzip(readFile(path("latest.xopp")), ok), "<stroke"), strokes.back());
     EXPECT_FALSE(PdfHistory::exportXopp(out, 99, path("none.xopp"), error));
 }
 

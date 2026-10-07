@@ -16,7 +16,11 @@
 #include "shell/DocumentFiles.h"
 #include "shell/LibraryCache.h"
 
-#include "../FailingWrites.h"
+#include "support/FailingWrites.h"
+#include "support/TestSupport.h"
+
+using xqt::test::waitFor;
+using xqt::test::processEventsFor;
 
 using namespace xqt;
 
@@ -36,13 +40,6 @@ QString text(qsizetype chars) {
         s += QStringLiteral("word%1 ").arg(i * 7919 % 100003);
     }
     return s;
-}
-void waitFor(const std::function<bool()>& cond, int ms = 3000) {
-    QElapsedTimer t;
-    t.start();
-    while (!cond() && t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
 }
 
 class LibraryCacheTest: public ::testing::Test {
@@ -214,7 +211,7 @@ TEST_F(LibraryCacheTest, writesWaitForAPauseButNotForever) {
     t.start();
     while (writes == 1 && t.elapsed() < 2000) {
         scheduler.changed();
-        waitFor([] { return false; }, 20);
+        processEventsFor(20);
     }
     EXPECT_EQ(writes, 2);
     EXPECT_LT(t.elapsed(), 600);
@@ -225,6 +222,6 @@ TEST_F(LibraryCacheTest, writesWaitForAPauseButNotForever) {
     EXPECT_EQ(writes, 3);
     scheduler.changed();
     scheduler.cancel();
-    waitFor([] { return false; }, 150);
+    processEventsFor(150);
     EXPECT_EQ(writes, 3) << "cancelled";
 }

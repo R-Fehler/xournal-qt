@@ -15,15 +15,13 @@
 #include "shell/RecentFiles.h"
 #include "shell/SystemApps.h"
 #include "AppController.h"
+#include "support/TestSupport.h"
+
+using xqt::test::writeFile;
 
 using namespace xqt;
 
 namespace {
-
-void writeFile(const fs::path& p, const std::string& content) {
-    fs::create_directories(p.parent_path());
-    std::ofstream(p, std::ios::binary) << content;
-}
 
 QString qstr(const fs::path& p) { return QString::fromStdString(p.string()); }
 

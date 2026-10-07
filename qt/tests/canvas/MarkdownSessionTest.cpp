@@ -18,7 +18,7 @@
 #include "model/XojPage.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
-#include "../SearchHits.h"
+#include "support/SearchHits.h"
 #include "session/DocumentSession.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/Matrix.h"

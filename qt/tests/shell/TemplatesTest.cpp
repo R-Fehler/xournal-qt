@@ -41,23 +41,15 @@
 #include "undo/UndoRedoHandler.h"
 
 #include "AppController.h"
+#include "support/TestSupport.h"
+
+using xqt::test::makeTextPdf;
+
+using xqt::test::waitFor;
 
 using namespace xqt;
 
 namespace {
-
-void makeTextPdf(const fs::path& p, const std::vector<std::string>& words) {
-    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
-    cairo_t* cr = cairo_create(s);
-    cairo_set_font_size(cr, 24);
-    for (const auto& w: words) {
-        cairo_move_to(cr, 72, 100);
-        cairo_show_text(cr, w.c_str());
-        cairo_show_page(cr);
-    }
-    cairo_destroy(cr);
-    cairo_surface_destroy(s);
-}
 
 void touch(const fs::path& file, const std::string& content = "x") {
     fs::create_directories(file.parent_path());
@@ -90,18 +82,6 @@ size_t strokesOn(const XojPage& page) {
     return n;
 }
 
-bool waitFor(const std::function<bool()>& done, int ms = 20000) {
-    QElapsedTimer t;
-    t.start();
-    while (!done()) {
-        if (t.elapsed() > ms) {
-            return false;
-        }
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-    return true;
-}
-
 QUrl url(const fs::path& p) { return QUrl::fromLocalFile(QString::fromStdString(p.string())); }
 
 class TemplatesTest: public ::testing::Test {
@@ -128,7 +108,7 @@ protected:
                   const QString& folder = {}) {
         QSignalSpy saved(&c, &AppController::templateSaved);
         EXPECT_TRUE(c.saveTemplate(page, name, folder, background, content, true));
-        EXPECT_TRUE(waitFor([&] { return saved.count() > 0; }));
+        EXPECT_TRUE(waitFor([&] { return saved.count() > 0; }, 20000));
         if (saved.isEmpty()) {
             return {};
         }
@@ -139,7 +119,7 @@ protected:
     int insert(AppController& c, const fs::path& file, int position = -1, int count = 1) {
         QSignalSpy done(&c, &AppController::templateInserted);
         EXPECT_TRUE(c.insertTemplate(QString::fromStdString(file.string()), position, count));
-        EXPECT_TRUE(waitFor([&] { return done.count() > 0; }));
+        EXPECT_TRUE(waitFor([&] { return done.count() > 0; }, 20000));
         if (done.isEmpty()) {
             return 0;
         }
@@ -377,7 +357,7 @@ TEST_F(TemplatesTest, aNewDocumentStartsWithTheTemplatesPage) {
 
     QSignalSpy done(&c, &AppController::templateInserted);
     ASSERT_TRUE(c.createDocumentFromTemplate("Week 1", true, QString::fromStdString(slide.string())));
-    ASSERT_TRUE(waitFor([&] { return done.count() > 0; }));
+    ASSERT_TRUE(waitFor([&] { return done.count() > 0; }, 20000));
     EXPECT_EQ(done.first().at(2).toString(), QString());
     DocumentSession& s = current(c);
     ASSERT_EQ(s.getDocument()->getPageCount(), 1u);
@@ -396,7 +376,7 @@ TEST_F(TemplatesTest, aMissingTemplateSaysSo) {
     c.newDocument();
     QSignalSpy done(&c, &AppController::templateInserted);
     ASSERT_TRUE(c.insertTemplate(QString::fromStdString((root / "missing.xopp").string())));
-    ASSERT_TRUE(waitFor([&] { return done.count() > 0; }));
+    ASSERT_TRUE(waitFor([&] { return done.count() > 0; }, 20000));
     EXPECT_FALSE(done.first().at(2).toString().isEmpty());
     EXPECT_EQ(current(c).getDocument()->getPageCount(), 1u);
 }

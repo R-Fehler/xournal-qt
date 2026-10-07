@@ -15,6 +15,9 @@
 #include "hwr/FakeRecognizer.h"
 #include "hwr/InkCopy.h"
 #include "hwr/InkRecognitionService.h"
+#include "support/TestSupport.h"
+
+using xqt::test::waitFor;
 
 using namespace xqt;
 using namespace xqt::hwr;
@@ -73,14 +76,6 @@ std::vector<InkStroke> page(int lines, int shape = 0) {
     return out;
 }
 
-bool waitFor(const std::function<bool()>& done, int ms = 10000) {
-    QElapsedTimer t;
-    t.start();
-    while (!done() && t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-    return done();
-}
 }  // namespace
 
 // Words in any order become lines top to bottom, words left to right; a line written on a slope or with tall letters
@@ -189,12 +184,12 @@ TEST(InkCopyTest, aPageBeingReadGivesWayToAnUrgentJob) {
         order.push_back(1);
         whole = std::move(r);
     });
-    ASSERT_TRUE(waitFor([&] { return fake->calls() >= 2; }));
+    ASSERT_TRUE(waitFor([&] { return fake->calls() >= 2; }, 10000));
     InkRecognitionService::Job copy;
     copy.strokes = page(1, 30);
     copy.urgent = true;
     service.submit(&copier, std::move(copy), [&](PageResult) { order.push_back(2); });
-    ASSERT_TRUE(waitFor([&] { return order.size() == 2; }));
+    ASSERT_TRUE(waitFor([&] { return order.size() == 2; }, 10000));
     EXPECT_EQ(order, (std::vector<int>{2, 1}));
     EXPECT_TRUE(whole.complete);
     EXPECT_EQ(whole.lines.size(), 6u);

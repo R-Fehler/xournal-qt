@@ -19,9 +19,9 @@
 #include "shell/NetFetch.h"
 #include "shell/SettingsModel.h"
 
-#include "../ArxivSamples.h"
-#include "../CitationPdfs.h"
-#include "../FakeNet.h"
+#include "support/ArxivSamples.h"
+#include "support/CitationPdfs.h"
+#include "support/FakeNet.h"
 
 using namespace xqt;
 

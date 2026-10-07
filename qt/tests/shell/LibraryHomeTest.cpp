@@ -24,22 +24,16 @@
 #include "shell/TabManager.h"
 #include "util/PathUtil.h"
 #include "AppController.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+using xqt::test::writeFile;
 
 using namespace xqt;
 namespace LM = xqt::LibraryMigration;
 
 namespace {
 
-void writeFile(const fs::path& p, const std::string& content) {
-    fs::create_directories(p.parent_path());
-    std::ofstream(p, std::ios::binary) << content;
-}
-std::string readFile(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    std::stringstream s;
-    s << in.rdbuf();
-    return s.str();
-}
 QString qstr(const fs::path& p) { return QString::fromStdString(p.string()); }
 RecentFiles* recentOf(const AppController& c) { return static_cast<RecentFiles*>(c.recentModel()); }
 LibraryModel* libraryOf(const AppController& c) { return static_cast<LibraryModel*>(c.libraryModel()); }

@@ -27,23 +27,15 @@
 
 #include "pdf/base/XojPdfDocument.h"
 #include "session/IncrementalPdf.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+
+using xqt::test::makeTextPdf;
 
 using namespace xqt;
 
 namespace {
-void makeTextPdf(const fs::path& p, const std::vector<std::string>& words) {
-    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
-    cairo_t* cr = cairo_create(s);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, 24);
-    for (const auto& w: words) {
-        cairo_move_to(cr, 72, 100);
-        cairo_show_text(cr, w.c_str());
-        cairo_show_page(cr);
-    }
-    cairo_destroy(cr);
-    cairo_surface_destroy(s);
-}
 
 int qpdfCheck(const fs::path& pdf, std::string& output) {
     std::ostringstream out, err;
@@ -57,11 +49,6 @@ int qpdfCheck(const fs::path& pdf, std::string& output) {
     job.run();
     output = out.str() + err.str();
     return job.getExitCode();
-}
-
-std::string fileBytes(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
 size_t countOf(const std::string& text, const std::string& what) {
@@ -96,7 +83,7 @@ protected:
 TEST_F(IncrementalPdfTest, writesAnUpdateInTheFilesStyle) {
     for (const bool streams: {false, true}) {
         const fs::path file = written(streams);
-        const std::string before = fileBytes(file);
+        const std::string before = readFile(file);
         IncrementalPdf::Tail tail;
         std::string error;
         ASSERT_TRUE(IncrementalPdf::readTail(file, tail, error)) << error;
@@ -123,7 +110,7 @@ TEST_F(IncrementalPdfTest, writesAnUpdateInTheFilesStyle) {
         EXPECT_EQ(stats.added, 1u);
         const auto r = IncrementalPdf::append(file, tail, update);
         ASSERT_TRUE(r.ok) << r.error;
-        const std::string after = fileBytes(file);
+        const std::string after = readFile(file);
         EXPECT_EQ(after.size(), r.size);
         EXPECT_EQ(after.substr(0, before.size()), before) << "the file's bytes stay, the update follows them";
         const std::string added = after.substr(before.size());
@@ -201,7 +188,7 @@ TEST_F(IncrementalPdfTest, addsStreamsAndCopiesOfOtherPdfs) {
 // a crash before goes with the next write
 TEST_F(IncrementalPdfTest, aFailedWriteLeavesTheFileAsItWas) {
     const fs::path file = written(true);
-    const std::string before = fileBytes(file);
+    const std::string before = readFile(file);
     IncrementalPdf::Tail tail;
     std::string error;
     ASSERT_TRUE(IncrementalPdf::readTail(file, tail, error));
@@ -226,7 +213,7 @@ TEST_F(IncrementalPdfTest, aFailedWriteLeavesTheFileAsItWas) {
         const auto r = IncrementalPdf::append(file, tail, update);
         EXPECT_FALSE(r.ok);
         EXPECT_FALSE(r.error.empty());
-        EXPECT_EQ(fileBytes(file), before);
+        EXPECT_EQ(readFile(file), before);
         noTemporaryFile();
     }
     IncrementalPdf::failWriteAt = nullptr;
@@ -234,7 +221,7 @@ TEST_F(IncrementalPdfTest, aFailedWriteLeavesTheFileAsItWas) {
     IncrementalPdf::Tail other = tail;
     other.size += 1;
     EXPECT_FALSE(IncrementalPdf::append(file, other, update).ok);
-    EXPECT_EQ(fileBytes(file), before);
+    EXPECT_EQ(readFile(file), before);
     // A temporary file a crash left behind (older than ten minutes) goes
     const fs::path stale = fs::path(tmp.path().toStdString()) / ("." + file.filename().string() + ".4242-1.part");
     std::ofstream(stale) << before.substr(0, 100);

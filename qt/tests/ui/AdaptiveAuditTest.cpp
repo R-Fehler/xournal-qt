@@ -34,6 +34,7 @@
 #include "shell/Thumbnails.h"
 
 #include "AppController.h"
+#include "UiFixture.h"
 #include "LayoutWalk.h"
 #include "config-test.h"
 
@@ -43,7 +44,7 @@ namespace {
 using Size = xqt::uitest::WindowSize;
 using xqt::uitest::labelOf;
 
-class AdaptiveAuditTest: public ::testing::Test {
+class AdaptiveAuditTest: public xqt::test::UiFixture {
 protected:
     /// A new window of this size, with a library of a few documents (each size starts afresh)
     void openWindow(const Size& s) {
@@ -68,58 +69,12 @@ protected:
         }
         std::ofstream(root / "kalman.md") << text;
 
-        controller = std::make_unique<AppController>();
+        makeController();
         controller->setLibraryRoot(root);
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));
+        ASSERT_NO_FATAL_FAILURE(loadWindow());
         window->resize(s.w, s.h);  // (before anything is shown: the bindings on the width see the size first)
         wait(300);
-    }
-    void closeWindow() {
-        if (controller) {
-            controller->shutdown();
-        }
-        engine.reset();
-        controller.reset();
-        window = nullptr;
-    }
-    void TearDown() override { closeWindow(); }
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    template <typename T = QObject>
-    T* find(const char* name) const {
-        return window->findChild<T*>(name);
-    }
-    QQuickItem* findItem(const char* name) const {
-        std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* i) -> QQuickItem* {
-            if (i->objectName() == name) {
-                return i;
-            }
-            for (QQuickItem* c: i->childItems()) {
-                if (QQuickItem* f = walk(c)) {
-                    return f;
-                }
-            }
-            return nullptr;
-        };
-        return walk(window->contentItem());
     }
     /// An object of a QML type (for those without an objectName)
     QObject* findType(const char* type) const {
@@ -232,9 +187,6 @@ protected:
     Size size{};
     std::unique_ptr<QTemporaryDir> tmpDir;
     fs::path root;
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
 };
 }  // namespace
 
@@ -506,6 +458,6 @@ TEST_F(AdaptiveAuditTest, walkTheScreensAtAllSizes) {
             return;
         }
         walk();
-        closeWindow();
+        closeApp();
     }
 }

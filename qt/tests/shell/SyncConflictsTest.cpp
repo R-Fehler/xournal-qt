@@ -19,6 +19,9 @@
 #include "shell/TabManager.h"
 #include "AppController.h"
 #include "config-test.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
 
 using namespace xqt;
 
@@ -156,10 +159,6 @@ struct FakeTrash: SystemApps {
         return QFile::remove(path);
     }
 };
-std::string bytesOf(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
 }  // namespace
 
 // "Keep one": keeping the document moves the copy to the trash; keeping the copy moves the document's file to the
@@ -194,14 +193,14 @@ TEST(SyncConflicts, keepOneOrCompare) {
     EXPECT_TRUE(list[0].toMap()["original"].toBool());
     EXPECT_EQ(list[1].toMap()["app"].toString() + list[2].toMap()["app"].toString(), "NextcloudSyncthing");
 
-    const std::string copyBytes = bytesOf(b);
+    const std::string copyBytes = readFile(b);
     ASSERT_TRUE(model.resolveConflict(QString::fromStdString(a.string()), false));  // keep the document
     EXPECT_EQ(trash.trashed, QStringList{QString::fromStdString(a.string())});
     EXPECT_TRUE(fs::exists(root / "notes.xopp"));
     ASSERT_TRUE(model.resolveConflict(QString::fromStdString(b.string()), true));  // keep the copy
     EXPECT_EQ(trash.trashed.last(), QString::fromStdString((root / "notes.xopp").string()));
     EXPECT_FALSE(fs::exists(b));
-    EXPECT_EQ(bytesOf(root / "notes.xopp"), copyBytes) << "the copy has the document's name";
+    EXPECT_EQ(readFile(root / "notes.xopp"), copyBytes) << "the copy has the document's name";
     EXPECT_TRUE(model.data(model.index(0), LibraryModel::ConflictsRole).toStringList().isEmpty());
     model.setLibrary(nullptr);
     SystemApps::setInstance(nullptr);

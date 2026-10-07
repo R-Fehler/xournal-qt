@@ -42,6 +42,9 @@
 #include "util/serializing/ObjectOutputStream.h"
 
 #include "config-test.h"
+#include "support/TestSupport.h"
+
+using xqt::test::gunzipFile;
 
 using namespace xqt;
 
@@ -120,13 +123,6 @@ std::vector<int64_t> timesOf(const Document& doc) {
     return times;
 }
 
-QByteArray gunzip(const QString& file) {
-    QProcess gz;
-    gz.start("gzip", {"-dc", file});
-    gz.waitForFinished();
-    return gz.readAllStandardOutput();
-}
-
 class ElementTimesTest: public ::testing::Test {
 protected:
     void SetUp() override { ASSERT_TRUE(tmp.isValid()); }
@@ -141,7 +137,7 @@ protected:
 TEST_F(ElementTimesTest, aXoppKeepsThemAsAnElementAttribute) {
     auto doc = timed();
     ASSERT_TRUE(DocumentSession::writeDocument(*doc, file("timed.xopp")).ok);
-    const QString xml = QString::fromUtf8(gunzip(tmp.filePath("timed.xopp")));
+    const QString xml = QString::fromStdString(gunzipFile(file("timed.xopp")));
     EXPECT_EQ(xml.count("xqt-created="), 4) << xml.toStdString();
     EXPECT_TRUE(xml.contains("xqt-created=\"1791100800000\""));
     EXPECT_TRUE(xml.contains("xqt-created=\"1791100802500\""));
@@ -159,7 +155,7 @@ TEST_F(ElementTimesTest, aXoppKeepsThemAsAnElementAttribute) {
 TEST_F(ElementTimesTest, aLoaderWithoutTimesReadsTheFileWithoutAnError) {
     auto doc = timed();
     ASSERT_TRUE(DocumentSession::writeDocument(*doc, file("timed.xopp")).ok);
-    const QByteArray xml = gunzip(tmp.filePath("timed.xopp"));
+    const QByteArray xml = QByteArray::fromStdString(gunzipFile(file("timed.xopp")));
     ASSERT_TRUE(xml.contains("xqt-created="));
 
     struct UpstreamBuilder final: DocumentBuilderInterface {
@@ -217,7 +213,7 @@ TEST_F(ElementTimesTest, aLoaderWithoutTimesReadsTheFileWithoutAnError) {
 TEST_F(ElementTimesTest, aBrokenValueIsIgnored) {
     auto doc = timed();
     ASSERT_TRUE(DocumentSession::writeDocument(*doc, file("timed.xopp")).ok);
-    QByteArray xml = gunzip(tmp.filePath("timed.xopp"));
+    QByteArray xml = QByteArray::fromStdString(gunzipFile(file("timed.xopp")));
     xml.replace("xqt-created=\"1791100800000\"", "xqt-created=\"soon\"");
     xml.replace("xqt-created=\"1791100801500\"", "xqt-created=\"-5\"");
     QFile out(tmp.filePath("broken.xml"));
@@ -329,8 +325,8 @@ TEST_F(ElementTimesTest, theirCostInTheFile) {
     const double gz = static_cast<double>(QFileInfo(tmp.filePath("with.xopp")).size() -
                                           QFileInfo(tmp.filePath("without.xopp")).size()) /
                       N;
-    const double plain = static_cast<double>(gunzip(tmp.filePath("with.xopp")).size() -
-                                             gunzip(tmp.filePath("without.xopp")).size()) /
+    const double plain = (static_cast<double>(gunzipFile(file("with.xopp")).size()) -
+                          static_cast<double>(gunzipFile(file("without.xopp")).size())) /
                          N;
     const double perStroke = static_cast<double>(QFileInfo(tmp.filePath("without.xopp")).size()) / N;
     std::printf("[ cost     ] xqt-created: %.1f bytes a stroke in the .xopp (gzip), %.1f uncompressed; a stroke of 11 "

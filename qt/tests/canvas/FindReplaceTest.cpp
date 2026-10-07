@@ -31,7 +31,7 @@
 #include "undo/UndoRedoHandler.h"
 #include "util/Matrix.h"
 
-#include "../SearchHits.h"
+#include "support/SearchHits.h"
 #include "CanvasView.h"
 #include "FindReplace.h"
 #include "MarkdownEditor.h"

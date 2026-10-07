@@ -40,6 +40,7 @@
 #include "shell/Thumbnails.h"
 
 #include "AppController.h"
+#include "UiFixture.h"
 
 using namespace xqt;
 
@@ -55,7 +56,7 @@ std::unique_ptr<Stroke> written(double x, double y, int letters = 4) {
     return s;
 }
 
-class CopyToolsTest: public ::testing::Test {
+class CopyToolsTest: public xqt::test::UiFixture {
 protected:
     void SetUp() override {
         // The handwriting is read by a scripted recogniser: a line of three words "Alpha beta gamma" (gamma unsure),
@@ -71,62 +72,18 @@ protected:
             return line.words.size() == 3 && word == 2 ? 0.3f : 0.9f;
         });
         hwr::HandwritingSearch::setFactory([f = fake](const QString&) { return f; });
-        controller = std::make_unique<AppController>();
+        makeController();
         qobject_cast<RecentFiles*>(controller->recentModel())->clear();
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new ThumbnailProvider);
-        engine->addImageProvider("sketch", new SketchProvider);
-        engine->addImageProvider("preview", new PreviewProvider);
-        engine->addImageProvider("hitpage", new HitPageProvider);
-        engine->addImageProvider("mdsnippet", new MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        window->resize(1920, 1080);
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));
+        ASSERT_NO_FATAL_FAILURE(loadWindow({.size = QSize(1920, 1080)}));
         QGuiApplication::clipboard()->clear();
         wait(100);
     }
     void TearDown() override {
         handwriting(false);
-        controller->shutdown();
-        engine.reset();
-        controller.reset();
+        closeApp();
         hwr::HandwritingSearch::setFactory({});
     }
 
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    void until(const std::function<bool()>& done, int ms = 5000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
-    }
-    template <typename T = QQuickItem>
-    T* find(const char* name) const {
-        return window->findChild<T*>(name);
-    }
-    static QObject* entryOf(QObject* menu, const char* name) {
-        const int n = menu ? menu->property("count").toInt() : 0;
-        for (int i = 0; i < n; ++i) {
-            QQuickItem* it = nullptr;
-            QMetaObject::invokeMethod(menu, "itemAt", Q_RETURN_ARG(QQuickItem*, it), Q_ARG(int, i));
-            if (it && it->objectName() == name) {
-                return it;
-            }
-        }
-        return nullptr;
-    }
     SettingsModel* settings() const { return qobject_cast<SettingsModel*>(controller->settingsModel()); }
     bool isInside(QQuickItem* item, QQuickItem* in) const {
         const QRectF a(item->mapToScene(QPointF(0, 0)), item->size());
@@ -158,7 +115,7 @@ protected:
         wait(200);
     }
     QPoint onPage(double x, double y) const {
-        auto* canvas = find("canvas");
+        auto* canvas = find<QQuickItem>("canvas");
         const QPointF at = view()->pageViewRect(0).topLeft() + QPointF(x, y) * view()->getViewController().zoom();
         return canvas->mapToScene(at).toPoint();
     }
@@ -176,18 +133,15 @@ protected:
     }
     QString clipboardText() const { return QGuiApplication::clipboard()->text(); }
     QString snackbar() const {
-        auto* bar = find("snackbar");
+        auto* bar = find<QQuickItem>("snackbar");
         return bar && bar->isVisible() ? find<QObject>("snackbarText")->property("text").toString() : QString();
     }
     void openList(const char* button, const char* menu) {
-        QMetaObject::invokeMethod(find(button), "pressAndHold");
+        QMetaObject::invokeMethod(find<QQuickItem>(button), "pressAndHold");
         until([&] { return find<QObject>(menu)->property("visible").toBool(); });
     }
 
     std::shared_ptr<hwr::FakeRecognizer> fake;
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
 };
 }  // namespace
 
@@ -196,11 +150,11 @@ protected:
 TEST_F(CopyToolsTest, snipHasAButtonOfItsOwn) {
     makeNotes();
     controller->selectTool("pen");
-    auto* snip = find("snipButton");
+    auto* snip = find<QQuickItem>("snipButton");
     ASSERT_NE(snip, nullptr);
     until([&] { return snip->isVisible(); });
     ASSERT_TRUE(snip->isVisible());
-    EXPECT_TRUE(isInside(snip, find("toolbox"))) << "a fixed tool of the rail";
+    EXPECT_TRUE(isInside(snip, find<QQuickItem>("toolbox"))) << "a fixed tool of the rail";
     openList("selectButton", "selectButtonVariants");
     QObject* selects = find<QObject>("selectButtonVariants");
     EXPECT_NE(entryOf(selects, "variant_selectRegion"), nullptr);
@@ -213,7 +167,7 @@ TEST_F(CopyToolsTest, snipHasAButtonOfItsOwn) {
     const QString first = controller->snipShape();
     ASSERT_FALSE(first.isEmpty());
     EXPECT_TRUE(snip->property("checked").toBool());
-    EXPECT_FALSE(find("selectButton")->property("checked").toBool()) << "the snip's button, not the selection's";
+    EXPECT_FALSE(find<QQuickItem>("selectButton")->property("checked").toBool()) << "the snip's button, not the selection's";
     QMetaObject::invokeMethod(snip, "clicked");
     EXPECT_EQ(controller->snipShape(), first == "rect" ? "lasso" : "rect") << "a tap while armed: the other shape";
     EXPECT_EQ(snip->property("currentKey").toString(), first == "rect" ? "snipLasso" : "snipRect");
@@ -234,7 +188,7 @@ TEST_F(CopyToolsTest, aSweepCopiesTheHandwritingAsTextAndGivesThePenBack) {
     handwriting(true);
     makeNotes();
     controller->selectTool("pen");
-    auto* button = find("pdfTextButton");
+    auto* button = find<QQuickItem>("pdfTextButton");
     ASSERT_NE(button, nullptr);
     openList("pdfTextButton", "pdfTextMenu");
     QObject* item = entryOf(find<QObject>("pdfTextMenu"), "copyInkTextItem");
@@ -246,8 +200,8 @@ TEST_F(CopyToolsTest, aSweepCopiesTheHandwritingAsTextAndGivesThePenBack) {
     EXPECT_EQ(controller->snipShape(), "") << "not a snip of a picture";
     EXPECT_TRUE(button->property("checked").toBool());
     EXPECT_EQ(button->property("currentKey").toString(), "copyInkText");
-    EXPECT_FALSE(find("selectButton")->property("checked").toBool());
-    EXPECT_FALSE(find("snipButton")->property("checked").toBool());
+    EXPECT_FALSE(find<QQuickItem>("selectButton")->property("checked").toBool());
+    EXPECT_FALSE(find<QQuickItem>("snipButton")->property("checked").toBool());
 
     // Along the first line
     drag({{45, 105}, {120, 106}, {200, 104}});
@@ -255,9 +209,10 @@ TEST_F(CopyToolsTest, aSweepCopiesTheHandwritingAsTextAndGivesThePenBack) {
     EXPECT_FALSE(controller->inkCopyArmed());
     until([&] { return clipboardText() == "Alpha beta gamma"; });
     EXPECT_EQ(clipboardText(), "Alpha beta gamma");
-    auto* toast = find("inkTextToast");
+    auto* toast = find<QQuickItem>("inkTextToast");
     until([&] { return toast->isVisible(); });
     ASSERT_TRUE(toast->isVisible());
+    nextFrame();  // (it places itself once shown: Qt.callLater)
     EXPECT_EQ(find<QObject>("inkTextToastTitle")->property("text").toString(), "Copied as text");
     const QString html = toast->property("html").toString();
     EXPECT_TRUE(html.contains("Alpha beta")) << html.toStdString();
@@ -290,17 +245,17 @@ TEST_F(CopyToolsTest, theSelectionPillCopiesTheHandwritingAsText) {
     makeNotes();
     controller->selectAllOnPage();
     until([&] { return controller->hasSelection(); });
-    auto* copyText = find("selectionCopyText");
+    auto* copyText = find<QQuickItem>("selectionCopyText");
     ASSERT_NE(copyText, nullptr);
     until([&] { return copyText->isVisible(); });
     ASSERT_TRUE(copyText->isVisible());
-    EXPECT_TRUE(find("selectionCopy")->isVisible());
+    EXPECT_TRUE(find<QQuickItem>("selectionCopy")->isVisible());
     QMetaObject::invokeMethod(copyText, "clicked");
     const QString both = "Alpha beta gamma\ndelta epsilon zeta eta.";
     until([&] { return clipboardText() == both; });
     EXPECT_EQ(clipboardText(), both);
-    until([&] { return find("inkTextToast")->isVisible(); });
-    EXPECT_TRUE(find("inkTextToast")->isVisible());
+    until([&] { return find<QQuickItem>("inkTextToast")->isVisible(); });
+    EXPECT_TRUE(find<QQuickItem>("inkTextToast")->isVisible());
     EXPECT_TRUE(controller->hasSelection()) << "the selection stays";
     // Nothing but a picture selected: no "Copy as text"
     controller->clearSelection();

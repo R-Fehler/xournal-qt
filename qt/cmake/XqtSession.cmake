@@ -254,7 +254,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BookmarksTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/AudioStorageTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/PageColorsTest.cpp)
-    target_link_libraries(xqt-session-tests PRIVATE xqt-session Qt6::Test GTest::gtest)
+    target_link_libraries(xqt-session-tests PRIVATE xqt-session xqt-test-support Qt6::Test GTest::gtest)
     target_include_directories(xqt-session-tests PRIVATE "${TEST_CONFIG_DIR}")
     target_compile_definitions(xqt-session-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}"
         # upstream Xournal++ built beside the fork (as for the golden tests): StickyNoteTest opens a file with it
@@ -292,7 +292,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PenStylesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/CanvasRotationTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/DarkPagesTest.cpp)
-    target_link_libraries(xqt-canvas-tests PRIVATE xqt-canvas Qt6::Test GTest::gtest)
+    target_link_libraries(xqt-canvas-tests PRIVATE xqt-canvas xqt-test-support Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-canvas-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-canvas-tests PRIVATE "${TEST_CONFIG_DIR}")
     gtest_discover_tests(xqt-canvas-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS canvas

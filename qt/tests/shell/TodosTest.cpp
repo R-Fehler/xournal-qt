@@ -33,16 +33,14 @@
 
 #include "MarkdownFile.h"
 #include "MdTasks.h"
+#include "support/TestSupport.h"
+
+using xqt::test::writeFile;
 
 using namespace xqt;
 namespace tasks = xqt::md::tasks;
 
 namespace {
-void writeFile(const fs::path& p, const std::string& bytes) {
-    fs::create_directories(p.parent_path());
-    std::ofstream out(p, std::ios::binary);
-    out << bytes;
-}
 
 std::unique_ptr<Text> box(const std::string& markdown, double x = 40, double y = 60) {
     auto text = std::make_unique<Text>();

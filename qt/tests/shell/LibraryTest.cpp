@@ -41,11 +41,16 @@
 #include "shell/TabManager.h"
 #include "AppController.h"
 #include "config-test.h"
+#include "support/TestSupport.h"
+
+using xqt::test::fixture;
+
+using xqt::test::waitFor;
+using xqt::test::processEventsFor;
 
 using namespace xqt;
 
 namespace {
-fs::path fixture(const char8_t* rel) { return GET_TESTFILE(rel); }
 
 void touch(const fs::path& p) {
     fs::create_directories(p.parent_path());
@@ -116,14 +121,6 @@ QStringList packKeys(const fs::path& folder, const QString& pack, int format = L
     }
     keys.sort();
     return keys;
-}
-
-void waitFor(const std::function<bool()>& cond, int ms = 5000) {
-    QElapsedTimer t;
-    t.start();
-    while (!cond() && t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
-    }
 }
 
 class LibraryTest: public ::testing::Test {
@@ -1266,7 +1263,7 @@ TEST_F(LibraryTest, packsAreWrittenAWhileAfterTheLastChange) {
     EXPECT_FALSE(fs::exists(root / DocumentFiles::META_DIR / "notes.pack")) << "not yet";
     waitFor([&] { return index.packsWritten() >= 6; });
     EXPECT_TRUE(fs::exists(root / DocumentFiles::META_DIR / "notes.pack"));
-    waitFor([] { return false; }, 150);
+    processEventsFor(150);
     EXPECT_EQ(index.packsWritten(), 6) << "each pack once";
 }
 
@@ -1496,7 +1493,7 @@ TEST_F(LibraryTest, removingTheCacheLeavesOtherFilesAndTheReadingPositions) {
     model.refresh();
     ASSERT_FALSE(PreviewCache::preview(DocumentFiles::itemOf(root / "lecture.pdf")).isNull());
     PreviewCache::flush();
-    waitFor([] { return false; }, 100);
+    processEventsFor(100);
     EXPECT_FALSE(fs::exists(root / DocumentFiles::META_DIR));
     model.setLibrary(std::make_unique<Library>(root));
     model.searchIndex()->flush();

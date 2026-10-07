@@ -77,7 +77,7 @@ if(XQT_BUILD_TESTS)
         target_sources(xqt-hwr-tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/TrocrTest.cpp
             ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/CtcTest.cpp)
     endif()
-    target_link_libraries(xqt-hwr-tests PRIVATE xqt-hwr xqt-shell Qt6::Test GTest::gtest)
+    target_link_libraries(xqt-hwr-tests PRIVATE xqt-hwr xqt-shell xqt-test-support Qt6::Test GTest::gtest)
     target_include_directories(xqt-hwr-tests PRIVATE "${TEST_CONFIG_DIR}")
     target_compile_definitions(xqt-hwr-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}"
         XQT_HWR_TEST_DATA="${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/data")

@@ -26,7 +26,10 @@
 #include "undo/InsertUndoAction.h"
 #include "undo/UndoRedoHandler.h"
 
-#include "../SearchHits.h"
+#include "support/SearchHits.h"
+#include "support/TestSupport.h"
+
+using xqt::test::waitFor;
 
 using namespace xqt;
 using namespace xqt::hwr;
@@ -58,15 +61,6 @@ std::unique_ptr<Document> notes(size_t pages, int lines) {
         doc->addPage(std::move(page));
     }
     return doc;
-}
-
-bool waitFor(const std::function<bool()>& done, int ms = 10000) {
-    QElapsedTimer t;
-    t.start();
-    while (!done() && t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-    return done();
 }
 
 class InkIndexerTest: public ::testing::Test {
@@ -107,7 +101,7 @@ protected:
 TEST_F(InkIndexerTest, handwritingOfAnOpenDocumentBecomesSearchable) {
     auto s = open(3, 2);
     InkTextIndexer indexer(*s, *service);
-    ASSERT_TRUE(waitFor([&] { return indexer.done() && indexer.pagesRead() == 3; }));
+    ASSERT_TRUE(waitFor([&] { return indexer.done() && indexer.pagesRead() == 3; }, 10000));
     EXPECT_EQ(fake->calls(), 6);  // 3 pages x 2 lines
     EXPECT_EQ(s->search().textIndex().inkPages(), 3u);
     EXPECT_EQ(hits(*s, QStringLiteral("kalman")), 6);
@@ -127,7 +121,7 @@ TEST_F(InkIndexerTest, handwritingOfAnOpenDocumentBecomesSearchable) {
 TEST_F(InkIndexerTest, anEditReadsOnlyTheLineItTouched) {
     auto s = open(2, 3);
     InkTextIndexer indexer(*s, *service);
-    ASSERT_TRUE(waitFor([&] { return indexer.done() && indexer.pagesRead() == 2; }));
+    ASSERT_TRUE(waitFor([&] { return indexer.done() && indexer.pagesRead() == 2; }, 10000));
     ASSERT_EQ(fake->calls(), 6);
     // A word added to the second line of page 1, as the pen does
     auto page = s->getDocument()->getPage(1);
@@ -137,14 +131,14 @@ TEST_F(InkIndexerTest, anEditReadsOnlyTheLineItTouched) {
     page->getSelectedLayer()->addElement(std::move(stroke));
     s->getDocument()->unlock();
     s->getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, page->getSelectedLayer(), raw));
-    ASSERT_TRUE(waitFor([&] { return fake->calls() == 7 && indexer.done(); }));
+    ASSERT_TRUE(waitFor([&] { return fake->calls() == 7 && indexer.done(); }, 10000));
     EXPECT_EQ(s->search().textIndex().inkOf(1)->words.size(), 10u);
     // Undo: the line as it was is known, nothing is read
     s->getUndoRedoHandler()->undo();
     ASSERT_TRUE(waitFor([&] {
         const ink::PageText* ink = s->search().textIndex().inkOf(1);
         return indexer.done() && ink && ink->words.size() == 9u;
-    }));
+    }, 10000));
     EXPECT_EQ(fake->calls(), 7);
 }
 
@@ -165,7 +159,7 @@ TEST_F(InkIndexerTest, thePageInViewComesFirst) {
     }
     InkTextIndexer indexer(*s, *service);
     indexer.setFocused(true);
-    ASSERT_TRUE(waitFor([&] { return indexer.done() && indexer.pagesRead() == 5; }));
+    ASSERT_TRUE(waitFor([&] { return indexer.done() && indexer.pagesRead() == 5; }, 10000));
     ASSERT_EQ(order.size(), 5u);
     const auto lines = indexer.pages();
     EXPECT_EQ(order[0], lines[3].lines[0].hash);
@@ -175,13 +169,13 @@ TEST_F(InkIndexerTest, withoutAModelPagesWaitAndAreReadWhenItComes) {
     fake->setReady(false, QStringLiteral("no model"));
     auto s = open(2, 1);
     InkTextIndexer indexer(*s, *service);
-    ASSERT_TRUE(waitFor([&] { return indexer.done() && indexer.pagesRead() == 2; }));
+    ASSERT_TRUE(waitFor([&] { return indexer.done() && indexer.pagesRead() == 2; }, 10000));
     EXPECT_EQ(fake->calls(), 0);
     EXPECT_FALSE(indexer.pages()[0].complete);
     EXPECT_EQ(hits(*s, QStringLiteral("kalman")), 0);
     fake->setReady(true);
     service->setRecognizer(fake);  // (ready now: the clients are told)
-    ASSERT_TRUE(waitFor([&] { return fake->calls() == 2 && indexer.done(); }));
+    ASSERT_TRUE(waitFor([&] { return fake->calls() == 2 && indexer.done(); }, 10000));
     EXPECT_EQ(hits(*s, QStringLiteral("kalman")), 2);
 }
 
@@ -189,7 +183,7 @@ TEST_F(InkIndexerTest, closingADocumentStopsItsWork) {
     fake->setDelay(5000);
     auto s = open(4, 2);
     auto indexer = std::make_unique<InkTextIndexer>(*s, *service);
-    ASSERT_TRUE(waitFor([&] { return service->pending() > 0; }));
+    ASSERT_TRUE(waitFor([&] { return service->pending() > 0; }, 10000));
     QElapsedTimer t;
     t.start();
     indexer.reset();
@@ -202,7 +196,7 @@ TEST_F(InkIndexerTest, closingADocumentStopsItsWork) {
 TEST_F(InkIndexerTest, theLineCacheHasALimit) {
     auto s = open(3, 4);
     InkTextIndexer indexer(*s, *service);
-    ASSERT_TRUE(waitFor([&] { return indexer.done() && indexer.pagesRead() == 3; }));
+    ASSERT_TRUE(waitFor([&] { return indexer.done() && indexer.pagesRead() == 3; }, 10000));
     EXPECT_EQ(service->cachedLines(), 12u);
     const size_t all = service->cacheBytes();
     service->setCacheLimit(all / 2);
@@ -214,7 +208,7 @@ TEST_F(InkIndexerTest, theModelIsUnloadedWhenIdle) {
     service->setUnloadAfter(50);
     auto s = open(1, 1);
     InkTextIndexer indexer(*s, *service);
-    ASSERT_TRUE(waitFor([&] { return indexer.done() && fake->calls() == 1; }));
+    ASSERT_TRUE(waitFor([&] { return indexer.done() && fake->calls() == 1; }, 10000));
     ASSERT_TRUE(waitFor([&] { return fake->unloads() == 1; }, 3000));
 }
 
@@ -245,7 +239,7 @@ TEST_F(InkIndexerTest, theSettingSwitchesItOnAndOff) {
     ASSERT_NE(search.indexerOf(a.get()), nullptr);
     ASSERT_NE(search.indexerOf(b.get()), nullptr);
     ASSERT_TRUE(waitFor([&] { return search.indexerOf(a.get())->done() && search.indexerOf(b.get())->done() &&
-                                     a->search().textIndex().inkPages() == 1 && b->search().textIndex().inkPages() == 1; }));
+                                     a->search().textIndex().inkPages() == 1 && b->search().textIndex().inkPages() == 1; }, 10000));
     EXPECT_EQ(hits(*b, QStringLiteral("kalman")), 2);
     // A document closed: its indexer goes with it
     b.reset();

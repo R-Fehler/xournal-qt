@@ -43,18 +43,14 @@
 #include "model/Layer.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+using xqt::test::writeFile;
 
 using namespace xqt;
 
 namespace {
-std::string readFile(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-void writeFile(const fs::path& p, const std::string& bytes) {
-    std::ofstream out(p, std::ios::binary);
-    out << bytes;
-}
 
 /// A Markdown text of several pages with all kinds of blocks, lines ending in `eol`.
 std::string longMarkdown(const std::string& eol) {

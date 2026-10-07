@@ -26,6 +26,9 @@
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
 #include "view/DocumentView.h"
+#include "support/TestSupport.h"
+
+using xqt::test::gunzipFile;
 
 using namespace xqt;
 
@@ -69,18 +72,6 @@ Picture draw(const PageRef& page, double scale = 1, const char* name = nullptr) 
 
 int grey(uint32_t c) {
     return static_cast<int>(((c >> 16) & 0xff) * 0.3 + ((c >> 8) & 0xff) * 0.59 + (c & 0xff) * 0.11);
-}
-
-std::string gunzip(const QString& file) {
-    gzFile f = gzopen(file.toStdString().c_str(), "rb");
-    std::string out;
-    char buf[4096];
-    int n;
-    while ((n = gzread(f, buf, sizeof buf)) > 0) {
-        out.append(buf, static_cast<size_t>(n));
-    }
-    gzclose(f);
-    return out;
 }
 
 class PageColorsTest: public ::testing::Test {
@@ -131,7 +122,7 @@ TEST_F(PageColorsTest, colorAndTextureGoThroughAXoppAndAPdfWithNotes) {
         EXPECT_GT(grey(line), grey(BLACK_PAPER & 0xffffff) + 25) << what;
     };
     ASSERT_TRUE(s->saveAs(path("paper.xopp")).ok);
-    const std::string xml = gunzip(tmp.filePath("paper.xopp"));
+    const std::string xml = gunzipFile(tmp.filePath("paper.xopp").toStdString());
     EXPECT_NE(xml.find("color=\"#161616ff\""), std::string::npos) << "upstream's background color";
     EXPECT_NE(xml.find("xqt-texture=paper"), std::string::npos) << "the texture in upstream's config";
     {

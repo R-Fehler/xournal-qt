@@ -61,7 +61,7 @@
 #include "GeometryToolPicture.h"
 #include "PenHover.h"
 #include "StickyNotes.h"
-#include "../SearchHits.h"
+#include "support/SearchHits.h"
 #include "config-test.h"
 #include "TextEditor.h"
 #include "MarkdownEditor.h"
