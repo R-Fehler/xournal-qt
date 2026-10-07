@@ -95,14 +95,14 @@ std::unique_ptr<DocumentSession> AppController::openTextFile(const fs::path& fil
     const bool editable = text->editable() && QFileInfo(QString::fromStdString(file.string())).isWritable();
     std::unique_ptr<Document> doc;
     bool continuous = false;
-    app->getSettings()->getCustomElement("xournalQt").getBool("textContinuous", continuous);
+    context().getSettings()->getCustomElement("xournalQt").getBool("textContinuous", continuous);
     continuous = continuous && editable;
     if (editable) {
         doc = MarkdownFile::textDocument(*text, continuous);
     } else {
         doc = MarkdownFile::document(markdown ? MarkdownFile::read(file) : MarkdownFile::readAsPlainText(file));
     }
-    auto session = std::make_unique<DocumentSession>(*app, std::move(doc));
+    auto session = std::make_unique<DocumentSession>(context(), std::move(doc));
     session->setTextContinuous(continuous);
     session->setTextFile(std::move(text), !editable);
     return session;
@@ -140,9 +140,9 @@ bool AppController::editAnyway(bool confirmed) {
     // The tab shows it as a plain text to edit now (in the place of the read-only one)
     const size_t page = session()->getCurrentPageNo();
     bool continuous = false;
-    app->getSettings()->getCustomElement("xournalQt").getBool("textContinuous", continuous);
+    context().getSettings()->getCustomElement("xournalQt").getBool("textContinuous", continuous);
     auto doc = MarkdownFile::textDocument(*text, continuous);
-    auto edited = std::make_unique<DocumentSession>(*app, std::move(doc));
+    auto edited = std::make_unique<DocumentSession>(context(), std::move(doc));
     edited->setTextContinuous(continuous);
     edited->setTextFile(std::move(text), false);
     const int old = tabs->currentIndex();
@@ -162,16 +162,16 @@ bool AppController::textContinuous() const {
         return s->isTextContinuous();  // (the current text document as it is laid out)
     }
     bool on = false;
-    app->getSettings()->getCustomElement("xournalQt").getBool("textContinuous", on);
+    context().getSettings()->getCustomElement("xournalQt").getBool("textContinuous", on);
     return on;
 }
 
 void AppController::setTextContinuous(bool on) {
     bool stored = false;
-    app->getSettings()->getCustomElement("xournalQt").getBool("textContinuous", stored);
+    context().getSettings()->getCustomElement("xournalQt").getBool("textContinuous", stored);
     if (on != stored) {
-        app->getSettings()->getCustomElement("xournalQt").setBool("textContinuous", on);
-        app->getSettings()->customSettingsChanged();
+        context().getSettings()->getCustomElement("xournalQt").setBool("textContinuous", on);
+        context().getSettings()->customSettingsChanged();
     }
     // The current text document follows (the others when they are opened again)
     if (DocumentSession* s = session(); s && s->isEditableText() && s->isTextContinuous() != on) {
@@ -232,7 +232,7 @@ bool AppController::editAsNotes() {
     const fs::path md = s->textFile()->path();
     const std::string text = s->currentText();  // (as it is here, saved or not)
     // (a text document of notes: typing goes into its text, also when the .md is empty; qt/docs/features/md-pdf.md)
-    auto notes = std::make_unique<DocumentSession>(*app, MarkdownFile::notesDocument(text));
+    auto notes = std::make_unique<DocumentSession>(context(), MarkdownFile::notesDocument(text));
     fs::path xopp = md;
     xopp.replace_extension(".xopp");
     notes->setMadeFrom(xopp);
@@ -253,11 +253,11 @@ bool AppController::editAsNotes() {
 // --- text documents as PDF (qt/docs/features/md-pdf.md) ------------------------------------------------------------------------
 
 bool AppController::newTextAsPdf() const {
-    return DocumentMode::newTextDocuments(*app->getSettings()) == DocumentMode::TextKind::Pdf;
+    return DocumentMode::newTextDocuments(*context().getSettings()) == DocumentMode::TextKind::Pdf;
 }
 
 bool AppController::makeTextPdf(const std::string& text, const fs::path& pdf) {
-    auto made = std::make_unique<DocumentSession>(*app, MarkdownFile::notesDocument(text));
+    auto made = std::make_unique<DocumentSession>(context(), MarkdownFile::notesDocument(text));
     DocumentSession* created = made.get();
     tabs->addTab(std::move(made));
     setHomeVisible(false);
@@ -494,7 +494,7 @@ bool AppController::reloadDocument(DocumentSession* s) {
     const std::vector<std::string> hybridChanged = result.hybridChanged;
     // The new one right after it, then the old one closed: the new one is in its place
     tabs->setCurrentIndex(index);
-    tabs->addTab(std::make_unique<DocumentSession>(*app, std::move(result.document)));
+    tabs->addTab(std::make_unique<DocumentSession>(context(), std::move(result.document)));
     DocumentSession* fresh = tabs->currentSession();
     fresh->setPermissions(result.allowPrint, result.allowCopy);
     closeTab(index);

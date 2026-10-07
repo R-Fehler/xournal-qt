@@ -151,13 +151,14 @@ AppController::AppController(QObject* parent):
 
 AppController::AppController(AppServices& services, QObject* parent): QObject(parent) { setUp(services); }
 
+AppContext& AppController::context() const { return *appServices->context(); }
+
 void AppController::setUp(AppServices& services) {
     appServices = &services;
     // The first window made on the services is the main window; the others are windows of undocked documents (the
     // same settings, tools, library and rendering, their own documents)
     primary = services.openDocuments().mainWindow();
     services.openDocuments().add(this);
-    app = services.context();
     colors = services.colors();
     settingsView = &services.settingsView();
     toolbox = &services.toolbox();
@@ -183,17 +184,17 @@ void AppController::setUp(AppServices& services) {
             }
         });
     }
-    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
-    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followSnipTool);
+    connect(&context(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
+    connect(&context(), &AppContext::activeToolChanged, this, &AppController::followSnipTool);
     if (!isSecondary()) {
         applySnipResolution();  // How sharp snips are (a setting; Snip.h)
     }
-    connect(app.get(), &AppContext::settingsChanged, this, &AppController::applySnipResolution);
+    connect(&context(), &AppContext::settingsChanged, this, &AppController::applySnipResolution);
     if (!isSecondary()) {
-        connect(app.get(), &AppContext::activeToolChanged, this, &AppController::followTodoStampTool);
+        connect(&context(), &AppContext::activeToolChanged, this, &AppController::followTodoStampTool);
     }
-    connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
-    connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
+    connect(&context(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
+    connect(&context(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
     setUpDarkPages();
     if (!isSecondary()) {
         loadCustomWidths();
@@ -223,7 +224,7 @@ void AppController::setUp(AppServices& services) {
     }
     makeTabs();
     connect(library, &LibraryModel::favouriteToggled, this, &AppController::favouriteChanged);
-    citations = std::make_unique<Citations>(*app->getSettings(), library);
+    citations = std::make_unique<Citations>(*context().getSettings(), library);
     makeAudioControl();
     connect(library, &LibraryModel::fuzzySearchChanged, this, &AppController::searchFuzzyChanged);
     connect(this, &AppController::searchChanged, this, &AppController::searchFuzzyChanged);
@@ -251,13 +252,13 @@ void AppController::makeTabs() {
     }
     current = std::make_unique<CurrentDocument>();
     connectCurrentDocument();
-    tabs = std::make_unique<TabManager>(*app);
+    tabs = std::make_unique<TabManager>(context());
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::syncHandwriting);
     connect(tabs.get(), &TabManager::countChanged, this, &AppController::syncHandwriting);
-    referenceMode = std::make_unique<ReferenceMode>(*tabs, app->getSettings());
+    referenceMode = std::make_unique<ReferenceMode>(*tabs, context().getSettings());
     compareMode = std::make_unique<VersionCompare>(*tabs, *referenceMode);
-    presenter = std::make_unique<PresenterConsole>(*app);
+    presenter = std::make_unique<PresenterConsole>(context());
     connect(referenceMode.get(), &ReferenceMode::openExternal, this, &AppController::openLink);
     connect(referenceMode.get(), &ReferenceMode::openDocumentLink, this, [this](const QString& uri, const QString& from) {
         // (a place of the document itself, tapped in the second view of it: it goes there, in the reference)
@@ -329,7 +330,7 @@ void AppController::makeTabs() {
     connect(tabs.get(), &TabManager::countChanged, this, [this] {
         // A document opened (or came from another window): with the hand tool, if so set (on Android by default:
         // one finger scrolls, the pen is chosen to write)
-        if (tabs->count() > lastTabCount && SettingsModel::handWhenOpening(*app->getSettings())) {
+        if (tabs->count() > lastTabCount && SettingsModel::handWhenOpening(*context().getSettings())) {
             selectTool(QStringLiteral("hand"));
         }
         lastTabCount = tabs->count();
@@ -586,8 +587,8 @@ void AppController::shutdown() {
     for (int i = 0; i < tabs->count(); ++i) {
         tabs->session(i)->deleteAutosaveFile();
     }
-    app->getToolHandler()->saveSettings();
-    app->getSettings()->save();
+    context().getToolHandler()->saveSettings();
+    context().getSettings()->save();
 }
 
 DocumentSession* AppController::session() const { return tabs->currentSession(); }
@@ -595,7 +596,7 @@ bool AppController::textPagesFixed() const { return session() && session()->text
 CanvasView* AppController::canvas() const { return tabs->currentView(); }
 
 QString AppController::textFontFamily() const {
-    QString family = QString::fromStdString(app->getSettings()->getFont().getName());
+    QString family = QString::fromStdString(context().getSettings()->getFont().getName());
     // (a font name may have a style, e.g. "Sans Bold": the family only)
     for (const char* style: {" Bold", " Italic", " Regular"}) {
         family.remove(QLatin1String(style));
@@ -666,7 +667,7 @@ QString AppController::startMarkdown(int page, std::optional<QPointF> at) {
     md::Style style;
     style.family = textFontFamily().toStdString();
     style.size = markdownFontSize();
-    style.color = app->getToolHandler()->getColor();
+    style.color = context().getToolHandler()->getColor();
     if (!at) {
         style.color = Color(0, 0, 0);  // (the page's text: black)
     }
@@ -794,7 +795,7 @@ void AppController::connectCurrentDocument() {
     connect(d, &CurrentDocument::contextRequested, this, &AppController::contextRequested);
     connect(d, &CurrentDocument::imageLoadRequested, this, [this](const QString& url) {
         std::string access;
-        app->getSettings()->getCustomElement("xournalQt").getString("networkAccess", access);
+        context().getSettings()->getCustomElement("xournalQt").getString("networkAccess", access);
         Q_EMIT webImageRequested(url, QUrl(url).host(),
                                  access == "on" || access == "off" ? QString::fromStdString(access)
                                                                    : QStringLiteral("ask"));
@@ -1056,60 +1057,60 @@ void AppController::redoPages() {
     }
 }
 
-int AppController::viewColumns() const { return std::max(1, app->getSettings()->getViewColumns()); }
-bool AppController::pairedPages() const { return app->getSettings()->isShowPairedPages(); }
-int AppController::pairsOffset() const { return app->getSettings()->getPairsOffset(); }
+int AppController::viewColumns() const { return std::max(1, context().getSettings()->getViewColumns()); }
+bool AppController::pairedPages() const { return context().getSettings()->isShowPairedPages(); }
+int AppController::pairsOffset() const { return context().getSettings()->getPairsOffset(); }
 
 void AppController::setViewColumns(int columns) {
     columns = std::clamp(columns, 1, 8);  // upstream's view menu offers 1..8
     if (columns != viewColumns()) {
-        app->getSettings()->setViewColumns(columns);
-        Q_EMIT app->settingsChanged();  // the views lay out again
+        context().getSettings()->setViewColumns(columns);
+        Q_EMIT context().settingsChanged();  // the views lay out again
         Q_EMIT viewLayoutChanged();
     }
 }
 void AppController::setPairedPages(bool paired) {
     if (paired != pairedPages()) {
-        app->getSettings()->setShowPairedPages(paired);
-        Q_EMIT app->settingsChanged();
+        context().getSettings()->setShowPairedPages(paired);
+        Q_EMIT context().settingsChanged();
         Q_EMIT viewLayoutChanged();
     }
 }
 void AppController::setPairsOffset(int offset) {
     offset = std::max(0, offset);
     if (offset != pairsOffset()) {
-        app->getSettings()->setPairsOffset(offset);
-        Q_EMIT app->settingsChanged();
+        context().getSettings()->setPairsOffset(offset);
+        Q_EMIT context().settingsChanged();
         Q_EMIT viewLayoutChanged();
     }
 }
 
-bool AppController::horizontalScrolling() const { return app->getSettings()->isViewFixedRows(); }
-int AppController::viewRows() const { return std::max(1, app->getSettings()->getViewRows()); }
-bool AppController::snapPages() const { return CanvasView::snapSetting(*app->getSettings()); }
+bool AppController::horizontalScrolling() const { return context().getSettings()->isViewFixedRows(); }
+int AppController::viewRows() const { return std::max(1, context().getSettings()->getViewRows()); }
+bool AppController::snapPages() const { return CanvasView::snapSetting(*context().getSettings()); }
 
 void AppController::setHorizontalScrolling(bool on) {
     if (on != horizontalScrolling()) {
         // Upstream's "fixed rows", filled column by column (its vertical layout): the same pages side by side
-        app->getSettings()->setViewFixedRows(on);
-        app->getSettings()->setViewLayoutVert(on);
-        Q_EMIT app->settingsChanged();
+        context().getSettings()->setViewFixedRows(on);
+        context().getSettings()->setViewLayoutVert(on);
+        Q_EMIT context().settingsChanged();
         Q_EMIT viewLayoutChanged();
     }
 }
 void AppController::setViewRows(int rows) {
     rows = std::clamp(rows, 1, 8);
     if (rows != viewRows()) {
-        app->getSettings()->setViewRows(rows);
-        Q_EMIT app->settingsChanged();
+        context().getSettings()->setViewRows(rows);
+        Q_EMIT context().settingsChanged();
         Q_EMIT viewLayoutChanged();
     }
 }
 void AppController::setSnapPages(bool snap) {
     if (snap != snapPages()) {
-        app->getSettings()->getCustomElement("xournalQt").setBool("snapPages", snap);  // (see CanvasView::snapSetting)
-        app->getSettings()->customSettingsChanged();
-        Q_EMIT app->settingsChanged();
+        context().getSettings()->getCustomElement("xournalQt").setBool("snapPages", snap);  // (see CanvasView::snapSetting)
+        context().getSettings()->customSettingsChanged();
+        Q_EMIT context().settingsChanged();
         Q_EMIT viewLayoutChanged();
     }
 }
@@ -1347,16 +1348,16 @@ bool AppController::canRedo() const {
 
 QString AppController::tool() const {
     // Upstream's tool names (pen, highlighter, eraser, hand, selectRect, selectRegion, text, image, ...).
-    return QString::fromUtf8(toolTypeToString(app->getToolHandler()->getToolType()).data());
+    return QString::fromUtf8(toolTypeToString(context().getToolHandler()->getToolType()).data());
 }
 
 QString AppController::drawingType() const {
-    return QString::fromUtf8(drawingTypeToString(app->getToolHandler()->getDrawingType()).data());
+    return QString::fromUtf8(drawingTypeToString(context().getToolHandler()->getDrawingType()).data());
 }
 
 void AppController::setDrawingType(const QString& name) {
     const DrawingType type = drawingTypeFromString(name.toStdString());
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     if (th->getToolType() != TOOL_PEN && th->getToolType() != TOOL_HIGHLIGHTER) {
         th->selectTool(TOOL_PEN);  // shapes are drawn with the pen (or the highlighter)
     }
@@ -1366,7 +1367,7 @@ void AppController::setDrawingType(const QString& name) {
 }
 
 QString AppController::lineStyle() const {
-    const LineStyle& style = app->getToolHandler()->getLineStyle();
+    const LineStyle& style = context().getToolHandler()->getLineStyle();
     if (!style.hasDashes()) {
         return QStringLiteral("plain");
     }
@@ -1375,7 +1376,7 @@ QString AppController::lineStyle() const {
 }
 
 void AppController::setLineStyle(const QString& name) {
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     if (!th->hasCapability(TOOL_CAP_LINE_STYLE, SelectedTool::toolbar)) {
         return;  // (upstream: only the pen has line styles)
     }
@@ -1386,13 +1387,13 @@ void AppController::setLineStyle(const QString& name) {
 }
 
 bool AppController::hasLineStyle() const {
-    return app->getToolHandler()->hasCapability(TOOL_CAP_LINE_STYLE, SelectedTool::active);
+    return context().getToolHandler()->hasCapability(TOOL_CAP_LINE_STYLE, SelectedTool::active);
 }
 
-bool AppController::fillEnabled() const { return app->getToolHandler()->getFill() != -1; }
+bool AppController::fillEnabled() const { return context().getToolHandler()->getFill() != -1; }
 
 void AppController::setFillEnabled(bool on) {
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     if (!th->hasCapability(TOOL_CAP_FILL, SelectedTool::toolbar)) {
         return;
     }
@@ -1402,12 +1403,12 @@ void AppController::setFillEnabled(bool on) {
 }
 
 int AppController::fillAlpha() const {
-    const ToolHandler* th = app->getToolHandler();
+    const ToolHandler* th = context().getToolHandler();
     return th->getToolType() == TOOL_HIGHLIGHTER ? th->getHighlighterFill() : th->getPenFill();
 }
 
 void AppController::setFillAlpha(int alpha) {
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     alpha = std::clamp(alpha, 1, 255);
     if (th->getToolType() == TOOL_HIGHLIGHTER) {
         th->setHighlighterFill(alpha);
@@ -1421,23 +1422,23 @@ void AppController::setFillAlpha(int alpha) {
 }
 
 QColor AppController::fillColor() const {
-    const auto c = penfill::color(*app->getSettings(), app->getToolHandler()->getToolType());
+    const auto c = penfill::color(*context().getSettings(), context().getToolHandler()->getToolType());
     return c ? toQColor(*c) : QColor(Qt::transparent);
 }
 
 void AppController::setFillColor(const QColor& c) {
-    const ToolType type = app->getToolHandler()->getToolType();
+    const ToolType type = context().getToolHandler()->getToolType();
     if (!penfill::hasOwnColor(type)) {
         return;
     }
-    penfill::setColor(*app->getSettings(), type,
+    penfill::setColor(*context().getSettings(), type,
                       c.isValid() && c.alpha() > 0 ? std::optional<Color>(toColor(c)) : std::nullopt);
     Q_EMIT toolChanged();
 }
 
-QColor AppController::color() const { return toQColor(app->getToolHandler()->getColor()); }
+QColor AppController::color() const { return toQColor(context().getToolHandler()->getColor()); }
 int AppController::size() const {
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     return th->isCustomThicknessActive() ? 5 : static_cast<int>(th->getSize());
 }
 
@@ -1449,12 +1450,12 @@ constexpr std::array<std::pair<ToolType, double>, 3> CUSTOM_WIDTH_TOOLS{
 }  // namespace
 
 double AppController::customWidth() const {
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     return th->getCustomThickness(th->getToolType());
 }
 
 void AppController::setCustomWidth(double points) {
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     const ToolType type = th->getToolType();
     if (th->getCustomThickness(type) <= 0) {
         return;  // (no sizes)
@@ -1465,7 +1466,7 @@ void AppController::setCustomWidth(double points) {
 }
 
 double AppController::sizeWidth(int s) const {
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     const ToolType type = th->getToolType();
     if (s == 5) {
         return th->getCustomThickness(type);
@@ -1477,9 +1478,9 @@ double AppController::sizeWidth(int s) const {
 }
 
 void AppController::loadCustomWidths() {
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     std::string stored;
-    app->getSettings()->getCustomElement(CUSTOM).getString("customWidths", stored);
+    context().getSettings()->getCustomElement(CUSTOM).getString("customWidths", stored);
     std::map<std::string, std::pair<double, bool>> read;
     for (const QString& entry: QString::fromStdString(stored).split(',', Qt::SkipEmptyParts)) {
         QString value = entry.section('=', 1);
@@ -1501,7 +1502,7 @@ void AppController::loadCustomWidths() {
 }
 
 void AppController::storeCustomWidths() {
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     QStringList entries;
     for (const auto& [type, width]: CUSTOM_WIDTH_TOOLS) {
         const bool active = th->isCustomThicknessActive(type);
@@ -1510,8 +1511,8 @@ void AppController::storeCustomWidths() {
                            .arg(th->getCustomThickness(type))
                            .arg(active ? "*" : "");
     }
-    app->getSettings()->getCustomElement(CUSTOM).setString("customWidths", entries.join(',').toStdString());
-    app->getSettings()->customSettingsChanged();
+    context().getSettings()->getCustomElement(CUSTOM).setString("customWidths", entries.join(',').toStdString());
+    context().getSettings()->customSettingsChanged();
 }
 
 QVariantList AppController::palette() const {
@@ -1526,7 +1527,7 @@ QVariantList AppController::colorPalettes() const { return ColorPalettes::builtI
 
 QString AppController::colorPalette() const {
     std::string stored;
-    app->getSettings()->getCustomElement(CUSTOM).getString("colorPalette", stored);
+    context().getSettings()->getCustomElement(CUSTOM).getString("colorPalette", stored);
     const QString id = QString::fromStdString(stored);
     return ColorPalettes::builtIn().palette(id) ? id : ColorPalettes::builtIn().defaultId();
 }
@@ -1535,8 +1536,8 @@ void AppController::setColorPalette(const QString& id) {
     if (id == colorPalette() || !ColorPalettes::builtIn().palette(id)) {
         return;
     }
-    app->getSettings()->getCustomElement(CUSTOM).setString("colorPalette", id.toStdString());
-    app->getSettings()->customSettingsChanged();
+    context().getSettings()->getCustomElement(CUSTOM).setString("colorPalette", id.toStdString());
+    context().getSettings()->customSettingsChanged();
     followColorPalette(id);
     Q_EMIT colorPaletteChanged();
 }
@@ -1559,7 +1560,7 @@ std::optional<std::pair<ToolType, ColorPalettes::Kind>> paletteTool(const QStrin
 
 QMap<QString, QString> AppController::colorRoles() const {
     std::string stored;
-    app->getSettings()->getCustomElement(CUSTOM).getString("colorRoles", stored);
+    context().getSettings()->getCustomElement(CUSTOM).getString("colorRoles", stored);
     QMap<QString, QString> roles;
     for (const QString& entry: QString::fromStdString(stored).split(';', Qt::SkipEmptyParts)) {
         const QString tool = entry.section('=', 0, 0).trimmed();
@@ -1576,8 +1577,8 @@ void AppController::storeColorRoles(const QMap<QString, QString>& roles) {
     for (auto it = roles.begin(); it != roles.end(); ++it) {
         entries << it.key() + '=' + it.value();
     }
-    app->getSettings()->getCustomElement(CUSTOM).setString("colorRoles", entries.join(';').toStdString());
-    app->getSettings()->customSettingsChanged();
+    context().getSettings()->getCustomElement(CUSTOM).setString("colorRoles", entries.join(';').toStdString());
+    context().getSettings()->customSettingsChanged();
 }
 
 QString AppController::colorRoleOf(const QString& tool) const {
@@ -1588,7 +1589,7 @@ QString AppController::colorRoleOf(const QString& tool) const {
     }
     // Only while the tool still has that color (it may have been changed another way since)
     const auto c = ColorPalettes::builtIn().color(ref, t->second);
-    const Color now = app->getToolHandler()->getTool(t->first).getColor();
+    const Color now = context().getToolHandler()->getTool(t->first).getColor();
     return c && toQColor(now) == *c ? ref.toString() : QString();
 }
 
@@ -1602,7 +1603,7 @@ void AppController::setPaletteColor(const QString& paletteId, const QString& rol
     if (!c) {
         return;
     }
-    app->getToolHandler()->setColor(toColor(*c), true);
+    context().getToolHandler()->setColor(toColor(*c), true);
     if (t) {
         QMap<QString, QString> roles = colorRoles();
         roles.insert(inHand, ColorRef{paletteId, role}.toString());
@@ -1614,7 +1615,7 @@ void AppController::setPaletteColor(const QString& paletteId, const QString& rol
 
 void AppController::followColorPalette(const QString& paletteId) {
     QMap<QString, QString> roles = colorRoles();
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     bool changed = false;
     for (const QString& tool: {QStringLiteral("pen"), QStringLiteral("highlighter"), QStringLiteral("text")}) {
         const QString ref = colorRoleOf(tool);
@@ -1670,14 +1671,14 @@ double AppController::highlighterOpacity() const { return ColorPalettes::highlig
 
 double AppController::markdownFontSize() const {
     double size = 0;
-    app->getSettings()->getCustomElement(CUSTOM).getDouble("markdownFontSize", size);
+    context().getSettings()->getCustomElement(CUSTOM).getDouble("markdownFontSize", size);
     return size > 0 ? size : md::defaultFontSize(fontSize());
 }
 
 void AppController::setMarkdownFontSize(double size) {
     size = std::clamp(size, 4.0, 400.0);
-    app->getSettings()->getCustomElement(CUSTOM).setDouble("markdownFontSize", size);
-    app->getSettings()->customSettingsChanged();
+    context().getSettings()->getCustomElement(CUSTOM).setDouble("markdownFontSize", size);
+    context().getSettings()->customSettingsChanged();
     if (canvas() && canvas()->getTextEditor() && canvas()->getTextEditor()->isMarkdown()) {
         canvas()->getTextEditor()->setFont(XojFont(fontFamily().toStdString(), size));  // the text being edited
     }
@@ -1721,14 +1722,14 @@ void AppController::applyMarkdownText() {
 
 bool AppController::toolbarHidden() const {
     bool hidden = false;
-    app->getSettings()->getCustomElement(CUSTOM).getBool("toolbarHidden", hidden);
+    context().getSettings()->getCustomElement(CUSTOM).getBool("toolbarHidden", hidden);
     return hidden;
 }
 
 void AppController::setToolbarHidden(bool hidden) {
     if (hidden != toolbarHidden()) {
-        app->getSettings()->getCustomElement(CUSTOM).setBool("toolbarHidden", hidden);
-        app->getSettings()->customSettingsChanged();
+        context().getSettings()->getCustomElement(CUSTOM).setBool("toolbarHidden", hidden);
+        context().getSettings()->customSettingsChanged();
         Q_EMIT toolbarHiddenChanged();
     }
 }
@@ -1740,7 +1741,7 @@ QVariantList AppController::pdfHighlightColors() const {
 
 QColor AppController::pdfHighlightColor() const {
     std::string stored;
-    if (app->getSettings()->getCustomElement(CUSTOM).getString("pdfHighlightColor", stored)) {
+    if (context().getSettings()->getCustomElement(CUSTOM).getString("pdfHighlightColor", stored)) {
         if (const QColor c(QString::fromStdString(stored)); c.isValid()) {
             return c;
         }
@@ -1752,8 +1753,8 @@ void AppController::setPdfHighlightColor(const QColor& color) {
     if (!color.isValid() || color.rgb() == pdfHighlightColor().rgb()) {
         return;
     }
-    app->getSettings()->getCustomElement(CUSTOM).setString("pdfHighlightColor", color.name().toStdString());
-    app->getSettings()->customSettingsChanged();
+    context().getSettings()->getCustomElement(CUSTOM).setString("pdfHighlightColor", color.name().toStdString());
+    context().getSettings()->customSettingsChanged();
     applyPdfTextMode();
     Q_EMIT pdfTextModeChanged();
 }
@@ -1770,8 +1771,8 @@ int AppController::pageNumber() const { return session() ? static_cast<int>(sess
 int AppController::pageCount() const { return canvas() ? static_cast<int>(canvas()->pageCount()) : 0; }
 
 void AppController::newDocument() {
-    inkForPaper(toQColor(app->getSettings()->getPageTemplateSettings().getBackgroundColor()));
-    tabs->addTab(std::make_unique<DocumentSession>(*app));
+    inkForPaper(toQColor(context().getSettings()->getPageTemplateSettings().getBackgroundColor()));
+    tabs->addTab(std::make_unique<DocumentSession>(context()));
     setHomeVisible(false);
 }
 
@@ -1799,10 +1800,10 @@ fs::path AppController::journalFileFor(const Library& lib) {
 
 bool AppController::createDocument(const QString& name, bool inLibrary) {
     // Ink that reads on the new document's paper (qt/docs/features/dark-pages.md)
-    inkForPaper(toQColor(app->getSettings()->getPageTemplateSettings().getBackgroundColor()));
+    inkForPaper(toQColor(context().getSettings()->getPageTemplateSettings().getBackgroundColor()));
     if (!inLibrary || !library->available()) {
         // The page template settings (background, size) are what the dialog changed.
-        tabs->addTab(std::make_unique<DocumentSession>(*app));
+        tabs->addTab(std::make_unique<DocumentSession>(context()));
         setHomeVisible(false);
         return true;
     }
@@ -1815,7 +1816,7 @@ bool AppController::createDocument(const QString& name, bool inLibrary) {
 }
 
 bool AppController::createDocumentAt(fs::path path) {
-    auto s = std::make_unique<DocumentSession>(*app);
+    auto s = std::make_unique<DocumentSession>(context());
     DocumentSession* created = s.get();
     tabs->addTab(std::move(s));
     setHomeVisible(false);
@@ -2012,14 +2013,14 @@ void AppController::openLibrary(const QUrl& folder) {
 
 void AppController::switchLibrary(const fs::path& root) {
     setLibraryRoot(root);
-    app->getSettings()->getCustomElement("xournalQt").setString("library", root.string());
-    app->getSettings()->customSettingsChanged();
+    context().getSettings()->getCustomElement("xournalQt").setString("library", root.string());
+    context().getSettings()->customSettingsChanged();
     setHomeVisible(true);
 }
 
 QString AppController::rememberedLibrary() const {
     std::string root;
-    app->getSettings()->getCustomElement("xournalQt").getString("library", root);
+    context().getSettings()->getCustomElement("xournalQt").getString("library", root);
     return QString::fromStdString(root);
 }
 
@@ -2116,7 +2117,7 @@ bool AppController::librariesInApp() const {
 
 bool AppController::offerLibrariesHome() const {
     bool declined = false;
-    app->getSettings()->getCustomElement("xournalQt").getBool(LIBRARIES_HOME_DECLINED, declined);
+    context().getSettings()->getCustomElement("xournalQt").getBool(LIBRARIES_HOME_DECLINED, declined);
     return librariesInApp() && !declined;
 }
 
@@ -2149,9 +2150,9 @@ QObject* AppController::libraryMoveObject() const {
 }
 
 void AppController::setLibrariesMoved() {
-    app->getSettings()->getCustomElement("xournalQt").setString(LIBRARIES_HOME, "shared");
-    app->getSettings()->customSettingsChanged();
-    app->getSettings()->save();  // (at once: the libraries are there now)
+    context().getSettings()->getCustomElement("xournalQt").setString(LIBRARIES_HOME, "shared");
+    context().getSettings()->customSettingsChanged();
+    context().getSettings()->save();  // (at once: the libraries are there now)
     Library::setHome(Library::Home::Shared);
 }
 
@@ -2173,7 +2174,7 @@ void AppController::chooseLibrariesHome() {
         libraryMoveTask->startCleanup(*pending);
     }
     std::string home;
-    app->getSettings()->getCustomElement("xournalQt").getString(LIBRARIES_HOME, home);
+    context().getSettings()->getCustomElement("xournalQt").getString(LIBRARIES_HOME, home);
     const bool access = SystemApps::instance().hasAllFilesAccess();
     Library::setHome(Library::chooseHome(folders, access, home == "shared"));
     // Nothing to move (a new install, or one after the libraries were moved and the app was installed again): with
@@ -2199,8 +2200,8 @@ void AppController::moveLibrariesHome() {
 }
 
 void AppController::declineLibrariesHome() {
-    app->getSettings()->getCustomElement("xournalQt").setBool(LIBRARIES_HOME_DECLINED, true);
-    app->getSettings()->customSettingsChanged();
+    context().getSettings()->getCustomElement("xournalQt").setBool(LIBRARIES_HOME_DECLINED, true);
+    context().getSettings()->customSettingsChanged();
     Q_EMIT librariesHomeChanged();
 }
 
@@ -2318,7 +2319,7 @@ void AppController::librariesCleanedUp(const LibraryMigration::Plan& plan, const
 }
 
 void AppController::followMovedLibraries(const std::vector<std::pair<fs::path, fs::path>>& moves) {
-    auto* settings = app->getSettings();
+    auto* settings = context().getSettings();
     std::string remembered;
     settings->getCustomElement("xournalQt").getString("library", remembered);
     for (const auto& [from, to]: moves) {
@@ -2483,7 +2484,7 @@ void AppController::applicationStateChanged(Qt::ApplicationState state) {
 }
 
 int AppController::autosaveAll() {
-    if (!app->getSettings()->isAutosaveEnabled()) {
+    if (!context().getSettings()->isAutosaveEnabled()) {
         return 0;
     }
     int written = 0;
@@ -2584,7 +2585,7 @@ void AppController::reopenTabs(const std::vector<std::pair<fs::path, int>>& last
             }
             if (result.document) {
                 const int pristine = tabs->isPristine(tabs->currentIndex()) ? tabs->currentIndex() : -1;
-                tabs->addTab(std::make_unique<DocumentSession>(*app, std::move(result.document)));
+                tabs->addTab(std::make_unique<DocumentSession>(context(), std::move(result.document)));
                 tabs->currentSession()->markRecovered(it->second.second);
                 if (pristine >= 0) {
                     tabs->closeTab(pristine);
@@ -2718,7 +2719,7 @@ void AppController::receiveFiles(const QStringList& sources) {
 }
 
 void AppController::setFingerDrawingDefault(bool on) {
-    Settings* s = app->getSettings();
+    Settings* s = context().getSettings();
     bool applied = false;
     if (s->getCustomElement("touch").getBool("drawingDefaultApplied", applied) && applied) {
         return;
@@ -2959,7 +2960,7 @@ bool AppController::openLoaded(const fs::path& file, const QString& path, xqt::D
     const std::vector<std::string> hybridChanged = result.hybridChanged;
     // An untouched new document is replaced instead of keeping an empty tab around.
     const int pristine = replacePristine && tabs->isPristine(tabs->currentIndex()) ? tabs->currentIndex() : -1;
-    auto opened = textSession ? std::move(textSession) : std::make_unique<DocumentSession>(*app, std::move(result.document));
+    auto opened = textSession ? std::move(textSession) : std::make_unique<DocumentSession>(context(), std::move(result.document));
     opened->setPermissions(result.allowPrint, result.allowCopy);  // (a PDF opened without its owner password)
     if (shown && !opened->textFile()) {
         opened->setShownFile(file, !DocumentFiles::isImageFile(file));
@@ -2969,14 +2970,14 @@ bool AppController::openLoaded(const fs::path& file, const QString& path, xqt::D
         tabs->closeTab(pristine);
     }
     watchTextFiles();  // (changes by other programs: a text file, a .xopp, a PDF)
-    app->getSettings()->setLastOpenPath(fs::path(path.toStdString()).parent_path());
+    context().getSettings()->setLastOpenPath(fs::path(path.toStdString()).parent_path());
     if (!VersionCache::instance().contains(file)) {  // (a version cut out of its file is gone when the app quits)
         recent->add(file);
     }
     DocumentPlaces::setRead(DocumentPlaces::keyOf(file));
     // "Open documents where they were left off": at the page it was left at (setting, off by default)
     if (bool resume = false;
-        app->getSettings()->getCustomElement("xournalQt").getBool("resumeAtLastPage", resume) && resume) {
+        context().getSettings()->getCustomElement("xournalQt").getBool("resumeAtLastPage", resume) && resume) {
         DocumentSession* s = tabs->currentSession();
         const int page = DocumentPlaces::lastPage(DocumentPlaces::keyOf(file));
         if (s && page > 0 && static_cast<size_t>(page) < s->getDocument()->getPageCount()) {
@@ -3097,7 +3098,7 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
         if (lowerExtension(pdf) != ".pdf") {
             pdf += ".pdf";
         }
-        firstIntoPdf = fs::exists(pdf, ec) && !HybridPdf::isHybrid(pdf) && !settingOn(app->getSettings(), NOTICE_KEY);
+        firstIntoPdf = fs::exists(pdf, ec) && !HybridPdf::isHybrid(pdf) && !settingOn(context().getSettings(), NOTICE_KEY);
     }
     QString keptBecause;
     if (choice != "keep") {
@@ -3134,7 +3135,7 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
         if (choice != "update") {
             request.exportXopp = own;  // (the first time: after the PDF is written, see below)
         }
-    } else if (hybrid && settingOn(app->getSettings(), "hybridExportXopp")) {
+    } else if (hybrid && settingOn(context().getSettings(), "hybridExportXopp")) {
         // "On every save of a hybrid PDF, also write a .xopp for Xournal++": from the same state, in the same job
         fs::path xopp = way == SaveWay::Save ? s->getFilePath() : target;
         if (way != SaveWay::Save && xopp.extension() != ".pdf") {
@@ -3167,7 +3168,7 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
             Q_EMIT pageActionDone(tr("Exported to %1").arg(QString::fromStdString(target.filename().string())), false);
         } else {
             if (way != SaveWay::Save) {
-                app->getSettings()->setLastSavePath(target.parent_path());
+                context().getSettings()->setLastSavePath(target.parent_path());
                 recent->add(saved.getFilePath());
             }
             if (saved.textFile() && !saved.hasFilePath()) {
@@ -3198,8 +3199,8 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
                     Q_EMIT message(tr("The .xopp was kept"), keptBecause, false);
                 }
                 if (firstIntoPdf) {
-                    app->getSettings()->getCustomElement("xournalQt").setBool(NOTICE_KEY, true);
-                    app->getSettings()->customSettingsChanged();
+                    context().getSettings()->getCustomElement("xournalQt").setBool(NOTICE_KEY, true);
+                    context().getSettings()->customSettingsChanged();
                     Q_EMIT pageActionDone(
                             tr("Your notes are saved in %1. Its pages stay as they were; other PDF apps show the notes "
                                "as annotations.")
@@ -3368,7 +3369,7 @@ bool AppController::openVersionAsCopy(int id) {
     loaded.document->lock();
     loaded.document->setFilepath({});
     loaded.document->unlock();
-    auto copy = std::make_unique<DocumentSession>(*app, std::move(loaded.document));
+    auto copy = std::make_unique<DocumentSession>(context(), std::move(loaded.document));
     copy->setMadeFrom(suggestion);
     tabs->addTab(std::move(copy));
     setHomeVisible(false);
@@ -3402,7 +3403,7 @@ QString AppController::oldXoppToAsk() const {
 }
 
 QString AppController::documentMode() const {
-    return DocumentMode::nameOf(DocumentMode::effective(*app->getSettings()));
+    return DocumentMode::nameOf(DocumentMode::effective(*context().getSettings()));
 }
 
 void AppController::setDocumentMode(const QString& mode) {
@@ -3411,17 +3412,17 @@ void AppController::setDocumentMode(const QString& mode) {
         return;
     }
     // (stored also when it is the mode in effect already: the question is not asked again)
-    DocumentMode::store(*app->getSettings(), m);
-    Q_EMIT app->settingsChanged();  // (every window; the settings sheet reads it again)
+    DocumentMode::store(*context().getSettings(), m);
+    Q_EMIT context().settingsChanged();  // (every window; the settings sheet reads it again)
 }
 
-bool AppController::pdfOnly() const { return DocumentMode::pdfOnly(*app->getSettings()); }
+bool AppController::pdfOnly() const { return DocumentMode::pdfOnly(*context().getSettings()); }
 
-bool AppController::askDocumentMode() const { return !isSecondary() && DocumentMode::shouldAsk(*app->getSettings()); }
+bool AppController::askDocumentMode() const { return !isSecondary() && DocumentMode::shouldAsk(*context().getSettings()); }
 
 bool AppController::introSeen() const {
     bool seen = false;
-    app->getSettings()->getCustomElement("xournalQt").getBool("introSeen", seen);
+    context().getSettings()->getCustomElement("xournalQt").getBool("introSeen", seen);
     return seen;
 }
 
@@ -3429,9 +3430,9 @@ void AppController::setIntroSeen(bool seen) {
     if (seen == introSeen()) {
         return;
     }
-    app->getSettings()->getCustomElement("xournalQt").setBool("introSeen", seen);
-    app->getSettings()->customSettingsChanged();  // (saved at once)
-    Q_EMIT app->settingsChanged();
+    context().getSettings()->getCustomElement("xournalQt").setBool("introSeen", seen);
+    context().getSettings()->customSettingsChanged();  // (saved at once)
+    Q_EMIT context().settingsChanged();
 }
 
 bool AppController::askIntro() const { return askDocumentMode() && !introSeen(); }
@@ -3559,7 +3560,7 @@ bool AppController::savesWithoutDialog(const DocumentSession* s) const {
     const fs::path pdf = s->annotatedPdf();
     // (notes on a protected PDF go into it too: there they are protected with it; a .xopp could not be)
     return !pdf.empty() &&
-           (settingOn(app->getSettings(), "hybridIntoPdf") || pdfOnly() || PdfEncryption::isProtected(pdf)) &&
+           (settingOn(context().getSettings(), "hybridIntoPdf") || pdfOnly() || PdfEncryption::isProtected(pdf)) &&
            !HybridPdf::inCache(pdf) && !MergedPdf::inCache(pdf);
 }
 
@@ -3571,7 +3572,7 @@ QUrl AppController::suggestedHybridFile() const {
     if (session()->isHybrid()) {
         target = session()->getFilePath();
     } else if (const fs::path pdf = session()->annotatedPdf(); !pdf.empty() && !HybridPdf::inCache(pdf)) {
-        target = settingOn(app->getSettings(), "hybridIntoPdf") || pdfOnly()
+        target = settingOn(context().getSettings(), "hybridIntoPdf") || pdfOnly()
                          ? pdf
                          : pdf.parent_path() / (pdf.stem().string() + ".notes.pdf");
     } else {
@@ -4184,12 +4185,12 @@ void AppController::redo() {
     }
 }
 
-QString AppController::fontFamily() const { return QString::fromStdString(app->getSettings()->getFont().getName()); }
-double AppController::fontSize() const { return app->getSettings()->getFont().getSize(); }
+QString AppController::fontFamily() const { return QString::fromStdString(context().getSettings()->getFont().getName()); }
+double AppController::fontSize() const { return context().getSettings()->getFont().getSize(); }
 
 void AppController::setFont(const QString& family, double size) {
     XojFont font(family.toStdString(), std::clamp(size, 4.0, 400.0));
-    app->getSettings()->setFont(font);
+    context().getSettings()->setFont(font);
     if (canvas() && canvas()->getTextEditor()) {
         auto* editor = canvas()->getTextEditor();
         // The text being edited follows (a Markdown text keeps its own size, see markdownFontSize)
@@ -4208,7 +4209,7 @@ bool AppController::insertStickyNote(const QColor& color) {
     if (textPagesFixed() || !canvas() || session()->isReadOnly()) {
         return false;
     }
-    if (!isSelectToolType(app->getToolHandler()->getToolType())) {
+    if (!isSelectToolType(context().getToolHandler()->getToolType())) {
         selectTool("selectRect");  // so that the note can be moved and resized right away (as an image)
     }
     std::optional<Color> c;
@@ -4347,13 +4348,13 @@ void AppController::selectTool(const QString& name) {
     if (type == TOOL_NONE) {
         type = TOOL_PEN;
     }
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     th->selectTool(type);
     th->fireToolChanged();
 }
 
 void AppController::setColor(const QColor& c) {
-    app->getToolHandler()->setColor(toColor(c), true);
+    context().getToolHandler()->setColor(toColor(c), true);
     if (QMap<QString, QString> roles = colorRoles(); roles.remove(tool()) > 0) {
         storeColorRoles(roles);  // (a color of one's own: no role)
     }
@@ -4361,7 +4362,7 @@ void AppController::setColor(const QColor& c) {
 }
 
 void AppController::setSize(int s) {
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     const ToolType type = th->getToolType();
     if (s == 5) {
         th->setCustomThickness(type, th->getCustomThickness(type), true);
@@ -4535,7 +4536,7 @@ bool AppController::insertPages(int position, int background, int paper, bool la
         return false;  // (a text file: its pages are its text)
     }
     DocumentSession* s = session();
-    const auto& types = app->getPageTypes()->getPageTypes();
+    const auto& types = context().getPageTypes()->getPageTypes();
     if (!s || background < 0 || background >= static_cast<int>(types.size()) || count < 1) {
         return false;
     }
@@ -4786,7 +4787,7 @@ bool AppController::changePageBackground(const QList<int>& pages, int background
         return false;  // (a text file: its pages are its text)
     }
     DocumentSession* s = session();
-    const auto& types = app->getPageTypes()->getPageTypes();
+    const auto& types = context().getPageTypes()->getPageTypes();
     if (!s || background < 0 || background >= static_cast<int>(types.size())) {
         return false;
     }
@@ -4833,7 +4834,7 @@ QVariantMap AppController::currentPageFormat() const {
     std::shared_lock lock(*doc);
     const PageRef p = doc->getPage(std::min(session()->getCurrentPageNo(), doc->getPageCount() - 1));
     int background = -1;
-    const auto& types = app->getPageTypes()->getPageTypes();
+    const auto& types = context().getPageTypes()->getPageTypes();
     const PageType pt = p->getBackgroundType();
     for (size_t i = 0; i < types.size(); ++i) {
         // (its paper's texture and ruling colors aside)
@@ -4901,7 +4902,7 @@ void AppController::movePageUp(int index) {
 }
 
 QUrl AppController::iconUrl(const QString& name) const {
-    return QUrl::fromLocalFile(QString::fromStdString((app->getResourceDir() / "icons" / name.toStdString()).string()) +
+    return QUrl::fromLocalFile(QString::fromStdString((context().getResourceDir() / "icons" / name.toStdString()).string()) +
                                ".svg");
 }
 
@@ -4909,7 +4910,7 @@ QUrl AppController::openFolder() const {
     if (session() && session()->hasFilePath()) {
         return QUrl::fromLocalFile(QString::fromStdString(session()->getFilePath().parent_path().string()));
     }
-    const fs::path& last = app->getSettings()->getLastOpenPath();
+    const fs::path& last = context().getSettings()->getLastOpenPath();
     return last.empty() ? QUrl() : QUrl::fromLocalFile(QString::fromStdString(last.string()));
 }
 

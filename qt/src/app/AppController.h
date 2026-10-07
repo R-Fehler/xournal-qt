@@ -1534,7 +1534,8 @@ public:
     /// Call before quitting: writes settings.
     void shutdown();
 
-    xqt::AppContext& context() const { return *app; }
+    /// The settings, tools and rendering, shared by all windows of the process (AppServices::context)
+    xqt::AppContext& context() const;
     xqt::TabManager& tabManager() const { return *tabs; }
     /// The current tab's document and view, with their signals (what follows "the current document" connects here)
     xqt::CurrentDocument& currentDocument() const { return *current; }
@@ -1868,8 +1869,6 @@ private:
     void reopenTabs(const std::vector<std::pair<fs::path, int>>& tabs, int current,
                     const std::map<size_t, std::pair<fs::path, fs::path>>& recovered);
 
-    /// Shared by all windows of the process (settings, tools, rendering)
-    std::shared_ptr<xqt::AppContext> app;
     std::shared_ptr<Palette> colors;
     AppController* primary = nullptr;  ///< the main window's controller (nullptr: this is the main window)
     bool windowGone = false;           ///< its window was closed (it is on its way out)

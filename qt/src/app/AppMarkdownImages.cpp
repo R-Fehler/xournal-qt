@@ -52,7 +52,7 @@ bool AppController::loadWebImage(const QString& address) {
     if (cache.empty()) {
         return false;
     }
-    Settings& settings = *app->getSettings();
+    Settings& settings = *context().getSettings();
     if (networkAccessOf(settings) == QLatin1String("off")) {
         Q_EMIT message(tr("Load image"),
                        tr("Connecting to the web is turned off (Settings → Documents → Web and citations)."), true);

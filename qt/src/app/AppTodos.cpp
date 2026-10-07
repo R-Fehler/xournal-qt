@@ -170,7 +170,7 @@ bool AppController::setTodoDone(const QString& path, const QString& rawText, int
                 }
                 return;
             }
-            auto s = std::make_unique<DocumentSession>(*self->app, std::move(loaded->document));
+            auto s = std::make_unique<DocumentSession>(self->context(), std::move(loaded->document));
             {
                 Document* doc = s->getDocument();
                 std::unique_lock lock(*doc);
@@ -251,7 +251,7 @@ void AppController::startTodoStamp() {
     }
     canvas()->clearSelection();  // (a tap on a selection would not reach the page)
     todostamp::disarm();  // (the tool changes: not the end of this stamp)
-    ToolHandler* th = app->getToolHandler();
+    ToolHandler* th = context().getToolHandler();
     th->selectTool(TOOL_HAND);  // (the tap writes nothing)
     th->fireToolChanged();
     QPointer<AppController> self(this);
@@ -271,7 +271,7 @@ void AppController::endTodoStamp(bool restore) {
     const QString previous = std::exchange(stampPreviousTool, QString());
     const bool wasArmed = todostamp::isArmed();
     todostamp::disarm();
-    if (restore && !previous.isEmpty() && app->getToolHandler()->getToolType() == TOOL_HAND) {
+    if (restore && !previous.isEmpty() && context().getToolHandler()->getToolType() == TOOL_HAND) {
         selectTool(previous);
     }
     if (wasArmed || restore) {
@@ -280,7 +280,7 @@ void AppController::endTodoStamp(bool restore) {
 }
 
 void AppController::followTodoStampTool() {
-    if (todostamp::isArmed() && app->getToolHandler()->getToolType() != TOOL_HAND) {
+    if (todostamp::isArmed() && context().getToolHandler()->getToolType() != TOOL_HAND) {
         stampPreviousTool.clear();
         todostamp::disarm();
         Q_EMIT todoStampChanged();

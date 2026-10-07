@@ -141,7 +141,7 @@ bool AppController::pasteSticker(const QString& path) {
             return;
         }
         // (a select tool: the sticker can be moved and resized right away, as an inserted image)
-        const ToolType tool = self->app->getToolHandler()->getToolType();
+        const ToolType tool = self->context().getToolHandler()->getToolType();
         if (tool != TOOL_SELECT_RECT && tool != TOOL_SELECT_REGION) {
             self->selectTool("selectRect");
         }

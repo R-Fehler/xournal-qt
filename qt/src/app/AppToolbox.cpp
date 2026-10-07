@@ -49,7 +49,7 @@ bool AppController::entryInHand(const QVariantMap& e) const {
     }
     if (type == "eraser") {
         return t == "eraser" &&
-               QString::fromUtf8(eraserTypeToString(app->getToolHandler()->getEraserType()).data()) ==
+               QString::fromUtf8(eraserTypeToString(context().getToolHandler()->getEraserType()).data()) ==
                        e.value("variant");
     }
     if (type == "laser") {
@@ -85,8 +85,8 @@ bool AppController::applyToolEntry(const QString& id) {
     if (snip::isArmed()) {
         endSnip(false);  // (another tool taken: the snip ends)
     }
-    ToolHandler* th = app->getToolHandler();
-    Settings& settings = *app->getSettings();
+    ToolHandler* th = context().getToolHandler();
+    Settings& settings = *context().getSettings();
     const QColor color = ToolboxModel::colorIn(e, colorPalette());
     const double width = e.value("width").toDouble();
     auto takeColor = [&](ToolType t) {
