@@ -38,8 +38,6 @@ ApplicationWindow {
     Material.accent: Material.Indigo
     color: app.presenting ? "#000000" : "#5f6368"  // (presenting: black around the pages, like a projector)
 
-    property var afterDiscardCheck: null
-
     // --- safe areas and the soft keyboard (qt/docs/adaptive-layout.md, "Safe areas", "The soft keyboard") ----------
     /// The parts of the window under the system's bars and a camera cut-out (edge to edge on Android and iOS; set by
     /// main.cpp from the window's safe area margins on Qt 6.9+, 0 elsewhere; the tests set them by hand): the status
@@ -90,7 +88,6 @@ ApplicationWindow {
     /// and on a phone the format bar sits right above it.
     readonly property real keyboardHeight: Math.max(0, height - keyboardTop)
     readonly property bool keyboardOpen: keyboardHeight > 0
-    property bool quitting: false
 
     // --- the layout for the window's size (qt/docs/adaptive-layout.md) --------------------------------------------
     /// The size class (desktopWide, desktopNarrow, tabletPortrait, phonePortrait, phoneShort, tiny), the width and
@@ -489,133 +486,18 @@ ApplicationWindow {
     /// controls (and no dot).
     property bool presentClean: false
 
-    function withSavedChanges(action) {
-        if (!app.modified) {
-            action()
-            return
-        }
-        afterDiscardCheck = action
-        unsavedDialog.open()
-    }
-    /// Save as, with the type: "xopp" (Xournal notes), "pdf" (a PDF with notes, editable: a hybrid PDF), or "" for
-    /// the document's own (app.saveFormat(): a hybrid PDF stays a PDF, a .xopp a .xopp; new documents, annotated PDFs
-    /// and images are PDFs with notes in PDF files mode, else .xopp).
-    function openSaveDialog(then, format) {
-        if (win.textDoc && app.textEditable) {
-            app.saveInBackground(then ? then : null)  // (a text file is saved as itself: no file types)
-            return
-        }
-        setUpSaveDialog(format || "")
-        saveDialog.afterSave = then
-        saveDialog.open()
-    }
-    function setUpSaveDialog(format) {
-        const pdf = format === "pdf" || (format !== "xopp" && app.saveFormat() === "pdf")
-        // .xopp: upstream Xournal++'s suggestion, next to the annotated PDF ("lecture.pdf" -> "lecture.xopp"), else
-        // the document's own path, else the default name in the library / the last used folder. PDF: the document's
-        // own hybrid PDF, "lecture.notes.pdf" for an annotated PDF, else the .xopp suggestion as .pdf.
-        const suggestion = (pdf ? app.suggestedHybridFile() : app.suggestedSaveFile()).toString()
-        saveDialog.settingUp = true
-        saveDialog.selectedNameFilter.index = pdf ? 1 : 0
-        if (suggestion !== "") {
-            saveDialog.currentFolder = suggestion.substring(0, suggestion.lastIndexOf("/"))
-            saveDialog.selectedFile = pdf ? suggestion : app.fileForFormat(suggestion, false)
-        }
-        saveDialog.settingUp = false
-    }
-    /// The Save as dialog was accepted: as a PDF with notes or as a .xopp (the extension typed wins). A document
-    /// saved as "name.xopp" asks first what happens to that .xopp (unless the choice is stored).
-    function saveChosen(url, pdfChosen, then) {
-        if (!app.savesAsPdf(url, pdfChosen)) {
-            app.saveAsInBackground(url, then ? then : null)
-            return
-        }
-        const old = app.oldXoppToAsk()
-        if (old === "") app.saveAsHybridInBackground(url, then ? then : null)
-        else oldXoppDialog.ask(old, url, then)
-    }
-    function openExportDialog() {
-        const suggestion = app.suggestedExportFile().toString()
-        if (suggestion !== "") {
-            exportDialog.currentFolder = suggestion.substring(0, suggestion.lastIndexOf("/"))
-            exportDialog.selectedFile = suggestion
-        }
-        exportDialog.open()
-    }
-    /// Share → a PDF with notes of the current document (`file`: a PDF of the library instead), shown in the file
-    /// manager or onto the clipboard. Saved first if needed; a .xopp is never turned into a PDF unasked.
-    function sharePdfOf(file, toClipboard, withHistory) {
-        if (file !== "") {
-            app.shareFile(file, toClipboard, !!withHistory)
-            return
-        }
-        const step = app.shareStep()
-        if (step === "share" || step === "save") {
-            app.sharePdf(toClipboard, !!withHistory)
-        } else if (step === "saveAs") {
-            openSaveDialog(function() { app.sharePdf(toClipboard) }, "pdf")
-        } else if (toClipboard) {
-            app.sharePdfCopy("", true)  // (a .xopp: a PDF copy in the cache; the document stays as it is)
-        } else {
-            shareXoppDialog.open()
-        }
-    }
-    // Share of a text file: the file itself; the open document's unsaved changes are saved first
-    function shareTextFile(path, current, toClipboard) {
-        if (current && app.textEditable && app.modified) {
-            app.saveInBackground(function() { app.shareFile(path, toClipboard) })
-        } else {
-            app.shareFile(path, toClipboard)
-        }
-    }
-    // "Open externally": a text file with unsaved changes is saved first (asked), so the other app sees them
-    function openExternally() {
-        if (app.textEditable && app.modified) {
-            externalSaveDialog.open()
-        } else {
-            app.openExternally()
-        }
-    }
-    function saveOrAsk(then) {
-        if (app.savesWithoutDialog()) {
-            // In the background: the window stays usable; `then` runs once the file is written (with its tab
-            // current), not at all if that failed (a message says why)
-            app.saveInBackground(then ? then : null)
-        } else {
-            openSaveDialog(then)
-        }
-    }
-
-    // Close a tab; unsaved changes are asked about first (with that tab shown). A tab being saved waits for its save.
-    function requestCloseTab(index) {
-        if (app.tabSaving(index)) {
-            app.whenSaved(index, function(i) { requestCloseTab(i) })
-            return
-        }
-        if (!app.tabModified(index)) {
-            app.closeTab(index)
-            return
-        }
-        app.currentTab = index
-        withSavedChanges(function() { app.closeTab(app.currentTab) })
-    }
-    // Close every document; unsaved changes are asked about one by one (after the saves that run).
-    function closeAllTabs() {
-        if (app.anySaving) {
-            app.whenAllSaved(function() { closeAllTabs() })
-            return
-        }
-        const pending = app.modifiedTabs()
-        if (pending.length === 0) {
-            app.closeAllTabs()
-            return
-        }
-        app.currentTab = pending[0]
-        withSavedChanges(function() { app.closeTab(app.currentTab); closeAllTabs() })
-    }
-    // Quitting: the saves that run finish first (the window stays usable meanwhile), then the tabs with unsaved
-    // changes are asked about one by one.
-    property bool waitingToClose: false
+    // --- saving, closing, sharing, exporting (SaveFlow.qml, ShareFlow.qml, ExportFlow.qml) ----------------------------
+    SaveFlow { id: saveFlow }
+    ShareFlow { id: shareFlow }
+    ExportFlow { id: exportFlow }
+    // (what the tests and other files call on the window)
+    function openSaveDialog(then, format) { saveFlow.openSaveDialog(then, format) }
+    function setUpSaveDialog(format) { saveFlow.setUpSaveDialog(format) }
+    function saveChosen(url, pdfChosen, then) { saveFlow.saveChosen(url, pdfChosen, then) }
+    function saveOrAsk(then) { saveFlow.saveOrAsk(then) }
+    function requestCloseTab(index) { saveFlow.requestCloseTab(index) }
+    function closeWindow() { saveFlow.closeWindow() }
+    function sharePdfOf(file, toClipboard, withHistory) { shareFlow.sharePdfOf(file, toClipboard, withHistory) }
     /// A web address chosen in the look-up menu (qt/docs/citations.md): asked first with the whole address, unless
     /// that was turned off (the menu showed it)
     function openWebAddress(url, purpose) {
@@ -654,26 +536,9 @@ ApplicationWindow {
     /// arXiv: a search by title, or one paper by its ID (qt/docs/citations.md)
     function arxivSearch(title) { arxivSheet.openSearch(title) }
     function arxivPaper(id) { arxivSheet.openId(id) }
-    function closeWindow() {
-        if (app.anySaving) {
-            if (!waitingToClose) {
-                waitingToClose = true
-                app.whenAllSaved(function() { waitingToClose = false; closeWindow() })
-            }
-            return
-        }
-        const pending = app.modifiedTabs()
-        if (pending.length === 0) {
-            quitting = true
-            win.close()
-            return
-        }
-        app.currentTab = pending[0]
-        withSavedChanges(function() { app.closeTab(app.currentTab); closeWindow() })
-    }
 
     onClosing: function(close) {
-        if (!quitting && (app.modifiedTabs().length > 0 || app.anySaving)) {
+        if (!saveFlow.quitting && (app.modifiedTabs().length > 0 || app.anySaving)) {
             close.accepted = false
             closeWindow()
             return
@@ -686,7 +551,7 @@ ApplicationWindow {
     Connections {
         target: app
         function onCloseWindowRequested() {  // its last document moved to another window
-            win.quitting = true
+            saveFlow.quitting = true
             win.close()
         }
         function onRaiseRequested() {
@@ -753,7 +618,7 @@ ApplicationWindow {
         onShareRequested: function(index) {
             app.currentTab = index
             app.homeVisible = false
-            shareDialog.openFor("")
+            shareFlow.shareDialog.openFor("")
         }
       }
       ToolBar {
@@ -1413,7 +1278,7 @@ ApplicationWindow {
                     id: moreMenu
                     objectName: "moreMenu"
                     AdaptiveMenuItem { objectName: "saveAsItem"; offered: !win.textDoc; text: qsTr("Save as…"); icon.source: app.iconUrl("xopp-document-save"); onTriggered: openSaveDialog(null) }
-                    AdaptiveMenuItem { objectName: "shareItem"; text: qsTr("Share…"); icon.source: app.iconUrl("xqt-share"); onTriggered: shareDialog.openFor("") }
+                    AdaptiveMenuItem { objectName: "shareItem"; text: qsTr("Share…"); icon.source: app.iconUrl("xqt-share"); onTriggered: shareFlow.shareDialog.openFor("") }
                     AdaptiveMenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); icon.source: app.iconUrl("xopp-document-print"); onTriggered: printDialog.open() }
                     // Find and replace: where text can be written (the search itself: View → Search, and the bars)
                     AdaptiveMenuItem { objectName: "replaceItem"; offered: app.canReplace && !win.reading; text: qsTr("Find and replace (Ctrl+H)"); icon.source: app.iconUrl("xqt-replace"); onTriggered: searchBar.openReplace() }
@@ -1462,8 +1327,8 @@ ApplicationWindow {
                         // Its name (qt/rename): the file, and what belongs to it, as the library renames it
                         AdaptiveMenuItem { objectName: "renameDocumentItem"; text: qsTr("Rename…"); icon.source: app.iconUrl("xqt-pencil"); onTriggered: renameDocumentDialog.openFor(app.currentTab) }
                         // A password to open it (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): AES-256, its PDF only
-                        AdaptiveMenuItem { objectName: "protectDocumentItem"; offered: app.canProtect && !app.protectedDocument; text: qsTr("Protect with a password…"); icon.source: app.iconUrl("xqt-lock"); onTriggered: protectDialog.openFor(false) }
-                        AdaptiveMenuItem { objectName: "changePasswordItem"; offered: app.canProtect && app.protectedDocument; text: qsTr("Change or remove the password…"); icon.source: app.iconUrl("xqt-lock-open"); onTriggered: protectDialog.openFor(true) }
+                        AdaptiveMenuItem { objectName: "protectDocumentItem"; offered: app.canProtect && !app.protectedDocument; text: qsTr("Protect with a password…"); icon.source: app.iconUrl("xqt-lock"); onTriggered: protectionDialogs.protectDialog.openFor(false) }
+                        AdaptiveMenuItem { objectName: "changePasswordItem"; offered: app.canProtect && app.protectedDocument; text: qsTr("Change or remove the password…"); icon.source: app.iconUrl("xqt-lock-open"); onTriggered: protectionDialogs.protectDialog.openFor(true) }
                         // Version history (qt/docs/hybrid-pdf.md): the sidebar's History panel (off by default; what it
                         // is and the switch are there)
                         AdaptiveMenuItem { objectName: "versionHistoryItem"; offered: !win.textDoc; text: qsTr("Version history…"); icon.source: app.iconUrl("xqt-history"); onTriggered: win.showHistory() }
@@ -1526,10 +1391,10 @@ ApplicationWindow {
                             text: app.adoptableCount > 0 ? qsTr("Adopt annotations from other apps (%1)…").arg(app.adoptableCount)
                                                          : qsTr("Adopt annotations from other apps…")
                             icon.source: app.iconUrl("xopp-tool-highlighter")
-                            onTriggered: app.adoptableCount > 0 ? adoptDialog.openFor(app.adoptableCount, app.adoptableApp, false)
+                            onTriggered: app.adoptableCount > 0 ? documentNotices.adoptDialog.openFor(app.adoptableCount, app.adoptableApp, false)
                                                                 : app.adoptAnnotations()
                         }
-                        AdaptiveMenuItem { objectName: "linkedFromItem"; text: qsTr("Linked from…"); icon.source: app.iconUrl("xqt-link"); onTriggered: backlinksDialog.show() }
+                        AdaptiveMenuItem { objectName: "linkedFromItem"; text: qsTr("Linked from…"); icon.source: app.iconUrl("xqt-link"); onTriggered: documentNotices.backlinksDialog.show() }
                         AdaptiveMenuItem { objectName: "copyPageLinkItem"; text: qsTr("Copy link to this page"); icon.source: app.iconUrl("xqt-copy"); onTriggered: app.copyPageLink(-1) }
                     }
                     AdaptiveMenu {
@@ -1538,7 +1403,7 @@ ApplicationWindow {
                         iconName: "xqt-file-output"
                         // A plain PDF: the notes drawn into the pages (a PDF with notes that stays editable is a type
                         // of Save as)
-                        AdaptiveMenuItem { objectName: "exportPdfItem"; text: qsTr("Export as plain PDF…"); icon.source: app.iconUrl("xopp-document-export-pdf"); onTriggered: openExportDialog() }
+                        AdaptiveMenuItem { objectName: "exportPdfItem"; text: qsTr("Export as plain PDF…"); icon.source: app.iconUrl("xopp-document-export-pdf"); onTriggered: exportFlow.openExportDialog() }
                         // Pages as PNG or JPEG pictures (qt/docs/page-files.md)
                         AdaptiveMenuItem { objectName: "exportImagesItem"; offered: !win.textDoc; text: qsTr("Export pages as pictures…"); icon.source: app.iconUrl("xqt-file-image"); onTriggered: pageFiles.openImages(app.pages.selectionCount > 0 ? app.pages.selectedPages() : []) }
                         // A PDF/A for keeping: the ink merged into the pages, the Xournal data inside
@@ -1547,7 +1412,7 @@ ApplicationWindow {
                             offered: !win.textDoc
                             text: qsTr("Export for the archive…")
                             icon.source: app.iconUrl("xqt-archive")
-                            onTriggered: archiveDialog.openFor("")
+                            onTriggered: shareFlow.archiveDialog.openFor("")
                         }
                         // The Markdown of the document's page texts as a .md (qt/docs/md-pdf.md)
                         AdaptiveMenuItem {
@@ -1555,7 +1420,7 @@ ApplicationWindow {
                             offered: !win.textDoc && app.hasMarkdownText
                             text: qsTr("Export as Markdown")
                             icon.source: app.iconUrl("xqt-markdown")
-                            onTriggered: win.exportMarkdown()
+                            onTriggered: exportFlow.exportMarkdown()
                         }
                     }
                     // The pages (a text file has none to add; an image and a sticky note are buttons of the tool bar)
@@ -1720,9 +1585,9 @@ ApplicationWindow {
                         objectName: "moreHelpMenu"
                         title: qsTr("Help")
                         iconName: "xqt-help"
-                        AdaptiveMenuItem { objectName: "helpIntroItem"; text: qsTr("Introduction"); icon.source: app.iconUrl("xqt-book-open"); onTriggered: introDialog.show() }
+                        AdaptiveMenuItem { objectName: "helpIntroItem"; text: qsTr("Introduction"); icon.source: app.iconUrl("xqt-book-open"); onTriggered: startupFlow.introDialog.show() }
                         AdaptiveMenuItem { objectName: "helpTutorialItem"; text: qsTr("Tutorial"); icon.source: app.iconUrl("xqt-notebook-pen"); onTriggered: app.openTutorial() }
-                        AdaptiveMenuItem { objectName: "helpRestartTutorialItem"; offered: app.tutorialExists; text: qsTr("Start the tutorial again…"); icon.source: app.iconUrl("xopp-edit-undo"); onTriggered: restartTutorialDialog.open() }
+                        AdaptiveMenuItem { objectName: "helpRestartTutorialItem"; offered: app.tutorialExists; text: qsTr("Start the tutorial again…"); icon.source: app.iconUrl("xopp-edit-undo"); onTriggered: startupFlow.restartTutorialDialog.open() }
                         AdaptiveMenuItem { objectName: "helpShortcutsItem"; text: qsTr("Keyboard shortcuts (F1)"); icon.source: app.iconUrl("xqt-keyboard"); onTriggered: shortcutSheet.open() }
                     }
                     CommandItem { slot: "settings" }
@@ -2184,7 +2049,7 @@ ApplicationWindow {
             iconName: "xqt-external-link"
             label: qsTr("Open externally")
             tip: qsTr("Open externally (in the app the system has for this file)")
-            onClicked: win.openExternally()
+            onClicked: saveFlow.openExternally()
         }
         // Commands of the top bar's first layout that ⋮ has too (qt/docs/toolbox.md, "The top bar": ⋮ is complete)
         IconButton {
@@ -2194,7 +2059,7 @@ ApplicationWindow {
             iconName: "xqt-share"
             label: qsTr("Share")
             tip: qsTr("Share…")
-            onClicked: shareDialog.openFor("")
+            onClicked: shareFlow.shareDialog.openFor("")
         }
         IconButton {
             id: printTool
@@ -3125,134 +2990,7 @@ ApplicationWindow {
         }
     }
 
-    // A tapped link: open it / go to the page (not at once: a tap can be a mistake). A link to a document
-    // (qt/docs/links.md) offers a new tab, the reference or "here", unless a choice was remembered (Settings). A page
-    // or a place of this document offers going there, or showing it in the reference: a second view of the document
-    // beside it (qt/self-reference).
-    Popup {
-        id: linkPopup
-        objectName: "linkPopup"
-        property string uri
-        property int page: -1
-        property var doc: null  // app.documentLink(uri) of a link to a document, else null
-        property bool inDocument: false  // a link to a place of this document (`#page=…`, a chapter)
-        padding: 6
-        function follow(how) {
-            if (linkRemember.checked) app.settings.set("linkOpening", how)
-            const uri = linkPopup.uri
-            linkPopup.close()
-            app.followDocumentLink(uri, how)
-        }
-        Connections {
-            target: app
-            function onLinkTapped(uri, page, rect) {
-                const info = uri !== "" ? app.documentLink(uri) : null
-                if (info && info.document && info.found && !info.here) {
-                    const how = (app.settings.revision, app.settings.get("linkOpening"))
-                    if (how !== "ask") {
-                        app.followDocumentLink(uri, how)
-                        return
-                    }
-                }
-                const inDocument = !!(info && info.document && info.here)
-                if (inDocument) {  // (a place in this document: there, or in the reference if that was chosen)
-                    const how = (app.settings.revision, app.settings.get("linkOpening"))
-                    if (how !== "ask") {
-                        app.followDocumentLink(uri, how === "reference" ? "reference" : "here")
-                        return
-                    }
-                }
-                linkPopup.uri = uri
-                linkPopup.page = page
-                linkPopup.doc = info && info.document ? info : null
-                linkPopup.inDocument = inDocument
-                linkRemember.checked = false
-                linkPopup.x = Math.max(8, Math.min(canvas.x + rect.x, win.width - linkPopup.width - 8))
-                linkPopup.y = canvas.y + rect.y + rect.height + 6
-                if (linkPopup.y + 120 > win.height) linkPopup.y = canvas.y + rect.y - (linkPopup.doc ? 120 : 60)
-                linkPopup.open()
-            }
-        }
-        ColumnLayout {
-            spacing: 2
-            RowLayout {
-                spacing: 4
-                Image { source: app.iconUrl("xqt-link"); sourceSize.width: 18; sourceSize.height: 18; Layout.leftMargin: 6 }
-                Label {
-                    objectName: "linkLabel"
-                    visible: linkPopup.uri !== ""
-                    text: !linkPopup.doc ? linkPopup.uri
-                          : linkPopup.inDocument ? (linkPopup.doc.place !== "" ? linkPopup.doc.place : linkPopup.uri)
-                          : !linkPopup.doc.found ? qsTr("%1 was not found").arg(linkPopup.doc.name)
-                          : linkPopup.doc.place !== "" ? qsTr("%1, %2").arg(linkPopup.doc.name).arg(linkPopup.doc.place)
-                                                       : linkPopup.doc.name
-                    elide: Text.ElideMiddle
-                    Layout.maximumWidth: 320
-                    Layout.rightMargin: linkPopup.doc ? 6 : 0
-                }
-                Button {
-                    objectName: "linkButton"
-                    visible: !linkPopup.doc || linkPopup.inDocument
-                    flat: true
-                    text: linkPopup.inDocument ? qsTr("Go there")
-                          : linkPopup.uri !== "" ? qsTr("Open") : linkPopup.page >= 0 ? qsTr("Go to page %1").arg(linkPopup.page + 1)
-                                                                                    : qsTr("Page not in this document")
-                    enabled: linkPopup.uri !== "" || linkPopup.page >= 0
-                    onClicked: {
-                        const uri = linkPopup.uri
-                        linkPopup.close()
-                        if (linkPopup.inDocument) app.followDocumentLink(uri, "here")
-                        else if (uri !== "") app.openLink(uri)
-                        else app.jumpToPage(linkPopup.page)
-                    }
-                }
-                // A page of this document: in a second view of it beside it (qt/self-reference)
-                Button {
-                    objectName: "linkInReference"
-                    visible: linkPopup.inDocument || (linkPopup.uri === "" && linkPopup.page >= 0)
-                    flat: true
-                    text: qsTr("In the reference")
-                    onClicked: {
-                        const uri = linkPopup.uri
-                        linkPopup.close()
-                        if (linkPopup.inDocument) app.followDocumentLink(uri, "reference")
-                        else app.reference.showBeside(linkPopup.page)
-                    }
-                }
-            }
-            RowLayout {
-                visible: !!linkPopup.doc && linkPopup.doc.found && !linkPopup.inDocument
-                spacing: 0
-                Button {
-                    objectName: "linkNewTab"
-                    flat: true
-                    text: qsTr("Open in a new tab")
-                    onClicked: linkPopup.follow("tab")
-                }
-                Button {
-                    objectName: "linkAsReference"
-                    flat: true
-                    text: qsTr("Open as reference")
-                    onClicked: linkPopup.follow("reference")
-                }
-                Button {
-                    objectName: "linkHere"
-                    flat: true
-                    text: qsTr("Open here")
-                    onClicked: linkPopup.follow("here")
-                }
-            }
-            CheckBox {
-                id: linkRemember
-                objectName: "linkRemember"
-                visible: !!linkPopup.doc && linkPopup.doc.found && !linkPopup.inDocument
-                text: qsTr("Remember my choice")
-                ToolTip.visible: hovered
-                ToolTip.delay: 600
-                ToolTip.text: qsTr("Links open this way from now on (Settings → Documents)")
-            }
-        }
-    }
+    LinkPopup { id: linkPopup }
 
     SearchBar {
         id: searchBar
@@ -3300,986 +3038,8 @@ ApplicationWindow {
     }
     // A zip opened (here, with the app, dropped): "Open in library…" (OpenZipDialog.qml)
     OpenZipDialog { objectName: "openZip" }
-    FileDialog {
-        id: saveDialog
-        objectName: "saveDialog"
-        property var afterSave: null
-        property bool settingUp: false
-        readonly property bool pdfChosen: selectedNameFilter.index === 1
-        title: qsTr("Save as")
-        fileMode: FileDialog.SaveFile
-        defaultSuffix: pdfChosen ? "pdf" : "xopp"
-        nameFilters: [qsTr("Xournal notes (*.xopp)"), qsTr("PDF with notes, editable (*.pdf)")]
-        // The name follows the chosen type (native dialogs may do that themselves; then this changes nothing)
-        onPdfChosenChanged: {
-            if (!settingUp && selectedFile.toString() !== "")
-                selectedFile = app.fileForFormat(selectedFile, pdfChosen)
-        }
-        onAccepted: {
-            win.saveChosen(selectedFile, pdfChosen, afterSave)
-            afterSave = null
-        }
-        onRejected: afterSave = null
-    }
-
-    /// A choice of the Share dialog: a title and a line about it
-    component ShareChoice: ItemDelegate {
-        id: choice
-        property string detail
-        Layout.fillWidth: true
-        contentItem: ColumnLayout {
-            spacing: 2
-            Label { text: choice.text; font.weight: Font.DemiBold; Layout.fillWidth: true; wrapMode: Text.Wrap }
-            Label {
-                text: choice.detail
-                color: "#6b6f75"
-                font.pixelSize: 13
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-            }
-        }
-    }
-    // A PDF that needs a password to open (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): asked here, kept in memory only
-    // while the document is open. A wrong one is said so and asked again; Cancel leaves it closed.
-    AdaptiveDialog {
-        id: pdfPasswordDialog
-        objectName: "pdfPasswordDialog"
-        kind: "question"
-        property string file: ""
-        property bool wrong: false
-        preferredWidth: 420
-        title: qsTr("Password")
-        onOpened: pdfPasswordField.forceActiveFocus()
-        ColumnLayout {
-            width: pdfPasswordDialog.availableWidth
-            spacing: 8
-            Label {
-                objectName: "pdfPasswordText"
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-                text: qsTr("%1 is protected with a password. Enter it to open the document.").arg(pdfPasswordDialog.file)
-            }
-            TextField {
-                id: pdfPasswordField
-                objectName: "pdfPasswordField"
-                Layout.fillWidth: true
-                echoMode: TextInput.Password
-                placeholderText: qsTr("Password")
-                onAccepted: pdfPasswordDialog.accept()
-            }
-            Label {
-                objectName: "pdfPasswordWrong"
-                Layout.fillWidth: true
-                visible: pdfPasswordDialog.wrong
-                wrapMode: Text.Wrap
-                color: "#b3261e"
-                text: qsTr("The password is not right. Try again.")
-            }
-        }
-        footer: DialogButtonBox {
-            Button {
-                objectName: "pdfPasswordOpen"
-                text: qsTr("Open")
-                enabled: pdfPasswordField.text !== ""
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-            Button {
-                objectName: "pdfPasswordCancel"
-                text: qsTr("Cancel")
-                flat: true
-                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
-            }
-        }
-        onAccepted: {
-            const password = pdfPasswordField.text
-            pdfPasswordField.text = ""  // (not kept in the window)
-            app.openWithPassword(password)
-        }
-        onRejected: {
-            pdfPasswordField.text = ""
-            app.cancelPassword()
-        }
-    }
-    Connections {
-        target: app
-        function onPasswordNeeded(file, wrong) {
-            pdfPasswordDialog.file = file
-            pdfPasswordDialog.wrong = wrong
-            pdfPasswordDialog.open()
-        }
-    }
-    // ⋮ → Document → "Protect with a password…" / "Change or remove the password…": AES-256 for its PDF, optional
-    // restrictions with a second password
-    AdaptiveDialog {
-        id: protectDialog
-        objectName: "protectDialog"
-        kind: "question"
-        /// The document is protected already: change or remove its password
-        property bool changing: false
-        readonly property string problem: {
-            if (protectPassword.text !== protectConfirm.text) return qsTr("The two passwords differ.")
-            return app.checkProtection(protectPassword.text, protectOwnerPassword.text, !restrictBox.checked || printBox.checked,
-                                       !restrictBox.checked || copyBox.checked, !restrictBox.checked || editBox.checked)
-        }
-        function openFor(change) {
-            changing = change
-            protectPassword.text = ""
-            protectConfirm.text = ""
-            protectOwnerPassword.text = ""
-            restrictBox.checked = false
-            printBox.checked = true
-            copyBox.checked = true
-            editBox.checked = true
-            open()
-            protectPassword.forceActiveFocus()
-        }
-        function clearFields() {
-            protectPassword.text = ""
-            protectConfirm.text = ""
-            protectOwnerPassword.text = ""
-        }
-        preferredWidth: 480
-        title: changing ? qsTr("Change or remove the password") : qsTr("Protect with a password")
-        ColumnLayout {
-            width: protectDialog.availableWidth
-            spacing: 6
-            Label {
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-                text: qsTr("Anyone who opens %1 needs this password, in any PDF app. If it is forgotten, nobody can "
-                           + "open the document again, not even this app.").arg(app.title)
-            }
-            Label {
-                objectName: "protectVersionsNote"
-                Layout.fillWidth: true
-                visible: app.versions.on
-                wrapMode: Text.Wrap
-                color: "#b06000"
-                text: qsTr("The file is written anew: the earlier versions it keeps are removed.")
-            }
-            TextField {
-                id: protectPassword
-                objectName: "protectPassword"
-                Layout.fillWidth: true
-                echoMode: TextInput.Password
-                placeholderText: protectDialog.changing ? qsTr("New password") : qsTr("Password")
-            }
-            TextField {
-                id: protectConfirm
-                objectName: "protectConfirm"
-                Layout.fillWidth: true
-                echoMode: TextInput.Password
-                placeholderText: qsTr("The same password again")
-                onAccepted: if (protectDialog.problem === "") protectDialog.accept()
-            }
-            CheckBox {
-                id: restrictBox
-                objectName: "protectRestrict"
-                Layout.fillWidth: true
-                text: qsTr("Restrict what others can do with it")
-            }
-            ColumnLayout {
-                Layout.fillWidth: true
-                Layout.leftMargin: 28
-                visible: restrictBox.checked
-                spacing: 2
-                CheckBox { id: printBox; objectName: "protectAllowPrint"; text: qsTr("Allow printing"); checked: true }
-                CheckBox { id: copyBox; objectName: "protectAllowCopy"; text: qsTr("Allow copying text"); checked: true }
-                CheckBox { id: editBox; objectName: "protectAllowEdit"; text: qsTr("Allow changes (notes, forms, pages)"); checked: true }
-                TextField {
-                    id: protectOwnerPassword
-                    objectName: "protectOwnerPassword"
-                    Layout.fillWidth: true
-                    echoMode: TextInput.Password
-                    placeholderText: qsTr("A second password, to lift the restrictions")
-                }
-                Label {
-                    Layout.fillWidth: true
-                    wrapMode: Text.Wrap
-                    color: "#6b6f75"
-                    text: qsTr("PDF apps that respect restrictions (Acrobat, Preview) apply them; others may not.")
-                }
-            }
-            Label {
-                objectName: "protectProblem"
-                Layout.fillWidth: true
-                visible: protectPassword.text !== "" && protectDialog.problem !== ""
-                wrapMode: Text.Wrap
-                color: "#b3261e"
-                text: protectDialog.problem
-            }
-        }
-        footer: DialogButtonBox {
-            Button {
-                objectName: "protectRemove"
-                visible: protectDialog.changing
-                text: qsTr("Remove the password")
-                flat: true
-                onClicked: {
-                    protectDialog.clearFields()
-                    protectDialog.close()
-                    app.removeProtection()
-                }
-            }
-            Button {
-                objectName: "protectAccept"
-                text: protectDialog.changing ? qsTr("Change") : qsTr("Protect")
-                enabled: protectPassword.text !== "" && protectDialog.problem === ""
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-            Button { text: qsTr("Cancel"); flat: true; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
-        }
-        onAccepted: {
-            const password = protectPassword.text
-            const owner = protectOwnerPassword.text
-            const restricted = restrictBox.checked
-            clearFields()
-            app.protectDocument(password, owner, !restricted || printBox.checked, !restricted || copyBox.checked,
-                                !restricted || editBox.checked)
-        }
-        onRejected: clearFields()
-    }
-    // Share…: the PDF with notes (shown in the file manager, or copied), or a copy for Xournal++ users
-    AdaptiveDialog {
-        id: shareDialog
-        objectName: "shareDialog"
-        kind: "question"
-        property string file: ""  // a PDF of the library; "": the current document
-        /// A Markdown or text file (the current document's, or a card's): shared as the file itself, never as a PDF
-        property string textFile: ""
-        /// The PDF with notes keeps its versions (version history): they go along only when chosen
-        property bool keepsVersions: false
-        function openFor(path) {
-            file = path
-            textFile = app.sharedTextFile(path)
-            keepsVersions = textFile === "" && app.sharedKeepsVersions(path)
-            withHistoryBox.checked = false
-            shareProtectBox.checked = app.protectedDocument
-            sharePasswordField.text = ""
-            open()
-        }
-        function share(toClipboard) {
-            if (sharePasswordField.visible) {
-                const password = sharePasswordField.text
-                sharePasswordField.text = ""
-                app.sharePdfProtected(password, toClipboard)
-            } else {
-                win.sharePdfOf(file, toClipboard, withHistoryBox.checked)
-            }
-        }
-        preferredWidth: 460
-        title: qsTr("Share")
-        standardButtons: Dialog.Cancel
-        ColumnLayout {
-            width: shareDialog.availableWidth
-            spacing: 0
-            ShareChoice {
-                objectName: "shareTextFileChoice"
-                visible: shareDialog.textFile !== ""
-                text: qsTr("The file itself")
-                detail: app.canShare ? qsTr("Shown in the file manager, to send it on.")
-                                     : qsTr("Not available on this system yet.")
-                enabled: app.canShare
-                onClicked: { shareDialog.close(); win.shareTextFile(shareDialog.textFile, shareDialog.file === "", false) }
-            }
-            ShareChoice {
-                objectName: "shareTextCopyChoice"
-                visible: shareDialog.textFile !== ""
-                text: qsTr("Copy the file")
-                detail: qsTr("Paste it into another app or a chat.")
-                onClicked: { shareDialog.close(); win.shareTextFile(shareDialog.textFile, shareDialog.file === "", true) }
-            }
-            // Version history: without the versions unless chosen (older versions may hold ink that was deleted)
-            CheckBox {
-                id: withHistoryBox
-                objectName: "shareWithHistory"
-                Layout.fillWidth: true
-                visible: shareDialog.keepsVersions
-                text: qsTr("With its version history")
-                ToolTip.visible: hovered
-                ToolTip.text: qsTr("Off (recommended): the PDF goes as it is now. On: with every version it keeps, "
-                                   + "also ink that was deleted since.")
-            }
-            // "Protect with a password": the PDF with notes shared as a copy that needs this password (AES-256). A
-            // protected document is shared with its own password anyway.
-            CheckBox {
-                id: shareProtectBox
-                objectName: "shareProtect"
-                Layout.fillWidth: true
-                visible: shareDialog.textFile === "" && shareDialog.file === ""
-                enabled: !app.protectedDocument
-                checked: app.protectedDocument
-                text: app.protectedDocument ? qsTr("Protected with its password") : qsTr("Protect with a password")
-            }
-            TextField {
-                id: sharePasswordField
-                objectName: "sharePassword"
-                Layout.fillWidth: true
-                visible: shareProtectBox.visible && shareProtectBox.checked && !app.protectedDocument
-                echoMode: TextInput.Password
-                placeholderText: qsTr("Password to open it")
-            }
-            ShareChoice {
-                objectName: "sharePdfChoice"
-                visible: shareDialog.textFile === ""
-                text: qsTr("PDF with notes (opens in any app)")
-                detail: app.canShare ? qsTr("Shown in the file manager, to send it on.")
-                                     : qsTr("Not available on this system yet.")
-                enabled: app.canShare && (!sharePasswordField.visible || sharePasswordField.text !== "")
-                onClicked: { shareDialog.close(); shareDialog.share(false) }
-            }
-            ShareChoice {
-                objectName: "shareCopyChoice"
-                visible: shareDialog.textFile === ""
-                text: qsTr("Copy the PDF with notes")
-                detail: qsTr("Paste it into another app or a chat.")
-                enabled: !sharePasswordField.visible || sharePasswordField.text !== ""
-                onClicked: { shareDialog.close(); shareDialog.share(true) }
-            }
-            ShareChoice {
-                objectName: "shareArchiveChoice"
-                visible: shareDialog.textFile === ""
-                text: qsTr("For the archive (PDF/A)")
-                detail: qsTr("A PDF made for keeping: readable for decades, the ink merged into the pages.")
-                onClicked: { shareDialog.close(); archiveDialog.openFor(shareDialog.file) }
-            }
-            ShareChoice {
-                objectName: "shareXournalChoice"
-                visible: shareDialog.textFile === ""
-                text: qsTr("For Xournal++ (.xopp + PDF)")
-                detail: qsTr("A copy in a folder you choose, never next to the document.")
-                onClicked: {
-                    shareDialog.close()
-                    xournalFolderDialog.file = shareDialog.file
-                    xournalFolderDialog.currentFolder = app.shareFolder()
-                    xournalFolderDialog.open()
-                }
-            }
-        }
-    }
-    // Share → PDF of a .xopp: saved as a PDF with notes (the document becomes it), or a PDF copy
-    AdaptiveDialog {
-        id: shareXoppDialog
-        objectName: "shareXoppDialog"
-        kind: "question"
-        preferredWidth: 500
-        title: qsTr("Share as a PDF with notes")
-        Label {
-            width: shareXoppDialog.availableWidth
-            wrapMode: Text.Wrap
-            text: qsTr("This document is saved as Xournal notes (.xopp). Other apps need a PDF with notes: save the "
-                       + "document as one (it stays editable here), or write a PDF copy and keep the .xopp.")
-        }
-        footer: DialogButtonBox {
-            Button {
-                objectName: "shareSaveAsPdf"
-                text: qsTr("Save as PDF with notes…")
-                flat: true
-                onClicked: {
-                    shareXoppDialog.close()
-                    openSaveDialog(function() { app.sharePdf(false) }, "pdf")
-                }
-            }
-            Button {
-                objectName: "shareSaveCopy"
-                text: qsTr("Save a PDF copy…")
-                flat: true
-                onClicked: {
-                    shareXoppDialog.close()
-                    const suggestion = app.suggestedHybridFile().toString()
-                    if (suggestion !== "") {
-                        pdfCopyDialog.currentFolder = suggestion.substring(0, suggestion.lastIndexOf("/"))
-                        pdfCopyDialog.selectedFile = suggestion
-                    }
-                    pdfCopyDialog.open()
-                }
-            }
-            Button {
-                text: qsTr("Cancel")
-                flat: true
-                onClicked: shareXoppDialog.close()
-            }
-        }
-    }
-    FileDialog {
-        id: pdfCopyDialog
-        objectName: "pdfCopyDialog"
-        title: qsTr("Save a PDF copy with notes")
-        fileMode: FileDialog.SaveFile
-        defaultSuffix: "pdf"
-        nameFilters: [qsTr("PDF with notes, editable (*.pdf)")]
-        onAccepted: app.sharePdfCopy(selectedFile, false)
-    }
-    FolderDialog {
-        id: xournalFolderDialog
-        objectName: "xournalFolderDialog"
-        property string file: ""
-        title: qsTr("Folder for the copy for Xournal++")
-        onAccepted: app.shareForXournal(selectedFolder, file)
-    }
-    Connections {
-        target: app
-        // Exported for Xournal++ and shown: the two files can be copied too
-        function onSharedForXournal(files, text) {
-            snackbar.show(text, false, qsTr("Copy"), function() { app.copyToClipboard(files) })
-        }
-    }
-    // Export for the archive: what it means, where it goes; then the PDF/A report
-    AdaptiveDialog {
-        id: archiveDialog
-        objectName: "archiveDialog"
-        property string file: ""  // a library card's document; "": the current document
-        property url suggestion
-        function openFor(path) {
-            file = path
-            suggestion = app.suggestedArchiveFile(path)
-            if (suggestion.toString() !== "")
-                archiveNextTo.checked = true
-            else
-                archiveInFolder.checked = true
-            open()
-        }
-        preferredWidth: 520
-        title: qsTr("Export for the archive")
-        ColumnLayout {
-            width: archiveDialog.availableWidth
-            spacing: 6
-            Label {
-                objectName: "archiveExplanation"
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-                text: qsTr("A PDF made for keeping (PDF/A-3). It stays readable for decades in any PDF viewer. "
-                           + "Your ink is merged into the pages, so no viewer can hide or lose it. The full Xournal "
-                           + "data is embedded, so this app can still open it for editing.")
-            }
-            // (PDF/A allows no encryption: an archive PDF of a protected document has no password)
-            Label {
-                objectName: "archiveNotProtected"
-                Layout.fillWidth: true
-                visible: archiveDialog.file === "" && app.protectedDocument
-                wrapMode: Text.Wrap
-                color: "#b06000"
-                text: qsTr("This document is protected with a password. An archive PDF cannot be (PDF/A does not "
-                           + "allow it): it is written without a password.")
-            }
-            Label {
-                Layout.fillWidth: true
-                Layout.topMargin: 6
-                text: qsTr("Where it goes")
-                font.weight: Font.DemiBold
-            }
-            ButtonGroup { id: archivePlaces }
-            RadioButton {
-                id: archiveNextTo
-                objectName: "archiveNextTo"
-                Layout.fillWidth: true
-                ButtonGroup.group: archivePlaces
-                enabled: archiveDialog.suggestion.toString() !== ""
-                text: enabled ? qsTr("Next to the document, as %1")
-                                    .arg(decodeURIComponent(archiveDialog.suggestion.toString().replace(/^.*\//, "")))
-                              : qsTr("Next to the document (it has no file yet)")
-            }
-            RadioButton {
-                id: archiveInFolder
-                objectName: "archiveInFolder"
-                Layout.fillWidth: true
-                ButtonGroup.group: archivePlaces
-                text: qsTr("In a folder I choose…")
-            }
-        }
-        footer: DialogButtonBox {
-            Button {
-                objectName: "archiveExportButton"
-                text: qsTr("Export")
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-            Button {
-                text: qsTr("Cancel")
-                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
-            }
-        }
-        onAccepted: {
-            if (archiveNextTo.checked) {
-                app.exportArchive(suggestion, file)
-            } else {
-                archiveFolderDialog.file = file
-                archiveFolderDialog.currentFolder = app.shareFolder()
-                archiveFolderDialog.open()
-            }
-        }
-    }
-    FolderDialog {
-        id: archiveFolderDialog
-        objectName: "archiveFolderDialog"
-        property string file: ""
-        title: qsTr("Folder for the archive PDF")
-        onAccepted: app.exportArchive(app.archiveFileIn(selectedFolder, file), file)
-    }
-    AdaptiveDialog {
-        id: archiveReportDialog
-        objectName: "archiveReportDialog"
-        kind: "card"
-        property string path: ""
-        property bool pdfa: false
-        property var problems: []
-        property var adjusted: []
-        preferredWidth: 520
-        title: pdfa ? qsTr("Archive PDF written") : qsTr("Written, but not as PDF/A")
-        ColumnLayout {
-            width: archiveReportDialog.availableWidth
-            spacing: 6
-            Label {
-                objectName: "archiveReportText"
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-                text: {
-                    const name = archiveReportDialog.path.replace(/^.*\//, "")
-                    if (archiveReportDialog.pdfa)
-                        return qsTr("%1 is a PDF/A-3b file: made for keeping, with your ink in the pages and the "
-                                    + "Xournal data inside.").arg(name)
-                    return qsTr("%1 was written with your ink in the pages and the Xournal data inside, and it opens "
-                                + "in any PDF viewer. It is not PDF/A, because:").arg(name)
-                            + "\n• " + archiveReportDialog.problems.join("\n• ")
-                }
-            }
-            Label {
-                objectName: "archiveReportAdjusted"
-                visible: archiveReportDialog.adjusted.length > 0
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-                color: "#6b6f75"
-                font.pixelSize: 13
-                text: qsTr("Changed to make it conform: %1.").arg(archiveReportDialog.adjusted.join("; "))
-            }
-        }
-        footer: DialogButtonBox {
-            Button {
-                objectName: "archiveShowButton"
-                visible: app.canShare
-                text: qsTr("Show in folder")
-                flat: true
-                onClicked: { app.shareFile(archiveReportDialog.path, false); archiveReportDialog.close() }
-            }
-            Button {
-                objectName: "archiveOkButton"
-                text: qsTr("OK")
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-        }
-    }
-    Connections {
-        target: app
-        function onArchiveExported(path, pdfa, notPdfA, adjusted) {
-            archiveReportDialog.path = path
-            archiveReportDialog.pdfa = pdfa
-            archiveReportDialog.problems = notPdfA
-            archiveReportDialog.adjusted = adjusted
-            archiveReportDialog.open()
-        }
-    }
-    // Saving a "name.xopp" as a PDF with notes: what happens to the .xopp (asked once, before it is written)
-    AdaptiveDialog {
-        id: oldXoppDialog
-        objectName: "oldXoppDialog"
-        kind: "question"
-        property string file: ""
-        property var url
-        property var afterSave: null
-        function ask(name, target, then) {
-            file = name
-            url = target
-            afterSave = then ? then : null
-            trashChoice.checked = true  // (the default)
-            dontAsk.checked = false
-            open()
-        }
-        /// "trash", "update" or "keep": the PDF is written, then that happens (Cancel: nothing is written)
-        function choose(choice) {
-            app.saveAsHybridInBackground(url, afterSave, choice, dontAsk.checked)
-            afterSave = null
-            close()
-        }
-        preferredWidth: 520
-        title: qsTr("The PDF holds everything")
-        ColumnLayout {
-            width: oldXoppDialog.availableWidth
-            spacing: 4
-            Label {
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-                text: qsTr("This document was saved as %1. What happens to it?").arg(oldXoppDialog.file)
-            }
-            ButtonGroup { id: oldXoppChoices }
-            RadioButton {
-                id: trashChoice
-                objectName: "oldXoppTrash"
-                ButtonGroup.group: oldXoppChoices
-                Layout.fillWidth: true
-                Component.onCompleted: contentItem.wrapMode = Text.Wrap
-                text: qsTr("Move %1 to the trash (the PDF now holds everything)").arg(oldXoppDialog.file)
-            }
-            RadioButton {
-                id: updateChoice
-                objectName: "oldXoppUpdate"
-                ButtonGroup.group: oldXoppChoices
-                Layout.fillWidth: true
-                Component.onCompleted: contentItem.wrapMode = Text.Wrap
-                text: qsTr("Keep it updated for Xournal++")
-            }
-            RadioButton {
-                id: keepChoice
-                objectName: "oldXoppKeep"
-                ButtonGroup.group: oldXoppChoices
-                Layout.fillWidth: true
-                Component.onCompleted: contentItem.wrapMode = Text.Wrap
-                text: qsTr("Keep it as it is (not updated)")
-            }
-            CheckBox {
-                id: dontAsk
-                objectName: "oldXoppDontAsk"
-                Layout.fillWidth: true
-                Component.onCompleted: contentItem.wrapMode = Text.Wrap
-                text: qsTr("Don't ask again (Settings → Documents)")
-            }
-        }
-        footer: DialogButtonBox {
-            Button {
-                objectName: "oldXoppSave"
-                text: qsTr("Save")
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-            Button {
-                text: qsTr("Cancel")
-                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
-            }
-        }
-        onAccepted: choose(updateChoice.checked ? "update" : keepChoice.checked ? "keep" : "trash")
-        onRejected: afterSave = null
-    }
-    // A hybrid PDF whose ink another app changed: keep ours, or take theirs as plain annotations
-    AdaptiveDialog {
-        id: hybridEditedDialog
-        objectName: "hybridEditedDialog"
-        kind: "question"
-        property string file: ""
-        preferredWidth: 520
-        title: qsTr("Edited in another app")
-        closePolicy: Popup.NoAutoClose
-        Label {
-            width: hybridEditedDialog.availableWidth
-            wrapMode: Text.Wrap
-            text: qsTr("This PDF was edited in another app: its ink differs from the Xournal data.") + "\n\n"
-                  + qsTr("Keep the Xournal data: the next save writes the ink from it again, and the other app's "
-                         + "changes to it are dropped. Import: the changed ink stays as the other app left it, as "
-                         + "plain annotations (shown, not editable here), and the layers it stood for are emptied "
-                         + "(Undo brings them back).")
-        }
-        footer: DialogButtonBox {
-            Button {
-                objectName: "hybridKeepButton"
-                text: qsTr("Keep the Xournal data")
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-            Button {
-                objectName: "hybridImportButton"
-                text: qsTr("Import the other app's changes")
-                DialogButtonBox.buttonRole: DialogButtonBox.ApplyRole
-                onClicked: { app.importHybridChanges(); hybridEditedDialog.close() }
-            }
-        }
-        onAccepted: app.keepHybridData()
-    }
-    // Annotations of another app in the PDF: make them editable? (qt/docs/adopt-annotations.md; asked once per file)
-    AdaptiveDialog {
-        id: adoptDialog
-        objectName: "adoptDialog"
-        kind: "question"
-        property int count: 0
-        property string appName: ""
-        property bool offered: false
-        function openFor(n, appName, offered) {
-            adoptDialog.count = n
-            adoptDialog.appName = appName
-            adoptDialog.offered = offered
-            open()
-        }
-        preferredWidth: 480
-        title: qsTr("Annotations from another app")
-        Label {
-            width: adoptDialog.availableWidth
-            wrapMode: Text.Wrap
-            text: (adoptDialog.appName !== ""
-                   ? qsTr("This PDF has %n annotation(s) from %1.", "", adoptDialog.count).arg(adoptDialog.appName)
-                   : qsTr("This PDF has %n annotation(s) from another app.", "", adoptDialog.count))
-                  + " " + qsTr("Make them editable?") + "\n\n"
-                  + qsTr("Ink, highlights, text boxes, shapes and pictures go into a layer of their own on each page, "
-                         + "notes become sticky notes. Their originals leave the PDF when it is saved, replaced by "
-                         + "these. Undo brings them back.")
-        }
-        footer: DialogButtonBox {
-            Button {
-                objectName: "adoptNotNowButton"
-                text: qsTr("Not now")
-                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
-            }
-            Button {
-                objectName: "adoptMakeEditableButton"
-                text: qsTr("Make editable")
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-        }
-        onAccepted: app.adoptAnnotations()
-        onRejected: if (offered) app.declineAdoption()
-    }
-    Connections {
-        target: app
-        function onAnnotationsToAdopt(count, appName, file) {
-            adoptDialog.openFor(count, appName, true)
-        }
-        function onHybridEditedElsewhere(file) {
-            hybridEditedDialog.file = file
-            hybridEditedDialog.open()
-        }
-        function onLinkTargetFound(name, folder) {
-            linkFoundDialog.file = name
-            linkFoundDialog.folder = folder
-            linkFoundDialog.open()
-        }
-        function onLinkTargetMissing(name) {
-            linkMissingDialog.file = name
-            linkMissingDialog.open()
-        }
-        function onEditAnywayWarning(name) {
-            editAnywayDialog.file = name
-            editAnywayDialog.open()
-        }
-        function onTextChangedOnDisk(name) {
-            textChangedDialog.file = name
-            textChangedDialog.document = false
-            textChangedDialog.open()
-        }
-        function onDocumentChangedOnDisk(name) {
-            textChangedDialog.file = name
-            textChangedDialog.document = true
-            textChangedDialog.open()
-        }
-    }
-    // Open externally with unsaved changes: save them first?
-    AdaptiveDialog {
-        id: externalSaveDialog
-        objectName: "externalSaveDialog"
-        kind: "question"
-        preferredWidth: 480
-        title: qsTr("Save before opening it elsewhere?")
-        Label {
-            width: externalSaveDialog.availableWidth
-            wrapMode: Text.Wrap
-            text: qsTr("%1 has changes that are not saved. The other app sees the file as it is on disk.").arg(app.title)
-        }
-        footer: DialogButtonBox {
-            Button {
-                objectName: "externalCancelButton"
-                text: qsTr("Cancel")
-                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
-            }
-            Button {
-                objectName: "externalWithoutSavingButton"
-                text: qsTr("Open without saving")
-                DialogButtonBox.buttonRole: DialogButtonBox.DestructiveRole
-                onClicked: { externalSaveDialog.close(); app.openExternally() }
-            }
-            Button {
-                objectName: "externalSaveButton"
-                text: qsTr("Save and open")
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-        }
-        onAccepted: saveOrAsk(function() { app.openExternally() })
-    }
-    // "Edit anyway" for a code, LaTeX, JSON... file: once per file, what editing it here means
-    AdaptiveDialog {
-        id: editAnywayDialog
-        objectName: "editAnywayDialog"
-        kind: "question"
-        property string file: ""
-        preferredWidth: 520
-        title: qsTr("Edit %1 as plain text?").arg(file)
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        Label {
-            width: editAnywayDialog.availableWidth
-            wrapMode: Text.Wrap
-            text: qsTr("This file is edited as plain text; the app does not know its format. It does not check or "
-                       + "complete what you write, and it writes the text back as you leave it (lines you do not touch "
-                       + "stay as they are). For more, open it externally in an editor made for it.")
-        }
-        onAccepted: app.editAnyway(true)
-    }
-    // "Linked from": the documents of the library that link to this one (qt/docs/links.md)
-    AdaptiveDialog {
-        id: backlinksDialog
-        objectName: "backlinksDialog"
-        property var items: []
-        function show() { items = app.backlinks(); open() }
-        preferredWidth: 460
-        title: qsTr("Linked from")
-        standardButtons: Dialog.Close
-        ColumnLayout {
-            width: backlinksDialog.availableWidth
-            Label {
-                visible: backlinksDialog.items.length === 0
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-                opacity: 0.7
-                text: qsTr("No document of the library links to this one.")
-            }
-            Repeater {
-                model: backlinksDialog.items
-                delegate: ItemDelegate {
-                    required property var modelData
-                    objectName: "backlink"
-                    Layout.fillWidth: true
-                    text: modelData.folder !== "" ? modelData.name + "  —  " + modelData.folder : modelData.name
-                    onClicked: { backlinksDialog.close(); app.openPath(modelData.path) }
-                }
-            }
-        }
-    }
-    // A followed link's file was gone: found elsewhere (update the link?) or not at all (locate it?)
-    AdaptiveDialog {
-        id: linkFoundDialog
-        objectName: "linkFoundDialog"
-        kind: "question"
-        property string file: ""
-        property string folder: ""
-        preferredWidth: 480
-        title: qsTr("The linked document was moved")
-        standardButtons: Dialog.Yes | Dialog.No
-        Label {
-            width: linkFoundDialog.availableWidth
-            wrapMode: Text.Wrap
-            text: qsTr("It was found as \u201c%1\u201d in %2 and opened. Update the link to point there?")
-                  .arg(linkFoundDialog.file).arg(linkFoundDialog.folder !== "" ? linkFoundDialog.folder : qsTr("the library"))
-        }
-        onAccepted: app.updateFoundLink()
-    }
-    AdaptiveDialog {
-        id: linkMissingDialog
-        objectName: "linkMissingDialog"
-        kind: "question"
-        property string file: ""
-        preferredWidth: 480
-        title: qsTr("Document not found")
-        standardButtons: Dialog.Open | Dialog.Cancel
-        Label {
-            width: linkMissingDialog.availableWidth
-            wrapMode: Text.Wrap
-            text: qsTr("\u201c%1\u201d is not where the link says, and nothing like it is in the library. Locate it? "
-                       + "The link then points to the file you choose.").arg(linkMissingDialog.file)
-        }
-        onAccepted: locateLinkDialog.open()
-    }
-    FileDialog {
-        id: locateLinkDialog
-        title: qsTr("Locate the linked document")
-        currentFolder: app.openFolder()
-        onAccepted: app.relinkTo(selectedFile)
-    }
-    // A text file changed on disk (another program) while it has changes here: which version stays
-    AdaptiveDialog {
-        id: textChangedDialog
-        objectName: "textChangedDialog"
-        kind: "question"
-        property string file: ""
-        property bool document: false  // a .xopp or PDF (reloading it cannot be undone)
-        preferredWidth: 520
-        title: qsTr("Changed in another app")
-        closePolicy: Popup.NoAutoClose
-        Label {
-            width: textChangedDialog.availableWidth
-            wrapMode: Text.Wrap
-            text: qsTr("%1 was changed by another app, and it has changes here that are not saved.").arg(textChangedDialog.file)
-                  + "\n\n" + (textChangedDialog.document
-                               ? qsTr("Reload: the file as it is now is shown, and your changes here are discarded. "
-                                      + "Keep mine: your version stays, and saving writes over the other app's changes.")
-                               : qsTr("Reload: the file as it is now is shown (Undo brings your changes back). Keep mine: "
-                                      + "your version stays, and saving writes over the other app's changes."))
-        }
-        footer: DialogButtonBox {
-            Button {
-                objectName: "textKeepButton"
-                text: qsTr("Keep mine")
-                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
-            }
-            Button {
-                objectName: "textReloadButton"
-                text: qsTr("Reload")
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-        }
-        onAccepted: app.resolveTextChange(true)
-        onRejected: app.resolveTextChange(false)
-    }
-    // "Export as Markdown" (qt/docs/md-pdf.md): next to the document (Xournal++ files; asked before a file is
-    // replaced), else where this dialog says
-    function exportMarkdown() {
-        const file = app.markdownExportFile()
-        if (file.toString() === "") {
-            const suggestion = app.suggestedMarkdownExport().toString()
-            markdownExportDialog.currentFolder = suggestion.substring(0, suggestion.lastIndexOf("/"))
-            markdownExportDialog.selectedFile = suggestion
-            markdownExportDialog.open()
-        } else if (app.fileExists(file)) {
-            markdownReplaceDialog.file = file
-            markdownReplaceDialog.open()
-        } else {
-            app.exportMarkdown(file)
-        }
-    }
-    FileDialog {
-        id: markdownExportDialog
-        objectName: "markdownExportDialog"
-        title: qsTr("Export as Markdown")
-        fileMode: FileDialog.SaveFile
-        defaultSuffix: "md"
-        nameFilters: [qsTr("Markdown (*.md)")]
-        onAccepted: app.exportMarkdown(selectedFile)
-    }
-    AdaptiveDialog {
-        id: markdownReplaceDialog
-        objectName: "markdownReplaceDialog"
-        kind: "question"
-        property url file
-        title: qsTr("Replace the Markdown file?")
-        preferredWidth: 440
-        Label {
-            width: markdownReplaceDialog.availableWidth
-            wrapMode: Text.WordWrap
-            text: qsTr("%1 exists. Replace it with the Markdown of this document?")
-                  .arg(decodeURIComponent(markdownReplaceDialog.file.toString().replace(/^.*\//, "")))
-        }
-        footer: DialogButtonBox {
-            Button { text: qsTr("Choose another place…"); DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
-                     onClicked: {
-                         markdownReplaceDialog.close()
-                         const suggestion = markdownReplaceDialog.file.toString()
-                         markdownExportDialog.currentFolder = suggestion.substring(0, suggestion.lastIndexOf("/"))
-                         markdownExportDialog.selectedFile = suggestion
-                         markdownExportDialog.open()
-                     } }
-            Button { text: qsTr("Cancel"); DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
-            Button { objectName: "markdownReplaceButton"; text: qsTr("Replace")
-                     DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
-        }
-        onAccepted: app.exportMarkdown(file)
-    }
-    FileDialog {
-        id: exportDialog
-        title: qsTr("Export as plain PDF")
-        fileMode: FileDialog.SaveFile
-        defaultSuffix: "pdf"
-        nameFilters: [qsTr("PDF (*.pdf)")]
-        onAccepted: app.exportPdf(selectedFile)
-    }
+    ProtectionDialogs { id: protectionDialogs }
+    DocumentNotices { id: documentNotices }
 
     FileDialog {
         id: imageDialog
@@ -4287,147 +3047,8 @@ ApplicationWindow {
         nameFilters: [qsTr("Images (*.png *.jpg *.jpeg *.gif *.bmp *.webp *.svg)"), qsTr("All files (*)")]
         onAccepted: app.insertImage(selectedFile)
     }
-
-    AdaptiveDialog {
-        id: unsavedDialog
-        objectName: "unsavedDialog"
-        kind: "question"
-        title: qsTr("Unsaved changes")
-        preferredWidth: 480
-        Label {
-            width: unsavedDialog.availableWidth
-            wrapMode: Text.Wrap
-            text: qsTr("\"%1\" has unsaved changes.").arg(app.title)
-        }
-        footer: DialogButtonBox {
-            Button { text: qsTr("Save"); DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
-            Button { text: qsTr("Discard"); DialogButtonBox.buttonRole: DialogButtonBox.DestructiveRole }
-            Button { text: qsTr("Cancel"); DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
-            onAccepted: { unsavedDialog.close(); saveOrAsk(afterDiscardCheck) }
-            onRejected: { unsavedDialog.close(); afterDiscardCheck = null }
-            onClicked: function(button) {
-                if (button.DialogButtonBox.buttonRole === DialogButtonBox.DestructiveRole) {
-                    unsavedDialog.close()
-                    var action = afterDiscardCheck
-                    afterDiscardCheck = null
-                    if (action) action()
-                }
-            }
-        }
-    }
-
-    // After a crash: offer the documents with unsaved changes (from emergency and autosave files).
-    AdaptiveDialog {
-        id: recoveryDialog
-        objectName: "recoveryDialog"
-        kind: "question"
-        onClosed: homeView.offerLibrariesHomeAtStart()
-        closePolicy: Popup.NoAutoClose
-        preferredWidth: 560
-        title: qsTr("Recover unsaved changes?")
-        ColumnLayout {
-            width: recoveryDialog.availableWidth
-            spacing: 8
-            Label {
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-                text: qsTr("Xournal Qt did not close properly. These documents have changes that were not saved:")
-            }
-            Repeater {
-                model: app.recoveryItems
-                delegate: RowLayout {
-                    required property var modelData
-                    Layout.fillWidth: true
-                    Label { text: modelData.title; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideMiddle }
-                    Label { text: modelData.time; color: "#6b6f75" }
-                }
-            }
-        }
-        footer: DialogButtonBox {
-            Button { text: qsTr("Recover"); DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
-            Button { text: qsTr("Discard changes"); DialogButtonBox.buttonRole: DialogButtonBox.DestructiveRole }
-            onAccepted: { recoveryDialog.close(); app.recover(true) }
-            onClicked: function(button) {
-                if (button.DialogButtonBox.buttonRole === DialogButtonBox.DestructiveRole) {
-                    recoveryDialog.close()
-                    app.recover(false)
-                }
-            }
-        }
-    }
-    // The first start shows the introduction (qt/docs/onboarding.md), which ends in the question which way to keep
-    // documents (PDF files or Xournal++ files); the question alone when the introduction was shown already but no way
-    // was chosen. Then the recovery question; then (Android) where the libraries are kept.
-    function afterFirstStart() {
-        if (app.recoveryItems.length > 0) recoveryDialog.open()
-        else homeView.offerLibrariesHomeAtStart()
-    }
-    DocumentModeDialog {
-        id: documentModeDialog
-        onChosen: win.afterFirstStart()
-    }
-    IntroDialog {
-        id: introDialog
-        onChosen: win.afterFirstStart()
-    }
-    // Help → Start the tutorial again: a fresh copy replaces the one written on (qt/docs/onboarding.md)
-    AdaptiveDialog {
-        id: restartTutorialDialog
-        objectName: "restartTutorialDialog"
-        kind: "question"
-        preferredWidth: 480
-        title: qsTr("Start the tutorial again?")
-        Label {
-            width: restartTutorialDialog.availableWidth
-            wrapMode: Text.Wrap
-            text: qsTr("A fresh copy of the tutorial replaces yours; what you wrote on it is gone. To keep it, save it "
-                       + "somewhere else first (⋮ → Save as…).")
-        }
-        footer: DialogButtonBox {
-            Button {
-                objectName: "restartTutorialConfirm"
-                text: qsTr("Start again")
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-            Button { text: qsTr("Cancel"); DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
-        }
-        onAccepted: app.restartTutorial()
-    }
-    Component.onCompleted: {
-        if (app.askIntro()) introDialog.openFirstStart()
-        else if (app.askDocumentMode()) documentModeDialog.open()
-        else if (app.recoveryItems.length > 0) recoveryDialog.open()
-        else homeView.offerLibrariesHomeAtStart()
-    }
-
-    AdaptiveDialog {
-        id: closeAllDialog
-        objectName: "closeAllDialog"
-        kind: "question"
-        preferredWidth: 480
-        title: qsTr("Close all documents?")
-        standardButtons: Dialog.Cancel | Dialog.Ok
-        ColumnLayout {
-            width: closeAllDialog.availableWidth
-            Label {
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-                text: qsTr("%1 documents are open. Documents with unsaved changes ask before they close.")
-                        .arg(app.tabs.count)
-            }
-        }
-        onAccepted: { tabOverview.close(); closeAllTabs() }
-    }
-
-    AdaptiveDialog {
-        id: messageDialog
-        objectName: "messageDialog"
-        kind: "card"
-        preferredWidth: 640
-        standardButtons: Dialog.Ok
-        property alias text: messageLabel.text
-        Label { id: messageLabel; wrapMode: Text.Wrap; width: parent.width }
-    }
+    StartupFlow { id: startupFlow }
+    Component.onCompleted: startupFlow.start()
     // Full screen (editing): the open documents as dots in a slim bar at the top; a tap shows them all, a swipe along
     // the bar or its small arrows at both ends go to the next or previous one (only on the bar: the pages keep every
     // touch)
@@ -4960,133 +3581,7 @@ ApplicationWindow {
         // (above the pills, the navigation bar and the keyboard)
         anchors.bottomMargin: 96 + canvas.y + canvas.height - win.canvasControlsBottom
     }
-    Connections {
-        target: app.versions
-        // A version was restored (the History panel): one undo step
-        function onRestored(ok, text) {
-            if (ok) {
-                snackbar.show(text, true)
-            } else {
-                messageDialog.title = qsTr("The version could not be restored")
-                messageDialog.text = text
-                messageDialog.open()
-            }
-        }
-    }
-    // "Save with a message…" (Ctrl+Alt+S, a milestone of the version history), or a version's message changed later
-    AdaptiveDialog {
-        id: versionMessageDialog
-        objectName: "versionMessageDialog"
-        kind: "question"
-        /// -1: the next save; else the version whose message it is
-        property int versionId: -1
-        function openFor(id) {
-            versionId = id
-            messageField.text = id >= 0 ? app.versions.messageOf(id) : ""
-            keepVersionsBox.checked = true
-            open()
-            messageField.forceActiveFocus()
-        }
-        preferredWidth: 420
-        title: versionId >= 0 ? qsTr("The message of the version of %1").arg(app.versions.titleOf(versionId))
-                              : qsTr("Save with a message")
-        ColumnLayout {
-            width: versionMessageDialog.availableWidth
-            spacing: 8
-            Label {
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-                visible: versionMessageDialog.versionId < 0
-                text: qsTr("A version with a message is a milestone: it is kept as it is, whatever is saved later that day.")
-            }
-            TextField {
-                id: messageField
-                objectName: "versionMessageField"
-                Layout.fillWidth: true
-                placeholderText: qsTr("What did you do?")
-                maximumLength: 200
-                onAccepted: versionMessageDialog.accept()
-            }
-            CheckBox {
-                id: keepVersionsBox
-                objectName: "versionMessageKeepVersions"
-                visible: versionMessageDialog.versionId < 0 && !app.versions.on
-                text: qsTr("Keep versions of this document")
-            }
-            Label {
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-                visible: versionMessageDialog.versionId < 0 && !app.versions.available
-                text: app.versions.unavailableReason
-                color: "#b06000"
-            }
-        }
-        footer: DialogButtonBox {
-            Button {
-                objectName: "versionMessageSave"
-                text: versionMessageDialog.versionId >= 0 ? qsTr("Change") : qsTr("Save")
-                enabled: versionMessageDialog.versionId >= 0 || app.versions.available
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-            Button { text: qsTr("Cancel"); flat: true; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
-        }
-        onAccepted: {
-            if (versionId >= 0) {
-                app.setVersionMessage(versionId, messageField.text)
-                return
-            }
-            if (keepVersionsBox.visible && keepVersionsBox.checked) app.versions.on = true
-            if (!app.saveWithMessage(messageField.text, null)) saveOrAsk(null)
-        }
-    }
-    Connections {
-        target: app
-        function onPageActionDone(text, undoable) { snackbar.show(text, undoable) }
-        // Copy handwriting as text (qt/copy-tools): the text near the words; why not, with the way to Settings
-        function onInkTextCopy(result) {
-            if (result.state === "reading" || result.state === "copied") {
-                inkTextToast.show(result)
-                return
-            }
-            inkTextToast.close()
-            if (result.state === "nothing") {
-                snackbar.show(qsTr("No handwriting there to copy"), false)
-            } else {
-                snackbar.show(result.state === "off"
-                              ? qsTr("Copying handwriting as text needs the handwriting search (Settings → Search)")
-                              : qsTr("No handwriting model to read it with (Settings → Search)"),
-                              false, qsTr("Settings"), function() { settingsPage.open(); settingsPage.showSearch() })
-            }
-        }
-        // A snip pasted from a document with a file (qt/docs/snip.md): a link to its page, if wanted
-        function onSnipLinkOffered(title) {
-            snackbar.show(qsTr("Add a link to the source page (%1)?").arg(title), false, qsTr("Add link"),
-                          function() { app.addSnipLink() })
-        }
-    }
-    Connections {
-        target: app
-        // The annotations were exported as Markdown (the Annotations panel): open the file from here
-        function onAnnotationsExported(file, error) {
-            if (error !== "") {
-                messageDialog.title = qsTr("Export failed")
-                messageDialog.text = error
-                messageDialog.open()
-                return
-            }
-            snackbar.show(qsTr("Annotations exported to %1").arg(file.split("/").pop()), false, qsTr("Open"),
-                          function() { app.openPath(file) })
-        }
-    }
-
-    Connections {
-        target: app
-        function onMessage(title, text, error) {
-            messageDialog.title = title !== "" ? title : (error ? qsTr("Error") : qsTr("Information"))
-            messageDialog.text = text
-            messageDialog.open()
-        }
-    }
+    VersionMessageDialog { id: versionMessageDialog }
 
     // Library and recent documents: over the document area while shown.
     // The home screen's color under a cut-out or the navigation bar at a side (the home screen itself is beside it)
@@ -5108,9 +3603,9 @@ ApplicationWindow {
         // A PDF card: the file itself; a card of notes (also a PDF with its .xopp): opened, then shared as a document
         onShareRequested: function(path) {
             if (path.toLowerCase().endsWith(".pdf") || app.sharedTextFile(path) !== "") {
-                shareDialog.openFor(path)  // (a PDF, a Markdown or text file: the file itself)
+                shareFlow.shareDialog.openFor(path)  // (a PDF, a Markdown or text file: the file itself)
             } else if (app.openPath(path)) {
-                shareDialog.openFor("")
+                shareFlow.shareDialog.openFor("")
             }
         }
     }
@@ -5205,10 +3700,6 @@ ApplicationWindow {
         anchors.topMargin: recordingPill.visible ? 8 : 12 + win.audioPillsTop - canvas.y
         z: 57
     }
-    Connections {
-        target: app.audio
-        function onMessage(text) { snackbar.show(text, false) }
-    }
     // The microphone refused by the system (macOS, Android): where to allow it
     MicrophoneDialog {}
     // The replay of the timeline (qt/docs/timeline.md): its play bar at the bottom of the page, above the navigation
@@ -5223,10 +3714,6 @@ ApplicationWindow {
         x: Math.round((win.canvasControlsLeft + win.canvasControlsRight - width) / 2)
         width: Math.min(win.canvasControlsRight - win.canvasControlsLeft - 2 * side, 960)
         z: 92
-    }
-    Connections {
-        target: app.timeline
-        function onMessage(text) { snackbar.show(text, false) }
     }
     Shortcut { sequence: "Escape"; enabled: win.replaying && !app.homeVisible; onActivated: app.timeline.stop() }
     Shortcut { sequence: "Space"; enabled: win.replaying && !app.homeVisible; onActivated: app.timeline.toggle() }
@@ -5310,15 +3797,15 @@ ApplicationWindow {
         id: settingsPage
         objectName: "settingsPage"
         onQuitRequested: win.closeWindow()  // (asks about unsaved documents first)
-        onIntroRequested: introDialog.show()
+        onIntroRequested: startupFlow.introDialog.show()
         onTutorialRequested: app.openTutorial()
-        onRestartTutorialRequested: restartTutorialDialog.open()
+        onRestartTutorialRequested: startupFlow.restartTutorialDialog.open()
     }
     TabOverview {
         id: tabOverview
         objectName: "tabOverview"
         onCloseRequested: function(index) { requestCloseTab(index) }
-        onCloseAllRequested: app.tabs.count > 1 ? closeAllDialog.open() : closeAllTabs()
+        onCloseAllRequested: app.tabs.count > 1 ? saveFlow.closeAllDialog.open() : saveFlow.closeAllTabs()
         onLibrarySearchRequested: win.searchLibrary()
     }
 
@@ -5465,7 +3952,7 @@ ApplicationWindow {
         enabled: !app.homeVisible
         onActivated: app.presenting ? (win.presentClean = !win.presentClean) : win.startPresenting(true)
     }
-    Shortcut { sequences: win.keysOf("export"); enabled: docKeys; onActivated: openExportDialog() }
+    Shortcut { sequences: win.keysOf("export"); enabled: docKeys; onActivated: exportFlow.openExportDialog() }
     Shortcut { sequences: win.keysOf("print"); enabled: docKeys; onActivated: printDialog.open() }
     Shortcut { sequences: win.keysOf("back"); enabled: docKeys; onActivated: app.navigateBack() }
     Shortcut { sequences: win.keysOf("forward"); enabled: docKeys; onActivated: app.navigateForward() }

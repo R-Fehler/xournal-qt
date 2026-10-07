@@ -203,6 +203,15 @@ endif()
 # The QML UI as a static QML module (XournalQt), used by the app and by the UI tests.
 set(XQT_QML_FILES
     src/app/qml/Main.qml
+    # (the parts of the window, each instantiated once in Main.qml)
+    src/app/qml/SaveFlow.qml
+    src/app/qml/ShareFlow.qml
+    src/app/qml/ExportFlow.qml
+    src/app/qml/ProtectionDialogs.qml
+    src/app/qml/DocumentNotices.qml
+    src/app/qml/StartupFlow.qml
+    src/app/qml/VersionMessageDialog.qml
+    src/app/qml/LinkPopup.qml
     src/app/qml/IconButton.qml
     src/app/qml/RecordButton.qml
     src/app/qml/RecordingPill.qml
