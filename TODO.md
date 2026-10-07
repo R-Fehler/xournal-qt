@@ -53,9 +53,8 @@ All four waves are merged (2026-10-07). The architecture overview:
   repository needs a paid plan, [ci.md](qt/docs/development/ci.md)), then `xqt-pages.yml` publishes the interactive
   architecture page.
 - [x] Docs: the glossary (`architecture/glossary.md`), ADRs 0004–0007, the device checks in the feature docs ("On the
-  device"), the platform docs without dated notes and block names. Left: `architecture/data-on-disk.md` (every path
-  per platform, checked against the code; the glossary links it already), the platform docs' "where the program keeps
-  things" tables checked against the code, and the settings keys table once typed (B13).
+  device"), the platform docs without dated notes and block names. Also `architecture/data-on-disk.md`. Left: the
+  settings keys table in it once they are typed (B13), and the macOS, Windows and Android paths tried on a machine.
 
 ### Later rounds (from the reviews, not started)
 - [ ] The feature objects out of `AppController` (app-cpp E–N, `app.versions` first as the template) · `CanvasView`

@@ -41,10 +41,13 @@ Where the program keeps things:
 
 | What | Where |
 |---|---|
-| Settings, palettes, the session journal, autosaves | `%LOCALAPPDATA%\xournal-qt` |
-| Caches (thumbnails, previews, library index) | `%LOCALAPPDATA%\cache\xournal-qt` |
+| Settings (`settings.xml`), recent files, the session journal, reading positions | `%LOCALAPPDATA%\xournal-qt` |
+| Caches (stand-ins, covers, a library's cache when kept in the app cache), autosaves of unsaved documents | `%LOCALAPPDATA%\cache\xournal-qt` |
 | Fontconfig's configuration (written at every start) and font cache | `%LOCALAPPDATA%\cache\xournal-qt\fontconfig` |
+| Recordings, the app's stickers and templates | `%APPDATA%\xournal-qt` |
 | The default library | `Documents\Xournal_Libraries\Default` |
+
+Every file, and why the folders are these: [data-on-disk.md](../architecture/data-on-disk.md).
 
 `bin\xournal-qt-cli.exe` is the command line tool (`xournal-qt-cli file.xopp --create-pdf=out.pdf`, as upstream's
 `xournalpp --create-pdf`); it runs in a terminal.

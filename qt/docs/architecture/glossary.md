@@ -1,7 +1,7 @@
 # Glossary
 
 The words the code, the docs and the commit messages use, each with what it means here and where to read more. Where
-a word names a class, the class is the definition. Files and folders on disk: [library.md](../features/library.md), "The library cache", and the platform docs in [development/](../development/README.md).
+a word names a class, the class is the definition. Files and folders on disk: [data-on-disk.md](data-on-disk.md).
 
 ## The fork and upstream
 
@@ -62,7 +62,7 @@ The words for the pictures the app keeps ([image-caches.md](image-caches.md) has
 | --- | --- |
 | **library** | a folder of documents shown on the home screen, with an index for search ([library.md](../features/library.md)); any folder can be one. |
 | **libraries home** | where the libraries are made by default: `Documents/Xournal_Libraries` (on Android the phone's or the app's own folder). |
-| **library key** | a short hash of a library's folder (`Library::key`): the name of its folder in the config and cache folders, of its single-instance socket and its session journal; a library moved outside the app gets a new key. |
+| **library key** | a short hash of a library's folder (`Library::key`): the name of its folders in the config and cache folders, and on the desktop of its single-instance socket and its session journal (`sessions/<key>.json`; the default library has none of these two by key); a library moved outside the app gets a new key. |
 | **quick library** | the Downloads folder, offered in the library menu and opened as a library; its files are taken as short-lived. |
 | **index**, **pack** | the library's search index; it is kept in packs (`notes.pack`, `pdf-text.pack`, `previews.pack`, `ink-text.pack`), one set per folder ([ADR 0004](../decisions/0004-library-index.md)). |
 | **cache folder** | a folder's hidden `.xournal_library/` with its packs, or the same under the app's cache folder (a setting of each library). |
@@ -78,7 +78,7 @@ The words for the pictures the app keeps ([image-caches.md](image-caches.md) has
 | **text file**, **text document** | a `.md` or text file opened as a document; a Markdown document kept as `.md` or as a PDF that carries the Markdown ([md-pdf.md](../features/md-pdf.md)). |
 | **Markdown box** | Markdown written on a page of a `.xopp` ([markdown-boxes.md](../features/markdown-boxes.md)). |
 | **autosave**, **recovery** | the copy of a changed document written every few minutes (upstream's autosave setting); offered at the next start after a crash, with the open tabs from the session journal. |
-| **session journal** | `session.json`: the open tabs of the windows, for recovery and the next start. |
+| **session journal** | the open tabs of a window, for recovery and the next start: `session.json` in the config folder for the default library (and on Android, one window for all libraries), `sessions/<library key>.json` for a window of another library on the desktop. |
 | **conflict copy** | a file a sync client left beside a document (`.sync-conflict-…`, "(conflicted copy)"); a badge on its card. |
 
 ## The window

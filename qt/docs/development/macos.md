@@ -41,9 +41,12 @@ Where the program keeps things (GLib's XDG folders, as on Linux and as upstream 
 
 | What | Where |
 |---|---|
-| Settings, palettes, the session journal, autosaves | `~/.config/xournal-qt` |
-| Caches (thumbnails, previews, library index) | `~/.cache/xournal-qt` |
+| Settings (`settings.xml`), recent files, the session journal, reading positions | `~/.config/xournal-qt` |
+| Caches (stand-ins, covers, a library's cache when kept in the app cache), autosaves of unsaved documents | `~/.cache/xournal-qt` |
+| Recordings, the app's stickers and templates | `~/Library/Application Support/xournal-qt` (Qt's folder) |
 | The default library | `~/Documents/Xournal_Libraries/Default` |
+
+Every file, and why the folders are these: [data-on-disk.md](../architecture/data-on-disk.md).
 
 `xournal-qt.app/Contents/MacOS/xournal-qt-cli` is the command line tool (`xournal-qt-cli file.xopp
 --create-pdf=out.pdf`, as upstream's `xournalpp --create-pdf`).
