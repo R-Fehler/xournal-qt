@@ -118,7 +118,8 @@ recent files and Ctrl+S use it. Library, covers and search load it the same way.
   is not a PDF with notes yet keeps `name.original.pdf` once, and the document takes its pages from a copy in the cache
   from then on (the file it read them from changes).
 - **In the background** (`DocumentSave.cpp`): the document's pages are copied on the UI thread (a few milliseconds),
-  the drawing, the `.xopp` and qpdf work on that copy on a worker, and the undo stack's saved point is the copied state.
+  the drawing, the `.xopp` and qpdf work on that copy on a worker, and the undo stack's saved point is the copied state
+  ([ADR 0006](../decisions/0006-background-save.md)).
 - `.xopp` stays the format of every document not saved as a PDF with notes; autosaves and crash saves are `.xopp` files
   in the cache.
 - Settings → Documents: **Save notes into the PDF itself** (off; turning it on explains it once: Ctrl+S on an

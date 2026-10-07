@@ -15,7 +15,7 @@ plus the window-wide helpers the QML needs from C++ (`import XournalQt.Canvas`).
 **May depend on**: `xqt-canvas` and below, Qt Quick. Not on shell or app.
 
 **Threads**: the UI thread and Qt Quick's render thread (`updatePaintNode`), which only composes tiles the workers
-rendered.
+rendered. Why tiles: [ADR 0007](../../docs/decisions/0007-canvas-tiles.md).
 
 **Tests**: `qt/tests/quick` (label `quick`). **Docs**: [adaptive layout](../../docs/features/adaptive-layout.md),
 [dark pages](../../docs/features/dark-pages.md), [hidpi](../../docs/features/hidpi.md),

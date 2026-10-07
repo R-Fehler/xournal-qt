@@ -229,6 +229,8 @@ program"): the files are watched, and looked at again when the window becomes ac
 Code: `AppController::checkTextFiles`, `checkDocumentFiles`, `reloadDocument` (`qt/src/app/AppTextFiles.cpp`).
 
 ## The library cache (`.xournal_library/`)
+Why it is built this way: [ADR 0004](../decisions/0004-library-index.md).
+
 The cache only speeds things up and can be deleted at any time. Each folder with documents has its own hidden
 `.xournal_library/`, with the cache of **only the documents directly in it** (never those of its subfolders). A
 folder without documents gets none, and when its last document goes, the folder goes too (unless something other
