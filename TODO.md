@@ -16,81 +16,46 @@ Open work only. The goals behind it are in [VISION.md](VISION.md); how the app w
 ## The refactoring of 2026-10
 
 The plan, the five reviews and the reasons: [qt/docs/review/2026-10/README.md](qt/docs/review/2026-10/README.md).
-Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is merged (2026-10-07).
+Waves 1–3 are merged (2026-10-07); wave 4 part 1 (`qt/docs-restructure`) too.
 
-- [ ] **Wave 2**: `qt/qml-split` (split `Main.qml`, qml.md §1.2) · `qt/test-support` (one UI fixture and shared test
-  helpers, fewer fixed waits, the QML-API test) · `qt/session-io` (`FileIo` helpers; bugs 2 and 6) ·
-  `qt/canvas-race` (the PDF cache race, bug 3; an injectable clock for the canvas tests).
-  - [x] `qt/canvas-race`: the PDF cache race (bug 3; `PdfCacheTest`) and the canvas clock (`Clock.h`; the canvas
-    tests no longer sleep). Left: `renderZoom`/`renderDpr` read as one (infra §6.4), a ThreadSanitizer run of the
-    canvas and shell labels, the quick tests' input on the clock (`CanvasItemInputTest`), the rest of B10/B11.
-  - [x] `qt/qml-split`: `Main.qml` split into 28 files of its parts (qml.md §1.2, files 4–23); left for wave 3: the
-    window's state (files 1–3, qml B5) and the `WindowActions` facade (file 24, qml B3).
-  - [x] `qt/session-io`: `session/FileIo.h` (atomic write with fsync, `FileWriteLock`, one stamp, FNV-1a, gzip,
-    MD5, `hasExtension`) and `PageCopy.h` used by session, shell and app; bug 2 (tags vs. saves, tags keep the version
-    history) and bug 6 (attached PDF on the save's worker, file preview outside the lock, `LoadHandler::pdfPassword`
-    set once), each with failing tests first. Left: shell block 9's `readJsonObject`, caching `library.json` and moving
-    reading positions out of the cache folder (Library.cpp: with `qt/library-split`); session block 6's manual
-    `lock()/unlock()` pairs and the plain autosave on the UI thread (risk 7); `setVersionMessage` still runs qpdf on the
-    UI thread; the static `DocumentHandler` copies; markdown's and hwr's own FNV (markdown is below session).
-  - [x] `qt/test-support`: `qt/tests/support` (`waitFor` that fails, files, test PDFs, fixtures), `UiFixture` for the
-    23 UI fixtures with the app's engine set-up (`src/app/EngineSetup`), `QmlApiTest`, the QML disk cache for the UI
-    tests (the ui label about twice as fast), stable PageRaster names, `golden-roundtrip`. Left: the `qpdfCheck` (10),
-    `makePdf`/`drawStroke`/`addStroke` variants and the quick tests' `wait` copies; the fixed "settle" waits without
-    an observable state (`XQT_WAIT_LOG` ranks them: AdaptiveLayoutTest's `resize` 150 ms, `click` 50 ms, the SetUp
-    waits of MainWindowTest and ToolboxTest); a `slow` label and dropping the CI's repeat (infra B2 4–5); the UI tests
-    on Qt 6.8 with the new fixture; `MainWindowTest` split by feature.
-- [ ] **Wave 3**: `qt/qml-split-2` (HomeView, SettingsPage, the Escape/Back dispatcher, bug 4) · `qt/library-split`
-  (`Library.*`, shared image-provider plumbing and shutdown, bug 5) · `qt/hybridpdf-split` (`HybridPdf.cpp`, one
-  marker writer) · `qt/app-services` (`AppServices` / `OpenDocuments` / `CurrentDocument`, bug 1).
-  - [x] `qt/hybridpdf-split`: `HybridPdf.cpp` (4,458 lines) split into nine files by subsystem behind
-    `HybridInternal.h` (session block 3; `prepare()` takes a `PrepareOptions`), and one writer of the marker, the
-    handwriting text and the embedded files for the full write and the incremental update (`HybridMarker.cpp`,
-    `ObjectSink`; block 5; `HybridMarkerTest` compares the two). Left: the "try incremental, else full" block that
-    `write()` and `writeKeeping()` both have (with session block 7); `PdfBookmarks::write` and `markHistoryIn` could
-    take an `ObjectSink`; splitting `HybridPdfTest.cpp` (block 9); `HybridSaveHandler` in ADR 0002 (block 10).
-  - [x] `qt/library-split`: `Library.*` split (Library, FileStamps, LibraryIndex + Entry/Packs/Read/Search/Queries);
-    `ImageWorkers` owns every image pool at idle priority and shutdown stops them all (bug 5,
-    `Sketches.nothingIsDrawnOrStoredAfterShutdown`); `AsyncImage` (one response, one LRU, one URL encoding); covers
-    cancellable; `ImageMemory` and the words page preview / sketch / thumbnail / stand-in / cover
-    ([image-caches.md](qt/docs/architecture/image-caches.md)); `library.json` read once. Left: the session registry out of
-    `ThumbnailProvider` (shell §6.2, block 4 step 3: only TabManager registers); the cards' QML role `preview` →
-    `cover` (with the QML); "preview" for covers and stand-ins in app/ comments and MainWindowTest names; LibraryTest.cpp
-    split by topic (shell block 12); reading positions outside a library out of the cache folder (§6.6).
-  - [x] `qt/qml-split-2`: one ordered Esc/Back dispatcher (bug 4, `EscapeKeysTest`), `record` in the shortcuts and
-    labels naming the keys as set (`win.keyNote`); the window's state in `WindowInsets`/`ViewModes`/`ChromeLayout`
-    (`win.insets/modes/layout`, Main.qml 1,100 lines), `AdaptiveLayout.phoneLayout`, `layout.undoPlace`; HomeView
-    (3,003 → ~500 lines, 15 parts) and SettingsPage (1,887 → ~220, 10 sections, 5 rows) split by pure moves. Left:
-    Main's search forwards and dialog openers (B3, `WindowActions`); B7's one `DocumentGrid` with the favourites in
-    C++, the menu target object and the search field's `type(text)`; B8's section model (the names are written twice,
-    the indices are magic) and SettingsPage's own keyboard fallback; the `typeof win` guards (B6); whether Back should
-    also do the rest of Esc's list (see the block's report).
+- [~] **Wave 4 part 2** `qt/architecture`: the architecture overview generated from one
+  `architecture.yaml` under `qt/docs/architecture/` (an SVG diagram and tables linking to the source on GitHub, an interactive
+  page on GitHub Pages), with the Xournal++ core and its connections to the frontend.
 
-  - [x] `qt/app-services`: bug 1 (the reference copied text of PDFs that forbid it; failing test first),
-    `CanvasActions` (`app.edit`, `app.reference.edit`; the pills' target), `AppServices` with `OpenDocuments` and
-    `BackgroundJobs` (one constructor; quitting waits for the jobs), `CurrentDocument` (the relay of
-    `currentTabChanged`); ADR 0003. Left: `AppController::app` not renamed to `context`; the facade names of the
-    canvas actions (`app.copySelection`, `app.zoomIn`, …) and the per-document properties stay on `AppController`
-    until their features move (E–N); no per-path guard between background writes and a `DocumentSession` save (tags
-    have theirs since `qt/session-io`); `WindowContext` for the feature objects not made yet.
-- [ ] **Wave 4**: `qt/docs-restructure` (part 1) · `qt/architecture` (part 2): an architecture overview generated
-  from a model in `qt/docs/architecture/` (`architecture.yaml`; an SVG diagram and tables linking to the source on
-  GitHub, and an interactive page on GitHub Pages), with the upstream core and its connections to the frontend
-  ([review README](qt/docs/review/2026-10/README.md), "Wave 4"); `qt/docs/architecture/README.md` is its placeholder.
-  - [x] `qt/docs-restructure`: the layout of [docs-plan.md](qt/docs/review/2026-10/docs-plan.md) (`features/`,
-    `decisions/`, `development/`, `architecture/`; `git mv`), every link and cited doc path fixed, a link check
-    (`qt/scripts/check-doc-links.py`, the "Doc links" job of `xqt-build.yml`), the entry page `qt/docs/README.md`,
-    building / CI / workflow guides, a README per `qt/src/<module>/`, the feature docs trimmed to how things work
-    now, the root README's pointer listed as a seam in ADR 0002. Left: a glossary and "where data lives on disk"
-    (with `qt/architecture`; the settings keys once they are typed, B13); new ADRs distilled from the feature docs
-    (the library index, memory owners, background save, canvas tiles); the device checklist's checks into the
-    feature docs (infra B14 step 6); the platform docs (`development/android.md`, `windows.md`, `macos.md`) still
-    carry dated notes and block names.
-- [ ] **Later rounds**: the feature objects out of `AppController` (app-cpp E–N, `app.versions` first) ·
-  `CanvasView` steps (infra B8, B9) · the `CanvasInput` split (B11) · non-view code out of `canvas` (B12) ·
-  `DocumentSession` split (session 4) · one PDF-writing entry point (session 7) · `LibraryService` and a list-model
-  base (shell 6–8) · typed settings (shell 10, infra B13) · module-qualified includes and one CMake file per module
-  (infra B4, B5; shell 13) · `DocumentCanvasItem` split (app-cpp O) · shared small QML components (qml B11).
+### What the merged blocks left (checked against the code, 2026-10-07)
+- [ ] App: `WindowActions` — Main's search forwards and the Connections that only open dialogs (qml B3); a
+  `WindowContext` for the feature objects; `AppController::app` → `context` (mechanical); the facade names of the
+  canvas actions (`app.copySelection`, `app.zoomIn`, …) and the per-document properties move with their features
+  (app-cpp E–N); a per-path guard between background writes and a `DocumentSession` save (tags have one).
+- [ ] QML: the 40 `typeof win` guards (qml B6); HomeView's one `DocumentGrid` with the favourites in C++, its menu
+  target object and the search field's `type(text)` (qml B7); SettingsPage's section model (names written twice,
+  magic indices) and its own keyboard fallback (qml B8); the cards' role `preview` → `cover` (LibraryModel's
+  `CoverRole` is still named "preview" for QML).
+- [ ] Shell: the session registry out of `ThumbnailProvider` (only TabManager registers; shell §6.2, block 4 step 3);
+  reading positions of documents outside a library out of the cache folder (shell §6.6); `readJsonObject` (block 9);
+  LibraryShare's `PdfHistory::gzip` → `fileio`; "preview" for covers and stand-ins in app/ comments and MainWindowTest
+  test names; `LibraryTest.cpp` split by topic (block 12).
+- [ ] Session: `setVersionMessage` still runs qpdf on the UI thread; session block 6's manual `lock()/unlock()` pairs
+  and the plain autosave on the UI thread (risk 7); the static `DocumentHandler` copies; the "try incremental, else
+  full" block in both `write()` and `writeKeeping()` (with block 7); `PdfBookmarks::write` and `markHistoryIn` on the
+  `ObjectSink`; `HybridPdfTest.cpp` split (block 9); `HybridSaveHandler` in ADR 0002 (block 10).
+- [ ] Canvas: `renderZoom`/`renderDpr` read as one (infra §6.4); the quick tests' input on the canvas clock
+  (`CanvasItemInputTest`); a ThreadSanitizer run of the canvas and shell labels.
+- [ ] Tests: the `qpdfCheck` (10), `makePdf`/`drawStroke`/`addStroke` variants and the quick tests' `wait` copies into
+  `qt/tests/support`; the fixed "settle" waits without an observable state (`XQT_WAIT_LOG` ranks them:
+  AdaptiveLayoutTest's `resize` 150 ms and `click` 50 ms, the SetUp waits of MainWindowTest and ToolboxTest); a
+  `slow` label and dropping the CI's `--repeat until-pass:3` (infra B2 4–5); `MainWindowTest` split by feature.
+- [ ] Docs: a glossary and "where data lives on disk" (settings keys once typed, B13); ADRs distilled from the
+  feature docs (the library index, memory owners, background save, canvas tiles); the device checklist's checks into
+  the feature docs (infra B14 step 6); `development/android.md`, `windows.md`, `macos.md` without dated notes and block
+  names.
+
+### Later rounds (from the reviews, not started)
+- [ ] The feature objects out of `AppController` (app-cpp E–N, `app.versions` first as the template) · `CanvasView`
+  steps (infra B8, B9) · the `CanvasInput` split (B11) · non-view code out of `canvas` (B12) · `DocumentSession` split
+  (session 4) · one PDF-writing entry point (session 7) · `LibraryService` and a list-model base (shell 6–8) · typed
+  settings (shell 10, infra B13) · module-qualified includes and one CMake file per module (infra B4, B5; shell 13) ·
+  `DocumentCanvasItem` split (app-cpp O) · shared small QML components (qml B11).
 
 ## Decisions for the author
 - [ ] Reading library cache packs from the other cache location (shell review §4 #15) stays: it also serves read-only
