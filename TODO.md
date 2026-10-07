@@ -84,6 +84,8 @@ Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is merged (2026-10-07).
   `build-qt/unit-cwd` (`qt/test-support`). Nothing left.
 
 ## Flaky tests
+- [ ] Under heavy load (four agents building, 2026-10-07) `StickerToolTest.theSelectionBecomesAStickerOfTheLibraryAndIsOnTheClipboard`
+  and `ToolboxTest.aToolHeldThenMovedIsCarriedToAnotherPlace` failed once in the full suite; 3 of 3 alone.
 - [ ] `PageFilesTest.aProtectedDocumentIsExtractedProtectedAndNeverAsXopp` fails about 1 in 3 runs alone (6 of 20 on
   the base of `qt/compat-dead`, 2026-10-07): extracting pages of the protected `locked.pdf` reads it with the wrong key
   at times (qpdf: "/Perms field in encryption dictionary doesn't match expected value"). A race on the file's password
