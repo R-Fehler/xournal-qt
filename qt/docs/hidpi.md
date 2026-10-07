@@ -2,7 +2,7 @@
 
 How xournal-qt behaves when the screen is scaled by a fraction, what was checked and fixed (`qt/hidpi-fractional`,
 2026-10-04), what each platform hands the app, and how to test it. The device steps are in
-[testing/device-checklist.md](testing/device-checklist.md), "Fractional scaling".
+[testing/device-checklist.md](testing/device-checklist.md), "Screens and scaling".
 
 ## In short
 

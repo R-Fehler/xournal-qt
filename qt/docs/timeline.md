@@ -2,7 +2,7 @@
 
 The author (2026-10-04): "a document timeline, which is like an audio playbar at the bottom, which replays the audio
 and replays the document editing history in read-only mode." Decided (2026-10-05, TODO.md): levels 1 and 2 of
-[idea B9](ideas-2026-10.md) as one design, on one clock: every element knows when it was made, recordings are tracks
+[idea B9](history/README.md) as one design, on one clock: every element knows when it was made, recordings are tracks
 placed by their start. Not in this block: erasing, moving and page changes (level 3, with the version history); times
 per point.
 

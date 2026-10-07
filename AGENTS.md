@@ -1,95 +1,85 @@
 # Working in this repository
 
-xournal-qt is a **fork of Xournal++** (see [FORK.md](FORK.md)): upstream's C++ core with a new Qt 6 / Qt Quick
-frontend. Everything of the fork lives under `qt/`; the rest of the tree is upstream and is touched as little as
-possible. `master` follows upstream, **`master-qt` is the fork's branch** and the one to work on.
+xournal-qt is a **fork of Xournal++** ([FORK.md](FORK.md)): upstream's C++ core with a new Qt 6 / Qt Quick frontend.
+Everything of the fork lives under `qt/`; the rest of the tree is upstream and is touched as little as possible.
+`master` follows upstream, **`master-qt` is the fork's branch** and the one to work on.
 
 ## Build and test
 
 ```sh
-cmake -S qt -B build-qt -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DXQT_FAST_DEV=ON   # once
+cmake -S qt -B build-qt -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DXQT_FAST_DEV=ON -DXQT_BUILD_SPIKES=OFF  # once
 cmake --build build-qt -j8 --target <the test binary you need>
-ctest --test-dir build-qt -j8 -L markdown   # labels: unit session canvas markdown quick shell ui golden
-ctest --test-dir build-qt -j8               # full suite (441 tests): at integration only, not per commit
+ctest --test-dir build-qt -j8 -L canvas    # labels: unit session canvas markdown audio hwr quick shell ui golden
+ctest --test-dir build-qt -j8              # the full suite: 1865 tests
 ```
 
-The machine is a slow 2-in-1, so every build and test run costs real time.
-
-`XQT_FAST_DEV=ON` is for development builds only (CI and releases leave it off): QML is not compiled ahead of time
-(an edit of `Main.qml` rebuilds in seconds instead of minutes), debug info is line tables only (`-g1`) and lld links
-when installed. The tests are listed when ctest runs (`PRE_TEST`), not after each link. Tiers: while working, only the
-labels or `-R` filters of what changed; the full suite once before a block is merged; the CI (`xqt-build.yml`) runs
-both Linux Qt versions (Debian 13 with 6.8, KDE neon with 6.7) on every push of `master-qt` and `claude/**`.
-- Build only the targets you need.
-- Run only the test labels, or `-R` filters, for the code you changed.
-- The full suite runs when a block is merged into `master-qt`, or when the author asks. The author runs the long
-  suites and tests the app by hand at the end.
-- Don't rebuild or retest after edits to docs or QML text alone.
-
-`qt/scripts/linux-deps.sh` installs what the build needs (Debian, Ubuntu, KDE neon). Qt 6.5 or newer (`find_package(Qt6 6.5)`).
-In a Claude Code cloud container (Ubuntu 24.04, Qt 6.4 only, GitHub downloads blocked), `qt/scripts/cloud-env.sh`
-sets up Qt 6.9 and the libraries from conda-forge in `/opt/xqt-env` (about 3.7 GB, 2 s when already there); then
-`source /opt/xqt-env/cloud-env.env` and configure with `$XQT_CMAKE_ARGS`.
-
-- `build-qt` is for the tests. `build-release` is the build the author tries on the device. Rebuild it after
-  integrating into `master-qt` (`cmake --build build-release -j8`), and do not leave it broken.
-- Tests run off-screen and use temporary config and cache folders (see each `tests/*/main.cpp`). They must never
-  write into `test/files` (upstream's fixtures) or into the author's real configuration.
-- Some tests are benchmarks that skip unless an environment variable is set (`XQT_BENCH_PDF=<file>`, `XQT_BENCH_SCROLL`).
-  `XQT_PERF=1` makes the running application write a line a second about the canvas work
-  ([qt/docs/testing/performance-logging.md](qt/docs/testing/performance-logging.md)); `XQT_SHOTS=<dir>` regenerates
-  the README's pictures from the UI tests.
+- `XQT_FAST_DEV=ON` is for development builds only: QML not compiled ahead of time (a QML edit rebuilds in seconds),
+  `-g1`, lld. CI and releases leave it off. The CI builds with Qt 6.7 (KDE neon) and 6.8 (Debian 13): **no Qt API
+  newer than 6.7** in C++ or QML (e.g. `AbstractButton.click()` is 6.8), and no QML property named like a JS global.
+- **Tiers**: while working, only the labels or `-R` filters of what changed, and only the targets you need; the full
+  suite once before a block is merged; the CI on every push of `master-qt` and `claude/**`; the author tests by hand
+  at the end. Don't rebuild or retest after edits to docs or QML text alone.
+- Tests run off-screen with temporary config and cache folders. They never write into `test/files` (upstream's
+  fixtures), the working directory or the author's configuration. Flaky tests: rerun alone first; the known ones are
+  in [TODO.md](TODO.md), "Flaky tests".
+- The testing guide (binaries, fixtures, writing UI tests, env variables such as `XQT_SHOTS`, `XQT_BENCH_*`,
+  `XQT_PERF`): [qt/docs/testing/README.md](qt/docs/testing/README.md).
+- **Cloud container** (Ubuntu 24.04, Qt 6.4 only, no GitHub downloads): `qt/scripts/cloud-env.sh` installs Qt 6.9
+  and the libraries from conda-forge into `/opt/xqt-env`. In every shell that builds or tests:
+  `source /opt/xqt-env/cloud-env.env`, configure with `$XQT_CMAKE_ARGS`. Use that env's `ctest` (tests are listed
+  when ctest runs; another CMake's ctest aborts). **Qt 6.8**: `source /opt/xqt-env68/cloud-env.env`, build dir
+  `/home/user/build-qt68`; run the UI tests there when you touch popups, keys or window states.
+- `qt/scripts/linux-deps.sh` installs the build's packages on Debian, Ubuntu and KDE neon.
 
 ## Rules that are easy to break
 
-1. **Upstream files stay upstream.** Never delete, move or reformat anything outside `qt/`. Where a seam is
-   unavoidable, keep it tiny, mark it with a `xournal-qt:` comment, and list the file in
-   [qt/docs/adr/0002-upstream-seams.md](qt/docs/adr/0002-upstream-seams.md). Everything else belongs under `qt/`.
+1. **Upstream files stay upstream.** Never delete, move or reformat anything outside `qt/`. An unavoidable seam is
+   tiny, marked `xournal-qt:`, and listed in [qt/docs/adr/0002-upstream-seams.md](qt/docs/adr/0002-upstream-seams.md).
 2. **The author's data is not yours.** Never touch `~/.config/xournalpp`, `~/.config/xournal-qt` or their documents.
-3. **Ask before anything leaves the machine**: pushing (branches or tags), publishing a release, building the `.deb`.
-   Local milestone tags are wanted: every block merged into `master-qt` gets an annotated tag
-   `ms/<date>-<block>` on its merge commit, with a one-line summary (`git tag -l 'ms/*' -n1` lists them).
-4. **One feature, one commit.** Before committing:
-   - the tests you ran for it pass;
-   - the device checklist ([qt/docs/testing/device-checklist.md](qt/docs/testing/device-checklist.md)) is
-     updated;
-   - a short plain report follows, one per feature, not a batch at the end.
-
-   Commit messages are plain prose: what was wrong, what changed, why.
+3. **Ask before anything leaves the machine**: pushing branches or tags, publishing a release, building the `.deb`.
+4. **One feature, one commit.** Before committing: the tests you ran for it pass; its feature doc in `qt/docs/` says
+   how it works now; checks that only a real device can make go into
+   [qt/docs/testing/device-checklist.md](qt/docs/testing/device-checklist.md) (short, by area). Commit messages are
+   plain prose: what was wrong, what changed, why.
 5. **A bug gets a failing test first.** Show it fails for the stated reason, then fix it.
 6. Keep the routine test run **under a minute**. Long suites go behind a label or an environment variable.
-7. **Vendored code must be committed whole.** A global gitignore on this machine ignores common folder names
-   (`lib/`, `env/`, `build/`, `out/`, `dist/`). After adding code under `qt/3rdparty/`, check
-   `git status --ignored qt/3rdparty` and add what is missing with `git add -f` (plus a `.gitignore` there with
-   `!name/`). A build in the worktree still works with the files uncommitted; a clean checkout does not.
+7. **Vendored code must be committed whole.** A global gitignore here ignores `lib/`, `env/`, `build/`, `out/`,
+   `dist/`: after adding code under `qt/3rdparty/`, check `git status --ignored qt/3rdparty` and `git add -f`.
 
 ## How work is organised
 
-- The tasks are in [TODO.md](TODO.md), grouped into **blocks**. A block is one branch `qt/<block>` in its own
-  worktree `../xournal_qt-<block>`, with its own `build-qt`. The build uses ccache when it is installed, with
-  the workspace as its base directory, so a new worktree reuses the objects the other checkouts already compiled. This needs ccache 4.7 or newer:
-  older versions put the object path in the key, and CMake names upstream `src/` objects after the worktree's
-  absolute path. Ubuntu 22.04 ships 4.5; 4.14 is installed in `~/.local/bin`.
-- Feature blocks are usually done by subagents. The main session works on architecture and integration, merging
-  blocks into `master-qt`.
-- Run at most two worktree builds at a time; the machine has 8 threads and 16 GB. When several agents work at once,
-  run every build and test through `qt/scripts/build-slot.sh` (two slots, each capped at 3 CPUs and 4 GB, low
-  priority) with `-j3`: five unlimited builds once froze the machine (RAM and swap full).
-- [VISION.md](VISION.md) holds the author's goals. Read it before planning. Don't add anything the author did not
-  say.
+- Open work is in [TODO.md](TODO.md), in **blocks**. A block is a branch `qt/<block>` in its own worktree
+  `../xournal_qt-<block>` with its own `build-qt`; ccache (4.7 or newer) shares objects between worktrees. Blocks are
+  usually done by agents; the main session works on architecture and integration and merges them into `master-qt`
+  after the full suite passed, with an annotated tag `ms/<date>-<block>` on the merge commit. After a merge,
+  `build-release` (the build the author tries) is rebuilt and never left broken.
+- The machine (8 threads, 16 GB) runs at most two builds at a time. With several agents, every build and test goes
+  through `qt/scripts/build-slot.sh` with `-j3`.
+- **The refactoring of 2026-10**: the reviews and the plan in waves are in
+  [qt/docs/review/2026-10/README.md](qt/docs/review/2026-10/README.md); a refactoring changes structure, not behaviour.
+- **Where to record what**: open work → TODO.md (done items are deleted at the merge); how a feature works now →
+  its doc in `qt/docs/`; why → an ADR in `qt/docs/adr/`; a user-visible change → the next draft in
+  `qt/docs/release-notes/`; device-only checks → the device checklist; turning points → `qt/docs/history/README.md`.
+- [VISION.md](VISION.md) holds the author's goals. Read it before planning; add nothing the author did not say.
 
 ## Where things are
 
-| Path | What |
-| --- | --- |
-| `qt/src/app` | `AppController` (the QML API), `main.cpp`, `qml/` (the whole UI) |
-| `qt/src/canvas` | `CanvasView` (a document in a view), `CanvasPage`, input, geometry tools, `CanvasMemory` |
-| `qt/src/render` | `PageRaster`, `RenderService` (worker threads, priorities) |
-| `qt/src/session` | `DocumentSession` (one open document, undo, autosave), `DocumentSearch`, `AppContext` |
-| `qt/src/shell` | tabs, library, previews, thumbnails, models for the QML lists |
-| `qt/src/markdown` | the Markdown engine: md4c, layout, pagination (the editor and its session sit in `canvas`) |
-| `qt/src/quick` | `DocumentCanvasItem`: the scene graph of the canvas |
-| `qt/tests` | by layer: `unit session canvas markdown quick shell ui`, plus `golden` (opt-in image comparison) |
+Dependencies point down this list only (`xqt-shell` also compiles `src/app`; the review plans to split them):
+
+| Path | Target | What |
+| --- | --- | --- |
+| `src/util`, `src/core` | `xoj-util`, `xoj-core`, `xoj-tools` | upstream's Qt-free core, built through the shadow headers of `qt/compat` |
+| `qt/src/render` | `xoj-render` | `PageRaster`, `RenderService` (worker threads); Qt-free |
+| `qt/src/markdown`, `qt/src/audio` | `xqt-markdown`, `xqt-audio` | the Markdown engine (md4c, layout, pagination); recording and playing |
+| `qt/src/session` | `xqt-session` | `DocumentSession` (one open document, undo, autosave), `AppContext`, the PDF formats, search |
+| `qt/src/canvas` | `xqt-canvas` | `CanvasView` (a document in a view), `CanvasPage`, `CanvasInput`, tools, editors, `CanvasMemory` |
+| `qt/src/hwr` | `xqt-hwr` | handwriting search (ONNX Runtime loaded at run time) |
+| `qt/src/quick` | `xqt-quick` | `DocumentCanvasItem`: the canvas in the scene graph, the input filter |
+| `qt/src/shell` | `xqt-shell` | library, tabs, image providers, models for the QML lists, settings models |
+| `qt/src/app` | `xqt-shell`, `xqt-ui`, `xournal-qt` | `AppController` (the QML API `app`), `main.cpp`, `qml/` (the whole UI) |
+| `qt/cli`, `qt/tools` | `xournal-qt-cli`, `xoj-imgdiff` | headless export (upstream's flags), developer tools |
+| `qt/tests` | one binary per label | `unit session canvas markdown audio hwr quick shell ui`, plus `golden` |
+| `qt/3rdparty`, `qt/packaging`, `qt/scripts` | | vendored libraries; packaging; build, deploy and environment scripts |
 
 ## What the moving parts assume
 
@@ -99,15 +89,15 @@ sets up Qt 6.9 and the libraries from conda-forge in `/opt/xqt-env` (about 3.7 G
 - **Every page has a revision** (`DocumentSession::pageRevision`) that changes when its picture does. Thumbnails,
   previews and their files on disk are named by it; a page keeps its revision when pages before it come or go.
 - **Memory has owners**: `CanvasMemory` for rendered pages (a setting, shared by all tabs), `PageSketches` for the
-  previews of every page, `ThumbnailProvider` for the sharp thumbnails. Adding a cache without an owner and a limit
-  is how this got slow before.
+  previews of every page, `ThumbnailProvider` for the sharp thumbnails. A cache without an owner and a limit is how
+  this got slow before.
 - **Work that is not for right now goes to a background worker** at idle priority, and nothing is ever drawn in front
   of the page the reader is looking at.
 - **QML items that a test needs carry an `objectName`.** UI tests drive the real window off-screen.
 
-## Documents to read when they matter
+## Documents
 
-[VISION.md](VISION.md) (goals) · [TODO.md](TODO.md) (open tasks) · [FORK.md](FORK.md) (branches, fork rules) · [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md) (what exists, what is planned,
-what was measured) · [qt/docs/adr/](qt/docs/adr/) (why the fork is built this way) ·
-[qt/docs/markdown-boxes.md](qt/docs/markdown-boxes.md) · [qt/docs/library.md](qt/docs/library.md) ·
-[qt/docs/releasing.md](qt/docs/releasing.md) (CI, packages)
+[VISION.md](VISION.md) (goals) · [TODO.md](TODO.md) (open work) · [FORK.md](FORK.md) (branches, fork rules) ·
+[qt/docs/](qt/docs/) (one doc per feature; [adr/](qt/docs/adr/) the decisions; [releasing.md](qt/docs/releasing.md)
+CI and packages; [history/README.md](qt/docs/history/README.md) how it came to be) ·
+[qt/docs/review/2026-10/docs-plan.md](qt/docs/review/2026-10/docs-plan.md) (the docs structure planned for wave 4).
