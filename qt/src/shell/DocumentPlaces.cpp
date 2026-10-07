@@ -4,13 +4,14 @@
 #include <mutex>
 
 #include <QDateTime>
-#include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 
 #include "util/PathUtil.h"
 
 #include "session/FileIo.h"
+
+#include "JsonFile.h"
 
 #include "DocumentFiles.h"
 
@@ -25,9 +26,8 @@ struct Store {
     QJsonObject& load() {
         if (!loaded) {
             loaded = true;
-            QFile f(QString::fromStdString(file.string()));
-            if (!file.empty() && f.open(QIODevice::ReadOnly)) {
-                entries = QJsonDocument::fromJson(f.readAll()).object();
+            if (!file.empty()) {
+                entries = readJsonObject(file);
             }
         }
         return entries;

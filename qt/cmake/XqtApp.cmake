@@ -153,6 +153,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/MdSnippets.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentCovers.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentCovers.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/JsonFile.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/JsonFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentPlaces.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentPlaces.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/RecentFiles.h

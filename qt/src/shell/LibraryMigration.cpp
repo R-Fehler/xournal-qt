@@ -26,6 +26,8 @@
 #include "util/PathUtil.h"
 #include "session/FileIo.h"
 
+#include "JsonFile.h"
+
 #include "DocumentFiles.h"
 #include "DocumentPlaces.h"
 #include "Library.h"
@@ -183,12 +185,8 @@ void mergeConfig(const fs::path& from, const fs::path& to) {
         if (!fs::exists(target, e)) {
             fs::rename(it->path(), target, e);
         } else if (it->path().filename() == "pages.json") {
-            auto read = [](const fs::path& p) {
-                QFile f(qstr(p));
-                return f.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(f.readAll()).object() : QJsonObject();
-            };
-            QJsonObject merged = read(target);
-            const QJsonObject moved = read(it->path());
+            QJsonObject merged = readJsonObject(target);
+            const QJsonObject moved = readJsonObject(it->path());
             for (auto i = moved.begin(); i != moved.end(); ++i) {
                 merged.insert(i.key(), i.value());
             }
@@ -507,11 +505,7 @@ bool writeManifest(const Plan& plan, const fs::path& file) {
 }
 
 std::optional<Plan> readManifest(const fs::path& file) {
-    QFile f(qstr(file));
-    if (!f.open(QIODevice::ReadOnly)) {
-        return std::nullopt;
-    }
-    const QJsonObject o = QJsonDocument::fromJson(f.readAll()).object();
+    const QJsonObject o = readJsonObject(file);
     if (o.isEmpty()) {
         return std::nullopt;
     }

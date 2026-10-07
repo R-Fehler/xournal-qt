@@ -3,7 +3,6 @@
 #include <set>
 
 #include <QDir>
-#include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -11,6 +10,8 @@
 #include "util/PathUtil.h"
 
 #include "session/FileIo.h"
+
+#include "JsonFile.h"
 
 #include "DocumentPlaces.h"
 #include "DocumentCovers.h"
@@ -29,11 +30,7 @@ fs::path RecentFiles::defaultStoreFile() { return Util::getConfigFile("recent.js
 
 auto RecentFiles::load() const -> std::vector<Entry> {
     std::vector<Entry> entries;
-    QFile f(qstr(storeFile));
-    if (!f.open(QIODevice::ReadOnly)) {
-        return entries;
-    }
-    for (const auto& v: QJsonDocument::fromJson(f.readAll()).object()["files"].toArray()) {
+    for (const auto& v: readJsonObject(storeFile).value("files").toArray()) {
         const QJsonObject o = v.toObject();
         const QString path = o["path"].toString();
         if (!path.isEmpty()) {

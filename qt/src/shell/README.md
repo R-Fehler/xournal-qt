@@ -13,7 +13,7 @@ review).
 | per-document list models | `PagesModel`, `PageFilterModel`, `OutlineModel`, `LayersModel`, `AnnotationsModel` (+ `Annotations`), `VersionsModel`, `DocumentChapters` |
 | window controllers | `TabManager` (owns each tab's session and view), `CanvasActions` (what acts on one canvas: `app.edit`, `app.reference.edit`), `ReferenceMode`, `VersionCompare`, `PresenterConsole`, `SessionRecovery`, `PageClipboard` |
 | settings-like models | `SettingsModel` (upstream's `settings.xml` keys and the fork's), `ShortcutsModel`, `ToolboxModel` (the rail and the top bar), `ColorPalettes`, `HandwritingSettings`, `ModelDownload`, `Stickers` |
-| platform utilities | `Citations`, `NetFetch`, `Todos`, `TodoCalendar`, `SystemApps`, `SingleInstance`, `LocalUrl`, `PdfPrinting` |
+| platform utilities | `Citations`, `NetFetch`, `Todos`, `TodoCalendar`, `SystemApps`, `SingleInstance`, `LocalUrl`, `PdfPrinting`, `JsonFile` (`readJsonObject`; writing goes through `session/FileIo`) |
 
 **May depend on**: `xqt-canvas`, `xqt-hwr` and below; Qt Widgets, Network, PrintSupport, Quick (image providers),
 DBus (Linux). From upstream: the model, `control/settings`, `pdf/base` (poppler for hit pages), `view/*` (drawing

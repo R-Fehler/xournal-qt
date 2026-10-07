@@ -8,7 +8,6 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QCryptographicHash>
-#include <QFile>
 #include <QStandardPaths>
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
@@ -16,6 +15,8 @@
 
 #include "session/FileIo.h"
 #include "util/PathUtil.h"
+
+#include "JsonFile.h"
 
 namespace xqt {
 
@@ -169,8 +170,7 @@ struct Library::SettingsCache {
 QJsonObject Library::settings() const {
     std::lock_guard lock(cache->mtx);
     if (!cache->json) {
-        QFile f(QString::fromStdString((configDir() / "library.json").string()));
-        cache->json = f.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(f.readAll()).object() : QJsonObject();
+        cache->json = readJsonObject(configDir() / "library.json");
     }
     return *cache->json;
 }
