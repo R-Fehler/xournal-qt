@@ -58,7 +58,8 @@ protected:
         const fs::path file = path(streams ? "streams.pdf" : "table.pdf");
         QPDF q;
         q.processFile(path("source.pdf").string().c_str());
-        QPDFWriter w(q, file.string().c_str());
+        const std::string wFile = file.string();  // (QPDFWriter keeps the pointer)
+        QPDFWriter w(q, wFile.c_str());
         w.setObjectStreamMode(streams ? qpdf_o_generate : qpdf_o_disable);
         w.write();
         return file;
@@ -222,7 +223,8 @@ TEST_F(PdfRevisionsTest, aFileWrittenAnewHasOneRevision) {
         const fs::path out = path(linearize ? "linear.pdf" : "compact.pdf");
         QPDF q;
         q.processFile(file.string().c_str());
-        QPDFWriter w(q, out.string().c_str());
+        const std::string wFile = out.string();  // (QPDFWriter keeps the pointer)
+        QPDFWriter w(q, wFile.c_str());
         w.setObjectStreamMode(qpdf_o_generate);
         w.setLinearization(linearize);
         w.write();

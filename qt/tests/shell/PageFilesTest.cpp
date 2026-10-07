@@ -57,7 +57,8 @@ namespace {
 void protect(const fs::path& in, const fs::path& out, const char* password) {
     QPDF q;
     q.processFile(in.string().c_str());
-    QPDFWriter w(q, out.string().c_str());
+    const std::string wFile = out.string();  // (QPDFWriter keeps the pointer)
+    QPDFWriter w(q, wFile.c_str());
     w.setR6EncryptionParameters(password, "owner of it", true, true, true, true, true, true, qpdf_r3p_full, true);
     w.write();
 }

@@ -126,7 +126,8 @@ TEST_F(PageFilesUiTest, aProtectedPdfAsksForItsPasswordInTheDialog) {
     {
         QPDF q;
         q.processFile((root / "lecture.pdf").string().c_str());
-        QPDFWriter w(q, (root / "locked.pdf").string().c_str());
+        const std::string wFile = (root / "locked.pdf").string();  // (QPDFWriter keeps the pointer)
+        QPDFWriter w(q, wFile.c_str());
         w.setR6EncryptionParameters("sesame", "owner", true, true, true, true, true, true, qpdf_r3p_full, true);
         w.write();
     }

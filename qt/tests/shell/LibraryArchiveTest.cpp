@@ -58,7 +58,8 @@ void makeOldPdf(const fs::path& p) {
             "/BaseFont /Helvetica >> >> >> >>"));
     page.replaceKey("/Contents", QPDFObjectHandle::newStream(&q, "BT /F1 24 Tf 72 700 Td (Hello) Tj ET\n"));
     QPDFPageDocumentHelper(q).addPage(page, false);
-    QPDFWriter w(q, p.string().c_str());
+    const std::string wFile = p.string();  // (QPDFWriter keeps the pointer)
+    QPDFWriter w(q, wFile.c_str());
     w.write();
 }
 

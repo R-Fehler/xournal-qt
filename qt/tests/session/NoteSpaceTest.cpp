@@ -471,7 +471,8 @@ TEST_F(NoteSpaceTest, rotatedPagesGrowOnTheSidesAsShown) {
         q.processFile(path("plain.pdf").string().c_str());
         QPDFPageObjectHelper p = QPDFPageDocumentHelper(q).getAllPages()[0];
         p.getObjectHandle().replaceKey("/Rotate", QPDFObjectHandle::newInteger(90));
-        QPDFWriter w(q, path("rotated.pdf").string().c_str());
+        const std::string wFile = path("rotated.pdf").string();  // (QPDFWriter keeps the pointer)
+        QPDFWriter w(q, wFile.c_str());
         w.write();
     }
     auto r = DocumentSession::loadFile(path("rotated.pdf"));

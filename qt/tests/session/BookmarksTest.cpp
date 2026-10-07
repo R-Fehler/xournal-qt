@@ -221,7 +221,8 @@ TEST_F(BookmarksTest, theOutlineItemInFullAndIncrementalWrites) {
         q.processFile(path("book.pdf").string().c_str());
         const auto pages = QPDFPageDocumentHelper(q).getAllPages();
         EXPECT_TRUE(PdfBookmarks::write(q, {{pages[1].getObjectHandle(), "Proof"}, {pages[3].getObjectHandle(), "Page 4"}}));
-        QPDFWriter w(q, file.string().c_str());
+        const std::string wFile = file.string();  // (QPDFWriter keeps the pointer)
+        QPDFWriter w(q, wFile.c_str());
         w.setObjectStreamMode(qpdf_o_generate);
         w.write();
     }
@@ -296,7 +297,8 @@ TEST_F(BookmarksTest, aPlainPdfTakesThemFromItsOutline) {
         q.processFile(path("book.pdf").string().c_str());
         const auto pages = QPDFPageDocumentHelper(q).getAllPages();
         PdfBookmarks::write(q, {{pages[0].getObjectHandle(), "Page 1"}, {pages[2].getObjectHandle(), "Results"}});
-        QPDFWriter w(q, path("marked.pdf").string().c_str());
+        const std::string wFile = path("marked.pdf").string();  // (QPDFWriter keeps the pointer)
+        QPDFWriter w(q, wFile.c_str());
         w.write();
     }
     auto loaded = DocumentSession::loadFile(path("marked.pdf"));

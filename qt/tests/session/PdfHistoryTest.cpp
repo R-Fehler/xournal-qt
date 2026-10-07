@@ -348,7 +348,8 @@ TEST_F(PdfHistoryTest, versionZeroOfPdfsFromOtherProducersStaysClean) {
         {
             QPDF q;
             q.processFile(made.string().c_str());
-            QPDFWriter w(q, pdf.string().c_str());
+            const std::string wFile = pdf.string();  // (QPDFWriter keeps the pointer)
+            QPDFWriter w(q, wFile.c_str());
             w.setObjectStreamMode(objectStreams ? qpdf_o_generate : qpdf_o_disable);
             w.write();
         }
