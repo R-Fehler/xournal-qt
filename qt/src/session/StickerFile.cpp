@@ -4,7 +4,6 @@
 #include <mutex>
 #include <shared_mutex>
 
-#include "model/DocumentHandler.h"
 #include "model/Element.h"
 #include "model/Image.h"
 #include "model/Layer.h"
@@ -14,6 +13,7 @@
 #include "model/XojPage.h"
 #include "util/Matrix.h"
 
+#include "DetachedDocument.h"
 #include "DocumentSession.h"
 
 using xoj::util::Rectangle;
@@ -21,12 +21,6 @@ using xoj::util::Rectangle;
 namespace xqt::stickers {
 
 namespace {
-/// The document's events go nowhere (it is never open in a session)
-DocumentHandler& handler() {
-    static DocumentHandler h;
-    return h;
-}
-
 void unite(std::optional<Rectangle<double>>& all, const Rectangle<double>& r) {
     if (all) {
         all->unite(r);
@@ -72,7 +66,7 @@ std::unique_ptr<Document> makeDocument(sticky::Group content, Color paper, const
     }
     const double dx = MARGIN - b.x;
     const double dy = MARGIN - b.y;
-    auto doc = std::make_unique<Document>(&handler());
+    auto doc = newDetachedDocument();
     auto page = std::make_shared<XojPage>(std::max(1.0, b.width) + 2 * MARGIN, std::max(1.0, b.height) + 2 * MARGIN,
                                           /*suppressLayerCreation=*/true);
     page->setBackgroundType(PageType(PageTypeFormat::Plain));

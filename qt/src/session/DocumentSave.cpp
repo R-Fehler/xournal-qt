@@ -37,7 +37,6 @@
 #include "control/settings/Settings.h"
 #include "control/xojfile/SaveHandler.h"
 #include "model/Document.h"
-#include "model/DocumentHandler.h"
 #include "model/Layer.h"
 #include "model/XojPage.h"
 #include "pdf/base/XojPdfPage.h"
@@ -52,6 +51,7 @@
 #include "view/background/BackgroundFlags.h"
 
 #include "AppContext.h"
+#include "DetachedDocument.h"
 #include "DocumentImages.h"
 #include "DocumentMode.h"
 #include "DocumentSaveTask.h"
@@ -81,12 +81,6 @@ QThreadPool& savePool() {
     return *pool;
 }
 
-/// Receives the events of the copies. It has no listeners.
-DocumentHandler& copyHandler() {
-    static DocumentHandler handler;
-    return handler;
-}
-
 fs::path backgroundOf(Document& doc) {
     std::shared_lock lock(doc);
     return doc.getPdfFilepath();
@@ -95,7 +89,7 @@ fs::path backgroundOf(Document& doc) {
 /// What the writers read of a document, copied (the caller holds its read lock). Its PDF is not loaded: the writers
 /// only need its file and number of pages.
 std::unique_ptr<Document> snapshotOf(const Document& doc) {
-    auto copy = std::make_unique<Document>(&copyHandler());
+    auto copy = newDetachedDocument();
     copy->setFilepath(doc.getFilepath());
     copy->setPdfAttributes(doc.getPdfFilepath(), doc.isAttachPdf());
     copy->setPathStorageMode(doc.getPathStorageMode());

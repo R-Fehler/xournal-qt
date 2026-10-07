@@ -46,6 +46,7 @@
 
 #include "AppContext.h"
 #include "audio/DocumentAudio.h"
+#include "DetachedDocument.h"
 #include "DocumentMode.h"
 #include "DocumentSaveTask.h"
 #include "DocumentImages.h"
@@ -100,12 +101,6 @@ void DocumentSession::addPageUndoAction(UndoActionPtr action) {
 }
 
 namespace {
-/// Receives the events of documents that are not owned by a session yet (while loading). It has no listeners.
-DocumentHandler& detachedHandler() {
-    static DocumentHandler handler;
-    return handler;
-}
-
 using fileio::hasExtension;
 }  // namespace
 
