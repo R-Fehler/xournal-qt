@@ -6,21 +6,14 @@
 #include <cmath>
 #include <cstdlib>
 
-#include <QClipboard>
-#include <QFile>
-#include <QGuiApplication>
-#include <QMimeData>
 #include <QUrl>
 
-#include "control/ToolEnums.h"
-#include "control/ToolHandler.h"
 #include "control/settings/Settings.h"
 
+#include "CanvasActions.h"
 #include "CanvasView.h"
-#include "StickyNotes.h"
 #include "session/AppContext.h"
 #include "PageSketches.h"
-#include "session/StickyNote.h"
 #include "PagesModel.h"
 #include "Thumbnails.h"
 #include "TabManager.h"
@@ -35,6 +28,18 @@ const char* const CUSTOM = "xournalQt";  // our settings (in upstream's settings
 
 ReferenceMode::ReferenceMode(TabManager& tabs, Settings* settings, QObject* parent):
         QObject(parent), tabs(tabs), settings(settings), pages(std::make_unique<PagesModel>()) {
+    // What acts on its canvas: as on the notes, changes only while it is written in
+    CanvasActions::Policy policy;
+    policy.readingOnly = [this] { return !editing(); };
+    policy.copiedText = tr("Copied from the reference");
+    policy.textCopiedText = tr("Text copied from the reference");
+    edits = std::make_unique<CanvasActions>(std::move(policy));
+    connect(edits.get(), &CanvasActions::notice, this, &ReferenceMode::copied);
+    // (hasSelection: elements, notes, PDF text)
+    connect(edits.get(), &CanvasActions::selectionChanged, this, &ReferenceMode::selectionChanged);
+    connect(edits.get(), &CanvasActions::pdfTextSelectionChanged, this, &ReferenceMode::selectionChanged);
+    // (written in or not: what may be done with the selection)
+    connect(this, &ReferenceMode::changed, edits.get(), &CanvasActions::selectionChanged);
     connect(&lock, &ScrollLock::lockedChanged, this, &ReferenceMode::scrollLockChanged);
     connect(&tabs, &TabManager::currentTabChanged, this, &ReferenceMode::update);
     connect(&tabs, &TabManager::referencesChanged, this, &ReferenceMode::update);
@@ -49,10 +54,12 @@ ReferenceMode::~ReferenceMode() {
     for (auto& c: connections) {
         disconnect(c);
     }
+    edits->setView(nullptr);
     pages->setSession(nullptr);
 }
 
 QObject* ReferenceMode::pagesModel() const { return pages.get(); }
+QObject* ReferenceMode::editObject() const { return edits.get(); }
 
 void ReferenceMode::setPagesShown(bool shown) {
     shown = shown && shownSession;
@@ -93,33 +100,11 @@ void ReferenceMode::update() {
         pages->setSession(s);
     }
     if (v && s) {
-        // (its own page: the session's is the tab's view's when it shows the same document)
-        connections.push_back(connect(v, &CanvasView::currentPageChanged, this, &ReferenceMode::pageChanged));
         connections.push_back(connect(s, &DocumentSession::filePathChanged, this, &ReferenceMode::changed));
         connections.push_back(
                 connect(s, &DocumentSession::undoRedoStateChanged, this, &ReferenceMode::undoRedoChanged));
         connections.push_back(connect(v, &CanvasView::markdownUndoChanged, this, &ReferenceMode::undoRedoChanged));
         connections.push_back(connect(v, &CanvasView::textEditingChanged, this, &ReferenceMode::undoRedoChanged));
-        connections.push_back(connect(v, &CanvasView::pagesChanged, this, &ReferenceMode::pageChanged));
-        connections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
-                                      &ReferenceMode::zoomChanged));
-        connections.push_back(connect(&v->getViewController(), &ViewController::zoom100Changed, this,
-                                      &ReferenceMode::zoomChanged));
-        connections.push_back(connect(v, &CanvasView::selectionChanged, this, &ReferenceMode::selectionChanged));
-        connections.push_back(connect(v, &CanvasView::noteSelectionChanged, this, &ReferenceMode::noteSelectionChanged));
-        // (select more: available, on or off, the count)
-        connections.push_back(connect(v, &CanvasView::selectMoreChanged, this, &ReferenceMode::selectMoreChanged));
-        connections.push_back(connect(v, &CanvasView::selectionChanged, this, &ReferenceMode::selectMoreChanged));
-        connections.push_back(connect(v, &CanvasView::noteSelectionChanged, this, &ReferenceMode::selectMoreChanged));
-        connections.push_back(
-                connect(&s->getApp(), &AppContext::activeToolChanged, this, &ReferenceMode::selectMoreChanged));
-        connections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &ReferenceMode::selectionChanged));
-        connections.push_back(connect(v, &CanvasView::pdfTextSelectionCleared, this, &ReferenceMode::selectionChanged));
-        connections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &ReferenceMode::pdfTextSelected));
-        connections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &ReferenceMode::pdfTextSelectionChanged));
-        connections.push_back(
-                connect(v, &CanvasView::pdfTextSelectionCleared, this, &ReferenceMode::pdfTextSelectionChanged));
-        connections.push_back(connect(v, &CanvasView::navigationChanged, this, &ReferenceMode::navigationChanged));
         // Links: offered as on the main canvas (a tap can be a mistake); followLink goes there
         connections.push_back(connect(v, &CanvasView::linkTapped, this, &ReferenceMode::linkTapped));
         // A long press or right click: the window offers what can be done there
@@ -136,15 +121,10 @@ void ReferenceMode::update() {
         connections.push_back(connect(v, &CanvasView::inkSwept, this,
                                       [this, v](int page, const QPolygonF& path) { Q_EMIT inkSwept(v, page, path); }));
     }
+    edits->setView(v && s ? v : nullptr);
     relock();
     Q_EMIT changed();
-    Q_EMIT pageChanged();
-    Q_EMIT zoomChanged();
     Q_EMIT selectionChanged();
-    Q_EMIT noteSelectionChanged();
-    Q_EMIT selectMoreChanged();
-    Q_EMIT pdfTextSelectionChanged();
-    Q_EMIT navigationChanged();
     if (!active()) {
         setFocused(false);
     }
@@ -234,20 +214,6 @@ QString ReferenceMode::title() const {
     return shownSession ? QString::fromStdString(shownSession->getDisplayName()) : QString();
 }
 
-int ReferenceMode::pageNumber() const {
-    return shownView ? static_cast<int>(shownView->currentPageNo()) + 1 : 0;
-}
-
-int ReferenceMode::pageCount() const { return shownView ? static_cast<int>(shownView->pageCount()) : 0; }
-
-int ReferenceMode::zoomPercent() const {
-    if (!shownView) {
-        return 100;
-    }
-    const auto& vc = shownView->getViewController();
-    return static_cast<int>(std::lround(vc.zoom() / vc.zoom100() * 100.0));
-}
-
 void ReferenceMode::setFocused(bool on) {
     if (on != focus) {
         focus = on;
@@ -256,75 +222,9 @@ void ReferenceMode::setFocused(bool on) {
 }
 
 bool ReferenceMode::hasSelection() const {
-    // (elements, or several notes with elements: the selection's pill; a single note has its own, as on the notes)
-    return shownView &&
-           (shownView->getSelection() || shownView->mixed().active() || shownView->hasPdfTextSelection());
+    // (elements, or several notes with elements, or PDF text; a single note has its own pill, as on the notes)
+    return edits->hasSelection() || edits->pdfTextIsSelected();
 }
-
-bool ReferenceMode::selectMoreOffered() const { return shownView && shownView->offersSelectMore(); }
-bool ReferenceMode::selectMoreAvailable() const { return shownView && shownView->canSelectMore(); }
-bool ReferenceMode::selectingMore() const { return shownView && shownView->selectingMore(); }
-void ReferenceMode::setSelectingMore(bool on) {
-    if (shownView) {
-        shownView->setSelectingMore(on);  // (only while it is written in: CanvasView::canSelectMore)
-    }
-}
-int ReferenceMode::selectedCount() const { return shownView ? shownView->selectedCount() : 0; }
-bool ReferenceMode::canGroup() const { return shownView && editing() && shownView->groupState().canGroup; }
-bool ReferenceMode::canUngroup() const { return shownView && editing() && shownView->groupState().canUngroup; }
-bool ReferenceMode::groupSelection() { return shownView && editing() && shownView->groupSelection(); }
-bool ReferenceMode::ungroupSelection() { return shownView && editing() && shownView->ungroupSelection(); }
-
-bool ReferenceMode::noteSelected() const { return shownView && shownView->notes().hasSelection(); }
-QColor ReferenceMode::noteColor() const {
-    if (const auto look = shownView ? shownView->notes().selectedLook() : std::nullopt) {
-        return QColor(look->color.red, look->color.green, look->color.blue);
-    }
-    return {};
-}
-void ReferenceMode::setNoteColor(const QColor& color) {
-    if (shownView && editing()) {
-        shownView->notes().setColor(Color(static_cast<uint8_t>(color.red()), static_cast<uint8_t>(color.green()),
-                                          static_cast<uint8_t>(color.blue())));
-    }
-}
-bool ReferenceMode::noteCovers() const {
-    const auto look = shownView ? shownView->notes().selectedLook() : std::nullopt;
-    return look && look->cover;
-}
-void ReferenceMode::setNoteCovers(bool covers) {
-    if (shownView && editing()) {
-        shownView->notes().setCover(covers);
-    }
-}
-QRectF ReferenceMode::noteBox() const {
-    return shownView ? shownView->getViewController().viewToScreen(shownView->notes().selectedViewBox()) : QRectF();
-}
-bool ReferenceMode::writeNoteText() {
-    return shownView && editing() && !shownSession->isReadOnly() && shownView->writeNoteText();
-}
-bool ReferenceMode::copyStickyNote() {
-    const bool ok = shownView && (shownView->mixed().active() ? shownView->mixed().copy()
-                                                              : shownView->notes().copySelected());
-    if (ok) {
-        Q_EMIT copied(tr("Copied from the reference"));
-    }
-    return ok;
-}
-bool ReferenceMode::cutStickyNote() {
-    if (!shownView || !editing()) {
-        return false;
-    }
-    return shownView->mixed().active() ? shownView->mixed().cut() : shownView->notes().cutSelected();
-}
-void ReferenceMode::deleteStickyNote() {
-    if (shownView && editing()) {
-        shownView->notes().deleteSelected();
-    }
-}
-
-bool ReferenceMode::canGoBack() const { return shownView && shownView->canGoBack(); }
-bool ReferenceMode::canGoForward() const { return shownView && shownView->canGoForward(); }
 
 double ReferenceMode::ratio() const {
     double r = 0.5;
@@ -422,40 +322,6 @@ void ReferenceMode::popOut() {
     tabs.setCurrentIndex(tabs.indexOf(shown));
 }
 
-void ReferenceMode::fitWidth() {
-    if (shownView) {
-        // The width of its current page (ViewController::fitWidthZoom), not of its widest one
-        shownView->getViewController().fitWidth(shownView->currentPageNo());
-    }
-}
-
-void ReferenceMode::zoomIn() {
-    if (shownView) {
-        auto& vc = shownView->getViewController();
-        vc.zoomBy(1.2, QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
-    }
-}
-
-void ReferenceMode::zoomToRealSize() {
-    if (shownView) {
-        auto& vc = shownView->getViewController();
-        vc.setZoom(vc.zoom100(), QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
-    }
-}
-
-void ReferenceMode::zoomOut() {
-    if (shownView) {
-        auto& vc = shownView->getViewController();
-        vc.zoomBy(1 / 1.2, QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
-    }
-}
-
-void ReferenceMode::goToPage(int index) {
-    if (shownView && index >= 0 && static_cast<size_t>(index) < shownView->pageCount()) {
-        shownView->jumpToPage(static_cast<size_t>(index));
-    }
-}
-
 bool ReferenceMode::isSelf() const { return active() && tabs.isSelfReference(tabs.currentIndex()); }
 
 void ReferenceMode::showBeside(int page) {
@@ -464,7 +330,7 @@ void ReferenceMode::showBeside(int page) {
         return;
     }
     if (tabs.isSelfReference(current)) {
-        goToPage(page);  // (Back returns to where it was)
+        edits->goToPage(page);  // (Back returns to where it was)
         return;
     }
     showTab(current);  // (where the tab is)
@@ -472,18 +338,6 @@ void ReferenceMode::showBeside(int page) {
         // A new view opens there
         shownView->setCurrentPageNo(static_cast<size_t>(page));
         shownView->getViewController().scrollToPage(static_cast<size_t>(page));
-    }
-}
-
-void ReferenceMode::navigateBack() {
-    if (shownView) {
-        shownView->navigateBack();
-    }
-}
-
-void ReferenceMode::navigateForward() {
-    if (shownView) {
-        shownView->navigateForward();
     }
 }
 
@@ -495,176 +349,23 @@ void ReferenceMode::followLink(const QString& uri, int page) {
     } else if (!uri.isEmpty()) {
         Q_EMIT openExternal(uri);
     } else {
-        goToPage(page);
+        edits->goToPage(page);
     }
 }
 
 bool ReferenceMode::copy() {
-    if (!shownView) {
-        return false;
+    if (edits->pdfTextIsSelected()) {
+        return edits->copyPdfText();  // (unselected once copied; refused where the PDF does not allow it)
     }
-    if (shownView->hasPdfTextSelection() && !copyingAllowed()) {
-        return false;
-    }
-    if (shownView->copyPdfText()) {
-        shownView->clearPdfTextSelection();
-        Q_EMIT copied(tr("Text copied from the reference"));
-        return true;
-    }
-    if (shownView->copySelection()) {
+    if (edits->copySelection()) {
         shownView->clearSelection();  // (copied: the elements go back where they were)
-        Q_EMIT copied(tr("Copied from the reference"));
         return true;
     }
     return false;
 }
 
-void ReferenceMode::clearSelection() {
-    if (shownView) {
-        shownView->clearPdfTextSelection();
-        if (shownView->hasAnySelection()) {
-            shownView->clearSelection();  // (elements, a note, several notes)
-        }
-    }
-}
-
-// --- the selections of the reference, for the same pills as the notes' (the actions of AppController) ------------
-
-bool ReferenceMode::pdfTextIsSelected() const { return shownView && shownView->hasPdfTextSelection(); }
-
-// (on the screen: the canvas item's coordinates, the canvas may be turned)
-QRectF ReferenceMode::pdfSelectionEnds() const {
-    return shownView ? shownView->getViewController().viewToScreenEnds(shownView->pdfSelectionEnds()) : QRectF();
-}
-
-QRectF ReferenceMode::pdfSelectionBox() const {
-    return shownView ? shownView->getViewController().viewToScreen(shownView->pdfSelectionBox()) : QRectF();
-}
-
-bool ReferenceMode::selectPdfTextAt(qreal x, qreal y) {
-    if (!shownView) {
-        return false;
-    }
-    // The same word again: its whole line (as on the notes)
-    const QPointF where = shownView->getViewController().screenToView(QPointF(x, y));
-    const bool again = shownView->hasPdfTextSelection() &&
-                       shownView->pdfSelectionEnds().adjusted(-8, -8, 8, 8).contains(where);
-    const bool selected = shownView->selectPdfTextAt(where, again);
-    Q_EMIT pdfTextSelectionChanged();
-    return selected;
-}
-
-bool ReferenceMode::dragPdfSelection(qreal x, qreal y, bool startEnd) {
-    const bool moved = shownView &&
-                       shownView->dragPdfSelection(shownView->getViewController().screenToView(QPointF(x, y)), startEnd);
-    if (moved) {
-        Q_EMIT pdfTextSelectionChanged();
-    }
-    return moved;
-}
-
-void ReferenceMode::showPdfSelection() {
-    if (shownView) {
-        shownView->scrollToPdfSelection();
-    }
-}
-
-bool ReferenceMode::markPdfText(const QString& mode) {
-    // (for reading only the view marks nothing)
-    const CanvasView::PdfTextMode m = mode == "underline"       ? CanvasView::PdfTextMode::Underline
-                                      : mode == "strikethrough" ? CanvasView::PdfTextMode::Strikethrough
-                                                                : CanvasView::PdfTextMode::Highlight;
-    return shownView && editing() && shownView->markPdfText(m);
-}
-
 QString ReferenceMode::shownFile() const {
     return shownSession ? QString::fromStdString(shownSession->documentFile().string()) : QString();
-}
-
-QString ReferenceMode::selectedText() const { return shownView ? shownView->selectedText() : QString(); }
-
-bool ReferenceMode::copyingAllowed() {
-    if (shownSession && !shownSession->allowsCopying()) {
-        // A PDF whose owner does not allow copying its text (opened without its owner password): honoured, as on the
-        // notes
-        Q_EMIT copied(tr("The author of this PDF does not allow copying its text"));
-        return false;
-    }
-    return true;
-}
-
-bool ReferenceMode::copyPdfText() {
-    if (!copyingAllowed()) {
-        return false;
-    }
-    const bool ok = shownView && shownView->copyPdfText();
-    if (ok) {
-        shownView->clearPdfTextSelection();
-        Q_EMIT copied(tr("Text copied from the reference"));
-    }
-    return ok;
-}
-
-void ReferenceMode::clearPdfTextSelection() {
-    if (shownView) {
-        shownView->clearPdfTextSelection();
-    }
-}
-
-bool ReferenceMode::copySelection() {
-    const bool ok = shownView && shownView->copySelection();
-    if (ok) {
-        Q_EMIT copied(tr("Copied from the reference"));
-    }
-    return ok;
-}
-
-bool ReferenceMode::cutSelection() { return shownView && editing() && shownView->cutSelection(); }
-
-void ReferenceMode::deleteSelection() {
-    if (shownView && editing()) {
-        shownView->deleteSelection();
-    }
-}
-
-bool ReferenceMode::pasteElements() {
-    return shownView && editing() && !shownSession->isReadOnly() && shownView->pasteElements();
-}
-
-bool ReferenceMode::pasteAt(qreal x, qreal y) {
-    return shownView && editing() && !shownSession->isReadOnly() &&
-           shownView->pasteElements(shownView->getViewController().screenToView(QPointF(x, y)));
-}
-
-bool ReferenceMode::canPaste() const {
-    const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
-    return mime && (mime->hasImage() || mime->hasText() || mime->hasFormat("application/xournal") ||
-                    mime->hasFormat(sticky::CLIPBOARD_MIME) || mime->hasFormat(sticky::GROUP_CLIPBOARD_MIME));
-}
-
-void ReferenceMode::selectAllOnPage() {
-    if (!shownView) {
-        return;
-    }
-    ToolHandler* tools = shownSession->getToolHandler();
-    if (tools->getToolType() != TOOL_SELECT_RECT && tools->getToolType() != TOOL_SELECT_REGION) {
-        tools->selectTool(TOOL_SELECT_REGION);  // (as on the notes: the selection is at hand)
-        tools->fireToolChanged();
-    }
-    shownView->selectAllOnPage();
-}
-
-bool ReferenceMode::insertImage(const QUrl& file) {
-    QFile f(file.toLocalFile());
-    if (!shownView || !editing() || !f.open(QIODevice::ReadOnly)) {
-        return false;
-    }
-    ToolHandler* tools = shownSession->getToolHandler();
-    if (tools->getToolType() != TOOL_SELECT_RECT && tools->getToolType() != TOOL_SELECT_REGION) {
-        tools->selectTool(TOOL_SELECT_RECT);  // (so that the image can be moved and resized right away)
-        tools->fireToolChanged();
-    }
-    return shownView->insertImage(f.readAll());
 }
 
 }  // namespace xqt

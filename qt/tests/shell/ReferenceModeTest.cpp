@@ -24,6 +24,7 @@
 #include "undo/UndoRedoHandler.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
+#include "shell/CanvasActions.h"
 #include "shell/ReferenceMode.h"
 #include "shell/TabManager.h"
 #include "session/VersionCache.h"
@@ -97,12 +98,12 @@ TEST(ReferenceMode, aTabShowsItsOwnDocumentBesideItself) {
     EXPECT_FALSE(t.ref().editing()) << "for reading at first";
     second->getViewController().setViewSize(QSizeF(400, 800));
     QCoreApplication::processEvents();
-    EXPECT_EQ(t.ref().pageNumber(), 5) << "it starts where the tab is";
+    EXPECT_EQ(t.ref().actions().pageNumber(), 5) << "it starts where the tab is";
 
     // Its own page: the page number of its pill follows it, the tab's stays
-    QSignalSpy pageChanged(&t.ref(), &ReferenceMode::pageChanged);
-    t.ref().goToPage(8);
-    EXPECT_EQ(t.ref().pageNumber(), 9);
+    QSignalSpy pageChanged(&t.ref().actions(), &CanvasActions::pageChanged);
+    t.ref().actions().goToPage(8);
+    EXPECT_EQ(t.ref().actions().pageNumber(), 9);
     EXPECT_GE(pageChanged.count(), 1);
     EXPECT_EQ(t.c.pageNumber(), 5);
     EXPECT_EQ(t.tabs().session(0)->getCurrentPageNo(), 4u);
@@ -110,7 +111,7 @@ TEST(ReferenceMode, aTabShowsItsOwnDocumentBesideItself) {
     // Keys with the reference: its pages, not the tab's
     t.ref().setFocused(true);
     t.c.previousPage();
-    EXPECT_EQ(t.ref().pageNumber(), 8);
+    EXPECT_EQ(t.ref().actions().pageNumber(), 8);
     EXPECT_EQ(t.c.pageNumber(), 5);
     t.ref().setFocused(false);
 
@@ -121,12 +122,12 @@ TEST(ReferenceMode, aTabShowsItsOwnDocumentBesideItself) {
     EXPECT_EQ(t.c.currentTab(), 0);
     EXPECT_TRUE(t.ref().isSelf());
     EXPECT_EQ(t.c.pageNumber(), 8);
-    EXPECT_EQ(t.ref().pageNumber(), 5);
+    EXPECT_EQ(t.ref().actions().pageNumber(), 5);
     EXPECT_DOUBLE_EQ(second->getViewController().zoom(), zoom);
 
     // "Show beside" of a page while it is open: it goes there
     t.ref().showBeside(1);
-    EXPECT_EQ(t.ref().pageNumber(), 2);
+    EXPECT_EQ(t.ref().actions().pageNumber(), 2);
     EXPECT_EQ(t.ref().canvas(), second);
 
     // Another tab: its own reference (none); back: the second view again
@@ -153,7 +154,7 @@ TEST(ReferenceMode, theSameDocumentBesideItselfPopsOutIntoItsOwnTab) {
     ASSERT_TRUE(t.ref().isSelf());
     t.ref().canvas()->getViewController().setViewSize(QSizeF(400, 800));
     QCoreApplication::processEvents();
-    EXPECT_EQ(t.ref().pageNumber(), 7);
+    EXPECT_EQ(t.ref().actions().pageNumber(), 7);
     EXPECT_EQ(t.c.pageNumber(), mainPage);
     // "Show as a tab": it has a tab, this one: the tab goes to the place of the reference (Back returns)
     t.ref().popOut();
@@ -466,8 +467,8 @@ TEST(ReferenceMode, theGridListsThePagesOfTheReferenceWhileItIsShown) {
     EXPECT_EQ(pages->rowCount(), 5);
     auto* mainPages = qobject_cast<QAbstractItemModel*>(t.c.pagesModel());
     EXPECT_EQ(mainPages->rowCount(), 1) << "the page sidebar keeps the notes' pages";
-    t.ref().goToPage(3);
-    EXPECT_EQ(t.ref().pageNumber(), 4);
+    t.ref().actions().goToPage(3);
+    EXPECT_EQ(t.ref().actions().pageNumber(), 4);
     t.ref().setPagesShown(false);
     EXPECT_EQ(pages->rowCount(), 0) << "it follows nothing while it is not shown";
     // Closing the reference closes its grid
@@ -485,19 +486,19 @@ TEST(ReferenceMode, aLinkToAPageOfTheDocumentOpensInTheReference) {
     t.c.jumpToPage(1);
     ASSERT_TRUE(t.c.followDocumentLink("#page=6", "reference"));
     ASSERT_TRUE(t.ref().isSelf());
-    EXPECT_EQ(t.ref().pageNumber(), 6);
+    EXPECT_EQ(t.ref().actions().pageNumber(), 6);
     EXPECT_EQ(t.c.pageNumber(), 2);
     // Open already: it goes there (Back returns)
     ASSERT_TRUE(t.c.followDocumentLink("#page=9", "reference"));
-    EXPECT_EQ(t.ref().pageNumber(), 9);
-    EXPECT_TRUE(t.ref().canGoBack());
+    EXPECT_EQ(t.ref().actions().pageNumber(), 9);
+    EXPECT_TRUE(t.ref().actions().canGoBack());
     // "Here" still goes there in the tab
     ASSERT_TRUE(t.c.followDocumentLink("#page=4", "here"));
     EXPECT_EQ(t.c.pageNumber(), 4);
-    EXPECT_EQ(t.ref().pageNumber(), 9);
+    EXPECT_EQ(t.ref().actions().pageNumber(), 9);
     // A PDF link to a page ("In the reference" of the link popup)
     t.ref().showBeside(2);
-    EXPECT_EQ(t.ref().pageNumber(), 3);
+    EXPECT_EQ(t.ref().actions().pageNumber(), 3);
 }
 
 namespace {
@@ -524,7 +525,7 @@ TEST(ReferenceMode, scrollingTogetherIsLockedPerPairAndRemembered) {
     QCoreApplication::processEvents();
     EXPECT_FALSE(t.ref().scrollLocked()) << "off for a new pair";
     main->jumpToPage(3);
-    t.ref().goToPage(1);
+    t.ref().actions().goToPage(1);
     QSignalSpy lockChanged(&t.ref(), &ReferenceMode::scrollLockChanged);
     t.ref().setScrollLocked(true);
     EXPECT_TRUE(t.ref().scrollLocked());
@@ -532,9 +533,9 @@ TEST(ReferenceMode, scrollingTogetherIsLockedPerPairAndRemembered) {
     EXPECT_EQ(t.ref().scrollLock().pageOffset(), -2);
     main->jumpToPage(6);
     EXPECT_EQ(lockedPage(book), 4u) << "page 4 beside page 2: page 7 beside page 5";
-    t.ref().goToPage(7);
+    t.ref().actions().goToPage(7);
     EXPECT_EQ(lockedPage(main), 9u) << "the reference moves the notes too";
-    t.ref().zoomIn();
+    t.ref().actions().zoomIn();
     EXPECT_NEAR(main->getViewController().zoom() / main->getViewController().fitWidthZoom(9),
                 book->getViewController().zoom() / book->getViewController().fitWidthZoom(7), 1e-6)
             << "zoomed the same, relative to the width of each half";
@@ -618,7 +619,7 @@ TEST(ReferenceMode, theTextOfAPdfThatForbidsCopyingIsNotCopiedFromTheReference) 
 
     select();
     clipboard->setText("before");
-    EXPECT_FALSE(c.reference().copyPdfText()) << "the pill's Copy";
+    EXPECT_FALSE(c.reference().actions().copyPdfText()) << "the pill's Copy";
     EXPECT_EQ(clipboard->text().toStdString(), "before");
     select();
     EXPECT_FALSE(c.reference().copy()) << "the reference's own Copy";
@@ -631,6 +632,6 @@ TEST(ReferenceMode, theTextOfAPdfThatForbidsCopyingIsNotCopiedFromTheReference) 
     // Allowed: copied (the same steps)
     v->getSession().setPermissions(true, true);
     select();
-    EXPECT_TRUE(c.reference().copyPdfText());
+    EXPECT_TRUE(c.reference().actions().copyPdfText());
     EXPECT_TRUE(clipboard->text().contains("copied")) << clipboard->text().toStdString();
 }

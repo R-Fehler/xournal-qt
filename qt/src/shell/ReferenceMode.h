@@ -10,6 +10,9 @@
  * the notes. Where the divider is (the share of the main document) and on which side the reference is are settings
  * of the application, the same for every tab.
  *
+ * What acts on the reference's canvas (its selection, notes, PDF text, the clipboard, its page and zoom) is `edit`,
+ * the same CanvasActions the notes have (`app.edit`): the pills of a canvas take either as their target.
+ *
  * Keys: the window's shortcuts act on the main document; while the reference has the focus (a tap on it or on its
  * pill), copying, zooming, fitting the width and going back and forth act on the reference (AppController); while it
  * is also written in (the edit switch), undo, redo, cut, paste, delete and select all as well.
@@ -39,6 +42,7 @@ class Settings;
 
 namespace xqt {
 
+class CanvasActions;
 class CanvasView;
 class DocumentSession;
 class PagesModel;
@@ -54,32 +58,15 @@ class ReferenceMode final: public QObject {
     Q_PROPERTY(QString title READ title NOTIFY changed)
     /// The reference is the current tab's own document, in a second view (qt/self-reference)
     Q_PROPERTY(bool self READ isSelf NOTIFY changed)
-    Q_PROPERTY(int pageNumber READ pageNumber NOTIFY pageChanged)
-    Q_PROPERTY(int pageCount READ pageCount NOTIFY pageChanged)
-    Q_PROPERTY(int zoomPercent READ zoomPercent NOTIFY zoomChanged)
+    /// What acts on the reference's canvas: selection, notes, PDF text, clipboard, page, zoom, Back (CanvasActions,
+    /// the same as the notes' `app.edit`; changes only while the reference is written in)
+    Q_PROPERTY(QObject* edit READ editObject CONSTANT)
     /// The reference is written in (the edit switch of its pill, per tab; off: for reading only).
     Q_PROPERTY(bool editing READ editing WRITE setEditing NOTIFY changed)
     /// The reference has the keyboard focus (set by the window: a tap on it or on its pill).
     Q_PROPERTY(bool focused READ focused WRITE setFocused NOTIFY focusedChanged)
-    /// Elements or PDF text are selected in the reference (to copy them).
+    /// Something to copy is selected in the reference: elements, notes or PDF text (its pill's Copy).
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
-    /// Select more, as on the notes (AppController's properties of the same names; qt/touch-multiselect)
-    Q_PROPERTY(bool selectMoreOffered READ selectMoreOffered NOTIFY selectMoreChanged)
-    Q_PROPERTY(bool selectMoreAvailable READ selectMoreAvailable NOTIFY selectMoreChanged)
-    Q_PROPERTY(bool selectingMore READ selectingMore WRITE setSelectingMore NOTIFY selectMoreChanged)
-    Q_PROPERTY(int selectedCount READ selectedCount NOTIFY selectMoreChanged)
-    /// Groups, as on the notes (AppController's properties of the same names; only while it is written in)
-    Q_PROPERTY(bool canGroup READ canGroup NOTIFY selectionChanged)
-    Q_PROPERTY(bool canUngroup READ canUngroup NOTIFY selectionChanged)
-    /// A sticky note is selected in the reference: the note's pill, as on the notes (AppController's properties of the
-    /// same names; changing it only while the reference is written in)
-    Q_PROPERTY(bool noteSelected READ noteSelected NOTIFY noteSelectionChanged)
-    Q_PROPERTY(QColor noteColor READ noteColor WRITE setNoteColor NOTIFY noteSelectionChanged)
-    Q_PROPERTY(bool noteCovers READ noteCovers WRITE setNoteCovers NOTIFY noteSelectionChanged)
-    /// PDF text is selected in the reference (the same name as AppController's: the pills of a canvas take either)
-    Q_PROPERTY(bool pdfTextIsSelected READ pdfTextIsSelected NOTIFY pdfTextSelectionChanged)
-    Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY navigationChanged)
-    Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY navigationChanged)
     /// The pages of the reference, for its page grid (xqt::PagesModel; the page sidebar keeps the main document's).
     /// It follows the reference only while the grid is shown (pagesShown): its previews come first then.
     Q_PROPERTY(QObject* pages READ pagesModel CONSTANT)
@@ -106,40 +93,18 @@ public:
     bool pagesShown() const { return gridShown; }
     void setPagesShown(bool shown);
     CanvasView* canvas() const;
+    /// What acts on the reference's canvas (CanvasActions)
+    CanvasActions& actions() const { return *edits; }
+    QObject* editObject() const;
     bool active() const;
     bool isSelf() const;
     int tab() const;
     QString title() const;
-    int pageNumber() const;
-    int pageCount() const;
-    int zoomPercent() const;
     bool focused() const;
     bool editing() const;
     void setEditing(bool on);
     void setFocused(bool on);
     bool hasSelection() const;
-    bool selectMoreOffered() const;
-    bool selectMoreAvailable() const;
-    bool selectingMore() const;
-    void setSelectingMore(bool on);
-    int selectedCount() const;
-    bool canGroup() const;
-    bool canUngroup() const;
-    Q_INVOKABLE bool groupSelection();
-    Q_INVOKABLE bool ungroupSelection();
-    bool noteSelected() const;
-    QColor noteColor() const;
-    void setNoteColor(const QColor& color);
-    bool noteCovers() const;
-    void setNoteCovers(bool covers);
-    /// The selected note in the reference's canvas coordinates (empty: none)
-    Q_INVOKABLE QRectF noteBox() const;
-    Q_INVOKABLE bool writeNoteText();
-    Q_INVOKABLE bool copyStickyNote();
-    Q_INVOKABLE bool cutStickyNote();
-    Q_INVOKABLE void deleteStickyNote();
-    bool canGoBack() const;
-    bool canGoForward() const;
     double ratio() const;
     void setRatio(double ratio);
     bool onLeft() const;
@@ -167,59 +132,23 @@ public:
     /// Ctrl+Shift+Tab then go between the two. The tab's own document (it has one tab): the tab goes to the place of
     /// the reference (Back returns), and the split closes.
     Q_INVOKABLE void popOut();
-    Q_INVOKABLE void fitWidth();
-    Q_INVOKABLE void zoomIn();
-    Q_INVOKABLE void zoomOut();
-    /// 100 %: the pages as large as the paper (ScreenCalibration.h)
-    Q_INVOKABLE void zoomToRealSize();
-    /// Go to a page of the reference (0-based), remembering the place for "back".
-    Q_INVOKABLE void goToPage(int index);
-    Q_INVOKABLE void navigateBack();
-    Q_INVOKABLE void navigateForward();
     /// Follow a link tapped in the reference: a page of it, a link to a document (openDocumentLink), or an external
     /// link (openExternal).
     Q_INVOKABLE void followLink(const QString& uri, int page);
-    /// Copy what is selected in the reference (PDF text, else elements). False if nothing is selected.
+    /// Copy what is selected in the reference (PDF text, else elements; then unselected). False if nothing is
+    /// selected (or the PDF does not allow copying its text).
     Q_INVOKABLE bool copy();
-    Q_INVOKABLE void clearSelection();
-
-    // --- the selections of the reference: the API of AppController that the pills of a canvas use (CanvasPills) ---
-    bool pdfTextIsSelected() const;
-    Q_INVOKABLE QRectF pdfSelectionEnds() const;
-    Q_INVOKABLE QRectF pdfSelectionBox() const;
-    Q_INVOKABLE bool selectPdfTextAt(qreal x, qreal y);
-    Q_INVOKABLE bool dragPdfSelection(qreal x, qreal y, bool startEnd);
-    Q_INVOKABLE void showPdfSelection();
-    /// Mark the selected PDF text ("highlight", "underline", "strikethrough"): only while the reference is written in.
-    Q_INVOKABLE bool markPdfText(const QString& mode);
-    Q_INVOKABLE bool copyPdfText();
-    /// The selected text of the reference (PDF text, or of the text being written in it): the look-up actions.
-    Q_INVOKABLE QString selectedText() const;
     /// The file of the document shown ("" without one).
     QString shownFile() const;
-    Q_INVOKABLE void clearPdfTextSelection();
-    Q_INVOKABLE bool copySelection();
-    /// Cut, delete, paste, insert: only while the reference is written in.
-    Q_INVOKABLE bool cutSelection();
-    Q_INVOKABLE void deleteSelection();
-    Q_INVOKABLE bool pasteElements();
-    Q_INVOKABLE bool pasteAt(qreal x, qreal y);
-    Q_INVOKABLE bool canPaste() const;
-    Q_INVOKABLE void selectAllOnPage();
-    Q_INVOKABLE bool insertImage(const QUrl& file);
     /// Undo / redo in the reference (while it is written in).
     void undo();
     void redo();
 
 Q_SIGNALS:
     void changed();
-    void pageChanged();
-    void zoomChanged();
     void focusedChanged();
+    /// What hasSelection says may be different
     void selectionChanged();
-    void noteSelectionChanged();
-    void selectMoreChanged();
-    void navigationChanged();
     void layoutChanged();
     void pagesShownChanged();
     void scrollLockChanged();
@@ -231,13 +160,8 @@ Q_SIGNALS:
     void openExternal(const QString& uri);
     /// A link to a document was tapped in the reference, which holds it in `from` (AppController follows it).
     void openDocumentLink(const QString& uri, const QString& from);
-    /// Something was copied from the reference (the window says so).
+    /// Something was copied from the reference, or could not be (the window says so).
     void copied(const QString& what);
-    /// PDF text was selected or unselected in the reference; selected: where (its canvas coordinates).
-    void pdfTextSelectionChanged();
-    void pdfTextSelected(QRectF rect);
-    /// (not emitted: the pills of a canvas listen to it on AppController)
-    void pdfTextModeChanged();
     /// A long press or right click on the reference (its canvas coordinates): the window offers what fits.
     void contextRequested(QPointF viewPos);
     /// The text tool on a Markdown text of the reference (while it is written in), as CanvasView's signals.
@@ -256,13 +180,12 @@ private:
     /// a new reference)
     void relock();
     bool pairLocked(const DocumentSession* x, const DocumentSession* y) const;
-    /// The PDF shown allows copying its text (else said so, through `copied`)
-    bool copyingAllowed();
 
     TabManager& tabs;
     Settings* settings;
     QPointer<CanvasView> shownView;
     std::unique_ptr<PagesModel> pages;
+    std::unique_ptr<CanvasActions> edits;
     DocumentSession* shownSession = nullptr;
     std::vector<QMetaObject::Connection> connections;
     bool focus = false;

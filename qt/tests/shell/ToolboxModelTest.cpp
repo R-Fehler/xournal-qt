@@ -11,6 +11,7 @@
 #include <QSignalSpy>
 #include <gtest/gtest.h>
 
+#include "shell/CanvasActions.h"
 #include "control/settings/Settings.h"
 #include "session/AppContext.h"
 #include "shell/SettingsModel.h"
@@ -516,7 +517,7 @@ TEST(ToolboxApply, anEntryGivesTheToolAllItsSettings) {
     m->update(note, {{"color", "#ffcc80"}});
     ASSERT_TRUE(c.applyToolEntry(note));
     EXPECT_TRUE(c.noteSelected());
-    EXPECT_EQ(c.noteColor(), QColor("#ffcc80"));
+    EXPECT_EQ(c.edit().noteColor(), QColor("#ffcc80"));
     EXPECT_NE(m->active(), note);
     c.shutdown();
 }

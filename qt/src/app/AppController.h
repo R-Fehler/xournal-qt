@@ -63,6 +63,7 @@ class AppContext;
 class Citations;
 class LibraryInkJob;
 class HandwritingSettings;
+class CanvasActions;
 class CanvasView;
 class LibraryArchive;
 class LibraryShare;
@@ -290,13 +291,11 @@ class AppController: public QObject {
     /// Presenting the current document in this window: a page fills the view, a swipe or a key goes one page on
     /// (the window goes full screen for it, in QML)
     Q_PROPERTY(bool presenting READ presenting WRITE setPresenting NOTIFY presentingChanged)
+    /// What acts on the current document's canvas (xqt::CanvasActions): its selection, sticky notes, PDF text, the
+    /// clipboard, page, zoom and Back; the pills of the notes take it as their target (the reference's: app.reference.edit)
+    Q_PROPERTY(QObject* edit READ editObject CONSTANT)
     /// Elements are selected on the canvas (select tools).
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
-    /// "Select more" (qt/touch-multiselect; qt/docs/sticky-notes.md, "Several notes at once"): the selection's pills
-    /// offer it with the rectangle or lasso select tool (selectMoreOffered; it can be switched on: selectMoreAvailable,
-    /// not for elements inside a note); while it is on (selectingMore), a tap adds a note or an element to the selection
-    /// or takes it away. selectedCount: notes and elements selected.
-    Q_PROPERTY(bool selectMoreOffered READ selectMoreOffered NOTIFY selectMoreChanged)
     /// The snip tool (qt/docs/snip.md) is armed: "rect" or "lasso" ("": not). The next rectangle or lasso dragged on a
     /// page copies its picture to the clipboard, then the tool used before comes back.
     Q_PROPERTY(QString snip READ snipShape NOTIFY snipChanged)
@@ -308,13 +307,6 @@ class AppController: public QObject {
     Q_PROPERTY(bool inkCopy READ inkCopyArmed NOTIFY snipChanged)
     /// The selection holds handwriting (pen strokes): its pill offers "Copy as text"
     Q_PROPERTY(bool selectionHasInk READ selectionHasInk NOTIFY selectionChanged)
-    Q_PROPERTY(bool selectMoreAvailable READ selectMoreAvailable NOTIFY selectMoreChanged)
-    Q_PROPERTY(bool selectingMore READ selectingMore WRITE setSelectingMore NOTIFY selectMoreChanged)
-    Q_PROPERTY(int selectedCount READ selectedCount NOTIFY selectMoreChanged)
-    /// Groups (qt/docs/groups.md): the selected elements can become one group (Ctrl+G) / leave their groups
-    /// (Ctrl+Shift+G); the selection's pill shows a button for each that can be done
-    Q_PROPERTY(bool canGroup READ canGroup NOTIFY selectionChanged)
-    Q_PROPERTY(bool canUngroup READ canUngroup NOTIFY selectionChanged)
     // Page operations (sidebar, page grid) go onto the one undo stack of the document (these are the same as undo)
     Q_PROPERTY(bool canUndoPages READ canUndoPages NOTIFY pageUndoChanged)
     Q_PROPERTY(bool canRedoPages READ canRedoPages NOTIFY pageUndoChanged)
@@ -597,14 +589,11 @@ public:
     void setSearchRegex(bool on);
     bool canReplace() const;
     bool hasSelection() const;
-    bool selectMoreOffered() const;
-    bool selectMoreAvailable() const;
-    bool selectingMore() const;
-    void setSelectingMore(bool on);
-    int selectedCount() const;
-    bool canGroup() const;
-    bool canUngroup() const;
-    /// Group / ungroup what is selected (the reference while it has the keys and is written in): one undo step
+    /// What acts on the current document's canvas (the pills; the keys go through keyActions)
+    xqt::CanvasActions& edit() const { return *edits; }
+    QObject* editObject() const;
+    /// Group (Ctrl+G) / ungroup (Ctrl+Shift+G) what is selected (the reference while it has the keys and is written
+    /// in): one undo step (qt/docs/groups.md)
     Q_INVOKABLE bool groupSelection();
     Q_INVOKABLE bool ungroupSelection();
     bool canGoBack() const;
@@ -773,10 +762,6 @@ public:
     Q_INVOKABLE bool cutSelection();
     /// Paste elements (copied in this or another tab, or another Xournal Qt window) as a selection.
     Q_INVOKABLE bool pasteElements();
-    /// Paste what is in the clipboard at a place on the canvas (text becomes a text element there).
-    Q_INVOKABLE bool pasteAt(qreal x, qreal y);
-    /// There is something to paste (text, an image or elements).
-    Q_INVOKABLE bool canPaste() const;
     Q_INVOKABLE void deleteSelection();
     Q_INVOKABLE void selectAllOnPage();
     /// Insert an image file on the current page (as a selection).
@@ -1220,29 +1205,15 @@ public:
     Q_INVOKABLE void navigateBack();
     Q_INVOKABLE void navigateForward();
     Q_INVOKABLE void clearNavigation();
-    /// The selected PDF text (select mode): mark it ("highlight", "underline", "strikethrough") or copy it.
-    Q_INVOKABLE bool markPdfText(const QString& mode);
-    Q_INVOKABLE bool copyPdfText();
-    /// The selected text of the current document: its selected PDF text, else the selection of the text being written
-    /// (a Markdown box, a text element, a .md). For the look-up actions (qt/docs/citations.md). "": none.
-    Q_INVOKABLE QString selectedText() const;
     /// The files of the documents shown (the tab's, the reference's): the paper of a reference is not looked for in
     /// the document the reference is in.
     Q_INVOKABLE QStringList shownDocumentFiles() const;
     /// Select the word of the PDF at this place on the canvas (again at the same word: its whole line).
     Q_INVOKABLE bool selectPdfTextAt(qreal x, qreal y);
-    /// Drag one end of that selection (true: the beginning).
-    Q_INVOKABLE bool dragPdfSelection(qreal x, qreal y, bool startEnd);
-    /// Where the selection begins and ends, for the handles (an empty rect: nothing selected).
-    Q_INVOKABLE QRectF pdfSelectionEnds() const;
-    /// All of the selected text on the canvas, for the actions beside it (an empty rect: nothing selected).
-    Q_INVOKABLE QRectF pdfSelectionBox() const;
-    /// Scroll back to the selected text (it can be far away after scrolling).
-    Q_INVOKABLE void showPdfSelection();
+    /// (dragging its ends, copying and marking it: edit, CanvasActions)
     /// PDF text is selected right now (then only copying and marking it make sense).
     Q_PROPERTY(bool pdfTextIsSelected READ pdfTextIsSelected NOTIFY pdfTextSelectionChanged)
     bool pdfTextIsSelected() const;
-    Q_INVOKABLE void clearPdfTextSelection();
     /// Insert `count` new pages before `position` (0-based; page count: at the end): background `background` (index
     /// in the settings' pageBackgrounds), paper `paper` (index in paperFormats; -1: the size of the current page),
     /// portrait or landscape. One step to undo.
@@ -1463,26 +1434,13 @@ public:
     /// "Several notes at once")
     Q_PROPERTY(bool notesSelectedTogether READ notesSelectedTogether NOTIFY selectionChanged)
     bool notesSelectedTogether() const;
-    Q_PROPERTY(QColor noteColor READ noteColor WRITE setNoteColor NOTIFY noteSelectionChanged)
-    QColor noteColor() const;
-    void setNoteColor(const QColor& color);
-    /// The selected note covers (self-testing: the pen leaves it alone, a tap lets it peek)
-    Q_PROPERTY(bool noteCovers READ noteCovers WRITE setNoteCovers NOTIFY noteSelectionChanged)
-    bool noteCovers() const;
-    void setNoteCovers(bool covers);
-    Q_INVOKABLE void deleteStickyNote();
-    /// The selected note's Markdown text (its pill's "Text"): written on the page, started or with the cursor at its
-    /// end (qt/docs/sticky-notes.md, "Notes as containers")
-    Q_INVOKABLE bool writeNoteText();
-    /// The selected note onto the clipboard, whole (its pill; Ctrl+C / Ctrl+X go through copySelection /
-    /// cutSelection); several notes selected together: all of them (and the elements with them). Paste (pasteElements, pasteAt) puts a copied note onto the page in view.
+    /// The selected note onto the clipboard, whole (Ctrl+C / Ctrl+X go through copySelection / cutSelection); several
+    /// notes selected together: all of them (and the elements with them). The note's pill: edit (CanvasActions).
     Q_INVOKABLE bool copyStickyNote();
     Q_INVOKABLE bool cutStickyNote();
     /// Ctrl+V in the page sidebar or grid pastes the copied note rather than the copied pages: a note is on the
     /// clipboard and it was copied after the pages (or a note is selected, or no pages are copied)
     Q_INVOKABLE bool pastesNoteBeforePages() const;
-    /// Where the selected note is on the canvas (an empty rect: none), for its pill
-    Q_INVOKABLE QRectF noteBox() const;
     /// The current page has sticky notes; they are hidden (a view state, not saved)
     Q_PROPERTY(bool pageHasNotes READ pageHasNotes NOTIFY notesChanged)
     bool pageHasNotes() const;
@@ -1641,8 +1599,6 @@ Q_SIGNALS:
     void presentingChanged();
     void pageUndoChanged();
     void selectionChanged();
-    /// Select more became available or not, was switched on or off, or what is selected changed (its count)
-    void selectMoreChanged();
     void snipChanged();
     void snipResolutionChanged();
     /// Copying handwriting as text (startInkCopy, copySelectionAsText): `result.state` is "reading" (the words are
@@ -1679,8 +1635,6 @@ Q_SIGNALS:
     void darkPagesChanged();
     void navigationChanged();
     void pdfTextModeChanged();
-    /// PDF text was selected (select mode); rect in canvas coordinates.
-    void pdfTextSelected(QRectF rect);
     /// Something was selected or unselected: `pdfTextIsSelected` and the ends of the selection are different now.
     void pdfTextSelectionChanged();
     void titlePageChanged();
@@ -1774,13 +1728,13 @@ private:
     /// The reference while it has the keys and is written in (its edit switch), else nullptr: then undo, cut,
     /// paste, delete and select all act on it.
     xqt::CanvasView* editedReference() const;
+    /// What the keys act on: the reference's canvas while it has the focus, else the current document's
+    xqt::CanvasActions* keyActions() const;
     /// What undo and redo act on: the Markdown being written in the canvas with the keys (its own steps first;
     /// nullptr: none), and the document with the keys (the reference while it is written in, else the tab's).
     xqt::MarkdownEditor* undoneMarkdown() const;
     xqt::DocumentSession* undoneSession() const;
     bool savesWithoutDialog(const xqt::DocumentSession* s) const;
-    /// Something was copied onto the clipboard (`ok`): it is pasted before copied pages (pastesNoteBeforePages)
-    bool copied(bool ok);
     /// ExportHybrid: a hybrid PDF copy (to share); ShareXopp: the export for Xournal++ with an attached PDF.
     enum class SaveWay { Save, SaveAs, Hybrid, ExportXopp, ExportHybrid, ShareXopp };
     /// Hand files to the system (share), or put them on the clipboard.
@@ -1990,6 +1944,8 @@ private:
     /// The colors taken from a palette take their role's color in `paletteId` (where it has the role)
     void followColorPalette(const QString& paletteId);
     std::vector<QMetaObject::Connection> currentConnections;
+    /// What acts on the current document's canvas (`edit`; follows the current tab)
+    std::unique_ptr<xqt::CanvasActions> edits;
     /// The view of the current tab (another tab: select more ends in the one before)
     QPointer<xqt::CanvasView> currentCanvas;
 

@@ -45,9 +45,14 @@ For cross-referencing within one large document: the tab's own document shows in
   last change of the document.
 - **Selecting works as on the notes** (qt/touch-multiselect): the selection's pill for elements and for notes
   selected together (with the count and "Select more"), the note's pill at a selected note (`NotePill` with
-  `target: app.reference`; colours, cover, text, image, cut and delete while the view is written in, copy and
+  `target: app.reference.edit`; colours, cover, text, image, cut and delete while the view is written in, copy and
   deselect for reading only), Ctrl + click and "Select more" to add and take away (qt/docs/sticky-notes.md, "Select
   more"). Each view has its own selection and its own select more.
+- **One set of canvas actions for both sides.** What the pills and keys do on a canvas (selection, groups, notes, PDF
+  text, the clipboard, page, zoom, Back) is `CanvasActions` (`shell/CanvasActions.h`): `app.edit` for the notes and
+  `app.reference.edit` for the reference, the same code with a policy (the reference changes nothing unless it is
+  written in). `AppController` keeps the names the window's shortcuts call (`app.copySelection`, `app.zoomIn`, …) and
+  routes them to the side with the keys (`keyActions`). `QmlApiTest` checks that every name a pill reads exists there.
 - **Memory.** Both views register with `CanvasMemory` like any view: the limit is shared, not doubled; the view used
   last gets the larger part, the other one keeps its visible pages. Previews and thumbnails are per document, so
   they are shared too.

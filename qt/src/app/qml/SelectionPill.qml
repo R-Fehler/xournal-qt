@@ -1,5 +1,5 @@
-// Actions on the selected elements (select tools) of a canvas: the notes (target: app), or the reference beside
-// them (target: app.reference). A canvas for reading only: copy and deselect, nothing that changes it. The count of
+// Actions on the selected elements (select tools) of a canvas: the notes (target: app.edit), or the reference beside
+// them (target: app.reference.edit). A canvas for reading only: copy and deselect, nothing that changes it. The count of
 // what is selected, and "Select more" (with the rectangle or lasso: taps add to the selection or take away).
 import QtQuick
 import QtQuick.Controls
@@ -10,7 +10,7 @@ Pane {
     id: pill
     /// The DocumentCanvas the selection is on (a sibling of this pill) and what acts on it
     property Item canvasItem
-    property var target: app
+    property var target: app.edit
     property bool hidden: false
     /// "Save as sticker…" (qt/docs/stickers.md): the window opens its dialog
     signal stickerRequested()
@@ -67,7 +67,7 @@ Pane {
         // The handwriting in it as text (qt/copy-tools; the notes only): the readings of its words to the clipboard
         IconButton {
             objectName: pill.named("selectionCopyText")
-            visible: pill.target === app && app.selectionHasInk
+            visible: pill.target === app.edit && app.selectionHasInk
             iconName: "xqt-copy-ink-text"
             label: qsTr("Copy as text")
             tip: qsTr("Copy as text (the handwriting's words, as the handwriting search read them)")
@@ -77,7 +77,7 @@ Pane {
         IconButton { objectName: pill.named("selectionPaste"); visible: !pill.readingOnly; iconName: "xopp-edit-paste"; tip: qsTr("Paste (Ctrl+V)"); onClicked: pill.target.pasteElements() }
         IconButton {
             objectName: pill.named("selectionSticker")
-            visible: pill.target === app  // (the notes; not the reference beside them)
+            visible: pill.target === app.edit  // (the notes; not the reference beside them)
             iconName: "xqt-sticker"
             tip: qsTr("Save as sticker… (to paste it again from the sticker button)")
             onClicked: pill.stickerRequested()

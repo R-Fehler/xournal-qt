@@ -22,6 +22,7 @@
 #include <QTest>
 #include <gtest/gtest.h>
 
+#include "shell/CanvasActions.h"
 #include "model/Document.h"
 #include "model/Layer.h"
 #include "model/Text.h"
@@ -247,7 +248,7 @@ TEST_F(DocumentLinksTest, wikiLinksHeadingsReferenceAndWhatWasNotFound) {
     ASSERT_TRUE(controller->followDocumentLink("../Lectures/kalman.xopp#page=2", "reference"));
     EXPECT_EQ(currentFile(), "a.md");
     EXPECT_TRUE(controller->reference().active());
-    EXPECT_EQ(controller->reference().pageNumber(), 2);
+    EXPECT_EQ(controller->reference().actions().pageNumber(), 2);
 
     // A file that is not there: said (the window offers to locate it), nothing opens
     QSignalSpy messages(controller.get(), &AppController::linkTargetMissing);

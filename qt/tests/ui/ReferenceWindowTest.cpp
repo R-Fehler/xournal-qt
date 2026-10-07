@@ -24,6 +24,7 @@
 #include <QFile>
 #include <QTemporaryDir>
 
+#include "shell/CanvasActions.h"
 #include "model/Document.h"
 #include "model/Point.h"
 #include "model/Stroke.h"
@@ -332,15 +333,15 @@ TEST_F(ReferenceWindowTest, thePageButtonGoesToAPage) {
     }
     ref().showTab(1);
     wait(100);
-    EXPECT_EQ(ref().pageCount(), 6);
+    EXPECT_EQ(ref().actions().pageCount(), 6);
     click(findItem("referencePageButton"));
     auto* popup = findItem("referencePageField");
     ASSERT_NE(popup, nullptr);
     until([&] { return popup->hasActiveFocus(); });
     QTest::keyClick(window, Qt::Key_4);
     key(Qt::Key_Return);
-    until([&] { return ref().pageNumber() == 4; });
-    EXPECT_EQ(ref().pageNumber(), 4);
+    until([&] { return ref().actions().pageNumber() == 4; });
+    EXPECT_EQ(ref().actions().pageNumber(), 4);
     EXPECT_EQ(controller->pageNumber(), 1) << "the main document stays where it is";
 }
 
@@ -642,8 +643,8 @@ TEST_F(ReferenceWindowTest, theGridOfTheReferenceShowsItsPagesInItsHalf) {
     QMetaObject::invokeMethod(gridView, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, cell), Q_ARG(int, 2));
     ASSERT_NE(cell, nullptr);
     click(cell);
-    until([&] { return ref().pageNumber() == 3; });
-    EXPECT_EQ(ref().pageNumber(), 3);
+    until([&] { return ref().actions().pageNumber() == 3; });
+    EXPECT_EQ(ref().actions().pageNumber(), 3);
     EXPECT_FALSE(grid->isVisible());
     EXPECT_EQ(controller->pageNumber(), 1);
 
@@ -718,9 +719,9 @@ TEST_F(ReferenceWindowTest, theReferenceHasItsOwnScrollBars) {
     EXPECT_DOUBLE_EQ(main->property("contentY").toDouble(), notesY);
     EXPECT_EQ(elements(tabs().session(1)), 0u);
     // Zoomed in: the horizontal one too
-    ref().zoomIn();
-    ref().zoomIn();
-    ref().zoomIn();
+    ref().actions().zoomIn();
+    ref().actions().zoomIn();
+    ref().actions().zoomIn();
     wait(50);
     EXPECT_TRUE(shownOver(findItem("referenceHorizontalScrollBar"), reference));
     // The notes keep theirs
@@ -738,7 +739,7 @@ TEST_F(ReferenceWindowTest, pdfTextOfTheReferenceHasItsKnobsAndPillOnItsSide) {
     ASSERT_NE(bar, nullptr);
     ASSERT_NE(handles, nullptr);
     until([&] { return bar->isVisible(); });
-    ASSERT_TRUE(ref().pdfTextIsSelected());
+    ASSERT_TRUE(ref().actions().pdfTextIsSelected());
     EXPECT_FALSE(controller->pdfTextIsSelected()) << "the notes have nothing selected";
     EXPECT_FALSE(findItem("pdfTextBar")->isVisible()) << "the notes' pill is shown";
     EXPECT_FALSE(findItem("pdfTextHandles")->isVisible());
@@ -781,8 +782,8 @@ TEST_F(ReferenceWindowTest, aKnobOfTheReferenceMovesTheReferencesSelectionOnly) 
     rightClick(word);
     auto* handles = findItem("referencePdfTextHandles");
     until([&] { return handles->isVisible(); });
-    ASSERT_TRUE(ref().pdfTextIsSelected());
-    const QRectF before = ref().pdfSelectionEnds();
+    ASSERT_TRUE(ref().actions().pdfTextIsSelected());
+    const QRectF before = ref().actions().pdfSelectionEnds();
     ASSERT_FALSE(before.isNull());
     // The knob at the end: dragged to the right along the line
     const QPoint knob = reference->mapToScene(before.bottomRight()).toPoint();
@@ -793,8 +794,8 @@ TEST_F(ReferenceWindowTest, aKnobOfTheReferenceMovesTheReferencesSelectionOnly) 
     }
     QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, knob + QPoint(120, 0));
     wait(100);
-    ASSERT_TRUE(ref().pdfTextIsSelected());
-    EXPECT_GT(ref().pdfSelectionEnds().right(), before.right() + 30) << "the knob did not move the selection";
+    ASSERT_TRUE(ref().actions().pdfTextIsSelected());
+    EXPECT_GT(ref().actions().pdfSelectionEnds().right(), before.right() + 30) << "the knob did not move the selection";
     EXPECT_FALSE(controller->pdfTextIsSelected()) << "the notes got a selection";
     EXPECT_FALSE(tabs().session(ref().tab())->isModified());
 }
@@ -949,12 +950,12 @@ TEST_F(ReferenceWindowTest, selectingInTheSameDocumentBesideItselfWorksAsOnTheNo
 
     // Select more: a tap on the other note adds it, on the first one takes it away
     click(findItem("referenceSelectionMore"));
-    EXPECT_TRUE(ref().selectingMore());
+    EXPECT_TRUE(ref().actions().selectingMore());
     EXPECT_TRUE(findItem("referenceSelectionMore")->property("checked").toBool());
-    EXPECT_FALSE(controller->selectingMore()) << "the notes' view has its own";
+    EXPECT_FALSE(controller->edit().selectingMore()) << "the notes' view has its own";
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, onReferencePage(0, QPointF(320, 120)));
     wait(50);
-    EXPECT_EQ(ref().selectedCount(), 3);
+    EXPECT_EQ(ref().actions().selectedCount(), 3);
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, onReferencePage(0, QPointF(150, 325)));
     wait(50);
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, onReferencePage(0, QPointF(100, 120)));
@@ -979,7 +980,7 @@ TEST_F(ReferenceWindowTest, selectingInTheSameDocumentBesideItselfWorksAsOnTheNo
     click(findItem("referenceNoteDeselect"));
     EXPECT_FALSE(second->hasAnySelection()) << "deselected in the reference";
     until([&] { return !notePill->isVisible(); });
-    EXPECT_FALSE(ref().selectingMore());
+    EXPECT_FALSE(ref().actions().selectingMore());
 
     // For reading only: a note (selected by a rectangle, to copy it) has a pill for copying
     ref().setEditing(false);
@@ -1080,7 +1081,7 @@ TEST_F(ReferenceWindowTest, pageKeysActOnTheSideWithTheKeysAndPresentingShowsThe
     key(Qt::Key_4);
     key(Qt::Key_Return);
     wait(100);
-    EXPECT_EQ(ref().pageNumber(), 4) << "the reference went to page 4";
+    EXPECT_EQ(ref().actions().pageNumber(), 4) << "the reference went to page 4";
     EXPECT_EQ(controller->pageNumber(), notesPage) << "the notes stay";
     EXPECT_TRUE(ref().focused()) << "and it keeps the keys";
 
@@ -1092,7 +1093,7 @@ TEST_F(ReferenceWindowTest, pageKeysActOnTheSideWithTheKeysAndPresentingShowsThe
     key(Qt::Key_Right);
     until([&] { return !tabs().view(1)->getViewController().isAnimating(); }, 2000);
     wait(50);
-    EXPECT_EQ(ref().pageNumber(), 5);
+    EXPECT_EQ(ref().actions().pageNumber(), 5);
     EXPECT_EQ(controller->pageNumber(), notesPage);
     click(main);
     ASSERT_FALSE(ref().focused());
@@ -1100,7 +1101,7 @@ TEST_F(ReferenceWindowTest, pageKeysActOnTheSideWithTheKeysAndPresentingShowsThe
     until([&] { return !tabs().view(0)->getViewController().isAnimating(); }, 2000);
     wait(50);
     EXPECT_EQ(controller->pageNumber(), notesPage + 1);
-    EXPECT_EQ(ref().pageNumber(), 5);
+    EXPECT_EQ(ref().actions().pageNumber(), 5);
     controller->setHorizontalScrolling(false);
     wait(50);
 
@@ -1128,7 +1129,7 @@ TEST_F(ReferenceWindowTest, fittedToTheWidthNeitherHalfScrollsSideways) {
     ref().showTab(1);
     wait(100);
     controller->fitWidth();
-    ref().fitWidth();
+    ref().actions().fitWidth();
     wait(100);
     for (QQuickItem* c: {main, reference}) {
         EXPECT_LE(c->property("contentWidth").toDouble(), c->width() + 1)
@@ -1159,7 +1160,7 @@ TEST_F(ReferenceWindowTest, theSameDocumentBesideItself) {
     QQuickItem* showBeside = findItem("pageMenuShowBeside", true);
     ASSERT_NE(showBeside, nullptr);
     click(showBeside);
-    until([&] { return reference->isVisible() && ref().pageNumber() == 7; });
+    until([&] { return reference->isVisible() && ref().actions().pageNumber() == 7; });
     until([&] { return !pageMenu->property("visible").toBool(); });  // (it fades out)
     ASSERT_TRUE(ref().isSelf());
     auto* second = ref().canvas();
@@ -1168,7 +1169,7 @@ TEST_F(ReferenceWindowTest, theSameDocumentBesideItself) {
     EXPECT_EQ(reference->property("view").value<QObject*>(), second);
     EXPECT_EQ(main->property("view").value<QObject*>(), first);
     EXPECT_TRUE(reference->property("readingOnly").toBool()) << "for reading at first";
-    EXPECT_EQ(ref().pageNumber(), 7) << "at the page of the menu";
+    EXPECT_EQ(ref().actions().pageNumber(), 7) << "at the page of the menu";
     EXPECT_EQ(controller->pageNumber(), 1) << "the tab stays where it is";
     EXPECT_EQ(controller->tabCount(), 2);
 
@@ -1187,8 +1188,8 @@ TEST_F(ReferenceWindowTest, theSameDocumentBesideItself) {
     EXPECT_EQ(first->getViewController().scrollPosition(), mainPos) << "the notes did not move";
 
     // The same page on both sides: a stroke on the notes shows in the reference too
-    ref().goToPage(0);
-    until([&] { return ref().pageNumber() == 1; });
+    ref().actions().goToPage(0);
+    until([&] { return ref().actions().pageNumber() == 1; });
     wait(300);
     controller->context().getRenderService()->waitForIdle();
     wait(100);

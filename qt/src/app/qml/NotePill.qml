@@ -1,8 +1,8 @@
 // The selected sticky note (qt/docs/sticky-notes.md), beside it: its color, cover mode (self-testing), its Markdown
 // text, an image onto it, copy, cut, delete, and "Select more" (qt/touch-multiselect). Every change is one undo step;
 // paste (Ctrl+V, the context pill) puts a copied note on the page in view. The note itself is moved by dragging it,
-// resized by the handle at its bottom right corner. Of the notes (target: app) or of the reference beside them
-// (target: app.reference; for reading only: copy and deselect).
+// resized by the handle at its bottom right corner. Of the notes (target: app.edit) or of the reference beside them
+// (target: app.reference.edit; for reading only: copy and deselect).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -11,7 +11,7 @@ import QtQuick.Layouts
 Pane {
     id: pill
     property Item canvasItem
-    property var target: app
+    property var target: app.edit
     property bool hidden: false
     property string namePrefix: ""
     function named(n) { return namePrefix === "" ? n : namePrefix + n.charAt(0).toUpperCase() + n.slice(1) }
@@ -149,7 +149,7 @@ Pane {
         IconButton { objectName: pill.named("noteCut"); visible: !pill.readingOnly; iconName: "xopp-edit-cut"; tip: qsTr("Cut the note (Ctrl+X): paste it on another page to move it there"); onClicked: pill.target.cutStickyNote() }
         IconButton {
             objectName: pill.named("noteSticker")
-            visible: pill.target === app  // (the notes; not the reference beside them)
+            visible: pill.target === app.edit  // (the notes; not the reference beside them)
             iconName: "xqt-sticker"
             tip: qsTr("Save the note as a sticker…")
             onClicked: pill.stickerRequested()

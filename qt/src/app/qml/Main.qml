@@ -1247,10 +1247,10 @@ ApplicationWindow {
         anchors.topMargin: Math.round(canvas.height * 0.2)
         /// The number is for the reference (it had the keys when the first digit was typed)
         property bool forReference: false
-        pageCount: forReference ? app.reference.pageCount : app.pageCount
+        pageCount: forReference ? app.reference.edit.pageCount : app.pageCount
         returnFocus: forReference ? referenceSplit.referenceCanvas : canvas
         onJumpRequested: function(page) {
-            if (forReference) app.reference.goToPage(page - 1)
+            if (forReference) app.reference.edit.goToPage(page - 1)
             else app.jumpToPage(page - 1)
         }
     }

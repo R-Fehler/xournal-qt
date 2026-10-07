@@ -28,6 +28,7 @@
 #include "shell/DocumentLinks.h"
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
+#include "shell/CanvasActions.h"
 #include "shell/ReferenceMode.h"
 #include "shell/DocumentFiles.h"
 #include "shell/LinkRewrite.h"
@@ -201,7 +202,7 @@ bool AppController::followDocumentLinkFrom(const QString& uri, const QString& ho
         const int ref = tabs->referenceOf(tabs->currentIndex());
         if (DocumentSession* shown = ref >= 0 ? tabs->session(ref) : nullptr) {
             const links::Place place = DocumentLinks::placeIn(*shown, *link);
-            referenceMode->goToPage(place.page);
+            referenceMode->actions().goToPage(place.page);
             if (!place.note.isEmpty()) {
                 Q_EMIT pageActionDone(place.note, false);
             }

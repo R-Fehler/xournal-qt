@@ -43,6 +43,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/TabManager.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ReferenceMode.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ReferenceMode.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/CanvasActions.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/CanvasActions.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PresenterConsole.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PresenterConsole.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.h

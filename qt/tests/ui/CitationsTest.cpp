@@ -27,6 +27,7 @@
 #include <QUrlQuery>
 #include <gtest/gtest.h>
 
+#include "shell/CanvasActions.h"
 #include "canvas/CanvasView.h"
 #include "canvas/MarkdownEditor.h"
 #include "canvas/ViewController.h"
@@ -188,7 +189,7 @@ protected:
         ASSERT_TRUE(v->selectPdfTextAt(onLine, true));
         until([&] { return shown("pdfLookUpButton"); });
         ASSERT_TRUE(controller->pdfTextIsSelected());
-        EXPECT_TRUE(controller->selectedText().contains(text)) << controller->selectedText().toStdString();
+        EXPECT_TRUE(controller->edit().selectedText().contains(text)) << controller->edit().selectedText().toStdString();
     }
 
     xqt::LibraryModel* library() const { return qobject_cast<xqt::LibraryModel*>(controller->libraryModel()); }
@@ -285,13 +286,13 @@ TEST_F(CitationsTest, textBeingWrittenIsLookedUpToo) {
     QGuiApplication::clipboard()->setText("Kalman filter");
     QTest::keyClick(window, Qt::Key_V, Qt::ControlModifier);
     wait(50);
-    EXPECT_EQ(controller->selectedText(), "") << "nothing selected yet";
+    EXPECT_EQ(controller->edit().selectedText(), "") << "nothing selected yet";
     QTest::keyClick(window, Qt::Key_Home, Qt::ShiftModifier);
     wait(50);
-    EXPECT_EQ(controller->selectedText(), "Kalman filter");
+    EXPECT_EQ(controller->edit().selectedText(), "Kalman filter");
     auto* citations = qobject_cast<xqt::Citations*>(controller->citationsObject());
     ASSERT_NE(citations, nullptr);
-    EXPECT_EQ(QUrlQuery(QUrl(citations->scholarUrl(controller->selectedText()))).queryItemValue("q"), "Kalman filter");
+    EXPECT_EQ(QUrlQuery(QUrl(citations->scholarUrl(controller->edit().selectedText()))).queryItemValue("q"), "Kalman filter");
 
     // The context pill (right click) offers "Look up…" on it
     const QPointF at = v->pageViewRect(0).topLeft() + QPointF(110, 105) * v->getViewController().zoom();
@@ -306,7 +307,7 @@ TEST_F(CitationsTest, textBeingWrittenIsLookedUpToo) {
 TEST_F(CitationsTest, selectedTextIsSearchedInTheDocumentTheTabsAndTheLibrary) {
     selectReference();
     auto* citations = qobject_cast<xqt::Citations*>(controller->citationsObject());
-    const QString query = citations->searchQuery(controller->selectedText());
+    const QString query = citations->searchQuery(controller->edit().selectedText());
     ASSERT_FALSE(query.isEmpty());
     EXPECT_TRUE(query.contains("Attention is all you need"));
     click("pdfLookUpButton");
@@ -373,7 +374,7 @@ TEST_F(CitationsTest, searchTheWebAsksWithTheEnginesAddress) {
     settings()->set("webSearch", "duckduckgo");
     selectReference();
     auto* citations = qobject_cast<xqt::Citations*>(controller->citationsObject());
-    const QString query = citations->searchQuery(controller->selectedText());
+    const QString query = citations->searchQuery(controller->edit().selectedText());
     click("pdfLookUpButton");
     until([&] { return shown("lookUpWebSearch"); });
     ASSERT_TRUE(shown("lookUpWebSearch"));
