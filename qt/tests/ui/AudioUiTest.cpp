@@ -39,12 +39,13 @@
 #include "shell/Thumbnails.h"
 
 #include "AppController.h"
+#include "UiFixture.h"
 #include "AudioControl.h"
 
 namespace fs = std::filesystem;
 
 namespace {
-class AudioUiTest: public ::testing::Test {
+class AudioUiTest: public xqt::test::UiFixture {
 protected:
     /// The fake microphone and speaker; false: as a build without any audio backend
     virtual bool withAudio() const { return true; }
@@ -57,64 +58,19 @@ protected:
         }
         xqt::audio::fake::reset();
         xqt::audio::setAppFolder(fs::path(tmp.filePath("audio").toStdString()));
-        controller = std::make_unique<AppController>();
+        makeController();
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        window->resize(1920, 1080);
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));
+        ASSERT_NO_FATAL_FAILURE(loadWindow({.size = QSize(1920, 1080)}));
         wait(100);
     }
     void TearDown() override {
         xqt::AudioControl::setPermissionAccess({});
         xqt::AudioControl::setSettingsOpener({});
         xqt::AudioControl::setPlatformHook({});
-        controller->shutdown();
-        engine.reset();
-        controller.reset();
+        closeApp();
         xqt::audio::setAppFolder({});
         xqt::audio::fake::reset();
         xqt::audio::useFakeDevices(false);
-    }
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    static bool until(const std::function<bool()>& done, int ms = 5000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
-        return done();
-    }
-    template <typename T = QObject>
-    T* find(const char* name) const {
-        return window->findChild<T*>(name);
-    }
-    static QObject* entryOf(QObject* menu, const char* name) {
-        const int n = menu ? menu->property("count").toInt() : 0;
-        for (int i = 0; i < n; ++i) {
-            QQuickItem* it = nullptr;
-            QMetaObject::invokeMethod(menu, "itemAt", Q_RETURN_ARG(QQuickItem*, it), Q_ARG(int, i));
-            if (it && it->objectName() == name) {
-                return it;
-            }
-        }
-        return nullptr;
     }
     QObject* audio() const { return controller->property("audio").value<QObject*>(); }
     xqt::DocumentSession* current() const { return controller->tabManager().currentSession(); }
@@ -160,9 +116,6 @@ protected:
     }
 
     QTemporaryDir tmp;
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
 };
 class NoAudioUiTest: public AudioUiTest {
 protected:

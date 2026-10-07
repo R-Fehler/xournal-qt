@@ -37,17 +37,15 @@
 #include "CanvasPage.h"
 #include "CanvasView.h"
 #include "config-test.h"
+#include "support/TestSupport.h"
+
+using xqt::test::processEventsFor;
+
+using xqt::test::fixturePath;
 
 using namespace xqt;
 
 namespace {
-void processEvents(int ms) {
-    QElapsedTimer t;
-    t.start();
-    while (t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-}
 
 void scribble(DocumentSession& s) {
     auto page = s.getDocument()->getPage(0);
@@ -61,10 +59,6 @@ void scribble(DocumentSession& s) {
     s.getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, layer, raw));
 }
 
-QString fixture(const char8_t* rel) {
-    const auto p = GET_TESTFILE(rel);
-    return QString::fromUtf8(reinterpret_cast<const char*>(p.c_str()));
-}
 }  // namespace
 
 TEST(Tabs, controllerStartsWithTheHomeScreen) {
@@ -89,10 +83,10 @@ TEST(Tabs, controllerStartsWithTheHomeScreen) {
 TEST(Tabs, openingReplacesTheUntouchedNewDocument) {
     AppController c;
     c.newDocument();
-    ASSERT_TRUE(c.openPath(fixture(u8"test1.xoj")));
+    ASSERT_TRUE(c.openPath(fixturePath(u8"test1.xoj")));
     EXPECT_EQ(c.tabCount(), 1) << "the empty start document should have been replaced";
     EXPECT_EQ(c.title(), "test1.xoj");
-    ASSERT_TRUE(c.openPath(fixture(u8"load/strokes.xopp")));
+    ASSERT_TRUE(c.openPath(fixturePath(u8"load/strokes.xopp")));
     EXPECT_EQ(c.tabCount(), 2);
     EXPECT_EQ(c.currentTab(), 1);
     EXPECT_EQ(c.title(), "strokes.xopp");
@@ -100,9 +94,9 @@ TEST(Tabs, openingReplacesTheUntouchedNewDocument) {
 
 TEST(Tabs, openingAnOpenFileSwitchesToItsTab) {
     AppController c;
-    ASSERT_TRUE(c.openPath(fixture(u8"test1.xoj")));
-    ASSERT_TRUE(c.openPath(fixture(u8"load/strokes.xopp")));
-    ASSERT_TRUE(c.openPath(fixture(u8"test1.xoj")));
+    ASSERT_TRUE(c.openPath(fixturePath(u8"test1.xoj")));
+    ASSERT_TRUE(c.openPath(fixturePath(u8"load/strokes.xopp")));
+    ASSERT_TRUE(c.openPath(fixturePath(u8"test1.xoj")));
     EXPECT_EQ(c.tabCount(), 2);
     EXPECT_EQ(c.currentTab(), 0);
     EXPECT_EQ(c.title(), "test1.xoj");
@@ -147,7 +141,7 @@ TEST(Tabs, closingTabs) {
 
 TEST(Tabs, modelDataAndMoving) {
     AppController c;
-    ASSERT_TRUE(c.openPath(fixture(u8"test1.xoj")));
+    ASSERT_TRUE(c.openPath(fixturePath(u8"test1.xoj")));
     c.newDocument();
     TabManager& tabs = c.tabManager();
     EXPECT_EQ(tabs.data(tabs.index(0), TabManager::TitleRole).toString(), "test1.xoj");
@@ -206,7 +200,7 @@ TEST(SingleInstanceTest, filesAreHandedToTheRunningInstance) {
     while (requested.isEmpty() && t.elapsed() < 3000) {
         QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
     }
-    processEvents(50);
+    processEventsFor(50);
     second.join();
     ASSERT_EQ(requested.count(), 1);
     EXPECT_EQ(requested.first().first().toStringList(), (QStringList{"/tmp/a.pdf", "/tmp/b.xopp"}));
@@ -237,7 +231,7 @@ TEST(Tabs, pageLayoutAppliesToAllTabs) {
 TEST(Export, pdfExportAndSuggestedName) {
     QTemporaryDir tmp;
     AppController c;
-    ASSERT_TRUE(c.openPath(fixture(u8"packaged_xopp/pdfBackground/old.xopp")));
+    ASSERT_TRUE(c.openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));
     EXPECT_TRUE(c.suggestedExportFile().toLocalFile().endsWith("old.pdf"));
     const QString out = tmp.filePath("export.pdf");
     ASSERT_TRUE(c.exportPdf(QUrl::fromLocalFile(out)));
@@ -287,14 +281,14 @@ TEST(SaveAs, suggestsTheDocumentsOwnFolderAndTheLibraryForNewOnes) {
     EXPECT_EQ(fs::path(c.suggestedSaveFile().toLocalFile().toStdString()).extension(), ".xopp");
 
     // A document that has a file: its own folder and name
-    ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
+    ASSERT_TRUE(c.openPath(fixturePath(u8"load/pages.xopp")));
     const fs::path opened = c.tabManager().currentSession()->getFilePath();
     EXPECT_EQ(fs::path(c.suggestedSaveFile().toLocalFile().toStdString()), opened);
 }
 
 TEST(Windows, aTabMovesToAWindowOfItsOwnAndBack) {
     AppController c;
-    ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
+    ASSERT_TRUE(c.openPath(fixturePath(u8"load/pages.xopp")));
     c.newDocument();
     ASSERT_EQ(c.tabManager().count(), 2);
     const QString first = c.tabManager().session(0)->getFilePath().string().c_str();
@@ -432,7 +426,7 @@ TEST(Tabs, closingATabDoesNotWaitForQueuedWork) {
     view->setDevicePixelRatio(2);
     view->getViewController().setViewSize(QSizeF(1100, 1600));
     view->setShown(true);
-    processEvents(50);
+    processEventsFor(50);
     QElapsedTimer one;
     one.start();
     DocumentSession* s = c.tabManager().currentSession();
@@ -500,7 +494,7 @@ TEST(Tabs, benchClosingABigPdf) {
                     QString("%1/%2/%3").arg(id).arg(p).arg(s->pageRevision(p)), QSize(1024, 1448)));
             QObject::connect(responses.back(), &QQuickImageResponse::finished, [&finished] { ++finished; });
         }
-        processEvents(round * 700 + 400);  // (rendering, drawing previews and thumbnails meanwhile)
+        processEventsFor(round * 700 + 400);  // (rendering, drawing previews and thumbnails meanwhile)
         QElapsedTimer t;
         t.start();
         c.closeTab(c.currentTab());

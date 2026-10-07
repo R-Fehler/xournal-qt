@@ -34,15 +34,13 @@
 #include "shell/Library.h"
 #include "shell/LibraryCache.h"
 #include "shell/LibraryModel.h"
+#include "support/TestSupport.h"
+
+using xqt::test::writeFile;
 
 using namespace xqt;
 
 namespace {
-void writeFile(const fs::path& p, const std::string& bytes) {
-    fs::create_directories(p.parent_path());
-    std::ofstream out(p, std::ios::binary);
-    out << bytes;
-}
 
 std::unique_ptr<Text> textAt(const std::string& text, bool markdown, double x = 40, double y = 60) {
     auto t = std::make_unique<Text>();

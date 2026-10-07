@@ -27,6 +27,12 @@ int main(int argc, char* argv[]) {
     qputenv("XDG_CACHE_HOME", (home.path() + "/cache").toUtf8());
     qputenv("XDG_DATA_HOME", (home.path() + "/data").toUtf8());  // (the tutorial's copy, qt/docs/onboarding.md)
     qputenv("XQT_RESOURCE_DIR", XQT_BUILD_RESOURCE_DIR);
+    // The compiled QML stays for the next test: ctest starts a process per test, and each compiled Main.qml and its
+    // hundred files again (no QML compiled ahead of time with XQT_FAST_DEV): half of a short test's time. Qt checks
+    // each file's time stamp, so an edited QML file is compiled again.
+    if (qEnvironmentVariableIsEmpty("QML_DISK_CACHE_PATH")) {
+        qputenv("QML_DISK_CACHE_PATH", XQT_UI_TEST_QML_CACHE);
+    }
     // The first start asks how to keep documents (DocumentMode.h): the tests work with Xournal++ files unless they set
     // another mode, and the question stays away (the tests of the question unset this)
     qputenv("XQT_DOCUMENT_MODE", "xopp");

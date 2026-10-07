@@ -47,23 +47,14 @@
 
 #include "AppController.h"
 #include "MarkdownFile.h"
+#include "support/TestSupport.h"
+
+using xqt::test::waitFor;
 
 using namespace xqt;
 
 namespace {
 QString qstr(const fs::path& p) { return QString::fromStdString(p.string()); }
-
-bool waitFor(const std::function<bool()>& done, int ms = 20000) {
-    QElapsedTimer t;
-    t.start();
-    while (!done()) {
-        if (t.elapsed() > ms) {
-            return false;
-        }
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-    return true;
-}
 
 /// A one-page PDF with a word on it.
 void makePlainPdf(const fs::path& p, const char* word = "lecture") {
@@ -210,7 +201,7 @@ TEST_F(LibraryKindsTest, theCardsAndTheFilterTakeTheKindsFromTheIndex) {
     fill();
     LibraryModel model;
     model.setLibrary(std::make_unique<Library>(root));
-    ASSERT_TRUE(waitFor([&] { return !model.indexing() && kindsOf(model)["text"] == "text"; }));
+    ASSERT_TRUE(waitFor([&] { return !model.indexing() && kindsOf(model)["text"] == "text"; }, 20000));
     EXPECT_EQ(kindsOf(model), (std::map<std::string, std::string>{{"archive", "archive"},
                                                                    {"notes", "notes"},
                                                                    {"plain", "plain"},
@@ -271,22 +262,22 @@ TEST_F(LibraryKindsTest, savingInTheAppUpdatesTheKind) {
         return row < 0 ? std::string("<none>")
                        : model->data(model->index(row), LibraryModel::PdfKindRole).toString().toStdString();
     };
-    ASSERT_TRUE(waitFor([&] { return kindOf("lecture.pdf") == "plain"; }));
+    ASSERT_TRUE(waitFor([&] { return kindOf("lecture.pdf") == "plain"; }, 20000));
 
     // Annotated and saved: into the PDF, which is a PDF with notes now
     ASSERT_TRUE(c.openPath(qstr(root / "lecture.pdf")));
     drawStroke(*c.tabManager().currentSession(), 0);
     ASSERT_TRUE(c.save());
-    EXPECT_TRUE(waitFor([&] { return kindOf("lecture.pdf") == "notes"; })) << kindOf("lecture.pdf");
+    EXPECT_TRUE(waitFor([&] { return kindOf("lecture.pdf") == "notes"; }, 20000)) << kindOf("lecture.pdf");
 
     // A new text document
     ASSERT_TRUE(c.createTextDocument("Report"));
-    EXPECT_TRUE(waitFor([&] { return kindOf("Report.pdf") == "text"; })) << kindOf("Report.pdf");
+    EXPECT_TRUE(waitFor([&] { return kindOf("Report.pdf") == "text"; }, 20000)) << kindOf("Report.pdf");
 
     // "Open as PDF document" of a .md
     ASSERT_TRUE(c.openPath(qstr(root / "draft.md")));
     ASSERT_TRUE(c.openAsPdfDocument());
-    EXPECT_TRUE(waitFor([&] { return kindOf("draft.pdf") == "text"; })) << kindOf("draft.pdf");
+    EXPECT_TRUE(waitFor([&] { return kindOf("draft.pdf") == "text"; }, 20000)) << kindOf("draft.pdf");
 
     // The Recent cards say the same
     auto* recent = qobject_cast<RecentFiles*>(c.recentModel());
@@ -300,7 +291,7 @@ TEST_F(LibraryKindsTest, savingInTheAppUpdatesTheKind) {
                     recent->data(at, RecentFiles::PdfKindRole).toString().toStdString();
         }
         return recentKinds["draft.pdf"] == "text" && recentKinds["lecture.pdf"] == "notes";
-    }));
+    }, 20000));
     EXPECT_EQ(recentKinds["draft.md"], "");
 }
 
@@ -420,7 +411,7 @@ TEST_F(LibraryKindsTest, documentsThatKeepVersionsAreMarked) {
             }
         }
         return false;
-    }));
+    }, 20000));
 }
 
 // A PDF protected with a password (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): the index never reads it, also while it
@@ -466,5 +457,5 @@ TEST_F(LibraryKindsTest, aProtectedPdfIsLockedAndNotRead) {
             }
         }
         return false;
-    }));
+    }, 20000));
 }

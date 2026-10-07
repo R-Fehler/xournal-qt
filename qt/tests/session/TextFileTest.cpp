@@ -12,19 +12,15 @@
 
 #include "session/TextFile.h"
 
-#include "../FailingWrites.h"
+#include "support/FailingWrites.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+using xqt::test::writeFile;
 
 using namespace xqt;
 
 namespace {
-std::string readFile(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-void writeFile(const fs::path& p, const std::string& bytes) {
-    std::ofstream out(p, std::ios::binary);
-    out << bytes;
-}
 
 class TextFileTest: public ::testing::Test {
 protected:

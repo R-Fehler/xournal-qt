@@ -48,38 +48,26 @@
 #include "shell/ToolboxModel.h"
 
 #include "AppController.h"
+#include "UiFixture.h"
 
 namespace {
-class ToolboxTest: public ::testing::Test {
+class ToolboxTest: public xqt::test::UiFixture {
 protected:
     void SetUp() override {
-        controller = std::make_unique<AppController>();
+        makeController();
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
         settings()->resetLayoutChoices();
         controller->toolboxModel()->reset();
         controller->setColorPalette("classic");
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        resize(1920, 1080);
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));  // (the pointer rests outside: nothing hovered, no tool tips)
+        ASSERT_NO_FATAL_FAILURE(loadWindow({.size = QSize(1920, 1080)}));
+        until([&] { return window->width() == 1920 && window->height() == 1080; });
+        wait(300);  // (the size class, then the plans settle)
         controller->newDocument();
         wait(200);
     }
     void TearDown() override {
         settings()->resetLayoutChoices();
-        controller->shutdown();
-        engine.reset();
-        controller.reset();
+        closeApp();
     }
 
     xqt::SettingsModel* settings() const { return qobject_cast<xqt::SettingsModel*>(controller->settingsModel()); }
@@ -88,20 +76,6 @@ protected:
         window->resize(w, h);
         until([&] { return window->width() == w && window->height() == h; });
         wait(300);  // (the size class, then the plans settle)
-    }
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    static void until(const std::function<bool()>& done, int ms = 5000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
     }
     /// By its objectName: among the window's objects, else in the tree of items (a Repeater's delegates)
     template <typename T = QQuickItem>
@@ -138,11 +112,6 @@ protected:
         }
         return false;
     }
-    void click(QQuickItem* item) {
-        ASSERT_NE(item, nullptr);
-        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, rectOf(item).center().toPoint());
-        wait(60);
-    }
     QString nth(const QString& type, int n = 0) const {
         for (const QVariant& v: tools()->tools()) {
             if (v.toMap().value("type") == type && n-- == 0) {
@@ -153,17 +122,6 @@ protected:
     }
     QQuickItem* entry(const QString& id) const { return find("toolEntry_" + id); }
     QVariant win(const char* property) const { return window->property(property); }
-    static QObject* entryOf(QObject* menu, const char* name) {
-        const int n = menu ? menu->property("count").toInt() : 0;
-        for (int i = 0; i < n; ++i) {
-            QQuickItem* it = nullptr;
-            QMetaObject::invokeMethod(menu, "itemAt", Q_RETURN_ARG(QQuickItem*, it), Q_ARG(int, i));
-            if (it && it->objectName() == name) {
-                return it;
-            }
-        }
-        return nullptr;
-    }
     /// Triggers an entry of a menu (it must be there and enabled), and waits for the menu to close
     void trigger(QObject* menu, const char* name) {
         until([&] { return menu->property("visible").toBool(); });
@@ -396,9 +354,6 @@ protected:
     QObject* editor() const { return find<QObject>("toolEntryEditor"); }
     bool editorOpen() const { return editor() && editor()->property("visible").toBool(); }
 
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
 };
 }  // namespace
 
@@ -1748,6 +1703,9 @@ TEST_F(ToolboxTest, inFullScreenTheMoreMenuListsTheTopBarAndNew) {
     auto* box = find("toolbox");
     until([&] { return box->property("floating").toBool(); });
     EXPECT_FALSE(shown(find("topBar")));
+    // (the window has grown to the screen and the rail shows its ⋯ where it stays: a click before missed it)
+    until([&] { return window->size() == window->screen()->size() && shown(find("toolboxMoreButton")); });
+    nextFrame();
     click(find("toolboxMoreButton"));
     auto* menu = find<QObject>("toolboxMoreMenu");
     until([&] { return menu->property("visible").toBool(); });

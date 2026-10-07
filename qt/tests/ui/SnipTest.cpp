@@ -50,69 +50,23 @@
 #include "shell/Thumbnails.h"
 
 #include "AppController.h"
+#include "UiFixture.h"
 
 namespace fs = std::filesystem;
 
 namespace {
-class SnipTest: public ::testing::Test {
+class SnipTest: public xqt::test::UiFixture {
 protected:
     void SetUp() override {
         ASSERT_TRUE(tmp.isValid());
         root = fs::path(tmp.path().toStdString());
-        controller = std::make_unique<AppController>();
+        makeController();
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        window->resize(1920, 1080);  // (the buttons in sight)
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));  // (the pointer rests outside: nothing hovered, no tool tips)
+        ASSERT_NO_FATAL_FAILURE(loadWindow({.size = QSize(1920, 1080)}));  // (the buttons in sight)
         QGuiApplication::clipboard()->clear();
         wait(100);
     }
-    void TearDown() override {
-        controller->shutdown();
-        engine.reset();
-        controller.reset();
-    }
 
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    void until(const std::function<bool()>& done, int ms = 5000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
-    }
-    template <typename T = QObject>
-    T* find(const char* name) const {
-        return window->findChild<T*>(name);
-    }
-    static QObject* entryOf(QObject* menu, const char* name) {
-        const int n = menu ? menu->property("count").toInt() : 0;
-        for (int i = 0; i < n; ++i) {
-            QQuickItem* it = nullptr;
-            QMetaObject::invokeMethod(menu, "itemAt", Q_RETURN_ARG(QQuickItem*, it), Q_ARG(int, i));
-            if (it && it->objectName() == name) {
-                return it;
-            }
-        }
-        return nullptr;
-    }
     xqt::DocumentSession* current() const { return controller->tabManager().currentSession(); }
     xqt::CanvasView* view() const { return controller->tabManager().currentView(); }
 
@@ -180,9 +134,6 @@ protected:
 
     QTemporaryDir tmp;
     fs::path root;
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
 };
 }  // namespace
 

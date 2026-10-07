@@ -44,13 +44,14 @@
 #include "undo/UndoRedoHandler.h"
 
 #include "AppController.h"
+#include "UiFixture.h"
 
 namespace fs = std::filesystem;
 
 namespace {
 constexpr int64_t T0 = 1791100800000;  // 2026-10-04 08:00:00 UTC
 
-class TimelineUiTest: public ::testing::Test {
+class TimelineUiTest: public xqt::test::UiFixture {
 protected:
     void SetUp() override {
         ASSERT_TRUE(tmp.isValid());
@@ -58,51 +59,21 @@ protected:
         xqt::audio::fake::reset();
         xqt::audio::setAppFolder(fs::path(tmp.filePath("audio").toStdString()));
         xqt::timeline::setClock([this] { return clock; });
-        controller = std::make_unique<AppController>();
+        makeController();
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
         settings()->set("replayHintSeen", true);  // (the hint's own test shows it)
         settings()->set("touchProfile", "auto");
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        window->resize(1600, 1000);
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));
+        ASSERT_NO_FATAL_FAILURE(loadWindow({.size = QSize(1600, 1000)}));
         wait(100);
     }
     void TearDown() override {
         settings()->resetLayoutChoices();
         settings()->set("touchProfile", "auto");
-        controller->shutdown();
-        engine.reset();
-        controller.reset();
+        closeApp();
         xqt::timeline::setClock({});
         xqt::audio::setAppFolder({});
         xqt::audio::fake::reset();
         xqt::audio::useFakeDevices(false);
-    }
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    static bool until(const std::function<bool()>& done, int ms = 5000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
-        return done();
     }
     /// By its objectName: among the window's objects, else in the tree of items (a Repeater's delegates)
     template <typename T = QObject>
@@ -208,9 +179,6 @@ protected:
 
     QTemporaryDir tmp;
     int64_t clock = T0;
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
 };
 }  // namespace
 

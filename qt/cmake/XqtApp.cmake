@@ -177,7 +177,9 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownFormat.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppReplace.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownImages.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppHelp.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppHelp.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/EngineSetup.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/EngineSetup.cpp)
 target_include_directories(xqt-shell PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src ${CMAKE_CURRENT_LIST_DIR}/../src/app)
 target_link_libraries(xqt-shell PUBLIC Qt6::Network Qt6::PrintSupport Qt6::Widgets Qt6::Quick xqt-canvas xqt-hwr)
 set_target_properties(xqt-shell PROPERTIES AUTOMOC ON)
@@ -388,7 +390,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/FractionalScaleTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CanvasRotationItemTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/DarkPagesCanvasTest.cpp)
-    target_link_libraries(xqt-quick-tests PRIVATE xqt-quick Qt6::QuickControls2 Qt6::GuiPrivate Qt6::Test GTest::gtest)
+    target_link_libraries(xqt-quick-tests PRIVATE xqt-quick xqt-test-support Qt6::QuickControls2 Qt6::GuiPrivate
+        Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-quick-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     gtest_discover_tests(xqt-quick-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS quick
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
@@ -412,6 +415,9 @@ if(XQT_BUILD_TESTS)
     # The real window (Main.qml) with an AppController, off-screen: shortcuts, sheets, tab overview.
     add_executable(xqt-ui-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/main.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/UiFixture.h
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/UiFixture.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/QmlApiTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/MainWindowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ReferenceWindowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/PresenterViewTest.cpp
@@ -439,9 +445,11 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AdaptiveAuditTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AdaptiveLayoutTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/FractionalScaleTest.cpp)
-    target_link_libraries(xqt-ui-tests PRIVATE xqt-quick xqt-shell xqt-uiplugin Qt6::QuickControls2 Qt6::Test
-        GTest::gtest)
-    target_compile_definitions(xqt-ui-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
+    target_link_libraries(xqt-ui-tests PRIVATE xqt-quick xqt-shell xqt-test-support xqt-uiplugin Qt6::QuickControls2
+        Qt6::Test GTest::gtest)
+    target_compile_definitions(xqt-ui-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}"
+        XQT_QML_SOURCE_DIR="${CMAKE_CURRENT_LIST_DIR}/../src/app/qml"
+        XQT_UI_TEST_QML_CACHE="${CMAKE_BINARY_DIR}/ui-tests-qmlcache")
     target_include_directories(xqt-ui-tests PRIVATE "${TEST_CONFIG_DIR}")
     gtest_discover_tests(xqt-ui-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS ui
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
@@ -503,7 +511,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TemplatesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PageFilesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/VersionsTest.cpp)
-    target_link_libraries(xqt-shell-tests PRIVATE xqt-shell Qt6::Test GTest::gtest)
+    target_link_libraries(xqt-shell-tests PRIVATE xqt-shell xqt-test-support Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-shell-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-shell-tests PRIVATE "${TEST_CONFIG_DIR}")
     gtest_discover_tests(xqt-shell-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS shell

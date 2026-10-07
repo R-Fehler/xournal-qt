@@ -36,35 +36,17 @@
 #include "session/DocumentSession.h"
 #include "session/HybridPdf.h"
 #include "shell/LibraryArchive.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+using xqt::test::writeFile;
+
+using xqt::test::makeTextPdf;
+using xqt::test::numbered;
 
 using namespace xqt;
 
 namespace {
-
-void writeFile(const fs::path& p, const std::string& content) {
-    fs::create_directories(p.parent_path());
-    std::ofstream(p, std::ios::binary) << content;
-}
-
-std::string readFile(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
-void makeTextPdf(const fs::path& p, int pages) {
-    fs::create_directories(p.parent_path());
-    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
-    cairo_t* cr = cairo_create(s);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, 24);
-    for (int i = 0; i < pages; ++i) {
-        cairo_move_to(cr, 72, 100);
-        cairo_show_text(cr, ("page " + std::to_string(i + 1)).c_str());
-        cairo_show_page(cr);
-    }
-    cairo_destroy(cr);
-    cairo_surface_destroy(s);
-}
 
 /// A PDF whose font (Helvetica) is not embedded: never PDF/A.
 void makeOldPdf(const fs::path& p) {
@@ -112,7 +94,7 @@ protected:
         out = fs::path(tmp.filePath("Backup").toStdString());
         fs::create_directories(out);
         // Lectures/lecture.pdf with its notes (lecture.xopp)
-        makeTextPdf(lib / "Lectures" / "lecture.pdf", 3);
+        makeTextPdf(lib / "Lectures" / "lecture.pdf", numbered("page ", 3));
         {
             auto loaded = DocumentSession::loadFile(lib / "Lectures" / "lecture.pdf");
             ASSERT_TRUE(loaded.document) << loaded.error;
@@ -136,7 +118,7 @@ protected:
             markdown->addElement(std::move(box));
             ASSERT_TRUE(DocumentSession::writeDocument(doc, lib / "notes.xopp").ok);
         }
-        makeTextPdf(lib / "paper.pdf", 1);
+        makeTextPdf(lib / "paper.pdf", numbered("page ", 1));
         makeOldPdf(lib / "Old" / "scan.pdf");
         writeFile(lib / "todo.md", "# To do\n\n- archive\n");
         writeFile(lib / "Old" / "Deeper" / "data.csv", "a,b\n1,2\n");

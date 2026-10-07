@@ -17,6 +17,9 @@
 #include "shell/ToolboxModel.h"
 
 #include "AppController.h"
+#include "support/TestSupport.h"
+
+using xqt::test::waitFor;
 
 using namespace xqt;
 
@@ -38,13 +41,6 @@ QStringList idsOf(const QVariantList& l) {
         t << v.toMap().value("id").toString();
     }
     return t;
-}
-void waitFor(const std::function<bool()>& done, int ms = 2000) {
-    QElapsedTimer t;
-    t.start();
-    while (!done() && t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
-    }
 }
 }  // namespace
 

@@ -31,6 +31,9 @@
 #include "shell/TabManager.h"
 #include "AppController.h"
 #include "config-test.h"
+#include "support/TestSupport.h"
+
+using xqt::test::waitFor;
 
 using namespace xqt;
 
@@ -65,14 +68,6 @@ void makeNotes(const fs::path& pdf, const fs::path& xopp, const std::vector<cons
         loaded.document->getPage(p)->getSelectedLayer()->addElement(std::move(t));
     }
     ASSERT_TRUE(DocumentSession::writeDocument(*loaded.document, xopp).ok);
-}
-
-void waitFor(const std::function<bool()>& cond, int ms = 5000) {
-    QElapsedTimer t;
-    t.start();
-    while (!cond() && t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
-    }
 }
 
 class LibraryFuzzyTest: public ::testing::Test {

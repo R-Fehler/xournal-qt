@@ -38,29 +38,16 @@
 #include "MarkdownFile.h"
 #include "MarkdownImages.h"
 #include "MdImages.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+using xqt::test::writeFile;
+using xqt::test::gunzipFile;
 
 using namespace xqt;
 
 namespace {
-std::string bytesOf(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-void writeFile(const fs::path& p, const std::string& bytes) { std::ofstream(p, std::ios::binary) << bytes; }
 QString qstr(const fs::path& p) { return QString::fromStdString(p.string()); }
-/// The XML of a .xopp
-std::string gunzip(const fs::path& p) {
-    gzFile in = gzopen(p.string().c_str(), "r");
-    std::string out;
-    char buf[65536];
-    for (int n; in && (n = gzread(in, buf, sizeof buf)) > 0;) {
-        out.append(buf, static_cast<size_t>(n));
-    }
-    if (in) {
-        gzclose(in);
-    }
-    return out;
-}
 QUrl url(const fs::path& p) { return QUrl::fromLocalFile(qstr(p)); }
 
 /// The data of an attachment of a PDF (read with qpdf); "<none>" when it has none of that name.
@@ -156,7 +143,7 @@ TEST_F(TextPdf, newTextDocumentsFollowTheSettingAndMarkdownFilesStayMarkdown) {
     EXPECT_EQ(c.textDocument(), "markdown");
     MarkdownFile::setText(current(c), "Still Markdown\n");
     ASSERT_TRUE(c.save());
-    EXPECT_EQ(bytesOf(root / "Ideas.md"), "Still Markdown\n");
+    EXPECT_EQ(readFile(root / "Ideas.md"), "Still Markdown\n");
     EXPECT_FALSE(fs::exists(root / "Ideas.pdf"));
 
     // The setting wins over the mode, both ways
@@ -189,7 +176,7 @@ TEST_F(TextPdf, openAsPdfDocumentMakesAPdfAndLeavesTheMarkdownFile) {
     EXPECT_EQ(flowOf(pdf), TEXT);
     EXPECT_EQ(attachment(root / "notes.pdf", "notes.md"), TEXT);
     EXPECT_GE(pdf.getDocument()->getPageCount(), 2u) << "the page break";
-    EXPECT_EQ(bytesOf(root / "notes.md"), TEXT);
+    EXPECT_EQ(readFile(root / "notes.md"), TEXT);
     EXPECT_EQ(fs::last_write_time(root / "notes.md"), before);
     EXPECT_FALSE(c.openAsPdfDocument()) << "only from a .md";
     // Unsaved changes of the .md go along (the .md stays as it is on disk); the name is taken: "notes (2).pdf"
@@ -198,7 +185,7 @@ TEST_F(TextPdf, openAsPdfDocumentMakesAPdfAndLeavesTheMarkdownFile) {
     ASSERT_TRUE(c.openAsPdfDocument());
     EXPECT_EQ(current(c).getFilePath(), root / "notes (2).pdf");
     EXPECT_EQ(flowOf(current(c)), "# Changed\n");
-    EXPECT_EQ(bytesOf(root / "notes.md"), TEXT);
+    EXPECT_EQ(readFile(root / "notes.md"), TEXT);
     // The library: the .md and the PDFs are documents of their own
     EXPECT_EQ(DocumentFiles::scan(root).items.size(), 3u);
 }
@@ -218,13 +205,13 @@ TEST_F(TextPdf, exportAsMarkdownWritesTheText) {
     EXPECT_EQ(c.suggestedMarkdownExport(), url(root / "Report.md"));
     fs::create_directories(root / "out");
     ASSERT_TRUE(c.exportMarkdown(url(root / "out" / "Report")));  // (".md" added)
-    EXPECT_EQ(bytesOf(root / "out" / "Report.md"), TEXT) << "unsaved changes included, no continuation lines";
+    EXPECT_EQ(readFile(root / "out" / "Report.md"), TEXT) << "unsaved changes included, no continuation lines";
 
     // Xournal++ files: next to the document, without asking
     DocumentMode::store(settings, DocumentMode::Mode::Xopp);
     EXPECT_EQ(c.markdownExportFile(), url(root / "Report.md"));
     ASSERT_TRUE(c.exportMarkdown(c.markdownExportFile()));
-    EXPECT_EQ(bytesOf(root / "Report.md"), TEXT);
+    EXPECT_EQ(readFile(root / "Report.md"), TEXT);
 
     // Notes without a page's Markdown text: nothing to export
     c.newDocument();
@@ -276,7 +263,7 @@ TEST_F(TextPdf, picturesAreCarriedInsideAPdfTextDocument) {
     MarkdownFile::setText(current(c), "# Report\n\n![](" + *first + ")\n");
     ASSERT_TRUE(c.save());
     EXPECT_FALSE(fs::exists(root / "Report.assets")) << "nothing next to the PDF";
-    const std::string png = bytesOf(DocumentImages::workFolder(pdf) / "Report.assets" / "image-2026-09-26-101112.png");
+    const std::string png = readFile(DocumentImages::workFolder(pdf) / "Report.assets" / "image-2026-09-26-101112.png");
     EXPECT_EQ(attachment(pdf, "Report.assets/image-2026-09-26-101112.png"), png);
     EXPECT_EQ(attachment(pdf, "Report.md"), "# Report\n\n![](Report.assets/image-2026-09-26-101112.png)\n");
 
@@ -326,11 +313,11 @@ TEST_F(TextPdf, picturesAreCarriedInsideAPdfTextDocument) {
     // Export as Markdown: the text and Report.assets/ next to it
     fs::create_directories(root / "out");
     ASSERT_TRUE(c.exportMarkdown(url(root / "out" / "Report.md")));
-    EXPECT_EQ(bytesOf(root / "out" / "Report.md"), "# Report\n\n![](" + *second + ")\n");
-    EXPECT_EQ(bytesOf(root / "out" / "Report.assets" / "image-2026-09-26-101113.png"), png);
+    EXPECT_EQ(readFile(root / "out" / "Report.md"), "# Report\n\n![](" + *second + ")\n");
+    EXPECT_EQ(readFile(root / "out" / "Report.assets" / "image-2026-09-26-101113.png"), png);
     // Under another name: the links follow the name of its folder
     ASSERT_TRUE(c.exportMarkdown(url(root / "out" / "Other name.md")));
-    EXPECT_EQ(bytesOf(root / "out" / "Other name.md"), "# Report\n\n![](Other%20name.assets/image-2026-09-26-101113.png)\n");
+    EXPECT_EQ(readFile(root / "out" / "Other name.md"), "# Report\n\n![](Other%20name.assets/image-2026-09-26-101113.png)\n");
     EXPECT_TRUE(fs::exists(root / "out" / "Other name.assets" / "image-2026-09-26-101113.png"));
 
     // Open as PDF document of a .md with a picture: the PDF carries it
@@ -339,7 +326,7 @@ TEST_F(TextPdf, picturesAreCarriedInsideAPdfTextDocument) {
     ASSERT_TRUE(red.save(qstr(root / "notes.assets" / "a.png")));
     ASSERT_TRUE(c.openPath(qstr(root / "notes.md")));
     ASSERT_TRUE(c.openAsPdfDocument());
-    EXPECT_EQ(attachment(root / "notes.pdf", "notes.assets/a.png"), bytesOf(root / "notes.assets" / "a.png"));
+    EXPECT_EQ(attachment(root / "notes.pdf", "notes.assets/a.png"), readFile(root / "notes.assets" / "a.png"));
 }
 
 // qt/docs/md-images.md: the Markdown of notes (.xopp) carries its pictures inside the .xopp, as extra <preview xqt-file>
@@ -351,7 +338,7 @@ TEST_F(TextPdf, picturesOfNotesAreCarriedInsideTheXopp) {
     c.newDocument();
     const fs::path xopp = root / "lecture.xopp";
     ASSERT_TRUE(current(c).saveAs(xopp).ok);
-    const std::string before = gunzip(xopp);
+    const std::string before = gunzipFile(xopp);
     EXPECT_EQ(before.find("xqt-file"), std::string::npos) << "no pictures: as upstream writes it";
 
     // A picture pasted into the page's Markdown text of the saved notes: kept in its work folder until saved
@@ -364,7 +351,7 @@ TEST_F(TextPdf, picturesOfNotesAreCarriedInsideTheXopp) {
     MarkdownFile::setText(current(c), "# Lecture\n\n![](" + *link + ")\n");
     ASSERT_TRUE(current(c).save().ok);
     EXPECT_FALSE(fs::exists(root / "lecture.assets")) << "nothing next to the .xopp";
-    const std::string xml = gunzip(xopp);
+    const std::string xml = gunzipFile(xopp);
     EXPECT_NE(xml.find("<preview xqt-file=\"lecture.assets/image-2026-09-26-090000.png\">"), std::string::npos);
     EXPECT_LT(xml.find("<preview>"), xml.find("<preview xqt-file")) << "the document's own preview first";
     if (const char* keep = std::getenv("XQT_KEEP_XOPP")) {  // (to open it in Xournal++: qt/docs/md-images.md)
@@ -373,7 +360,7 @@ TEST_F(TextPdf, picturesOfNotesAreCarriedInsideTheXopp) {
     const auto carried = DocumentImages::xoppPictures(xopp);
     ASSERT_EQ(carried.size(), 1u);
     EXPECT_EQ(carried[0].second,
-              bytesOf(DocumentImages::workFolder(xopp) / "lecture.assets" / "image-2026-09-26-090000.png"));
+              readFile(DocumentImages::workFolder(xopp) / "lecture.assets" / "image-2026-09-26-090000.png"));
 
     // Opened again, its work folder gone: the picture comes from the file
     c.closeTab(c.tabManager().currentIndex());

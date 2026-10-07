@@ -41,33 +41,20 @@
 #include "shell/Thumbnails.h"
 
 #include "AppController.h"
+#include "UiFixture.h"
 #include "config-test.h"
+#include "support/TestSupport.h"
+
+using xqt::test::fixturePath;
 
 namespace {
-QString fixturePath(const char8_t* rel) {
-    const auto p = GET_TESTFILE(rel);
-    return QString::fromUtf8(reinterpret_cast<const char*>(p.c_str()));
-}
 
-class PresenterView: public ::testing::Test {
+class PresenterView: public xqt::test::UiFixture {
 protected:
     void SetUp() override {
         twoScreens = QGuiApplication::screens().size() >= 2;
-        controller = std::make_unique<AppController>();
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        window->requestActivate();
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));  // (the pointer rests outside: nothing hovered, no tool tips)
+        makeController();
+        ASSERT_NO_FATAL_FAILURE(loadWindow({.activate = true}));
         ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
         wait(100);
         controller->jumpToPage(0);  // (not where an earlier test of this run left it)
@@ -83,26 +70,9 @@ protected:
         settings()->set("presenterSwapScreens", false);
         settings()->set("presenterShowNotes", false);
         settings()->set("presenterFollowView", true);
-        controller->shutdown();
-        engine.reset();
-        controller.reset();
+        closeApp();
     }
 
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    /// (returns as soon as it is true: the time is for a machine slowed down by other work)
-    static void until(const std::function<bool()>& done, int ms = 5000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
-    }
     QQuickItem* findIn(QQuickWindow* w, const char* name) const {
         std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* i) -> QQuickItem* {
             if (i->objectName() == name) {
@@ -120,17 +90,6 @@ protected:
     }
     QQuickItem* find(const char* name) const { return findIn(window, name); }
     static QRectF sceneRect(const QQuickItem* i) { return i->mapRectToScene(QRectF(0, 0, i->width(), i->height())); }
-    void key(Qt::Key k, Qt::KeyboardModifiers m = Qt::NoModifier) {
-        QTest::keyClick(window, k, m);
-        wait(20);
-    }
-    void click(QQuickItem* item) {
-        ASSERT_NE(item, nullptr);
-        ASSERT_TRUE(item->isVisible());
-        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
-                          item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
-        wait(50);
-    }
     xqt::SettingsModel* settings() const { return qobject_cast<xqt::SettingsModel*>(controller->settingsModel()); }
     xqt::DocumentSession* session() const { return controller->tabManager().currentSession(); }
     xqt::CanvasView* presenterView() const { return controller->tabManager().currentView(); }
@@ -151,9 +110,6 @@ protected:
     }
 
     bool twoScreens = false;
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
     QQuickWindow* audienceWindow = nullptr;
     xqt::PresenterConsole* console = nullptr;
 };

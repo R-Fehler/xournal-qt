@@ -23,7 +23,10 @@
 #include "session/FuzzyQuery.h"
 #include "shell/InkTextStore.h"
 
-#include "../SearchHits.h"
+#include "support/SearchHits.h"
+#include "support/TestSupport.h"
+
+using xqt::test::waitFor;
 
 using namespace xqt;
 using namespace xqt::hwr;
@@ -51,15 +54,6 @@ std::unique_ptr<Document> notes(int lines) {
     }
     doc->addPage(std::move(page));
     return doc;
-}
-
-bool waitFor(const std::function<bool()>& done, int ms = 10000) {
-    QElapsedTimer t;
-    t.start();
-    while (!done() && t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-    return done();
 }
 
 ink::Word wordOf(const QRectF& box, std::vector<std::pair<QString, float>> readings, float conf = 0.9f) {
@@ -170,7 +164,7 @@ TEST_F(MultiModelTest, theSetHasTheIdsAndLanguagesOfItsModels) {
 TEST_F(MultiModelTest, theSearchFindsWordsOfEitherModel) {
     auto s = std::make_unique<DocumentSession>(*app, notes(2));
     InkTextIndexer indexer(*s, *service);
-    ASSERT_TRUE(waitFor([&] { return indexer.done() && indexer.pagesRead() == 1; }));
+    ASSERT_TRUE(waitFor([&] { return indexer.done() && indexer.pagesRead() == 1; }, 10000));
     EXPECT_EQ(english->calls(), 2);
     EXPECT_EQ(german->calls(), 2);
     EXPECT_EQ(hits(*s, QStringLiteral("Straße")), 2);  // German only
@@ -278,7 +272,7 @@ protected:
                                           std::shared_ptr<LanguagePlan> plan = nullptr) {
         auto s = std::make_unique<DocumentSession>(*app, mixed(lines, german));
         indexer = std::make_unique<InkTextIndexer>(*s, *service, nullptr, std::move(plan));
-        EXPECT_TRUE(waitFor([&] { return indexer->done() && indexer->pagesRead() == 1; }));
+        EXPECT_TRUE(waitFor([&] { return indexer->done() && indexer->pagesRead() == 1; }, 10000));
         return s;
     }
     std::unique_ptr<InkTextIndexer> indexer;
@@ -359,7 +353,7 @@ TEST_F(LanguageDetectionTest, theUsersChoiceWins) {
     EXPECT_EQ(german->calls(), 8);
     EXPECT_EQ(hits(*s, QStringLiteral("dumb")), 0);
     indexer->setLanguageChoice(LanguagePlan::Choice::Both);
-    ASSERT_TRUE(waitFor([&] { return english->calls() == 8 && indexer->done(); }));
+    ASSERT_TRUE(waitFor([&] { return english->calls() == 8 && indexer->done(); }, 10000));
     EXPECT_EQ(german->calls(), 8);  // (not again)
     EXPECT_EQ(hits(*s, QStringLiteral("dumb")), 8);
     EXPECT_EQ(hits(*s, QStringLiteral("dumm")), 8);

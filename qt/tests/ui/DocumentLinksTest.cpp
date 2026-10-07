@@ -45,46 +45,31 @@
 #include "shell/MdSnippets.h"
 
 #include "AppController.h"
+#include "UiFixture.h"
+#include "support/TestSupport.h"
+
+using xqt::test::writeFile;
 
 namespace fs = std::filesystem;
 
 namespace {
-void writeFile(const fs::path& p, const std::string& text) {
-    fs::create_directories(p.parent_path());
-    std::ofstream out(p, std::ios::binary);
-    out << text;
-}
 
-class DocumentLinksTest: public ::testing::Test {
+class DocumentLinksTest: public xqt::test::UiFixture {
 protected:
     void SetUp() override {
         ASSERT_TRUE(tmp.isValid());
         root = fs::path(tmp.path().toStdString());
-        controller = std::make_unique<AppController>();
+        makeController();
         settings()->set("linkOpening", "ask");
         makeDocuments();
         controller->setLibraryRoot(root);
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));  // (the pointer rests outside: nothing hovered, no tool tips)
+        ASSERT_NO_FATAL_FAILURE(loadWindow());
         wait(100);
     }
     void TearDown() override {
         settings()->set("linkOpening", "ask");
-        controller->shutdown();
-        engine.reset();
-        controller.reset();
+        closeApp();
     }
     xqt::SettingsModel* settings() const { return qobject_cast<xqt::SettingsModel*>(controller->settingsModel()); }
 
@@ -109,31 +94,6 @@ protected:
         writeFile(root / "Notes" / "b.md", b);
     }
 
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    /// (returns as soon as it is true: the time is for a machine slowed down by other work)
-    void until(const std::function<bool()>& done, int ms = 5000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
-    }
-    template <typename T = QObject>
-    T* find(const char* name) const {
-        return window->findChild<T*>(name);
-    }
-    void click(QQuickItem* item) {
-        ASSERT_NE(item, nullptr);
-        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
-                          item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
-        wait(50);
-    }
     xqt::DocumentSession* current() const { return controller->tabManager().currentSession(); }
     std::string currentFile() const { return current() ? current()->documentFile().filename().string() : ""; }
 
@@ -187,9 +147,6 @@ protected:
 
     QTemporaryDir tmp;
     fs::path root;
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
 };
 }  // namespace
 

@@ -34,6 +34,13 @@ Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is merged (2026-10-07).
     reading positions out of the cache folder (Library.cpp: with `qt/library-split`); session block 6's manual
     `lock()/unlock()` pairs and the plain autosave on the UI thread (risk 7); `setVersionMessage` still runs qpdf on the
     UI thread; the static `DocumentHandler` copies; markdown's and hwr's own FNV (markdown is below session).
+  - [x] `qt/test-support`: `qt/tests/support` (`waitFor` that fails, files, test PDFs, fixtures), `UiFixture` for the
+    23 UI fixtures with the app's engine set-up (`src/app/EngineSetup`), `QmlApiTest`, the QML disk cache for the UI
+    tests (the ui label about twice as fast), stable PageRaster names, `golden-roundtrip`. Left: the `qpdfCheck` (10),
+    `makePdf`/`drawStroke`/`addStroke` variants and the quick tests' `wait` copies; the fixed "settle" waits without
+    an observable state (`XQT_WAIT_LOG` ranks them: AdaptiveLayoutTest's `resize` 150 ms, `click` 50 ms, the SetUp
+    waits of MainWindowTest and ToolboxTest); a `slow` label and dropping the CI's repeat (infra B2 4–5); the UI tests
+    on Qt 6.8 with the new fixture; `MainWindowTest` split by feature.
 - [ ] **Wave 3**: `qt/qml-split-2` (HomeView, SettingsPage, the Escape/Back dispatcher, bug 4) · `qt/library-split`
   (`Library.*`, shared image-provider plumbing and shutdown, bug 5) · `qt/hybridpdf-split` (`HybridPdf.cpp`, one
   marker writer) · `qt/app-services` (`AppServices` / `OpenDocuments` / `CurrentDocument`, bug 1).
@@ -73,9 +80,8 @@ Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is merged (2026-10-07).
 - [ ] **A touch on the "pages with hits" filter can make the maximized window half as high** (old, touch only,
   KWin; also the page grid button). Suspect a touch whose item disappears mid-touch, taken by KWin as a window
   gesture. Next time: `XQT_LOG_WINDOW=1`, look for a touch cancel before the resize.
-- [ ] A test leaves a settings file `non-existing-file-path` in the working directory: upstream's
-  `test/unit_tests/control/SettingsTest.cpp`; give the `xoj-unit-tests` discovery a `WORKING_DIRECTORY` under the
-  build folder (infra B3).
+- [x] A test leaves a settings file `non-existing-file-path` in the working directory: the unit tests now run in
+  `build-qt/unit-cwd` (`qt/test-support`). Nothing left.
 
 ## Flaky tests
 - [ ] `PageFilesTest.aProtectedDocumentIsExtractedProtectedAndNeverAsXopp` fails about 1 in 3 runs alone (6 of 20 on

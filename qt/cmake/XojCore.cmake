@@ -119,12 +119,20 @@ target_link_libraries(xoj-imgdiff PRIVATE xoj::deps)
 set_target_properties(xoj-imgdiff PROPERTIES AUTOMOC OFF RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 
 set(XQT_GOLDEN_ENV "QT_CLI=$<TARGET_FILE:xournal-qt-cli>;IMGDIFF=$<TARGET_FILE:xoj-imgdiff>")
-# Routine run (part of plain `ctest`): a few representative fixtures at 72 dpi, a few seconds.
+# Routine run (part of plain `ctest`): a few representative fixtures at 72 dpi, a few seconds. The round trip (save
+# and load again: the same structure and picture) needs only the fork's CLI and runs everywhere; the comparison with
+# upstream's own export needs upstream's binary (XOJ_UPSTREAM_BIN) and is reported as skipped without it.
+add_test(NAME golden-roundtrip
+    COMMAND "${CMAKE_CURRENT_LIST_DIR}/../tests/golden/run_golden.sh"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
+set_tests_properties(golden-roundtrip PROPERTIES
+    ENVIRONMENT "${XQT_GOLDEN_ENV};GOLDEN_MODE=quick;GOLDEN_PARTS=roundtrip;GOLDEN_OUT=${CMAKE_BINARY_DIR}/golden-out-roundtrip"
+    LABELS golden TIMEOUT 120)
 add_test(NAME golden-quick
     COMMAND "${CMAKE_CURRENT_LIST_DIR}/../tests/golden/run_golden.sh"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
 set_tests_properties(golden-quick PROPERTIES
-    ENVIRONMENT "${XQT_GOLDEN_ENV};GOLDEN_MODE=quick;GOLDEN_OUT=${CMAKE_BINARY_DIR}/golden-out-quick"
+    ENVIRONMENT "${XQT_GOLDEN_ENV};GOLDEN_MODE=quick;GOLDEN_PARTS=upstream;GOLDEN_OUT=${CMAKE_BINARY_DIR}/golden-out-quick"
     SKIP_RETURN_CODE 77 LABELS golden TIMEOUT 120)
 # Full run (opt-in, several minutes): every fixture at 72 and 150 dpi. For upstream merges / milestone sign-off:
 #   ctest -C Full -L golden-full --output-on-failure

@@ -23,17 +23,13 @@
 #include "shell/TabManager.h"
 
 #include "AppController.h"
+#include "support/TestSupport.h"
+
+using xqt::test::processEventsFor;
 
 using namespace xqt;
 
 namespace {
-void processEvents(int ms) {
-    QElapsedTimer t;
-    t.start();
-    while (t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-}
 
 class QuickNoteTest: public ::testing::Test {
 protected:
@@ -155,7 +151,7 @@ TEST_F(QuickNoteTest, theCommandLineRequestReachesTheRunningInstance) {
     while (quick.isEmpty() && t.elapsed() < 3000) {
         QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
     }
-    processEvents(50);
+    processEventsFor(50);
     second.join();
     EXPECT_TRUE(handedOver);
     ASSERT_EQ(files.count(), 1);

@@ -43,23 +43,15 @@
 #include "undo/UndoRedoHandler.h"
 
 #include "AppController.h"
+#include "support/TestSupport.h"
+
+using xqt::test::makeTextPdf;
+
+using xqt::test::waitFor;
 
 using namespace xqt;
 
 namespace {
-
-void makeTextPdf(const fs::path& p, const std::vector<std::string>& words) {
-    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
-    cairo_t* cr = cairo_create(s);
-    cairo_set_font_size(cr, 24);
-    for (const auto& w: words) {
-        cairo_move_to(cr, 72, 100);
-        cairo_show_text(cr, w.c_str());
-        cairo_show_page(cr);
-    }
-    cairo_destroy(cr);
-    cairo_surface_destroy(s);
-}
 
 void protect(const fs::path& in, const fs::path& out, const char* password) {
     QPDF q;
@@ -95,18 +87,6 @@ size_t strokesOn(const XojPage& page) {
     return n;
 }
 
-bool waitFor(const std::function<bool()>& done, int ms = 30000) {
-    QElapsedTimer t;
-    t.start();
-    while (!done()) {
-        if (t.elapsed() > ms) {
-            return false;
-        }
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-    return true;
-}
-
 QUrl url(const fs::path& p) { return QUrl::fromLocalFile(QString::fromStdString(p.string())); }
 
 bool hasText(Document& doc, size_t page, const char* text) { return !DocumentSearch::findOnPage(doc, page, text).empty(); }
@@ -133,13 +113,13 @@ protected:
     QVariantMap read(AppController& c, const fs::path& file, const QString& password = {}) {
         QSignalSpy spy(&c, &AppController::pageFileRead);
         EXPECT_TRUE(c.readPageFile(url(file), password));
-        EXPECT_TRUE(waitFor([&] { return spy.count() > 0; }));
+        EXPECT_TRUE(waitFor([&] { return spy.count() > 0; }, 30000));
         return spy.isEmpty() ? QVariantMap() : spy.first().at(0).toMap();
     }
     int insert(AppController& c, const QString& range, const QList<int>& picked, int position) {
         QSignalSpy spy(&c, &AppController::pagesFromFileInserted);
         EXPECT_TRUE(c.insertPagesFromFile(range, picked, position));
-        EXPECT_TRUE(waitFor([&] { return spy.count() > 0; }));
+        EXPECT_TRUE(waitFor([&] { return spy.count() > 0; }, 30000));
         if (spy.isEmpty()) {
             return 0;
         }
@@ -150,7 +130,7 @@ protected:
     QStringList written(AppController& c, const std::function<bool()>& start) {
         QSignalSpy spy(&c, &AppController::pagesExtracted);
         EXPECT_TRUE(start());
-        EXPECT_TRUE(waitFor([&] { return spy.count() > 0; }));
+        EXPECT_TRUE(waitFor([&] { return spy.count() > 0; }, 30000));
         if (spy.isEmpty()) {
             return {};
         }
@@ -160,7 +140,7 @@ protected:
     QStringList images(AppController& c, const QList<int>& pages, int dpi, bool transparent, const QString& format) {
         QSignalSpy spy(&c, &AppController::pageImagesExported);
         EXPECT_TRUE(c.exportPageImages(pages, url(root / "pictures"), dpi, transparent, format));
-        EXPECT_TRUE(waitFor([&] { return spy.count() > 0; }));
+        EXPECT_TRUE(waitFor([&] { return spy.count() > 0; }, 30000));
         if (spy.isEmpty()) {
             return {};
         }
@@ -451,7 +431,7 @@ TEST_F(PageFilesTest, aPageIsCopiedAsAHighResolutionImage) {
     QSignalSpy copied(&c, &AppController::pageImageCopied);
     QSignalSpy toast(&c, &AppController::pageActionDone);
     ASSERT_TRUE(c.copyPagesAsImage({2}));
-    ASSERT_TRUE(waitFor([&] { return copied.count() > 0; }));
+    ASSERT_TRUE(waitFor([&] { return copied.count() > 0; }, 30000));
     EXPECT_EQ(copied.first().at(0).toInt(), 2);
     EXPECT_EQ(copied.first().at(3).toString(), QString());
     // 595 × 842 points at 300 dpi
@@ -472,7 +452,7 @@ TEST_F(PageFilesTest, aPageIsCopiedAsAHighResolutionImage) {
     c.setPageImageDpi(1200);
     copied.clear();
     ASSERT_TRUE(c.copyPagesAsImage({0}));
-    ASSERT_TRUE(waitFor([&] { return copied.count() > 0; }));
+    ASSERT_TRUE(waitFor([&] { return copied.count() > 0; }, 30000));
     const QSize capped = copied.first().at(1).toSize();
     EXPECT_LE(double(capped.width()) * capped.height(), 32.0 * 1024 * 1024);
     EXPECT_LT(copied.first().at(2).toInt(), 1200);

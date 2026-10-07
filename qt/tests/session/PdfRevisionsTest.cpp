@@ -25,23 +25,15 @@
 
 #include "session/IncrementalPdf.h"
 #include "session/PdfRevisions.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+
+using xqt::test::makeTextPdf;
 
 using namespace xqt;
 
 namespace {
-void makeTextPdf(const fs::path& p, const std::vector<std::string>& words) {
-    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
-    cairo_t* cr = cairo_create(s);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, 24);
-    for (const auto& w: words) {
-        cairo_move_to(cr, 72, 100);
-        cairo_show_text(cr, w.c_str());
-        cairo_show_page(cr);
-    }
-    cairo_destroy(cr);
-    cairo_surface_destroy(s);
-}
 
 int qpdfCheck(const fs::path& pdf, std::string& output) {
     std::ostringstream out, err;
@@ -55,11 +47,6 @@ int qpdfCheck(const fs::path& pdf, std::string& output) {
     job.run();
     output = out.str() + err.str();
     return job.getExitCode();
-}
-
-std::string fileBytes(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
 class PdfRevisionsTest: public ::testing::Test {
@@ -164,7 +151,7 @@ TEST_F(PdfRevisionsTest, eightAppendedSavesGiveNineRevisions) {
 TEST_F(PdfRevisionsTest, anotherAppsClassicUpdateIsARevision) {
     const fs::path file = written(false);
     const uint64_t ours = appendOne(file, 1);
-    std::string bytes = fileBytes(file);
+    std::string bytes = readFile(file);
     QPDF q;
     q.processFile(file.string().c_str());
     const int size = static_cast<int>(q.getTrailer().getKey("/Size").getIntValue());

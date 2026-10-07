@@ -28,24 +28,16 @@
 #include "shell/LibraryModel.h"
 
 #include "MarkdownFile.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+
+using xqt::test::waitFor;
 
 using namespace xqt;
 
 namespace {
 QString qstr(const fs::path& p) { return QString::fromStdString(p.string()); }
-
-std::string bytesOf(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
-void waitFor(const std::function<bool()>& cond, int ms = 5000) {
-    QElapsedTimer t;
-    t.start();
-    while (!cond() && t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
-    }
-}
 
 /// A .xopp of `pages` blank pages with these bookmarks (page -> label).
 void makeNotes(const fs::path& xopp, size_t pages, const std::map<size_t, std::string>& marks = {}) {
@@ -92,13 +84,13 @@ TEST_F(FavouritesTest, aStarIsKeptBesideTheDocumentAndFollowsIt) {
     fs::create_directories(root / "Sub");
     LibraryModel model;
     model.setLibrary(std::make_unique<Library>(root));
-    const std::string before = bytesOf(root / "alpha.xopp");
+    const std::string before = readFile(root / "alpha.xopp");
     const auto modified = fs::last_write_time(root / "alpha.xopp");
     model.setFavourite(qstr(root / "alpha.xopp"), true);
     EXPECT_TRUE(model.isFavourite(qstr(root / "alpha.xopp")));
     EXPECT_FALSE(model.isFavourite(qstr(root / "beta.xopp")));
     EXPECT_TRUE(model.data(model.index(model.rowOf(qstr(root / "alpha.xopp"))), LibraryModel::FavouriteRole).toBool());
-    EXPECT_EQ(bytesOf(root / "alpha.xopp"), before) << "the file is not touched";
+    EXPECT_EQ(readFile(root / "alpha.xopp"), before) << "the file is not touched";
     EXPECT_EQ(fs::last_write_time(root / "alpha.xopp"), modified);
     EXPECT_TRUE(fs::exists(model.library()->placesFile()));
 

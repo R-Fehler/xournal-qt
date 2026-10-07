@@ -51,6 +51,14 @@
 #include "util/PathUtil.h"
 
 #include "config.h"
+#include "support/TestSupport.h"
+
+using xqt::test::gunzip;
+
+using xqt::test::readFile;
+
+using xqt::test::makeTextPdf;
+using xqt::test::numbered;
 
 using namespace xqt;
 
@@ -58,20 +66,6 @@ namespace {
 
 constexpr const char* PASSWORD = "s3cret pass";
 constexpr const char* MARKER = "inkmarkerQ7Z";  ///< a text of the document: it must never be found unencrypted
-
-void makeTextPdf(const fs::path& p, int pages = 2) {
-    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
-    cairo_t* cr = cairo_create(s);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, 24);
-    for (int i = 0; i < pages; ++i) {
-        cairo_move_to(cr, 72, 100);
-        cairo_show_text(cr, ("page" + std::to_string(i + 1)).c_str());
-        cairo_show_page(cr);
-    }
-    cairo_destroy(cr);
-    cairo_surface_destroy(s);
-}
 
 /// Encrypt `in` as `out` with qpdf directly (as another app would): AES-256, a user password (may be empty) and an
 /// owner password; `restrict`: no printing, no copying.
@@ -122,36 +116,6 @@ bool popplerOpens(const fs::path& pdf, const std::string& password) {
     return ok;
 }
 
-std::string fileBytes(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
-std::string gunzip(const std::string& data) {
-    if (data.size() < 2 || static_cast<unsigned char>(data[0]) != 0x1f || static_cast<unsigned char>(data[1]) != 0x8b) {
-        return {};
-    }
-    z_stream z{};
-    if (inflateInit2(&z, 15 + 32) != Z_OK) {
-        return {};
-    }
-    std::string out;
-    char buf[65536];
-    z.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
-    z.avail_in = static_cast<uInt>(data.size());
-    while (true) {
-        z.next_out = reinterpret_cast<Bytef*>(buf);
-        z.avail_out = sizeof buf;
-        const int rc = inflate(&z, Z_NO_FLUSH);
-        out.append(buf, sizeof buf - z.avail_out);
-        if (rc != Z_OK) {
-            break;
-        }
-    }
-    inflateEnd(&z);
-    return out;
-}
-
 /// Everything readable without a password in `pdf`: its strings and its streams decoded (empty when it needs one).
 std::string readableText(const fs::path& pdf) {
     std::string all;
@@ -186,7 +150,7 @@ std::vector<fs::path> leaks(const fs::path& dir, const std::string& marker) {
         if (!it->is_regular_file()) {
             continue;
         }
-        const std::string bytes = fileBytes(it->path());
+        const std::string bytes = readFile(it->path());
         bool found = bytes.find(marker) != std::string::npos || gunzip(bytes).find(marker) != std::string::npos;
         if (!found && bytes.rfind("%PDF", 0) == 0) {
             found = readableText(it->path()).find(marker) != std::string::npos;
@@ -242,7 +206,7 @@ protected:
     fs::path path(const char* name) const { return fs::path(tmp.filePath(name).toStdString()); }
     /// A plain PDF of two pages, protected with PASSWORD (the owner password another one).
     fs::path protectedPdf(const char* name) {
-        makeTextPdf(path("plain.pdf"));
+        makeTextPdf(path("plain.pdf"), numbered("page", 2));
         const fs::path out = path(name);
         encrypt(path("plain.pdf"), out, PASSWORD, "the owner");
         return out;
@@ -308,7 +272,7 @@ TEST_F(PdfEncryptionTest, aPasswordIsNeededAndChecked) {
 }
 
 TEST_F(PdfEncryptionTest, anOwnerPasswordOnlyOpensWithoutAskingAndTellsItsRestrictions) {
-    makeTextPdf(path("plain.pdf"));
+    makeTextPdf(path("plain.pdf"), numbered("page", 2));
     encrypt(path("plain.pdf"), path("restricted.pdf"), "", "the owner", /*restrict=*/true);
     const auto st = PdfEncryption::probe(path("restricted.pdf"));
     EXPECT_TRUE(st.readable);
@@ -369,7 +333,7 @@ TEST_F(PdfEncryptionTest, aXoppOnAProtectedPdfAsksForThePdfsPassword) {
 }
 
 TEST_F(PdfEncryptionTest, protectChangeAndRemoveThePassword) {
-    makeTextPdf(path("doc.pdf"));
+    makeTextPdf(path("doc.pdf"), numbered("page", 2));
     PdfEncryption::Protection p;
     p.password = "first";
     std::string error;
@@ -422,7 +386,7 @@ TEST_F(PdfEncryptionTest, notesSavedIntoAProtectedPdfStayEncryptedAndOpenWithThe
     EXPECT_EQ(qpdfCheck(pdf, PASSWORD), 0);
     EXPECT_TRUE(popplerOpens(pdf, PASSWORD));
     EXPECT_TRUE(readableText(pdf).empty());
-    EXPECT_EQ(fileBytes(pdf).find(MARKER), std::string::npos);
+    EXPECT_EQ(readFile(pdf).find(MARKER), std::string::npos);
     const size_t elements = elementCount(*s->getDocument());
     s.reset();
 
@@ -491,14 +455,14 @@ TEST_F(PdfEncryptionTest, aProtectedPdfWithNotesIsAppendedToEncrypted) {
         EXPECT_TRUE(readableText(pdf).empty());
     }
     EXPECT_GT(fs::file_size(pdf), sizeBefore);
-    EXPECT_EQ(fileBytes(pdf).find("xopp:p"), std::string::npos) << "the names of our annotations are encrypted too";
+    EXPECT_EQ(readFile(pdf).find("xopp:p"), std::string::npos) << "the names of our annotations are encrypted too";
     // Every earlier revision is a file that opens with the password
     const auto chain = PdfRevisions::read(pdf);
     ASSERT_GE(chain.revisions.size(), 4U);
     for (const auto& rev: chain.revisions) {
         const fs::path cut = path("cut.pdf");
         {
-            const std::string bytes = fileBytes(pdf).substr(0, rev.end);
+            const std::string bytes = readFile(pdf).substr(0, rev.end);
             std::ofstream out(cut, std::ios::binary);
             out << bytes;
         }
@@ -654,7 +618,7 @@ TEST_F(PdfEncryptionTest, benchLongProtectedPdf) {
     }
     fs::path source = given == "1" ? path("long.pdf") : fs::path(given.toStdString());
     if (given == "1") {
-        makeTextPdf(source, 1321);
+        makeTextPdf(source, numbered("page", 1321));
     }
     const fs::path pdf = path("long-protected.pdf");
     encrypt(source, pdf, PASSWORD, "the owner");

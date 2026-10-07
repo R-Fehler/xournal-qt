@@ -32,60 +32,28 @@
 #include "shell/Thumbnails.h"
 
 #include "AppController.h"
+#include "UiFixture.h"
 #include "DocumentCanvasItem.h"
 
 namespace fs = std::filesystem;
 
 namespace {
-class DarkPagesUiTest: public ::testing::Test {
+class DarkPagesUiTest: public xqt::test::UiFixture {
 protected:
     void SetUp() override {
         ASSERT_TRUE(tmp.isValid());
-        controller = std::make_unique<AppController>();
+        makeController();
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
         controller->setDarkPagesMode("off");
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        window->resize(1600, 1000);
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));
+        ASSERT_NO_FATAL_FAILURE(loadWindow({.size = QSize(1600, 1000)}));
         controller->newDocument();
         wait(200);
     }
     void TearDown() override {
         controller->setDarkPagesMode("off");
-        controller->shutdown();
-        engine.reset();
-        controller.reset();
+        closeApp();
     }
 
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    void until(const std::function<bool()>& done, int ms = 5000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
-    }
-    template <typename T = QObject>
-    T* find(const char* name) const {
-        return window->findChild<T*>(name);
-    }
     /// An item under `root` (the delegates of a Repeater are not its QObject children)
     static QQuickItem* item(QQuickItem* root, const char* name) {
         if (!root) {
@@ -109,9 +77,6 @@ protected:
     }
 
     QTemporaryDir tmp;
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
 };
 }  // namespace
 
@@ -184,7 +149,7 @@ TEST_F(DarkPagesUiTest, printingDarkPaperSaysItTakesALotOfInk) {
     ASSERT_NE(warning, nullptr);
     EXPECT_FALSE(warning->isVisible()) << "white paper";
     QMetaObject::invokeMethod(print, "close");
-    wait(300);
+    ASSERT_TRUE(waitOpened(print, false));
 
     const int plain = static_cast<int>(
             controller->settingsModel()->property("pageBackgroundFormats").toStringList().indexOf("plain"));
@@ -192,5 +157,5 @@ TEST_F(DarkPagesUiTest, printingDarkPaperSaysItTakesALotOfInk) {
     openDialog(print);
     EXPECT_TRUE(warning->isVisible()) << "black paper";
     QMetaObject::invokeMethod(print, "close");
-    wait(300);
+    ASSERT_TRUE(waitOpened(print, false));
 }

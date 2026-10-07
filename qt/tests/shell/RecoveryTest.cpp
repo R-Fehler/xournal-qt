@@ -44,11 +44,15 @@
 #include "AppController.h"
 #include "MarkdownFile.h"
 #include "config-test.h"
+#include "support/TestSupport.h"
+
+using xqt::test::waitFor;
+
+using xqt::test::fixture;
 
 using namespace xqt;
 
 namespace {
-fs::path fixture(const char8_t* rel) { return GET_TESTFILE(rel); }
 
 void scribble(DocumentSession& s) {
     auto page = s.getDocument()->getPage(0);
@@ -524,15 +528,7 @@ TEST_F(RecoveryTest, emergencySaveDuringABackgroundSave) {
                             EXPECT_TRUE(r.ok) << r.error;
                             finished = true;
                         }});
-    auto waitFor = [](const std::function<bool()>& done) {
-        const auto until = std::chrono::steady_clock::now() + 20s;
-        while (!done() && std::chrono::steady_clock::now() < until) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-            std::this_thread::sleep_for(1ms);
-        }
-        return done();
-    };
-    ASSERT_TRUE(waitFor([&] { return held == 1; })) << "the save is writing";
+    ASSERT_TRUE(waitFor([&] { return held == 1; }, 20000)) << "the save is writing";
     scribble(s);  // (edited meanwhile)
     EXPECT_EQ(SessionRecovery::emergencySaveAll(), 1);
     const fs::path emergency = DocumentSession::emergencyPath(Util::getPid(), s.serial());
@@ -541,7 +537,7 @@ TEST_F(RecoveryTest, emergencySaveDuringABackgroundSave) {
     EXPECT_EQ(saved.document->getPage(0)->getSelectedLayer()->getElements().size(), before + 2)
             << "the document as it is now";
     release.set_value();
-    const bool done = waitFor([&] { return finished; });
+    const bool done = waitFor([&] { return finished; }, 20000);
     PdfPageKeeper::stopSaveAt = nullptr;
     ASSERT_TRUE(done);
     auto file = DocumentSession::loadFile(doc);

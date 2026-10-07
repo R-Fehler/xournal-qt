@@ -110,15 +110,20 @@
 #include "util/PathUtil.h"
 
 #include "AppController.h"
+#include "UiFixture.h"
 #include "MarkdownFile.h"
-#include "../SearchHits.h"
+#include "support/SearchHits.h"
 #include "config-test.h"
+#include "support/TestSupport.h"
+
+using xqt::test::waitFor;
+using xqt::test::fixturePath;
 
 namespace {
-class MainWindowTest: public ::testing::Test {
+class MainWindowTest: public xqt::test::UiFixture {
 protected:
     void SetUp() override {
-        controller = std::make_unique<AppController>();
+        makeController();
         prepareController();
         // (the tests of a run share the config: no layout chosen by hand in an earlier one, e.g. the sidebar hidden;
         // no tool variant or recent color remembered)
@@ -127,85 +132,10 @@ protected:
             QMetaObject::invokeMethod(controller->settingsModel(), "set", Q_ARG(QString, "toolVariants"), Q_ARG(QVariant, ""));
             QMetaObject::invokeMethod(controller->settingsModel(), "set", Q_ARG(QString, "recentColors"), Q_ARG(QVariant, ""));
         }
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        window->requestActivate();
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));  // (the pointer rests outside: nothing hovered, no tool tips)
+        ASSERT_NO_FATAL_FAILURE(loadWindow({.activate = true}));
         wait(100);
     }
-    void TearDown() override {
-        controller->shutdown();  // first the image workers, then the engine that owns their providers
-        engine.reset();
-        controller.reset();
-    }
 
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    template <typename T = QObject>
-    T* find(const char* name) const {
-        return window->findChild<T*>(name);
-    }
-    /// Waits until the popup is fully open (or closed).
-    static bool waitOpened(QObject* popup, bool opened, int timeoutMs = 5000) {
-        auto done = [&] {
-            return popup->property("opened").toBool() == opened && popup->property("visible").toBool() == opened;
-        };
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < timeoutMs) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-        return done();
-    }
-    void key(Qt::Key k, Qt::KeyboardModifiers m = Qt::NoModifier) {
-        QTest::keyClick(window, k, m);
-        wait(20);
-    }
-    /// Also items without a QObject parent (made by a Repeater): through the item tree.
-    QQuickItem* findItem(const char* name) const {
-        std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* i) -> QQuickItem* {
-            if (i->objectName() == name) {
-                return i;
-            }
-            for (QQuickItem* c: i->childItems()) {
-                if (QQuickItem* f = walk(c)) {
-                    return f;
-                }
-            }
-            return nullptr;
-        };
-        return walk(window->contentItem());
-    }
-    /// Waits until something is true (animations, delegates of a list, a popup fading out).
-    /// (returns as soon as it is true: the time is for a machine slowed down by other work)
-    void until(const std::function<bool()>& done, int ms = 5000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
-    }
-    void click(QQuickItem* item, Qt::KeyboardModifiers m = Qt::NoModifier) {
-        ASSERT_NE(item, nullptr);
-        QTest::mouseClick(window, Qt::LeftButton, m,
-                          item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
-        wait(50);
-    }
     /// The toolbox (qt/docs/toolbox.md): the id of its `n`th entry of a type ("pen", "highlighter", "eraser", "shape",
     /// "text", "sticky", "laser", "snip"), and its button on the rail
     QString toolEntryId(const QString& type, int n = 0) const {
@@ -221,50 +151,6 @@ protected:
     QQuickItem* onRail(const QString& id) const {
         QQuickItem* b = toolEntry(id);
         return b && b->isVisible() ? b : nullptr;
-    }
-    /// An entry of a menu by its name (entries made by a Repeater are not found through the objects' parents)
-    static QObject* entryOf(QObject* menu, const char* name) {
-        const int n = menu ? menu->property("count").toInt() : 0;
-        for (int i = 0; i < n; ++i) {
-            QQuickItem* it = nullptr;
-            QMetaObject::invokeMethod(menu, "itemAt", Q_RETURN_ARG(QQuickItem*, it), Q_ARG(int, i));
-            if (it && it->objectName() == name) {
-                return it;
-            }
-        }
-        return nullptr;
-    }
-    /// Scrolls the flickable (a ScrollView's) that holds `item` so that the item is shown (to be clicked).
-    void scrollIntoView(QQuickItem* item) {
-        ASSERT_NE(item, nullptr);
-        QQuickItem* flick = item->parentItem();
-        while (flick && !flick->inherits("QQuickFlickable")) {
-            flick = flick->parentItem();
-        }
-        if (!flick) {
-            return;
-        }
-        auto* content = flick->property("contentItem").value<QQuickItem*>();
-        if (!content) {
-            return;
-        }
-        const qreal y = item->mapToItem(content, QPointF(0, 0)).y();
-        const qreal maxY = std::max(0.0, flick->property("contentHeight").toReal() - flick->height());
-        flick->setProperty("contentY", std::clamp(y - flick->height() / 3, 0.0, maxY));
-        nextFrame();
-    }
-    /// Until the window drew its next frame: layouts changed meanwhile are done, the items are where they are shown
-    void nextFrame() {
-        QSignalSpy drawn(window, &QQuickWindow::frameSwapped);
-        window->update();
-        drawn.wait(5000);
-    }
-    /// Types text into the focused item (QTest::keyClicks is for widgets only).
-    void type(const char* text) {
-        for (const char* c = text; *c; ++c) {
-            QTest::keyClick(window, *c);
-        }
-        wait(20);
     }
 
     /// Opens the ⋮ menu down to the entry `name`: through its submenu when it is in one (Document, Export, Page,
@@ -312,9 +198,6 @@ protected:
     }
 
     bool restarting = false;
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
 };
 }  // namespace
 
@@ -765,18 +648,6 @@ TEST_F(MainWindowTest, twoA4PagesSideBySideOnTheUnfoldedFold) {
 }
 
 namespace {
-QString fixturePath(const char8_t* rel) {
-    const auto p = GET_TESTFILE(rel);
-    return QString::fromUtf8(reinterpret_cast<const char*>(p.c_str()));
-}
-bool waitFor(const std::function<bool()>& done, int ms = 3000) {
-    QElapsedTimer t;
-    t.start();
-    while (!done() && t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-    return done();
-}
 /// An ordinary text (as Xournal++ writes them, not Markdown) on a page of the current document, in its selected layer
 void addXournalText(AppController& c, size_t pageNo, double x, double y, const std::string& text) {
     Document* doc = c.tabManager().currentSession()->getDocument();
@@ -1356,7 +1227,7 @@ TEST_F(MainWindowTest, holdingAPageInTheSidebarSelectsIt) {
     EXPECT_TRUE(menu->property("visible").toBool());
     EXPECT_EQ(menu->property("what").toString(), "2 pages");
     QMetaObject::invokeMethod(menu, "close");
-    wait(100);
+    ASSERT_TRUE(waitOpened(menu, false));
 
     // Done: the selection goes, a tap goes to a page again
     auto* done = find<QQuickItem>("sidebarSelectionDone");
@@ -3357,7 +3228,8 @@ TEST_F(MainWindowTest, aTabGetsAWindowOfItsOwn) {
     wait(50);
     EXPECT_EQ(controller->tabManager().count(), 2) << "the document is back in the main window";
     EXPECT_EQ(closing.count(), 1);
-    wait(100);  // the window without documents closes itself, with its controller
+    // the window without documents closes itself, with its controller
+    until([&] { return controller->documentWindows().empty() && made[0].isNull(); });
     EXPECT_TRUE(controller->documentWindows().empty());
     EXPECT_TRUE(made[0].isNull()) << "the window is gone";
     AppController::setWindowFactory({});

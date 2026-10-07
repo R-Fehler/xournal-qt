@@ -35,7 +35,10 @@
 #include "undo/InsertUndoAction.h"
 #include "undo/UndoRedoHandler.h"
 
-#include "../FailingWrites.h"
+#include "support/FailingWrites.h"
+#include "support/TestSupport.h"
+
+using xqt::test::waitFor;
 
 using namespace xqt;
 using namespace std::chrono_literals;
@@ -118,20 +121,6 @@ struct HeldSave {
     std::shared_future<void> released = promise.get_future().share();
     std::atomic<bool> done{false};
 };
-
-/// Runs the event loop until `done` (false: it took too long).
-bool waitFor(const std::function<bool()>& done, int ms = 20000) {
-    QElapsedTimer t;
-    t.start();
-    while (!done()) {
-        if (t.elapsed() > ms) {
-            return false;
-        }
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        std::this_thread::sleep_for(1ms);
-    }
-    return true;
-}
 
 /// Runs the event loop until `finished`, and measures the longest time it did not run (the window was blocked),
 /// including the call that starts the work.
@@ -239,12 +228,12 @@ TEST_F(BackgroundSaveTest, anEditDuringASaveIsNotLostAndTheDocumentStaysModified
                             result = r;
                             finished = true;
                         }});
-    ASSERT_TRUE(waitFor([&] { return held.entered == 1; }));
+    ASSERT_TRUE(waitFor([&] { return held.entered == 1; }, 20000));
     EXPECT_TRUE(s.isSaving());
     EXPECT_TRUE(s.isModified()) << "modified until the file is written";
     addStroke(s, 0);  // while the worker writes
     held.release();
-    ASSERT_TRUE(waitFor([&] { return finished; }));
+    ASSERT_TRUE(waitFor([&] { return finished; }, 20000));
     ASSERT_TRUE(result.ok) << result.error;
     EXPECT_FALSE(s.isSaving());
     EXPECT_EQ(saving.count(), 2) << "saving, then not";
@@ -274,7 +263,7 @@ TEST_F(BackgroundSaveTest, aFailedSaveKeepsTheDocumentModifiedAndReportsTheError
                             result = r;
                             finished = true;
                         }});
-    ASSERT_TRUE(waitFor([&] { return finished; }));
+    ASSERT_TRUE(waitFor([&] { return finished; }, 20000));
     EXPECT_FALSE(result.ok);
     EXPECT_FALSE(result.error.empty());
     EXPECT_TRUE(s.isModified());
@@ -317,12 +306,12 @@ TEST_F(BackgroundSaveTest, aSaveAskedForWhileOneRunsFollowsIt) {
         ++finished;
     };
     s.saveInBackground({DocumentSession::SaveKind::Save, {}, {}, done});
-    ASSERT_TRUE(waitFor([&] { return held.entered == 1; }));
+    ASSERT_TRUE(waitFor([&] { return held.entered == 1; }, 20000));
     addStroke(s, 0);
     s.saveInBackground({DocumentSession::SaveKind::Save, {}, {}, done});
     s.saveInBackground({DocumentSession::SaveKind::Save, {}, {}, done});
     held.release();
-    ASSERT_TRUE(waitFor([&] { return finished == 3; }));
+    ASSERT_TRUE(waitFor([&] { return finished == 3; }, 20000));
     EXPECT_EQ(held.entered, 2) << "one more save, not two";
     EXPECT_FALSE(s.isSaving());
     EXPECT_FALSE(s.isModified());
@@ -336,7 +325,7 @@ TEST_F(BackgroundSaveTest, closingWaitsForARunningSave) {
     bool called = false;
     s->saveInBackground({DocumentSession::SaveKind::SaveAs, tmpPath("closed.xopp"), {},
                          [&](const DocumentSession::SaveResult&) { called = true; }});
-    ASSERT_TRUE(waitFor([&] { return held.entered == 1; }));
+    ASSERT_TRUE(waitFor([&] { return held.entered == 1; }, 20000));
     std::thread releaser([&] {
         std::this_thread::sleep_for(300ms);
         held.release();

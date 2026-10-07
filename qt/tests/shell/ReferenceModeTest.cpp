@@ -30,14 +30,13 @@
 #include "AppController.h"
 #include "CanvasView.h"
 #include "config-test.h"
+#include "support/TestSupport.h"
+
+using xqt::test::fixturePath;
 
 using namespace xqt;
 
 namespace {
-QString fixture(const char8_t* rel) {
-    const auto p = GET_TESTFILE(rel);
-    return QString::fromUtf8(reinterpret_cast<const char*>(p.c_str()));
-}
 
 /// Three documents: 0, 1, 2 (the last one current)
 struct ThreeTabs {
@@ -336,7 +335,7 @@ TEST(ReferenceMode, openAsReferenceOpensTheFileBesideTheCurrentDocument) {
     AppController c;
     c.newDocument();  // untouched: it stays, for the notes
     DocumentSession* notes = c.tabManager().currentSession();
-    ASSERT_TRUE(c.openAsReference(fixture(u8"test1.xoj")));
+    ASSERT_TRUE(c.openAsReference(fixturePath(u8"test1.xoj")));
     EXPECT_EQ(c.tabCount(), 2) << "the new document was replaced";
     EXPECT_EQ(c.tabManager().currentSession(), notes);
     ASSERT_TRUE(c.reference().active());
@@ -346,17 +345,17 @@ TEST(ReferenceMode, openAsReferenceOpensTheFileBesideTheCurrentDocument) {
     // A file that is open already: its tab
     notes->insertNewPage(1);  // (written in: no longer replaced by a file opened)
     ASSERT_FALSE(c.tabManager().isPristine(c.currentTab()));
-    ASSERT_TRUE(c.openPath(fixture(u8"load/strokes.xopp")));
+    ASSERT_TRUE(c.openPath(fixturePath(u8"load/strokes.xopp")));
     const int strokes = c.currentTab();
     c.setCurrentTab(c.tabManager().indexOf(notes));
-    ASSERT_TRUE(c.openAsReference(fixture(u8"load/strokes.xopp")));
+    ASSERT_TRUE(c.openAsReference(fixturePath(u8"load/strokes.xopp")));
     EXPECT_EQ(c.tabCount(), 3);
     EXPECT_EQ(c.reference().tab(), strokes);
     EXPECT_EQ(c.tabManager().currentSession(), notes);
 
     // Nothing open: it is opened as the document
     AppController empty;
-    ASSERT_TRUE(empty.openAsReference(fixture(u8"test1.xoj")));
+    ASSERT_TRUE(empty.openAsReference(fixturePath(u8"test1.xoj")));
     EXPECT_EQ(empty.tabCount(), 1);
     EXPECT_FALSE(empty.reference().active());
 }

@@ -33,23 +33,13 @@
 #include "shell/TabManager.h"
 #include "shell/VersionsModel.h"
 #include "undo/UndoRedoHandler.h"
+#include "support/TestSupport.h"
+
+using xqt::test::makeTextPdf;
 
 using namespace xqt;
 
 namespace {
-void makeTextPdf(const fs::path& p, const std::vector<std::string>& words) {
-    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
-    cairo_t* cr = cairo_create(s);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, 24);
-    for (const auto& w: words) {
-        cairo_move_to(cr, 72, 100);
-        cairo_show_text(cr, w.c_str());
-        cairo_show_page(cr);
-    }
-    cairo_destroy(cr);
-    cairo_surface_destroy(s);
-}
 
 void drawOn(DocumentSession& s, size_t pageNo, double y) {
     PageRef page = s.getDocument()->getPage(pageNo);

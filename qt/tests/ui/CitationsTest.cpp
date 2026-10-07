@@ -49,10 +49,11 @@
 #include "shell/TabManager.h"
 #include "shell/Thumbnails.h"
 
-#include "../ArxivSamples.h"
-#include "../CitationPdfs.h"
-#include "../FakeNet.h"
+#include "support/ArxivSamples.h"
+#include "support/CitationPdfs.h"
+#include "support/FakeNet.h"
 #include "AppController.h"
+#include "UiFixture.h"
 
 namespace fs = std::filesystem;
 
@@ -75,13 +76,13 @@ constexpr const char* ARXIV_REFERENCE =
         "[2] T. B. Brown et al., Language models are few-shot learners, arXiv:2005.14165, 2020.";
 constexpr double ARXIV_REF_Y = 230;
 
-class CitationsTest: public ::testing::Test {
+class CitationsTest: public xqt::test::UiFixture {
 protected:
     void SetUp() override {
         ASSERT_TRUE(tmp.isValid());
         root = fs::path(tmp.path().toStdString());
         xqt::SystemApps::setInstance(&browser);
-        controller = std::make_unique<AppController>();
+        makeController();
         settings()->set("webConfirm", true);
         settings()->set("translateService", "google");
         settings()->set("translateLanguage", "de");
@@ -98,46 +99,18 @@ protected:
                              "Deep Residual Learning for Image Recognition", "Kaiming He, Xiangyu Zhang");
         controller->setLibraryRoot(root);
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));
+        ASSERT_NO_FATAL_FAILURE(loadWindow());
         wait(100);
     }
     void TearDown() override {
         settings()->set("webConfirm", true);
         settings()->set("translateLanguage", "");
         settings()->set("webSearch", "google");
-        controller->shutdown();
-        engine.reset();
-        controller.reset();
+        closeApp();
         xqt::SystemApps::setInstance(nullptr);
     }
     xqt::SettingsModel* settings() const { return qobject_cast<xqt::SettingsModel*>(controller->settingsModel()); }
 
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    void until(const std::function<bool()>& done, int ms = 5000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
-    }
     /// By objectName: a QObject child of the window, else an item of the scene (delegates of lists have no QObject
     /// parent there)
     template <typename T = QObject>
@@ -166,13 +139,8 @@ protected:
         auto* o = find(name);
         return o && o->property("visible").toBool();
     }
-    void click(QQuickItem* item) {
-        ASSERT_NE(item, nullptr);
-        ASSERT_TRUE(item->isVisible());
-        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
-                          item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
-        wait(50);
-    }
+    using UiFixture::click;
+    /// The item of that name, once it is shown (in a menu or a dialog: once that is open)
     void click(const char* name) {
         until([&] { auto* i = find<QQuickItem>(name); return i && i->isVisible() && i->width() > 0; });
         // (in a menu or a dialog: once it is fully open, not while it grows into place)
@@ -232,9 +200,6 @@ protected:
     QTemporaryDir tmp;
     fs::path root;
     FakeBrowser browser;
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
 };
 }  // namespace
 

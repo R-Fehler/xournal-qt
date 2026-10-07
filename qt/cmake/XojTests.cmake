@@ -16,6 +16,16 @@ block()
     configure_file("${XOJ_UPSTREAM_DIR}/test/config-test.h.in" "${TEST_CONFIG_DIR}/config-test.h" ESCAPE_QUOTES @ONLY)
 endblock()
 
+# Helpers shared by the test binaries of the fork (qt/tests/support: waiting for a state, files, test PDFs, upstream's
+# fixtures). Included as "support/<name>.h".
+add_library(xqt-test-support STATIC
+    ${CMAKE_CURRENT_LIST_DIR}/../tests/support/TestSupport.h
+    ${CMAKE_CURRENT_LIST_DIR}/../tests/support/TestSupport.cpp)
+target_include_directories(xqt-test-support PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../tests)
+target_link_libraries(xqt-test-support PUBLIC Qt6::Core GTest::gtest PRIVATE xoj::deps)
+target_compile_definitions(xqt-test-support PRIVATE XQT_TEST_FILES_DIR="${XOJ_UPSTREAM_DIR}/test/files")
+set_target_properties(xqt-test-support PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+
 set(XOJ_TEST "${XOJ_UPSTREAM_DIR}/test/unit_tests")
 set(XOJ_UNIT_TEST_SOURCES
     ${XOJ_TEST}/control/LoadHandlerTest.cpp
@@ -57,7 +67,12 @@ include(GoogleTest)
 # Some upstream suites write to fixed paths in the temp directory (e.g. /tmp/xournalpp-test-units.xopp): they must
 # not run in parallel with each other (ctest -j). The rest runs freely.
 set(XOJ_UNIT_TMPFILE_SUITES "ControlLoadHandler.*:SettingsTest.*:Metadata.*")
+# A folder of their own to run in: upstream's SettingsTest writes a settings file "non-existing-file-path" into the
+# working directory. NO_PRETTY_VALUES: a parameterized case is named by its name generator (PageRasterTest), not by
+# its value printed (a char8_t* printed as an address).
+set(XOJ_UNIT_CWD "${CMAKE_BINARY_DIR}/unit-cwd")
+file(MAKE_DIRECTORY "${XOJ_UNIT_CWD}")
 gtest_discover_tests(xoj-unit-tests DISCOVERY_TIMEOUT 30 TEST_FILTER "${XOJ_UNIT_TMPFILE_SUITES}"
-    PROPERTIES LABELS unit RESOURCE_LOCK xoj-unit-tmpfiles)
+    WORKING_DIRECTORY "${XOJ_UNIT_CWD}" NO_PRETTY_VALUES PROPERTIES LABELS unit RESOURCE_LOCK xoj-unit-tmpfiles)
 gtest_discover_tests(xoj-unit-tests DISCOVERY_TIMEOUT 30 TEST_FILTER "-${XOJ_UNIT_TMPFILE_SUITES}"
-    PROPERTIES LABELS unit)
+    WORKING_DIRECTORY "${XOJ_UNIT_CWD}" NO_PRETTY_VALUES PROPERTIES LABELS unit)

@@ -46,36 +46,23 @@
 #include "shell/Thumbnails.h"
 
 #include "AppController.h"
-#include "../SearchHits.h"
+#include "UiFixture.h"
+#include "support/SearchHits.h"
 #include "config-test.h"
+#include "support/TestSupport.h"
+
+using xqt::test::fixturePath;
 
 namespace {
-QString fixturePath(const char8_t* rel) {
-    const auto p = GET_TESTFILE(rel);
-    return QString::fromUtf8(reinterpret_cast<const char*>(p.c_str()));
-}
 
-class ReferenceWindowTest: public ::testing::Test {
+class ReferenceWindowTest: public xqt::test::UiFixture {
 protected:
     void SetUp() override {
-        controller = std::make_unique<AppController>();
+        makeController();
         controller->newDocument();
         controller->newDocument();
         controller->setCurrentTab(0);
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        window->requestActivate();
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));  // (the pointer rests outside: nothing hovered, no tool tips)
+        ASSERT_NO_FATAL_FAILURE(loadWindow({.activate = true}));
         wait(100);
         main = findItem("canvas");
         reference = findItem("referenceCanvas");
@@ -87,26 +74,9 @@ protected:
     void TearDown() override {
         ref().setRatio(0.5);  // (the settings are shared by the tests of this run)
         ref().setOnLeft(true);
-        controller->shutdown();
-        engine.reset();
-        controller.reset();
+        closeApp();
     }
 
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    /// (returns as soon as it is true: the time is for a machine slowed down by other work)
-    void until(const std::function<bool()>& done, int ms = 5000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
-    }
     /// Also in the popups (the overlay) and items made by a Repeater; `shown`: only a visible one
     QQuickItem* findItem(const char* name, bool shown = false) const {
         std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* i) -> QQuickItem* {
@@ -130,10 +100,6 @@ protected:
         QTest::mouseClick(window, button, Qt::NoModifier,
                           item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
         wait(50);
-    }
-    void key(Qt::Key k, Qt::KeyboardModifiers m = Qt::NoModifier) {
-        QTest::keyClick(window, k, m);
-        wait(20);
     }
     xqt::ReferenceMode& ref() const { return controller->reference(); }
     /// A place of a page of the reference (page points) in the window
@@ -171,9 +137,6 @@ protected:
     xqt::TabManager& tabs() const { return controller->tabManager(); }
     static QRectF sceneRect(QQuickItem* i) { return QRectF(i->mapToScene(QPointF(0, 0)), i->size()); }
 
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
     QQuickItem* main = nullptr;
     QQuickItem* reference = nullptr;
     QQuickItem* split = nullptr;
@@ -507,25 +470,25 @@ TEST_F(ReferenceWindowTest, theMenusOpenAReference) {
     ASSERT_NE(entry, nullptr) << "no entry for the other tab";
     click(entry);
     EXPECT_EQ(ref().tab(), 1);
-    wait(300);  // (the menu closes)
+    until([&] { return findItem("openAsReferenceTabItem", true) == nullptr; });  // (the menu closes)
     entry = menuEntry(1);
     ASSERT_NE(entry, nullptr);
     click(entry);  // "Close the reference" now
     EXPECT_FALSE(ref().active());
-    wait(300);
+    until([&] { return findItem("openAsReferenceTabItem", true) == nullptr; });  // (the menu closes)
     // The current tab: its own document beside it (qt/self-reference)
     entry = menuEntry(0);
     ASSERT_NE(entry, nullptr);
     EXPECT_EQ(entry->property("text").toString(), "Show this document beside");
     click(entry);
     EXPECT_TRUE(ref().isSelf());
-    wait(300);
+    until([&] { return findItem("openAsReferenceTabItem", true) == nullptr; });  // (the menu closes)
     entry = menuEntry(0);
     ASSERT_NE(entry, nullptr);
     EXPECT_EQ(entry->property("text").toString(), "Close the view beside");
     click(entry);
     EXPECT_FALSE(ref().active());
-    wait(300);
+    until([&] { return findItem("openAsReferenceTabItem", true) == nullptr; });  // (the menu closes)
 
     // The tab overview: the button on the card of another document
     auto* overview = window->findChild<QObject*>("tabOverview");
@@ -727,7 +690,6 @@ TEST_F(ReferenceWindowTest, swappingRolesDrawsNothingAgain) {
     EXPECT_TRUE(visibleRendered(notes));
     EXPECT_TRUE(visibleRendered(book));
 }
-
 
 // --- the reference has the same scroll bars, knobs and pills as the notes, on its side ------------------------
 

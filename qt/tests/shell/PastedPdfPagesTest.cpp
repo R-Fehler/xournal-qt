@@ -44,29 +44,17 @@
 #include "CanvasView.h"
 
 #include "AppController.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+
+using xqt::test::makeTextPdf;
+
+using xqt::test::waitFor;
 
 using namespace xqt;
 
 namespace {
-/// A PDF with one page per word, each word as real text.
-void makeTextPdf(const fs::path& p, const std::vector<std::string>& words) {
-    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
-    cairo_t* cr = cairo_create(s);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, 24);
-    for (const auto& w: words) {
-        cairo_move_to(cr, 72, 100);
-        cairo_show_text(cr, w.c_str());
-        cairo_show_page(cr);
-    }
-    cairo_destroy(cr);
-    cairo_surface_destroy(s);
-}
-
-std::string bytesOf(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
 
 /// "<name>.xopp" annotating `pdf` (as upstream saves it).
 void annotate(const fs::path& pdf, const fs::path& xopp) {
@@ -97,18 +85,6 @@ std::vector<std::string> pdfsIn(const fs::path& dir) {
     }
     std::sort(out.begin(), out.end());
     return out;
-}
-
-bool waitFor(const std::function<bool()>& done, int ms = 20000) {
-    QElapsedTimer t;
-    t.start();
-    while (!done()) {
-        if (t.elapsed() > ms) {
-            return false;
-        }
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-    return true;
 }
 
 /// Holds the first write of a merged PDF by a save (on its worker) until released.
@@ -159,7 +135,7 @@ protected:
 
 TEST_F(PastedPdfPages, stayPdfPagesWithTheirTextInAHiddenSidecar) {
     annotate(root / "lecture.pdf", root / "lecture.xopp");
-    const std::string original = bytesOf(root / "lecture.pdf");
+    const std::string original = readFile(root / "lecture.pdf");
     AppController c;
     ASSERT_TRUE(open(c, root / "other.pdf"));
     c.copyPages({1});  // "pastedbeta"
@@ -174,7 +150,7 @@ TEST_F(PastedPdfPages, stayPdfPagesWithTheirTextInAHiddenSidecar) {
     ASSERT_TRUE(c.save());
     EXPECT_EQ(backgroundOf(s), root / ".lecture.pages.pdf");
     EXPECT_TRUE(fs::exists(root / ".lecture.pages.pdf"));
-    EXPECT_EQ(bytesOf(root / "lecture.pdf"), original) << "the lecture's PDF is never changed";
+    EXPECT_EQ(readFile(root / "lecture.pdf"), original) << "the lecture's PDF is never changed";
     ASSERT_EQ(notes.count(), 1);
     const QString note = notes.first().at(0).toString();
     EXPECT_TRUE(note.contains(".lecture.pages.pdf")) << note.toStdString();
@@ -244,12 +220,12 @@ TEST_F(PastedPdfPages, aDocumentWithoutPdfGetsItsOwnPairedPdf) {
 
     // "busy.pdf" is somebody else's: the pages go into the hidden sidecar
     makeTextPdf(root / "busy.pdf", {"somethingelse"});
-    const std::string busy = bytesOf(root / "busy.pdf");
+    const std::string busy = readFile(root / "busy.pdf");
     newSaved(c, root / "busy.xopp");
     ASSERT_EQ(c.pastePages(0), 2);
     ASSERT_TRUE(c.save());
     EXPECT_EQ(backgroundOf(current(c)), root / ".busy.pages.pdf");
-    EXPECT_EQ(bytesOf(root / "busy.pdf"), busy);
+    EXPECT_EQ(readFile(root / "busy.pdf"), busy);
     EXPECT_TRUE(pageHasText(current(c), 0, "pastedalpha"));
 }
 
@@ -409,7 +385,7 @@ size_t pdfPagesOf(const fs::path& pdf) {
 
 TEST_F(PastedPdfPages, savingDropsThePdfPagesNoLongerUsed) {
     annotate(root / "lecture.pdf", root / "lecture.xopp");
-    const std::string original = bytesOf(root / "lecture.pdf");
+    const std::string original = readFile(root / "lecture.pdf");
     AppController c;
     ASSERT_TRUE(open(c, root / "other.pdf"));
     c.copyPages({0, 1});
@@ -435,7 +411,7 @@ TEST_F(PastedPdfPages, savingDropsThePdfPagesNoLongerUsed) {
     EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS),
               (std::vector<std::string>{"lectureone", "lecturethree", "pastedbeta"}))
             << "the saved .xopp opens in Xournal++ with the right pages";
-    EXPECT_EQ(bytesOf(root / "lecture.pdf"), original);
+    EXPECT_EQ(readFile(root / "lecture.pdf"), original);
 
     // The deleted pages come back with undo, with their PDF pages (kept in memory when they were dropped)
     c.undoPages();
@@ -489,12 +465,12 @@ TEST_F(PastedPdfPages, theFirstSavePutsThemNextToTheDocument) {
     EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "fresh.xopp", WORDS), (std::vector<std::string>{"", "pastedbeta"}));
 
     // A PDF annotated without .xopp yet: its pages and the pasted ones go into the hidden sidecar
-    const std::string original = bytesOf(root / "lecture.pdf");
+    const std::string original = readFile(root / "lecture.pdf");
     ASSERT_TRUE(open(c, root / "lecture.pdf"));
     ASSERT_EQ(c.pastePages(1), 1);
     ASSERT_TRUE(c.saveAs(QUrl::fromLocalFile(QString::fromStdString((root / "lecture.xopp").string()))));
     EXPECT_EQ(backgroundOf(current(c)), root / ".lecture.pages.pdf");
-    EXPECT_EQ(bytesOf(root / "lecture.pdf"), original);
+    EXPECT_EQ(readFile(root / "lecture.pdf"), original);
     EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS),
               (std::vector<std::string>{"lectureone", "pastedbeta", "lecturetwo", "lecturethree"}));
 
@@ -640,11 +616,11 @@ TEST_F(PastedPdfPages, anUndoWhileTheMergedPdfIsWrittenIsSavedRight) {
                             result = r;
                             finished = true;
                         }});
-    ASSERT_TRUE(waitFor([&] { return held.writes == 1; }));
+    ASSERT_TRUE(waitFor([&] { return held.writes == 1; }, 20000));
     c.undoPages();  // pastedalpha comes back while its PDF page is being dropped
     EXPECT_TRUE(pageHasText(s, 1, "pastedalpha"));
     held.release();
-    ASSERT_TRUE(waitFor([&] { return finished; }));
+    ASSERT_TRUE(waitFor([&] { return finished; }, 20000));
     ASSERT_TRUE(result.ok) << result.error;
     EXPECT_FALSE(s.isModified());
     EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS),
@@ -679,7 +655,7 @@ TEST_F(PastedPdfPages, pagesPastedWhileTheMergedPdfIsWrittenGoNextToTheDocumentT
                             result = r;
                             finished = true;
                         }});
-    ASSERT_TRUE(waitFor([&] { return held.writes == 1; }));
+    ASSERT_TRUE(waitFor([&] { return held.writes == 1; }, 20000));
     std::thread releaser([&] {
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
         held.release();
@@ -687,7 +663,7 @@ TEST_F(PastedPdfPages, pagesPastedWhileTheMergedPdfIsWrittenGoNextToTheDocumentT
     ASSERT_EQ(c.pastePages(2), 1);  // (waits for the merged PDF to be written)
     releaser.join();
     EXPECT_TRUE(pageHasText(s, 2, "pastedgamma"));
-    ASSERT_TRUE(waitFor([&] { return finished; }));
+    ASSERT_TRUE(waitFor([&] { return finished; }, 20000));
     ASSERT_TRUE(result.ok) << result.error;
     EXPECT_FALSE(s.isModified());
     EXPECT_EQ(backgroundOf(s), root / "fresh.pdf");
@@ -751,7 +727,7 @@ TEST_F(PastedPdfPages, aPastedPageIsDrawnOnTheCanvasAtOnce) {
     ASSERT_TRUE(waitFor([&] {
         settled();
         return canvasShowsText(view, 0) && canvasShowsText(view, 1);
-    }));
+    }, 20000));
     auto far = [&] { return view->getPage(120)->bufferInfo().valid; };
     ASSERT_FALSE(far()) << "a page far from the view is not drawn";
     for (const size_t at: {1, 2}) {
@@ -765,7 +741,7 @@ TEST_F(PastedPdfPages, aPastedPageIsDrawnOnTheCanvasAtOnce) {
             ASSERT_TRUE(waitFor([&] {
                 settled();
                 return canvasShowsText(view, 0);
-            }));
+            }, 20000));
         }
         QElapsedTimer t;
         t.start();
@@ -908,7 +884,7 @@ TEST_F(PastedPdfPages, aPasteDoesNotWaitForTheMergedPdf) {
     t.start();
     ASSERT_EQ(c.pastePages(1), 1);
     const qint64 paste = t.elapsed();
-    ASSERT_TRUE(waitFor([&] { return !s.mergingPdfPages(); }));
+    ASSERT_TRUE(waitFor([&] { return !s.mergingPdfPages(); }, 20000));
     const qint64 merged = t.elapsed();
     std::cout << "paste into 1,500 pages: the window blocked " << paste << " ms, merged after " << merged << " ms\n";
     EXPECT_LT(paste, merged * 35 / 100) << "the paste waits for the merged PDF";
@@ -931,11 +907,11 @@ TEST_F(PastedPdfPages, aPastedPageIsDrawnAndUndoneWhileItIsMerged) {
     RenderService* renders = c.context().getRenderService();
     HeldMerge held;
     ASSERT_EQ(c.pastePages(1), 1);
-    ASSERT_TRUE(waitFor([&] { return held.entered == 1; }));
+    ASSERT_TRUE(waitFor([&] { return held.entered == 1; }, 20000));
     ASSERT_TRUE(waitFor([&] {
         renders->waitForIdle();
         return canvasShowsText(view, 1);
-    })) << "drawn from the pasted PDF meanwhile";
+    }, 20000)) << "drawn from the pasted PDF meanwhile";
     EXPECT_TRUE(s.mergingPdfPages());
     c.undoPages();
     EXPECT_EQ(s.getDocument()->getPageCount(), 3u);
@@ -943,12 +919,12 @@ TEST_F(PastedPdfPages, aPastedPageIsDrawnAndUndoneWhileItIsMerged) {
     ASSERT_EQ(s.getDocument()->getPageCount(), 4u);
     EXPECT_EQ(s.getDocument()->getPage(1)->getPdfPageNr(), 3u);
     held.release();
-    ASSERT_TRUE(waitFor([&] { return !s.mergingPdfPages(); }));
+    ASSERT_TRUE(waitFor([&] { return !s.mergingPdfPages(); }, 20000));
     EXPECT_TRUE(pageHasText(s, 1, "pastedbeta"));
     ASSERT_TRUE(waitFor([&] {
         renders->waitForIdle();
         return canvasShowsText(view, 1);
-    }));
+    }, 20000));
     ASSERT_TRUE(c.save());
     EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS),
               (std::vector<std::string>{"lectureone", "pastedbeta", "lecturetwo", "lecturethree"}));
@@ -965,7 +941,7 @@ TEST_F(PastedPdfPages, aSaveRightAfterAPasteWaitsForTheMerge) {
     DocumentSession& s = current(c);
     HeldMerge held;
     ASSERT_EQ(c.pastePages(1), 1);
-    ASSERT_TRUE(waitFor([&] { return held.entered == 1; }));
+    ASSERT_TRUE(waitFor([&] { return held.entered == 1; }, 20000));
     bool saved = false;
     ASSERT_TRUE(c.saveInBackground(QJSValue()));
     s.saveInBackground({DocumentSession::SaveKind::Save, {}, {}, [&](const DocumentSession::SaveResult& r) {
@@ -980,7 +956,7 @@ TEST_F(PastedPdfPages, aSaveRightAfterAPasteWaitsForTheMerge) {
     EXPECT_FALSE(saved) << "waits for the merge";
     EXPECT_TRUE(s.isSaving());
     held.release();
-    ASSERT_TRUE(waitFor([&] { return saved; }));
+    ASSERT_TRUE(waitFor([&] { return saved; }, 20000));
     EXPECT_FALSE(s.isModified());
     EXPECT_EQ(backgroundOf(s), root / ".lecture.pages.pdf");
     EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS),
@@ -1032,7 +1008,7 @@ TEST_F(PastedPdfPages, anExportRightAfterAPasteHasThePastedPage) {
     ASSERT_TRUE(open(c, root / "lecture.xopp"));
     auto held = std::make_unique<HeldMerge>();
     ASSERT_EQ(c.pastePages(1), 1);
-    ASSERT_TRUE(waitFor([&] { return held->entered == 1; }));
+    ASSERT_TRUE(waitFor([&] { return held->entered == 1; }, 20000));
     std::thread releaser([&] {
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
         held->release();

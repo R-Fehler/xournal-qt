@@ -14,7 +14,7 @@
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
 
-#include "../FakeNet.h"
+#include "support/FakeNet.h"
 #include "control/settings/Settings.h"
 #include "hwr/FakeRecognizer.h"
 #include "hwr/HandwritingSearch.h"
@@ -23,21 +23,15 @@
 #include "shell/HandwritingSettings.h"
 #include "shell/LibraryInkJob.h"
 #include "shell/ModelDownload.h"
+#include "support/TestSupport.h"
+
+using xqt::test::waitFor;
 
 using namespace xqt;
 
 namespace {
 QString sha(const QByteArray& b) {
     return QString::fromLatin1(QCryptographicHash::hash(b, QCryptographicHash::Sha256).toHex());
-}
-
-bool waitFor(const std::function<bool()>& done, int ms = 5000) {
-    QElapsedTimer t;
-    t.start();
-    while (!done() && t.elapsed() < ms) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-    return done();
 }
 
 class ModelDownloadTest: public ::testing::Test {

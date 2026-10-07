@@ -39,11 +39,12 @@
 #include "shell/Thumbnails.h"
 
 #include "AppController.h"
+#include "UiFixture.h"
 
 namespace fs = std::filesystem;
 
 namespace {
-class TemplateToolTest: public ::testing::Test {
+class TemplateToolTest: public xqt::test::UiFixture {
 protected:
     void SetUp() override {
         ASSERT_TRUE(tmp.isValid());
@@ -51,50 +52,17 @@ protected:
         library = root / "Library";
         fs::create_directories(library);
         xqt::stickers::setAppSet(root / "app-templates", xqt::stickers::Kind::Templates);
-        controller = std::make_unique<AppController>();
+        makeController();
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
         controller->setLibraryRoot(library);
-        engine = std::make_unique<QQmlApplicationEngine>();
-        engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
-        engine->addImageProvider("sketch", new xqt::SketchProvider);
-        engine->addImageProvider("preview", new xqt::PreviewProvider);
-        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
-        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
-        engine->rootContext()->setContextProperty("app", controller.get());
-        engine->loadFromModule("XournalQt", "Main");
-        ASSERT_FALSE(engine->rootObjects().isEmpty());
-        window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-        ASSERT_NE(window, nullptr);
-        window->resize(1920, 1080);  // (the buttons in sight)
-        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
-        QTest::mouseMove(window, QPoint(-20, -20));
+        ASSERT_NO_FATAL_FAILURE(loadWindow({.size = QSize(1920, 1080)}));  // (the buttons in sight)
         wait(100);
     }
     void TearDown() override {
-        controller->shutdown();
-        engine.reset();
-        controller.reset();
+        closeApp();
         xqt::stickers::setAppSet({}, xqt::stickers::Kind::Templates);
     }
 
-    static void wait(int ms) {
-        QElapsedTimer t;
-        t.start();
-        while (t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-    }
-    void until(const std::function<bool()>& done, int ms = 5000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            wait(20);
-        }
-    }
-    template <typename T = QObject>
-    T* find(const char* name) const {
-        return window->findChild<T*>(name);
-    }
     std::vector<QQuickItem*> delegates(const char* view) const {
         std::vector<QQuickItem*> items;
         auto* v = find<QQuickItem>(view);
@@ -146,9 +114,6 @@ protected:
 
     QTemporaryDir tmp;
     fs::path root, library;
-    std::unique_ptr<AppController> controller;
-    std::unique_ptr<QQmlApplicationEngine> engine;
-    QQuickWindow* window = nullptr;
 };
 }  // namespace
 

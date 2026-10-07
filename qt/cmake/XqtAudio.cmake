@@ -113,7 +113,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/audio/OggVorbisTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/audio/RecorderTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/audio/PlayerTest.cpp)
-    target_link_libraries(xqt-audio-tests PRIVATE xqt-audio Qt6::Test GTest::gtest)
+    target_link_libraries(xqt-audio-tests PRIVATE xqt-audio xqt-test-support Qt6::Test GTest::gtest)
     target_include_directories(xqt-audio-tests PRIVATE "${TEST_CONFIG_DIR}")
     gtest_discover_tests(xqt-audio-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS audio
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

@@ -28,10 +28,14 @@
 #include "undo/UndoRedoHandler.h"
 #include "util/Matrix.h"
 
-#include "../SearchHits.h"
+#include "support/SearchHits.h"
 #include "MdBox.h"
 
 #include "config-test.h"
+#include "support/TestSupport.h"
+
+using xqt::test::processEventsFor;
+using xqt::test::waitFor;
 
 using namespace xqt;
 using xqt::test::placedHits;
@@ -58,14 +62,6 @@ protected:
     static void search(DocumentSession& s, const QString& text, bool jump = true) {
         s.search().setQuery(text, jump);
         ASSERT_TRUE(waitForCounts(s.search()));
-    }
-    static bool waitFor(const std::function<bool()>& done, int ms = 5000) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < ms) {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-        return done();
     }
     QTemporaryDir tmp;
     std::unique_ptr<AppContext> app;
@@ -506,7 +502,7 @@ TEST_F(DocumentSearchTest, vocabulariesAreMadeInTheBackgroundWhenTheFuzzySearchI
     DocumentTextIndex& offIndex = off->search().textIndex();
     offIndex.start();
     ASSERT_TRUE(waitFor([&] { return offIndex.complete(); }));
-    waitFor([] { return false; }, 200);
+    processEventsFor(200);  // (and nothing is made meanwhile)
     EXPECT_EQ(offIndex.pdfPagesWithWords(), 0u) << "off: not made";
 
     DocumentTextIndex::setWordsInBackground(true);

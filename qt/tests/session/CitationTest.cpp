@@ -9,7 +9,7 @@
 
 #include "session/Citation.h"
 
-#include "../ArxivSamples.h"
+#include "support/ArxivSamples.h"
 
 using namespace xqt;
 

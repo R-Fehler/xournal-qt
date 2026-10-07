@@ -16,7 +16,7 @@
 #include "session/DocumentTextIndex.h"
 #include "session/InkText.h"
 
-#include "../SearchHits.h"
+#include "support/SearchHits.h"
 
 using namespace xqt;
 

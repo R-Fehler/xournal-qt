@@ -41,35 +41,17 @@
 #include "shell/LibraryUnzip.h"
 #include "shell/Previews.h"
 #include "shell/ZipFile.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+using xqt::test::writeFile;
+
+using xqt::test::makeTextPdf;
+using xqt::test::numbered;
 
 using namespace xqt;
 
 namespace {
-
-void writeFile(const fs::path& p, const std::string& content) {
-    fs::create_directories(p.parent_path());
-    std::ofstream(p, std::ios::binary) << content;
-}
-
-std::string readFile(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
-void makeTextPdf(const fs::path& p, int pages) {
-    fs::create_directories(p.parent_path());
-    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
-    cairo_t* cr = cairo_create(s);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, 24);
-    for (int i = 0; i < pages; ++i) {
-        cairo_move_to(cr, 72, 100);
-        cairo_show_text(cr, ("turbine page " + std::to_string(i + 1)).c_str());
-        cairo_show_page(cr);
-    }
-    cairo_destroy(cr);
-    cairo_surface_destroy(s);
-}
 
 void addStroke(Document& doc, size_t page, double y = 200) {
     auto s = std::make_unique<Stroke>();
@@ -145,7 +127,7 @@ protected:
         lib = fs::canonical(fs::path(tmp.path().toStdString())) / "Studies";
         shared = lib / "Shared";
         // A .xopp with its PDF
-        makeTextPdf(shared / "Lectures" / "lecture.pdf", 3);
+        makeTextPdf(shared / "Lectures" / "lecture.pdf", numbered("turbine page ", 3));
         {
             auto loaded = DocumentSession::loadFile(shared / "Lectures" / "lecture.pdf");
             ASSERT_TRUE(loaded.document) << loaded.error;
@@ -160,7 +142,7 @@ protected:
             ASSERT_TRUE(DocumentSession::writeDocument(doc, shared / "notes.xopp").ok);
         }
         // A .xopp whose PDF is outside the shared folder
-        makeTextPdf(lib / "Elsewhere" / "outside.pdf", 2);
+        makeTextPdf(lib / "Elsewhere" / "outside.pdf", numbered("turbine page ", 2));
         {
             auto loaded = DocumentSession::loadFile(lib / "Elsewhere" / "outside.pdf");
             ASSERT_TRUE(loaded.document) << loaded.error;
@@ -175,7 +157,7 @@ protected:
         writeFile(shared / "todo.md", "# To do\n\n![a picture](../Elsewhere/pic.png)\n\nSee [b](../Other/b.md) and "
                                       "[the lecture](Lectures/lecture.xopp#page=2).\n");
         // A PDF with notes that keeps its versions (two)
-        makeTextPdf(lib / "base.pdf", 2);
+        makeTextPdf(lib / "base.pdf", numbered("turbine page ", 2));
         {
             auto loaded = DocumentSession::loadFile(lib / "base.pdf");
             ASSERT_TRUE(loaded.document);
@@ -191,7 +173,7 @@ protected:
         fs::remove(lib / "base.pdf");
         ASSERT_TRUE(HybridPdf::markerOf(shared / "hist.pdf").history);
         // A protected PDF
-        makeTextPdf(lib / "plain.pdf", 1);
+        makeTextPdf(lib / "plain.pdf", numbered("turbine page ", 1));
         {
             PdfEncryption::Protection p;
             p.password = "secret";

@@ -42,22 +42,16 @@
 #include "util/PathUtil.h"
 
 #include "AppController.h"
+#include "support/TestSupport.h"
+
+using xqt::test::readFile;
+
+using xqt::test::makeTextPdf;
+
 
 using namespace xqt;
 
 namespace {
-void makeTextPdf(const fs::path& p, const std::vector<std::string>& words) {
-    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
-    cairo_t* cr = cairo_create(s);
-    cairo_set_font_size(cr, 24);
-    for (const auto& w: words) {
-        cairo_move_to(cr, 72, 100);
-        cairo_show_text(cr, w.c_str());
-        cairo_show_page(cr);
-    }
-    cairo_destroy(cr);
-    cairo_surface_destroy(s);
-}
 
 void makePng(const fs::path& p) {
     cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_RGB24, 64, 48);
@@ -67,11 +61,6 @@ void makePng(const fs::path& p) {
     cairo_destroy(cr);
     cairo_surface_write_to_png(s, p.string().c_str());
     cairo_surface_destroy(s);
-}
-
-std::string bytesOf(const fs::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
 size_t count(const std::string& haystack, const std::string& needle) {
@@ -140,18 +129,6 @@ std::vector<std::string> pageContents(const fs::path& pdf) {
     return out;
 }
 
-bool waitFor(const std::function<bool()>& done, int ms = 20000) {
-    QElapsedTimer t;
-    t.start();
-    while (!done()) {
-        if (t.elapsed() > ms) {
-            return false;
-        }
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-    return true;
-}
-
 QUrl url(const fs::path& p) { return QUrl::fromLocalFile(QString::fromStdString(p.string())); }
 
 class PdfOnlyMode: public ::testing::Test {
@@ -217,7 +194,7 @@ TEST_F(PdfOnlyMode, newDocumentsArePdfsWithNotes) {
 // next Ctrl+S appends an incremental update. A one-time notice says where the notes went.
 TEST_F(PdfOnlyMode, annotatingAPdfSavesIntoItThenAppends) {
     const fs::path pdf = root / "lecture.pdf";
-    const std::string original = bytesOf(pdf);
+    const std::string original = readFile(pdf);
     const std::vector<std::string> originalPages = pageContents(pdf);
     const fs::path originals = Util::getCacheSubfolder("originals");
     fs::remove_all(originals);  // (the test's cache: what other tests of this run kept)
@@ -250,7 +227,7 @@ TEST_F(PdfOnlyMode, annotatingAPdfSavesIntoItThenAppends) {
     }
     ASSERT_EQ(kept.size(), 1u);
     EXPECT_EQ(kept[0].filename(), "lecture.pdf");
-    EXPECT_EQ(bytesOf(kept[0]), original);
+    EXPECT_EQ(readFile(kept[0]), original);
 
     // Said once
     auto noticed = [&] {
@@ -266,11 +243,11 @@ TEST_F(PdfOnlyMode, annotatingAPdfSavesIntoItThenAppends) {
     // when it is written anew: not here)
     const double compactAbove = HybridPdf::compactAbove;
     HybridPdf::compactAbove = 100;
-    const std::string first = bytesOf(pdf);
+    const std::string first = readFile(pdf);
     drawStroke(current(c), 2, 300);
     ASSERT_TRUE(c.save());
     HybridPdf::compactAbove = compactAbove;
-    const std::string second = bytesOf(pdf);
+    const std::string second = readFile(pdf);
     ASSERT_GT(second.size(), first.size());
     EXPECT_EQ(second.compare(0, first.size(), first), 0) << "an incremental update: the earlier bytes stay";
     EXPECT_EQ(count(second, "startxref"), count(first, "startxref") + 1);
@@ -278,7 +255,7 @@ TEST_F(PdfOnlyMode, annotatingAPdfSavesIntoItThenAppends) {
     EXPECT_EQ(pageContents(pdf), originalPages);
     EXPECT_EQ(filesIn(root), std::vector<std::string>{"lecture.pdf"});
     EXPECT_EQ(noticed(), 1) << "once";
-    EXPECT_EQ(bytesOf(kept[0]), original) << "the kept original stays the first one";
+    EXPECT_EQ(readFile(kept[0]), original) << "the kept original stays the first one";
 
     // Opened again: both strokes, editable
     c.closeTab(0);
