@@ -52,10 +52,10 @@ All four waves are merged (2026-10-07). The architecture overview:
 - [ ] Docs: **the author enables GitHub Pages once** (Settings → Pages → Source: GitHub Actions; a private
   repository needs a paid plan, [ci.md](qt/docs/development/ci.md)), then `xqt-pages.yml` publishes the interactive
   architecture page.
-- [ ] Docs: a glossary and "where data lives on disk" (settings keys once typed, B13); ADRs distilled from the
-  feature docs (the library index, memory owners, background save, canvas tiles); the device checklist's checks into
-  the feature docs (infra B14 step 6); `development/android.md`, `windows.md`, `macos.md` without dated notes and block
-  names.
+- [x] Docs: the glossary (`architecture/glossary.md`), ADRs 0004–0007, the device checks in the feature docs ("On the
+  device"), the platform docs without dated notes and block names. Left: `architecture/data-on-disk.md` (every path
+  per platform, checked against the code; the glossary links it already), the platform docs' "where the program keeps
+  things" tables checked against the code, and the settings keys table once typed (B13).
 
 ### Later rounds (from the reviews, not started)
 - [ ] The feature objects out of `AppController` (app-cpp E–N, `app.versions` first as the template) · `CanvasView`

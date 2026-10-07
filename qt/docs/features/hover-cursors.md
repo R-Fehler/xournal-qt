@@ -68,3 +68,10 @@ Known limits:
 - A size or kind of its own for the eraser button, set in Xournal++'s settings, shows once the eraser end has
   touched. Before that, the tool bar eraser's size and kind are shown. This app's settings always use the tool bar
   eraser's.
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] The pointer (dot or crosshair, Settings → Pen) follows the hovering pen as fast as the mouse arrow; over the
+      bars the arrow; Android's S Pen shows the drawn dot under the tip. If no pointer shows: `XQT_PEN_CURSOR=0`.

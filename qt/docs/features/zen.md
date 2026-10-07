@@ -93,3 +93,13 @@ dot, the pill and its entries, Zen writes, the note once), `ReadingPhoneTest` (`
 with Back), `EscapeKeysTest.backWithNothingLeftAsksBeforeLeaving`, `PhoneChromeTest.zenIsAutomaticOnlyInATinyWindow`,
 `PhoneChromeTest.presentingWithoutControlsHasTheZenDot`, `MainWindowTest.presentingWithoutControls`. The back gesture
 itself is on the device checklist.
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] Zen's dot is faint but findable on a projector and in sunlight.
+- [ ] A desktop: full screen with a selected sticky note, then with an armed snip: Esc unselects or puts the snip
+      away, the next Esc leaves full screen. Presenting likewise (the second Esc ends presenting).
+- [ ] Android: Back closes a sheet or the drawer, then leaves Zen, then closes what is open; with nothing of that
+      open it leaves the app as before. The back gesture over the replay's slider.

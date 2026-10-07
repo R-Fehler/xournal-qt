@@ -2,8 +2,11 @@
 
 What only a real device, a real screen or another app can show. Everything else is covered by the tests that run
 off-screen ([README.md](README.md)). Walk through it before a release, and after a change to input, rendering,
-scaling, windows or a platform build. Add a check here only when no off-screen test can make it, in the area it
-belongs to, one line each; the feature's behaviour itself belongs in its feature doc.
+scaling, windows or a platform build.
+
+This page is the short list to walk. The checks of one feature are in that feature's doc, in its section "On the
+device", and this list links to them (last section). A new check: in the feature doc when it belongs to one feature,
+here when it is about the device, the platform or the app as a whole; one line each, in the area it belongs to.
 
 The per-block checklist of before 2026-10-07 (1546 checks, one section per block, most of them covered by tests
 since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
@@ -19,12 +22,9 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
       (also on a canvas turned by 90° and by a free angle).
 - [ ] Highlighter translucent and multiplied with what is under it.
 - [ ] The pen's side buttons and its eraser end erase while held; the pen draws again afterwards.
-- [ ] Hover: the pointer (dot or crosshair, Settings → Pen) follows the hovering pen as fast as the mouse arrow; over
-      the bars the arrow; Android's S Pen shows the drawn dot under the tip. If no pointer shows: `XQT_PEN_CURSOR=0`.
 - [ ] A stroke from one page into the next continues on the next page.
-- [ ] Hold to straighten and scratch out (Settings → Pen) trigger with real handwriting, and never while writing
-      normally (thresholds).
-- [ ] The setsquare and the compass at 15 cm on the Surface at 200 % move and turn smoothly.
+- [ ] The pointer over the page, pen gestures, the setsquare and the compass: [hover-cursors.md](../features/hover-cursors.md#on-the-device),
+      [pen-gestures.md](../features/pen-gestures.md#on-the-device), [toolbox.md](../features/toolbox.md#on-the-device).
 
 ## Touch and palm rejection
 
@@ -41,25 +41,25 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
 
 ## Screens and scaling
 
-- [ ] At 125 %, 150 % and 175 % (Plasma Wayland and X11, GNOME, Windows): pages, thumbnails, the page grid, the
-      selection's frame and knobs are as sharp as at 100 %; the UI's lines are even; Settings → Display's
-      calibration page names the scale the app got.
-- [ ] A window moved between screens of different scales draws its pages and selection anew for the new screen.
-- [ ] Screen calibration: 1 cm on the page is 1 cm on the ruler at 100 % zoom.
-- [ ] Presenting (F5) with a projector: the console on the laptop, the slide alone on the projector (also when the
-      window was on the projector); a clicker turns pages; writing on the console shows on the projector at once;
-      the audience follows the presenter's zoom smoothly; unplugging the projector ends the second screen cleanly.
-- [ ] Zen's dot is faint but findable on a projector and in sunlight.
+- [ ] Fractional scales, screens of different scales, the calibration: [hidpi.md](../features/hidpi.md#on-the-device).
+- [ ] Presenting with a projector: [presenter-view.md](../features/presenter-view.md#on-the-device); Zen's dot on a
+      projector: [zen.md](../features/zen.md#on-the-device).
+
+## The app's windows
+
+- [ ] Drag a tab off the strip into a window of its own, quit from the main window: no crash, the other window goes
+      with it; again with unsaved changes in the second window (they come back as recovered tabs next start).
+- [ ] Killed with an unsaved document: the next start offers to recover it.
+- [ ] Quitting while pictures are still being drawn (the library grid's covers right after opening a big library,
+      the page sidebar of a long PDF, the library search's pages) closes at once and leaves no crash report.
 
 ## Linux
 
-- [ ] The `.deb` (neon and Debian 13) and the AppImage install and start; the launcher's right-click "Quick note".
+- [ ] The `.deb` (neon and Debian 13) and the AppImage install and start; the launcher's right-click "Quick note"
+      ([quick-note.md](../features/quick-note.md#on-the-device)).
 - [ ] Opening a file from the file manager while the app runs opens it as a tab of the running window.
 - [ ] Printing on a real printer: page range, copies, landscape pages turned onto the sheet.
-- [ ] Recording with the built-in microphone and a headset; playing from a stroke at the right speed.
-- [ ] Killed with an unsaved document: the next start offers to recover it.
-- [ ] Quitting while pictures are still being drawn (the library grid's covers right after opening a big library,
-  the page sidebar of a long PDF, the library search's pages) closes at once and leaves no crash report.
+- [ ] Recording and playing ([audio.md](../features/audio.md#on-the-device)).
 
 ## Windows (the portable zip, Surface)
 
@@ -67,15 +67,14 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
 - [ ] Pen pressure; if not: `xournal-qt-debug.bat` writes `input-log.txt`.
 - [ ] Text with ä ö ü ß; folders and documents with umlauts in their names open and save.
 - [ ] "Show in file manager" selects the file in Explorer; "Open with the system app" opens the right program.
-- [ ] Recording (`bin\xournal-qt.exe --audio-info` lists the microphones); with the microphone blocked in Windows'
-      privacy settings the app says so.
+- [ ] Recording ([audio.md](../features/audio.md#on-the-device)).
 - [ ] Writing into a PDF that another program holds open.
 
 ## macOS (the `.dmg`, Apple Silicon)
 
 - [ ] The `.dmg` opens; the app starts after "Open Anyway" (unsigned) and takes nothing from Homebrew.
 - [ ] Pen (a Wacom tablet), trackpad pinch and scroll.
-- [ ] The first recording asks for the microphone with the app's text; refused, the app says where to allow it.
+- [ ] The first recording ([audio.md](../features/audio.md#on-the-device)).
 
 ## Android (the APK, Galaxy Fold 7)
 
@@ -83,83 +82,31 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
       the libraries to `Documents/Xournal_Libraries` work and keep file times.
 - [ ] "Open with" and the share sheet for a PDF, a `.xopp`, a `.md` and photos: each opens, a copy lands in "Opened".
 - [ ] Import files and folders through Android's picker; a library in a folder synced by another app (Syncthing).
-- [ ] Folded (412 × 915) and unfolded (900 × 1000), upright and sideways: nothing to tap under the status bar, the
-      cut-out or the gesture bar; the rail and the top bar use their room and scroll to their ends (TODO.md: the top
-      bar's blank end).
-- [ ] The soft keyboard: dialogs and the format bar move above it; the text cursor stays in view.
-- [ ] Back leaves Zen first, then closes what is open; the back gesture over the replay's slider.
-- [ ] Recording with the screen off: the notification with its clock, Pause/Resume and Stop.
-- [ ] The launcher's "Quick note" shortcut; "Add to calendar" for a to-do opens the calendar's new event.
+- [ ] Folded and unfolded, upright and sideways; the soft keyboard: [adaptive-layout.md](../features/adaptive-layout.md#on-the-device).
+- [ ] Back and the back gesture: [zen.md](../features/zen.md#on-the-device).
+- [ ] Recording with the screen off ([audio.md](../features/audio.md#on-the-device)); the launcher's "Quick note"
+      ([quick-note.md](../features/quick-note.md#on-the-device)); "Add to calendar"
+      ([todos.md](../features/todos.md#on-the-device)).
 - [ ] `adb logcat --pid=$(adb shell pidof org.xournalqt.app)` shows no crash.
 
 ## Other apps
 
-- [ ] A PDF with notes (and an archive PDF) shows its ink in Acrobat, Preview, Xodo, Drawboard, Chrome/pdf.js,
-      Firefox, Okular and Evince; after a save in one of them, the app still opens the notes (or says what changed).
-- [ ] A PDF with version history opens in other viewers as its latest version.
-- [ ] An encrypted PDF made here opens with its password in Acrobat, Preview and pdf.js; its restrictions hold.
-- [ ] Annotations exported by GoodNotes, Drawboard and Preview become editable here as the standard types promise.
-- [ ] Tags written as PDF keywords show in Zotero and Acrobat.
 - [ ] A `.xopp` saved here opens in Xournal++ 1.2/1.3 and looks the same (with groups, creation times and
       recordings); Xournal++'s files open here.
-- [ ] The Markdown inside a PDF text document can be taken out with a PDF viewer's attachments
-      ([user guide](../user/markdown-from-pdf.md)).
+- [ ] PDFs with notes, archive PDFs, version history and encrypted PDFs in other viewers:
+      [hybrid-pdf.md](../features/hybrid-pdf.md#on-the-device).
+- [ ] Other apps' annotations made editable: [adopt-annotations.md](../features/adopt-annotations.md#on-the-device);
+      tags as PDF keywords: [tags.md](../features/tags.md#on-the-device); the Markdown inside a PDF text document:
+      [md-pdf.md](../features/md-pdf.md#on-the-device).
 
-## Handwriting search, with the real models
+## The checks in the feature docs
 
-- [ ] The models download once with consent; the author's own notes in English and German are found by words
-      written in them, also in the library search and in other PDF viewers (the invisible text layer).
+Each link is that doc's section "On the device".
 
-## No compatibility with earlier pre-releases; Markdown only (0.9.0)
-
-- [ ] Start with the settings and a library of 0.8.0: the app starts; the library reads its documents once (the
-      progress shows), the second start reads nothing; tags, to-dos and bookmarks are there after that first read.
-- [ ] The text tool on an empty place makes a Markdown text box; on a text box of a Xournal++ file it edits that text
-      as it is, and the file opens in Xournal++ afterwards with the edited text.
-- [ ] A fresh profile: snapping off, the pen's side buttons erase; switch snapping on, restart: it stays on.
-
-## The main window in parts (`Main.qml` split, 2026-10)
-
-- [ ] On the Fold (folded and unfolded) and a desktop: the Zen dot and its pill, the view pill, the full-screen tab
-      dots, the toasts and the read-only note sit where they did, over the page and under the home screen.
-- [ ] ⋮, the toolbox's menus and the catalog open at their buttons (a sheet on the phone); Back closes a sheet, then
-      leaves Zen, as before.
-- [ ] The window's state in its own objects (`win.insets`, `win.modes`, `win.layout`, 2026-10): on the Fold, the
-      controls stay clear of the status and gesture bars and above the soft keyboard; F11, F5, Read and Zen enter and
-      leave as before, and leaving full screen goes back to maximized on KDE.
-
-## The home screen and the settings in parts (`qt/qml-split-2`)
-
-- [ ] On the Fold (folded, unfolded, sideways) and a desktop: the home screen's header, switch, breadcrumbs, search,
-      grids, the floating "+", a card's menu and its dialogs (rename, move to, trash, import, archive) as before.
-- [ ] Settings: every tab (desktop) and every section of the list (phone) shows its rows; Reset, Remove the cache
-      folders and a shortcut's key capture open their dialogs.
-
-## Esc and Back (`qt/qml-split-2`)
-
-- [ ] A desktop: full screen with a selected sticky note, then with an armed snip: Esc unselects or puts the snip
-      away, the next Esc leaves full screen. Presenting likewise (the second Esc ends presenting).
-- [ ] Android: Back closes the drawer, then leaves Zen; with nothing of that open it leaves the app as before.
-- [ ] Settings → Shortcuts: give "Record audio" other keys: they record, and the record button's tip names them.
-
-## Saving and tags (`qt/session-io`)
-
-- [ ] A PDF with notes that keeps its versions, open in a tab: give it a tag (card menu → Tags…) and press Ctrl+S at
-      once: both are in the file; the version list shows no "other app" entry; "Save with a message" works.
-- [ ] A `.xopp` made from a big PDF with "attach the PDF": Save as into another folder while writing with the pen:
-      the pen keeps drawing; the `name.xopp.bg.pdf` next to it opens, also in Xournal++.
-
-## Windows and the reference (`qt/app-services`)
-
-- [ ] Drag a tab off the strip into a window of its own, quit from the main window: no crash, the other window goes
-      with it; again with unsaved changes in the second window (they come back as recovered tabs next start).
-- [ ] Beside the notes, a PDF whose author forbids copying (opened without its owner password): its text cannot be
-      copied from the reference's pill or with Ctrl+C; the notes' and the reference's pills act on their own side.
-
-## The window's actions and the home grids (`qt/app-window`)
-
-- [ ] On the Fold: the menus are sheets on the phone and menus unfolded (AdaptiveMenu, the page menu, the stickers),
-      Settings stays above the soft keyboard while a field in it has the keys; a card's menu, rename and trash act on
-      the card (also on the Recent grid).
-- [ ] A desktop with the reference beside the notes: with the reference focused, Ctrl+G, Ctrl+X, Delete, zoom and
-      "Fit the width" act on it; with the notes focused, on the notes.
+| Area | Docs |
+| --- | --- |
+| Pen and tools | [hover-cursors](../features/hover-cursors.md#on-the-device), [pen-gestures](../features/pen-gestures.md#on-the-device), [toolbox](../features/toolbox.md#on-the-device) |
+| Screens and the window | [hidpi](../features/hidpi.md#on-the-device), [adaptive-layout](../features/adaptive-layout.md#on-the-device), [zen](../features/zen.md#on-the-device), [presenter-view](../features/presenter-view.md#on-the-device), [reference-view](../features/reference-view.md#on-the-device) |
+| Documents and files | [hybrid-pdf](../features/hybrid-pdf.md#on-the-device), [library](../features/library.md#on-the-device), [adopt-annotations](../features/adopt-annotations.md#on-the-device), [tags](../features/tags.md#on-the-device), [todos](../features/todos.md#on-the-device), [quick-note](../features/quick-note.md#on-the-device) |
+| Markdown | [markdown-boxes](../features/markdown-boxes.md#on-the-device), [md-pdf](../features/md-pdf.md#on-the-device) |
+| Search and sound | [handwriting-search](../features/handwriting-search.md#on-the-device) (with the real models), [audio](../features/audio.md#on-the-device) |

@@ -275,3 +275,10 @@ as the line); a missing file shows its alt text and path in red, and a web pictu
 - Flattening into Text mode.
 - Math: the error of a formula on a touch screen (no mouse to rest on it); per-formula editing inside a block (the
   whole block shows its source, as for the other marks).
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] The text tool on an empty place makes a Markdown text box; on a text box of a Xournal++ file it edits that text
+      as it is, and the file opens in Xournal++ afterwards with the edited text.

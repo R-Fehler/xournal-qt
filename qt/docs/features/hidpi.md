@@ -117,3 +117,13 @@ The off-screen platform's own screen is 800 x 600 device pixels, 533 x 400 at 15
 layout, so the UI tests use `qt/tests/ui/offscreen-hidpi.json` (3200 x 2400) at a scale. The quick tests convert
 between logical and device pixels where Qt hands them device pixels (`tests/quick/DevicePixels.h`: events given to
 `QWindowSystemInterface`, `grabWindow()`).
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] At 125 %, 150 % and 175 % (Plasma Wayland and X11, GNOME, Windows): pages, thumbnails, the page grid, the
+      selection's frame and knobs are as sharp as at 100 %; the UI's lines are even; Settings → Display's
+      calibration page names the scale the app got.
+- [ ] A window moved between screens of different scales draws its pages and selection anew for the new screen.
+- [ ] Screen calibration: 1 cm on the page is 1 cm on the ruler at 100 % zoom.

@@ -251,3 +251,14 @@ recording whose tab closes; the hook's commands pause, resume and stop. `Recorde
 
 Not built or checked here: the Windows, macOS and Android packages (no SDKs in the build container; the next
 release run builds them); the Java checked only against stubs of the Android API. See the device checklist.
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] Linux: recording with the built-in microphone and a headset; playing from a stroke at the right speed.
+- [ ] Windows: recording (`bin\xournal-qt.exe --audio-info` lists the microphones); with the microphone blocked in
+      Windows' privacy settings the app says so.
+- [ ] macOS: the first recording asks for the microphone with the app's text; refused, the app says where to allow it.
+- [ ] Android: recording with the screen off: the notification with its clock, Pause/Resume and Stop.
+- [ ] Settings → Shortcuts: give "Record audio" other keys: they record, and the record button's tip names them.

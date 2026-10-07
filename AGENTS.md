@@ -40,7 +40,8 @@ ctest --test-dir build-qt -j8              # the full suite: about 1900 tests
    (block agents may push their own `qt/<block>` branch for its tests).
 4. **One feature, one commit.** Before committing: the tests you ran for it pass; its feature doc in
    [qt/docs/features/](qt/docs/features/README.md) says how it works now; checks that only a real device can make go
-   into the [device checklist](qt/docs/testing/device-checklist.md) (short, by area). Commit messages are plain prose:
+   into the feature doc's "On the device" (the [device checklist](qt/docs/testing/device-checklist.md) links them; a
+   check of no one feature goes there, short, by area). Commit messages are plain prose:
    what was wrong, what changed, why.
 5. **A bug gets a failing test first.** Show it fails for the stated reason, then fix it.
 6. Keep the routine test run **under a minute**. Long suites go behind a label or an environment variable.

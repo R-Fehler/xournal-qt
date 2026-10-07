@@ -6,8 +6,9 @@ start `bin\xournal-qt.exe`. No installer yet. What is left for later is in [wind
 ## Getting the zip
 
 The workflow **xournal-qt Windows** ([.github/workflows/xqt-windows.yml](../../../.github/workflows/xqt-windows.yml))
-runs when it is started by hand (Actions → "xournal-qt Windows" → "Run workflow", any branch) and for every push
-to the branch `qt/windows-build`, and for nothing else. Its run page has the artifacts:
+runs when it is started by hand (Actions → "xournal-qt Windows" → "Run workflow", any branch), for every push to
+the branches `qt/windows-build` and `qt/windows-feel`, and from the release workflow, which puts the zip into every
+release as `xournal-qt-<version>-windows-x64.zip` ([releasing.md](releasing.md)). Its run page has the artifacts:
 
 | Artifact | What |
 |---|---|
@@ -50,8 +51,7 @@ Where the program keeps things:
 
 ## Text and fonts
 
-**Pango draws with its fontconfig backend on Windows, not its Windows one.** The CI smoke test found (2026-09-24,
-runs 2 and 3) that Pango's default backend on Windows, `win32` (DirectWrite), kills the process as soon as text is
+**Pango draws with its fontconfig backend on Windows, not its Windows one.** The CI smoke test found that Pango's default backend on Windows, `win32` (DirectWrite), kills the process as soon as text is
 drawn into an image surface: a PNG export of a document with text, the page rasters and thumbnails of the app. The
 process ends with a fatal NTSTATUS and prints nothing (MSYS2 shows exit code 127). Text into a PDF worked, and so
 did everything with `PANGOCAIRO_BACKEND=fc`, which is what Linux uses as well.
@@ -82,7 +82,7 @@ Qt reads the pen through Windows Ink (`WM_POINTER`) and hands it to the app as t
 the canvas takes them in `DocumentCanvasItem::eventFilter` and `CanvasInput::tabletEvent`, as on Linux. The pressure
 sets the width when Settings → "Pressure changes the line width" is on (the default).
 
-**The Surface Pro 8 (2026-09-24): every stroke had the same width.** The path from a tablet event's pressure to the
+**On a Surface Pro 8 every stroke had the same width.** The path from a tablet event's pressure to the
 stroke is tested (`CanvasItemInputTest.thePensPressureReachesTheStroke`), so the question is what Windows and Qt
 send. For that there is an input log:
 
@@ -189,7 +189,7 @@ qt/scripts/windows-smoke.sh dist/xournal-qt smoke           # its smoke test
 
 ## Known limitations of this first build
 
-- **Tried once on a real machine**, a Surface Pro 8 with Windows 11 (the author, 2026-09-24): it runs. Of the two
+- **Tried on a real machine**, a Surface Pro 8 with Windows 11: it runs. Of the two
   problems found, "Downloads folder (quick library)" failing with "cannot open c//" is fixed (a URL made as
   "file://" + path; paths and URLs are converted with `QUrl::fromLocalFile` / `xqt::localPathOf` now).
 - **Pen pressure** did not change the width on the Surface Pro 8; see "Pen input" for the log that shows why. The
@@ -199,7 +199,7 @@ qt/scripts/windows-smoke.sh dist/xournal-qt smoke           # its smoke test
 - **Printing** sends images (at most 300 dpi), not the PDF: larger print jobs and no vector output on the printer.
 - **Replacing a file that is open**: saving a hybrid PDF, the pasted-pages PDF and a few caches renames a new file
   over the old one while it may still be open (poppler keeps its PDF open). Windows refuses that where Linux does
-  not; saving such a document may fail until this is handled (see TODO.md, "rename semantics").
+  not; saving such a document may fail until this is handled (TODO.md, "Windows: writing into a PDF renames over it").
 - **Paths**: the code joins paths with `std::filesystem`, which is fine, but a few places build or compare path
   strings with `/`. Library folders, the `.assets` folders of Markdown files and links between documents need a
   check with backslashes and with drive letters.

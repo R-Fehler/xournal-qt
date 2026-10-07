@@ -814,3 +814,22 @@ so they are not size classes either:
 - The audit's own walk (`XQT_UI_AUDIT`, pictures and `report.tsv`, now with the class) shares the walker
   (`qt/tests/ui/LayoutWalk.h`). Its screens `allTools`, `recentTabs` and `dockPages` show the phone chrome's sheets;
   `presenting` is another name for `chrome`.
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] Android, folded (412 × 915) and unfolded (900 × 1000), upright and sideways: nothing to tap under the status
+      bar, the cut-out or the gesture bar; the rail and the top bar use their room and scroll to their ends (TODO.md:
+      the top bar's blank end).
+- [ ] The soft keyboard: dialogs and the format bar move above it; the text cursor stays in view; Settings stays
+      above it while a field in it has the keys.
+- [ ] On the Fold (folded and unfolded) and a desktop: the Zen dot and its pill, the view pill, the full-screen tab
+      dots, the toasts and the read-only note sit over the page and under the home screen.
+- [ ] ⋮, the toolbox's menus and the catalog open at their buttons (a sheet on the phone); the menus are sheets on
+      the folded phone and menus unfolded (AdaptiveMenu, the page menu, the stickers); Back closes a sheet first.
+- [ ] The window's state objects (`win.insets`, `win.modes`, `win.layout`): on the Fold the controls stay clear of
+      the status and gesture bars and above the soft keyboard; F11, F5, Read and Zen enter and leave, and leaving
+      full screen goes back to maximized on KDE.
+- [ ] Settings: every tab (desktop) and every section of the list (phone) shows its rows; Reset, Remove the cache
+      folders and a shortcut's key capture open their dialogs.

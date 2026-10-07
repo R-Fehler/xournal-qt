@@ -127,3 +127,9 @@ Nothing comes back: no sync, no reminders, no account access (decided by the aut
 - A stamp's text from handwriting search needs the recogniser; without it the picture alone.
 - Pages of a PDF text document: a to-do toggled in a closed one is saved into the PDF; its carried `name.md` follows
   with the save.
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] Android: "Add to calendar" for a to-do opens the calendar's new event.

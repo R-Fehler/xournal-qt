@@ -40,3 +40,10 @@ document, not saved yet.
 - Android: `XournalActivity.ACTION_QUICK_NOTE` / `QUICK_NOTE`, `xqt::android::QUICK_NOTE`.
 - Tests: `qt/tests/shell/QuickNoteTest.cpp` (names, formats, the daily file, the hand-over through `SingleInstance`),
   `qt/tests/ui/QuickNoteTest.cpp` (the home button and "+", Ctrl+Alt+N, ⋮, the daily note's cursor).
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] Linux: the launcher's right-click "Quick note" (the `.deb` and the AppImage).
+- [ ] Android: the launcher's "Quick note" shortcut (long press on the icon, also dragged to the home screen).

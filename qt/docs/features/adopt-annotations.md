@@ -221,3 +221,9 @@ Preview-like (a signature stamp, an arrow outside its rectangle) files. `MainWin
 7. **Asked once per file** (again only when it has more of them); never converted without being asked.
 8. **Text boxes**: plain `/Contents` (rich text `/RC` ignored), the font family mapped to Sans / Serif / Monospace,
    wrapped at the box's width; their border and background are not drawn.
+
+## On the device
+
+What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
+
+- [ ] Annotations exported by GoodNotes, Drawboard and Preview become editable here as the standard types promise.

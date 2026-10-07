@@ -5,7 +5,7 @@ in detail.
 
 Besides the rendered pages of the canvas ([CanvasMemory](../../src/canvas/CanvasMemory.h)), the app draws smaller
 pictures of pages and documents and keeps them, so that lists and grids show them at once. They have one vocabulary,
-one owner of their memory and one owner of their worker threads.
+one owner of their memory and one owner of their worker threads ([ADR 0005](../decisions/0005-memory-owners.md)).
 
 ## The words
 
