@@ -5,9 +5,9 @@
  * second canvas item, beside the current tab's, behind a movable divider. It may be the tab's own document
  * (qt/self-reference): then a second CanvasView of the same DocumentSession (TabManager::Tab::selfView) with its own
  * page, zoom, selection and way back; edits show on both sides, there is one undo history, and the rendered pages of
- * both views share CanvasMemory's limit. See qt/docs/reference-view.md. It is for reading only (the canvas item's
- * readingOnly): it scrolls and zooms, and its elements and PDF text can be selected and copied, to paste them into
- * the notes. Where the divider is (the share of the main document) and on which side the reference is are settings
+ * both views share CanvasMemory's limit. See qt/docs/features/reference-view.md. It is for reading only (the canvas
+ * item's readingOnly): it scrolls and zooms, and its elements and PDF text can be selected and copied, to paste them
+ * into the notes. Where the divider is (the share of the main document) and on which side the reference is are settings
  * of the application, the same for every tab.
  *
  * What acts on the reference's canvas (its selection, notes, PDF text, the clipboard, its page and zoom) is `edit`,

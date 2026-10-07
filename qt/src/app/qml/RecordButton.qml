@@ -1,7 +1,8 @@
-// The record button (qt/docs/audio.md, "In the app"): a tap starts recording for this document (a voice memo of the
-// page shown; ink written meanwhile plays the moment it was written), a tap again stops it. Held (or right-clicked):
-// the play tool (tap ink to hear it) and the document's recordings. Self-contained, so its owner can put it anywhere:
-// it is an app item of the arrangement (the top bar's at a first start; the rail, a group, ⋮ → Tools; qt/top-bar).
+// The record button (qt/docs/features/audio.md, "In the app"): a tap starts recording for this document (a voice memo
+// of the page shown; ink written meanwhile plays the moment it was written), a tap again stops it. Held (or
+// right-clicked): the play tool (tap ink to hear it) and the document's recordings. Self-contained, so its owner can
+// put it anywhere: it is an app item of the arrangement (the top bar's at a first start; the rail, a group, ⋮ → Tools;
+// qt/top-bar).
 import QtQuick
 import QtQuick.Controls
 import "Popups.js" as Popups

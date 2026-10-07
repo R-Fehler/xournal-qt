@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the material of a page tile shown dark (qt/docs/dark-pages.md): the tile's texture looked up in the
- * dark table (canvas/DarkPages.h) on the GPU, except in the rectangles kept (pictures). No page is drawn again: the
+ * xournal-qt: the material of a page tile shown dark (qt/docs/features/dark-pages.md): the tile's texture looked up in
+ * the dark table (canvas/DarkPages.h) on the GPU, except in the rectangles kept (pictures). No page is drawn again: the
  * tile is the page's picture as it is.
  *
  * Only with a graphics API (RHI); the software renderer ignores materials, and the canvas maps the tiles on the CPU

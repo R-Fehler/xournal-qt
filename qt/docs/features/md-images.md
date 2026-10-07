@@ -6,8 +6,8 @@ Related: [markdown-boxes.md](markdown-boxes.md) (drawing, formulas as inline sha
 
 ## Drawing
 
-- `![alt](path "title")` is one run of the parsed text (`md::Run` with `Image`): its text is the alt text, its source
-  the whole `![…](…)` (as a formula's run is its whole `$…$`), its link the image's path. The layout puts an image in
+- `![alt](../path "title")` is one run of the parsed text (`md::Run` with `Image`): its text is the alt text, its source
+  the whole `![…](../…)` (as a formula's run is its whole `$…$`), its link the image's path. The layout puts an image in
   the text as one character, U+FFFC, with a Pango shape as big as the picture, as it does for formulas
   (`MdLayout.cpp`). So lines break around it, a tap on it is a place in the text, pages are split around it and never
   inside it.
@@ -30,7 +30,7 @@ Related: [markdown-boxes.md](markdown-boxes.md) (drawing, formulas as inline sha
   surface (PDF export, the hybrid PDF, print) the picture is drawn at its natural size, a JPEG as the file itself
   (Cairo embeds it as it is), each picture once per PDF (`CAIRO_MIME_TYPE_UNIQUE_ID`).
 - **Missing or unreadable file**: the alt text and the path, in red, in the text.
-- **While the block is written** (the block with the cursor shows its Markdown): the `![…](…)` is shown as its source,
+- **While the block is written** (the block with the cursor shows its Markdown): the `![…](../…)` is shown as its source,
   and the picture is drawn below the block, as the preview of a `$$` formula.
 - **Everywhere**: the canvas, the `.md` editor, full-page mode, thumbnails, previews, PDF export, the hybrid PDF and
   print all draw Markdown through `md::layout` / `md::draw`.
@@ -42,7 +42,7 @@ Related: [markdown-boxes.md](markdown-boxes.md) (drawing, formulas as inline sha
 
 - Paste (Ctrl+V with a picture on the clipboard: on the page, in a `.md`, and in the editor beside the page), a
   dropped image file, or the formatting bar's image button (a file picker) saves the picture and inserts
-  `![](name.assets/image-YYYY-MM-DD-HHMMSS.png)` at the cursor (Typora's names; a dropped or picked file keeps its
+  `![](../name.assets/image-YYYY-MM-DD-HHMMSS.png)` at the cursor (Typora's names; a dropped or picked file keeps its
   name and kind, made unique in the folder, and its name is the alt text). A pasted picture's alt text is empty. It is
   one undo step of the text; undo leaves the file (see clean-up). A copied text that also carries a picture (a
   spreadsheet's cells) is pasted as text.

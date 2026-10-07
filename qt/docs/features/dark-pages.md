@@ -3,7 +3,7 @@
 The author (round of 2026-10-05 evening): dark mode for pages, inverted on the GPU with pictures kept, ink and
 highlighter shown as their dark equivalents (palette roles) and readable in both; curated page colors (black, grey,
 illustration paper, textured paper) for `.xopp` and PDFs, with a printing warning for dark pages. Idea A5 of
-[the ideas of 2026-10](history/README.md).
+[the ideas of 2026-10](../history/README.md).
 
 Two things that look alike and are not:
 
@@ -144,4 +144,4 @@ Without them the build says so and dark pages are drawn on the CPU.
   ruling visible on dark papers, a highlighter on dark paper visible and yellow (and upstream's on white).
 - `xqt-ui-tests` `DarkPagesUiTest.*`: the View menu, the background dialog's swatches and texture, the print warning.
 
-Device checks: [device-checklist.md](testing/device-checklist.md).
+Device checks: [device-checklist.md](../testing/device-checklist.md).

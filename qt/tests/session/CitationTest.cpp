@@ -1,6 +1,7 @@
 /*
- * xournal-qt: citations (qt/docs/citations.md): the look-up addresses of selected text, the title of a bibliography
- * entry and how titles match, arXiv IDs, arXiv's answers (saved ones: no network) and the names of downloads.
+ * xournal-qt: citations (qt/docs/features/citations.md): the look-up addresses of selected text, the title of a
+ * bibliography entry and how titles match, arXiv IDs, arXiv's answers (saved ones: no network) and the names of
+ * downloads.
  *
  * @license GNU GPLv2 or later
  */

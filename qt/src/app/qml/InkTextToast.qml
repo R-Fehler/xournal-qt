@@ -1,8 +1,9 @@
-// The handwriting just copied as text (qt/copy-tools; qt/docs/handwriting-search.md, "Copy handwriting as text"): a
-// small card near the words swept over or selected, with the text now on the clipboard. The words the recogniser was
-// unsure of are grey. The text can be selected (and copied again in part), not edited: the clipboard has it as it is
-// shown. It hides by itself after a while (longer for a longer text), not while the pointer is on it or text in it is
-// selected; × closes it. While the words are still being read (lines not read before): "Reading the handwriting…".
+// The handwriting just copied as text (qt/copy-tools; qt/docs/features/handwriting-search.md, "Copy handwriting as
+// text"): a small card near the words swept over or selected, with the text now on the clipboard. The words the
+// recogniser was unsure of are grey. The text can be selected (and copied again in part), not edited: the clipboard has
+// it as it is shown. It hides by itself after a while (longer for a longer text), not while the pointer is on it or
+// text in it is selected; × closes it. While the words are still being read (lines not read before): "Reading the
+// handwriting…".
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

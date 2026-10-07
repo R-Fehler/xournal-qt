@@ -6,7 +6,7 @@ import XournalQt.Canvas
 
 Item {
     id: windowShortcuts
-    // --- Esc and Android's back key: one dispatcher (qt/docs/zen.md, "Esc and Back") ------------------------------
+    // --- Esc and Android's back key: one dispatcher (qt/docs/features/zen.md, "Esc and Back") ------------------------
     // Two enabled Shortcuts of the same key are "ambiguous" to Qt, and then neither acts. So Esc and Back have ONE
     // Shortcut each, and what a press does is the first step of this list that applies (the next press: the next one):
     //   0. what is in front takes the key itself: a popup (Qt gives a modal popup, or one that closes on Esc, the key
@@ -95,7 +95,7 @@ Item {
     Shortcut { sequence: "Right"; enabled: win.modes.replaying && !app.homeVisible; onActivated: app.timeline.skip(5000) }
     Shortcut { sequence: "Home"; enabled: win.modes.replaying && !app.homeVisible; onActivated: app.timeline.seek(0) }
     Shortcut { sequence: "End"; enabled: win.modes.replaying && !app.homeVisible; onActivated: app.timeline.seek(app.timeline.duration) }
-    // Recording (qt/docs/audio.md): starts or stops it for this document
+    // Recording (qt/docs/features/audio.md): starts or stops it for this document
     Shortcut { sequences: win.keysOf("record"); enabled: app.audio.available && !app.homeVisible; onActivated: app.audio.toggleRecording() }
     // Document shortcuts do nothing while the home screen is shown.
     readonly property bool docKeys: !app.homeVisible && !app.markdownActive && !win.modes.replaying
@@ -166,7 +166,7 @@ Item {
     // Ctrl+N adds a page (what one needs while writing), Ctrl+Shift+N a document
     Shortcut { sequences: win.keysOf("addPage"); enabled: docKeys; onActivated: app.addPageAfterCurrent() }
     Shortcut { sequences: win.keysOf("newDocument"); onActivated: app.newDocument() }
-    // Quick note (qt/docs/quick-note.md): from the home screen too
+    // Quick note (qt/docs/features/quick-note.md): from the home screen too
     Shortcut { sequences: win.keysOf("quickNote"); onActivated: app.quickNote() }
     Shortcut { sequences: win.keysOf("addPage"); enabled: app.homeVisible; onActivated: app.newDocument() }
     Shortcut { sequences: win.keysOf("closeTab"); enabled: docKeys; onActivated: requestCloseTab(app.currentTab) }
@@ -257,7 +257,7 @@ Item {
     Shortcut { sequences: win.keysOf("selectAll"); enabled: docKeys; onActivated: app.selectAllOnPage() }
     Shortcut { sequences: win.keysOf("group"); enabled: docKeys; onActivated: app.groupSelection() }
     Shortcut { sequences: win.keysOf("ungroup"); enabled: docKeys; onActivated: app.ungroupSelection() }
-    // The page (the first selected page) as a high-resolution picture on the clipboard (qt/docs/page-files.md)
+    // The page (the first selected page) as a high-resolution picture on the clipboard (qt/docs/features/page-files.md)
     Shortcut { sequences: win.keysOf("copyPageImage"); enabled: docKeys && !win.textDoc; onActivated: app.copyPagesAsImage(app.pages.selectionCount > 0 ? app.pages.selectedPages() : []) }
     Shortcut { sequences: win.keysOf("findNext"); enabled: docKeys; onActivated: app.searchNext() }
     Shortcut { sequences: win.keysOf("findPrevious"); enabled: docKeys; onActivated: app.searchPrevious() }

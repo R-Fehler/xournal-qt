@@ -1,6 +1,6 @@
 // xournal-qt: where we are in the library: the breadcrumbs (eliding from the middle), or what the list shows
 // (search, flat, favourites, a tag), with what the library is busy with.
-// Part of HomeView.qml (the home screen, qt/docs/library.md), instantiated once there: it reads the home
+// Part of HomeView.qml (the home screen, qt/docs/features/library.md), instantiated once there: it reads the home
 // screen's state through `home`, and the other parts by their ids (HomeView.qml's context).
 import QtQuick
 import QtQuick.Controls

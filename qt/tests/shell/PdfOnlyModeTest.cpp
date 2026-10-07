@@ -1,6 +1,6 @@
 /*
- * xournal-qt: PDF files mode (qt/docs/hybrid-pdf.md, "PDF-only mode"): every document is one PDF with notes, and
- * nothing is written next to the user's files.
+ * xournal-qt: PDF files mode (qt/docs/features/hybrid-pdf.md, "PDF-only mode"): every document is one PDF with notes,
+ * and nothing is written next to the user's files.
  *
  * @license GNU GPLv2 or later
  */

@@ -9,8 +9,8 @@
  * an "%%EOF" of its own (the main section of a linearized file, a hybrid-reference file's stream) belongs to the
  * revision that refers to it. Bytes after the last good revision (a damaged tail) are reported, not trusted.
  *
- * The version history of a PDF with notes (qt/docs/hybrid-pdf.md, "Version history") is built on this: a version is
- * one of these prefixes.
+ * The version history of a PDF with notes (qt/docs/features/hybrid-pdf.md, "Version history") is built on this: a
+ * version is one of these prefixes.
  *
  * @license GNU GPLv2 or later
  */

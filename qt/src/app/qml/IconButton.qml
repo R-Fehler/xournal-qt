@@ -1,8 +1,8 @@
 // A touch-sized tool bar button showing one of the upstream Xournal++ (Lucide) icons.
-// Its name without hover (qt/docs/adaptive-layout.md, "Labels without hover"): the mouse and the pen's hover show the
-// tip after a moment; a finger held on it shows its `label` above the finger while held, and letting go then does
-// not press it. A button with a long press of its own (`ownHold`: a menu of its variants, a dialog) keeps that; the
-// popup it opens shows the button's name. A mouse or pen held long on a plain button still presses it on release.
+// Its name without hover (qt/docs/features/adaptive-layout.md, "Labels without hover"): the mouse and the pen's hover
+// show the tip after a moment; a finger held on it shows its `label` above the finger while held, and letting go then
+// does not press it. A button with a long press of its own (`ownHold`: a menu of its variants, a dialog) keeps that;
+// the popup it opens shows the button's name. A mouse or pen held long on a plain button still presses it on release.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

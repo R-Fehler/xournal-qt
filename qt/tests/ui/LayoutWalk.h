@@ -1,6 +1,6 @@
 /*
  * xournal-qt: what the UI tests of window sizes share (AdaptiveAuditTest, AdaptiveLayoutTest): the sizes of the audit
- * (qt/docs/ui-adaptive-audit.md), and a walk over the visible controls of a window that finds those outside it, those
+ * (qt/docs/history/README.md), and a walk over the visible controls of a window that finds those outside it, those
  * hidden in a scrolled area and those smaller than a finger.
  *
  * @license GNU GPLv2 or later

@@ -1,8 +1,8 @@
 /*
- * xournal-qt: the toolbox in the real window (qt/docs/toolbox.md): the user's own tools in a rail docked to a side of
- * the canvas (right by default), undo and redo at its head, the app's tools (hand, select, snip, mark PDF text) lent to
- * it as items of the same arrangement; a tap picks a tool up, the rail scrolls when it is short (the same order on every
- * screen), the edge is chosen per window size.
+ * xournal-qt: the toolbox in the real window (qt/docs/features/toolbox.md): the user's own tools in a rail docked to a
+ * side of the canvas (right by default), undo and redo at its head, the app's tools (hand, select, snip, mark PDF text)
+ * lent to it as items of the same arrangement; a tap picks a tool up, the rail scrolls when it is short (the same order
+ * on every screen), the edge is chosen per window size.
  *
  * @license GNU GPLv2 or later
  */
@@ -166,7 +166,7 @@ protected:
         }
         return runs;
     }
-    /// What the rail shows in its middle (qt/docs/toolbox.md, "A rail that scrolls"): its items along it ("toolEntry_e1",
+    /// What the rail shows in its middle (qt/docs/features/toolbox.md, "A rail that scrolls"): its items along it ("toolEntry_e1",
     /// "railApp_hand", "railGroup_g1", "|"), how many cells lie wholly in sight, the room of the middle, the length of
     /// its view and of its contents, where it is scrolled to
     struct RailState {
@@ -1300,7 +1300,7 @@ TEST_F(ToolboxTest, onAPhoneTheDockIsTheSameRailWithPlusAtItsEnd) {
     EXPECT_TRUE(inside(find("phonePageButton"), find("phoneAppBar")));
 }
 
-// --- the top bar (qt/top-bar; qt/docs/toolbox.md, "The top bar") ------------------------------------------------------
+// --- the top bar (qt/top-bar; qt/docs/features/toolbox.md, "The top bar") ------------------------------------------------------
 
 // The top bar shows the other list of the arrangement in the user's order, with its dividers and groups (the items not
 // offered here skipped, not removed); it scrolls as the rail does: half of the next cell, a fade, the wheel; "+" and ⋮
@@ -1844,8 +1844,8 @@ TEST_F(ToolboxTest, aTextDocumentsFormatBarScrollsWithItsCommands) {
     EXPECT_TRUE(rectOf(flick).contains(rectOf(find("settingsButton"))));
 }
 
-/// Zen and read only (qt/docs/zen.md; qt/zen): three switches of their own - full screen, Zen (only the page and the
-/// dot), read only (the edges turn the pages, no ink) - and Read, Zen and read only together
+/// Zen and read only (qt/docs/features/zen.md; qt/zen): three switches of their own - full screen, Zen (only the page
+/// and the dot), read only (the edges turn the pages, no ink) - and Read, Zen and read only together
 class ReadingTest: public ToolboxTest {
 protected:
     void SetUp() override {
@@ -2106,7 +2106,8 @@ TEST_F(ReadingTest, readOnlyIsASwitchOfItsOwn) {
     until([&] { return !box->property("floating").toBool(); });
 }
 
-// Zen (qt/docs/zen.md): only the page and a faint dot in the lower left corner; the pen writes, P/H/E/T take tools
+// Zen (qt/docs/features/zen.md): only the page and a faint dot in the lower left corner; the pen writes, P/H/E/T take
+// tools
 TEST_F(ReadingTest, zenHidesEverythingButThePageAndTheDot) {
     resize(1280, 800);
     auto* canvas = find("canvas");
@@ -2185,8 +2186,8 @@ TEST_F(ReadingTest, zenHidesEverythingButThePageAndTheDot) {
     EXPECT_EQ(byId.value("read"), "Ctrl+Alt+R");
 }
 
-// The dot's pill (qt/docs/zen.md): beside the dot over the page (the page does not move); Show controls, Read only, the
-// page number (all pages), fit the width / the whole page; a tap on the page closes it and writes nothing
+// The dot's pill (qt/docs/features/zen.md): beside the dot over the page (the page does not move); Show controls, Read
+// only, the page number (all pages), fit the width / the whole page; a tap on the page closes it and writes nothing
 TEST_F(ReadingTest, theZenDotsPillAndItsEntries) {
     resize(1280, 800);
     auto* canvas = find("canvas");
@@ -2257,7 +2258,7 @@ TEST_F(ReadingTest, theZenDotsPillAndItsEntries) {
 }
 
 namespace {
-/// Recording (qt/docs/audio.md) with the fake microphone, or in a build without any audio backend
+/// Recording (qt/docs/features/audio.md) with the fake microphone, or in a build without any audio backend
 class ToolboxAudioTest: public ToolboxTest {
 protected:
     virtual bool withAudio() const { return true; }

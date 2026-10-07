@@ -1,8 +1,9 @@
 /*
- * xournal-qt: pages as files (qt/docs/page-files.md): inserting pages from a PDF, a PDF with notes or a protected PDF
- * (their text stays searchable, their notes come along, one undo step); extracting selected pages into a new PDF with
- * notes or .xopp (opened, the source unchanged or the pages removed in one undo step; a protected document gives a
- * protected PDF and no .xopp); splitting; exporting pages as pictures named "name-p003.png"; the ranges and names.
+ * xournal-qt: pages as files (qt/docs/features/page-files.md): inserting pages from a PDF, a PDF with notes or a
+ * protected PDF (their text stays searchable, their notes come along, one undo step); extracting selected pages into a
+ * new PDF with notes or .xopp (opened, the source unchanged or the pages removed in one undo step; a protected document
+ * gives a protected PDF and no .xopp); splitting; exporting pages as pictures named "name-p003.png"; the ranges and
+ * names.
  *
  * @license GNU GPLv2 or later
  */

@@ -41,7 +41,7 @@ Written as `#page=12&pdfpage=7`. Viewers that know only `page=` still get close.
 
 ## Where links live
 
-- **In Markdown boxes and `.md` files:** ordinary Markdown links, `[Kalman, prediction](../Lectures/Kalman.xopp#chapter=…&page=12)`.
+- **In Markdown boxes and `.md` files:** ordinary Markdown links, `[Kalman, prediction](../../Lectures/Kalman.xopp#chapter=…&page=12)`.
   This is stored as plain text, so the file stays upstream-compatible (Xournal++ shows the link text as source).
 - **In the hybrid PDF:** also as a real PDF `/Link` annotation with a `GoToR` action (a file plus a page), so
   Acrobat and other viewers follow it too.
@@ -53,7 +53,7 @@ Written as `#page=12&pdfpage=7`. Viewers that know only `page=` still get close.
 
 - **"Copy link"** on a page (sidebar, page grid), a chapter (Contents), a library card, a search hit, or the
   current page (⋮ menu). The clipboard then holds the link, as a URI and as Markdown.
-- **Pasting** it into a Markdown box inserts `[title](link)`. Pasting it on the page with nothing selected creates
+- **Pasting** it into a Markdown box inserts `[title](../link)`. Pasting it on the page with nothing selected creates
   a link marker. Pasting it with a selection ("link this") attaches it to the selection as a marker next to it.
 - **Dragging** a library card, a page from the sidebar or grid, or a chapter onto the page does the same.
 
@@ -111,7 +111,7 @@ The author accepted the plan with its proposals:
 - `links::parseWiki` reads `[[note#heading]]` (the name is looked up later: it has no extension).
 - `links::write` writes the fragment in the order chapter, heading, page, pdfpage, line, text, and escapes what a
   Markdown link cannot hold (space, `%`, `#`, `?`, parentheses, brackets, `<` `>`; in values also `&`, `=`, `+`).
-  Letters beyond ASCII stay as they are (`Übung%203.xopp`). `links::markdown` gives `[title](link)`.
+  Letters beyond ASCII stay as they are (`Übung%203.xopp`). `links::markdown` gives `[title](../link)`.
 - Paths are relative to the folder of the document that holds the link (`links::relativePath`, `resolvePath`).
 - Where a link leads (`links::resolve`, on a list of the target's chapters and pages): the chapter by its title,
   then by its normalised title (case folded, only letters and digits); the PDF page (`pdfpage=`); the page number,
@@ -160,9 +160,9 @@ The author accepted the plan with its proposals:
   manager would take that as a file to paste.) Titles: "kalman, page 4", "kalman, Prediction step", "kalman".
   A document without a file yet copies "#Page:12", upstream's link within it, as before.
 - **Pasting** into Markdown being written on the page, into a `.md`, or beside the page (the panel) inserts
-  `[title](link)` with the path relative to that document (a new document without a file: the absolute path).
+  `[title](../link)` with the path relative to that document (a new document without a file: the absolute path).
 - **Pasting on a page** (Ctrl+V, the paste of the context pill) makes a **link marker**: a small Markdown text box in
-  the page's Markdown layer (made if needed) holding `[🔗 title](link)`, in the link color, as wide as its text.
+  the page's Markdown layer (made if needed) holding `[🔗 title](../link)`, in the link color, as wide as its text.
   Xournal++ shows it as that text. It goes where it was pasted, or in the middle of the visible page; with elements
   selected, at their top right ("this sketch links to …"). One undo step (plus one for a Markdown layer made for
   it). A tap on it follows the link like any link in a Markdown box.
@@ -182,7 +182,7 @@ The author accepted the plan with its proposals:
   folders; a rename from a tab, ⋮ → Document → Rename… or the overview of open documents, which is the library's
   rename): `LinkRewrite::plan` finds the links that point elsewhere now - links to what moved, and the relative links of
   a moved document itself - and writes each anew relative to where it is (the fragment stays; a wiki link to a renamed
-  document gets the new name). Only link targets change: `](…)`, `](<…>)`, `[id]: …`, `[[…]]`; the rest of the text
+  document gets the new name). Only link targets change: `](../…)`, `](<../…>)`, `[id]: …`, `[[…]]`; the rest of the text
   stays byte for byte.
   - Open documents change through themselves, with undo (a `.xopp`'s texts as text edits, a `.md` as one edit of
     its text), and are saved when they had no unsaved changes (so the file has the new link too); with unsaved

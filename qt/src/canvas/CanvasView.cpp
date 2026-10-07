@@ -476,7 +476,7 @@ void CanvasView::clearSelection() {
     mixedSelection->clear();
     stickyNotes->clearSelection();
     // xournal-qt: groups that come into a layer where another group has their number get new ones (moved to another
-    // page or into a note; qt/docs/groups.md)
+    // page or into a note; qt/docs/features/groups.md)
     if (selection && selection->getSourceLayer()) {
         std::vector<Element*> elements;
         for (const Element* e: selection->getElementsView()) {
@@ -563,7 +563,7 @@ bool CanvasView::copySelection() {
     auto* mime = new QMimeData;
     mime->setData(XOURNAL_MIME, QByteArray(data->str, static_cast<qsizetype>(data->len)));
     g_string_free(data, TRUE);
-    // xournal-qt: the groups beside it (qt/docs/groups.md), only when there are any
+    // xournal-qt: the groups beside it (qt/docs/features/groups.md), only when there are any
     std::vector<const Element*> copied;
     for (const Element* e: selection->getElementsView()) {
         copied.push_back(e);
@@ -613,7 +613,8 @@ bool CanvasView::pasteText(const QString& content, std::optional<QPointF> viewPo
         return ((visible.isEmpty() ? pageRect : visible).center() - pageRect.topLeft()) / zoom;
     };
     QPointF onPage = pointOn(pNr);
-    // Into a sticky note: the selected one (at its left, half way down), or the one there (qt/docs/sticky-notes.md)
+    // Into a sticky note: the selected one (at its left, half way down), or the one there
+    // (qt/docs/features/sticky-notes.md)
     const auto note = noteTarget(pNr, onPage);
     if (note) {
         pNr = note->page;
@@ -788,7 +789,7 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
         const auto scope = actingScope(pNr);
         return stickyNotes->paste(pNr);
     }
-    // A copied link ("Copy link"): a link marker (qt/docs/links.md)
+    // A copied link ("Copy link"): a link marker (qt/docs/features/links.md)
     if (mime && mime->hasFormat(links::MIME)) {
         return pasteLinkMarker(viewPos);
     }
@@ -834,7 +835,7 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
     if (pNr >= pages.size()) {
         return false;
     }
-    // Into a sticky note: the selected one, or the one at the paste point (qt/docs/sticky-notes.md)
+    // Into a sticky note: the selected one, or the one at the paste point (qt/docs/features/sticky-notes.md)
     const auto pastePoint = [&](size_t index) {
         const double zoom = viewController.zoom();
         const QRectF pageRect = layout.pageRect(index, zoom);
@@ -873,7 +874,7 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
         sel->readSerialized(in);
         const int count = in.readInt();
         auto undo = std::make_unique<AddUndoAction>(page, false);
-        // xournal-qt: their groups (qt/docs/groups.md), with new numbers on this page
+        // xournal-qt: their groups (qt/docs/features/groups.md), with new numbers on this page
         std::vector<groups::Id> pastedGroups;
         if (mime->hasFormat(groups::CLIPBOARD_MIME)) {
             pastedGroups = groups::fromClipboard(mime->data(groups::CLIPBOARD_MIME).toStdString(),
@@ -906,7 +907,7 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
             std::shared_lock lock(*doc);
             groups::renumber(pasted, *doc);
         }
-        timeline::stampNew(pasted);  // (pasted elements are new: qt/docs/timeline.md)
+        timeline::stampNew(pasted);  // (pasted elements are new: qt/docs/features/timeline.md)
         session.getUndoRedoHandler()->addUndoAction(std::move(undo));
 
         // Paste target: where the user asked for it, else the middle of the visible part of the page (upstream
@@ -940,7 +941,7 @@ bool CanvasView::insertImage(const QByteArray& data, std::optional<QPointF> view
     if (pNr >= pages.size() || data.isEmpty()) {
         return false;
     }
-    // A sticky note takes it: the selected one, or the one where it goes (qt/docs/sticky-notes.md)
+    // A sticky note takes it: the selected one, or the one where it goes (qt/docs/features/sticky-notes.md)
     std::optional<QPointF> point;
     {
         const double zoom = viewController.zoom();
@@ -1264,7 +1265,8 @@ std::optional<QRectF> CanvasView::textColumnAt(size_t index, QPointF pagePoint) 
 
 void CanvasView::doubleTapAt(QPointF viewPos) {
     if (viewController.rotated()) {
-        // Turned: two taps turn it upright again, the point tapped staying where it is (qt/docs/canvas-rotation.md)
+        // Turned: two taps turn it upright again, the point tapped staying where it is
+        // (qt/docs/features/canvas-rotation.md)
         resetRotation(viewController.viewToScreen(viewPos));
         return;
     }
@@ -2188,7 +2190,7 @@ void CanvasView::startText(CanvasPage& page, double x, double y) {
         return;
     }
     // Markdown: the page's text and text boxes, written on the page (formatted while typing) or beside it. On a
-    // sticky note: the note's one Markdown text (the Markdown session finds the note; qt/docs/sticky-notes.md)
+    // sticky note: the note's one Markdown text (the Markdown session finds the note; qt/docs/features/sticky-notes.md)
     bool onNote = false;
     bool onBox = false;
     bool onText = false;
@@ -3198,7 +3200,7 @@ void CanvasView::selectTogether(CanvasPage& page, std::vector<Layer*> notes,
         return;
     }
     {
-        // xournal-qt: a group with any member selected is selected whole (qt/docs/groups.md)
+        // xournal-qt: a group with any member selected is selected whole (qt/docs/features/groups.md)
         std::shared_lock lock(*session.getDocument());
         std::vector<Layer*> layers;
         for (const auto& item: items) {
@@ -3302,7 +3304,7 @@ void CanvasView::toggleSelected(CanvasPage& page, Layer* note, Element* element)
     if (element) {
         const auto at = std::find_if(items.begin(), items.end(), [&](const auto& i) { return i.element == element; });
         if (at != items.end()) {
-            // xournal-qt: its whole group leaves the selection (qt/docs/groups.md)
+            // xournal-qt: its whole group leaves the selection (qt/docs/features/groups.md)
             const Layer* layer = at->layer;
             const uint32_t group = element->getGroup();
             items.erase(std::remove_if(items.begin(), items.end(),
@@ -3473,7 +3475,7 @@ Layer::Index CanvasView::selectNoteLayer(const PageRef& page, const Layer* note)
 }
 
 std::optional<CanvasView::NoteTarget> CanvasView::noteTarget(size_t pNr, std::optional<QPointF> pagePoint) const {
-    // The selected note (one that can be written on), else the note there (qt/docs/sticky-notes.md)
+    // The selected note (one that can be written on), else the note there (qt/docs/features/sticky-notes.md)
     if (const auto look = stickyNotes->selectedLook(); look && !look->cover) {
         if (const auto idx = stickyNotes->selectedPage() ? indexOf(stickyNotes->selectedPage()) : std::nullopt) {
             return NoteTarget{stickyNotes->selectedLayer(), *idx, *look, true};
@@ -3510,7 +3512,7 @@ void CanvasView::endSelectionDrag() {
         return;
     }
     // Only a move of elements changes where they are: the note under the middle of the selection takes them, else the
-    // page (qt/docs/sticky-notes.md, "Selecting in a note"). Never the page's Markdown texts.
+    // page (qt/docs/features/sticky-notes.md, "Selecting in a note"). Never the page's Markdown texts.
     const bool ofMarkdown = markdownSelection && markdownSelection->selection == sel && !markdownSelection->inNotes;
     auto* page = static_cast<CanvasPage*>(sel->getView());
     if (type != CURSOR_SELECTION_MOVE || !sel->isMoving() || ofMarkdown || !page || isReadingOnly() ||

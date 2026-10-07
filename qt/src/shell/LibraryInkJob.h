@@ -1,5 +1,6 @@
 /*
- * xournal-qt: reads the handwriting of the library's documents in the background (qt/docs/handwriting-search.md).
+ * xournal-qt: reads the handwriting of the library's documents in the background
+ * (qt/docs/features/handwriting-search.md).
  *
  * Open documents are read by their indexers (InkTextIndexer) whatever the power source. The rest of the library is
  * read only while

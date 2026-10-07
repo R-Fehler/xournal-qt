@@ -1,7 +1,7 @@
 /*
  * xournal-qt: the width of a Markdown text box, set with the handle on its right edge (MarkdownBoxResize;
- * qt/docs/markdown-boxes.md, "Size"): while it is written on the page and while it is selected, with the mouse, the
- * pen and a finger. The page's own Markdown text has no handle.
+ * qt/docs/features/markdown-boxes.md, "Size"): while it is written on the page and while it is selected, with the
+ * mouse, the pen and a finger. The page's own Markdown text has no handle.
  *
  * @license GNU GPLv2 or later
  */

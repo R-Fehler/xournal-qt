@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- xournal-qt.app's Info.plist. qt/scripts/macos-deploy.sh fills in @VERSION@ and @MINIMUM_SYSTEM@ (docs/macos.md). -->
+<!-- xournal-qt.app's Info.plist. qt/scripts/macos-deploy.sh fills in @VERSION@ and @MINIMUM_SYSTEM@ (qt/docs/development/macos.md). -->
 <plist version="1.0">
 <dict>
   <key>CFBundleDevelopmentRegion</key>
@@ -39,8 +39,8 @@
   <false/>
   <key>LSSupportsOpeningDocumentsInPlace</key>
   <true/>
-  <!-- Audio recordings (qt/docs/audio.md): macOS asks for the microphone with this text when the first recording
-       starts -->
+  <!-- Audio recordings (qt/docs/features/audio.md): macOS asks for the microphone with this text when the first
+       recording starts -->
   <key>NSMicrophoneUsageDescription</key>
   <string>Xournal Qt records audio while you write, so that your notes play back what was said at that moment.</string>
 

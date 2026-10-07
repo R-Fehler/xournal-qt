@@ -1,6 +1,6 @@
 /*
  * xournal-qt: a document's handwriting as a line dataset for training and evaluating models
- * (qt/research/hwr/train/FORMATS.md, §1, "kind": "ink"; qt/docs/handwriting-search.md, "Your handwriting as a
+ * (qt/research/hwr/train/FORMATS.md, §1, "kind": "ink"; qt/docs/features/handwriting-search.md, "Your handwriting as a
  * dataset"). `xournal-qt-cli hwr-lines` runs it.
  *
  * Every page's ink is laid out in lines and words as the search does (InkLayout.h); each line, in reading order (pages

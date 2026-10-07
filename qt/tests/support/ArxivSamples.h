@@ -1,6 +1,6 @@
 /*
  * xournal-qt: answers of arXiv's export API as it sends them (saved; no test touches the network), for the citation
- * tests (qt/docs/citations.md).
+ * tests (qt/docs/features/citations.md).
  *
  * @license GNU GPLv2 or later
  */

@@ -1,6 +1,6 @@
 /*
- * xournal-qt: links between documents (qt/docs/links.md) applied to documents: what a document offers a link to
- * lead to (its chapters, its pages), where a link leads in an open document, which file a link means, and the link
+ * xournal-qt: links between documents (qt/docs/features/links.md) applied to documents: what a document offers a link
+ * to lead to (its chapters, its pages), where a link leads in an open document, which file a link means, and the link
  * to a place in a document.
  *
  * The format itself and the resolution are in session/DocumentLink.h.

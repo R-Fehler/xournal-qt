@@ -1,5 +1,5 @@
 // xournal-qt: Settings → Help: the introduction, the tutorial and the keyboard shortcuts
-// (qt/docs/onboarding.md).
+// (qt/docs/features/onboarding.md).
 // Part of SettingsPage.qml, instantiated once there: it reads the sheet through `sheet` (SettingsPage.qml's
 // context: `sheet.s` is app.settings, `sheet.narrow`, `sheet.win`); its rows are Settings*Row.qml.
 import QtQuick

@@ -519,10 +519,10 @@ QSGGeometryNode* trianglesNode(const std::vector<QPointF>& triangles, const QCol
 }
 }  // namespace
 
-/// The pointer drawn by the canvas (qt/docs/hover-cursors.md): an item of its own over the pages, so that following
-/// the pen moves only it (a new position in the scene graph) and draws no page anew. Its nodes are made again only
-/// when what it shows changes. The dot is a small texture; the eraser's outline is geometry (no texture however big
-/// it is: a big eraser at a high zoom is thousands of pixels wide).
+/// The pointer drawn by the canvas (qt/docs/features/hover-cursors.md): an item of its own over the pages, so that
+/// following the pen moves only it (a new position in the scene graph) and draws no page anew. Its nodes are made again
+/// only when what it shows changes. The dot is a small texture; the eraser's outline is geometry (no texture however
+/// big it is: a big eraser at a high zoom is thousands of pixels wide).
 class HoverMarkItem final: public QQuickItem {
 public:
     explicit HoverMarkItem(QQuickItem* parent): QQuickItem(parent) {
@@ -1470,7 +1470,7 @@ bool DocumentCanvasItem::event(QEvent* e) {
 }
 
 // The text the on-screen keyboard (or an input method) sends, and what it asks: QT_LOGGING_RULES="xqt.input.text=true"
-// (on Android through the launch intent, qt/docs/android.md)
+// (on Android through the launch intent, qt/docs/development/android.md)
 Q_LOGGING_CATEGORY(lcInputText, "xqt.input.text", QtWarningMsg)
 
 void DocumentCanvasItem::keyPressEvent(QKeyEvent* e) {
@@ -1479,8 +1479,8 @@ void DocumentCanvasItem::keyPressEvent(QKeyEvent* e) {
     if (!editor && canvasView && !e->text().isEmpty() && e->text().at(0).isPrint() &&
         !(e->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) &&
         (canvasView->textMode() || canvasView->typesIntoFlow()) && canvasView->ensureTextEditor()) {
-        // A text file, a text document of notes (qt/docs/md-pdf.md): typing starts writing (at the top of the page in
-        // view)
+        // A text file, a text document of notes (qt/docs/features/md-pdf.md): typing starts writing (at the top of the
+        // page in view)
         editor = canvasView->getTextInput();
     }
     bool finish = false;
@@ -1912,16 +1912,16 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
     const double zoom = vc.zoom();
     const double dpr = window() ? window()->effectiveDevicePixelRatio() : 1.0;
     const auto [first, last] = canvasView->visiblePages();
-    // The canvas turned (qt/docs/canvas-rotation.md): everything below is drawn in the upright view, which this turns
-    // onto the screen. The pages' pictures stay upright; the GPU turns their tiles.
+    // The canvas turned (qt/docs/features/canvas-rotation.md): everything below is drawn in the upright view, which
+    // this turns onto the screen. The pages' pictures stay upright; the GPU turns their tiles.
     {
         QMatrix4x4 turn;  // (the identity while upright)
         if (vc.rotated()) {
             QPointF at = vc.viewToScreen(QPointF(0, 0));  // where the view's origin is on the screen
             if (vc.rightAngled()) {
                 // A quarter turn maps whole device pixels onto whole device pixels, once the view's origin lies on
-                // one: the tiles are shown pixel for pixel, as upright (qt/docs/hidpi.md). (Input is mapped without
-                // this, less than a device pixel away.)
+                // one: the tiles are shown pixel for pixel, as upright (qt/docs/features/hidpi.md). (Input is mapped
+                // without this, less than a device pixel away.)
                 at = snapPoint(at, dpr);
             }
             const auto c = static_cast<float>(vc.rotationCos()), s = static_cast<float>(vc.rotationSin());
@@ -1951,8 +1951,9 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
     };
     bool more = false;  // tiles left for the next frame
 
-    // Dark pages (qt/docs/dark-pages.md): the tiles turned dark where they are composed, by a shader (one lookup in a
-    // table per pixel; the software renderer has no shaders: the same table on the CPU, when a tile is composed)
+    // Dark pages (qt/docs/features/dark-pages.md): the tiles turned dark where they are composed, by a shader (one
+    // lookup in a table per pixel; the software renderer has no shaders: the same table on the CPU, when a tile is
+    // composed)
     const bool gpu = DarkTileMaterial::available() && window() &&
                      window()->rendererInterface()->graphicsApi() != QSGRendererInterface::Software;
     QSGTexture* darkTable = nullptr;

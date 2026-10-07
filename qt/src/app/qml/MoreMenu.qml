@@ -34,7 +34,7 @@ Row {
         label: qsTr("More")
         tip: qsTr("More")
         onClicked: Popups.openAt(moreMenu)
-        // The ⋮ menu (qt/docs/adaptive-layout.md, "Menus"): complete since qt/top-bar - every command, whether
+        // The ⋮ menu (qt/docs/features/adaptive-layout.md, "Menus"): complete since qt/top-bar - every command, whether
         // a bar shows it or not (the bars are the user's to arrange; ⋮ is not), the commands of the bars in
         // its submenus; a sheet with drill-in on phones.
         AdaptiveMenu {
@@ -66,7 +66,7 @@ Row {
                     icon.color: "transparent"
                     onTriggered: app.toggleBookmark(app.pageNumber - 1)
                 }
-                // A favourite: a star kept beside the file, never in it (qt/docs/bookmarks.md)
+                // A favourite: a star kept beside the file, never in it (qt/docs/features/bookmarks.md)
                 AdaptiveMenuItem {
                     objectName: "favouriteDocumentItem"
                     offered: app.canFavourite
@@ -76,7 +76,7 @@ Row {
                     onTriggered: app.favourite = !app.favourite
                 }
                 MenuSeparator {}
-                // Quick note (qt/docs/quick-note.md): a new note in the library's Inbox, or a line in today's
+                // Quick note (qt/docs/features/quick-note.md): a new note in the library's Inbox, or a line in today's
                 // Markdown note there (Settings → Documents). Here, not at the top of ⋮ (at most 10 entries
                 // there): a new document, as the shortcut sheet's group "Document" has it
                 AdaptiveMenuItem {
@@ -89,11 +89,11 @@ Row {
                 MenuSeparator {}
                 // Its name (qt/rename): the file, and what belongs to it, as the library renames it
                 AdaptiveMenuItem { objectName: "renameDocumentItem"; text: qsTr("Rename…"); icon.source: app.iconUrl("xqt-pencil"); onTriggered: renameDocumentDialog.openFor(app.currentTab) }
-                // A password to open it (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): AES-256, its PDF only
+                // A password to open it (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs"): AES-256, its PDF only
                 AdaptiveMenuItem { objectName: "protectDocumentItem"; offered: app.canProtect && !app.protectedDocument; text: qsTr("Protect with a password…"); icon.source: app.iconUrl("xqt-lock"); onTriggered: protectionDialogs.protectDialog.openFor(false) }
                 AdaptiveMenuItem { objectName: "changePasswordItem"; offered: app.canProtect && app.protectedDocument; text: qsTr("Change or remove the password…"); icon.source: app.iconUrl("xqt-lock-open"); onTriggered: protectionDialogs.protectDialog.openFor(true) }
-                // Version history (qt/docs/hybrid-pdf.md): the sidebar's History panel (off by default; what it
-                // is and the switch are there)
+                // Version history (qt/docs/features/hybrid-pdf.md): the sidebar's History panel (off by default; what
+                // it is and the switch are there)
                 AdaptiveMenuItem { objectName: "versionHistoryItem"; offered: !win.textDoc; text: qsTr("Version history…"); icon.source: app.iconUrl("xqt-history"); onTriggered: win.showHistory() }
                 AdaptiveMenuItem {
                     objectName: "saveWithMessageItem"
@@ -110,7 +110,7 @@ Row {
                     icon.source: app.iconUrl("xqt-file-pen")
                     onTriggered: app.editAnyway(false)
                 }
-                // Text documents as PDF (qt/docs/md-pdf.md): a .md as a new PDF text document
+                // Text documents as PDF (qt/docs/features/md-pdf.md): a .md as a new PDF text document
                 AdaptiveMenuItem {
                     objectName: "openAsPdfDocumentItem"
                     offered: app.textDocument === "markdown"
@@ -125,14 +125,14 @@ Row {
                     icon.source: app.iconUrl("xqt-image-off")
                     onTriggered: unusedImagesDialog.show()
                 }
-                // Its tags: a PDF's keywords, without typing into it (qt/docs/tags.md)
+                // Its tags: a PDF's keywords, without typing into it (qt/docs/features/tags.md)
                 AdaptiveMenuItem {
                     objectName: "documentTagsMenuItem"
                     text: qsTr("Tags…")
                     icon.source: app.iconUrl("xqt-tag")
                     onTriggered: documentTagsDialog.openFor(app.currentDocumentPath())
                 }
-                // Which handwriting models read this document (qt/docs/handwriting-search.md): found from its
+                // Which handwriting models read this document (qt/docs/features/handwriting-search.md): found from its
                 // first lines, or chosen; kept in the library's cache
                 AdaptiveMenu {
                     id: handwritingLanguageMenu
@@ -146,7 +146,7 @@ Row {
                     AdaptiveMenuItem { objectName: "handwritingLanguageDe"; checkable: true; checked: handwritingLanguageMenu.current === "de"; text: qsTr("German"); onTriggered: app.handwritingLanguage = "de" }
                     AdaptiveMenuItem { objectName: "handwritingLanguageBoth"; checkable: true; checked: handwritingLanguageMenu.current === "both"; text: qsTr("Both"); onTriggered: app.handwritingLanguage = "both" }
                 }
-                // Marks other apps put into the PDF made editable (qt/docs/adopt-annotations.md)
+                // Marks other apps put into the PDF made editable (qt/docs/features/adopt-annotations.md)
                 AdaptiveMenuItem {
                     objectName: "adoptAnnotationsItem"
                     offered: !win.textDoc
@@ -167,7 +167,7 @@ Row {
                 // A plain PDF: the notes drawn into the pages (a PDF with notes that stays editable is a type
                 // of Save as)
                 AdaptiveMenuItem { objectName: "exportPdfItem"; text: qsTr("Export as plain PDF…"); icon.source: app.iconUrl("xopp-document-export-pdf"); onTriggered: exportFlow.openExportDialog() }
-                // Pages as PNG or JPEG pictures (qt/docs/page-files.md)
+                // Pages as PNG or JPEG pictures (qt/docs/features/page-files.md)
                 AdaptiveMenuItem { objectName: "exportImagesItem"; offered: !win.textDoc; text: qsTr("Export pages as pictures…"); icon.source: app.iconUrl("xqt-file-image"); onTriggered: pageFiles.openImages(app.pages.selectionCount > 0 ? app.pages.selectedPages() : []) }
                 // A PDF/A for keeping: the ink merged into the pages, the Xournal data inside
                 AdaptiveMenuItem {
@@ -177,7 +177,7 @@ Row {
                     icon.source: app.iconUrl("xqt-archive")
                     onTriggered: shareFlow.archiveDialog.openFor("")
                 }
-                // The Markdown of the document's page texts as a .md (qt/docs/md-pdf.md)
+                // The Markdown of the document's page texts as a .md (qt/docs/features/md-pdf.md)
                 AdaptiveMenuItem {
                     objectName: "exportMarkdownItem"
                     offered: !win.textDoc && app.hasMarkdownText
@@ -193,21 +193,21 @@ Row {
                 iconName: "xqt-file"
                 offered: !win.textDoc
                 AdaptiveMenuItem { objectName: "insertPagesItem"; text: qsTr("Insert pages…"); icon.source: app.iconUrl("xopp-page-add"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
-                // Pages as files (qt/docs/page-files.md): from a file, into a new document, split
+                // Pages as files (qt/docs/features/page-files.md): from a file, into a new document, split
                 AdaptiveMenuItem { objectName: "insertFromFileItem"; offered: app.canInsertTemplate; text: qsTr("Insert pages from a file…"); icon.source: app.iconUrl("xqt-import"); onTriggered: pageFiles.chooseFile(app.pageNumber - 1, true) }
                 AdaptiveMenuItem { objectName: "copyPageImageItem"; text: qsTr("Copy page as image"); icon.source: app.iconUrl("xqt-copy"); onTriggered: app.copyPagesAsImage(app.pages.selectionCount > 0 ? app.pages.selectedPages() : []) }
                 AdaptiveMenuItem { objectName: "extractPagesItem"; text: qsTr("Extract to a new document…"); icon.source: app.iconUrl("xqt-file-output"); onTriggered: pageFiles.openExtract(app.pages.selectionCount > 0 ? app.pages.selectedPages() : []) }
                 AdaptiveMenuItem { objectName: "splitDocumentItem"; text: qsTr("Split the document…"); icon.source: app.iconUrl("xqt-page-break"); onTriggered: pageFiles.openSplit(app.pages.selectionCount > 0 ? app.pages.selectedPages() : []) }
-                // Page templates (qt/docs/templates.md): this page saved to be added again; one added
+                // Page templates (qt/docs/features/templates.md): this page saved to be added again; one added
                 AdaptiveMenuItem { objectName: "saveTemplateItem"; text: qsTr("Save page as template…"); icon.source: app.iconUrl("xqt-file-plus"); onTriggered: templateSaveDialog.openForPage(app.pageNumber - 1) }
                 AdaptiveMenuItem { objectName: "insertTemplateItem"; offered: app.canInsertTemplate; text: qsTr("Add a page from a template…"); icon.source: app.iconUrl("xopp-page-add"); onTriggered: templatePicker.openToInsert(app.pageNumber) }
                 AdaptiveMenuItem { objectName: "pageBackgroundItem"; text: qsTr("Background of this page…"); icon.source: app.iconUrl("xqt-palette"); onTriggered: backgroundDialog.openFor([app.pageNumber - 1]) }
                 // Another paper size for this page, the selected pages or all of them (PageSizeDialog)
                 AdaptiveMenuItem { objectName: "pageSizeItem"; text: qsTr("Page size…"); icon.source: app.iconUrl("xqt-scaling"); onTriggered: pageSizeDialog.openFor([app.pageNumber - 1]) }
-                // Writing space beside the slides of all pages (qt/docs/note-space.md)
+                // Writing space beside the slides of all pages (qt/docs/features/note-space.md)
                 AdaptiveMenuItem { objectName: "noteSpaceItem"; text: qsTr("Space for notes…"); icon.source: app.iconUrl("xqt-note-space"); onTriggered: noteSpaceDialog.openFor([app.pageNumber - 1], true) }
                 AdaptiveMenuItem { objectName: "chapterItem"; text: qsTr("Start a chapter here…"); icon.source: app.iconUrl("xqt-toc"); onTriggered: chapterDialog.openFor(app.pageNumber - 1) }
-                // A quarter turn of this page or of all pages (qt/docs/page-rotation.md); PDF pages of a .xopp
+                // A quarter turn of this page or of all pages (qt/docs/features/page-rotation.md); PDF pages of a .xopp
                 // stay, and the menu says why
                 AdaptiveMenu {
                     id: rotateMenu
@@ -266,11 +266,11 @@ Row {
                     icon.source: app.iconUrl("xqt-book-open")
                     onTriggered: toolboxMenus.openAfterMenus(viewPill.layoutMenu)
                 }
-                // A black sheet over part of the page, for teaching and presenting (qt/docs/curtain.md)
+                // A black sheet over part of the page, for teaching and presenting (qt/docs/features/curtain.md)
                 AdaptiveMenuItem { objectName: "curtainItem"; offered: !win.textDoc; checkable: true; checked: app.curtain === "curtain"; text: qsTr("Curtain (B)"); icon.source: app.iconUrl("xqt-curtain"); onTriggered: app.toggleCurtain("curtain") }
                 AdaptiveMenuItem { objectName: "spotlightItem"; offered: !win.textDoc; checkable: true; checked: app.curtain === "spotlight"; text: qsTr("Spotlight") + win.keyNote("spotlight"); icon.source: app.iconUrl("xqt-spotlight"); onTriggered: app.toggleCurtain("spotlight") }
                 AdaptiveMenuItem { objectName: "presentCleanItem"; text: qsTr("Present without controls") + win.keyNote("presentClean"); icon.source: app.iconUrl("xopp-presentation-mode"); onTriggered: win.modes.startPresenting(true) }
-                // Zen: only the page and a faint dot (qt/docs/zen.md)
+                // Zen: only the page and a faint dot (qt/docs/features/zen.md)
                 AdaptiveMenuItem {
                     objectName: "zenItem"
                     checkable: true
@@ -297,7 +297,7 @@ Row {
                     icon.source: app.iconUrl("xqt-book-open")
                     onTriggered: win.modes.startReading()
                 }
-                // Pages shown dark, the document unchanged (qt/docs/dark-pages.md)
+                // Pages shown dark, the document unchanged (qt/docs/features/dark-pages.md)
                 AdaptiveMenu {
                     objectName: "darkPagesMenu"
                     offered: !win.textDoc
@@ -313,10 +313,11 @@ Row {
                     DarkItem { objectName: "darkPagesOnItem"; text: qsTr("On"); mode: "on" }
                     DarkItem { objectName: "darkPagesSystemItem"; text: qsTr("With the system's dark mode"); mode: "system" }
                 }
-                // The document's timeline: how it was written, with its recordings (qt/docs/timeline.md)
+                // The document's timeline: how it was written, with its recordings (qt/docs/features/timeline.md)
                 AdaptiveMenuItem { objectName: "replayItem"; offered: !win.textDoc; text: qsTr("Replay the writing"); icon.source: app.iconUrl("xqt-replay"); onTriggered: app.timeline.start() }
                 MenuSeparator {}
-                // The toolbox's edge in this size class (qt/docs/toolbox.md); the phone classes have their dock
+                // The toolbox's edge in this size class (qt/docs/features/toolbox.md); the phone classes have their
+                // dock
                 AdaptiveMenu {
                     objectName: "toolboxPositionMenu"
                     offered: !win.layout.phoneLayout
@@ -342,7 +343,7 @@ Row {
                     }
                 }
             }
-            // Help (qt/docs/onboarding.md): the introduction of the first start, the tutorial, the keyboard
+            // Help (qt/docs/features/onboarding.md): the introduction of the first start, the tutorial, the keyboard
             // shortcuts
             AdaptiveMenu {
                 objectName: "moreHelpMenu"

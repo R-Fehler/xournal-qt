@@ -59,13 +59,13 @@ class DocumentCanvasItem: public QQuickItem {
     Q_PROPERTY(qreal contentY READ contentY NOTIFY viewportChanged)
     /// The view is shown for reading only (the reference beside the document of a tab, CanvasView::setReadingOnly).
     Q_PROPERTY(bool readingOnly READ readingOnly WRITE setReadingOnly NOTIFY readingOnlyChanged)
-    /// Reading (qt/docs/toolbox.md): a drag or a fling up and down comes to rest on a row of pages, when the setting
-    /// snapPages is on (CanvasView::setSnapVertically)
+    /// Reading (qt/docs/features/toolbox.md): a drag or a fling up and down comes to rest on a row of pages, when the
+    /// setting snapPages is on (CanvasView::setSnapVertically)
     Q_PROPERTY(bool snapVertically READ snapVertically WRITE setSnapVertically NOTIFY snapVerticallyChanged)
-    /// Reading (qt/docs/zen.md): taps within this many pixels of the left or right edge that nothing
+    /// Reading (qt/docs/features/zen.md): taps within this many pixels of the left or right edge that nothing
     /// else takes are edgeTapped (the window turns the page); 0: off (CanvasView::setEdgeTapWidth)
     Q_PROPERTY(qreal edgeTapWidth READ edgeTapWidth WRITE setEdgeTapWidth NOTIFY edgeTapWidthChanged)
-    /// The canvas may be turned here (qt/docs/canvas-rotation.md; the reference beside the notes may not:
+    /// The canvas may be turned here (qt/docs/features/canvas-rotation.md; the reference beside the notes may not:
     /// CanvasView::setRotatable)
     Q_PROPERTY(bool rotatable READ rotatable WRITE setRotatable NOTIFY rotatableChanged)
     /// The mouse rests on a formula of a Markdown text that cannot be drawn: why (empty: none), and where it is (item
@@ -74,8 +74,8 @@ class DocumentCanvasItem: public QQuickItem {
     Q_PROPERTY(QRectF mathErrorRect READ mathErrorRect NOTIFY mathErrorChanged)
     /// The link under the mouse or the hovering pen, once it rested on it for a moment (LINK_HOVER_MS): { uri, page,
     /// pdfPage } as CanvasView::LinkTarget has them; empty when there is none. The window shows where it leads in a
-    /// status line (qt/docs/links.md, "Links with the mouse"). `hoveredLinkPointer`: where the pointer is (item
-    /// coordinates), so the line keeps out of its way.
+    /// status line (qt/docs/features/links.md, "Links with the mouse"). `hoveredLinkPointer`: where the pointer is
+    /// (item coordinates), so the line keeps out of its way.
     Q_PROPERTY(QVariantMap hoveredLink READ hoveredLink NOTIFY hoveredLinkChanged)
     Q_PROPERTY(QPointF hoveredLinkPointer READ hoveredLinkPointer NOTIFY hoveredLinkPointerChanged)
     /// Text is being written on the canvas (a text box, Markdown): the emoji picker inserts there.
@@ -90,10 +90,10 @@ class DocumentCanvasItem: public QQuickItem {
     Q_PROPERTY(int emojiCompletionIndex READ emojiCompletionIndex NOTIFY emojiCompletionChanged)
     Q_PROPERTY(QRectF emojiCompletionRect READ emojiCompletionRect NOTIFY emojiCompletionChanged)
     /// A sticky note's text is written with the cursor below the note's bottom: where the note is (item coordinates;
-    /// empty otherwise). The window says that the text is longer than the note (qt/docs/sticky-notes.md).
+    /// empty otherwise). The window says that the text is longer than the note (qt/docs/features/sticky-notes.md).
     Q_PROPERTY(QRectF noteTextHint READ noteTextHint NOTIFY noteTextHintChanged)
-    /// Dark pages (qt/docs/dark-pages.md): the pages shown dark, their pictures kept, ink in its dark equivalent. Only
-    /// what is shown: the document does not change.
+    /// Dark pages (qt/docs/features/dark-pages.md): the pages shown dark, their pictures kept, ink in its dark
+    /// equivalent. Only what is shown: the document does not change.
     Q_PROPERTY(bool darkPages READ darkPages WRITE setDarkPages NOTIFY darkPagesChanged)
 public:
     explicit DocumentCanvasItem(QQuickItem* parent = nullptr);
@@ -196,9 +196,9 @@ public:
         double dpr = 0;
     };
     SelectionShown selectionShown() const { return selectionStats; }
-    /// The pointer the canvas draws itself (tests; qt/docs/hover-cursors.md): for a pen the platform shows no cursor
-    /// for, and an eraser too big for a cursor. Shown or not, where its middle is (item coordinates), its side (logical
-    /// pixels), and the eraser it shows (none: the dot).
+    /// The pointer the canvas draws itself (tests; qt/docs/features/hover-cursors.md): for a pen the platform shows no
+    /// cursor for, and an eraser too big for a cursor. Shown or not, where its middle is (item coordinates), its side
+    /// (logical pixels), and the eraser it shows (none: the dot).
     struct HoverMarkShown {
         bool visible = false;
         QPointF center;
@@ -257,8 +257,8 @@ private:
     void updateViewGeometry();
     /// The content's size and the scroll position along a screen axis (0: across, 1: down), for the scroll bars
     std::pair<qreal, qreal> screenContent(int screenAxis) const;
-    /// Item (screen) coordinates to the view's and back (the canvas turned: qt/docs/canvas-rotation.md; the same while
-    /// it is upright)
+    /// Item (screen) coordinates to the view's and back (the canvas turned: qt/docs/features/canvas-rotation.md; the
+    /// same while it is upright)
     QPointF toView(QPointF itemPos) const;
     QRectF toItem(const QRectF& viewRect) const;
     /// The mouse moved without a button: the formula error under it, once it rests (hoverTimer).
@@ -271,7 +271,7 @@ private:
     /// handle's, `widthHandle`)
     void endLinkHover(bool widthHandle = false);
 
-    // --- the pointer over the page (qt/docs/hover-cursors.md) ---
+    // --- the pointer over the page (qt/docs/features/hover-cursors.md) ---
     /// What the cursor is: the tool's pointer, a pointing hand on a link a click follows, the width handle's arrows
     enum class PointerKind { Tool, Link, WidthHandle };
     enum class PointerSource { Mouse, Pen };

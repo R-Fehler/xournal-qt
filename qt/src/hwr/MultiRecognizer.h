@@ -1,5 +1,6 @@
 /*
- * xournal-qt: several handwriting models read the same lines (qt/docs/handwriting-search.md, "Languages and models").
+ * xournal-qt: several handwriting models read the same lines (qt/docs/features/handwriting-search.md, "Languages and
+ * models").
  *
  * With "English and German" the search runs an English and a German model; their readings of a line are put together
  * per ink word, so a word is found through either. Nothing is transcribed: the search only needs every likely

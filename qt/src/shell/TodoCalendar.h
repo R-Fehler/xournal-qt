@@ -1,8 +1,8 @@
 /*
- * xournal-qt: to-dos handed to the system's calendar, one way (qt/docs/todos.md, "Calendar"): an all-day event on the
- * to-do's due date in an iCalendar file (.ics, RFC 5545) that the calendar app imports, or on Android its "new event"
- * screen filled in (CalendarContract's ACTION_INSERT). Nothing comes back: no sync, no reminders. The open to-dos of
- * the To-dos view are exported as one .ics (those with a due date) or as a Markdown list.
+ * xournal-qt: to-dos handed to the system's calendar, one way (qt/docs/features/todos.md, "Calendar"): an all-day event
+ * on the to-do's due date in an iCalendar file (.ics, RFC 5545) that the calendar app imports, or on Android its "new
+ * event" screen filled in (CalendarContract's ACTION_INSERT). Nothing comes back: no sync, no reminders. The open
+ * to-dos of the To-dos view are exported as one .ics (those with a due date) or as a Markdown list.
  *
  * Why an all-day VEVENT and not a VTODO: Google Calendar, Outlook and most phone calendars import events from an .ics
  * but ignore or reject VTODOs (only Apple Reminders, Thunderbird and a few task apps read those).

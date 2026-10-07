@@ -1,6 +1,6 @@
 // xournal-qt: the bar at the top while items are selected: the count, and what to do with them where the row
 // has room (else HomeSelectionActions.qml at the bottom).
-// Part of HomeView.qml (the home screen, qt/docs/library.md), instantiated once there: it reads the home
+// Part of HomeView.qml (the home screen, qt/docs/features/library.md), instantiated once there: it reads the home
 // screen's state through `home`, and the other parts by their ids (HomeView.qml's context).
 import QtQuick
 import QtQuick.Controls

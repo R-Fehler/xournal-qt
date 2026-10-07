@@ -412,7 +412,7 @@ void DocumentSession::beginSave() {
         case SaveKind::SaveAs: {
             t.target = t.request.target;
             // The recordings a PDF with notes brought (in the cache): into the app's audio folder, where the .xopp's
-            // bare names find them, as upstream (qt/docs/audio.md)
+            // bare names find them, as upstream (qt/docs/features/audio.md)
             std::vector<std::string> names;
             fs::path before;
             {
@@ -662,7 +662,7 @@ void DocumentSession::takeSnapshot() {
         }
     }
     // Encrypted PDFs: as asked (protect, change or remove the password), else a protected document's files stay
-    // encrypted with its password, also a copy (qt/docs/hybrid-pdf.md, "Encrypted PDFs")
+    // encrypted with its password, also a copy (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs")
     t.encryption = t.request.encryption ? *t.request.encryption : encryptionForSave();
     if (!t.hybrid && !exporting && pdfPages->hasStaged()) {
         t.stagedAs = pdfPages->stagedName();

@@ -36,7 +36,7 @@ ctest --test-dir build-qt -j8              # the full suite: 1865 tests
 ## Rules that are easy to break
 
 1. **Upstream files stay upstream.** Never delete, move or reformat anything outside `qt/`. An unavoidable seam is
-   tiny, marked `xournal-qt:`, and listed in [qt/docs/adr/0002-upstream-seams.md](qt/docs/adr/0002-upstream-seams.md).
+   tiny, marked `xournal-qt:`, and listed in [qt/docs/decisions/0002-upstream-seams.md](qt/docs/decisions/0002-upstream-seams.md).
 2. **The author's data is not yours.** Never touch `~/.config/xournalpp`, `~/.config/xournal-qt` or their documents.
 3. **Ask before anything leaves the machine**: pushing branches or tags, publishing a release, building the `.deb`.
 4. **One feature, one commit.** Before committing: the tests you ran for it pass; its feature doc in `qt/docs/` says
@@ -62,7 +62,7 @@ ctest --test-dir build-qt -j8              # the full suite: 1865 tests
 - **The refactoring of 2026-10**: the reviews and the plan in waves are in
   [qt/docs/review/2026-10/README.md](qt/docs/review/2026-10/README.md); a refactoring changes structure, not behaviour.
 - **Where to record what**: open work → TODO.md (done items are deleted at the merge); how a feature works now →
-  its doc in `qt/docs/`; why → an ADR in `qt/docs/adr/`; a user-visible change → the next draft in
+  its doc in `qt/docs/`; why → an ADR in `qt/docs/decisions/`; a user-visible change → the next draft in
   `qt/docs/release-notes/`; device-only checks → the device checklist; turning points → `qt/docs/history/README.md`.
 - [VISION.md](VISION.md) holds the author's goals. Read it before planning; add nothing the author did not say.
 
@@ -94,7 +94,7 @@ Dependencies point down this list only (`xqt-shell` also compiles `src/app`; the
 - **Every page has a revision** (`DocumentSession::pageRevision`) that changes when its picture does. Thumbnails,
   sketches, stand-ins and their files on disk are named by it; a page keeps its revision when pages before it come or go.
 - **Memory has owners**: `CanvasMemory` for rendered pages (a setting, shared by all tabs), `ImageMemory` for the
-  limits of all image caches (thumbnails, sketches, stand-ins, covers, …; [qt/docs/image-caches.md](qt/docs/image-caches.md)),
+  limits of all image caches (thumbnails, sketches, stand-ins, covers, …; [qt/docs/architecture/image-caches.md](qt/docs/architecture/image-caches.md)),
   `ImageWorkers` for their threads. A cache without an owner and a limit is how this got slow before.
 - **Work that is not for right now goes to a background worker** at idle priority, and nothing is ever drawn in front
   of the page the reader is looking at.
@@ -103,6 +103,6 @@ Dependencies point down this list only (`xqt-shell` also compiles `src/app`; the
 ## Documents
 
 [VISION.md](VISION.md) (goals) · [TODO.md](TODO.md) (open work) · [FORK.md](FORK.md) (branches, fork rules) ·
-[qt/docs/](qt/docs/) (one doc per feature; [adr/](qt/docs/adr/) the decisions; [releasing.md](qt/docs/releasing.md)
+[qt/docs/](qt/docs/) (one doc per feature; [adr/](qt/docs/decisions/) the decisions; [releasing.md](qt/docs/development/releasing.md)
 CI and packages; [history/README.md](qt/docs/history/README.md) how it came to be) ·
 [qt/docs/review/2026-10/docs-plan.md](qt/docs/review/2026-10/docs-plan.md) (the docs structure planned for wave 4).

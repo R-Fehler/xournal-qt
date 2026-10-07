@@ -1,6 +1,6 @@
 // xournal-qt: the menu of a card of the library or of Recent (or of the selection it is part of): open, as
 // reference, favourite, tags, rename, copy, move, share, trash. It acts on home.menu*.
-// Part of HomeView.qml (the home screen, qt/docs/library.md), instantiated once there: it reads the home
+// Part of HomeView.qml (the home screen, qt/docs/features/library.md), instantiated once there: it reads the home
 // screen's state through `home`, and the other parts by their ids (HomeView.qml's context).
 import QtQuick
 import QtQuick.Controls
@@ -42,7 +42,7 @@ AdaptiveMenu {
             function onAboutToShow() { favouriteItemRef.starred = app.isFavouriteFile(home.menuPath) }
         }
     }
-    // Its tags: a PDF's keywords, written into the file; the #tags typed in it (qt/docs/tags.md)
+    // Its tags: a PDF's keywords, written into the file; the #tags typed in it (qt/docs/features/tags.md)
     AdaptiveMenuItem {
         objectName: "documentTagsItem"
         text: qsTr("Tags…")
@@ -104,7 +104,7 @@ AdaptiveMenu {
     AdaptiveMenuItem {
         objectName: "copyLinkItem"
         text: qsTr("Copy link")
-        // A link to the document, to paste into notes (qt/docs/links.md)
+        // A link to the document, to paste into notes (qt/docs/features/links.md)
         offered: !home.menuMany && !home.menuFolder && home.menuKind !== "library" && home.menuKind !== "other"
         onTriggered: app.copyDocumentLink(home.menuPath)
     }

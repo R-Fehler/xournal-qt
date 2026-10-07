@@ -1,7 +1,7 @@
 /*
- * xournal-qt: the handwriting search in Settings and the library (qt/docs/handwriting-search.md): the switch, the
- * languages read, per language its model (state, download with the address and size shown first, removal, a folder of
- * the user's own), and the progress of reading.
+ * xournal-qt: the handwriting search in Settings and the library (qt/docs/features/handwriting-search.md): the switch,
+ * the languages read, per language its model (state, download with the address and size shown first, removal, a folder
+ * of the user's own), and the progress of reading.
  *
  * UI thread.
  *

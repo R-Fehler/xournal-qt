@@ -16,7 +16,7 @@ AdaptiveDialog {
     /// 0-based page numbers
     property var pages: []
     property int bgIndex: 0
-    /// The paper (qt/docs/dark-pages.md): its color and texture
+    /// The paper (qt/docs/features/dark-pages.md): its color and texture
     property color paper: "#ffffff"
     property bool textured: false
     readonly property bool overPdf: app.pagesHavePdfBackground(pages)

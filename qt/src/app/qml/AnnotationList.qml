@@ -1,7 +1,7 @@
-// The Annotations panel of the page sidebar (qt/docs/annotations-md.md): the document's highlights, text and Markdown
-// boxes, handwriting (a picture of each piece on its page, washed out, and the PDF text it is on) and links, by page. A tap goes there. The list follows the document
-// (read again once the writing pauses). The filter button chooses the kinds shown; "Export as Markdown" writes them
-// into a .md with links back to their pages.
+// The Annotations panel of the page sidebar (qt/docs/features/annotations-md.md): the document's highlights, text and
+// Markdown boxes, handwriting (a picture of each piece on its page, washed out, and the PDF text it is on) and links,
+// by page. A tap goes there. The list follows the document (read again once the writing pauses). The filter button
+// chooses the kinds shown; "Export as Markdown" writes them into a .md with links back to their pages.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -138,7 +138,7 @@ Item {
         }
     }
 
-    // Marks of other apps in the PDF (qt/docs/adopt-annotations.md): they can be made editable
+    // Marks of other apps in the PDF (qt/docs/features/adopt-annotations.md): they can be made editable
     Rectangle {
         id: adoptBanner
         objectName: "adoptBanner"

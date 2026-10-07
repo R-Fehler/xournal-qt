@@ -27,7 +27,7 @@ public:
     /// sockets are named pipes there, which all users of the machine share).
     static QString userId();
 
-    /// The entry that asks for a quick note (qt/docs/quick-note.md), after the files.
+    /// The entry that asks for a quick note (qt/docs/features/quick-note.md), after the files.
     static constexpr const char* QUICK_NOTE = "--quick-note";
 
     /// Try to hand the files (and QUICK_NOTE) to a running instance. Returns true if one received them (this process

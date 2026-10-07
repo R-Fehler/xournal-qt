@@ -1,6 +1,6 @@
 /*
- * xournal-qt: which handwriting models read the lines of one document (qt/docs/handwriting-search.md, "Which language
- * a document is in"), to save work when English and German models are both in use.
+ * xournal-qt: which handwriting models read the lines of one document (qt/docs/features/handwriting-search.md, "Which
+ * language a document is in"), to save work when English and German models are both in use.
  *
  * Reading a line costs about 0.2 s per model; most documents are in one language. With both models in use and the
  * document's choice "Automatic" (the default):

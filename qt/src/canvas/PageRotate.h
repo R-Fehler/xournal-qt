@@ -1,5 +1,5 @@
 /*
- * xournal-qt: turning pages by a quarter turn, to the left or to the right (qt/docs/page-rotation.md).
+ * xournal-qt: turning pages by a quarter turn, to the left or to the right (qt/docs/features/page-rotation.md).
  *
  * The page's width and height swap and everything on it turns with it about the page:
  * - strokes, texts, images, TeX images and links turn (their points, their transformation: exact quarter turns, no

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# xournal-qt: build the unsigned debug APK for Android (arm64-v8a). See qt/docs/android.md.
+# xournal-qt: build the unsigned debug APK for Android (arm64-v8a). See qt/docs/development/android.md.
 #
 #   qt/scripts/android-build.sh          # dependencies (vcpkg), configure, build the APK
 #   qt/scripts/android-build.sh deps     # only the C dependencies through vcpkg (hours the first time)
@@ -55,7 +55,7 @@ heavy() {
 }
 
 for d in "$ANDROID_NDK_ROOT" "$JAVA_HOME" "$QT_ANDROID" "$QT_HOST"; do
-    [ -d "$d" ] || { echo "missing: $d (see qt/docs/android.md)" >&2; exit 1; }
+    [ -d "$d" ] || { echo "missing: $d (see qt/docs/development/android.md)" >&2; exit 1; }
 done
 
 # Host programs vcpkg does not download itself and that may be missing without root: bison (gettext's tools) and

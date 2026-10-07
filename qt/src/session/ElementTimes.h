@@ -1,5 +1,5 @@
 /*
- * xournal-qt: when an element was made (qt/docs/timeline.md, "Creation times").
+ * xournal-qt: when an element was made (qt/docs/features/timeline.md, "Creation times").
  *
  * Every element the user makes gets the time it was made: milliseconds since 1970-01-01 UTC, saved as the element
  * attribute xqt-created (Element::getCreated, an upstream seam like xqt-group, ADR 0002). The document's timeline

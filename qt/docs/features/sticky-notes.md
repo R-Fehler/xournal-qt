@@ -33,7 +33,7 @@ clipped to it. It lies above the page's ink.
 - **Colours:** five pastel presets (yellow, pink, blue, green, orange). A new note is yellow.
 - **Placing:** the tool bar's **Sticky note** button (one of the tools that are never hidden; since
   qt/adaptive-toolbar the only place: the shapes menu is gone and ⋮ → Page has no "Insert sticky note" any more,
-  qt/docs/adaptive-layout.md "One place for each action"). The note goes in the middle of the visible part of
+  qt/docs/features/adaptive-layout.md "One place for each action"). The note goes in the middle of the visible part of
   the current page, selected, and the rectangle select tool is chosen (as for an inserted image), so that it can be
   moved and resized right away.
 

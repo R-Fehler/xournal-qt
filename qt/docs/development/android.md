@@ -16,7 +16,7 @@ qt/scripts/android-build.sh apk      # only configure + build (after deps)
 The APK lands in `build-android/android-build/build/outputs/apk/debug/android-build-debug.apk` (about 94 MB: the
 native libraries are stored uncompressed, as Android wants for loading them in place).
 
-The script wraps the preset `android-arm64-debug` in [qt/CMakePresets.json](../CMakePresets.json)
+The script wraps the preset `android-arm64-debug` in [qt/CMakePresets.json](../../CMakePresets.json)
 (`cmake --preset android-arm64-debug && cmake --build build-android --target apk` does the same with the default
 paths). Every heavy step runs with at most 4 jobs (`XQT_JOBS`), at `nice 15`, and in a systemd user scope with
 `MemoryMax=6G` (`XQT_MEM`) and a CPU quota of 4 cores, so that the machine stays usable. Gradle gets at most 4
@@ -77,7 +77,7 @@ package `org.xournalqt.app`. A document can be opened at start from adb (debug b
 
 **Where the documents are** (`qt/android-storage`). The libraries live in the phone's own
 `Documents/Xournal_Libraries` (`/storage/emulated/0/Documents/Xournal_Libraries/Default` for the default library;
-the folder comes from `Environment.getExternalStoragePublicDirectory`, [Library.cpp](../src/shell/Library.cpp)
+the folder comes from `Environment.getExternalStoragePublicDirectory`, [Library.cpp](../../src/shell/Library.cpp)
 `PlatformFolders`). There file managers and sync apps (Syncthing) see them, and they stay when the app is uninstalled
 (VISION: the app keeps no hostage data). The app reads and writes there with "All files access", so until it has
 that, the libraries are in the app's own folder, `/storage/emulated/0/Android/data/org.xournalqt.app/files/
@@ -87,7 +87,7 @@ and while the app has the access; else the app's folder (`AppController::chooseL
 - **Moving them.** At the first start, and at later starts while the libraries are in the app's folder, a dialog
   says where they belong and asks for "All files access" ("Keep libraries on the phone?"). Continue shows
   Android's page for the access; back with it, the libraries move in the background
-  ([LibraryMigration](../src/shell/LibraryMigration.h)): every file is copied into a hidden
+  ([LibraryMigration](../../src/shell/LibraryMigration.h)): every file is copied into a hidden
   `.xqt-moving-<name>` folder next to its place, read back and compared (size and SHA-1), and only when all of it
   arrived do the folders get their names and the app switches over. Recent files, the library shown, the reading
   positions and title pages, the library's settings and its cache (covers, search index), the session journal
@@ -119,9 +119,9 @@ note at the bottom says where the copy is. A file with the same name and size al
 again instead of being copied twice (another file of the same name is copied as "name (2)"). Text shared without a
 file (a link from a browser) is refused with a message. Files handed over while the app runs open in the running
 window (the activity is `singleTask`). The activity is Qt's with this added: `org.xournalqt.app.XournalActivity`
-([qt/packaging/android/src](../packaging/android/src/org/xournalqt/app/XournalActivity.java)), the native side is
-[AndroidActivity.cpp](../src/app/AndroidActivity.cpp) and `AppController::receiveFiles`; the copy is made by
-[ContentFiles](../src/shell/ContentFiles.h), so nothing after it sees a `content://` URI. Testing from adb:
+([qt/packaging/android/src](../../packaging/android/src/org/xournalqt/app/XournalActivity.java)), the native side is
+[AndroidActivity.cpp](../../src/app/AndroidActivity.cpp) and `AppController::receiveFiles`; the copy is made by
+[ContentFiles](../../src/shell/ContentFiles.h), so nothing after it sees a `content://` URI. Testing from adb:
 
 ```sh
 adb shell am start -a android.intent.action.VIEW -d content://media/external/file/<id> -t application/pdf \
@@ -136,10 +136,10 @@ put the URI into the clip data, which carries the grant. So test SEND with a fil
 the phone is locked the app's event loop is paused: a file handed over then opens when it is unlocked.
 
 **Quick note from the launcher.** A long press on the app's icon offers "Quick note" (a static shortcut,
-[res/xml/shortcuts.xml](../packaging/android/res/xml/shortcuts.xml); it can be dragged to the home screen). Its intent
+[res/xml/shortcuts.xml](../../packaging/android/res/xml/shortcuts.xml); it can be dragged to the home screen). Its intent
 (action `org.xournalqt.app.QUICK_NOTE`) takes the way of the files above: the activity adds the entry
 `xournal-qt:quick-note` to the incoming files, and the native side makes a quick note
-([quick-note.md](quick-note.md)) instead of receiving a file, at start and while the app runs. From adb:
+([quick-note.md](../features/quick-note.md)) instead of receiving a file, at start and while the app runs. From adb:
 `adb shell am start -a org.xournalqt.app.QUICK_NOTE -n org.xournalqt.app/.XournalActivity`.
 
 **Opening and importing through Android's pickers.** "Open…" (tool bar, on a phone "All tools"; Recent), "Import files…" and "Import a
@@ -147,7 +147,7 @@ folder…" (library) show Android's system pickers (the Storage Access Framework
 folders, `ACTION_OPEN_DOCUMENT_TREE`, which Qt's `FileDialog` and `FolderDialog` use on Android). They return
 `content://` URIs: "Open…" copies the file into "Opened" as above and opens it; the imports copy into the library's
 current folder, a folder with all its subfolders (hidden ones stay behind) and every file the library shows. The
-copies go through a staging folder in the app's cache first, in the background ([LibraryModel](../src/shell/LibraryModel.cpp)
+copies go through a staging folder in the app's cache first, in the background ([LibraryModel](../../src/shell/LibraryModel.cpp)
 `importUrls`). An image picked for "Insert image" is read the same way.
 
 **Libraries in the phone's storage ("All files access").** A library can be any folder of the shared storage, e.g.
@@ -164,7 +164,7 @@ per-folder packs, the search index, and the folder watcher that sees what the sy
   (`AppController::openLibrary`, `requestStorageAccess`; the Java side is `XournalActivity.hasAllFilesAccess` and
   `requestAllFilesAccess`.) Google Play allows this permission only to some kinds of apps; fine for sideloading and
   F-Droid, to be revisited for Play.
-- **The in-app folder chooser** (`qt/android-storage`, [FolderChooser.qml](../src/app/qml/FolderChooser.qml)): with
+- **The in-app folder chooser** (`qt/android-storage`, [FolderChooser.qml](../../src/app/qml/FolderChooser.qml)): with
   "All files access", "Open a folder as library…" lists the folders itself, from the phone's storage down (tap a
   folder to go in, ↑ to go up), and "Use this folder" opens the one shown. Android's picker refuses the `Download`
   folder, the storage's root and `Android/data` by design; the app can read them by their paths. The storage root
@@ -209,26 +209,26 @@ upload them. Autosaving off (Settings) writes nothing.
 settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-qt/` (copied from the APK at start),
 `files/fonts.conf` and `files/fonts/` (fonts of your own for text boxes), caches in `cache/`. The library cache (covers, search
 index) is in `cache/xournal-qt/libraries/` too: on Android a library keeps its cache in the app cache by default, not
-in hidden `.xournal_library` folders next to the documents that a sync app would upload ([library.md](library.md),
+in hidden `.xournal_library` folders next to the documents that a sync app would upload ([library.md](../features/library.md),
 "Where the cache is kept"; Settings → Storage switches it per library). Android may clear the app cache when storage
 runs low; the library then reads its documents once again.
 
 ## How it is built
 
-- **Dependencies through vcpkg** ([qt/vcpkg.json](../vcpkg.json), manifest mode, pinned baseline). Everything is a
-  static library (triplet [qt/vcpkg/triplets/arm64-android.cmake](../vcpkg/triplets/arm64-android.cmake): vcpkg's
+- **Dependencies through vcpkg** ([qt/vcpkg.json](../../vcpkg.json), manifest mode, pinned baseline). Everything is a
+  static library (triplet [qt/vcpkg/triplets/arm64-android.cmake](../../vcpkg/triplets/arm64-android.cmake): vcpkg's
   arm64-android, release only, API 28, `c++_shared` like Qt), linked into the one app library
   `libxournal-qt_arm64-v8a.so`. `androiddeployqt` then only has Qt's own libraries to bundle, and nothing can be
   missing at run time (checked: every undefined symbol of the app library resolves in the bundled Qt libraries or the
   system's; only lsan's weak hooks stay open).
 - **Toolchains**: Qt's `qt.toolchain.cmake` chains vcpkg's `vcpkg.cmake` (`QT_CHAINLOAD_TOOLCHAIN_FILE`), which
   chains the NDK's `android.toolchain.cmake` (`VCPKG_CHAINLOAD_TOOLCHAIN_FILE`), as QField does.
-- **Dependency lookup** ([qt/cmake/XojDeps.cmake](../cmake/XojDeps.cmake), one target `xoj::deps`): libxml2, libzip
+- **Dependency lookup** ([qt/cmake/XojDeps.cmake](../../cmake/XojDeps.cmake), one target `xoj::deps`): libxml2, libzip
   and qpdf as CMake packages first (vcpkg), pkg-config for the GNOME libraries, which only ship `.pc` files (vcpkg
   installs them). A cross build reads only the target's `.pc` files (`PKG_CONFIG_LIBDIR`). Static builds use
   `pkg-config --static`. The Linux desktop build stays on pkg-config alone, as before (Ubuntu 22.04's libzip CMake
   files are broken and fail even a `QUIET` lookup).
-- **Packaging** ([qt/cmake/XqtAndroid.cmake](../cmake/XqtAndroid.cmake), [qt/packaging/android/](../packaging/android)):
+- **Packaging** ([qt/cmake/XqtAndroid.cmake](../../cmake/XqtAndroid.cmake), [qt/packaging/android/](../../packaging/android)):
   Qt's manifest template with the app's id, name and icon (the desktop SVG as PNGs), min SDK 28 (Qt 6.11's minimum),
   target SDK 36, "All files access" (`MANAGE_EXTERNAL_STORAGE`, asked for at run time only when a library in the
   shared storage is opened; the storage permissions up to Android 10), resizable activity, intent filters for "Open
@@ -243,7 +243,7 @@ runs low; the library then reads its documents once again.
   (`--no-zstd`; the official Qt for Android cannot read zstd resources), and its command line tool is left out.
   The configure step passes `KF6SyntaxHighlighting_DIR`, so `XqtMarkdown.cmake` finds it as on the desktop.
 - **Resources**: page templates, palettes and icons, which the core reads as plain files, are Qt resources in the APK
-  and are copied to the app's data folder at start ([AndroidSetup.cpp](../src/app/AndroidSetup.cpp)).
+  and are copied to the app's data folder at start ([AndroidSetup.cpp](../../src/app/AndroidSetup.cpp)).
 - **Fonts**: vcpkg's fontconfig knows no configuration on the phone. The app writes its own `fonts.conf` at start
   (`FONTCONFIG_FILE`): `/system/fonts`, `/product/fonts`, the app's `files/fonts`, a cache in the app's cache
   folder, and the generic families mapped to Android's fonts ("Sans" → Roboto, "Serif" → Noto Serif, "Monospace" →
@@ -251,7 +251,7 @@ runs low; the library then reads its documents once again.
   backend for PDFs with fonts that are not embedded. It also lists the app's own fonts (`share/xournal-qt/fonts`: the
   colour emoji font, `qt/resources/fonts/README.md`) with the rules that take emoji from it and scale its bitmaps
   (Android has no `conf.d`); the font travels in the APK as a big resource (10.7 MB).
-- **Audio recordings** ([audio.md](audio.md), "Android"): Qt Multimedia from aqt (`-m qtmultimedia`; locally the
+- **Audio recordings** ([audio.md](../features/audio.md), "Android"): Qt Multimedia from aqt (`-m qtmultimedia`; locally the
   Maintenance Tool's "Qt Multimedia" for Android, or `aqt install-qt linux android 6.11.2 android_arm64_v8a -m
   qtmultimedia`), its audio devices only: `qt_import_plugins(xournal-qt EXCLUDE_BY_TYPE multimedia)` keeps its media
   plugins and FFmpeg out of the APK. Without Qt Multimedia the APK builds and offers no recording;

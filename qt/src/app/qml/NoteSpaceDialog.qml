@@ -1,6 +1,6 @@
-// Space for notes beside slides (qt/docs/note-space.md): the page grows by the amounts on any of its sides, the slide
-// stays as it is (the PDF drawn at its place, the ink with it). Amounts in % of the slide or in cm, presets, a
-// preview to scale, and which pages. One undo step; all 0 takes the space away again.
+// Space for notes beside slides (qt/docs/features/note-space.md): the page grows by the amounts on any of its sides,
+// the slide stays as it is (the PDF drawn at its place, the ink with it). Amounts in % of the slide or in cm, presets,
+// a preview to scale, and which pages. One undo step; all 0 takes the space away again.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

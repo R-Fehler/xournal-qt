@@ -1,6 +1,7 @@
 /*
- * xournal-qt: Quick note (qt/docs/quick-note.md). One action makes a note to write on at once: a new document in the
- * library's "Inbox" named by the date and time, or a line in today's Markdown note there (the setting "quickNote").
+ * xournal-qt: Quick note (qt/docs/features/quick-note.md). One action makes a note to write on at once: a new document
+ * in the library's "Inbox" named by the date and time, or a line in today's Markdown note there (the setting
+ * "quickNote").
  *
  * @license GNU GPLv2 or later
  */

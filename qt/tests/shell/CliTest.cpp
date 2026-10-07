@@ -62,7 +62,7 @@ TEST(Cli, exportsPagesAsPicturesNamedAsTheAppNamesThem) {
                           fixturePath(u8"load/pages.xopp")});
     ASSERT_TRUE(process.waitForFinished(60000));
     EXPECT_EQ(process.exitCode(), 0) << process.readAllStandardError().toStdString();
-    // (qt/docs/page-files.md: "name-p001.png", the page's number with at least three digits)
+    // (qt/docs/features/page-files.md: "name-p001.png", the page's number with at least three digits)
     EXPECT_TRUE(QFileInfo::exists(out.filePath("pictures/pages-p001.png")));
     EXPECT_TRUE(QFileInfo::exists(out.filePath("pictures/pages-p002.png")));
     EXPECT_FALSE(QFileInfo::exists(out.filePath("pictures/pages-p003.png")));

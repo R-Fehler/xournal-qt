@@ -1,6 +1,6 @@
 # xournal-qt for Android: build the arm64 APK with qt/scripts/android-build.sh (vcpkg C libraries, KSyntaxHighlighting,
 # the official Qt for Android) and publish it as the artifact "xournal-qt-android-arm64" (a zip holding the .apk).
-# See qt/docs/android.md. Runs only when asked, or for pushes to the qt/android-build branch.
+# See qt/docs/development/android.md. Runs only when asked, or for pushes to the qt/android-build branch.
 #
 # Signing: with the repository secrets XQT_ANDROID_KEYSTORE (the keystore, base64) and XQT_ANDROID_KEYSTORE_PASSWORD
 # (and optionally XQT_ANDROID_KEY_ALIAS, default "xournal-qt") the APK is signed with that release key, so that it installs as an update over earlier
@@ -32,7 +32,7 @@ jobs:
       VCPKG_BINARY_CACHE: ${{ github.workspace }}/.ci/vcpkg-archives
       XQT_ANDROID_BUILD: ${{ github.workspace }}/.ci/build-android
       XQT_JOBS: 4
-      XQT_REQUIRE_AUDIO: 'ON'  # (recording: a Qt without Qt Multimedia fails the build, qt/docs/audio.md)
+      XQT_REQUIRE_AUDIO: 'ON'  # (recording: a Qt without Qt Multimedia fails the build, qt/docs/features/audio.md)
     steps:
       - uses: actions/checkout@v4
 
@@ -74,8 +74,8 @@ jobs:
           set -euo pipefail
           pipx install aqtinstall
           aqt install-qt linux desktop "$QT_VERSION" linux_gcc_64 -O "$GITHUB_WORKSPACE/.ci/Qt"
-          # Qt Multimedia for the recordings (qt/docs/audio.md): the audio devices only; its media plugins are left
-          # out of the APK (qt/cmake/XqtAndroid.cmake)
+          # Qt Multimedia for the recordings (qt/docs/features/audio.md): the audio devices only; its media plugins are
+          # left out of the APK (qt/cmake/XqtAndroid.cmake)
           aqt install-qt linux android "$QT_VERSION" android_arm64_v8a -m qtmultimedia -O "$GITHUB_WORKSPACE/.ci/Qt"
 
       - name: vcpkg at the manifest's baseline

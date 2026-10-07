@@ -1,7 +1,7 @@
-// The bottom sheet that an AdaptiveMenu becomes in the phone classes (qt/docs/adaptive-layout.md, "Menus"). There is
-// one per window (Main.qml's menuSheet). It shows the entries of the menu as rows as tall as a finger needs, and a
-// submenu drills in: the sheet shows its entries, with a back arrow and its title. The menu itself stays closed; its
-// entries are only read, and a tap on a row triggers the entry. What is not an entry comes along: a separator as a
+// The bottom sheet that an AdaptiveMenu becomes in the phone classes (qt/docs/features/adaptive-layout.md, "Menus").
+// There is one per window (Main.qml's menuSheet). It shows the entries of the menu as rows as tall as a finger needs,
+// and a submenu drills in: the sheet shows its entries, with a back arrow and its title. The menu itself stays closed;
+// its entries are only read, and a tap on a row triggers the entry. What is not an entry comes along: a separator as a
 // line, a label as a caption, anything else (a row of controls) is borrowed from the menu while the sheet shows it.
 // At most 85 % of the window high (the rest scrolls), above the bottom safe area. A drag down on the handle or a tap
 // beside it closes it; Esc or Android's back go back a level, and close it at the top.

@@ -2,7 +2,7 @@
 
 Status: design agreed with the author 2026-09-25/26 (TODO.md, "Ideas round of 2026-09-25/26", "Markdown inside the
 PDF with notes"); built as `qt/md-pdf`. Its pictures (`name.assets/…`): `qt/md-images`, [md-images.md](md-images.md).
-The user guide for getting the Markdown out again is [user/markdown-from-pdf.md](user/markdown-from-pdf.md).
+The user guide for getting the Markdown out again is [user/markdown-from-pdf.md](../user/markdown-from-pdf.md).
 
 ## One model
 
@@ -41,7 +41,7 @@ The user guide for getting the Markdown out again is [user/markdown-from-pdf.md]
   PDF's `name.archive.pdf` gives `name.md`). It is written again on every save, full and incremental, from the
   document as saved. Subtype `text/markdown`, description "The text of this PDF as Markdown".
 - Whoever gets the PDF extracts it with any PDF viewer's attachment list or `qpdf --show-attachment=name.md`
-  ([user/markdown-from-pdf.md](user/markdown-from-pdf.md)).
+  ([user/markdown-from-pdf.md](../user/markdown-from-pdf.md)).
 - **Archive export** (PDF/A-3): the same file is an associated file with `/AFRelationship /Alternative` (an
   alternative representation of the content), next to `document.xopp` (`/Source`).
 - **The hook:** `TextDocument::attachments(document, pdfName)` gives the files a hybrid PDF carries for other apps;

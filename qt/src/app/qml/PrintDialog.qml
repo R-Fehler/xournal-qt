@@ -16,7 +16,7 @@ AdaptiveDialog {
     property string pages: "all"   ///< "all", "current" or "range"
     readonly property string range: pages === "current" ? String(app.pageNumber)
                                     : pages === "range" ? rangeField.text.trim() : ""
-    /// The pages printed have dark paper (qt/docs/dark-pages.md): the dialog says it takes a lot of ink
+    /// The pages printed have dark paper (qt/docs/features/dark-pages.md): the dialog says it takes a lot of ink
     readonly property bool darkPaper: visible && withAnnotations && app.printUsesDarkPaper(range)
 
     /// Opens it for these pages (0-based, e.g. what is selected in the page overview).

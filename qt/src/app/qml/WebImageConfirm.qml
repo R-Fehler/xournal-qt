@@ -1,6 +1,6 @@
-// A web picture of a Markdown text is never fetched unasked (qt/docs/md-images.md): its "Load image" shows the whole
-// address and where it goes, and, while connecting to the web was not decided yet, what that means (the same opt-in
-// as for arXiv, qt/docs/citations.md). "Load" fetches it into the app's cache; Cancel sends nothing.
+// A web picture of a Markdown text is never fetched unasked (qt/docs/features/md-images.md): its "Load image" shows the
+// whole address and where it goes, and, while connecting to the web was not decided yet, what that means (the same
+// opt-in as for arXiv, qt/docs/features/citations.md). "Load" fetches it into the app's cache; Cancel sends nothing.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

@@ -1,6 +1,6 @@
 /*
  * xournal-qt: which pages differ between two documents (comparing two versions, or a version and now;
- * qt/docs/reference-view.md "Comparing", qt/docs/hybrid-pdf.md "Version history").
+ * qt/docs/features/reference-view.md "Comparing", qt/docs/features/hybrid-pdf.md "Version history").
  *
  * Each page gets a signature from what it holds, without drawing anything: its size, its background (kind, PDF page,
  * colour, image file) and each element of each layer as the .xopp holds it (upstream's SaveHandler: a stroke drawn

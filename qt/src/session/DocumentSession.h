@@ -71,10 +71,10 @@ public:
         bool hybrid = false;
         /// A hybrid PDF whose annotations of ours another app changed, moved or deleted (their names)
         std::vector<std::string> hybridChanged;
-        /// A hybrid PDF: the root of the pictures its Markdown carries (qt/docs/md-images.md), registered while this
-        /// lives (a session registers its own).
+        /// A hybrid PDF: the root of the pictures its Markdown carries (qt/docs/features/md-images.md), registered
+        /// while this lives (a session registers its own).
         std::shared_ptr<md::images::RootHandle> pictures;
-        // --- encrypted PDFs (PdfEncryption.h; qt/docs/hybrid-pdf.md, "Encrypted PDFs")
+        // --- encrypted PDFs (PdfEncryption.h; qt/docs/features/hybrid-pdf.md, "Encrypted PDFs")
         /// Not opened: the PDF (`passwordFile`: the file itself, or the background PDF of a .xopp) needs a password
         /// and none was given, or `wrongPassword`.
         bool needsPassword = false;
@@ -114,7 +114,7 @@ public:
         bool pdfa = false;                  ///< the archive PDF carries the PDF/A-3b identification
         std::vector<std::string> notPdfA;   ///< why not
         std::vector<std::string> adjusted;  ///< what was changed in the source PDF to conform
-        // --- a hybrid PDF saved again (qt/docs/hybrid-pdf.md, "Saving: incremental updates")
+        // --- a hybrid PDF saved again (qt/docs/features/hybrid-pdf.md, "Saving: incremental updates")
         bool incremental = false;  ///< only what changed was appended
         uint64_t appended = 0;     ///< bytes appended
         // --- version history (keepsVersions())
@@ -186,9 +186,9 @@ public:
     /// A hybrid PDF whose file holds earlier revisions (incremental updates): written anew (SaveRequest::compact)
     /// before it is shared.
     bool hasEarlierRevisions() const;
-    /// Version history (qt/docs/hybrid-pdf.md, "Version history"): this document keeps its versions when it is saved
-    /// as a PDF with notes. Unless chosen here: what its file says (a PDF with notes), else the setting for new PDFs
-    /// with notes (DocumentMode::keepVersionsOfNewPdfs). The choice is written by the next save.
+    /// Version history (qt/docs/features/hybrid-pdf.md, "Version history"): this document keeps its versions when it is
+    /// saved as a PDF with notes. Unless chosen here: what its file says (a PDF with notes), else the setting for new
+    /// PDFs with notes (DocumentMode::keepVersionsOfNewPdfs). The choice is written by the next save.
     bool keepsVersions() const;
     void setKeepsVersions(bool on);
     /// The choice was made here and is not in the file yet.
@@ -213,7 +213,7 @@ public:
     /// Take the other app's version of those annotations: they stay in the PDF as plain annotations (shown by the
     /// background), and the layers they stood for are emptied (undoable). False if that failed (`error`).
     bool importHybridChanges(std::string& error);
-    // --- annotations of other apps made editable (AdoptAnnotations.h, qt/docs/adopt-annotations.md) --------------
+    // --- annotations of other apps made editable (AdoptAnnotations.h, qt/docs/features/adopt-annotations.md) ---------
     /// What adopting needs from the document (planAdoption, UI thread), for the work on a worker (adopt::prepare with
     /// pdf, pdfPages, copy and mark).
     struct AdoptPlan {
@@ -307,11 +307,11 @@ public:
     /// It shows a Markdown or text file read-only (not saved as a .xopp): the canvas does not write on it. Also while
     /// it is replayed (setReplaying).
     bool isReadOnly() const;
-    /// Its timeline is replayed (qt/docs/timeline.md): nothing may change it meanwhile (read-only, no undo)
+    /// Its timeline is replayed (qt/docs/features/timeline.md): nothing may change it meanwhile (read-only, no undo)
     void setReplaying(bool on) { replaying = on; }
     bool isReplaying() const { return replaying; }
 
-    // --- a text file edited (TextFile.h, qt/docs/md-editor.md) -------------------------------------------------
+    // --- a text file edited (TextFile.h, qt/docs/features/md-editor.md) ----------------------------------------------
     /// This document is the text of a file (a .md, a .txt, another text file): its pages hold the text as the page's
     /// Markdown text (MarkdownFile.h), and saving writes the text back to the file (never a .xopp). A text file that
     /// cannot be edited (not UTF-8, too big, not writable, or another text file not accepted for editing) is shown
@@ -323,7 +323,7 @@ public:
     /// The text the pages hold now (the parts of the page's Markdown text joined). `lock`: under the document's read
     /// lock (not in a crash handler).
     std::string currentText(bool lock = true) const;
-    /// Where the relative links of its Markdown point, and where its pictures are kept (qt/docs/md-images.md);
+    /// Where the relative links of its Markdown point, and where its pictures are kept (qt/docs/features/md-images.md);
     /// nullptr: nowhere (a notes document not saved yet).
     const md::images::Root* imageRootOf() const { return imageRoot.active() ? &imageRoot.root() : nullptr; }
     /// The text changed (the pages' boxes): the modified state follows.
@@ -368,7 +368,7 @@ public:
     /// no unencrypted copy of it stays there.
     static void forgetOriginal(const fs::path& pdf);
 
-    // --- encrypted PDFs (PdfEncryption.h; qt/docs/hybrid-pdf.md, "Encrypted PDFs") ----------------------------------
+    // --- encrypted PDFs (PdfEncryption.h; qt/docs/features/hybrid-pdf.md, "Encrypted PDFs") --------------------------
     /// Its file, or the PDF it annotates, opens only with a password (known in this process while it is open):
     /// nothing of it is kept on disk unencrypted (previews, the library's index, handwriting, autosaves). Any thread,
     /// no locking (also the crash handler).
@@ -495,7 +495,7 @@ public:
     void movePageTowardsBeginning();
     void movePageTowardsEnd();
 
-    // --- bookmarks (PageBookmarks.h, qt/docs/bookmarks.md) ----------------------------------------------------------
+    // --- bookmarks (PageBookmarks.h, qt/docs/features/bookmarks.md) --------------------------------------------------
     /// Bookmark a page with this label ("": the automatic one, "Page N"), rename its bookmark, or remove it (nullopt).
     /// One undo step. False if nothing changed.
     bool setBookmark(size_t page, std::optional<std::string> label);
@@ -504,7 +504,7 @@ public:
     /// Emits bookmarksChanged if one changed.
     void syncTextBookmarks();
 
-    // --- audio recordings (audio/DocumentAudio.h, qt/docs/audio.md) ----------------------------------------------------
+    // --- audio recordings (audio/DocumentAudio.h, qt/docs/features/audio.md) ----------------------------------------------------
     /// A recording runs for this document: new pen strokes and texts are tied to it, its name (upstream's fn) and
     /// the time in it now from `clock` (ms, upstream's ts). An empty name: none runs.
     void setRecording(const std::string& name, std::function<size_t()> clock);
@@ -672,8 +672,8 @@ private:
     /// generated background are kept from there). Forgotten when the pages of the background PDF may be renumbered.
     std::unordered_map<const XojPage*, std::pair<std::weak_ptr<XojPage>, size_t>> hybridBase;
     std::unique_ptr<TextFile> text;  ///< a text file edited (or shown read-only)
-    /// Where the relative links of the document's Markdown point (its pictures, qt/docs/md-images.md): registered
-    /// while it is open, kept up to date with its file (updateImageRoot).
+    /// Where the relative links of the document's Markdown point (its pictures, qt/docs/features/md-images.md):
+    /// registered while it is open, kept up to date with its file (updateImageRoot).
     md::images::RootHandle imageRoot;
     md::images::RootHandle folderImageRoot;  ///< (a PDF with notes: the folder it is in)
     void updateImageRoot();

@@ -2,7 +2,7 @@
 
 Every window of xournal-qt adapts to its size: a wide desktop window, a narrow one, a 2-in-1 or Surface held upright,
 a phone (Android now, iOS later). This page describes the foundation that block `qt/adaptive-foundation` built, and
-how the later blocks of the UI audit (2026-09-26, now in git history: [history/README.md](history/README.md)) plug
+how the later blocks of the UI audit (2026-09-26, now in git history: [history/README.md](../history/README.md)) plug
 into it. This page has what the code does.
 
 ## One place that knows the size: `AdaptiveLayout`

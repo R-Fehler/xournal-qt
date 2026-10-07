@@ -1,6 +1,6 @@
 /*
  * xournal-qt: the fonts of the core's text (Pango) on Windows, for the app and the CLI (Qt-free). See
- * qt/docs/windows.md, "Text and fonts".
+ * qt/docs/development/windows.md, "Text and fonts".
  *
  * Pango's default font backend on Windows (win32, DirectWrite) kills the process when text is drawn into an image
  * surface, as the page rasters, thumbnails and PNG exports do (found in the CI smoke test, 2026-09-24; the process

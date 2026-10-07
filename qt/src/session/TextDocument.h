@@ -1,5 +1,5 @@
 /*
- * xournal-qt: text documents in the notes model (qt/docs/md-pdf.md).
+ * xournal-qt: text documents in the notes model (qt/docs/features/md-pdf.md).
  *
  * A Markdown text is a flow over a run of pages: the page's Markdown text (MarkdownSession.h), one part per page in
  * the page's box at the margins, the parts after the first starting with "<!-- xqt:cont … -->" (MdPaginate.h). A
@@ -41,8 +41,8 @@ bool hasMarkdownText(Document& doc);
 /// page after its last one (`end`). Empty when the page has no page text. `parts`: what of the text each page holds.
 std::string flowText(Document& doc, size_t first = 0, size_t* end = nullptr, std::vector<md::Part>* parts = nullptr);
 
-/// The pages whose bookmarks are the comments of their Markdown (qt/docs/bookmarks.md, "Markdown"): the pages of the
-/// flow that starts on page 1 (a text document, a .md; not a plain text) are [0, *end). False if none.
+/// The pages whose bookmarks are the comments of their Markdown (qt/docs/features/bookmarks.md, "Markdown"): the pages
+/// of the flow that starts on page 1 (a text document, a .md; not a plain text) are [0, *end). False if none.
 bool hasTextBookmarks(Document& doc, size_t* end = nullptr);
 /// The bookmarks of those pages read again from their text (MdBookmarks.h: a page's first bookmark comment, its
 /// label or the automatic one), into XojPage::bookmark (which the pages sidebar, the contents, the library and the
@@ -54,7 +54,7 @@ std::vector<std::pair<PageRef, std::optional<std::string>>> bookmarkChanges(Docu
 /// between them (Export as Markdown).
 std::string markdown(Document& doc);
 
-/// The page break of the formatting bar (qt/docs/md-editor.md, "Page breaks").
+/// The page break of the formatting bar (qt/docs/features/md-editor.md, "Page breaks").
 constexpr const char* PAGE_BREAK = "<div style=\"page-break-after: always\"></div>";
 
 /// "name.md" for the PDF "name.pdf" (an archive's "name.archive.pdf" too).
@@ -71,16 +71,16 @@ struct Attachment {
     /// Its data never changes under its name (a picture): an incremental save keeps the one the file has, and adds
     /// it only when the file has none.
     bool fixed = false;
-    /// A recording (qt/docs/audio.md): its data is this file (read while the PDF is written, not kept in memory), and
-    /// `source` is its name in the document (upstream's fn). Its attachment's name carries its pages, so it is renamed
-    /// when they change; it is listed in the marker's /Audio (name, source), not /Files.
+    /// A recording (qt/docs/features/audio.md): its data is this file (read while the PDF is written, not kept in
+    /// memory), and `source` is its name in the document (upstream's fn). Its attachment's name carries its pages, so
+    /// it is renamed when they change; it is listed in the marker's /Audio (name, source), not /Files.
     fs::path file;
     std::string source;
 };
 /// What the PDF `pdfName` written from this document carries for other apps: a text document its "name.md" (the
 /// flow) and the pictures its Markdown links to (also in notes), under the paths the links name ("name.assets/…";
-/// qt/docs/md-images.md). The pictures are found through the roots (md::images): the document's work folder while it
-/// is open.
+/// qt/docs/features/md-images.md). The pictures are found through the roots (md::images): the document's work folder
+/// while it is open.
 std::vector<Attachment> attachments(Document& doc, const std::string& pdfName);
 /// The MIME type of a picture by its name ("image/png", "image/jpeg", …; "application/octet-stream" if unknown).
 std::string pictureMime(const std::string& name);

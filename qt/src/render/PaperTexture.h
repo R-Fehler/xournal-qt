@@ -1,5 +1,5 @@
 /*
- * xournal-qt: page colors beyond white and textured paper (qt/docs/dark-pages.md, "Page colors").
+ * xournal-qt: page colors beyond white and textured paper (qt/docs/features/dark-pages.md, "Page colors").
  *
  * The page's color is upstream's background color (Xournal++ shows it). Textured paper is a key of upstream's page
  * type config, `xqt-texture=paper` (upstream keeps the keys it does not know and writes them back; Xournal++ shows the

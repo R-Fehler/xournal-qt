@@ -2,7 +2,7 @@
 
 Research for recognising handwriting in xournal-qt: first to **search** handwritten notes, later maybe to convert
 ink to text. Nothing here is implemented. The throwaway trials behind the measured numbers are in
-[`qt/research/hwr/`](../../research/hwr/README.md).
+[`qt/research/hwr/`](README.md).
 
 - **Measured** means run on the author's laptop (Intel i7-1165G7, 16 GB) with 2 threads under a 3 GB memory cap,
   on 40 random lines each of IAM validation (English) and of the German `fhswf/german_handwriting` set, and on the
@@ -34,7 +34,7 @@ ink to text. Nothing here is implemented. The throwaway trials behind the measur
   for the shape classifiers, so text candidates come ranked but without scores.
 - There is **no math model**.
 - **Terms:** it is proprietary. It ships in the APK, so the GPL's system-library exception does not cover it.
-  `qt/docs/platform-research.md` already flags this. The first download also needs Google's servers, which breaks
+  The platform research of 2026-09 already flagged this. The first download also needs Google's servers, which breaks
   "self-contained". Quality: Google's online recogniser is the state of the art for strokes
   ([Carbune et al. 2020](https://doi.org/10.1007/s10032-020-00350-4)). Not measured here.
 - **Verdict:** an opt-in extra at most, in a separate flavour (for example a Play build), after a licence decision

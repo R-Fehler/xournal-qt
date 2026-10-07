@@ -1,6 +1,6 @@
 /*
  * xournal-qt: bookmarks in a Markdown text, "<!-- xqt:bookmark label -->" before the block they mark
- * (qt/docs/bookmarks.md, "Markdown").
+ * (qt/docs/features/bookmarks.md, "Markdown").
  *
  * @license GNU GPLv2 or later
  */

@@ -1,6 +1,6 @@
 /*
  * xournal-qt: comparing two versions of a document, or a version and now, in the reference view (`app.compare`;
- * qt/docs/reference-view.md "Comparing", qt/docs/hybrid-pdf.md "Version history").
+ * qt/docs/features/reference-view.md "Comparing", qt/docs/features/hybrid-pdf.md "Version history").
  *
  * The newer one is the tab's document (now, or a version shown read-only), the older one its reference (a version,
  * read-only), and the two are scrolled together (ReferenceMode::scrollLocked). The pages that differ are found from

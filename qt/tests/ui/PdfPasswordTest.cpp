@@ -1,7 +1,7 @@
 /*
- * xournal-qt: encrypted PDFs in the real window (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): opening a protected PDF
- * asks for its password (a wrong one is said so and asked again, Cancel leaves it closed), ⋮ → Document protects the
- * document's PDF and changes or removes its password, and Share protects a copy.
+ * xournal-qt: encrypted PDFs in the real window (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs"): opening a protected
+ * PDF asks for its password (a wrong one is said so and asked again, Cancel leaves it closed), ⋮ → Document protects
+ * the document's PDF and changes or removes its password, and Share protects a copy.
  *
  * @license GNU GPLv2 or later
  */

@@ -1,7 +1,7 @@
 /*
- * xournal-qt: dark pages and page colors in the real window (qt/docs/dark-pages.md): ⋮ › View › Dark pages turns the
- * canvas and the page pictures dark, the background dialog gives pages a curated paper color and texture, and the
- * print dialog says that dark paper takes a lot of ink.
+ * xournal-qt: dark pages and page colors in the real window (qt/docs/features/dark-pages.md): ⋮ › View › Dark pages
+ * turns the canvas and the page pictures dark, the background dialog gives pages a curated paper color and texture, and
+ * the print dialog says that dark paper takes a lot of ink.
  *
  * @license GNU GPLv2 or later
  */

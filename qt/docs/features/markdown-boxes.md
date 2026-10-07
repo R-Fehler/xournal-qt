@@ -252,7 +252,7 @@ Markdown text (`Text::isMarkdown`): by its layer's name, or, for a note's text, 
 - **Wrap width:** the width of the box.
 - **Position:** the top left of the box.
 
-Pictures of the Markdown (`![](name.assets/…)`) are carried at the end of the `.xopp` as extra `<preview>` elements,
+Pictures of the Markdown (`![](../name.assets/…)`) are carried at the end of the `.xopp` as extra `<preview>` elements,
 which Xournal++ ignores ([md-images.md](md-images.md), "Markdown boxes in a `.xopp`").
 
 Xournal++ shows the source as plain text and keeps it unchanged. xournal-qt draws it formatted everywhere a page is
@@ -267,7 +267,7 @@ Code: `qt/src/markdown/` (parser `MdDocument`, layout `MdLayout`, boxes `MdBox`)
 `.md` files are edited the same way, on their own pages: [md-editor.md](md-editor.md).
 
 ## Images
-`![alt](path)` is drawn in the text (a picture alone in its paragraph as wide as the column, one in a line as high
+`![alt](../path)` is drawn in the text (a picture alone in its paragraph as wide as the column, one in a line as high
 as the line); a missing file shows its alt text and path in red, and a web picture is never fetched unasked:
 [md-images.md](md-images.md).
 

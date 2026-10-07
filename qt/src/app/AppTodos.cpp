@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the library's to-dos (qt/docs/todos.md) as the window offers them: the To-dos view of the library home,
- * ticking a to-do there (in its document when it is open, else in its file), opening one at its line.
+ * xournal-qt: the library's to-dos (qt/docs/features/todos.md) as the window offers them: the To-dos view of the
+ * library home, ticking a to-do there (in its document when it is open, else in its file), opening one at its line.
  *
  * @license GNU GPLv2 or later
  */

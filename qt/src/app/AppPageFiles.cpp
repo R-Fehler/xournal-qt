@@ -1,6 +1,6 @@
 /*
- * xournal-qt: pages as files in the window (qt/page-files, qt/docs/page-files.md): inserting pages from a PDF or
- * another document (A6), extracting the selected pages into a new document or splitting the document into several
+ * xournal-qt: pages as files in the window (qt/page-files, qt/docs/features/page-files.md): inserting pages from a PDF
+ * or another document (A6), extracting the selected pages into a new document or splitting the document into several
  * (A7), and exporting pages as pictures (A8).
  *
  * - Inserting reads the file on a worker (asking for the password of a protected PDF) and keeps it while the dialog is
@@ -8,7 +8,7 @@
  *   merged PDF, so their text stays searchable; one undo step.
  * - Extracting and splitting copy the pages (PageFiles.h) on the UI thread and write the files on a worker: a PDF
  *   with notes, or a .xopp with its PDF; a protected document gives PDFs protected with its password, never a .xopp
- *   (qt/docs/hybrid-pdf.md, "Encrypted PDFs").
+ *   (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs").
  * - Pictures are drawn as RegionRender draws a snip, in the normal colours (no dark pages), one page at a time on a
  *   worker. A protected document is not exported as pictures: they could not keep its password.
  *

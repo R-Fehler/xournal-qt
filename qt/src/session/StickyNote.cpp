@@ -92,7 +92,7 @@ std::unordered_set<const Layer*> peeking;
 
 // The shadow under a note (points): a little to the bottom right, soft. A blur without a bitmap: three rectangles of
 // low opacity, each reaching a little further, so that the shade fades outwards (a few paths in a PDF, little to fill
-// on a screen). Its cost is measured by StickyNoteTest.benchmarkTheLook (qt/docs/sticky-notes.md).
+// on a screen). Its cost is measured by StickyNoteTest.benchmarkTheLook (qt/docs/features/sticky-notes.md).
 constexpr double SHADOW_DX = 0.8;
 constexpr double SHADOW_DY = 1.4;
 constexpr int SHADOW_RINGS = 3;
@@ -272,7 +272,7 @@ thread_local std::optional<Rectangle<double>> changingNote;
 /// copies its whole buffer for each stroke it reads (ObjectInputStream::readData), so one stream for a note with
 /// hundreds of strokes took quadratic time (15 ms to read a note with 300 strokes, now 1-3 ms). The name changed
 /// with the format: a note copied by an older version is not pasted (not misread).
-constexpr const char* CLIPBOARD_OBJECT = "StickyNote3";  // (3: with the elements' groups, qt/docs/groups.md)
+constexpr const char* CLIPBOARD_OBJECT = "StickyNote3";  // (3: with the elements' groups, qt/docs/features/groups.md)
 }  // namespace
 
 NoteLayerChange::NoteLayerChange(const Layer& layer): before(changingNote) {
@@ -626,7 +626,7 @@ void writeElement(ObjectOutputStream& out, const Element& e) {
     GString* bytes = one.stealData();
     out.writeImage(std::string_view(bytes->str, bytes->len));
     g_string_free(bytes, TRUE);
-    out.writeUInt(e.getGroup());  // (not in upstream's serialization: qt/docs/groups.md)
+    out.writeUInt(e.getGroup());  // (not in upstream's serialization: qt/docs/features/groups.md)
 }
 /// An element written by writeElement (nullptr: not one)
 ElementPtr readElement(ObjectInputStream& in) {

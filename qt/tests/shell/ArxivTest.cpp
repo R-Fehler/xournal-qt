@@ -1,5 +1,5 @@
 /*
- * xournal-qt: arXiv (qt/docs/citations.md) - opt-in networking, one request every 3 s, the search and a paper
+ * xournal-qt: arXiv (qt/docs/features/citations.md) - opt-in networking, one request every 3 s, the search and a paper
  * downloaded into the library by its title. The network is a fake: no test touches it.
  *
  * @license GNU GPLv2 or later

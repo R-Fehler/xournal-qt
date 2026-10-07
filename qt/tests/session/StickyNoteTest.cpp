@@ -1,7 +1,7 @@
 /*
- * xournal-qt: sticky notes (qt/docs/sticky-notes.md): the file format (a layer per note, its paper first), a save and
- * load round trip, upstream Xournal++ opening the file, and the note drawn with its content clipped to it in every
- * export (PDF, print, hybrid PDF, archive, thumbnails), without the marks that only the screen shows.
+ * xournal-qt: sticky notes (qt/docs/features/sticky-notes.md): the file format (a layer per note, its paper first), a
+ * save and load round trip, upstream Xournal++ opening the file, and the note drawn with its content clipped to it in
+ * every export (PDF, print, hybrid PDF, archive, thumbnails), without the marks that only the screen shows.
  *
  * @license GNU GPLv2 or later
  */
@@ -329,7 +329,7 @@ TEST_F(StickyNoteTest, upstreamXournalppOpensTheFileAndShowsTheNotes) {
     cairo_surface_destroy(s);
 }
 
-// qt/sticky-containers: the note's one Markdown text (qt/docs/sticky-notes.md, "Notes as containers")
+// qt/sticky-containers: the note's one Markdown text (qt/docs/features/sticky-notes.md, "Notes as containers")
 TEST_F(StickyNoteTest, aNotesMarkdownTextIsToldByItsPlaceAndFlowsInTheNotesWidth) {
     const auto look = *sticky::lookOf(*note);
     const auto origin = sticky::textOrigin(look);

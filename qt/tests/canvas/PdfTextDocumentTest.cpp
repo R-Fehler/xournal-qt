@@ -1,7 +1,7 @@
 /*
- * xournal-qt: text documents as PDF (qt/docs/md-pdf.md): a text document of notes (page 1 starts the page's Markdown
- * text) saved as a PDF with notes opens again with its text editable, carries the flow as a plain "name.md" after
- * full and incremental saves (read with qpdf), and typing goes into its text.
+ * xournal-qt: text documents as PDF (qt/docs/features/md-pdf.md): a text document of notes (page 1 starts the page's
+ * Markdown text) saved as a PDF with notes opens again with its text editable, carries the flow as a plain "name.md"
+ * after full and incremental saves (read with qpdf), and typing goes into its text.
  *
  * @license GNU GPLv2 or later
  */

@@ -1,6 +1,6 @@
 /*
  * xournal-qt: the version history of the current document for the page sidebar's History panel (PdfHistory.h,
- * qt/docs/hybrid-pdf.md "Version history").
+ * qt/docs/features/hybrid-pdf.md "Version history").
  *
  * Newest first: "Unsaved changes" while the document is modified, then each version (its date, its message for a
  * milestone) and, where they are in the file, revisions another app added. The list is read from the file on a worker

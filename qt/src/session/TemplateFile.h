@@ -1,6 +1,6 @@
 /*
- * xournal-qt: a page template's file (qt/docs/templates.md): a page saved to be added again, as a .xopp of one page
- * that Xournal++ opens as it is.
+ * xournal-qt: a page template's file (qt/docs/features/templates.md): a page saved to be added again, as a .xopp of one
+ * page that Xournal++ opens as it is.
  *
  * With its background the page keeps it as it is: ruled, graph, plain paper with its colour, a picture, or a PDF page.
  * A PDF page goes along as upstream's attached PDF of the .xopp ("name.xopp.bg.pdf", one page, referred to as domain

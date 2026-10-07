@@ -32,7 +32,7 @@ QString inkSnippet(const ink::PageText& text, const ink::Hit& hit) {
 }  // namespace
 
 std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const {
-    // "tag:name" terms: only documents with these tags (qt/docs/tags.md); the rest is the text searched
+    // "tag:name" terms: only documents with these tags (qt/docs/features/tags.md); the rest is the text searched
     const tags::Query tagged = tags::splitQuery(simplified(query).trimmed());
     const QString q = tagged.rest;
     const QString folded = textmatch::prepare(q);

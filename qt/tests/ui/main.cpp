@@ -25,7 +25,8 @@ int main(int argc, char* argv[]) {
     QTemporaryDir home;
     qputenv("XDG_CONFIG_HOME", (home.path() + "/config").toUtf8());
     qputenv("XDG_CACHE_HOME", (home.path() + "/cache").toUtf8());
-    qputenv("XDG_DATA_HOME", (home.path() + "/data").toUtf8());  // (the tutorial's copy, qt/docs/onboarding.md)
+    // (the tutorial's copy, qt/docs/features/onboarding.md)
+    qputenv("XDG_DATA_HOME", (home.path() + "/data").toUtf8());
     qputenv("XQT_RESOURCE_DIR", XQT_BUILD_RESOURCE_DIR);
     // The compiled QML stays for the next test: ctest starts a process per test, and each compiled Main.qml and its
     // hundred files again (no QML compiled ahead of time with XQT_FAST_DEV): half of a short test's time. Qt checks

@@ -1,7 +1,8 @@
-// The audience's screen of the presenter view (qt/docs/presenter-view.md): only the slide (or the whole page with its
-// space for notes, when the presenter shows the notes too), full screen on the other screen, black around it. Its page follows the presenter's; strokes being written, the laser pointer and the curtain
-// show here too (PresenterConsole, CanvasView::setMirror). It takes no input on the page; the keys that go from page
-// to page work here as in the console's window (a clicker sends them to whichever window has the focus).
+// The audience's screen of the presenter view (qt/docs/features/presenter-view.md): only the slide (or the whole page
+// with its space for notes, when the presenter shows the notes too), full screen on the other screen, black around it.
+// Its page follows the presenter's; strokes being written, the laser pointer and the curtain show here too
+// (PresenterConsole, CanvasView::setMirror). It takes no input on the page; the keys that go from page to page work
+// here as in the console's window (a clicker sends them to whichever window has the focus).
 import QtQuick
 import QtQuick.Window
 import XournalQt.Canvas

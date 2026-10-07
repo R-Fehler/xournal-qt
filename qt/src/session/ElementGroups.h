@@ -1,5 +1,5 @@
 /*
- * xournal-qt: groups of elements (qt/docs/groups.md).
+ * xournal-qt: groups of elements (qt/docs/features/groups.md).
  *
  * A group is a number on the elements of one layer (Element::getGroup, an upstream seam; 0: in no group), saved in a
  * .xopp as the element attribute xqt-group="n". Upstream Xournal++ ignores the attribute (and drops it when it saves:

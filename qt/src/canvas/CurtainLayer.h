@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the curtain and the spotlight, for teaching and presenting (qt/docs/curtain.md).
+ * xournal-qt: the curtain and the spotlight, for teaching and presenting (qt/docs/features/curtain.md).
  *
  * The curtain is a black sheet over part of the page, like a sheet of paper on an overhead projector: the audience
  * does not see what lies under it. It is put out over the lower half of the part of the page in view. The spotlight is

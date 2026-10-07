@@ -1,8 +1,8 @@
 /*
- * xournal-qt: the snip tool in the real window (qt/docs/snip.md): from the select tools' list or the image button, a
- * rectangle or lasso dragged over a page puts its picture on the clipboard (PNG, with the fork's entry saying where it
- * came from), then the tool used before comes back. Pasted into a document, the picture has the size it had on its
- * page, and the window offers a link to that page next to it.
+ * xournal-qt: the snip tool in the real window (qt/docs/features/snip.md): from the select tools' list or the image
+ * button, a rectangle or lasso dragged over a page puts its picture on the clipboard (PNG, with the fork's entry saying
+ * where it came from), then the tool used before comes back. Pasted into a document, the picture has the size it had on
+ * its page, and the window offers a link to that page next to it.
  *
  * @license GNU GPLv2 or later
  */

@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the real window on a screen at 125 %, 150 % (qt/docs/hidpi.md). CTest runs these once as they are and
- * once more with QT_SCALE_FACTOR=1.5 (FractionalScale.ui@150), as Qt runs on a screen at 150 % (Wayland's
+ * xournal-qt: the real window on a screen at 125 %, 150 % (qt/docs/features/hidpi.md). CTest runs these once as they
+ * are and once more with QT_SCALE_FACTOR=1.5 (FractionalScale.ui@150), as Qt runs on a screen at 150 % (Wayland's
  * fractional-scale-v1, X11's Xft.dpi, Windows' per-monitor DPI): the window's device pixel ratio is 1.5.
  *
  * @license GNU GPLv2 or later
@@ -106,7 +106,7 @@ QStringList unevenLines(QQuickItem* root, double dpr) {
             return;
         }
         const QQmlContext* context = qmlContext(item);
-        // (the app's own QML; Qt's controls draw their separators themselves, see qt/docs/hidpi.md)
+        // (the app's own QML; Qt's controls draw their separators themselves, see qt/docs/features/hidpi.md)
         const bool own = context && context->baseUrl().toString().startsWith("qrc:/qt/qml/XournalQt/");
         if (own && QString(item->metaObject()->className()).startsWith("QQuickRectangle")) {
             // (its file, and the nearest named item above it)

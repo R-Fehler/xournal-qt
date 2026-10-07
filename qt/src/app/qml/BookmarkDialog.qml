@@ -1,5 +1,5 @@
-// The label of a page's bookmark (qt/docs/bookmarks.md): "" or "Page N" is the automatic one, which follows the page.
-// From the page menu and the Bookmarks section of the contents sidebar.
+// The label of a page's bookmark (qt/docs/features/bookmarks.md): "" or "Page N" is the automatic one, which follows
+// the page. From the page menu and the Bookmarks section of the contents sidebar.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts

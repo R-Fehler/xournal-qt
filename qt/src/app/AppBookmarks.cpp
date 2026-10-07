@@ -1,7 +1,7 @@
 /*
- * xournal-qt: bookmarks on pages and favourite documents (qt/docs/bookmarks.md), as the window offers them: the page
- * menu, the pages sidebar and the contents sidebar of the open document; the ⋮ menu's star; the library's cards and
- * its Bookmarks view.
+ * xournal-qt: bookmarks on pages and favourite documents (qt/docs/features/bookmarks.md), as the window offers them:
+ * the page menu, the pages sidebar and the contents sidebar of the open document; the ⋮ menu's star; the library's
+ * cards and its Bookmarks view.
  *
  * @license GNU GPLv2 or later
  */

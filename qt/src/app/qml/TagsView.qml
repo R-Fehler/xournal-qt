@@ -1,8 +1,8 @@
-// The library's Tags view (home screen, qt/docs/tags.md): the tags of the library's documents (#tags typed in them,
-// keywords of PDFs) with how many documents have each; nested tags (#course/math) folded under their parent. A tap on a
-// tag shows the library's documents with it (the library's tag filter: with the Show filter, the Favourites chip and
-// the folder). It follows the library's "Show" filter and its Favourites chip, and with "Only in …" its current
-// folder; the list comes from the library's index (no document is opened to make it).
+// The library's Tags view (home screen, qt/docs/features/tags.md): the tags of the library's documents (#tags typed in
+// them, keywords of PDFs) with how many documents have each; nested tags (#course/math) folded under their parent. A
+// tap on a tag shows the library's documents with it (the library's tag filter: with the Show filter, the Favourites
+// chip and the folder). It follows the library's "Show" filter and its Favourites chip, and with "Only in …" its
+// current folder; the list comes from the library's index (no document is opened to make it).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

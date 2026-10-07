@@ -1,7 +1,7 @@
 /*
- * xournal-qt: a page template's file (qt/docs/templates.md): a .xopp of one page; with its background as it is (a PDF
- * page as upstream's attached PDF of one page next to it), without it plain paper marked as such; with or without its
- * content; opened by upstream's loader without a warning.
+ * xournal-qt: a page template's file (qt/docs/features/templates.md): a .xopp of one page; with its background as it is
+ * (a PDF page as upstream's attached PDF of one page next to it), without it plain paper marked as such; with or
+ * without its content; opened by upstream's loader without a warning.
  *
  * @license GNU GPLv2 or later
  */

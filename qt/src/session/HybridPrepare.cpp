@@ -94,7 +94,8 @@ public:
         return page < layers.size() && layer < layers[page].size() ? layers[page][layer] : 0;
     }
     uint64_t backgroundHash(size_t page) const { return page < backgrounds.size() ? backgrounds[page] : 0; }
-    /// The recordings' names written instead of theirs (Export for Xournal++: absolute paths; qt/docs/audio.md).
+    /// The recordings' names written instead of theirs (Export for Xournal++: absolute paths;
+    /// qt/docs/features/audio.md).
     const std::map<std::string, std::string>* audioNames = nullptr;
 
 protected:
@@ -285,7 +286,7 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
     const fs::path xopp = work / DATA_NAME;
     HybridSaveHandler h(pdfName, options.attach);
     h.audioNames = options.audioNames;
-    std::vector<audio::Recording> recordings;  // (qt/docs/audio.md: their files are found after the lock)
+    std::vector<audio::Recording> recordings;  // (qt/docs/features/audio.md: their files are found after the lock)
     fs::path docFile;
     {
         std::shared_lock lock(doc);
@@ -293,7 +294,7 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
     }
     {
         std::shared_lock lock(doc);
-        out.attachments = TextDocument::attachments(doc, pdfName);  // (qt/docs/md-pdf.md)
+        out.attachments = TextDocument::attachments(doc, pdfName);  // (qt/docs/features/md-pdf.md)
         recordings = audio::recordingsOf(doc);
         docFile = doc.getFilepath();
         out.bg = doc.getPdfFilepath();
@@ -467,8 +468,8 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
             out.extras.emplace_back(n, fileio::readFile(it->path()));
         }
     }
-    // The recordings, for other apps too (qt/docs/audio.md): "audio-p012-…ogg" with their pages. One whose file is
-    // nowhere is left out (its strokes keep their names).
+    // The recordings, for other apps too (qt/docs/features/audio.md): "audio-p012-…ogg" with their pages. One whose
+    // file is nowhere is left out (its strokes keep their names).
     for (const auto& rec: recordings) {
         TextDocument::Attachment a;
         a.file = audio::find(rec.name, docFile);

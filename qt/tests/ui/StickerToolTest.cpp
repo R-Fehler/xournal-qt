@@ -1,8 +1,8 @@
 /*
- * xournal-qt: stickers in the real window (qt/docs/stickers.md): what is selected saved as a sticker (the selection's
- * pill and its dialog, into the library's Stickers folder or a folder of it, onto the clipboard too), and a sticker
- * pasted from the picker: at its size in the middle of the visible part of the page, selected, one undo step, smaller
- * only when it is larger than the page; not into a document opened for reading only.
+ * xournal-qt: stickers in the real window (qt/docs/features/stickers.md): what is selected saved as a sticker (the
+ * selection's pill and its dialog, into the library's Stickers folder or a folder of it, onto the clipboard too), and a
+ * sticker pasted from the picker: at its size in the middle of the visible part of the page, selected, one undo step,
+ * smaller only when it is larger than the page; not into a document opened for reading only.
  *
  * @license GNU GPLv2 or later
  */

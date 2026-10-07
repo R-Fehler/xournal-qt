@@ -378,8 +378,8 @@ QPointF addWebLink(DocumentSession& session, CanvasView& view, DocumentCanvasIte
 }
 }  // namespace
 
-// Links with the mouse (qt/docs/links.md): resting on a link shows where it leads after a moment, the cursor is a
-// pointing hand where a click follows it, and a click follows it (the pen tool draws nothing there).
+// Links with the mouse (qt/docs/features/links.md): resting on a link shows where it leads after a moment, the cursor
+// is a pointing hand where a click follows it, and a click follows it (the pen tool draws nothing there).
 TEST_F(CanvasItemInputTest, theMouseOverALinkShowsItsTargetAndAClickFollowsIt) {
     const QPointF link = addWebLink(*session, *view, *canvas);
     wait(100);
@@ -489,8 +489,8 @@ TEST_F(CanvasItemInputTest, theMouseOverAMarkdownBoxHandleShowsTheResizeCursor) 
     EXPECT_EQ(canvas->cursor().shape(), Qt::BitmapCursor) << "away from it";
 }
 
-// The pointer over the page (qt/docs/hover-cursors.md): a cursor of the platform, which the compositor moves at no cost
-// to the app: a small dot by default, the crosshair as a setting.
+// The pointer over the page (qt/docs/features/hover-cursors.md): a cursor of the platform, which the compositor moves
+// at no cost to the app: a small dot by default, the crosshair as a setting.
 TEST_F(CanvasItemInputTest, thePointerIsADotCursorOrTheCrosshair) {
     QTest::mouseMove(window, QPoint(300, 300));
     wait(20);
@@ -577,8 +577,9 @@ namespace {
 int cursorSide(const QCursor& c) { return c.pixmap().deviceIndependentSize().toSize().width(); }
 }  // namespace
 
-// The eraser as the pointer (qt/docs/hover-cursors.md): gray, its real size at the zoom (upstream's square, 2 × its
-// width a side), following the zoom and the eraser's size; dashed when it deletes whole strokes, round for whiteout.
+// The eraser as the pointer (qt/docs/features/hover-cursors.md): gray, its real size at the zoom (upstream's square, 2
+// × its width a side), following the zoom and the eraser's size; dashed when it deletes whole strokes, round for
+// whiteout.
 TEST_F(CanvasItemInputTest, theEraserCursorHasTheErasersSizeAtTheZoom) {
     ToolHandler* tools = app->getToolHandler();
     tools->selectTool(TOOL_ERASER);

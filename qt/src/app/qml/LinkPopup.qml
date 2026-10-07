@@ -4,8 +4,8 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 // A tapped link: open it / go to the page (not at once: a tap can be a mistake). A link to a document
-// (qt/docs/links.md) offers a new tab, the reference or "here", unless a choice was remembered (Settings). A page
-// or a place of this document offers going there, or showing it in the reference: a second view of the document
+// (qt/docs/features/links.md) offers a new tab, the reference or "here", unless a choice was remembered (Settings). A
+// page or a place of this document offers going there, or showing it in the reference: a second view of the document
 // beside it (qt/self-reference).
 Popup {
     id: linkPopup

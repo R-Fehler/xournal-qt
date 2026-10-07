@@ -16,8 +16,8 @@
  * a word (Bounds), and several terms are found at once (the hits of all of them, in order, without overlaps). A fuzzy
  * term (Bounds::Fuzzy) matches whole words, word by word (WordMatch.h): the words of the text are read by words(),
  * and a hit is a word that matches, from its first to its last character.
- * The find and replace bar's options (qt/docs/md-editor.md, "Find and replace") are bounds too: CaseSensitive compares
- * the letters as they are (no folding; the rest stays as above), Regex reads the term as a regular expression
+ * The find and replace bar's options (qt/docs/features/md-editor.md, "Find and replace") are bounds too: CaseSensitive
+ * compares the letters as they are (no folding; the rest stays as above), Regex reads the term as a regular expression
  * (QRegularExpression, Perl syntax) matched in the text as it is kept, simplified.
  *
  * @license GNU GPLv2 or later
@@ -87,8 +87,8 @@ struct Term {
     unsigned bounds = Anywhere;
     bool operator==(const Term&) const = default;
 };
-/// The options of the find and replace bar (qt/docs/md-editor.md, "Find and replace"): letters as typed, whole words,
-/// a regular expression.
+/// The options of the find and replace bar (qt/docs/features/md-editor.md, "Find and replace"): letters as typed, whole
+/// words, a regular expression.
 struct Options {
     bool caseSensitive = false;
     bool wholeWord = false;

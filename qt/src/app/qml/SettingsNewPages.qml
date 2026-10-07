@@ -39,7 +39,7 @@ ScrollView {
             key: "landscape"; text: qsTr("Landscape")
             enabled: !(sheet.s.revision, sheet.s.get("copyLastPageSize"))
         }
-        // The paper of new pages (qt/docs/dark-pages.md, "Page colors")
+        // The paper of new pages (qt/docs/features/dark-pages.md, "Page colors")
         Label { text: qsTr("Paper"); Layout.fillWidth: true }
         PaperSwatches {
             Layout.fillWidth: true

@@ -25,8 +25,8 @@ class QJsonObject;
 
 namespace xqt {
 
-/// The folders of the platform the libraries' home and the Downloads folder can be in (see qt/docs/android.md,
-/// "Where the documents are"). Tests set their own (Library::setPlatformFolders).
+/// The folders of the platform the libraries' home and the Downloads folder can be in (see
+/// qt/docs/development/android.md, "Where the documents are"). Tests set their own (Library::setPlatformFolders).
 struct PlatformFolders {
     /// The Documents folder the app may always use: "~/Documents" on the desktop; on Android the app's own folder in
     /// the shared storage (Android/data/<package>/files/Documents), which Android deletes with the app.

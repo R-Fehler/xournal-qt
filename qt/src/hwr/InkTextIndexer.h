@@ -1,5 +1,5 @@
 /*
- * xournal-qt: keeps the handwriting of one open document searchable (qt/docs/handwriting-search.md).
+ * xournal-qt: keeps the handwriting of one open document searchable (qt/docs/features/handwriting-search.md).
  *
  * Per open document (tab) while the handwriting search is on. It hands the pages to the recognition worker
  * (InkRecognitionService.h) and the words read to the document's text index (DocumentTextIndex::setInk), where the

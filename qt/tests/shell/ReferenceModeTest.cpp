@@ -509,8 +509,9 @@ size_t lockedPage(CanvasView* v) {
 }
 }  // namespace
 
-// Locked scrolling (ScrollLock, qt/docs/reference-view.md): either side moves the other, by page from where the two
-// were when it was switched on; off for a new pair, remembered per pair for the session, a document beside itself too
+// Locked scrolling (ScrollLock, qt/docs/features/reference-view.md): either side moves the other, by page from where
+// the two were when it was switched on; off for a new pair, remembered per pair for the session, a document beside
+// itself too
 TEST(ReferenceMode, scrollingTogetherIsLockedPerPairAndRemembered) {
     ThreeTabs t;
     t.c.insertPages(1, 0, -1, false, 9);  // (tab 0: ten pages)

@@ -1,8 +1,8 @@
 /*
- * xournal-qt: Esc and Android's back key in the real window (qt/docs/zen.md, "Esc and Back"): with more than one
- * thing to leave (full screen with a selected note, an armed snip, the to-do stamp, the replay; presenting likewise),
- * one press does the first of them in a fixed order, the next press the next one. And the keys a button names are the
- * keys set in the shortcuts (a rebound key shows in the tips).
+ * xournal-qt: Esc and Android's back key in the real window (qt/docs/features/zen.md, "Esc and Back"): with more than
+ * one thing to leave (full screen with a selected note, an armed snip, the to-do stamp, the replay; presenting
+ * likewise), one press does the first of them in a fixed order, the next press the next one. And the keys a button
+ * names are the keys set in the shortcuts (a rebound key shows in the tips).
  *
  * @license GNU GPLv2 or later
  */

@@ -1,8 +1,8 @@
-// "Save page as template…" (qt/docs/templates.md): a page becomes a template of the library's Templates folder (or,
-// "In all libraries", of the app-wide set). The name (the document's name and the page number), the folder (the set
-// itself, one of its folders, or a new one typed), "With the page's background" (a PDF page: that PDF page goes along,
-// as when the page is copied; paper stays as it is) and "With its content" (ink, text, boxes, notes). Written in the
-// background.
+// "Save page as template…" (qt/docs/features/templates.md): a page becomes a template of the library's Templates folder
+// (or, "In all libraries", of the app-wide set). The name (the document's name and the page number), the folder (the
+// set itself, one of its folders, or a new one typed), "With the page's background" (a PDF page: that PDF page goes
+// along, as when the page is copied; paper stays as it is) and "With its content" (ink, text, boxes, notes). Written in
+// the background.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

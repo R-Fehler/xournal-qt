@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# The macOS app bundle and disk image of xournal-qt, from a build made with Homebrew's libraries (see qt/docs/macos.md):
+# The macOS app bundle and disk image of xournal-qt, from a build made with Homebrew's libraries (see
+# qt/docs/development/macos.md):
 #
 #   qt/scripts/macos-deploy.sh <build dir> <output folder>      e.g.  build dist
 #
@@ -115,10 +116,10 @@ step "macdeployqt"
 "$macdeployqt" "$app" -qmldir="$qml_sources" -verbose=1 ${extra[@]+"${extra[@]}"}
 
 # --- Qt Multimedia: the framework, not the media plugins ------------------------------------------------------------
-# The recordings (qt/docs/audio.md, "Platforms") use QAudioSource and QAudioSink, which are in QtMultimedia.framework
-# itself (Core Audio). macdeployqt adds Qt's media plugins because the program links it (FFmpeg's and the
-# AVFoundation one: players, cameras, video), and with the FFmpeg plugin FFmpeg and its codecs' libraries. They go
-# again: the plugins, then every library only they used (none that anything else in the bundle refers to).
+# The recordings (qt/docs/features/audio.md, "Platforms") use QAudioSource and QAudioSink, which are in
+# QtMultimedia.framework itself (Core Audio). macdeployqt adds Qt's media plugins because the program links it (FFmpeg's
+# and the AVFoundation one: players, cameras, video), and with the FFmpeg plugin FFmpeg and its codecs' libraries. They
+# go again: the plugins, then every library only they used (none that anything else in the bundle refers to).
 step "Qt Multimedia: the framework, without the media plugins"
 if [[ -d "$contents/PlugIns/multimedia" ]]; then
     plugin_libs=$(find "$contents/PlugIns/multimedia" -type f -name '*.dylib' -exec otool -L {} \; 2> /dev/null |

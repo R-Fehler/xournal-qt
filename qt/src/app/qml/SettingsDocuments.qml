@@ -40,7 +40,7 @@ ScrollView {
             text: qsTr("A PDF document opens in any PDF app and carries its text as a Markdown file inside. "
                        + "Markdown files you have stay Markdown files.")
         }
-        // Quick note (qt/docs/quick-note.md): Ctrl+Alt+N, the home screen, ⋮, --quick-note
+        // Quick note (qt/docs/features/quick-note.md): Ctrl+Alt+N, the home screen, ⋮, --quick-note
         SettingsComboRow {
             objectName: "quickNoteRow"
             key: "quickNote"
@@ -69,7 +69,7 @@ ScrollView {
                 { text: qsTr("Here, in place of this one"), value: "here" }
             ]
         }
-        // The library's To-dos (qt/docs/todos.md): which check boxes of Markdown are to-dos
+        // The library's To-dos (qt/docs/features/todos.md): which check boxes of Markdown are to-dos
         SettingsSectionTitle { text: qsTr("To-dos") }
         SettingsComboRow {
             objectName: "todoSourceRow"
@@ -101,7 +101,7 @@ ScrollView {
                        + "show the marker. Check-box stamps for handwritten to-dos always count. A due date: "
                        + "📅 2026-10-12 or due:2026-10-12.")
         }
-        // Looking up selected text, the papers of references, arXiv (qt/docs/citations.md)
+        // Looking up selected text, the papers of references, arXiv (qt/docs/features/citations.md)
         SettingsSectionTitle { text: qsTr("Web and citations") }
         SettingsSwitchRow {
             objectName: "webConfirmRow"
@@ -257,7 +257,7 @@ ScrollView {
                 { text: qsTr("Keep it as it is"), value: "keep" }
             ]
         }
-        // Version history (qt/docs/hybrid-pdf.md): per document in the sidebar's History panel; this is
+        // Version history (qt/docs/features/hybrid-pdf.md): per document in the sidebar's History panel; this is
         // for PDFs with notes that are new
         SettingsSectionTitle { text: qsTr("Version history") }
         SettingsHint {
@@ -317,8 +317,8 @@ ScrollView {
             }
         }
         SettingsHint { text: qsTr("%F is the date (2026-09-19), %H-%M the time.") }
-        // Pictures put on the clipboard (qt/docs/snip.md, qt/docs/page-files.md): chosen here once, not asked
-        // with every snip or copied page
+        // Pictures put on the clipboard (qt/docs/features/snip.md, qt/docs/features/page-files.md): chosen here once,
+        // not asked with every snip or copied page
         SettingsSectionTitle { text: qsTr("Pictures copied to the clipboard") }
         RowLayout {
             Layout.fillWidth: true
@@ -345,7 +345,7 @@ ScrollView {
             }
         }
         SettingsHint { text: qsTr("Copy page as image (Ctrl+Shift+C) puts the page on the clipboard at this resolution; a screenshot has the screen's. Export as pictures starts with it.") }
-        // Audio recordings (qt/docs/audio.md)
+        // Audio recordings (qt/docs/features/audio.md)
         SettingsSectionTitle { visible: app.audio.available; text: qsTr("Audio recordings") }
         RowLayout {
             visible: app.audio.available

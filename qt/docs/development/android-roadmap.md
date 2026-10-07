@@ -11,7 +11,7 @@ keyboard. Mobile UI work waits until mobile testing is a real concern. Items are
   scroll: on the cover screen they can run past the right edge.
 - Done (`qt/phone-chrome`): the **document tool bar** on the cover screen: the phone chrome replaces it with an app
   bar at the top and a tool dock at the bottom (a rail at the side in landscape), every tool in its "All tools" sheet
-  (qt/docs/adaptive-layout.md, "The phone chrome").
+  (qt/docs/features/adaptive-layout.md, "The phone chrome").
 - (O) **Markdown file being edited** in the emulator: the text shows overlapping, smeared glyphs while the cursor is
   in it (the same file reads fine). Probably the emulator's ARM translation, like the dark bars below; check on the
   phone.

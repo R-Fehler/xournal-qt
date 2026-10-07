@@ -84,7 +84,7 @@ ApplicationWindow {
     function startPresenting(clean) { viewModes.startPresenting(clean) }
     function showSidebar(shown) { chromeLayout.showSidebar(shown) }
     function chooseToolboxEdge(edge) { chromeLayout.chooseToolboxEdge(edge) }
-    // --- the layout for the window's size (qt/docs/adaptive-layout.md) --------------------------------------------
+    // --- the layout for the window's size (qt/docs/features/adaptive-layout.md) --------------------------------------
     /// The size class (desktopWide, desktopNarrow, tabletPortrait, phonePortrait, phoneShort, tiny), the width and
     /// height classes, the touch profile and its target size (minTarget). Everything that depends on the window's size
     /// reads it from here instead of keeping a threshold of its own.
@@ -94,10 +94,10 @@ ApplicationWindow {
         adaptive: (app.settings.revision, app.settings.get("adaptiveLayout"))
         touchSetting: (app.settings.revision, app.settings.get("touchProfile"))
     }
-    /// "Save page as template…" for page index `page` (qt/docs/templates.md; the page menus)
+    /// "Save page as template…" for page index `page` (qt/docs/features/templates.md; the page menus)
     function openTemplateSave(page) { templateSaveDialog.openForPage(page) }
-    /// Pages as files (PageFiles.qml, qt/docs/page-files.md), from the page menus: "insert" (from a file, after page
-    /// `pages[0]`), "extract", "split", "images" (the pages, or the selection)
+    /// Pages as files (PageFiles.qml, qt/docs/features/page-files.md), from the page menus: "insert" (from a file,
+    /// after page `pages[0]`), "extract", "split", "images" (the pages, or the selection)
     function openPageFiles(what, pages) {
         if (what === "insert") pageFiles.chooseFile(pages.length > 0 ? pages[pages.length - 1] : app.pageNumber - 1, true)
         else if (what === "extract") pageFiles.openExtract(pages)
@@ -115,7 +115,8 @@ ApplicationWindow {
         sidebar.mode = "history"
         win.layout.showSidebar(true)
     }
-    /// The document is a text file (a .md, a .txt): written with the keyboard, no ink tools (qt/docs/md-editor.md)
+    /// The document is a text file (a .md, a .txt): written with the keyboard, no ink tools
+    /// (qt/docs/features/md-editor.md)
     readonly property bool textDoc: app.textDocument !== ""
     /// The cycling buttons' groups (ToolGroups.qml): the fixed tools of the toolbox (select, snip, setsquare, text)
     readonly property ToolGroups toolGroups: ToolGroups {}
@@ -131,7 +132,7 @@ ApplicationWindow {
         return keys.length > 0 ? " (" + keys[0] + ")" : ""
     }
 
-    // --- the presenter view on a second screen (qt/docs/presenter-view.md) ----------------------------------------
+    // --- the presenter view on a second screen (qt/docs/features/presenter-view.md) ----------------------------------
     /// The audience's window: the slide on the other screen while this window is the console (modes.presenterConsole)
     AudienceWindow {
         id: audienceWindow
@@ -165,8 +166,8 @@ ApplicationWindow {
     function requestCloseTab(index) { saveFlow.requestCloseTab(index) }
     function closeWindow() { saveFlow.closeWindow() }
     function sharePdfOf(file, toClipboard, withHistory) { shareFlow.sharePdfOf(file, toClipboard, withHistory) }
-    /// A web address chosen in the look-up menu (qt/docs/citations.md): asked first with the whole address, unless
-    /// that was turned off (the menu showed it)
+    /// A web address chosen in the look-up menu (qt/docs/features/citations.md): asked first with the whole address,
+    /// unless that was turned off (the menu showed it)
     function openWebAddress(url, purpose) {
         if (url === "") return
         if ((app.settings.revision, app.settings.get("webConfirm"))) {
@@ -175,9 +176,9 @@ ApplicationWindow {
         }
         if (app.citations.openWeb(url)) snackbar.show(qsTr("Opened %1 in the browser").arg(app.citations.hostOf(url)), false)
     }
-    /// The searches of selected text (the look-up menu, qt/docs/citations.md): the document's search bar with the
-    /// text, run (the bar follows a search set from elsewhere); the open tabs' search in their overview; the library's
-    /// search on the home screen, in the library shown.
+    /// The searches of selected text (the look-up menu, qt/docs/features/citations.md): the document's search bar with
+    /// the text, run (the bar follows a search set from elsewhere); the open tabs' search in their overview; the
+    /// library's search on the home screen, in the library shown.
     function searchInDocument(text) {
         if (text === "") return
         pageGrid.close()
@@ -198,9 +199,9 @@ ApplicationWindow {
         app.homeVisible = true
         Qt.callLater(function() { homeView.searchFor(text) })  // (after the home screen is shown, as searchLibrary())
     }
-    /// "Find this paper": the library searched for the title of a bibliography entry (qt/docs/citations.md)
+    /// "Find this paper": the library searched for the title of a bibliography entry (qt/docs/features/citations.md)
     function findPaper(text) { findPaperSheet.openFor(text) }
-    /// arXiv: a search by title, or one paper by its ID (qt/docs/citations.md)
+    /// arXiv: a search by title, or one paper by its ID (qt/docs/features/citations.md)
     function arxivSearch(title) { arxivSheet.openSearch(title) }
     function arxivPaper(id) { arxivSheet.openId(id) }
 
@@ -230,7 +231,8 @@ ApplicationWindow {
 
     header: Column {
       id: headerColumn
-      // The phone classes: the app bar instead of the tab strip (qt/docs/adaptive-layout.md, "The phone chrome")
+      // The phone classes: the app bar instead of the tab strip (qt/docs/features/adaptive-layout.md, "The phone
+      // chrome")
       PhoneAppBar {
         id: phoneAppBar
         width: parent.width
@@ -297,8 +299,8 @@ ApplicationWindow {
         Material.foreground: "#303030"
         height: 56
       }
-      // Markdown being written (a .md, Markdown on a page): its formatting tools (qt/docs/md-editor.md). A text
-      // document's top bar is merged into it (F7.2): its items at the end of the row, ⋮ pinned at its end
+      // Markdown being written (a .md, Markdown on a page): its formatting tools (qt/docs/features/md-editor.md). A
+      // text document's top bar is merged into it (F7.2): its items at the end of the row, ⋮ pinned at its end
       MarkdownFormatBar {
         id: formatBar
         // On a phone, while the soft keyboard is open for the page's Markdown, right above the keyboard (in the
@@ -330,7 +332,7 @@ ApplicationWindow {
       bottomPadding: win.insets.keyboardHeight
     }
     // The phone's tool dock: at the bottom (in the footer, above the navigation bar), or a rail at the right side when
-    // the phone is held sideways (qt/docs/adaptive-layout.md, "The phone chrome")
+    // the phone is held sideways (qt/docs/features/adaptive-layout.md, "The phone chrome")
     PhoneDock {
         id: phoneDock
         vertical: win.layout.dockVertical
@@ -437,7 +439,7 @@ ApplicationWindow {
         z: 3
         color: "#ffffff"
     }
-    // The toolbox (qt/docs/toolbox.md): the user's own tools; docked beside the page in the full chrome
+    // The toolbox (qt/docs/features/toolbox.md): the user's own tools; docked beside the page in the full chrome
     Toolbox {
         id: toolboxPane
         parent: win.layout.toolboxInDock ? phoneDock.toolboxSlot : win.layout.toolboxFloating ? win.contentItem
@@ -516,7 +518,7 @@ ApplicationWindow {
         parent: win.layout.phoneChrome ? phoneAppBar.moreSlot : win.layout.toolsInFormatBar ? formatBar.trailing : topBarPane.trailingTail
         y: win.layout.toolsInFormatBar && !win.layout.phoneChrome ? -2 : 0
     }
-    // The top bar (qt/docs/toolbox.md, "The top bar"; qt/top-bar): the other list of the arrangement, in the user's order
+    // The top bar (qt/docs/features/toolbox.md, "The top bar"; qt/top-bar): the other list of the arrangement, in the user's order
     // with its dividers and groups; it scrolls sideways as the rail does, "+" (the catalog) and ⋮ pinned at its end. In
     // a text document it is the end of the format bar's row; on a phone, in the app bar
     Toolbox {
@@ -601,7 +603,7 @@ ApplicationWindow {
         height: referenceSplit.mainHeight
         clip: true  // zoomed-in pages must not paint over the sidebar
         view: app.view
-        darkPages: app.darkPagesShown  // (qt/docs/dark-pages.md)
+        darkPages: app.darkPagesShown  // (qt/docs/features/dark-pages.md)
         // (a version cut out of its file, compared or shown: read-only)
         readingOnly: win.modes.readOnlyOn || win.modes.replaying || app.viewingVersion
         snapVertically: win.modes.readOnlyOn && !app.presenting
@@ -613,11 +615,11 @@ ApplicationWindow {
             if (count > 1) zenPillDelay.stop()
             else if (win.modes.zenShown && zenDot.visible) zenPillDelay.restart()
         }
-        // A stroke tried while read only: said once, at the pen (qt/docs/zen.md)
+        // A stroke tried while read only: said once, at the pen (qt/docs/features/zen.md)
         onWritingRefused: function(pos) { if (win.modes.readOnlyOn) readOnlyNote.tell(pos) }
 
         // Picture files dropped on Markdown being written (a .md, a text document, Markdown on a page): saved with
-        // the document and linked at the cursor (qt/docs/md-images.md)
+        // the document and linked at the cursor (qt/docs/features/md-images.md)
         DropArea {
             objectName: "markdownDropArea"
             anchors.fill: parent
@@ -628,8 +630,8 @@ ApplicationWindow {
                     drop.accept(Qt.CopyAction)
             }
         }
-        // Presenting with two screens, zoomed in, the audience following (qt/docs/presenter-view.md): a thin frame
-        // around what the audience sees (the screens' shapes differ, and the slide's edge cuts what they see)
+        // Presenting with two screens, zoomed in, the audience following (qt/docs/features/presenter-view.md): a thin
+        // frame around what the audience sees (the screens' shapes differ, and the slide's edge cuts what they see)
         Rectangle {
             objectName: "audienceFrame"
             readonly property rect shown: app.presenter.audienceFrame
@@ -681,7 +683,7 @@ ApplicationWindow {
                         canvas.emojiCompletionRect.width, canvas.emojiCompletionRect.height)
         onChosen: function(index) { canvas.chooseEmojiCompletion(index) }
     }
-    // Presenting with two screens: the console's panel beside the page (qt/docs/presenter-view.md)
+    // Presenting with two screens: the console's panel beside the page (qt/docs/features/presenter-view.md)
     PresenterPanel {
         id: presenterPanel
         visible: win.modes.presenterConsole
@@ -787,7 +789,7 @@ ApplicationWindow {
         onStickerRequested: stickerSaveDialog.openForSelection()
         hidden: pageGrid.visible
     }
-    // "Save as sticker…" of the pills (qt/docs/stickers.md)
+    // "Save as sticker…" of the pills (qt/docs/features/stickers.md)
     StickerSaveDialog { id: stickerSaveDialog }
 
     // Handwriting copied as text (the text tools' second tool, "Copy as text" of the selection): the text near it
@@ -815,7 +817,8 @@ ApplicationWindow {
     SearchBar {
         id: searchBar
         objectName: "searchBar"
-        // Find and replace (qt/docs/md-editor.md): not while reading; on the source beside the page while it is open
+        // Find and replace (qt/docs/features/md-editor.md): not while reading; on the source beside the page while it
+        // is open
         replaceAllowed: !win.modes.readOnlyOn
         sourcePanel: markdownPanel.visible ? markdownPanel : null
         onNotice: function(text, undo) {
@@ -827,7 +830,7 @@ ApplicationWindow {
         width: Math.min(implicitWidth, win.layout.canvasControlsRight - win.layout.canvasControlsLeft - 16)
     }
 
-    // Where the link under the mouse or the hovering pen leads (qt/docs/links.md, "Links with the mouse")
+    // Where the link under the mouse or the hovering pen leads (qt/docs/features/links.md, "Links with the mouse")
     LinkStatusLine {
         canvasItem: canvas
         visible: !win.modes.hudHidden
@@ -873,7 +876,7 @@ ApplicationWindow {
     TabToast { id: tabToast }
 
     PresentPageIndicator { id: presentIndicator }
-    // --- Zen (qt/docs/zen.md) ----------------------------------------------------------------------------------------
+    // --- Zen (qt/docs/features/zen.md) -------------------------------------------------------------------------------
     ZenDot { id: zenDot }
     // Where the mouse or the pen counts as near the dot (looked through by the page: it writes there as anywhere)
     Item {
@@ -971,7 +974,7 @@ ApplicationWindow {
         z: 57
     }
     // The curtain: its handles, taking it away (below the setsquare's pill when that is out too)
-    // A recording runs, a recording plays (qt/docs/audio.md): at the top of the canvas, in the middle
+    // A recording runs, a recording plays (qt/docs/features/audio.md): at the top of the canvas, in the middle
     // (below the toolbox where it floats at the top, in the middle too: full screen, presenting)
     RecordingPill {
         id: recordingPill
@@ -989,9 +992,9 @@ ApplicationWindow {
     // The microphone refused by the system (macOS, Android): where to allow it
     MicrophoneDialog {}
     LeaveAppDialog { id: leaveAppDialog }
-    // The replay of the timeline (qt/docs/timeline.md): its play bar at the bottom of the page, above the navigation
-    // bar and clear of a cut-out (the safe area), off the side edges (where Android's back gesture starts); the view
-    // pill, the tools and the phone's dock are put away meanwhile (hudHidden, dockShown)
+    // The replay of the timeline (qt/docs/features/timeline.md): its play bar at the bottom of the page, above the
+    // navigation bar and clear of a cut-out (the safe area), off the side edges (where Android's back gesture starts);
+    // the view pill, the tools and the phone's dock are put away meanwhile (hudHidden, dockShown)
     TimelineBar {
         id: timelineBar
         touch: win.adaptive.touchProfile
@@ -1010,7 +1013,8 @@ ApplicationWindow {
         z: 57
     }
     InsertPagesDialog { id: insertPagesDialog }
-    // Page templates (qt/docs/templates.md): the picker (in the middle of the window, a sheet on a phone) and saving
+    // Page templates (qt/docs/features/templates.md): the picker (in the middle of the window, a sheet on a phone) and
+    // saving
     StickerPicker { id: templatePicker; mode: "templates" }
     TemplateSaveDialog { id: templateSaveDialog; parent: Overlay.overlay }
     PageFiles { id: pageFiles }

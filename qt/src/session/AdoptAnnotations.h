@@ -1,5 +1,5 @@
 /*
- * xournal-qt: annotations of other apps made editable (qt/docs/adopt-annotations.md).
+ * xournal-qt: annotations of other apps made editable (qt/docs/features/adopt-annotations.md).
  *
  * A PDF that GoodNotes, Drawboard, Preview, Acrobat, Xodo or Zotero marked up carries their marks as PDF annotations
  * (ink, highlights, text boxes, shapes, notes, stamps). Here they are found (scan), turned into elements of ours

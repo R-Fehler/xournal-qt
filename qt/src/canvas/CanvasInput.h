@@ -64,10 +64,10 @@ public:
 
     std::optional<QPointF> hoverPosition() const { return hover; }
     bool hoverIsEraser() const { return hoverEraser; }
-    /// A click of the mouse on a link follows it (qt/docs/links.md, "Links with the mouse"): with the hand, the select
-    /// tools and the tools that draw (a drag still draws), whatever the tool with Ctrl; on text being written
-    /// (`editing`) only with Ctrl, a plain click puts the cursor there. Not while a selection is out (the click ends
-    /// it) nor with a spline being drawn.
+    /// A click of the mouse on a link follows it (qt/docs/features/links.md, "Links with the mouse"): with the hand,
+    /// the select tools and the tools that draw (a drag still draws), whatever the tool with Ctrl; on text being
+    /// written (`editing`) only with Ctrl, a plain click puts the cursor there. Not while a selection is out (the click
+    /// ends it) nor with a spline being drawn.
     bool clickFollowsLink(bool editing, Qt::KeyboardModifiers modifiers) const;
 
 Q_SIGNALS:

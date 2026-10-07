@@ -1,5 +1,5 @@
 /*
- * xournal-qt: where recordings are kept and found (qt/docs/audio.md, "Storage").
+ * xournal-qt: where recordings are kept and found (qt/docs/features/audio.md, "Storage").
  *
  * As in Xournal++, a .xopp names its recordings bare ("2026-10-04_14-03-22.ogg") and the files are in the app's
  * audio folder (here <app data>/audio, never the cache: they are the user's data). A recording is found, in this

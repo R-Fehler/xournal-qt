@@ -1,12 +1,12 @@
 /*
- * xournal-qt: pages as files of their own (qt/docs/page-files.md): which pages a typed range names, how a document is
- * split, the selected pages of a document written as a new PDF with notes or .xopp (extract, split), and the names of
- * pages exported as pictures.
+ * xournal-qt: pages as files of their own (qt/docs/features/page-files.md): which pages a typed range names, how a
+ * document is split, the selected pages of a document written as a new PDF with notes or .xopp (extract, split), and
+ * the names of pages exported as pictures.
  *
  * A new document from some pages is a copy of those pages (as a save copies them) whose background PDF is the
  * source's own: the writer takes their PDF pages from it (qpdf, the text stays text, searchable) and nothing else of
- * it. A protected source (qt/docs/hybrid-pdf.md, "Encrypted PDFs") gives a PDF with notes protected the same way;
- * a .xopp of it is refused by the caller (a .xopp cannot be encrypted).
+ * it. A protected source (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs") gives a PDF with notes protected the same
+ * way; a .xopp of it is refused by the caller (a .xopp cannot be encrypted).
  *
  * Qt-free; any thread (the source document is read under its shared lock, the caller must not hold it).
  *

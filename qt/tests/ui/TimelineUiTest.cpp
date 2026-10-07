@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the replay of a document's timeline in the real window (qt/docs/timeline.md, "Replay"): ⋮ → View →
- * Replay the writing, the play bar at the bottom (play, the slider, the speed, ✕ and Esc), read-only (the pen writes
+ * xournal-qt: the replay of a document's timeline in the real window (qt/docs/features/timeline.md, "Replay"): ⋮ → View
+ * → Replay the writing, the play bar at the bottom (play, the slider, the speed, ✕ and Esc), read-only (the pen writes
  * nothing, a tap on ink goes to its moment), the document exactly as it was afterwards; with a recording (the fake
  * speaker), the recording is heard where it is on the bar, and the playback pill starts the replay at its moment.
  *
@@ -106,8 +106,8 @@ protected:
         until([&] { return window->width() == w && window->height() == h; });
         wait(300);  // (the size class, then the plans settle)
     }
-    /// Tools outside the toolbox (qt/docs/toolbox.md): undo and redo in the command bar, the phone dock's own buttons
-    /// (a text document's). None of it is there beside the toolbox.
+    /// Tools outside the toolbox (qt/docs/features/toolbox.md): undo and redo in the command bar, the phone dock's own
+    /// buttons (a text document's). None of it is there beside the toolbox.
     QStringList classicToolsShown() const {
         QStringList out;
         for (const char* name: {"toolUndoButton", "toolRedoButton", "dockToolsButton", "dockUndoButton"}) {

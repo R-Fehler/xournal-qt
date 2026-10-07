@@ -1111,7 +1111,7 @@ bool MarkdownEditor::keyPressed(const QKeyEvent* e, bool& finish) {
                     return true;
                 }
                 // Pictures (a copied picture, copied picture files): saved with the document, their Markdown pasted
-                // (qt/docs/md-images.md)
+                // (qt/docs/features/md-images.md)
                 if (!plain) {
                     QString error;
                     if (auto pictures = MarkdownImages::pastedPictures(session, QGuiApplication::clipboard()->mimeData(),

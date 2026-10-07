@@ -1,5 +1,5 @@
 /*
- * xournal-qt: space for notes beside slides (qt/docs/note-space.md).
+ * xournal-qt: space for notes beside slides (qt/docs/features/note-space.md).
  *
  * A page gets blank space for notes on any of its four sides: it grows by the amounts, its PDF background is drawn at
  * (left, top) at its own scale, and everything on it moves by the change of (left, top), so the ink stays on the

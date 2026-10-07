@@ -1,9 +1,10 @@
-// The play bar of the document's timeline (qt/docs/timeline.md, "The play bar"): the pages as of a moment, read-only.
-// A title ("Replay"; a tap: what it is), the time "12:04 · 3 Oct, 14:20" (the bar's time and the clock time of the
-// moment), the previous / next session, play / pause, a slider with a large handle and its elapsed part filled, the
-// sessions as ticks (their dates as tips) and the recordings as bands under it, the speed and ✕. One row on a wide bar;
-// two on a narrow one (a phone: the slider on its own row). Touch-sized (48 px) in the touch profile. The first replay
-// shows a hint above the bar, once (setting replayHintSeen). Self-contained: Main.qml places it and sets `touch`.
+// The play bar of the document's timeline (qt/docs/features/timeline.md, "The play bar"): the pages as of a moment,
+// read-only. A title ("Replay"; a tap: what it is), the time "12:04 · 3 Oct, 14:20" (the bar's time and the clock time
+// of the moment), the previous / next session, play / pause, a slider with a large handle and its elapsed part filled,
+// the sessions as ticks (their dates as tips) and the recordings as bands under it, the speed and ✕. One row on a wide
+// bar; two on a narrow one (a phone: the slider on its own row). Touch-sized (48 px) in the touch profile. The first
+// replay shows a hint above the bar, once (setting replayHintSeen). Self-contained: Main.qml places it and sets
+// `touch`.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

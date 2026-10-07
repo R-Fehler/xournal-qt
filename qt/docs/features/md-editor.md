@@ -14,7 +14,7 @@ into a `.md`. Plain text files (`.txt`) are edited the same way, as plain text (
   empty line, makes it a new paragraph; Shift+Enter starts a paragraph at once. One rule on every device, as note
   apps do it (a phone's keyboard has no Shift+Enter; decided 2026-09-27). After a heading, a code fence, a table or
   a formula block Enter starts the next block as before. Formulas (`$…$`, `$$…$$`) are drawn, and the block with the cursor
-  shows their source ([markdown-boxes.md](markdown-boxes.md), "Math"). So are images (`![](name.assets/…)`,
+  shows their source ([markdown-boxes.md](markdown-boxes.md), "Math"). So are images (`![](../name.assets/…)`,
   [md-images.md](md-images.md)).
 - **Whatever the tool**, the pen and the mouse put the cursor where they press, and a drag selects. A finger
   scrolls; a tap with a finger puts the cursor there too. Ctrl + click (and a finger tap) on a link follows it.
@@ -41,7 +41,7 @@ without knowing Markdown's marks, grouped as in Typora, Obsidian and Zettlr:
   (`$…$`). Around the selection (on each of its lines, not around the spaces); without a selection the empty marks
   go in with the cursor between them. On text that has the mark (the cursor in it, or it selected, with its marks or
   not), the mark goes. A link around a selected text selects the address to type (`[text](https://)`); a selected
-  address becomes the target (`[](address)`); on a link, Link makes it its text again.
+  address becomes the target (`[](../address)`); on a link, Link makes it its text again.
 - **Marks of the lines**: bullet list, numbered list, check boxes, quote, for every line of the selection (empty
   lines are left out; a quote goes on over them with `>`). If all of them have it, it goes; else they all get it (a
   list mark or heading they had is replaced; a numbered list goes on from the item before it). The quote stays when
@@ -139,7 +139,7 @@ sticky notes' texts). **Ctrl+H**, the bar's replace button (beside ✕) or ⋮ �
 cursor in the search field (in the replace field when there is a text to find). Documents shown read-only (a file that
 cannot be written, a code file before "Edit anyway"), PDFs and notes without Markdown text, and reading mode have no
 replace row: there Ctrl+H opens the search alone. With the toolbox the search is a command of a text document's format
-bar (qt/docs/toolbox.md); find and replace adds no button to that bar's ladder, only the row, the bar's button and the
+bar (qt/docs/features/toolbox.md); find and replace adds no button to that bar's ladder, only the row, the bar's button and the
 ⋮ entry.
 - **Options**, in the row; the search takes them while the row is shown (its marks and count follow at once; never the
   fuzzy syntax then, the Fuzzy toggle is hidden): **Aa** match case, **ab** whole words (not next to a letter or

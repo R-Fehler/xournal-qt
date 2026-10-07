@@ -69,7 +69,7 @@ text in addition to normal copy and give the user a small popup with the text th
 ## Languages and models
 
 - A model is a folder with a manifest `model.json` (its `kind`: `trocr` or `ctc`, its `languages`, its files with
-  sha256 and size; [FORMATS.md](../research/hwr/train/FORMATS.md) §2). Per language the app takes the folder chosen
+  sha256 and size; [FORMATS.md](../../research/hwr/train/FORMATS.md) §2). Per language the app takes the folder chosen
   in Settings, else `XQT_HWR_MODEL` (English) / `XQT_HWR_MODEL_DE` (German), else its own in
   `~/.local/share/xournal-qt/models/` (`trocr-small-hw-int8`, `crnn-de`); without one there, any model in that folder
   that reads the language. A model that reads both languages serves both.
@@ -122,7 +122,7 @@ Reading a line costs about 0.2 s per model, and most documents are in one langua
 
 To train a model on your handwriting, or to measure how well a model reads it, the command line tool writes a
 document's handwriting as a **line dataset** in the format the training reads
-([qt/research/hwr/train/FORMATS.md](../research/hwr/train/FORMATS.md), §1, `"kind": "ink"`):
+([qt/research/hwr/train/FORMATS.md](../../research/hwr/train/FORMATS.md), §1, `"kind": "ink"`):
 
 ```sh
 xournal-qt-cli hwr-lines notes.xopp --out ~/hwr-data/notes [--text transcripts.txt] [--lang de] [--writer me]
@@ -171,8 +171,8 @@ The sentences are the texts (`sentences-<lang>.txt`; `make_sample.py` makes the 
   `XQT_HWR_MODEL` is set; `XQT_BENCH_HWR=1` with the model prints the time per line. English and German are tested
   with scripted models (`MultiModelTest`: merging, the language of a document, the choice).
 
-- **Training models** (German, German + English, a person's own hand): `qt/research/hwr/train` ([README](../research/hwr/train/README.md)),
-  PyTorch on GPUs, exporting the model folders of [FORMATS.md](../research/hwr/train/FORMATS.md).
+- **Training models** (German, German + English, a person's own hand): `qt/research/hwr/train` ([README](../../research/hwr/train/README.md)),
+  PyTorch on GPUs, exporting the model folders of [FORMATS.md](../../research/hwr/train/FORMATS.md).
 - Tests that need the runtime or the model are skipped unless `XQT_ONNXRUNTIME` (a tiny model in
   `qt/tests/hwr/data`) or `XQT_HWR_MODEL` is set; `XQT_BENCH_HWR=1` with the model prints the time per line.
 

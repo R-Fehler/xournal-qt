@@ -1,5 +1,5 @@
 /*
- * xournal-qt: what a handwriting recogniser is to the search (qt/docs/handwriting-search.md).
+ * xournal-qt: what a handwriting recogniser is to the search (qt/docs/features/handwriting-search.md).
  *
  * A recogniser reads one line of ink at a time (InkLayout.h found the lines and their words) and returns, per word
  * box of the line, a few readings with their shares (InkText.h). It is called on the recognition worker

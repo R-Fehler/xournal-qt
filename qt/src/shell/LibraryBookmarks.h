@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the "Bookmarks" view of the library home (qt/docs/bookmarks.md): the bookmarked pages of all documents
- * of the library, grouped by document.
+ * xournal-qt: the "Bookmarks" view of the library home (qt/docs/features/bookmarks.md): the bookmarked pages of all
+ * documents of the library, grouped by document.
  *
  * It comes from the library's index (LibraryIndex::bookmarks: read into each folder's "notes" pack when a document is
  * indexed), so no document is opened to list them; the pictures of the pages are drawn by HitPageProvider (as the

@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the width of a Markdown text box (qt/docs/markdown-boxes.md, "Size").
+ * xournal-qt: the width of a Markdown text box (qt/docs/features/markdown-boxes.md, "Size").
  *
  * A text box (not the page's own Markdown text, which goes from margin to margin) has a handle in the middle of its
  * right edge: while it is written on the page (MarkdownEditor), and while it is selected alone (the selection's

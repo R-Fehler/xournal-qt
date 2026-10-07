@@ -1,6 +1,6 @@
 // xournal-qt: the home screen's header: the switch's, the breadcrumbs' and the search's slots, New, Quick note,
 // Import, New folder, Flat, Show, Sort, the size of the cards (expanded), or "+" and View (grouped), Settings.
-// Part of HomeView.qml (the home screen, qt/docs/library.md), instantiated once there: it reads the home
+// Part of HomeView.qml (the home screen, qt/docs/features/library.md), instantiated once there: it reads the home
 // screen's state through `home`, and the other parts by their ids (HomeView.qml's context).
 import QtQuick
 import QtQuick.Controls
@@ -135,7 +135,7 @@ Flickable {
                     onTriggered: newDocumentDialog.open()
                 }
                 // A text document: a PDF text document or a Markdown file, as Settings → Documents says
-                // (qt/docs/md-pdf.md)
+                // (qt/docs/features/md-pdf.md)
                 AdaptiveMenuItem {
                     objectName: "newMarkdownItem"
                     text: app.newTextAsPdf ? qsTr("New text document…") : qsTr("New Markdown file…")
@@ -186,8 +186,8 @@ Flickable {
                 }
             }
         }
-        // Quick note (qt/docs/quick-note.md): a new note in the library's Inbox, named by the date and time (or
-        // a line in today's Markdown note there); a button of its own when expanded, else first in "+"
+        // Quick note (qt/docs/features/quick-note.md): a new note in the library's Inbox, named by the date and time
+        // (or a line in today's Markdown note there); a button of its own when expanded, else first in "+"
         IconButton {
             objectName: "quickNoteButton"
             label: qsTr("Quick note")

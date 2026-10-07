@@ -1,7 +1,7 @@
 // xournal-qt: the home screen's dialogs for the library's items and libraries: rename, new folder, new text file,
 // copy or move to, trash, storage access, the libraries' home on Android and its move, new library,
 // share as zip.
-// Part of HomeView.qml (the home screen, qt/docs/library.md), instantiated once there: it reads the home
+// Part of HomeView.qml (the home screen, qt/docs/features/library.md), instantiated once there: it reads the home
 // screen's state through `home`, and the other parts by their ids (HomeView.qml's context).
 import QtQuick
 import QtQuick.Controls

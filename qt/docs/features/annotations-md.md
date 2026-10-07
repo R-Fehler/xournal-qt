@@ -15,7 +15,7 @@ document's annotations by page, top to bottom:
 | Highlight in the PDF | The PDF's own markup annotations (highlight, underline, squiggly, strike out) made in other apps, with the text under them and their note. The annotations our hybrid PDF writes for its own layers (`xopp:` names) are not listed twice. Made editable ([adopt-annotations.md](adopt-annotations.md)) they are highlighter strokes, listed as highlights. |
 | Text / Markdown | Text boxes and Markdown boxes with their text. The panel shows a Markdown box formatted. |
 | Handwriting | Every piece of ink, as a small picture of it on its page: the pen's strokes (drawn by hand, with the ruler, as shapes or through the stroke recogniser: all pen strokes), on any visible layer, and highlighter strokes over no text (neither PDF text nor a text box). A stroke joins the piece written just before it when it is within 18 pt (about 6 mm); pieces that overlap are one; a dot or short mark (under 4 pt) joins the nearest piece within 36 pt, else it is listed by itself. Ink on PDF text (an underline, a circle, a strike through, a word written over the slide) is listed with that text: `on “Kalman gain”`. Not listed: the whiteout eraser's strokes (they hide ink), hidden layers. |
-| Link | A link marker: a Markdown box that is only `[title](target)` ([links.md](links.md)). |
+| Link | A link marker: a Markdown box that is only `[title](../target)` ([links.md](links.md)). |
 | Note | Sticky notes: another block builds them and plugs in with `annotations::setNoteSource` (a function called for each page read, under the document's read lock). The filter shows "Notes" only when there are any. |
 
 - While the PDF has annotations of other apps that can be made editable (ink, highlights, text boxes, shapes, notes,
@@ -111,14 +111,14 @@ The download button of the panel writes a `.md`:
   images yet ([markdown-boxes.md](markdown-boxes.md), "Not yet"), so a picture would show as its alt text there.
   The picture export is built and tested: `XQT_ANNOTATION_PICTURES=1` writes each piece as
   `<name>.assets/p<page>-<n>.png` (Typora's folder convention, the same crop as the panel's, with the page under
-  the ink) and links it as `![Handwriting, page N](…)`. Turn it on by default once the editor draws images.
-- Handwriting on PDF text ends with the text, quoted: `- [p. 1](…) (handwriting) on “Kalman gain”`, or
-  `- ![Handwriting, page 1](…) on “Kalman gain” ([p. 1](…))` with pictures.
+  the ink) and links it as `![Handwriting, page N](../…)`. Turn it on by default once the editor draws images.
+- Handwriting on PDF text ends with the text, quoted: `- [p. 1](../…) (handwriting) on “Kalman gain”`, or
+  `- ![Handwriting, page 1](../…) on “Kalman gain” ([p. 1](../…))` with pictures.
 
 **Where it goes.**
 - Xournal++ files mode: `<name>.annotations.md` next to the document, without asking. If it exists, a dialog asks:
   Replace (it says that text added by hand is lost), Save as…, or Cancel.
-- PDF files mode ([DocumentMode](../src/session/DocumentMode.h)): nothing may be written next to files, so a save
+- PDF files mode ([DocumentMode](../../src/session/DocumentMode.h)): nothing may be written next to files, so a save
   dialog asks, suggesting the same name.
 - A document never saved: the export asks to save it first (the links need its file).
 

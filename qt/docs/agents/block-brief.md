@@ -12,7 +12,7 @@ block. This page is what the integrator hands every block agent (point it here i
 
 ## Rules that matter most
 - Upstream files (everything outside `qt/`) stay untouched. An unavoidable seam: tiny, marked `xournal-qt:`, listed
-  in `qt/docs/adr/0002-upstream-seams.md`.
+  in `qt/docs/decisions/0002-upstream-seams.md`.
 - One feature, one commit. A bug gets a failing test first (show it fails for the stated reason, then fix it).
 - Before each commit: the tests you ran for it pass; `qt/docs/testing/device-checklist.md` gets the manual checks a
   device needs. Commit messages are plain prose (what was wrong / what changed / why), with the attribution lines the

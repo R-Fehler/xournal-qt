@@ -46,7 +46,7 @@ For cross-referencing within one large document: the tab's own document shows in
 - **Selecting works as on the notes** (qt/touch-multiselect): the selection's pill for elements and for notes
   selected together (with the count and "Select more"), the note's pill at a selected note (`NotePill` with
   `target: app.reference.edit`; colours, cover, text, image, cut and delete while the view is written in, copy and
-  deselect for reading only), Ctrl + click and "Select more" to add and take away (qt/docs/sticky-notes.md, "Select
+  deselect for reading only), Ctrl + click and "Select more" to add and take away (qt/docs/features/sticky-notes.md, "Select
   more"). Each view has its own selection and its own select more.
 - **One set of canvas actions for both sides.** What the pills and keys do on a canvas (selection, groups, notes, PDF
   text, the clipboard, page, zoom, Back) is `CanvasActions` (`shell/CanvasActions.h`): `app.edit` for the notes and

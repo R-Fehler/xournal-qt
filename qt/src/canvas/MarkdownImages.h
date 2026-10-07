@@ -1,6 +1,6 @@
 /*
- * xournal-qt: pictures brought into a Markdown text (qt/docs/md-images.md, "Adding images"): pasted, dropped or
- * picked, they are saved where the document keeps its pictures ("name.assets/" next to a .md; the app cache of a PDF
+ * xournal-qt: pictures brought into a Markdown text (qt/docs/features/md-images.md, "Adding images"): pasted, dropped
+ * or picked, they are saved where the document keeps its pictures ("name.assets/" next to a .md; the app cache of a PDF
  * text document) and linked as "name.assets/file".
  *
  * @license GNU GPLv2 or later

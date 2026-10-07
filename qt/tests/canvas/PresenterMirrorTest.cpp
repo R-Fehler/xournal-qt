@@ -1,7 +1,7 @@
 /*
- * xournal-qt: the audience's screen of the presenter view (qt/docs/presenter-view.md) at the level of the views: the
- * audience's view shows only the slide (not its space for notes), and what the presenter's view shows only for a
- * moment - a stroke being written, the laser pointer's ink, the curtain - shows on it too.
+ * xournal-qt: the audience's screen of the presenter view (qt/docs/features/presenter-view.md) at the level of the
+ * views: the audience's view shows only the slide (not its space for notes), and what the presenter's view shows only
+ * for a moment - a stroke being written, the laser pointer's ink, the curtain - shows on it too.
  *
  * @license GNU GPLv2 or later
  */
@@ -269,8 +269,9 @@ TEST_F(PresenterMirror, theCurtainShowsOnTheAudiencesScreenWithoutHandles) {
     EXPECT_FALSE(theirs.active());
 }
 
-// Following the presenter's zoom (qt/docs/presenter-view.md): what the audience sees is what the presenter sees of the
-// slide, widened to the audience's screen's shape, kept within the slide, never less than the presenter sees
+// Following the presenter's zoom (qt/docs/features/presenter-view.md): what the audience sees is what the presenter
+// sees of the slide, widened to the audience's screen's shape, kept within the slide, never less than the presenter
+// sees
 TEST(AudienceRegion, widenedToTheScreensShapeWithinTheSlide) {
     using presenter::audienceRegion;
     const QRectF slide(0, 0, 960, 540);  // 16:9

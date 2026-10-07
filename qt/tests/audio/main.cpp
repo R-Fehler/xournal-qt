@@ -1,6 +1,7 @@
 /*
- * xournal-qt: test runner for the audio recordings (qt/docs/audio.md). A QCoreApplication for the timers of the fake
- * devices and queued calls; config, cache and data folders in a temporary folder, so nothing touches the user's.
+ * xournal-qt: test runner for the audio recordings (qt/docs/features/audio.md). A QCoreApplication for the timers of
+ * the fake devices and queued calls; config, cache and data folders in a temporary folder, so nothing touches the
+ * user's.
  *
  * @license GNU GPLv2 or later
  */

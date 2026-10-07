@@ -1,6 +1,6 @@
 /*
- * xournal-qt: to-dos (qt/docs/todos.md): the task lines of the library's Markdown ("- [ ] call the lab") listed in its
- * To-dos view.
+ * xournal-qt: to-dos (qt/docs/features/todos.md): the task lines of the library's Markdown ("- [ ] call the lab")
+ * listed in its To-dos view.
  *
  * The library's index reads every task line (LibraryIndex::todos); which of them are to-dos is a setting, "Collect
  * to-dos from": the lines marked as to-dos (the default: the marker "todo:" anywhere in the line, case ignored; the

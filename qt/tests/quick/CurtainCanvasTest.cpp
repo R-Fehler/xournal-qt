@@ -1,7 +1,7 @@
 /*
- * xournal-qt: the curtain on the canvas item (real Qt Quick window, off-screen; qt/docs/curtain.md): a node of its own
- * over the pages, black where it lies; moving, turning and sizing it change only that node (no page tile is drawn
- * again); its handles are drawn while they are shown. Nothing of it is in the pages' own pictures.
+ * xournal-qt: the curtain on the canvas item (real Qt Quick window, off-screen; qt/docs/features/curtain.md): a node of
+ * its own over the pages, black where it lies; moving, turning and sizing it change only that node (no page tile is
+ * drawn again); its handles are drawn while they are shown. Nothing of it is in the pages' own pictures.
  *
  * @license GNU GPLv2 or later
  */

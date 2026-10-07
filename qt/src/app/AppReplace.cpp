@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the window's side of find and replace (qt/docs/md-editor.md, "Find and replace"): the replace row's
- * options, which the search takes while the row is shown, and Replace / Replace all on the current document
+ * xournal-qt: the window's side of find and replace (qt/docs/features/md-editor.md, "Find and replace"): the replace
+ * row's options, which the search takes while the row is shown, and Replace / Replace all on the current document
  * (FindReplace.h). The same in the source beside the page: replaceInSource, AppMarkdownFormat.cpp.
  *
  * @license GNU GPLv2 or later

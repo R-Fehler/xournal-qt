@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the words recognised in handwriting, for the search (qt/docs/handwriting-search.md).
+ * xournal-qt: the words recognised in handwriting, for the search (qt/docs/features/handwriting-search.md).
  *
  * Handwriting is never turned into text here: a recogniser (qt/src/hwr) reads each line of ink and gives, per word of
  * the line, its box and a few readings ("candidates") with the share of the recogniser's guesses each got. The search

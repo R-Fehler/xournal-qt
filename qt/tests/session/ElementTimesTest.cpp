@@ -1,7 +1,8 @@
 /*
- * xournal-qt: when an element was made (qt/docs/timeline.md, "Creation times"): the element attribute xqt-created
- * (written only when known, read back, ignored by upstream's loader without a message), kept by copies and by the
- * pieces the eraser leaves, not in upstream's clipboard data; the .xopp inside a PDF with notes; its cost in bytes.
+ * xournal-qt: when an element was made (qt/docs/features/timeline.md, "Creation times"): the element attribute
+ * xqt-created (written only when known, read back, ignored by upstream's loader without a message), kept by copies and
+ * by the pieces the eraser leaves, not in upstream's clipboard data; the .xopp inside a PDF with notes; its cost in
+ * bytes.
  *
  * @license GNU GPLv2 or later
  */
@@ -300,7 +301,7 @@ TEST_F(ElementTimesTest, stampingUsesTheClock) {
 }
 
 // What the times cost in the file: measured on 2000 strokes of 11 points (a short stroke), each made 0.2 to 3 s after
-// the one before. Written down in qt/docs/timeline.md.
+// the one before. Written down in qt/docs/features/timeline.md.
 TEST_F(ElementTimesTest, theirCostInTheFile) {
     constexpr int N = 2000;
     auto make = [&](bool withTimes) {

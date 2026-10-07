@@ -30,7 +30,7 @@ element is in one group or in none) and lie in one layer, like a selection of el
   pieces), `XmlAttrs.h`, the generic read in `XmlParser::parserStartElement`, a virtual with an empty default in
   `DocumentBuilderInterface` implemented by `LoadHandler`, and the write in `SaveHandler::visitLayer` (so autosave,
   recovery, sticker files and the `.xopp` inside a PDF with notes keep groups too). See
-  [adr/0002-upstream-seams.md](adr/0002-upstream-seams.md).
+  [adr/0002-upstream-seams.md](../decisions/0002-upstream-seams.md).
 - **Numbers:** a new group gets a number larger than every number in the document and every number handed out
   before while the app runs (`groups::fresh`), so a group brought back by undo never meets a new one with its number.
 - **The clipboard:** upstream's `application/xournal` data stays exactly as upstream writes it (the group is not in

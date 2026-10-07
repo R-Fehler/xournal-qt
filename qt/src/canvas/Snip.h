@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the snip tool (qt/snip, qt/docs/snip.md): a rectangle or lasso dragged over a page copies a picture of
- * what is there to the clipboard.
+ * xournal-qt: the snip tool (qt/snip, qt/docs/features/snip.md): a rectangle or lasso dragged over a page copies a
+ * picture of what is there to the clipboard.
  *
  * Armed (process-wide, like the tool in hand), the next rectangle or lasso of the select tools is a snip instead of a
  * selection: on release the area is drawn (render/RegionRender.h, off the UI thread) and the view says so
@@ -26,7 +26,7 @@ namespace xqt::snip {
 
 enum class Shape { None, Rectangle, Lasso };
 /// What a snip copies: the picture of the area, or the handwriting there as text (the tool "Copy handwriting as text",
-/// qt/docs/handwriting-search.md: the lasso's path is a sweep over the words, CanvasView::inkSwept)
+/// qt/docs/features/handwriting-search.md: the lasso's path is a sweep over the words, CanvasView::inkSwept)
 enum class Purpose { Picture, InkText };
 
 /// The next rectangle or lasso (of the select tools) is a snip of this shape. None: not armed.

@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- xournal-qt: the launcher's shortcuts (a long press on the app's icon; AndroidManifest.xml). "Quick note"
-     (qt/docs/quick-note.md) starts or brings up the app with the action ACTION_QUICK_NOTE of XournalActivity.java,
-     which makes a new note in the library's Inbox (or a line in today's Markdown note, as Settings say). -->
+     (qt/docs/features/quick-note.md) starts or brings up the app with the action ACTION_QUICK_NOTE of
+     XournalActivity.java, which makes a new note in the library's Inbox (or a line in today's Markdown note, as
+     Settings say). -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
         android:shortcutId="quick_note"

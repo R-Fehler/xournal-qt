@@ -1,5 +1,5 @@
 /*
- * xournal-qt: bookmarks in a Markdown text (qt/docs/bookmarks.md, "Markdown").
+ * xournal-qt: bookmarks in a Markdown text (qt/docs/features/bookmarks.md, "Markdown").
  *
  * A bookmark is an HTML comment on a line of its own, right before the block it marks (a paragraph, a heading, a
  * list, ...):

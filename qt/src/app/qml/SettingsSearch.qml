@@ -78,7 +78,7 @@ ScrollView {
                        + "one. Documents with the word as typed come first.")
         }
 
-        // --- Handwriting (qt/docs/handwriting-search.md) ---
+        // --- Handwriting (qt/docs/features/handwriting-search.md) ---
         RowLayout {
             Layout.fillWidth: true
             Label {

@@ -1,5 +1,5 @@
 /*
- * xournal-qt: dark pages (qt/docs/dark-pages.md): pages shown dark without drawing them again.
+ * xournal-qt: dark pages (qt/docs/features/dark-pages.md): pages shown dark without drawing them again.
  *
  * A view setting (⋮ → View → Dark pages). The page's picture stays what it is; where the canvas composes its tiles a
  * shader (or, on the software renderer, the same table on the CPU) turns every color into its dark equivalent:

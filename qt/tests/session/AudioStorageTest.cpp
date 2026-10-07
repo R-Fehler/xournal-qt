@@ -1,8 +1,8 @@
 /*
- * xournal-qt: where recordings are kept (qt/docs/audio.md, "Storage"): found in the app's audio folder and next to the
- * document; carried by a PDF with notes as attachments named with their pages ("audio-p001-p003-….ogg", renamed by an
- * incremental save when pages move), left out of the clean copy, taken out again when the PDF is opened; an archive
- * PDF's associated files; "Export for Xournal++" with the recordings copied beside it under absolute names.
+ * xournal-qt: where recordings are kept (qt/docs/features/audio.md, "Storage"): found in the app's audio folder and
+ * next to the document; carried by a PDF with notes as attachments named with their pages ("audio-p001-p003-….ogg",
+ * renamed by an incremental save when pages move), left out of the clean copy, taken out again when the PDF is opened;
+ * an archive PDF's associated files; "Export for Xournal++" with the recordings copied beside it under absolute names.
  *
  * @license GNU GPLv2 or later
  */

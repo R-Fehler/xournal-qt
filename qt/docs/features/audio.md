@@ -78,7 +78,7 @@ real microphone with `XQT_AUDIO_DEVICE=1` in a build with Qt Multimedia (skipped
   do not, as upstream. The recognised shape of a stroke keeps it (`Stroke::applyStyleFrom`).
 - **Voice memos**: a recording is also tied to the page it was started on (`DocumentSession::addVoiceMemo`, one undo
   step "Record audio"). It is the page attribute `xqt-audio="2026-10-04_14-03-22.ogg|…"` (`XojPage::getAudioMemos`, an
-  upstream seam like `xqt-bookmark`, [ADR 0002](adr/0002-upstream-seams.md)). So a recording without ink is not lost,
+  upstream seam like `xqt-bookmark`, [ADR 0002](../decisions/0002-upstream-seams.md)). So a recording without ink is not lost,
   and it follows its page when pages move; a duplicated page keeps it, as its strokes keep theirs. Xournal++ ignores
   the attribute and drops it when it saves; the strokes' recordings keep working there.
 - **Names**: as upstream, the time the recording started, `2026-10-04_14-03-22.ogg` (`-2`, `-3` … when taken), written
@@ -216,7 +216,7 @@ such a page: macOS's Privacy & Security → Microphone (`x-apple.systempreferenc
 - `NSMicrophoneUsageDescription` in `Info.plist.in` (without it macOS ends the app when the microphone is opened): the
   text of the system's question.
 - The `.dmg` has an ad-hoc signature without the hardened runtime, which needs no entitlement for the microphone.
-  Once it is signed with a Developer ID and the hardened runtime ([macos.md](macos.md), "Signing and
+  Once it is signed with a Developer ID and the hardened runtime ([macos.md](../development/macos.md), "Signing and
   notarization"), the entitlements must include `com.apple.security.device.audio-input`.
 
 ### Android

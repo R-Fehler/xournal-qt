@@ -15,7 +15,7 @@
  * Writing is atomic: a copy of the file plus the update goes to a temporary file next to it, which is flushed to
  * the disk and renamed over the file. A crash or a failed write at any point leaves the previous revision as it was
  * (never a half-written update that readers would have to repair), and readers of the file meanwhile (the library,
- * previews, other apps) never see a partial update. See qt/docs/hybrid-pdf.md, "Saving: incremental updates".
+ * previews, other apps) never see a partial update. See qt/docs/features/hybrid-pdf.md, "Saving: incremental updates".
  *
  * @license GNU GPLv2 or later
  */
@@ -98,7 +98,8 @@ public:
     std::string serialize(const Tail& tail, Stats* stats = nullptr);
 
     /// The revisions of the file after its first `prefix.size` bytes, written again as one (version history: the
-    /// day's version replaced, an older version's data stored as a delta; qt/docs/hybrid-pdf.md, "Version history").
+    /// day's version replaced, an older version's data stored as a delta; qt/docs/features/hybrid-pdf.md, "Version
+    /// history").
     struct Over {
         Tail prefix;  ///< the end of the file as it was before those revisions (they are cut away when appended)
         /// The objects those revisions define (PdfRevisions::Revision::objects): written again with what they are now.

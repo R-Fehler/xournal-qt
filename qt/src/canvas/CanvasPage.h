@@ -116,7 +116,7 @@ public:
     void addOverlayView(std::unique_ptr<xoj::view::OverlayView> v);
     void removeOverlayViewsOf(const OverlayBase* o);
 
-    // --- the audience's screen of the presenter view (CanvasView::setMirror, qt/docs/presenter-view.md) -----------
+    // --- the audience's screen of the presenter view (CanvasView::setMirror, qt/docs/features/presenter-view.md) -----
     /// The same page in the view that mirrors this page's view (nullptr: none, or not shown there)
     CanvasPage* mirrorPage() const;
     /// A view of another page's handler (a stroke being written, the laser pointer) shown here too. `once`: drawn once
@@ -189,7 +189,7 @@ private:
     bool selectObjectAt(double x, double y, bool multiLayer, bool aggregate);
     DeviceId currentSequenceDeviceId;
 
-    // --- sticky notes (qt/docs/sticky-notes.md) ---
+    // --- sticky notes (qt/docs/features/sticky-notes.md) ---
     /// A press with a tool that writes: onto the note there, if any (its layer is selected until the release). True
     /// when the press is done with (on a covering note: nothing is written, a tap lets it peek).
     bool pressOnNote(double x, double y);
@@ -200,14 +200,15 @@ private:
     std::optional<Layer::Index> layerBeforeNote;  ///< the page's selected layer while writing on a note
     std::optional<xoj::util::Rectangle<double>> noteClip;  ///< the note written on: the stroke is drawn clipped to it
     std::optional<std::pair<double, double>> coverPress;  ///< a press on a covering note (a tap: it peeks)
-    /// A rectangle or lasso started on this note: its elements (a tap: the whole note; qt/docs/sticky-notes.md)
+    /// A rectangle or lasso started on this note: its elements (a tap: the whole note;
+    /// qt/docs/features/sticky-notes.md)
     Layer* selectorNote = nullptr;
     /// The rectangle or lasso started on a note ends: its elements inside it (never its paper or its text) are
     /// selected, or the note when it was a tap.
     void selectInNote(Layer* note, bool tapped);
     /// A rectangle or lasso started beside the notes ends (not a tap): when it encloses whole notes (or `add`s to a
-    /// selection of notes), they are selected with the page's elements in it (qt/docs/sticky-notes.md, "Several notes
-    /// at once"). False: no note in it, the selection is made as before.
+    /// selection of notes), they are selected with the page's elements in it (qt/docs/features/sticky-notes.md,
+    /// "Several notes at once"). False: no note in it, the selection is made as before.
     bool selectNotesAndElements(bool add);
 
     std::optional<std::vector<LinkSpot>> links;  ///< linkSpots()

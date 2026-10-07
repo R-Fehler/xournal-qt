@@ -2,8 +2,8 @@
 
 The author's role-based palettes as tabs in the color chooser, next to the colors of the tool bar and "Add a color…"
 (the picker with the hex field). The spec is kept verbatim in
-[`qt/resources/palettes/palettes.json`](../resources/palettes/palettes.json) (sources and licenses: its
-[README](../resources/palettes/README.md)).
+[`qt/resources/palettes/palettes.json`](../../resources/palettes/palettes.json) (sources and licenses: its
+[README](../../resources/palettes/README.md)).
 
 ## The model (`qt/src/shell/ColorPalettes.h`)
 

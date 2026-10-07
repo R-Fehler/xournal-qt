@@ -2,14 +2,14 @@
 
 The author (2026-10-04): "a document timeline, which is like an audio playbar at the bottom, which replays the audio
 and replays the document editing history in read-only mode." Decided (2026-10-05, TODO.md): levels 1 and 2 of
-[idea B9](history/README.md) as one design, on one clock: every element knows when it was made, recordings are tracks
+[idea B9](../history/README.md) as one design, on one clock: every element knows when it was made, recordings are tracks
 placed by their start. Not in this block: erasing, moving and page changes (level 3, with the version history); times
 per point.
 
 ## Creation times
 
 `qt/src/session/ElementTimes.*`; the seam in `Element.h` and the `.xopp` reader and writer
-([ADR 0002](adr/0002-upstream-seams.md)).
+([ADR 0002](../decisions/0002-upstream-seams.md)).
 
 - Every element the user makes gets the time it was made: **milliseconds since 1970-01-01 UTC**, the element
   attribute `xqt-created="1791100800000"` on stroke, text, image, teximage and link, written only when known

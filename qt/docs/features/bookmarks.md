@@ -41,7 +41,7 @@ The key is the document's PDF when it has one (a PDF keeps its star when its `.x
 
 ### The model
 A bookmark is an optional label on a page: `XojPage::getBookmark()` → `std::optional<std::string>` (an upstream seam,
-listed in [ADR 0002](adr/0002-upstream-seams.md)). An **empty label is the automatic one**: the page is called
+listed in [ADR 0002](../decisions/0002-upstream-seams.md)). An **empty label is the automatic one**: the page is called
 "Page N" by its place *now*, so it stays right when pages come, go or move. Because the label lives on the page
 object, it follows its page through insertions, deletions, moves and their undo without any bookkeeping in the Qt
 layer (the task allowed a PageRef-keyed store in the Qt layer; a field is simpler and survives every page operation,
@@ -69,7 +69,7 @@ dictionary's `/Count` follows).
 
 - **Full write** (`HybridPdf::write` in full, `writeArchive`, and the base pages of "For Xournal++"): our item is
   removed from the copied outline and written again from the document.
-- **Incremental save** (Ctrl+S, qt/docs/hybrid-pdf.md): nothing of the outline is touched when the bookmarks are as
+- **Incremental save** (Ctrl+S, qt/docs/features/hybrid-pdf.md): nothing of the outline is touched when the bookmarks are as
   the file has them (same titles, same page objects). Otherwise our item is written again in its place (new
   children; the old ones stay unreachable until the next full write), and when the item comes or goes, the outline
   dictionary and the neighbouring item are touched. Tested with `qpdf --check` after every revision.

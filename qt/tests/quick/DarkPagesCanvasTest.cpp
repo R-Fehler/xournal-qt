@@ -1,8 +1,8 @@
 /*
- * xournal-qt: dark pages on the canvas (qt/docs/dark-pages.md), pixel tests: a page with ink, a highlighter and a
- * picture, shown as it is and dark. The dark picture is the light one through the table (on the GPU a shader; on the
- * software renderer the same table on the CPU), the picture keeps its colors, a page with dark paper stays as it is,
- * and no page is drawn again for it.
+ * xournal-qt: dark pages on the canvas (qt/docs/features/dark-pages.md), pixel tests: a page with ink, a highlighter
+ * and a picture, shown as it is and dark. The dark picture is the light one through the table (on the GPU a shader; on
+ * the software renderer the same table on the CPU), the picture keeps its colors, a page with dark paper stays as it
+ * is, and no page is drawn again for it.
  *
  * Plain ctest runs it on the software renderer; DarkPagesCanvas.quick@gl runs it on OpenGL (Mesa's llvmpipe under
  * Xvfb), with XQT_EXPECT_GPU set: then the shader must be what drew it.

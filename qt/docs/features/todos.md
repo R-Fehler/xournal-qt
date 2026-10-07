@@ -82,7 +82,7 @@ another tool, ends it without a stamp. Placing it is an undo step (two when the 
 - In the list it shows **the handwriting beside it** as a picture: the region renderer of `qt/snip`
   (`qt/src/render/RegionRender`) draws the area from its check box to the page's right side (96 % of its width),
   4.5 check boxes high, through `image://hitpage/…/<page>/area/x,y,w,h` (the hit-page provider's kept documents).
-- When handwriting search has read that line (`qt/docs/handwriting-search.md`), its words are the to-do's text
+- When handwriting search has read that line (`qt/docs/features/handwriting-search.md`), its words are the to-do's text
   (filterable, exported); else the picture alone.
 
 ## Calendar (one way)
@@ -101,7 +101,7 @@ ignore `VTODO`; only Apple Reminders, Thunderbird and some task apps read those.
 (`file:///…/name.xopp#page=N`).
 
 The view's ⋮ menu: **Export open to-dos** of the list (its filters apply; done ones never) as an `.ics` (those with a
-due date) or as Markdown (`# To-dos of <library>`, a heading per document, `- [ ] text 📅 date ([page N](link))`).
+due date) or as Markdown (`# To-dos of <library>`, a heading per document, `- [ ] text 📅 date ([page N](../link))`).
 
 Nothing comes back: no sync, no reminders, no account access (decided by the author).
 

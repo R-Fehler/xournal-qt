@@ -1,6 +1,6 @@
 /*
- * xournal-qt: groups of elements in the canvas (qt/docs/groups.md): grouping and ungrouping what is selected (one
- * undo step each).
+ * xournal-qt: groups of elements in the canvas (qt/docs/features/groups.md): grouping and ungrouping what is selected
+ * (one undo step each).
  *
  * @license GNU GPLv2 or later
  */

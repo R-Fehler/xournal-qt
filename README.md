@@ -94,7 +94,7 @@ markup tools (stamps, measurements).
 
 Releases have packages for Linux (`.deb` for KDE neon / Ubuntu 22.04 and Debian 13 / Ubuntu 25.04, an AppImage),
 Windows (a portable zip), Android 9 and newer (an APK) and macOS 15 on Apple Silicon (an unsigned `.dmg`):
-[releases](https://github.com/R-Fehler/xournal-qt/releases), and [qt/docs/releasing.md](qt/docs/releasing.md) for
+[releases](https://github.com/R-Fehler/xournal-qt/releases), and [qt/docs/development/releasing.md](qt/docs/development/releasing.md) for
 which one fits. From source (Linux, Qt 6.5 or newer):
 
 ```sh
@@ -104,9 +104,9 @@ cmake --build build-qt
 ./build-qt/xournal-qt
 ```
 
-More: [how it came to be](qt/docs/history/README.md) · [the adaptive layout](qt/docs/adaptive-layout.md)
-· [Markdown](qt/docs/md-editor.md) · [the library](qt/docs/library.md) · [Android](qt/docs/android.md) ·
-[macOS](qt/docs/macos.md) · [how the fork is kept](FORK.md)
+More: [how it came to be](qt/docs/history/README.md) · [the adaptive layout](qt/docs/features/adaptive-layout.md)
+· [Markdown](qt/docs/features/md-editor.md) · [the library](qt/docs/features/library.md) · [Android](qt/docs/development/android.md) ·
+[macOS](qt/docs/development/macos.md) · [how the fork is kept](FORK.md)
 
 ---
 

@@ -62,13 +62,13 @@
 Q_IMPORT_QML_PLUGIN(XournalQtPlugin)
 
 namespace {
-/// The window's safe area (Main.qml's safeTop, safeRight, safeBottom, safeLeft; qt/docs/adaptive-layout.md, "Safe
-/// areas"): edge to edge (Android 15 and newer, iOS) the status bar lies over the window's top, the navigation bar or
-/// the gesture bar over its bottom, and a camera cut-out over a side when the phone is held sideways. The controls stay
-/// clear of them; the pages are drawn under them. Qt 6.9+ reports them (and when they change: the phone turned, folded
-/// or unfolded); older Qt: 0. XQT_SAFE_AREA="top,right,bottom,left" sets them by hand (to look at a phone's insets on the
-/// desktop); XQT_FAKE_KEYBOARD=<height> shows the layout with a soft keyboard of that height (Main.qml's
-/// fakeKeyboardHeight).
+/// The window's safe area (Main.qml's safeTop, safeRight, safeBottom, safeLeft; qt/docs/features/adaptive-layout.md,
+/// "Safe areas"): edge to edge (Android 15 and newer, iOS) the status bar lies over the window's top, the navigation
+/// bar or the gesture bar over its bottom, and a camera cut-out over a side when the phone is held sideways. The
+/// controls stay clear of them; the pages are drawn under them. Qt 6.9+ reports them (and when they change: the phone
+/// turned, folded or unfolded); older Qt: 0. XQT_SAFE_AREA="top,right,bottom,left" sets them by hand (to look at a
+/// phone's insets on the desktop); XQT_FAKE_KEYBOARD=<height> shows the layout with a soft keyboard of that height
+/// (Main.qml's fakeKeyboardHeight).
 void watchSafeArea(QQuickWindow* w) {
     if (!w) {
         return;
@@ -96,7 +96,7 @@ void watchSafeArea(QQuickWindow* w) {
     }
 }
 #ifdef Q_OS_MACOS
-/// The documents Finder opens with the app (QFileOpenEvent, docs/macos.md), handed to `open`.
+/// The documents Finder opens with the app (QFileOpenEvent, qt/docs/development/macos.md), handed to `open`.
 class FileOpenFilter: public QObject {
 public:
     FileOpenFilter(std::function<void(const QString&)> open, QObject* parent): QObject(parent), open(std::move(open)) {}
@@ -134,7 +134,7 @@ int main(int argc, char* argv[]) {
     xqt::android::addSymbolFallback();
 #endif
 #ifdef Q_OS_WIN
-    // UTF-8 for std::filesystem's narrow strings, GLib's cache folder, fontconfig (see qt/docs/windows.md).
+    // UTF-8 for std::filesystem's narrow strings, GLib's cache folder, fontconfig (see qt/docs/development/windows.md).
     xqt::windows::prepareEnvironment();
 #endif
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_WIN) && !defined(Q_OS_MACOS)
@@ -160,12 +160,12 @@ int main(int argc, char* argv[]) {
     parser.addVersionOption();
     parser.addPositionalArgument("folder", "Folder to open as library (default: the standard library)", "[folder]");
     parser.addPositionalArgument("file", "Documents to open (.xopp, .xoj or .pdf)", "[files...]");
-    // Quick note (qt/docs/quick-note.md): also handed to the window that runs already
+    // Quick note (qt/docs/features/quick-note.md): also handed to the window that runs already
     const QCommandLineOption quickNoteOption(
             "quick-note", "Make a quick note: a new note in the library's Inbox, named by the date and time (or a line "
                           "in today's Markdown note there, as Settings - Documents says)");
     parser.addOption(quickNoteOption);
-    // What recording runs on (qt/docs/audio.md, "Platforms"; the CI's smoke tests of the packages ask)
+    // What recording runs on (qt/docs/features/audio.md, "Platforms"; the CI's smoke tests of the packages ask)
     const QCommandLineOption audioInfoOption(
             "audio-info", "Print whether recording is offered and the microphones and speakers found, then exit "
                           "(exit code 1: recording is not offered)");
@@ -238,7 +238,7 @@ int main(int argc, char* argv[]) {
     AppController controller(services);
 #ifdef Q_OS_ANDROID
     // The libraries' home: the phone's Documents/Xournal_Libraries once they were moved there (with "All files
-    // access"), else the app's own folder (qt/docs/android.md)
+    // access"), else the app's own folder (qt/docs/development/android.md)
     controller.chooseLibrariesHome();
     if (libraryDir.isEmpty()) {
         std::error_code ec;
@@ -264,7 +264,7 @@ int main(int argc, char* argv[]) {
     } else {
 #ifndef Q_OS_ANDROID
         // Not on Android yet: the handlers replace the system's, and a crash would then leave no backtrace in
-        // logcat (see qt/docs/android-roadmap.md).
+        // logcat (see qt/docs/development/android-roadmap.md).
         xqt::SessionRecovery::installCrashHandlers();
 #endif
         controller.startSession(files);
@@ -312,8 +312,8 @@ int main(int argc, char* argv[]) {
     // first start there, off where a stylus is attached (as on the desktop)
     controller.setFingerDrawingDefault(!xqt::android::hasStylus());
     // A recording keeps the microphone in the background through a foreground service, whose notification shows
-    // its time with Pause/Resume and Stop (qt/docs/audio.md, "Android"); refused, the microphone is allowed on the
-    // app's page of the system's settings
+    // its time with Pause/Resume and Stop (qt/docs/features/audio.md, "Android"); refused, the microphone is allowed on
+    // the app's page of the system's settings
     xqt::AudioControl::setPlatformHook([](const xqt::AudioControl::PlatformState& state) {
         xqt::android::setRecording(state.recording, state.paused, state.recordedMs, state.title,
                                    {QCoreApplication::translate("AudioControl", "Recording"),
@@ -330,7 +330,7 @@ int main(int argc, char* argv[]) {
     xqt::AudioControl::setSettingsOpener([] { return xqt::android::openAppSettings(); });
     // "Open with" and the share sheet: files other apps hand over, at start and while the app runs (the window
     // is there to show them and what went wrong)
-    // The launcher's shortcut "Quick note" (qt/docs/quick-note.md) comes the same way, as an entry of its own.
+    // The launcher's shortcut "Quick note" (qt/docs/features/quick-note.md) comes the same way, as an entry of its own.
     xqt::android::watchIncomingFiles([&controller](QStringList files) {
         const bool quickNote = files.removeAll(QLatin1String(xqt::android::QUICK_NOTE)) > 0;
         if (!files.isEmpty()) {

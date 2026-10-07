@@ -1,6 +1,6 @@
 /*
  * xournal-qt: writing the version history of a PDF with notes (HybridInternal.h; PdfHistory.h reads it;
- * qt/docs/hybrid-pdf.md, "Version history").
+ * qt/docs/features/hybrid-pdf.md, "Version history").
  *
  * @license GNU GPLv2 or later
  */
@@ -23,7 +23,7 @@ using namespace detail;
 
 namespace {
 
-// --- version history (PdfHistory.h; qt/docs/hybrid-pdf.md, "Version history") --------------------------------------
+// --- version history (PdfHistory.h; qt/docs/features/hybrid-pdf.md, "Version history") -------------------------------
 
 /// The embedded document.xopp of a PDF with notes as the file has it (gzipped); empty: none.
 std::string embeddedXoppOf(QPDF& q) {

@@ -13,16 +13,17 @@
     <!-- Only these permissions: without the marker of Qt's template for permissions, androiddeployqt adds none of the
          ones its modules ask for by default (INTERNET for Qt Network, WRITE_EXTERNAL_STORAGE); Qt Network is there for
          the local socket. "All files access" is asked for only when the user opens a folder of the shared storage as
-         a library (with an explanation first, see qt/docs/android.md): libraries in folders that sync apps
+         a library (with an explanation first, see qt/docs/development/android.md): libraries in folders that sync apps
          (Syncthing, FolderSync) keep, read by their paths like on the desktop. Before Android 11 the storage
          permission does the same. (Google Play restricts MANAGE_EXTERNAL_STORAGE; fine for sideloading and F-Droid.) -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
-    <!-- Audio recordings (qt/docs/audio.md, "Android"): the microphone, asked for when the first recording starts
-         (Qt's QMicrophonePermission), and the foreground service that keeps it while the app is in the background or
-         the screen is off, with its notification (Android 13+ asks for that once, at the first recording; without it
-         the service still runs and shows only in the task manager) and a partial wake lock while it runs. -->
+    <!-- Audio recordings (qt/docs/features/audio.md, "Android"): the microphone, asked for when the first recording
+         starts (Qt's QMicrophonePermission), and the foreground service that keeps it while the app is in the
+         background or the screen is off, with its notification (Android 13+ asks for that once, at the first
+         recording; without it the service still runs and shows only in the task manager) and a partial wake lock
+         while it runs. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
@@ -38,7 +39,7 @@
         android:normalScreens="true"
         android:smallScreens="true" />
     <!-- hasFragileUserData: uninstalling asks whether to keep the app's data (settings, reading positions, recent
-         files; the libraries themselves are in Documents/Xournal_Libraries, see qt/docs/android.md). -->
+         files; the libraries themselves are in Documents/Xournal_Libraries, see qt/docs/development/android.md). -->
     <application
         android:name="org.qtproject.qt.android.bindings.QtApplication"
         android:hardwareAccelerated="true"
@@ -64,7 +65,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             <!-- The launcher's shortcuts (a long press on the icon): "Quick note" (res/xml/shortcuts.xml,
-                 qt/docs/quick-note.md) -->
+                 qt/docs/features/quick-note.md) -->
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
 
             <!-- "Open with": a copy goes into the library (folder "Opened") and opens (AppController::receiveFiles).
@@ -129,9 +130,9 @@
                 android:name="android.app.arguments"
                 android:value="-- %%INSERT_APP_ARGUMENTS%% --" />
             <!-- Qt's event loop keeps running when the app goes to the background (Qt blocks it otherwise): a
-                 recording takes the microphone's samples on it, and would stop with the screen off (qt/docs/audio.md,
-                 "Android"). The window draws nothing meanwhile (it is not exposed); without a foreground service
-                 Android freezes an app in the background anyway. -->
+                 recording takes the microphone's samples on it, and would stop with the screen off
+                 (qt/docs/features/audio.md, "Android"). The window draws nothing meanwhile (it is not exposed);
+                 without a foreground service Android freezes an app in the background anyway. -->
             <meta-data
                 android:name="android.app.background_running"
                 android:value="true" />

@@ -54,7 +54,7 @@ struct FormulaShape {
     std::shared_ptr<const math::Formula> formula;
     double size = 12;
     double dx = 0;
-    // a picture (qt/docs/md-images.md)
+    // a picture (qt/docs/features/md-images.md)
     bool isImage = false;
     images::Info image;
     double width = 0;
@@ -112,7 +112,7 @@ struct TextOptions {
     double width = -1;  ///< wrap width (points); -1: no wrapping
     double lineSpacing = LINE_SPACING;
     PangoAlignment align = PANGO_ALIGN_LEFT;
-    bool blockImage = false;  ///< the text is a picture alone: as wide as the column (qt/docs/md-images.md)
+    bool blockImage = false;  ///< the text is a picture alone: as wide as the column (qt/docs/features/md-images.md)
 };
 
 /// A paragraph's text that is one picture alone (and blanks): a block image.

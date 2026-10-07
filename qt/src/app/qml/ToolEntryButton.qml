@@ -1,7 +1,7 @@
-// One of the user's tools in the toolbox (qt/docs/toolbox.md): its kind as an icon and a sample of its ink below it
-// (its color, how wide, dashed or filled), like a pen lying in a sorted box. The entry in hand is lifted towards the
-// page, as a pen picked up. A group shows the entry used last of it with dots for how many it holds; an app item
-// (hand, select, …) shows its button's icon (the carried one, a group's face).
+// One of the user's tools in the toolbox (qt/docs/features/toolbox.md): its kind as an icon and a sample of its ink
+// below it (its color, how wide, dashed or filled), like a pen lying in a sorted box. The entry in hand is lifted
+// towards the page, as a pen picked up. A group shows the entry used last of it with dots for how many it holds; an app
+// item (hand, select, …) shows its button's icon (the carried one, a group's face).
 // A tap picks it up (the toolbox decides what a tap on the one in hand does: its editor); a long press or a right
 // click: its menu; the mouse wheel over it: the width (the toolbox handles these through the signals).
 import QtQuick
@@ -24,18 +24,18 @@ AbstractButton {
     /// Its name (tips, the held finger, accessibility)
     property string name: ""
     property real cell: 48
-    /// It is being dragged to another place (qt/docs/toolbox.md, "Carrying"): drawn lifted with a shadow
+    /// It is being dragged to another place (qt/docs/features/toolbox.md, "Carrying"): drawn lifted with a shadow
     property bool dragging: false
     /// An app item ({id, app}: the hand, select, …): the icon of its button (it has no ink)
     property string appIcon: ""
-    /// A carried tool was held over it long enough: let go, the two are a group (qt/docs/toolbox.md, "Groups")
+    /// A carried tool was held over it long enough: let go, the two are a group (qt/docs/features/toolbox.md, "Groups")
     property bool ringed: false
 
     signal held(point pos)
     signal secondaryClicked(point pos)
     signal wheelStepped(int steps)
-    /// Reordering (qt/docs/toolbox.md, "Reordering"): held 400 ms without moving, then moved: the pointer in the
-    /// scene while it moves, and where it was let go
+    /// Reordering (qt/docs/features/toolbox.md, "Reordering"): held 400 ms without moving, then moved: the pointer in
+    /// the scene while it moves, and where it was let go
     signal dragMoved(point scenePos)
     signal dropped(point scenePos)
     signal dragCanceled()

@@ -1,5 +1,5 @@
 /*
- * xournal-qt: which elements a drawing shows (the replay of the timeline, qt/docs/timeline.md, "Replay").
+ * xournal-qt: which elements a drawing shows (the replay of the timeline, qt/docs/features/timeline.md, "Replay").
  *
  * A filter is set for the drawing of a thread (FilterScope; PageRaster sets the one its host gives, RasterHost::
  * rasterFilter). Layers are then drawn without the elements it hides: upstream's LayerView asks the frontend's layer

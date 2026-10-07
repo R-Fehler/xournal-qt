@@ -1,7 +1,7 @@
 // The fuzzy search's help: what fuzzy means for names and for text (with the typo tolerance as it is set), the syntax
 // with an example per row, and how the pages with hits are chosen. Opened by a long press or a right click on the
 // "Fuzzy" button of a search field (FuzzyToggle) and from Settings → Search. The one place of this text: the
-// "Fuzzy search" section of qt/docs/library.md mirrors it.
+// "Fuzzy search" section of qt/docs/features/library.md mirrors it.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

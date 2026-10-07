@@ -1,10 +1,11 @@
 /*
- * xournal-qt: the keywords of a PDF as tags (qt/docs/tags.md): its document information's /Keywords and its XMP
- * metadata's dc:subject, as Zotero, Acrobat and LaTeX's hyperref write them.
+ * xournal-qt: the keywords of a PDF as tags (qt/docs/features/tags.md): its document information's /Keywords and its
+ * XMP metadata's dc:subject, as Zotero, Acrobat and LaTeX's hyperref write them.
  *
  * Reads with qpdf (the trailer, the document information and the catalog's /Metadata; no page is read), on any thread.
- * Writes them as an incremental update, the way the app saves PDFs with notes (qt/docs/tags.md, "Tags in files"),
- * holding the file's fileio::FileWriteLock (a save of the same file waits); a PDF with notes keeps its version history.
+ * Writes them as an incremental update, the way the app saves PDFs with notes (qt/docs/features/tags.md, "Tags in
+ * files"), holding the file's fileio::FileWriteLock (a save of the same file waits); a PDF with notes keeps its version
+ * history.
  *
  * @license GNU GPLv2 or later
  */

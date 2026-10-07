@@ -1,7 +1,7 @@
 /*
  * xournal-qt: the covers of documents on disk: the picture of a document's title page on its card in the library and
  * recent-files grids (the stickers' too). Pictures of pages of open documents are not covers: those are thumbnails,
- * sketches and stand-ins (qt/docs/image-caches.md).
+ * sketches and stand-ins (qt/docs/architecture/image-caches.md).
  *
  * CoverProvider is an asynchronous QML image provider ("image://cover/<id>", see url()). A cover is rendered once
  * (the document is loaded on a worker thread and its title page drawn like the page thumbnails; a Markdown file as
@@ -56,7 +56,7 @@ public:
     /// Forget the covers of documents that are not among these (in the folders read so far).
     static void prune(const std::vector<DocumentItem>& items);
     /// Remove the stored cover of a document, every version of it (in its folder's pack, written by the next flush,
-    /// and outside the library): it was protected with a password (qt/docs/hybrid-pdf.md, "Encrypted PDFs").
+    /// and outside the library): it was protected with a password (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs").
     static void forget(const DocumentItem& item);
     /// The stored cover of a document of the library as it is now: its pack entry ("stamp", "png"; the stamp
     /// with the title page), else nothing (none, or of another version). Reads its folder's pack if needed. Any thread.

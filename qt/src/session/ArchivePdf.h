@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the archive PDF (qt/docs/hybrid-pdf.md, "Archive PDF").
+ * xournal-qt: the archive PDF (qt/docs/features/hybrid-pdf.md, "Archive PDF").
  *
  * A PDF/A-3b file meant for keeping: the ink is merged into the page content (so no viewer can hide or lose it), the
  * links stay /Link annotations, and the whole Xournal document is embedded as the file's source data (a PDF/A-3

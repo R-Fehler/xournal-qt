@@ -38,9 +38,9 @@ const char* const CUSTOM = "xournalQt";  // our settings (in upstream's settings
 
 AppServices::AppServices() {
     app = std::make_shared<AppContext>(AppContext::defaultResourceDir());
-    MdImageDecoder::install();  // the pictures of Markdown texts, read with Qt (qt/docs/md-images.md)
+    MdImageDecoder::install();  // the pictures of Markdown texts, read with Qt (qt/docs/features/md-images.md)
     DocumentImages::pruneWorkFolders();  // (work folders of documents not opened for 60 days; before any opens)
-    // What protected PDFs had taken out into the cache in a process that crashed (qt/docs/hybrid-pdf.md)
+    // What protected PDFs had taken out into the cache in a process that crashed (qt/docs/features/hybrid-pdf.md)
     HybridPdf::removeProtectedLeftovers([](int64_t pid) {
         return pid == Util::getPid() || SessionRecovery::processAlive(static_cast<qint64>(pid));
     });
@@ -57,7 +57,7 @@ AppServices::AppServices() {
 
     pages = std::make_unique<PageClipboard>();
     settings = std::make_unique<SettingsModel>(*app);
-    // The toolbox's tools (qt/docs/toolbox.md): stored in the settings; without them, the first layout
+    // The toolbox's tools (qt/docs/features/toolbox.md): stored in the settings; without them, the first layout
     AppContext* context = app.get();
     tools = std::make_unique<ToolboxModel>(
             [context] {

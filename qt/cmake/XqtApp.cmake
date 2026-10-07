@@ -24,8 +24,8 @@ add_library(xqt-quick STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/DarkTileMaterial.cpp)
 target_include_directories(xqt-quick PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src/quick)
 target_link_libraries(xqt-quick PUBLIC Qt6::Quick Qt6::Qml xqt-canvas)
-# Dark pages on the GPU (qt/docs/dark-pages.md): the tiles' shader, compiled by Qt Shader Tools. Without them the
-# canvas turns the tiles dark on the CPU (as on the software renderer).
+# Dark pages on the GPU (qt/docs/features/dark-pages.md): the tiles' shader, compiled by Qt Shader Tools. Without them
+# the canvas turns the tiles dark on the CPU (as on the software renderer).
 find_package(Qt6 QUIET OPTIONAL_COMPONENTS ShaderTools)
 if(TARGET Qt6::ShaderTools)
     qt_add_shaders(xqt-quick "xqt_dark_shaders" BATCHABLE PREFIX "/xqt-shaders" BASE "${CMAKE_CURRENT_LIST_DIR}/../src/quick/shaders"
@@ -212,8 +212,8 @@ set_target_properties(xqt-shell PROPERTIES AUTOMOC ON)
 qt_add_resources(xqt-shell xqt_palettes PREFIX /xqt-palettes BASE "${CMAKE_CURRENT_LIST_DIR}/../resources/palettes"
     FILES "${CMAKE_CURRENT_LIST_DIR}/../resources/palettes/palettes.json")
 
-# Help (qt/docs/onboarding.md): the tutorial's Markdown, a finished tutorial.pdf if the author ships one, and the
-# pictures the text links to, compiled in as :/xqt-help/…
+# Help (qt/docs/features/onboarding.md): the tutorial's Markdown, a finished tutorial.pdf if the author ships one, and
+# the pictures the text links to, compiled in as :/xqt-help/…
 set(XQT_HELP_DIR "${CMAKE_CURRENT_LIST_DIR}/../resources/help")
 file(GLOB_RECURSE XQT_HELP_PICTURES CONFIGURE_DEPENDS RELATIVE "${XQT_HELP_DIR}" "${XQT_HELP_DIR}/tutorial.assets/*")
 file(GLOB XQT_HELP_PDF CONFIGURE_DEPENDS RELATIVE "${XQT_HELP_DIR}" "${XQT_HELP_DIR}/tutorial.pdf")
@@ -431,7 +431,7 @@ target_link_libraries(xournal-qt PRIVATE Qt6::Widgets Qt6::Quick Qt6::QuickContr
 target_compile_definitions(xournal-qt PRIVATE XQT_VERSION="${PROJECT_VERSION}")
 set_target_properties(xournal-qt PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 if(WIN32)
-    # A GUI program (no console window), and what it sets up before the core starts (docs/windows.md).
+    # A GUI program (no console window), and what it sets up before the core starts (qt/docs/development/windows.md).
     set_target_properties(xournal-qt PROPERTIES WIN32_EXECUTABLE TRUE)
     target_sources(xournal-qt PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowsSetup.h
@@ -465,7 +465,7 @@ if(XQT_BUILD_TESTS)
     set_tests_properties(FractionalScaleCanvas.quick@167 PROPERTIES LABELS quick
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=1.6666667")
 
-    # Dark pages drawn by their shader (qt/docs/dark-pages.md): OpenGL through Mesa's llvmpipe under Xvfb, where there is one
+    # Dark pages drawn by their shader (qt/docs/features/dark-pages.md): OpenGL through Mesa's llvmpipe under Xvfb, where there is one
     find_program(XQT_XVFB_RUN xvfb-run)
     if(XQT_XVFB_RUN AND TARGET Qt6::ShaderTools)
         add_test(NAME DarkPagesCanvas.quick@gl COMMAND ${XQT_XVFB_RUN} -a $<TARGET_FILE:xqt-quick-tests>
@@ -516,20 +516,22 @@ if(XQT_BUILD_TESTS)
     target_include_directories(xqt-ui-tests PRIVATE "${TEST_CONFIG_DIR}")
     gtest_discover_tests(xqt-ui-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS ui
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
-    # The same window on a screen at 150 % (qt/docs/hidpi.md): Qt's own scale factor, as on Wayland, X11 and Windows.
-    # (A screen big enough for the desktop layout: the default off-screen one, 800 x 600 pixels, is 533 x 400 at 150 %.)
+    # The same window on a screen at 150 % (qt/docs/features/hidpi.md): Qt's own scale factor, as on Wayland, X11 and
+    # Windows. (A screen big enough for the desktop layout: the default off-screen one, 800 x 600 pixels, is 533 x 400
+    # at 150 %.)
     add_test(NAME FractionalScale.ui@150 COMMAND xqt-ui-tests --gtest_filter=FractionalScale.*)
     set_tests_properties(FractionalScale.ui@150 PROPERTIES LABELS ui ENVIRONMENT
         "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_LIST_DIR}/../tests/ui/offscreen-hidpi.json;QT_SCALE_FACTOR=1.5")
-    # Reading on a phone (qt/docs/toolbox.md, "Reading"): full screen on a phone's screen stays a phone
+    # Reading on a phone (qt/docs/features/toolbox.md, "Reading"): full screen on a phone's screen stays a phone
     add_test(NAME ReadingPhone.ui@phone COMMAND xqt-ui-tests --gtest_filter=ReadingPhoneTest.*)
     set_tests_properties(ReadingPhone.ui@phone PROPERTIES LABELS ui ENVIRONMENT
         "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_LIST_DIR}/../tests/ui/offscreen-phone.json")
-    # The replay's play bar on a phone (qt/docs/timeline.md, "The play bar"): touch-sized, above the navigation bar
+    # The replay's play bar on a phone (qt/docs/features/timeline.md, "The play bar"): touch-sized, above the navigation
+    # bar
     add_test(NAME TimelinePhone.ui@phone COMMAND xqt-ui-tests --gtest_filter=TimelinePhoneTest.*)
     set_tests_properties(TimelinePhone.ui@phone PROPERTIES LABELS ui ENVIRONMENT
         "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_LIST_DIR}/../tests/ui/offscreen-phone.json")
-    # The presenter view with two screens (qt/docs/presenter-view.md): a laptop and a projector, off-screen
+    # The presenter view with two screens (qt/docs/features/presenter-view.md): a laptop and a projector, off-screen
     add_test(NAME PresenterView.ui@2screens COMMAND xqt-ui-tests --gtest_filter=PresenterView.*)
     set_tests_properties(PresenterView.ui@2screens PROPERTIES LABELS ui ENVIRONMENT
         "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_LIST_DIR}/../tests/ui/offscreen-two-screens.json")

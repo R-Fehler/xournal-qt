@@ -133,8 +133,8 @@ TEST(TextMatch, matchesAsTheSearchPromises) {
     EXPECT_EQ(s.origin[static_cast<size_t>(s.text.size())], 13) << "the end of the last character";
 }
 
-// The find and replace bar's options (qt/docs/md-editor.md, "Find and replace"): letters as typed, whole words, a
-// regular expression
+// The find and replace bar's options (qt/docs/features/md-editor.md, "Find and replace"): letters as typed, whole
+// words, a regular expression
 TEST(TextMatch, optionsOfTheFindAndReplaceBar) {
     using textmatch::count;
     using textmatch::optionTerms;

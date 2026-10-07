@@ -220,7 +220,7 @@ void PageRaster::renderToBuffer(cairo_t* cr, const RasterParams&, bool backgroun
     size_t pdfPageNo = 0;
     double width = 0;
     double height = 0;
-    NoteSpace space;  // (qt/docs/note-space.md)
+    NoteSpace space;  // (qt/docs/features/note-space.md)
     {
         std::shared_lock lock(*doc);
         const auto pt = page->getBackgroundType();

@@ -493,8 +493,8 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
     }
     QPDFObjectHandle info = writeInfo(sink, out, /*modDate=*/true);
     if (hybrid) {
-        // The file written over keeps its keywords: its tags (qt/docs/tags.md; given to the file, not to the document,
-        // so a background without them would drop them)
+        // The file written over keeps its keywords: its tags (qt/docs/features/tags.md; given to the file, not to the
+        // document, so a background without them would drop them)
         if (std::error_code ec; fs::exists(target, ec) && !fs::equivalent(target, prep.bg, ec)) {
             const QString keywords = pdfkeywords::read(target, /*session=*/true).info;
             if (!keywords.isEmpty()) {

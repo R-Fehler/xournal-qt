@@ -1,4 +1,4 @@
-// xournal-qt: the toolbox's menus (qt/docs/toolbox.md; part of the main window, Main.qml): ⋯ of the floating
+// xournal-qt: the toolbox's menus (qt/docs/features/toolbox.md; part of the main window, Main.qml): ⋯ of the floating
 // toolbox, a tool's menu, the catalog ("+"), the tool editor, and the helpers that open a menu or a dialog once
 // a phone's menu sheet has gone.
 import QtQuick
@@ -43,7 +43,7 @@ Item {
             icon.source: app.iconUrl("xqt-eye-off")
             onTriggered: app.presenting ? (win.modes.presentClean = true) : win.modes.startPresenting(true)
         }
-        // Read only: the pen does not write, the edges turn the pages (qt/docs/zen.md)
+        // Read only: the pen does not write, the edges turn the pages (qt/docs/features/zen.md)
         AdaptiveMenuItem {
             objectName: "toolboxReadOnlyItem"
             text: qsTr("Read only")
@@ -52,7 +52,7 @@ Item {
             checked: win.modes.readOnlyOn
             onTriggered: win.modes.readOnly = !win.modes.readOnlyOn
         }
-        // Zen: only the page and the dot (qt/docs/zen.md)
+        // Zen: only the page and the dot (qt/docs/features/zen.md)
         AdaptiveMenuItem {
             objectName: "toolboxZenItem"
             offered: !app.presenting  // (presenting: "Hide the tools" above)
@@ -125,7 +125,7 @@ Item {
         }
         return out
     }
-    // A tool's editor: a tap on the tool in hand, Edit in its menu, "+" (qt/docs/toolbox.md, "Editing a tool")
+    // A tool's editor: a tap on the tool in hand, Edit in its menu, "+" (qt/docs/features/toolbox.md, "Editing a tool")
     ToolEntryEditor {
         id: toolEditor
         ownerOf: function(id) { return toolboxPane.buttonFor(id) || topBarPane.buttonFor(id) }
@@ -143,7 +143,7 @@ Item {
         property Item button: null
         readonly property string entryId: entry && entry.id ? entry.id : ""
         readonly property var store: app.toolbox
-        /// An app item's (its button: the window's); a group's (qt/docs/toolbox.md, "Groups"); else a tool's
+        /// An app item's (its button: the window's); a group's (qt/docs/features/toolbox.md, "Groups"); else a tool's
         readonly property bool isApp: entry && entry.app !== undefined
         readonly property bool isGroup: entry && entry.group === true
         readonly property bool isTool: !isApp && !isGroup

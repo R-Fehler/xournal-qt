@@ -1,5 +1,5 @@
 /*
- * xournal-qt: bookmarks on pages (qt/docs/bookmarks.md).
+ * xournal-qt: bookmarks on pages (qt/docs/features/bookmarks.md).
  *
  * A bookmark is part of the document: a page's optional label (XojPage::getBookmark, an upstream seam), saved in a
  * .xopp as the page attribute xqt-bookmark="label" and in a PDF with notes also as the children of a top-level outline

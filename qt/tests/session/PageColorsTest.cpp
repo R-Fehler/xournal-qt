@@ -1,8 +1,8 @@
 /*
- * xournal-qt: page colors and textured paper (qt/docs/dark-pages.md, "Page colors"): the color is upstream's background
- * color and the texture a key of upstream's page type config, both kept through a .xopp and a PDF with notes; the
- * texture is drawn wherever a page is (deterministic, subtle); ruling stays visible on dark paper; a highlighter on
- * dark paper lightens instead of disappearing.
+ * xournal-qt: page colors and textured paper (qt/docs/features/dark-pages.md, "Page colors"): the color is upstream's
+ * background color and the texture a key of upstream's page type config, both kept through a .xopp and a PDF with
+ * notes; the texture is drawn wherever a page is (deterministic, subtle); ruling stays visible on dark paper; a
+ * highlighter on dark paper lightens instead of disappearing.
  *
  * @license GNU GPLv2 or later
  */

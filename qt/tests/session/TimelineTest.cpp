@@ -1,7 +1,7 @@
 /*
- * xournal-qt: the timeline of a document (qt/docs/timeline.md, "The timeline"): elements in the order they were made,
- * those without a time first, long pauses shortened and sessions marked, recordings placed by their start (their ink's
- * times, else their name), what is shown and heard at a moment.
+ * xournal-qt: the timeline of a document (qt/docs/features/timeline.md, "The timeline"): elements in the order they
+ * were made, those without a time first, long pauses shortened and sessions marked, recordings placed by their start
+ * (their ink's times, else their name), what is shown and heard at a moment.
  *
  * @license GNU GPLv2 or later
  */

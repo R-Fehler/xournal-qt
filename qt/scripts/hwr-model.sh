@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# xournal-qt: put the handwriting search's model where the app looks for it (qt/docs/handwriting-search.md).
+# xournal-qt: put the handwriting search's model where the app looks for it (qt/docs/features/handwriting-search.md).
 #
 # The model is TrOCR-small handwritten, int8, as Xenova's ONNX export on Hugging Face (Xenova/trocr-small-handwritten,
 # MIT; about 64 MB). This script copies it from the Hugging Face cache (where the research trials put it,

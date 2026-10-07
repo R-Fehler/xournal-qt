@@ -52,8 +52,8 @@ protected:
 };
 
 /// xournal-qt: a frontend may draw over the background of a page with a pattern (textured paper,
-/// qt/docs/dark-pages.md): createForPage hands it the background of every page that is not a PDF or an image page,
-/// and draws what it returns. nullptr (upstream): as it is.
+/// qt/docs/features/dark-pages.md): createForPage hands it the background of every page that is not a PDF or an image
+/// page, and draws what it returns. nullptr (upstream): as it is.
 using BackgroundDecorator = std::unique_ptr<BackgroundView> (*)(std::unique_ptr<BackgroundView> view,
                                                                 const XojPage& page);
 inline std::atomic<BackgroundDecorator> backgroundDecorator{nullptr};

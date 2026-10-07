@@ -241,7 +241,7 @@ bool StickyNotes::insert(std::optional<Color> color) {
 void StickyNotes::place(CanvasPage& page, Layer* layer, const char* what) {
     DocumentSession& session = view.getSession();
     {
-        // A new note, or a pasted one: new (qt/docs/timeline.md)
+        // A new note, or a pasted one: new (qt/docs/features/timeline.md)
         std::vector<Element*> elements;
         for (auto& e: layer->getElements()) {
             elements.push_back(e.get());

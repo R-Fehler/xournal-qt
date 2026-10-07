@@ -1,7 +1,7 @@
 /*
- * xournal-qt: encrypted PDFs in the window (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): the password asked for when a
- * protected PDF is opened (or a protected document's autosave is recovered), and protecting the current document's
- * PDF with a password, changing it or removing it.
+ * xournal-qt: encrypted PDFs in the window (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs"): the password asked for
+ * when a protected PDF is opened (or a protected document's autosave is recovered), and protecting the current
+ * document's PDF with a password, changing it or removing it.
  *
  * @license GNU GPLv2 or later
  */

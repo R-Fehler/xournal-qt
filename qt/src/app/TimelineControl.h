@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the replay of a document's timeline in the window (qt/docs/timeline.md, "Replay"), the QML object
- * `app.timeline`; its play bar is TimelineBar.qml.
+ * xournal-qt: the replay of a document's timeline in the window (qt/docs/features/timeline.md, "Replay"), the QML
+ * object `app.timeline`; its play bar is TimelineBar.qml.
  *
  * Read-only: while it replays, the document's view is for reading (every tool scrolls, a tap on ink goes to the moment
  * it was written), the session refuses changes (DocumentSession::setReplaying: no undo, no paste, ...). Leaving brings

@@ -1,5 +1,5 @@
 /*
- * xournal-qt: sticky notes (qt/docs/sticky-notes.md).
+ * xournal-qt: sticky notes (qt/docs/features/sticky-notes.md).
  *
  * A note is a layer of its own named "Sticky note" ("Sticky note (cover)" when it covers), whose first element is
  * its paper: a closed, filled rectangle stroke. The other elements of the layer are drawn on the note and clipped to
@@ -98,7 +98,7 @@ Layer* noteAt(const XojPage& page, double x, double y);
 /// the page takes it). Call under the document's lock.
 Layer* openNoteAt(const XojPage& page, double x, double y);
 
-// --- the note's Markdown text (qt/docs/sticky-notes.md, "Notes as containers") ------------------------------------
+// --- the note's Markdown text (qt/docs/features/sticky-notes.md, "Notes as containers") ------------------------------
 /// Where a note's Markdown text begins (its top left) and how wide it is laid out
 xoj::util::Point<double> textOrigin(const Look& look);
 double textWidth(const Look& look);
@@ -126,15 +126,17 @@ private:
 std::optional<xoj::util::Rectangle<double>> changingNoteArea();
 
 /// While a selection of a note's elements lives, the note is its page's selected layer (they are dropped there):
-/// leaveNoteLayer leaves it alone. Held and let go by the canvas (qt/docs/sticky-notes.md, "Selecting in a note").
+/// leaveNoteLayer leaves it alone. Held and let go by the canvas (qt/docs/features/sticky-notes.md, "Selecting in a
+/// note").
 void holdLayer(const Layer* layer, bool hold);
 
 /// The layer id (1-based, as upstream counts) of a note layer, 0 if it is not on the page
 Layer::Index layerIdOf(const XojPage& page, const Layer* layer);
 
-/// The rule of the selected layer: never a note, except while something is done on one (qt/docs/sticky-notes.md).
-/// If the page's selected layer is a note, the topmost layer that is not one is selected (a new empty layer below
-/// the notes if there is none). Takes the document's lock itself. True when it changed the selection.
+/// The rule of the selected layer: never a note, except while something is done on one
+/// (qt/docs/features/sticky-notes.md). If the page's selected layer is a note, the topmost layer that is not one is
+/// selected (a new empty layer below the notes if there is none). Takes the document's lock itself. True when it
+/// changed the selection.
 bool leaveNoteLayer(Document& doc, const PageRef& page);
 
 // --- peeking (the screen only) --------------------------------------------------------------------------------
@@ -236,10 +238,10 @@ std::unique_ptr<Layer> deserialize(const char* data, size_t size);
 xoj::util::Rectangle<double> pastePlace(xoj::util::Rectangle<double> rect, double pageWidth, double pageHeight,
                                         const std::vector<xoj::util::Rectangle<double>>& taken);
 
-/// Where a copied selection of several notes and elements (qt/docs/sticky-notes.md, "Several notes at once") goes on
-/// a page of this size: how far it is moved as a whole (its layout and size kept). The same place when it fits, else
-/// moved inside the page (its top left at the page's when it is larger); moved on a little while one of its `notes`
-/// would lie exactly on one of `taken`.
+/// Where a copied selection of several notes and elements (qt/docs/features/sticky-notes.md, "Several notes at once")
+/// goes on a page of this size: how far it is moved as a whole (its layout and size kept). The same place when it fits,
+/// else moved inside the page (its top left at the page's when it is larger); moved on a little while one of its
+/// `notes` would lie exactly on one of `taken`.
 xoj::util::Point<double> groupPastePlace(const xoj::util::Rectangle<double>& bounds,
                                          const std::vector<xoj::util::Rectangle<double>>& notes, double pageWidth,
                                          double pageHeight, const std::vector<xoj::util::Rectangle<double>>& taken);

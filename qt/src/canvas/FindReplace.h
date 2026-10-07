@@ -1,5 +1,5 @@
 /*
- * xournal-qt: find and replace in a document (qt/docs/md-editor.md, "Find and replace").
+ * xournal-qt: find and replace in a document (qt/docs/features/md-editor.md, "Find and replace").
  *
  * What it changes is the text that can be written: the page's Markdown text (a .md or .txt edited, a PDF text
  * document, the page texts of notes; each flow over its pages once), the Markdown text boxes and the sticky notes'

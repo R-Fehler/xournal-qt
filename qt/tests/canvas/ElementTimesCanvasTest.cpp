@@ -1,7 +1,7 @@
 /*
- * xournal-qt: new elements get the time they were made (qt/docs/timeline.md, "Creation times"): strokes when the pen
- * touches, shapes, texts when their box opens, images, pasted elements and stickers (new: the time they were pasted),
- * sticky notes; what changes an element (the eraser's pieces, moving, undo and redo) keeps its time.
+ * xournal-qt: new elements get the time they were made (qt/docs/features/timeline.md, "Creation times"): strokes when
+ * the pen touches, shapes, texts when their box opens, images, pasted elements and stickers (new: the time they were
+ * pasted), sticky notes; what changes an element (the eraser's pieces, moving, undo and redo) keeps its time.
  *
  * @license GNU GPLv2 or later
  */

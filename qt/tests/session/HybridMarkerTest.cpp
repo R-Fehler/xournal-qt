@@ -1,5 +1,5 @@
 /*
- * xournal-qt: what a PDF with notes carries besides its pages (qt/docs/hybrid-pdf.md): the marker, the text layer of the
+ * xournal-qt: what a PDF with notes carries besides its pages (qt/docs/features/hybrid-pdf.md): the marker, the text layer of the
  * handwriting and the embedded files are the same whether the file was written in full or saved again as an
  * incremental update (both write them through one writer, HybridMarker.cpp). Read back from both and compared; for a
  * PDF with notes and for an archive PDF.

@@ -200,7 +200,7 @@ Rectangle {
                     radius: 2
                     color: "#9334e6"
                 }
-                // A bookmarked page: the ribbon (qt/docs/bookmarks.md)
+                // A bookmarked page: the ribbon (qt/docs/features/bookmarks.md)
                 Image {
                     visible: cell.bookmark !== ""
                     anchors.left: parent.left
@@ -317,7 +317,7 @@ Rectangle {
                 text: qsTr("Print")
                 onClicked: app.requestPrint(app.pages.selectionCount > 0 ? app.pages.selectedPages() : [])
             }
-            // A quarter turn of the selected pages (qt/docs/page-rotation.md)
+            // A quarter turn of the selected pages (qt/docs/features/page-rotation.md)
             IconButton {
                 id: rotateLeftButton
                 objectName: "pageGridRotateLeft"
@@ -342,7 +342,8 @@ Rectangle {
                 enabled: app.pages.selectionCount > 0 && app.pages.selectionCount < app.pages.count
                 onClicked: app.deletePages(app.pages.selectedPages())
             }
-            // The selected pages as files (qt/docs/page-files.md): a new document, split there, pictures; from a file
+            // The selected pages as files (qt/docs/features/page-files.md): a new document, split there, pictures; from
+            // a file
             IconButton {
                 id: filesButton
                 objectName: "pageGridFilesButton"

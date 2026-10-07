@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the canvas turned (qt/docs/canvas-rotation.md) in a real Qt Quick window: the pages are shown turned,
- * and the pen, the mouse, the wheel and the fingers act where they are on the screen.
+ * xournal-qt: the canvas turned (qt/docs/features/canvas-rotation.md) in a real Qt Quick window: the pages are shown
+ * turned, and the pen, the mouse, the wheel and the fingers act where they are on the screen.
  *
  * @license GNU GPLv2 or later
  */

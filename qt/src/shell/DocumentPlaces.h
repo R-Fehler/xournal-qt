@@ -49,12 +49,12 @@ void setLastPage(const fs::path& document, int page);
 qint64 lastRead(const fs::path& document);
 /// It is read now (or at `when`, seconds since 1970).
 void setRead(const fs::path& document, qint64 when = -1);
-/// The document is a favourite (starred; qt/docs/bookmarks.md). The star is the user's relation to the file, not
-/// its content: kept here, never written into the file.
+/// The document is a favourite (starred; qt/docs/features/bookmarks.md). The star is the user's relation to the file,
+/// not its content: kept here, never written into the file.
 bool favourite(const fs::path& document);
 void setFavourite(const fs::path& document, bool on);
 /// How many annotations of other apps the document had when making them editable was offered (0: never offered;
-/// qt/docs/adopt-annotations.md): offered again only when it has more.
+/// qt/docs/features/adopt-annotations.md): offered again only when it has more.
 int adoptionOffered(const fs::path& document);
 void setAdoptionOffered(const fs::path& document, int count);
 /// Files or folders renamed or moved (old, new): their entries follow.

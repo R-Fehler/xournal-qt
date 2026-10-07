@@ -38,7 +38,7 @@ not get the keys back when one closes) and whose menus take a click on their but
 1. Everything green on `master-qt`, and the device checklist walked through (`qt/docs/testing/device-checklist.md`).
 2. Set the version in `qt/CMakeLists.txt` (`project(xournal-qt VERSION x.y.z ...)`). The release job refuses a tag
    that says something else.
-3. Write `qt/docs/release-notes/x.y.z.md` (the draft takes it as its text; without it GitHub writes a list of commits).
+3. Write `qt/docs/release-notes/<x.y.z>.md` (the draft takes it as its text; without it GitHub writes a list of commits).
 4. Commit, then tag and push:
    ```sh
    git tag -a vx.y.z -m "xournal-qt x.y.z"
@@ -64,7 +64,7 @@ A build without a tag: start the workflow by hand ("Run workflow"); it uses the 
 The fork needs Qt 6.5 or newer, cairo, pango, poppler-glib, libzip, qpdf 12 and gdk-pixbuf, and optionally
 KSyntaxHighlighting (for highlighted code blocks in Markdown boxes).
 
-**qpdf** is built with the app on Linux ([XqtQpdf.cmake](../cmake/XqtQpdf.cmake)): a pinned release (12.4.1, checked
+**qpdf** is built with the app on Linux ([XqtQpdf.cmake](../../cmake/XqtQpdf.cmake)): a pinned release (12.4.1, checked
 by SHA-256) is downloaded when the build is configured and linked statically, with its native crypto and the
 system's zlib and libjpeg. The packages therefore do not depend on the distribution's `libqpdf` (Ubuntu 22.04 has
 10.6, Debian 13 has 12.2), and the incremental save runs on the qpdf it is tested with. Distribution builds can use
@@ -96,7 +96,7 @@ newer, arm64) into the draft, and (also since 0.4.0) the unsigned **macOS** `.dm
 - **Windows**: a first build exists (`xqt-windows.yml`, [windows.md](windows.md)): MSYS2 (UCRT64) packages,
   `windeployqt --qmldir qt/src/app/qml`, a portable zip, no installer yet. Upstream's `windows-setup/` builds an
   NSIS installer that can be reused ([windows-roadmap.md](windows-roadmap.md)).
-- **Recording** ([audio.md](audio.md), "Platforms"; since `qt/audio-platforms`): every package offers it. Windows,
+- **Recording** ([audio.md](../features/audio.md), "Platforms"; since `qt/audio-platforms`): every package offers it. Windows,
   macOS and Android are built with Qt Multimedia (`mingw-w64-ucrt-x86_64-qt6-multimedia`, Homebrew `qtmultimedia`,
   aqt `-m qtmultimedia`) and configured with `-DXQT_REQUIRE_AUDIO=ON`, so a Qt without it fails the job. What each
   package carries for it:

@@ -4,7 +4,7 @@ The canvas turns like Krita's: the view of the pages, not the pages themselves (
 [page-rotation.md](page-rotation.md)). Decided by the author on 2026-10-04: "rotate canvas only (like krita does for
 drawing) … it should use the rotate gesture and reset with double tap or fit to X buttons on the layout pill." Built in
 `qt/canvas-rotate` (90° steps first, then free with snapping). The device steps are in
-[testing/device-checklist.md](testing/device-checklist.md), "Pen" and "Touch and palm rejection".
+[testing/device-checklist.md](../testing/device-checklist.md), "Pen" and "Touch and palm rejection".
 
 ## Using it
 

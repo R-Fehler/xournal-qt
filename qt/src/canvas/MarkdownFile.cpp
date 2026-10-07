@@ -189,7 +189,7 @@ std::unique_ptr<Document> make(const std::string& source, const md::Style& s, si
         }
         doc->addPage(std::move(page));
     }
-    TextDocument::syncBookmarks(*doc);  // (its bookmark comments, qt/docs/bookmarks.md)
+    TextDocument::syncBookmarks(*doc);  // (its bookmark comments, qt/docs/features/bookmarks.md)
     return doc;
 }
 }  // namespace

@@ -1,6 +1,6 @@
 # Image caches: the pictures the app draws ahead and keeps
 
-Besides the rendered pages of the canvas ([CanvasMemory](../src/canvas/CanvasMemory.h)), the app draws smaller
+Besides the rendered pages of the canvas ([CanvasMemory](../../src/canvas/CanvasMemory.h)), the app draws smaller
 pictures of pages and documents and keeps them, so that lists and grids show them at once. They have one vocabulary,
 one owner of their memory and one owner of their worker threads.
 
@@ -25,7 +25,7 @@ files behind in every folder of a library, which sync clients upload.
 
 ## Memory: one owner
 
-[ImageMemory](../src/shell/ImageMemory.h) sets what each cache may keep, in one table:
+[ImageMemory](../../src/shell/ImageMemory.h) sets what each cache may keep, in one table:
 
 - the page previews take the setting **Settings → Documents → "Page previews (sidebar, overviews)"**
   (`previewMemory`, 64–1024 MB, default 256 MB): three quarters for the thumbnails, a quarter for the sketches;
@@ -34,11 +34,11 @@ files behind in every folder of a library, which sync clients upload.
   annotation pictures 24 MB, snippets 8 parsed files.
 
 Within its limit, each cache drops the pictures used least recently first (`LruImageCache` in
-[AsyncImage.h](../src/shell/AsyncImage.h) for the thumbnails, hit pages and annotation pictures).
+[AsyncImage.h](../../src/shell/AsyncImage.h) for the thumbnails, hit pages and annotation pictures).
 
 ## Workers: one owner
 
-[ImageWorkers](../src/shell/ImageWorkers.h) owns the thread pools that draw, read and store these pictures: one pool
+[ImageWorkers](../../src/shell/ImageWorkers.h) owns the thread pools that draw, read and store these pictures: one pool
 per kind of work (thumbnails, sketches, stand-ins on disk, covers, the covers' packs, hit pages, snippets,
 annotations, annotation pictures), sized in one table, **all at idle priority**: the canvas's own renders come first.
 

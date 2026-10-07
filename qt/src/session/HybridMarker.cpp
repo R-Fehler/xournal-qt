@@ -230,8 +230,8 @@ FileEntry documentEntry(const std::string& name, const std::string& xopp, bool a
     return f;
 }
 
-/// The recordings (qt/docs/audio.md), listed in `audio` (attachment name, name in the document). Written in full:
-/// each one whose file can be read. Saved again (`had`): one the file has stays as it is, renamed when its pages
+/// The recordings (qt/docs/features/audio.md), listed in `audio` (attachment name, name in the document). Written in
+/// full: each one whose file can be read. Saved again (`had`): one the file has stays as it is, renamed when its pages
 /// changed (the same file specification and stream, under its new name); a new one is added. A recording the
 /// document no longer has, or a new one in an archive PDF: throws (the whole file is written anew).
 void embedAudio(ObjectSink& sink, QPDF& q, QPDFEmbeddedFileDocumentHelper& efdh, const Prepared& prep, bool archive,
@@ -411,7 +411,7 @@ Embedded embedFiles(ObjectSink& sink, QPDF& q, const Prepared& prep, bool archiv
             addFile(sink, efdh, f);
         } else if (a.fixed) {
             // A picture: the one the file has stays as it is (its data does not change under its name); a new one is
-            // added (qt/docs/md-images.md)
+            // added (qt/docs/features/md-images.md)
             if (!before.erase(a.name)) {
                 if (archive) {
                     throw std::runtime_error("a new attachment of an archive PDF");  // (its /AF: written in full)

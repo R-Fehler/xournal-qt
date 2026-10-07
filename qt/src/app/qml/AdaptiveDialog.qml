@@ -1,5 +1,5 @@
-// A dialog that fits every window (qt/docs/adaptive-layout.md, "Dialogs and sheets"). What is declared inside it is
-// its body: it scrolls when the window is too short, while the title and the buttons stay in place. Where it goes
+// A dialog that fits every window (qt/docs/features/adaptive-layout.md, "Dialogs and sheets"). What is declared inside
+// it is its body: it scrolls when the window is too short, while the title and the buttons stay in place. Where it goes
 // follows the window's size class (win.adaptive):
 //   - a desktop or a tablet: in the middle, at most the window's height less 48 px (above the soft keyboard);
 //   - phone portrait: a form ("form") takes the whole screen, with × at the left and the confirm button at the top

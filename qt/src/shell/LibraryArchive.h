@@ -1,5 +1,5 @@
 /*
- * xournal-qt: "Export library as archive…" (qt/docs/hybrid-pdf.md, "Archive PDF").
+ * xournal-qt: "Export library as archive…" (qt/docs/features/hybrid-pdf.md, "Archive PDF").
  *
  * Every document of a library (or of one of its folders, with its subfolders) as an archive PDF (PDF/A-3b,
  * HybridPdf::writeArchive) in a new folder "<name> archive <date>" inside a folder the user chose, keeping the folder

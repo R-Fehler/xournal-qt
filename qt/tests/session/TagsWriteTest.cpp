@@ -1,7 +1,7 @@
 /*
- * xournal-qt: writing a PDF's tags (PdfKeywords::write) next to the app's own saves of it (qt/docs/tags.md, "Tags in
- * files"): a save that starts while the tags are written waits for them (one writer of a file at a time), and on a
- * PDF with notes with version history the tags' update is ours, not "another app's" (the day's version is still
+ * xournal-qt: writing a PDF's tags (PdfKeywords::write) next to the app's own saves of it (qt/docs/features/tags.md,
+ * "Tags in files"): a save that starts while the tags are written waits for them (one writer of a file at a time), and
+ * on a PDF with notes with version history the tags' update is ours, not "another app's" (the day's version is still
  * replaced, a version still takes a message).
  *
  * @license GNU GPLv2 or later

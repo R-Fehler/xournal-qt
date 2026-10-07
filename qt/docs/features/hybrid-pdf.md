@@ -1,7 +1,7 @@
 # Hybrid PDF: design draft
 
-Status: **design agreed 2026-09-24**; built as `qt/hybrid-pdf` right after `qt/pdf-pages`. Background: [VISION.md](../../VISION.md) ("PDF as
-the document") and [the platform research](history/README.md) (qpdf can write everything needed).
+Status: **design agreed 2026-09-24**; built as `qt/hybrid-pdf` right after `qt/pdf-pages`. Background: [VISION.md](../../../VISION.md) ("PDF as
+the document") and [the platform research](../history/README.md) (qpdf can write everything needed).
 
 ## Goal
 
@@ -465,7 +465,7 @@ with every object serialised through qpdf (`unparseResolved`, a stream's diction
   6.4 s with 10.6; the whole appended save takes about 0.2 s). A number is taken with a null object that is replaced
   later (qpdf 12 gives a handle of a number the file does not have that is bound to nothing). A new stream is a
   dictionary in the qpdf document (so other objects can refer to it) whose data the `Update` keeps.
-- qpdf 12 or newer is needed; the desktop build compiles a pinned release ([releasing.md](releasing.md), "Which
+- qpdf 12 or newer is needed; the desktop build compiles a pinned release ([releasing.md](../development/releasing.md), "Which
   package for which system").
 - The cross-reference section matches the file's style: a cross-reference stream after one (PDF 1.5; our full
   writes use them), with the new dictionaries in an object stream, else a classic table. The trailer has `/Size`,
@@ -684,7 +684,7 @@ every document is a single PDF, with no sidecars.
 
 The author (2026-10-05): "a fully version controlled PDF document leveraging the append saving … a version sidebar,
 the save date as the commit message and optional milestone messages", off by default but easy to find. What follows is
-what is built (the research and the plan were deleted: [history/README.md](history/README.md)).
+what is built (the research and the plan were deleted: [history/README.md](../history/README.md)).
 
 ### The model
 
@@ -776,7 +776,7 @@ is 62 KB gzipped at the end). Eleven versions: 532 KB in all.
 - Acrobat's "Save" appends its own update: the versions stay, its revision is listed as "Changed in another app" and
   never cut away. Acrobat "Save As", "Reduce file size", macOS Preview and most mobile apps write the file anew: the
   latest state stays, the versions are gone (the panel says how many were removed). To be checked on the device
-  ([testing/device-checklist.md](testing/device-checklist.md)).
+  ([testing/device-checklist.md](../testing/device-checklist.md)).
 - An old version cut out of the file shows correctly in any PDF viewer (its page drawings are complete); its `.xopp`
   needs xournal-qt or `xournal-qt-cli export-xopp` when it is a delta.
 

@@ -1,4 +1,4 @@
-// xournal-qt: groups of elements in the canvas (qt/docs/groups.md): grouping and ungrouping what is selected.
+// xournal-qt: groups of elements in the canvas (qt/docs/features/groups.md): grouping and ungrouping what is selected.
 #include <memory>
 #include <mutex>
 #include <shared_mutex>

@@ -19,7 +19,8 @@ Rectangle {
     objectName: "homeView"
     color: "#eef0f3"
 
-    // --- the layout for the window's size (qt/docs/adaptive-layout.md, "The home screen and the tab overview") ---
+    // --- the layout for the window's size
+    // (qt/docs/features/adaptive-layout.md, "The home screen and the tab overview")
     /// The window's layout (Main.qml's `win.adaptive`), if there is one
     readonly property var adaptive: typeof win !== "undefined" && win ? win.adaptive : null
     readonly property string layoutClass: adaptive ? adaptive.layoutClass : "desktopWide"
@@ -76,8 +77,8 @@ Rectangle {
     /// The actions on a selection in a bar at the bottom (Open, Copy, Move, Trash, ⋮): on a phone, and where the
     /// selection bar's row does not fit
     readonly property bool selectionAtBottom: phoneLayout || selectionBar.selectionFull.implicitWidth + selectionBar.selectionLabel.implicitWidth + 96 > width
-    /// 0: library, 1: recent documents, 2: the library's bookmarks (qt/docs/bookmarks.md), 3: its to-dos
-    /// (qt/docs/todos.md), 4: its tags (qt/docs/tags.md)
+    /// 0: library, 1: recent documents, 2: the library's bookmarks (qt/docs/features/bookmarks.md), 3: its to-dos
+    /// (qt/docs/features/todos.md), 4: its tags (qt/docs/features/tags.md)
     property int page: app.library.available ? 0 : 1
     /// Changes when a star is set or taken away (the Recent cards ask for theirs)
     property int favouriteRevision: 0
@@ -295,7 +296,7 @@ Rectangle {
         // of phones have them: selectionActions)
         HomeSelectionBar { id: selectionBar }
 
-        // --- header: library / recent / bookmarks, search, actions (qt/docs/adaptive-layout.md) ---
+        // --- header: library / recent / bookmarks, search, actions (qt/docs/features/adaptive-layout.md) ---
         // (the ladder: every action a button of its own where there is room (expanded), else behind "+" and View; on
         // a phone "+" floats at the bottom, the switch has a row of its own when upright, and the breadcrumbs come
         // into this row when held sideways. A window too narrow even for that, e.g. a tiny one, scrolls it sideways)

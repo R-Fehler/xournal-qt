@@ -1,5 +1,6 @@
 /*
- * xournal-qt: sticky notes on the canvas (qt/docs/sticky-notes.md; the format and drawing: session/StickyNote.h).
+ * xournal-qt: sticky notes on the canvas (qt/docs/features/sticky-notes.md; the format and drawing:
+ * session/StickyNote.h).
  *
  * One per view. It places notes, keeps the selected note (an outline and a handle drawn over its page), moves and
  * resizes it (also onto another page), changes its color and cover mode (all undoable), copies, cuts and pastes
@@ -56,7 +57,7 @@ public:
     /// Delete the selected note (one undo step; `what`: its name in the undo list)
     void deleteSelected(const char* what = nullptr);
 
-    // --- the clipboard (qt/docs/sticky-notes.md) ----------------------------------------------------------------
+    // --- the clipboard (qt/docs/features/sticky-notes.md) ------------------------------------------------------------
     /// Put the selected note on the clipboard: the whole note (sticky::CLIPBOARD_MIME), and a picture of it for other
     /// apps. False: no note selected.
     bool copySelected();
@@ -75,8 +76,8 @@ public:
     /// not the note's: the rectangle or lasso selects in the note (CanvasPage; a tap selects the note then).
     /// Returns true when the press was the note's (nothing else happens); `deselected`: it only ended a selection.
     /// `add` (Ctrl or Shift with a select tool): a note there is added to the selection or taken out of it
-    /// (CanvasView::toggleSelected; qt/docs/sticky-notes.md, "Several notes at once"); elsewhere the press goes on
-    /// without ending the selection (a rectangle or a tap adds to it).
+    /// (CanvasView::toggleSelected; qt/docs/features/sticky-notes.md, "Several notes at once"); elsewhere the press
+    /// goes on without ending the selection (a rectangle or a tap adds to it).
     bool press(CanvasPage& page, double x, double y, bool selectTool, bool& deselected, bool areaTool = false,
                bool add = false);
     /// A finger on the selected note (view coordinates): it moves it or its handle resizes it. False: not on it.

@@ -5,8 +5,8 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-// The page sidebar's tab (qt/docs/adaptive-layout.md, "The page sidebar"): an arrow at the left edge of the canvas
-// area opens it (beside the page where there is room, else as the drawer); at the sidebar's edge, "‹" closes it.
+// The page sidebar's tab (qt/docs/features/adaptive-layout.md, "The page sidebar"): an arrow at the left edge of the
+// canvas area opens it (beside the page where there is room, else as the drawer); at the sidebar's edge, "‹" closes it.
 // A finger's size in the touch profile; not in the compact chrome or Zen, nor while presenting, nor while the
 // tool bar is put away (unless the sidebar is open: then it closes it).
 AbstractButton {

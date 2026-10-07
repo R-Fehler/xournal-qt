@@ -1,7 +1,7 @@
 # How xournal-qt came to be
 
 The turning points of the fork and why they went the way they did. What the app does now is in
-the feature docs in [qt/docs/](../); the recorded decisions are in [../adr/](../adr/); what each release brought
+the feature docs in [qt/docs/](../); the recorded decisions are in [../adr/](../decisions/); what each release brought
 is in [../release-notes/](../release-notes/). Everything else (the per-block changelog, measurements, research notes,
 done tasks) is in git history: see "Where the old notes went" at the end.
 
@@ -14,7 +14,7 @@ done tasks) is in git history: see "Where the old notes went" at the end.
 - **A real git fork with upstream history**, so upstream's fixes can still be merged. All new code lives under `qt/`
   with its own build root (`qt/CMakeLists.txt`); upstream files are not deleted, moved or reformatted, only left
   unbuilt. The few unavoidable edits are small, marked `xournal-qt:` and listed
-  ([0000](../adr/0000-fork-policy.md), [0002](../adr/0002-upstream-seams.md)).
+  ([0000](../decisions/0000-fork-policy.md), [0002](../decisions/0002-upstream-seams.md)).
 - **A Qt-free core without editing upstream.** Upstream's GTK glue is replaced by shadow headers with upstream's
   names (`qt/compat/include/control/Control.h` and friends) and a tiny `gtk/gtk.h` shim with GDK's types, so reused
   upstream files (model, file I/O, undo, tools, rendering) compile unchanged and any real GTK call fails to compile.
@@ -22,7 +22,7 @@ done tasks) is in git history: see "Where the old notes went" at the end.
 - **Pixel-identical rendering.** Pages are still drawn with cairo through upstream's view code (`PageRaster` is a
   port of upstream's `RenderJob` and page buffer), so ink looks exactly as in Xournal++. The CLI mirrors upstream's
   export flags so golden tests could compare both programs' output on upstream's fixtures.
-- **Qt Quick, not Widgets** ([0001](../adr/0001-ui-host.md)). A throw-away spike drew with the same canvas in
+- **Qt Quick, not Widgets** ([0001](../decisions/0001-ui-host.md)). A throw-away spike drew with the same canvas in
   a `QQuickItem` and a `QWidget` on the target 2-in-1 (KDE Plasma, Wayland, Wacom pen); both met the latency and
   input criteria and felt the same, so Qt Quick won: it is touch-first and the only realistic way to Android and iOS.
   Krita's experience (a QML canvas abandoned after years of tablet bugs) shaped one rule that still holds: **all
@@ -37,7 +37,7 @@ done tasks) is in git history: see "Where the old notes went" at the end.
 - **The hybrid PDF** (0.2.0): a document can be one ordinary PDF that any viewer shows with its ink (one annotation
   per layer with the exact appearance drawn by cairo) and that still carries the full Xournal data (an embedded
   `.xopp`). This made "PDF files" a way of keeping documents equal to "Xournal++ files"; the first start asks which
-  ([hybrid-pdf.md](../hybrid-pdf.md)). Saves append incremental updates as Acrobat and Drawboard
+  ([hybrid-pdf.md](../features/hybrid-pdf.md)). Saves append incremental updates as Acrobat and Drawboard
   do, so a save of a big PDF takes milliseconds and the original pages are never rewritten.
 - **Archive PDF**: PDF/A-3b with the ink flattened and the data embedded, readable for decades.
 - **Version history inside the PDF** (0.6.0): the incremental updates are kept as versions (one per day plus
@@ -54,30 +54,30 @@ done tasks) is in git history: see "Where the old notes went" at the end.
   button writes Markdown on the page instead (formatted while typing), which does what the text mode did and more.
   Its code went in the 2026-10 refactoring. Text written with it is ordinary text.
 - **Text documents** are either `.md` files (with `name.assets/` beside them) or PDFs that carry the Markdown and its
-  pictures as attachments, following the first-start choice ([md-pdf.md](../md-pdf.md)).
+  pictures as attachments, following the first-start choice ([md-pdf.md](../features/md-pdf.md)).
 
 ## One interface for every screen (0.4.0 to 0.8.0)
 
 - **Adaptive layout** (0.4.0): an audit of how the UI copes with narrow, short and portrait windows led to size
   classes, a touch profile, adaptive menus and dialogs, a phone chrome and safe areas
-  ([adaptive-layout.md](../adaptive-layout.md)).
+  ([adaptive-layout.md](../features/adaptive-layout.md)).
 - **The toolbox replaced the classic tool bar.** The toolbox (0.5.0): the user's own pens, each with its color and
   width, picked up like pens from a box (as in Drawboard). The classic bar was kept for a release next to it, then
   removed in 0.8.0 to stop carrying two UIs.
 - **Scrolling instead of folding** (0.8.0): the rail first folded sections into one button when room ran out; on an
   unfolded phone the user's own tools collapsed while the fixed ones stayed. Folding went away: the rail and the top
   bar scroll, keep one order on every screen, and are one stored arrangement the user edits and groups
-  ([toolbox.md](../toolbox.md)).
+  ([toolbox.md](../features/toolbox.md)).
 - **Zen replaced the reader chrome** (0.8.0): reading had its own chrome, then a read-only full screen; both were
   replaced by three independent switches (full screen, Zen, read only), Zen showing nothing but the page and a faint
-  dot ([zen.md](../zen.md)).
+  dot ([zen.md](../features/zen.md)).
 
 ## Search, sound and time
 
 - **Handwriting search, never conversion** (0.5.0): a recogniser reads the ink in the background at idle priority
   and the search looks at its readings; the ink stays ink. TrOCR-small in ONNX Runtime (loaded at run time, so the
   app does not link it) found 97 % of English words; German needed a model of its own, so several models run side by
-  side ([research](../research/handwriting-recognition.md), [the feature](../handwriting-search.md)).
+  side ([research](../../research/hwr/research.md), [the feature](../features/handwriting-search.md)).
 - **Audio compatible with Xournal++** (0.5.0): recordings tied to strokes as upstream does it (Ogg Vorbis, vendored),
   and in a PDF with notes the recordings are attachments named by page, findable without the app.
 - **The timeline** (0.6.0): every element remembers when it was made (an attribute upstream ignores), so a document

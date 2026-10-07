@@ -123,7 +123,7 @@ class AppController: public QObject {
     Q_PROPERTY(QObject* filteredPages READ filteredPagesModel CONSTANT)
     /// Table of contents of the current tab (PDF outline)
     Q_PROPERTY(QObject* outline READ outlineModel CONSTANT)
-    /// Highlights and notes of the current tab (the sidebar's Annotations panel, qt/docs/annotations-md.md)
+    /// Highlights and notes of the current tab (the sidebar's Annotations panel, qt/docs/features/annotations-md.md)
     Q_PROPERTY(QObject* annotations READ annotationsModel CONSTANT)
     /// The version history of the current tab (the sidebar's History panel; xqt::VersionsModel, PdfHistory.h)
     Q_PROPERTY(QObject* versions READ versionsModel CONSTANT)
@@ -132,8 +132,8 @@ class AppController: public QObject {
     /// The keyboard shortcuts (the same ones in every window)
     Q_PROPERTY(QObject* shortcuts READ shortcutsModel CONSTANT)
     Q_PROPERTY(QObject* settings READ settingsModel CONSTANT)
-    /// The toolbox's tools (qt/docs/toolbox.md): the user's own ordered tools, each a tool with its settings; shared
-    /// by all windows, stored per device (ToolboxModel)
+    /// The toolbox's tools (qt/docs/features/toolbox.md): the user's own ordered tools, each a tool with its settings;
+    /// shared by all windows, stored per device (ToolboxModel)
     Q_PROPERTY(QObject* toolbox READ toolboxObject CONSTANT)
     /// How high the pen is above the screen, for pens that tell it (xqt::PenHover)
     Q_PROPERTY(QObject* penHover READ penHover CONSTANT)
@@ -162,7 +162,7 @@ class AppController: public QObject {
     /// The current document shows a file it is not (a Markdown file, read-only for now; an image to write on): what
     /// the note over the canvas says about it ("": nothing to say).
     Q_PROPERTY(QString shownFileNote READ shownFileNote NOTIFY titleChanged)
-    /// The current document is a text file (qt/docs/md-editor.md): "markdown" or "plain" ("" if not).
+    /// The current document is a text file (qt/docs/features/md-editor.md): "markdown" or "plain" ("" if not).
     Q_PROPERTY(QString textDocument READ textDocument NOTIFY titleChanged)
     /// ... and it is edited (not shown read-only).
     Q_PROPERTY(bool textEditable READ textEditable NOTIFY titleChanged)
@@ -177,12 +177,12 @@ class AppController: public QObject {
     Q_PROPERTY(bool textContinuous READ textContinuous WRITE setTextContinuous NOTIFY textLayoutChanged)
     /// The document is saved as a hybrid PDF (Ctrl+S writes it again).
     Q_PROPERTY(bool isHybrid READ isHybrid NOTIFY titleChanged)
-    // --- encrypted PDFs (AppEncryption.cpp; qt/docs/hybrid-pdf.md, "Encrypted PDFs")
+    // --- encrypted PDFs (AppEncryption.cpp; qt/docs/features/hybrid-pdf.md, "Encrypted PDFs")
     /// The current document is protected with a password (its PDF, or the PDF its notes are on).
     Q_PROPERTY(bool protectedDocument READ protectedDocument NOTIFY titleChanged)
     /// Its password can be set, changed or removed here: its file is a PDF (not an archive PDF).
     Q_PROPERTY(bool canProtect READ canProtect NOTIFY titleChanged)
-    // --- annotations of other apps made editable (AppAdopt.cpp; qt/docs/adopt-annotations.md)
+    // --- annotations of other apps made editable (AppAdopt.cpp; qt/docs/features/adopt-annotations.md)
     /// How many annotations of other apps the current document's PDF has that can be made editable (0: none, or not
     /// looked at yet), and the app that made them (empty: not known).
     Q_PROPERTY(int adoptableCount READ adoptableCount NOTIFY adoptableChanged)
@@ -194,8 +194,8 @@ class AppController: public QObject {
     Q_PROPERTY(QString tool READ tool NOTIFY toolChanged)
     Q_PROPERTY(QColor color READ color NOTIFY toolChanged)
     Q_PROPERTY(double fontSize READ fontSize WRITE setFontSize NOTIFY fontChanged)
-    /// Dark pages (qt/docs/dark-pages.md): "off", "on", or "system" (dark while the system's colors are dark); the
-    /// setting darkPages, for every window. Only what is shown: the documents do not change.
+    /// Dark pages (qt/docs/features/dark-pages.md): "off", "on", or "system" (dark while the system's colors are dark);
+    /// the setting darkPages, for every window. Only what is shown: the documents do not change.
     Q_PROPERTY(QString darkPagesMode READ darkPagesMode WRITE setDarkPagesMode NOTIFY darkPagesChanged)
     /// ... whether the pages are shown dark now (the canvases, the page lists)
     Q_PROPERTY(bool darkPagesShown READ darkPagesShown NOTIFY darkPagesChanged)
@@ -251,7 +251,7 @@ class AppController: public QObject {
     /// The command bar is put away (its tab at the top edge; a slim strip brings it back)
     Q_PROPERTY(bool toolbarHidden READ toolbarHidden WRITE setToolbarHidden NOTIFY toolbarHiddenChanged)
     Q_PROPERTY(int zoomPercent READ zoomPercent NOTIFY zoomChanged)
-    /// The canvas turned (qt/docs/canvas-rotation.md): degrees clockwise, in [0, 360); 0 upright
+    /// The canvas turned (qt/docs/features/canvas-rotation.md): degrees clockwise, in [0, 360); 0 upright
     Q_PROPERTY(double canvasRotation READ canvasRotation NOTIFY canvasRotationChanged)
     /// It may be turned here (not while presenting, not in a text file or a text document of notes)
     Q_PROPERTY(bool canRotateCanvas READ canRotateCanvas NOTIFY canvasRotationChanged)
@@ -271,8 +271,9 @@ class AppController: public QObject {
     Q_PROPERTY(bool searchFuzzy READ searchFuzzy WRITE setSearchFuzzy NOTIFY searchFuzzyChanged)
     /// Why the current (fuzzy) search is read as plain text, or a regular expression is not searched ("": neither).
     Q_PROPERTY(QString searchHint READ searchHint NOTIFY searchChanged)
-    /// Find and replace (qt/docs/md-editor.md, "Find and replace"): the replace row of the search bar is shown, and
-    /// its options, in effect while it is (the search runs again with them, never fuzzy then). For this window.
+    /// Find and replace (qt/docs/features/md-editor.md, "Find and replace"): the replace row of the search bar is
+    /// shown, and its options, in effect while it is (the search runs again with them, never fuzzy then). For this
+    /// window.
     Q_PROPERTY(bool replacing READ replacing WRITE setReplacing NOTIFY searchOptionsChanged)
     Q_PROPERTY(bool searchCaseSensitive READ searchCaseSensitive WRITE setSearchCaseSensitive NOTIFY
                        searchOptionsChanged)
@@ -298,14 +299,14 @@ class AppController: public QObject {
     Q_PROPERTY(QObject* edit READ editObject CONSTANT)
     /// Elements are selected on the canvas (select tools).
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
-    /// The snip tool (qt/docs/snip.md) is armed: "rect" or "lasso" ("": not). The next rectangle or lasso dragged on a
-    /// page copies its picture to the clipboard, then the tool used before comes back.
+    /// The snip tool (qt/docs/features/snip.md) is armed: "rect" or "lasso" ("": not). The next rectangle or lasso
+    /// dragged on a page copies its picture to the clipboard, then the tool used before comes back.
     Q_PROPERTY(QString snip READ snipShape NOTIFY snipChanged)
     /// How sharp a snip's picture is: "screen" (the screen's, at least 200 dpi; the default), "high" (300 dpi) or
     /// "veryHigh" (600 dpi); Settings and the snip's list (Snip.h: the limits)
     Q_PROPERTY(QString snipResolution READ snipResolution WRITE setSnipResolution NOTIFY snipResolutionChanged)
-    /// "Copy handwriting as text" is armed (qt/docs/handwriting-search.md, AppInkCopy.cpp): the next sweep (the
-    /// lasso's path) over ink copies the words there as text, then the tool used before comes back
+    /// "Copy handwriting as text" is armed (qt/docs/features/handwriting-search.md, AppInkCopy.cpp): the next sweep
+    /// (the lasso's path) over ink copies the words there as text, then the tool used before comes back
     Q_PROPERTY(bool inkCopy READ inkCopyArmed NOTIFY snipChanged)
     /// The selection holds handwriting (pen strokes): its pill offers "Copy as text"
     Q_PROPERTY(bool selectionHasInk READ selectionHasInk NOTIFY selectionChanged)
@@ -324,30 +325,32 @@ class AppController: public QObject {
     Q_PROPERTY(QObject* compare READ compareObject CONSTANT)
     /// The current document is a version of a PDF with notes cut out of its file: shown read-only
     Q_PROPERTY(bool viewingVersion READ viewingVersion NOTIFY documentChanged)
-    /// The presenter view on a second screen while presenting (xqt::PresenterConsole, qt/docs/presenter-view.md)
+    /// The presenter view on a second screen while presenting (xqt::PresenterConsole,
+    /// qt/docs/features/presenter-view.md)
     Q_PROPERTY(QObject* presenter READ presenterObject CONSTANT)
-    /// Looking up selected text, papers of references, arXiv (Citations.h, qt/docs/citations.md)
+    /// Looking up selected text, papers of references, arXiv (Citations.h, qt/docs/features/citations.md)
     Q_PROPERTY(QObject* citations READ citationsObject CONSTANT)
-    /// Recording and playing (AudioControl.h, qt/docs/audio.md)
+    /// Recording and playing (AudioControl.h, qt/docs/features/audio.md)
     Q_PROPERTY(QObject* audio READ audioObject CONSTANT)
-    /// The replay of the document's timeline (TimelineControl.h, qt/docs/timeline.md)
+    /// The replay of the document's timeline (TimelineControl.h, qt/docs/features/timeline.md)
     Q_PROPERTY(QObject* timeline READ timelineObject CONSTANT)
     /// Documents of a crashed previous run that can be recovered: [{ title, time }]. Empty when there are none.
     Q_PROPERTY(QVariantList recoveryItems READ recoveryItems NOTIFY recoveryChanged)
     /// How documents are kept (session/DocumentMode.h): "xopp" (Xournal++ files) or "pdf" (PDF files: every document
     /// one PDF with notes). Written by the first-start question and Settings → Documents (stored at once).
     Q_PROPERTY(QString documentMode READ documentMode WRITE setDocumentMode NOTIFY documentModeChanged)
-    /// The introduction was shown (qt/docs/onboarding.md): finished or skipped, at the first start or later from Help.
-    /// The setting "introSeen" (stored at once).
+    /// The introduction was shown (qt/docs/features/onboarding.md): finished or skipped, at the first start or later
+    /// from Help. The setting "introSeen" (stored at once).
     Q_PROPERTY(bool introSeen READ introSeen WRITE setIntroSeen NOTIFY documentModeChanged)
     /// The user's copy of the tutorial is there (Help → Start the tutorial again is offered).
     Q_PROPERTY(bool tutorialExists READ tutorialExists NOTIFY tutorialChanged)
     /// The mode in effect is "PDF files".
     Q_PROPERTY(bool pdfOnly READ pdfOnly NOTIFY documentModeChanged)
-    /// New text documents are PDF text documents (the setting "newTextDocuments", qt/docs/md-pdf.md), not ".md" files.
+    /// New text documents are PDF text documents (the setting "newTextDocuments", qt/docs/features/md-pdf.md), not
+    /// ".md" files.
     Q_PROPERTY(bool newTextAsPdf READ newTextAsPdf NOTIFY documentModeChanged)
-    /// The current document is a text document of notes (qt/docs/md-pdf.md: page 1 starts the page's Markdown text; a
-    /// PDF text document): typing goes into its text, the formatting bar is shown.
+    /// The current document is a text document of notes (qt/docs/features/md-pdf.md: page 1 starts the page's Markdown
+    /// text; a PDF text document): typing goes into its text, the formatting bar is shown.
     Q_PROPERTY(bool textNotes READ textNotes NOTIFY markdownOnPageChanged)
     /// The current document (notes) has a page's Markdown text: "Export as Markdown" is offered.
     Q_PROPERTY(bool hasMarkdownText READ hasMarkdownText NOTIFY markdownOnPageChanged)
@@ -400,9 +403,9 @@ public:
     /// flowing over pages, to write on with the pen. The .md stays as it is; saving suggests "name.xopp" next to it
     /// (the library shows the two as two documents: they go their own ways).
     Q_INVOKABLE bool editAsNotes();
-    /// "Open as PDF document" (qt/docs/md-pdf.md): the current .md as a new PDF text document next to it ("name.pdf",
-    /// or "name (2).pdf" when taken), built as editAsNotes builds its notes, saved at once as a PDF with notes and
-    /// opened in a new tab with the cursor in its text. The .md stays as it is.
+    /// "Open as PDF document" (qt/docs/features/md-pdf.md): the current .md as a new PDF text document next to it
+    /// ("name.pdf", or "name (2).pdf" when taken), built as editAsNotes builds its notes, saved at once as a PDF with
+    /// notes and opened in a new tab with the cursor in its text. The .md stays as it is.
     Q_INVOKABLE bool openAsPdfDocument();
     bool textNotes() const;
     bool hasMarkdownText() const;
@@ -465,7 +468,7 @@ public:
     /// The highlighter's opacity on the current page's paper: 0.5 on light paper, 0.8 on dark
     /// (ColorPalettes::highlighterOpacity)
     Q_INVOKABLE double highlighterOpacity() const;
-    // --- colors taken from a palette remember their role (qt/docs/color-palettes.md) ---
+    // --- colors taken from a palette remember their role (qt/docs/features/color-palettes.md) ---
     /// The tool in hand takes the color of `role` in palette `paletteId` (its ink; the highlight color for the
     /// highlighter) and remembers the role; the palette becomes the chosen one, and the other tools' colors taken from
     /// a palette follow it.
@@ -480,7 +483,7 @@ public:
     /// role, the color stays as it is). For tool presets that follow a palette switch (qt/toolbox).
     Q_INVOKABLE QColor followPalette(const QString& ref, const QString& paletteId, bool highlight) const;
 
-    // --- the toolbox (qt/docs/toolbox.md; AppToolbox.cpp) ---
+    // --- the toolbox (qt/docs/features/toolbox.md; AppToolbox.cpp) ---
     QObject* toolboxObject() const;
     xqt::ToolboxModel* toolboxModel() const { return toolbox; }
     /// Takes the toolbox's entry `id`: its tool with all its settings (color, width, line style, filling, eraser kind,
@@ -501,7 +504,7 @@ public:
     QString darkPagesMode() const;
     void setDarkPagesMode(const QString& mode);
     bool darkPagesShown() const;
-    /// The curated page colors (qt/docs/dark-pages.md, "Page colors"): [{ id, name, color, dark }]
+    /// The curated page colors (qt/docs/features/dark-pages.md, "Page colors"): [{ id, name, color, dark }]
     Q_INVOKABLE QVariantList paperSwatches() const;
     /// The pages printed (`range` as printDocument takes it) have dark paper (a page color, not a PDF page): printing
     /// them takes a lot of ink, the print dialog says so
@@ -526,18 +529,19 @@ public:
     /// Start editing the Markdown box of a page (-1: the current page; made when there is none). Returns its source.
     Q_INVOKABLE QString beginMarkdown(int page = -1);
     bool markdownOnPage() const;
-    // --- the formatting bar (qt/docs/md-editor.md, "Formatting bar"; AppMarkdownFormat.cpp) --------------------------
+    // --- the formatting bar (qt/docs/features/md-editor.md, "Formatting bar"; AppMarkdownFormat.cpp) -----------------
     QVariantMap markdownFormat() const;
     /// A formatting tool (md::format::actionNamed: "bold", "heading2", "codeBlock" with the language as `arg`, ...)
     /// on the Markdown written on the page or in the .md: one undo step. False if no Markdown is written.
     Q_INVOKABLE bool formatMarkdown(const QString& action, const QString& arg = QString());
     /// Pictures (files: the formatting bar's picker, a drop) into the Markdown written on the page or in the .md:
     /// saved where the document keeps its pictures ("name.assets/"), their Markdown at the cursor, one undo step
-    /// (qt/docs/md-images.md). False if nothing was inserted (a message says why when a picture could not be saved).
+    /// (qt/docs/features/md-images.md). False if nothing was inserted (a message says why when a picture could not be
+    /// saved).
     Q_INVOKABLE bool insertMarkdownImages(const QList<QUrl>& files);
     /// Fetch the web picture at `url` (its "Load image" was tapped, the window showed the address and the user
-    /// agreed; qt/docs/md-images.md) into the app cache, and lay out the texts that show it again. Choosing it is the
-    /// opt-in to networking when that was not decided yet; false (a message) when networking is off.
+    /// agreed; qt/docs/features/md-images.md) into the app cache, and lay out the texts that show it again. Choosing it
+    /// is the opt-in to networking when that was not decided yet; false (a message) when networking is off.
     Q_INVOKABLE bool loadWebImage(const QString& url);
     /// "Remove unused images" of a .md: the files in its "name.assets" folder that its text (as it is now) does not
     /// link to, as paths relative to that folder; empty when there are none (or it is no .md).
@@ -597,7 +601,7 @@ public:
     xqt::CanvasActions& edit() const { return *edits; }
     QObject* editObject() const;
     /// Group (Ctrl+G) / ungroup (Ctrl+Shift+G) what is selected (the reference while it has the keys and is written
-    /// in): one undo step (qt/docs/groups.md)
+    /// in): one undo step (qt/docs/features/groups.md)
     Q_INVOKABLE bool groupSelection();
     Q_INVOKABLE bool ungroupSelection();
     bool canGoBack() const;
@@ -640,11 +644,11 @@ public:
     Q_INVOKABLE bool createDocument(const QString& name, bool inLibrary);
     /// A new document of notes saved at once as `path` (".pdf": a PDF with notes, else a .xopp), in a new tab.
     bool createDocumentAt(fs::path path);
-    /// Quick note (qt/docs/quick-note.md; AppQuickNote.cpp): as the setting "quickNote" says, a new note in the
-    /// library's folder "Inbox" named by the date and time ("2026-10-04 21-30.xopp", or ".pdf" in the PDF files mode),
-    /// opened at once with the pen in hand; or ("daily") a line "- 21:30 " added to "Inbox/2026-10-04.md", opened
-    /// with the cursor at its end. The folder and the file are made on first use. Without a library: a new unsaved
-    /// document. The home screen, ⋮, Ctrl+Alt+N and `xournal-qt --quick-note` call it.
+    /// Quick note (qt/docs/features/quick-note.md; AppQuickNote.cpp): as the setting "quickNote" says, a new note in
+    /// the library's folder "Inbox" named by the date and time ("2026-10-04 21-30.xopp", or ".pdf" in the PDF files
+    /// mode), opened at once with the pen in hand; or ("daily") a line "- 21:30 " added to "Inbox/2026-10-04.md",
+    /// opened with the cursor at its end. The folder and the file are made on first use. Without a library: a new
+    /// unsaved document. The home screen, ⋮, Ctrl+Alt+N and `xournal-qt --quick-note` call it.
     Q_INVOKABLE bool quickNote();
     /// The same at a given time (tests).
     bool quickNoteAt(const QDateTime& when);
@@ -653,9 +657,9 @@ public:
     /// "New Markdown file" / "New text file": an empty "name.md" / "name.txt" (`extension`: ".md" or ".txt") in the
     /// library's current folder, opened for writing (the cursor in it).
     Q_INVOKABLE bool createTextFile(const QString& name, const QString& extension);
-    /// "New text document" (qt/docs/md-pdf.md): a PDF text document "name.pdf" (a PDF with notes whose page 1 starts
-    /// an empty Markdown text) in the library's current folder, saved at once and opened with the cursor in its text;
-    /// or, when new text documents are Markdown files (newTextAsPdf false), "name.md" as createTextFile.
+    /// "New text document" (qt/docs/features/md-pdf.md): a PDF text document "name.pdf" (a PDF with notes whose page 1
+    /// starts an empty Markdown text) in the library's current folder, saved at once and opened with the cursor in its
+    /// text; or, when new text documents are Markdown files (newTextAsPdf false), "name.md" as createTextFile.
     Q_INVOKABLE bool createTextDocument(const QString& name);
     bool newTextAsPdf() const;
     /// A new PDF text document of `text` saved as `pdf` (a PDF with notes), in a new tab with the cursor in its text.
@@ -798,7 +802,7 @@ public:
     Q_INVOKABLE void openSearchResult(int index);
     /// The same, at the first hit on or after `page` (a page of the extended search).
     Q_INVOKABLE void openSearchResultAt(int index, int page);
-    // --- bookmarks and favourites (AppBookmarks.cpp, qt/docs/bookmarks.md) ---
+    // --- bookmarks and favourites (AppBookmarks.cpp, qt/docs/features/bookmarks.md) ---
     /// The bookmarks of the current document, in page order: [{ page (0-based), label (as shown), automatic }]
     Q_PROPERTY(QVariantList bookmarks READ bookmarks NOTIFY bookmarksChanged)
     /// The current document can have bookmarks (not a plain text file)
@@ -831,8 +835,8 @@ public:
     Q_INVOKABLE bool openBookmark(const QString& path, int page);
     QObject* libraryBookmarksModel() const;
 
-    // --- to-dos (AppTodos.cpp, qt/docs/todos.md) ---
-    // --- tags (AppTags.cpp, qt/docs/tags.md) ---
+    // --- to-dos (AppTodos.cpp, qt/docs/features/todos.md) ---
+    // --- tags (AppTags.cpp, qt/docs/features/tags.md) ---
     /// The library's Tags view (LibraryTagsModel)
     Q_PROPERTY(QObject* libraryTags READ libraryTagsModel CONSTANT)
     QObject* libraryTagsModel() const;
@@ -912,8 +916,8 @@ public:
 private:
     std::optional<std::string> pictureLinkFor(const QString& arg);
     /// A page of the current document whose bookmark is a comment in its Markdown (a .md, a PDF text document;
-    /// qt/docs/bookmarks.md, "Markdown"): add (+1), remove (-1) or rename (0) it as an edit of that text, one undo step
-    /// as a typed one. Nothing (false, `handled` false) if the page is not such a page.
+    /// qt/docs/features/bookmarks.md, "Markdown"): add (+1), remove (-1) or rename (0) it as an edit of that text, one
+    /// undo step as a typed one. Nothing (false, `handled` false) if the page is not such a page.
     bool editTextBookmark(int page, int change, const QString& label, bool& handled);
     /// A text file open in `s` was renamed or moved (`from` -> `to`, the library): its tab follows.
     void followTextFile(xqt::DocumentSession& s, const fs::path& from, const fs::path& to);
@@ -925,7 +929,7 @@ private:
     void openReceived(const fs::path& folder, const std::vector<fs::path>& files, const QStringList& errors);
 
 public:
-    // --- version history (qt/docs/hybrid-pdf.md "Version history"; the model: `versions`) ------------------------
+    // --- version history (qt/docs/features/hybrid-pdf.md "Version history"; the model: `versions`) -------------------
     /// "Save with a message…" (Ctrl+Alt+S): a save that makes a milestone (a version with this message, never
     /// replaced). Like saveInBackground otherwise.
     Q_INVOKABLE bool saveWithMessage(const QString& message, const QJSValue& then = QJSValue());
@@ -964,7 +968,7 @@ public:
     Q_INVOKABLE bool saveReferenceInHand();
     /// Close a tab without asking (QML asks about unsaved changes first). The last tab is replaced by a new one.
     Q_INVOKABLE void closeTab(int index);
-    // --- renaming (AppRename.cpp, qt/docs/library.md "Renaming") ------------------------------------------------
+    // --- renaming (AppRename.cpp, qt/docs/features/library.md "Renaming") --------------------------------------------
     /// What the name field of a tab's document shows: {name (without the extension), extension (it stays), note (what
     /// is renamed with it), unsaved (a new document: the name it is saved under), problem (read-only: why not)}.
     Q_INVOKABLE QVariantMap tabRenameInfo(int index) const;
@@ -1014,13 +1018,13 @@ public:
     /// The document was saved as "name.xopp" and Save as writes it as a PDF with notes now: the name of that .xopp
     /// if the window asks what happens to it (the setting "hybridOldXopp" is "ask"), else "".
     Q_INVOKABLE QString oldXoppToAsk() const;
-    // --- the document mode (qt/docs/hybrid-pdf.md, "PDF-only mode") ---
+    // --- the document mode (qt/docs/features/hybrid-pdf.md, "PDF-only mode") ---
     QString documentMode() const;
     void setDocumentMode(const QString& mode);
     bool pdfOnly() const;
     /// The first start (of the main window) asks which way to work: nothing chosen yet, and XQT_DOCUMENT_MODE unset.
     Q_INVOKABLE bool askDocumentMode() const;
-    // --- getting started (qt/docs/onboarding.md) ---
+    // --- getting started (qt/docs/features/onboarding.md) ---
     bool introSeen() const;
     void setIntroSeen(bool seen);
     /// The first start shows the introduction, which ends in the document mode question: that question is due
@@ -1042,7 +1046,7 @@ public:
     /// The same, waiting until the file is written (tests): whether that worked.
     Q_INVOKABLE bool save();
     Q_INVOKABLE bool saveAs(const QUrl& url);
-    // Hybrid PDF (qt/docs/hybrid-pdf.md)
+    // Hybrid PDF (qt/docs/features/hybrid-pdf.md)
     bool isHybrid() const;
     bool protectedDocument() const;
     bool canProtect() const;
@@ -1079,7 +1083,7 @@ public:
     /// Save writes without asking: the document has a file, or it is an annotated PDF and the notes go into it.
     Q_INVOKABLE bool savesWithoutDialog() const;
     Q_INVOKABLE bool exportXopp(const QUrl& url);
-    // --- Share (qt/docs/hybrid-pdf.md) ---
+    // --- Share (qt/docs/features/hybrid-pdf.md) ---
     /// What "Share → PDF with notes" does with the current document: "share" (its file as it is: a hybrid PDF without
     /// unsaved changes, a PDF without notes), "save" (saved first: a hybrid PDF with changes, notes that go into the
     /// PDF itself), "ask" (a .xopp: saved as a PDF with notes, or a PDF copy), "saveAs" (no file yet: Save as).
@@ -1109,7 +1113,7 @@ public:
     Q_INVOKABLE bool copyToClipboard(const QStringList& files);
     /// The folder the "For Xournal++" dialog starts in: the one chosen last, else the documents folder.
     Q_INVOKABLE QUrl shareFolder() const;
-    // --- Archive PDF (qt/docs/hybrid-pdf.md, "Archive PDF") ---
+    // --- Archive PDF (qt/docs/features/hybrid-pdf.md, "Archive PDF") ---
     /// "Export for the archive…": "name.archive.pdf" next to the current document, or next to `file` (a library card's
     /// PDF). Empty when the document has no file yet (the window then asks for a folder).
     Q_INVOKABLE QUrl suggestedArchiveFile(const QString& file = QString()) const;
@@ -1127,7 +1131,7 @@ public:
     /// `into` is inside the library.
     Q_INVOKABLE bool exportLibraryArchive(const QUrl& into, bool currentFolderOnly);
     Q_INVOKABLE void cancelLibraryArchive();
-    // --- Sharing a folder or the library as a zip (qt/docs/library.md, "Sharing a folder or the library") ---
+    // --- Sharing a folder or the library as a zip (qt/docs/features/library.md, "Sharing a folder or the library") ---
     /// "Share folder…" / "Share library…" (LibraryShare: running, done, total, current, survey, passwordAvailable;
     /// finished(summary)).
     Q_PROPERTY(QObject* libraryShare READ libraryShareObject CONSTANT)
@@ -1158,7 +1162,7 @@ public:
     Q_INVOKABLE void keepHybridData();
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
-    /// The fits also turn the canvas upright again (qt/docs/canvas-rotation.md)
+    /// The fits also turn the canvas upright again (qt/docs/features/canvas-rotation.md)
     Q_INVOKABLE void fitWidth();
     /// The height of the current page fills the view, or the whole page fits into it.
     Q_INVOKABLE void fitHeight();
@@ -1186,7 +1190,7 @@ public:
     Q_INVOKABLE void jumpToPage(int index);
     /// The same, showing this part of the page (page points): an item of the Annotations panel.
     Q_INVOKABLE void jumpToPlace(int index, const QRectF& rect);
-    // --- annotations of other apps made editable (AppAdopt.cpp; qt/docs/adopt-annotations.md) ---
+    // --- annotations of other apps made editable (AppAdopt.cpp; qt/docs/features/adopt-annotations.md) ---
     /// Make the annotations of other apps in the current document editable (converted on a worker, then taken by the
     /// document as one undo step); the snackbar says how many.
     Q_INVOKABLE void adoptAnnotations();
@@ -1195,7 +1199,7 @@ public:
     int adoptableCount() const;
     QString adoptableApp() const;
     bool adopting() const { return adoptRunning; }
-    // --- the annotations as Markdown (qt/docs/annotations-md.md) ---
+    // --- the annotations as Markdown (qt/docs/features/annotations-md.md) ---
     /// Where "Export as Markdown" writes without asking: "<name>.annotations.md" next to the document, with Xournal++
     /// files. Empty: ask with a save dialog (PDF files mode writes nothing next to files), or the document was never
     /// saved.
@@ -1221,7 +1225,7 @@ public:
     /// Insert `count` new pages before `position` (0-based; page count: at the end): background `background` (index
     /// in the settings' pageBackgrounds), paper `paper` (index in paperFormats; -1: the size of the current page),
     /// portrait or landscape. One step to undo.
-    /// `paperColor`, `textured` (-1: the settings' for new pages): the paper's color and texture (qt/docs/dark-pages.md)
+    /// `paperColor`, `textured` (-1: the settings' for new pages): the paper's color and texture (qt/docs/features/dark-pages.md)
     Q_INVOKABLE bool insertPages(int position, int background, int paper, bool landscape, int count = 1,
                                  const QColor& paperColor = QColor(), int textured = -1);
     /// Give these pages another background (index in the settings' pageBackgrounds), on paper of this color and
@@ -1237,8 +1241,8 @@ public:
     Q_INVOKABLE void requestInsertPages(int position) { Q_EMIT insertPagesRequested(position); }
     /// Ask the window for the background dialog for these pages (0-based).
     Q_INVOKABLE void requestPageBackground(const QList<int>& pages) { Q_EMIT pageBackgroundRequested(pages); }
-    /// Space for notes beside slides (qt/docs/note-space.md). Ask the window for its dialog, for these pages (0-based;
-    /// empty: the current page, `allPages`: offer all pages first).
+    /// Space for notes beside slides (qt/docs/features/note-space.md). Ask the window for its dialog, for these pages
+    /// (0-based; empty: the current page, `allPages`: offer all pages first).
     Q_INVOKABLE void requestNoteSpace(const QList<int>& pages, bool allPages = false) {
         Q_EMIT noteSpaceRequested(pages, allPages);
     }
@@ -1268,9 +1272,9 @@ public:
     /// Give these pages width × height (points): the content stays where it is, PDF pages keep theirs, the page's
     /// text flows anew. One undo step. Returns how many pages changed.
     Q_INVOKABLE int applyPageSize(const QList<int>& pages, double width, double height);
-    /// Turning pages a quarter to the left or right (qt/src/canvas/PageRotate.h, qt/docs/page-rotation.md). What it
-    /// would do to these pages (0-based): { possible (some turn), pages (that turn), leftOut (PDF pages that stay),
-    /// reason (why not, or why some stay; "": nothing to say) }. PDF pages turn only in a PDF with notes (or a
+    /// Turning pages a quarter to the left or right (qt/src/canvas/PageRotate.h, qt/docs/features/page-rotation.md).
+    /// What it would do to these pages (0-based): { possible (some turn), pages (that turn), leftOut (PDF pages that
+    /// stay), reason (why not, or why some stay; "": nothing to say) }. PDF pages turn only in a PDF with notes (or a
     /// document that will be saved as one); in a .xopp they stay as they are.
     Q_INVOKABLE QVariantMap rotationOf(const QList<int>& pages) const;
     /// Turn these pages (0-based) a quarter to the right (or left): one undo step. Returns how many turned; the window
@@ -1280,10 +1284,10 @@ public:
     Q_INVOKABLE void requestChapter(int page) { Q_EMIT chapterRequested(page); }
     /// Write a chapter heading on a page (level 0-2): the contents sidebar and overview show it. Undoable.
     Q_INVOKABLE bool addChapter(int page, const QString& title, int level);
-    /// "Copy link" (qt/docs/links.md): a link to a page of the current document (-1: the current page) onto the
-    /// clipboard, as the app's own format, Markdown and HTML (links::toMime). Pasted into a Markdown text it becomes
-    /// `[title](link)` relative to that document, on a page a link marker. A document without a file yet: "#Page:12",
-    /// a link within it, as before.
+    /// "Copy link" (qt/docs/features/links.md): a link to a page of the current document (-1: the current page) onto
+    /// the clipboard, as the app's own format, Markdown and HTML (links::toMime). Pasted into a Markdown text it
+    /// becomes `[title](link)` relative to that document, on a page a link marker. A document without a file yet:
+    /// "#Page:12", a link within it, as before.
     Q_INVOKABLE void copyPageLink(int page);
     /// The same for a chapter of the contents (its title, its page).
     Q_INVOKABLE void copyChapterLink(int page, const QString& title);
@@ -1326,7 +1330,7 @@ public:
     bool inkCopyArmed() const;
     bool selectionHasInk() const;
 
-    // --- stickers (AppStickers.cpp, qt/docs/stickers.md) ---
+    // --- stickers (AppStickers.cpp, qt/docs/features/stickers.md) ---
     /// The picker's list (StickersModel): the library's Stickers folder or the app-wide set
     Q_PROPERTY(QObject* stickers READ stickersModel CONSTANT)
     QObject* stickersModel() const;
@@ -1345,7 +1349,7 @@ public:
     Q_PROPERTY(bool canPasteSticker READ canPasteSticker NOTIFY selectionChanged)
     bool canPasteSticker() const;
 
-    // --- page templates (AppTemplates.cpp, qt/docs/templates.md) ---
+    // --- page templates (AppTemplates.cpp, qt/docs/features/templates.md) ---
     /// The template picker's list (StickersModel of templates): the library's Templates folder or the app-wide set
     Q_PROPERTY(QObject* templates READ templatesModel CONSTANT)
     QObject* templatesModel() const;
@@ -1366,7 +1370,7 @@ public:
     /// A new document that starts with a template's page (else as createDocument); read off the UI thread, then
     /// created (templateInserted)
     Q_INVOKABLE bool createDocumentFromTemplate(const QString& name, bool inLibrary, const QString& path);
-    // --- pages as files (AppPageFiles.cpp, qt/docs/page-files.md) ---
+    // --- pages as files (AppPageFiles.cpp, qt/docs/features/page-files.md) ---
     /// Insert pages from a file (A6): read `file` (a PDF, a PDF with notes, a .xopp) off the UI thread and keep it
     /// until insertPagesFromFile or closePageFile; pageFileRead says what it is: { ok, name, pages, thumbnails (the URL
     /// of its pages' pictures, "/<page>" appended; "" for a protected file), protectedFile, needsPassword,
@@ -1413,9 +1417,9 @@ public:
     Q_INVOKABLE bool copyPagesAsImage(const QList<int>& pages);
     /// Put the setsquare ("setsquare") or the compass ("compass") on the page, or take it away again.
     Q_INVOKABLE void toggleGeometryTool(const QString& which);
-    /// The curtain over part of the page, or the spotlight (all black but a rectangle; qt/docs/curtain.md; this tab's,
-    /// only on the screen): "curtain" / "spotlight" puts it out (instead of the other one; the same again takes it
-    /// away), "" takes it away.
+    /// The curtain over part of the page, or the spotlight (all black but a rectangle; qt/docs/features/curtain.md;
+    /// this tab's, only on the screen): "curtain" / "spotlight" puts it out (instead of the other one; the same again
+    /// takes it away), "" takes it away.
     Q_INVOKABLE void toggleCurtain(const QString& which);
     /// Which one is out ("" if none)
     Q_PROPERTY(QString curtain READ curtain NOTIFY curtainChanged)
@@ -1424,7 +1428,7 @@ public:
     Q_PROPERTY(bool curtainHandles READ curtainHandles WRITE setCurtainHandles NOTIFY curtainChanged)
     bool curtainHandles() const;
     void setCurtainHandles(bool shown);
-    // --- sticky notes (qt/docs/sticky-notes.md) ---
+    // --- sticky notes (qt/docs/features/sticky-notes.md) ---
     /// A new sticky note in the middle of the visible part of the current page, selected so that it can be moved
     /// and resized right away (a select tool is chosen, as for an image). One undo step.
     Q_INVOKABLE bool insertStickyNote(const QColor& color = QColor());
@@ -1434,8 +1438,8 @@ public:
     /// A sticky note is selected (its pill: colors, cover, delete)
     Q_PROPERTY(bool noteSelected READ noteSelected NOTIFY noteSelectionChanged)
     bool noteSelected() const;
-    /// Several notes are selected, or notes with elements of the page (the selection's pill; qt/docs/sticky-notes.md,
-    /// "Several notes at once")
+    /// Several notes are selected, or notes with elements of the page (the selection's pill;
+    /// qt/docs/features/sticky-notes.md, "Several notes at once")
     Q_PROPERTY(bool notesSelectedTogether READ notesSelectedTogether NOTIFY selectionChanged)
     bool notesSelectedTogether() const;
     /// The selected note onto the clipboard, whole (Ctrl+C / Ctrl+X go through copySelection / cutSelection); several
@@ -1503,14 +1507,14 @@ public:
     /// "[[wiki]]") is followed in a new tab.
     Q_INVOKABLE void openLink(const QString& uri);
 
-    // --- links between documents (qt/docs/links.md; AppLinks.cpp) ---
+    // --- links between documents (qt/docs/features/links.md; AppLinks.cpp) ---
     /// About a tapped link (a Markdown link target, "[[a wiki link]]"): { document: it leads to a document, name: the
     /// file's name ("" for this document), place: "page 12", "chapter …", found: the file is there, here: it is
     /// this document }.
     Q_INVOKABLE QVariantMap documentLink(const QString& uri) const;
-    /// What the status line shows for the link under the mouse or the hovering pen (qt/docs/links.md, "Links with the
-    /// mouse"), in the document of `view` (a CanvasView: the tab's or the reference): a web address in full; a page
-    /// of that document as "Page 12 · its chapter"; a link to another document as its file name and the place ("…,
+    /// What the status line shows for the link under the mouse or the hovering pen (qt/docs/features/links.md, "Links
+    /// with the mouse"), in the document of `view` (a CanvasView: the tab's or the reference): a web address in full; a
+    /// page of that document as "Page 12 · its chapter"; a link to another document as its file name and the place ("…,
     /// page 3"), or "name (not found)". `page` / `pdfPage` as CanvasView::LinkTarget has them.
     Q_INVOKABLE QString linkPreview(QObject* view, const QString& uri, int page, int pdfPage) const;
     /// Follow a link to a document from the current one: "tab" (switches to it when it is open), "reference" (beside
@@ -1711,7 +1715,7 @@ private:
     /// Dark pages: the roles' dark colors for the canvas, and darkPagesChanged when the setting (any window's) or the
     /// system's colors change (AppPaper.cpp)
     void setUpDarkPages();
-    /// A new document's paper: the ink in hand readable on it (qt/docs/dark-pages.md, "Ink on dark paper")
+    /// A new document's paper: the ink in hand readable on it (qt/docs/features/dark-pages.md, "Ink on dark paper")
     void inkForPaper(const QColor& paper);
     /// The pattern `background` (index in the page types) on this paper (invalid, -1: the settings' for new pages)
     PageType paperTypeOf(int background, const QColor& paperColor, int textured, Color& color) const;
@@ -1881,9 +1885,9 @@ private:
     std::unique_ptr<xqt::VersionCompare> compareMode;   ///< (after `referenceMode`, reset before it)
     std::unique_ptr<xqt::PresenterConsole> presenter;   ///< (after `tabs`, reset before it)
     std::unique_ptr<xqt::Citations> citations;
-    std::unique_ptr<xqt::AudioControl> audioControl;  ///< (one recording per window; qt/docs/audio.md)
+    std::unique_ptr<xqt::AudioControl> audioControl;  ///< (one recording per window; qt/docs/features/audio.md)
     void makeAudioControl();
-    std::unique_ptr<xqt::TimelineControl> timelineControl;  ///< (qt/docs/timeline.md; made with the audio's)
+    std::unique_ptr<xqt::TimelineControl> timelineControl;  ///< (qt/docs/features/timeline.md; made with the audio's)
     bool replacePristine = true;  ///< opening a file replaces an untouched new document (not for a reference)
     std::unique_ptr<xqt::PagesModel> pages;
     std::unique_ptr<xqt::PageFilterModel> filteredPages;

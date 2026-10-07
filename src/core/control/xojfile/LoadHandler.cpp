@@ -115,13 +115,13 @@ void LoadHandler::setPageNoteSpace(double left, double top, double right, double
     this->page->setNoteSpace(NoteSpace{left, top, right, bottom});
 }
 
-// xournal-qt: bookmarks (qt/docs/bookmarks.md)
+// xournal-qt: bookmarks (qt/docs/features/bookmarks.md)
 void LoadHandler::setPageBookmark(const std::string& label) {
     xoj_assert(this->page);
     this->page->setBookmark(label);
 }
 
-// xournal-qt: voice memos (qt/docs/audio.md)
+// xournal-qt: voice memos (qt/docs/features/audio.md)
 void LoadHandler::setPageAudio(const std::string& memos) {
     xoj_assert(this->page);
     this->page->setAudioMemos(memos);

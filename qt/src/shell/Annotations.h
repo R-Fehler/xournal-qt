@@ -1,6 +1,6 @@
 /*
  * xournal-qt: a document's annotations - its highlights and notes - as a list, and as Markdown
- * (qt/docs/annotations-md.md).
+ * (qt/docs/features/annotations-md.md).
  *
  * What counts, page by page:
  *  - highlights over PDF text: the highlighter's strokes (drawn by hand or made from selected PDF text: highlight,
@@ -9,7 +9,7 @@
  *  - the highlight annotations of the PDF itself (highlight, underline, squiggly, strike out, made in other apps),
  *    with the text under them and their note;
  *  - text boxes and Markdown boxes, with their text; a Markdown box that is only a link (a link marker,
- *    qt/docs/links.md) is a link;
+ *    qt/docs/features/links.md) is a link;
  *  - handwriting: the pen's strokes (also its shapes, the ruler's lines) and highlighter strokes over no text,
  *    grouped - a stroke joins the group written just before it when it is near it, groups that overlap become one,
  *    dots join the group next to them - each with the PDF text it is on (underlined, circled, struck through, written
@@ -79,7 +79,7 @@ struct Item {
 /// What a page shows that its items are made of, read under the document's lock (plain values).
 struct PageContent {
     int pdfPage = -1;  ///< the PDF page it shows (0-based), -1: none
-    QPointF pdfOffset;  ///< where the PDF page is on the page (space for notes, qt/docs/note-space.md)
+    QPointF pdfOffset;  ///< where the PDF page is on the page (space for notes, qt/docs/features/note-space.md)
     double width = 0, height = 0;
     struct Box {
         bool markdown = false;
@@ -143,8 +143,8 @@ struct Picture {
     size_t item = 0;
 };
 /// The Markdown text: a title, a link to the document, a heading per chapter (or page), each item as a quote or a
-/// bullet with a link to its page (qt/docs/links.md). `markdownFile`: where it goes (links are relative to it).
-/// `pictures` (with inkImages): the pictures to write next to it.
+/// bullet with a link to its page (qt/docs/features/links.md). `markdownFile`: where it goes (links are relative to
+/// it). `pictures` (with inkImages): the pictures to write next to it.
 std::string markdown(const std::vector<Item>& items, const ExportInput& input, const fs::path& markdownFile,
                      std::vector<Picture>* pictures = nullptr);
 /// The link to an item's page, relative to `markdownFile`.

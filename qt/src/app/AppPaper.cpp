@@ -1,5 +1,5 @@
 /*
- * xournal-qt: dark pages and page colors in the application controller (qt/docs/dark-pages.md).
+ * xournal-qt: dark pages and page colors in the application controller (qt/docs/features/dark-pages.md).
  *
  * @license GNU GPLv2 or later
  */

@@ -1,15 +1,15 @@
-// The formatting bar of the Markdown editors (qt/docs/md-editor.md, "Formatting bar"): a row of tools shown while
-// Markdown is written (a .md, Markdown on a page, its source beside the page), for writing without knowing its
+// The formatting bar of the Markdown editors (qt/docs/features/md-editor.md, "Formatting bar"): a row of tools shown
+// while Markdown is written (a .md, Markdown on a page, its source beside the page), for writing without knowing its
 // marks. Grouped as Typora's and Obsidian's: the block's kind (paragraph, headings), the marks in the text, the lines'
 // marks (lists, check boxes, quotes), then what is inserted on lines of its own (code block, table, formula block,
 // image, rule, page break). The buttons show what is at the cursor (`format`, as app.markdownFormat). The tools do not
 // take the focus: the text keeps it, and the keyboard stays.
 //
-// Where the room is short (qt/docs/adaptive-layout.md, "The format bar"): on a desktop or a tablet the bar takes the
-// richest form that fits - everything as buttons; then the inserts in an "Insert" menu; then the block's kind as one
-// button with a menu too. The block's kind, the marks and the lists stay in the row. Only when even that does not fit
-// does the row scroll. On a phone the row scrolls sideways (the norm in mobile editors), with fading edges that show
-// there is more. A text document's bar holds its commands too (the top bar, at the row's end; qt/top-bar): then
+// Where the room is short (qt/docs/features/adaptive-layout.md, "The format bar"): on a desktop or a tablet the bar
+// takes the richest form that fits - everything as buttons; then the inserts in an "Insert" menu; then the block's kind
+// as one button with a menu too. The block's kind, the marks and the lists stay in the row. Only when even that does
+// not fit does the row scroll. On a phone the row scrolls sideways (the norm in mobile editors), with fading edges that
+// show there is more. A text document's bar holds its commands too (the top bar, at the row's end; qt/top-bar): then
 // nothing folds, the row scrolls as the bars do (all formatting first, then the commands; its view ends through the
 // middle of a button, the wheel scrolls it).
 import QtQuick
@@ -434,7 +434,7 @@ Rectangle {
     }
 
     // The image button: a picture file, saved with the document and linked at the cursor
-    // (qt/docs/md-images.md)
+    // (qt/docs/features/md-images.md)
     FileDialog {
         id: imagePicker
         objectName: bar.named("mdImageDialog")

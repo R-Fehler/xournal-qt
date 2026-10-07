@@ -1,6 +1,6 @@
 /*
  * xournal-qt: what the audience's screen of the presenter view shows while it follows the presenter's view
- * (qt/docs/presenter-view.md, "The audience follows the presenter's view").
+ * (qt/docs/features/presenter-view.md, "The audience follows the presenter's view").
  *
  * @license GNU GPLv2 or later
  */

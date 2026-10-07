@@ -1,8 +1,9 @@
 /*
- * xournal-qt: the copy tools in the real window (qt/copy-tools): snip as a button of its own (qt/docs/snip.md), and
- * handwriting copied as text (qt/docs/handwriting-search.md, "Copy handwriting as text"): the text tools' second tool
- * (a sweep over ink, then the tool before), "Copy as text" of the selection's pill, the card with the text, and what
- * the window says when the handwriting search is off. The handwriting is read by a scripted recogniser.
+ * xournal-qt: the copy tools in the real window (qt/copy-tools): snip as a button of its own
+ * (qt/docs/features/snip.md), and handwriting copied as text (qt/docs/features/handwriting-search.md, "Copy handwriting
+ * as text"): the text tools' second tool (a sweep over ink, then the tool before), "Copy as text" of the selection's
+ * pill, the card with the text, and what the window says when the handwriting search is off. The handwriting is read by
+ * a scripted recogniser.
  *
  * @license GNU GPLv2 or later
  */

@@ -107,7 +107,7 @@ address, and opens through the same confirmation as Scholar.
 4. **The hits**: each row has the document's title (the heading or `/Title`, else the name), its folder and file
    name, the score as a percentage, and three actions: **Reference** (beside the notes, `openAsReference`), **Tab**
    (a new tab), **Copy link** (the app's document link, `copyDocumentLink`: pasted onto the page it makes a link
-   marker, into Markdown `[title](path)`, as `qt/docs/links.md` says).
+   marker, into Markdown `[title](../path)`, as `qt/docs/features/links.md` says).
 5. **No hit** (and under the hits, smaller): **Search in Google Scholar** and **Search arXiv** for the title, each
    with its address shown.
 

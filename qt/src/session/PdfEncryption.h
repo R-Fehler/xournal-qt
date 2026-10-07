@@ -1,5 +1,5 @@
 /*
- * xournal-qt: encrypted PDFs (qt/docs/hybrid-pdf.md, "Encrypted PDFs").
+ * xournal-qt: encrypted PDFs (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs").
  *
  * - What a PDF's encryption is (probe): whether it needs a password to open (a user password), whether one given
  *   is right, and what it allows (printing, copying, editing) when it is opened without its owner password.

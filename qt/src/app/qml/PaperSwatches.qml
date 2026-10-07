@@ -1,6 +1,6 @@
-// The paper of pages (qt/docs/dark-pages.md, "Page colors"): the curated colors (white, illustration paper, kraft, a
-// soft green and blue, grey, dark grey, black) as round swatches, and textured paper. Used where pages get their
-// background: the background dialog, a new document, inserting pages, Settings → new pages.
+// The paper of pages (qt/docs/features/dark-pages.md, "Page colors"): the curated colors (white, illustration paper,
+// kraft, a soft green and blue, grey, dark grey, black) as round swatches, and textured paper. Used where pages get
+// their background: the background dialog, a new document, inserting pages, Settings → new pages.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

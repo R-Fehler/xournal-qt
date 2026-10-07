@@ -1,7 +1,7 @@
 /*
- * xournal-qt: a PDF with notes saved again as an incremental update (HybridInternal.h; qt/docs/hybrid-pdf.md, "Saving:
- * incremental updates"): only what changed is appended; pages whose layers and links are as the marker recorded them
- * are not even read.
+ * xournal-qt: a PDF with notes saved again as an incremental update (HybridInternal.h; qt/docs/features/hybrid-pdf.md,
+ * "Saving: incremental updates"): only what changed is appended; pages whose layers and links are as the marker
+ * recorded them are not even read.
  *
  * @license GNU GPLv2 or later
  */
@@ -271,8 +271,8 @@ private:
         return true;
     }
 
-    /// Page i's boxes for its space for notes (qt/docs/note-space.md). Only pages that have or had space are read; a
-    /// page of the file whose boxes change is written again, with its annotations (placed on its crop box).
+    /// Page i's boxes for its space for notes (qt/docs/features/note-space.md). Only pages that have or had space are
+    /// read; a page of the file whose boxes change is written again, with its annotations (placed on its crop box).
     void placeSpace(size_t i, QPDFObjectHandle obj, const NoteSpace& space) {
         if (u.isNew(obj)) {
             setSpace(obj, space);

@@ -1,5 +1,5 @@
 /*
- * xournal-qt: gestures of the pen while it writes (qt/docs/pen-gestures.md).
+ * xournal-qt: gestures of the pen while it writes (qt/docs/features/pen-gestures.md).
  *
  * - Hold to straighten: a stroke of the pen or the highlighter, finished and held still for a moment before the pen is
  *   lifted, becomes what upstream's ShapeRecognizer makes of it (a line, a triangle, a rectangle, a circle or an

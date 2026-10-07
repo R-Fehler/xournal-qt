@@ -1,7 +1,7 @@
 // Where the link under the mouse or the hovering pen leads, in a small line at the bottom left of the canvas, as
-// browsers show it (qt/docs/links.md, "Links with the mouse"). It comes once the pointer rested on the link for a
-// moment (DocumentCanvas.hoveredLink) and fades out when it leaves. It never takes the focus or a press (the canvas
-// looks through it), and it moves to the bottom right when the pointer is where it would be.
+// browsers show it (qt/docs/features/links.md, "Links with the mouse"). It comes once the pointer rested on the link
+// for a moment (DocumentCanvas.hoveredLink) and fades out when it leaves. It never takes the focus or a press (the
+// canvas looks through it), and it moves to the bottom right when the pointer is where it would be.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

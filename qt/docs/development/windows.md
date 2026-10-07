@@ -5,7 +5,7 @@ start `bin\xournal-qt.exe`. No installer yet. What is left for later is in [wind
 
 ## Getting the zip
 
-The workflow **xournal-qt Windows** ([.github/workflows/xqt-windows.yml](../../.github/workflows/xqt-windows.yml))
+The workflow **xournal-qt Windows** ([.github/workflows/xqt-windows.yml](../../../.github/workflows/xqt-windows.yml))
 runs when it is started by hand (Actions → "xournal-qt Windows" → "Run workflow", any branch) and for every push
 to the branch `qt/windows-build`, and for nothing else. Its run page has the artifacts:
 
@@ -56,7 +56,7 @@ drawn into an image surface: a PNG export of a document with text, the page rast
 process ends with a fatal NTSTATUS and prints nothing (MSYS2 shows exit code 127). Text into a PDF worked, and so
 did everything with `PANGOCAIRO_BACKEND=fc`, which is what Linux uses as well.
 
-So the app and the CLI start with ([WindowsFonts.cpp](../src/app/WindowsFonts.cpp)):
+So the app and the CLI start with ([WindowsFonts.cpp](../../src/app/WindowsFonts.cpp)):
 
 - `PANGOCAIRO_BACKEND=fc`, and `FONTCONFIG_FILE` pointing to a `fonts.conf` of their own, written at every start to
   `%LOCALAPPDATA%\cache\xournal-qt\fontconfig\` (the cache folder, `XDG_CACHE_HOME` when set). It lists
@@ -108,23 +108,23 @@ What to look for: pen strokes that arrive as `MouseButtonPress` with `type=Mouse
 **Toolchain: MSYS2 UCRT64**, the one upstream Xournal++ builds its Windows installer with. GLib, Cairo, Pango,
 poppler, qpdf, libxml2, libzip, gdk-pixbuf and Qt 6 are prebuilt `mingw-w64-ucrt-x86_64-*` packages, so nothing is
 compiled but the app. The fallback, if MSYS2 ever gets in the way, is QField's route: MSVC with vcpkg, reusing the
-manifest [qt/vcpkg.json](../vcpkg.json) of the Android build.
+manifest [qt/vcpkg.json](../../vcpkg.json) of the Android build.
 
 The workflow's steps:
 
 1. **MSYS2** (`msys2/setup-msys2`, `UCRT64`, updated): `toolchain`, `cmake`, `ninja`, `ccache`, `glib2`, `cairo`,
    `pango`, `gdk-pixbuf2`, `poppler`, `qpdf`, `libxml2`, `libzip`, `zlib`, `qt6-base`, `qt6-declarative`,
-   `qt6-svg`, `qt6-shadertools` (the shader of dark pages, qt/docs/dark-pages.md), `qt6-multimedia` (the microphone
-   and the speaker of the audio recordings, [audio.md](audio.md)). The step after it prints the versions and where
+   `qt6-svg`, `qt6-shadertools` (the shader of dark pages, qt/docs/features/dark-pages.md), `qt6-multimedia` (the microphone
+   and the speaker of the audio recordings, [audio.md](../features/audio.md)). The step after it prints the versions and where
    Qt's tools are.
 2. **Configure**: `cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DXQT_BUILD_TESTS=OFF
    -DXQT_BUILD_SPIKES=OFF -DXQT_BUILD_CLI=ON -DXQT_REQUIRE_AUDIO=ON` (without Qt Multimedia the configure step fails
    rather than build a zip without recording). The dependencies are found as on the other platforms
-   ([XojDeps.cmake](../cmake/XojDeps.cmake)): libxml2, libzip and qpdf as CMake packages, the GNOME libraries through
+   ([XojDeps.cmake](../../cmake/XojDeps.cmake)): libxml2, libzip and qpdf as CMake packages, the GNOME libraries through
    pkg-config, and on Windows also libintl (gettext is not part of the C library there).
 3. **Build** with ccache (its folder is cached between runs), `ninja -k 0`: it keeps going after an error, so one run
    lists every file that does not compile. The errors are repeated at the end of the step and in the run's summary.
-4. **Deploy** ([qt/scripts/windows-deploy.sh](../scripts/windows-deploy.sh)):
+4. **Deploy** ([qt/scripts/windows-deploy.sh](../../scripts/windows-deploy.sh)):
    - `cmake --install` (the program, the CLI, `share/xournal-qt`);
    - `windeployqt --qmldir qt/src/app/qml`: Qt's DLLs and plugins and the QML modules the QML files import. When
      windeployqt is missing or fails, the script copies Qt's plugin folders and the QML modules the app imports
@@ -139,11 +139,11 @@ The workflow's steps:
    - every DLL from MSYS2 that any `.exe` or `.dll` in the folder imports, recursively (read with `objdump -p`;
      nothing is run), and a final check that every import is in `bin\` or part of Windows.
 5. **Publish** the folder as the artifact `xournal-qt-windows-x64`.
-6. **Smoke test** ([qt/scripts/windows-smoke.sh](../scripts/windows-smoke.sh)), with a `PATH` of Windows alone so
+6. **Smoke test** ([qt/scripts/windows-smoke.sh](../../scripts/windows-smoke.sh)), with a `PATH` of Windows alone so
    that a DLL missing from the folder shows here: the CLI's `--version`; exports chosen to tell apart what fails
    (strokes to PNG: raster without text; text to PDF: text without raster; text to PNG: both; images to PDF; a PDF
    background to PDF); then the app itself, off-screen with Qt Quick's software renderer, opening a library and a
-   document and saving a screenshot of its window after 5 s. Last, `text-probe` ([qt/tools/text-probe.c](../tools/text-probe.c)),
+   document and saving a screenshot of its window after 5 s. Last, `text-probe` ([qt/tools/text-probe.c](../../tools/text-probe.c)),
    Pango and Cairo alone drawing text into a PNG and a PDF with the folder's DLLs, with each of Pango's font backends
    and with and without the UTF-8 C locale. Then recording: `Qt6Multimedia.dll` is in `bin\` (its imports are
    listed), no media plugin and no FFmpeg DLL is, and `xournal-qt --audio-info` says "recording: available (Qt
@@ -163,15 +163,15 @@ The unit tests are not built on Windows yet: they use POSIX headers and `/proc` 
 
 | Where | Linux | Windows |
 |---|---|---|
-| [WindowsFonts.cpp](../src/app/WindowsFonts.cpp), at start of the app and the CLI | fontconfig is Pango's only backend | Pango's fontconfig backend with a configuration of our own (see "Text and fonts") |
-| [WindowsSetup.cpp](../src/app/WindowsSetup.cpp), at start | – | The C library's character set becomes UTF-8 (`setlocale(LC_CTYPE, ".UTF-8")`): libstdc++'s `std::filesystem` converts narrow strings with it, and the app hands it UTF-8 everywhere (`QString::toStdString`, GLib, the core). Without it a path with an umlaut would be read in the ANSI code page. `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME` point to Qt's generic folders unless set: GLib reads them on Windows too, and its default cache is the Internet Explorer cache folder |
-| Single instance ([SingleInstance.cpp](../src/shell/SingleInstance.cpp)) | a local socket named after the uid | a named pipe named after a hash of the Windows user (pipes are shared by all users of a machine) |
-| Crash recovery ([SessionRecovery.cpp](../src/shell/SessionRecovery.cpp)) | signal handlers; other instances are checked in `/proc` | also an unhandled-exception filter (access violations arrive as structured exceptions), chained to MinGW's; other instances are checked with `QueryFullProcessImageNameW`. No `SIGBUS` |
-| Printing ([PdfPrinting.cpp](../src/shell/PdfPrinting.cpp)) | the PDF goes to `lp` as it is | no spooler takes a PDF: poppler draws each page into an image of at most 300 dpi, which Qt's print engine sends to the printer chosen in the Windows print dialog |
-| "Show in file manager" ([SystemApps.cpp](../src/shell/SystemApps.cpp)) | D-Bus `FileManager1.ShowItems` | `explorer /select,<file>`. D-Bus is Linux only |
-| Memory size ([CanvasMemory.cpp](../src/canvas/CanvasMemory.cpp)) | `sysconf` | `GlobalMemoryStatusEx` |
-| Background render threads ([RenderService.cpp](../src/render/RenderService.cpp)) | `SCHED_IDLE` | `THREAD_PRIORITY_IDLE` |
-| CLI arguments ([cli/main.cpp](../cli/main.cpp)) | `argv` | the UTF-8 command line (`g_win32_get_command_line`) |
+| [WindowsFonts.cpp](../../src/app/WindowsFonts.cpp), at start of the app and the CLI | fontconfig is Pango's only backend | Pango's fontconfig backend with a configuration of our own (see "Text and fonts") |
+| [WindowsSetup.cpp](../../src/app/WindowsSetup.cpp), at start | – | The C library's character set becomes UTF-8 (`setlocale(LC_CTYPE, ".UTF-8")`): libstdc++'s `std::filesystem` converts narrow strings with it, and the app hands it UTF-8 everywhere (`QString::toStdString`, GLib, the core). Without it a path with an umlaut would be read in the ANSI code page. `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME` point to Qt's generic folders unless set: GLib reads them on Windows too, and its default cache is the Internet Explorer cache folder |
+| Single instance ([SingleInstance.cpp](../../src/shell/SingleInstance.cpp)) | a local socket named after the uid | a named pipe named after a hash of the Windows user (pipes are shared by all users of a machine) |
+| Crash recovery ([SessionRecovery.cpp](../../src/shell/SessionRecovery.cpp)) | signal handlers; other instances are checked in `/proc` | also an unhandled-exception filter (access violations arrive as structured exceptions), chained to MinGW's; other instances are checked with `QueryFullProcessImageNameW`. No `SIGBUS` |
+| Printing ([PdfPrinting.cpp](../../src/shell/PdfPrinting.cpp)) | the PDF goes to `lp` as it is | no spooler takes a PDF: poppler draws each page into an image of at most 300 dpi, which Qt's print engine sends to the printer chosen in the Windows print dialog |
+| "Show in file manager" ([SystemApps.cpp](../../src/shell/SystemApps.cpp)) | D-Bus `FileManager1.ShowItems` | `explorer /select,<file>`. D-Bus is Linux only |
+| Memory size ([CanvasMemory.cpp](../../src/canvas/CanvasMemory.cpp)) | `sysconf` | `GlobalMemoryStatusEx` |
+| Background render threads ([RenderService.cpp](../../src/render/RenderService.cpp)) | `SCHED_IDLE` | `THREAD_PRIORITY_IDLE` |
+| CLI arguments ([cli/main.cpp](../../cli/main.cpp)) | `argv` | the UTF-8 command line (`g_win32_get_command_line`) |
 | CMake | strict C++20 | gnu++20 (MinGW's headers hide `M_PI` and POSIX names under strict C++), `NOMINMAX`, 8 MB thread stacks as on Linux (MinGW's default is 2 MB), a GUI executable (`WIN32_EXECUTABLE`), `-Wa,-mbig-obj` (large translation units), no desktop files or `.deb` |
 
 ## Building it on a Windows machine

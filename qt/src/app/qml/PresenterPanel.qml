@@ -1,6 +1,6 @@
-// The presenter's console beside the current page (qt/docs/presenter-view.md): the clock, the time since the start
-// (paused, resumed, reset), the page number, the next page smaller, swap screens and end. The current page itself is
-// the window's canvas at its left, with its space for notes; the audience's screen shows only the slide.
+// The presenter's console beside the current page (qt/docs/features/presenter-view.md): the clock, the time since the
+// start (paused, resumed, reset), the page number, the next page smaller, swap screens and end. The current page itself
+// is the window's canvas at its left, with its space for notes; the audience's screen shows only the slide.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

@@ -11,7 +11,7 @@ bundle with Homebrew moved away.
 
 ## Getting the .dmg
 
-The workflow **xournal-qt macOS** ([.github/workflows/xqt-macos.yml](../../.github/workflows/xqt-macos.yml)) runs when
+The workflow **xournal-qt macOS** ([.github/workflows/xqt-macos.yml](../../../.github/workflows/xqt-macos.yml)) runs when
 it is started by hand (Actions → "xournal-qt macOS" → "Run workflow", any branch), for every push to the branch
 `qt/macos-build`, and when another workflow calls it (`workflow_call`, meant for the release workflow; not wired in
 yet). Its run page has the artifacts:
@@ -55,14 +55,14 @@ Where the program keeps things (GLib's XDG folders, as on Linux and as upstream 
 and the app need is a Homebrew bottle, so nothing is compiled but the app:
 
 - `glib`, `cairo`, `pango`, `fontconfig`, `poppler`, `libzip`, `gdk-pixbuf`, `gettext` (libintl, which is not part
-  of the C library on macOS; [XojDeps.cmake](../cmake/XojDeps.cmake) links it as on Windows);
-- `qpdf` 12.4 (12 or newer is what [XqtQpdf.cmake](../cmake/XqtQpdf.cmake) asks for). The Linux packages compile a
+  of the C library on macOS; [XojDeps.cmake](../../cmake/XojDeps.cmake) links it as on Windows);
+- `qpdf` 12.4 (12 or newer is what [XqtQpdf.cmake](../../cmake/XqtQpdf.cmake) asks for). The Linux packages compile a
   pinned qpdf into the program because the distributions have old ones; Homebrew's is current, so on macOS, as on
   Windows and Android, the package manager's qpdf is used (`XQT_SYSTEM_QPDF` is on by default for Apple);
 - Qt 6.11 as Homebrew's split formulas `qtbase` (it has `macdeployqt`), `qtdeclarative` (the QML modules),
   `qtsvg` (the SVG icons) and `qtmultimedia` (the microphone and the speaker of the audio recordings,
-  [audio.md](audio.md)), not the `qt` formula that pulls in every Qt module;
-- `librsvg` only to draw the program icon ([qt/packaging/xournal-qt.svg](../packaging/xournal-qt.svg)) into the
+  [audio.md](../features/audio.md)), not the `qt` formula that pulls in every Qt module;
+- `librsvg` only to draw the program icon ([qt/packaging/xournal-qt.svg](../../packaging/xournal-qt.svg)) into the
   `.icns`;
 - libxml2 and zlib come with macOS.
 
@@ -79,7 +79,7 @@ The workflow's steps:
    without Qt Multimedia the configure step fails rather than build a `.dmg` without recording).
 3. **Build** with ccache (its folder is cached between runs), `ninja -k 0`: one run lists every file that does not
    compile, repeated in the run's summary.
-4. **Bundle and disk image** ([qt/scripts/macos-deploy.sh](../scripts/macos-deploy.sh)):
+4. **Bundle and disk image** ([qt/scripts/macos-deploy.sh](../../scripts/macos-deploy.sh)):
    - `cmake --install` into a staging folder; the program and the CLI go to `Contents/MacOS`, the resources (page
      templates, palettes, icons, fonts) to `Contents/Resources/share/xournal-qt`, where
      `AppContext::defaultResourceDir` looks in a bundle;
@@ -99,14 +99,14 @@ The workflow's steps:
      removes the rpaths into Homebrew;
    - a check that every reference of every binary resolves inside the bundle (a failure otherwise: it would not
      start on a Mac without Homebrew);
-   - `Info.plist` from [qt/packaging/macos/Info.plist.in](../packaging/macos/Info.plist.in): bundle id
+   - `Info.plist` from [qt/packaging/macos/Info.plist.in](../../packaging/macos/Info.plist.in): bundle id
      `org.xournalqt.app` (the Android app's id), the version from `qt/CMakeLists.txt`, the minimum macOS, the document
      types;
    - an ad-hoc signature (`codesign --sign -`: `install_name_tool` broke the linker's signatures, and Apple Silicon
      runs no unsigned code);
    - the `.dmg` (`hdiutil create`, compressed) with the app, a link to Applications and a README.
 5. **Publish** the `.dmg` as the artifact `xournal-qt-macos-arm64`.
-6. **Smoke test** ([qt/scripts/macos-smoke.sh](../scripts/macos-smoke.sh)), everything from the bundle and with
+6. **Smoke test** ([qt/scripts/macos-smoke.sh](../../scripts/macos-smoke.sh)), everything from the bundle and with
    **Homebrew moved away** (`/opt/homebrew` renamed for the step, and put back after it), so that a library missing
    from the bundle fails here and not on a Mac without Homebrew: the CLI's `--version`; exports that tell apart what
    fails (strokes to PNG, text to PDF, text to PNG, images to PDF, a PDF background to PDF); then the app, off-screen
@@ -121,7 +121,7 @@ The workflow's steps:
 Homebrew builds its bottles for the three newest macOS versions only, and each for its own version: on the
 `macos-14` runner glib, cairo, pango and qpdf would have been compiled from source, and on `macos-15` the bottles
 (and so the app) need macOS 15. Supporting older macOS would mean building every library ourselves with an older
-deployment target, as upstream Xournal++ does with jhbuild ([mac-setup/](../../mac-setup)) or as the Android build
+deployment target, as upstream Xournal++ does with jhbuild ([mac-setup/](../../../mac-setup)) or as the Android build
 does with vcpkg.
 
 ### Intel Macs
@@ -133,7 +133,7 @@ out, and no Intel run was made: Homebrew no longer publishes bottles for Intel M
 2026-09-27 at formulae.brew.sh), so the job would compile Qt and every library from source, for hours, past the
 job's time limit.
 An Intel build would need the libraries from elsewhere, as for older macOS versions above: vcpkg (the manifest
-[qt/vcpkg.json](../vcpkg.json) of the Android build, with the `x64-osx` triplet) and Qt's official binaries
+[qt/vcpkg.json](../../vcpkg.json) of the Android build, with the `x64-osx` triplet) and Qt's official binaries
 (aqtinstall). No universal binary.
 
 ## What the code does differently on macOS
@@ -150,7 +150,7 @@ An Intel build would need the libraries from elsewhere, as for older macOS versi
   (untested).
 - **Session recovery** asks the kernel for the name of a process (`proc_name`) instead of `/proc`.
 - **Show in Finder**: `open -R` (SystemApps.cpp). No D-Bus.
-- **The microphone** ([audio.md](audio.md), "macOS"): macOS asks the first time a recording starts, with the text of
+- **The microphone** ([audio.md](../features/audio.md), "macOS"): macOS asks the first time a recording starts, with the text of
   `NSMicrophoneUsageDescription` in `Info.plist`; refused, a dialog says where to allow it and opens System Settings →
   Privacy & Security → Microphone. With the hardened runtime (signing, below) the entitlement
   `com.apple.security.device.audio-input` is needed as well.

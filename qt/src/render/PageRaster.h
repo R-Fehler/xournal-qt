@@ -7,7 +7,7 @@
  *    (scaled) until then, exactly like upstream;
  *  - partial re-renders render only the (merged) dirty rectangles and paint them onto the existing buffer;
  *  - tool views may draw directly onto the buffer (drawAndDeleteToolView) under the drawing mutex.
- * Differences to upstream (see qt/docs/adr/0002-upstream-seams.md):
+ * Differences to upstream (see qt/docs/decisions/0002-upstream-seams.md):
  *  - fractional device pixel ratios are supported (scaled template surface instead of an integer DPI factor);
  *  - the PDF background is rendered without holding the document lock (PDF pages are immutable), so that a slow
  *    PDF render never blocks the UI thread when it takes the exclusive document lock (e.g. on pen-up);

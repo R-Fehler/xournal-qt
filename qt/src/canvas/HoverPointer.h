@@ -1,5 +1,5 @@
 /*
- * xournal-qt: what the pointer looks like over the page (qt/docs/hover-cursors.md).
+ * xournal-qt: what the pointer looks like over the page (qt/docs/features/hover-cursors.md).
  *
  * The mouse and the hovering pen show the tool's pointer: a small dot (the default) or the crosshair, a setting. With
  * the eraser in hand (also the pen's eraser end, or a side button set to erase) it is the eraser itself: its real

@@ -1,9 +1,9 @@
 .pragma library
 // The line styles (upstream's StrokeStyle: plain, dashed, dash-dot, dotted) as the samples draw them: the buttons of
 // the toolbox's editor and of the pen's options, the ink of a tool on the rail.
-// Two things of Qt's Canvas to know (qt/docs/toolbox.md, "Line styles"): setLineDash() takes only a JavaScript array -
-// a list that came through a model (a Repeater's modelData.dashes) is silently ignored and the line is drawn solid;
-// and, as QPen does, it measures the dashes in widths of the line, not in pixels.
+// Two things of Qt's Canvas to know (qt/docs/features/toolbox.md, "Line styles"): setLineDash() takes only a JavaScript
+// array - a list that came through a model (a Repeater's modelData.dashes) is silently ignored and the line is drawn
+// solid; and, as QPen does, it measures the dashes in widths of the line, not in pixels.
 
 /// Upstream's dashes, in widths of the line (as it draws them, round caps), as a new JavaScript array
 function dashes(style) {

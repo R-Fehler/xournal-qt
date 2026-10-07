@@ -53,12 +53,12 @@ ask the user whether they also want to paste a link to the source document and p
 - **The link:** when the snip came from a document with a file, a note at the bottom offers "Add a link to the source
   page (name, page N)?" with **Add link**; it goes away by itself after a few seconds (nothing modal). Add link puts a
   link marker (as "Copy link" pasted, [links.md](links.md)) under the picture (beside it when there is no room
-  below): `[🔗 name, page N](../relative/name.xopp#page=N&…)`, relative to the document it is pasted into, with
+  below): `[🔗 name, page N](../../relative/name.xopp#page=N&…)`, relative to the document it is pasted into, with
   `pdfpage=` for a page that shows a PDF page and the page's first words for one that does not. One undo step.
 - **A document without a file** (new, not saved): no link offered, the picture alone.
 - **Markdown** (a `.md`, a Markdown text being written on a page): the picture the Markdown way
-  ([md-images.md](md-images.md): saved next to the document, `![](name.assets/image-….png)`), and the offer adds a
-  Markdown link `[name, page N](path#page=N…)` as a paragraph after the picture.
+  ([md-images.md](md-images.md): saved next to the document, `![](../name.assets/image-….png)`), and the offer adds a
+  Markdown link `[name, page N](../path#page=N…)` as a paragraph after the picture.
 - Pasted into another app: the picture (at its resolution); the fork's entry is ignored there.
 
 ## Code

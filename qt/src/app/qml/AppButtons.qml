@@ -6,10 +6,10 @@ import QtQuick.Controls.Material
 import QtQuick.Layouts
 import "Popups.js" as Popups
 
-// The window's buttons of the app's items (tools and commands, qt/docs/toolbox.md): kept here, out of sight, and
-// lent to the bar that holds each of them in the arrangement (the rail or the top bar, ToolboxModel); one not placed
-// stays here (⋮ and the catalog reach it). The buttons of the moment (the emoji while writing, edit as notes, open
-// externally) sit at the top bar's end, before "+".
+// The window's buttons of the app's items (tools and commands, qt/docs/features/toolbox.md): kept here, out of sight,
+// and lent to the bar that holds each of them in the arrangement (the rail or the top bar, ToolboxModel); one not
+// placed stays here (⋮ and the catalog reach it). The buttons of the moment (the emoji while writing, edit as notes,
+// open externally) sit at the top bar's end, before "+".
 Item {
     id: toolArea
     objectName: "toolArea"
@@ -67,8 +67,8 @@ Item {
             onClicked: app.settings.set("touchDrawing", !checked)
         }
         ToolCycleButton { id: selectTool; objectName: "selectButton"; parent: toolBank; group: "select"; property bool offered: !win.textDoc }
-        // Snip (qt/docs/snip.md): one tap away, a fixed tool of the rail (qt/copy-tools); a tap while armed: the other
-        // shape
+        // Snip (qt/docs/features/snip.md): one tap away, a fixed tool of the rail (qt/copy-tools); a tap while armed:
+        // the other shape
         ToolCycleButton { id: snipTool; objectName: "snipButton"; parent: toolBank; group: "snip"; property bool offered: !win.textDoc }
         // Writing on the page with the keyboard: Markdown, formatted while typing (hold: its source beside the page).
         IconButton {
@@ -244,7 +244,8 @@ Item {
                 acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
                 onTapped: function(point) { Popups.openAt(imageMenu, point.position) }
             }
-            // A picture file, or a snip: the picture of a rectangle or lasso on any page (qt/docs/snip.md), to paste
+            // A picture file, or a snip: the picture of a rectangle or lasso on any page (qt/docs/features/snip.md), to
+            // paste
             AdaptiveMenu {
                 id: imageMenu
                 objectName: "imageMenu"
@@ -267,7 +268,7 @@ Item {
                     icon.source: app.iconUrl("xqt-snip")
                     onTriggered: app.startSnip("lasso")
                 }
-                // A check box for a to-do written by hand beside it (qt/docs/todos.md): the next tap places it
+                // A check box for a to-do written by hand beside it (qt/docs/features/todos.md): the next tap places it
                 AdaptiveMenuItem {
                     objectName: "todoStampItem"
                     text: qsTr("Check box for a handwritten to-do")
@@ -276,14 +277,14 @@ Item {
                 }
             }
         }
-        // Stickers (qt/docs/stickers.md): saved content of the library, pasted with a tap (self-contained:
+        // Stickers (qt/docs/features/stickers.md): saved content of the library, pasted with a tap (self-contained:
         // StickerButton.qml brings its picker and its dialog)
         StickerButton {
             id: stickerTool
             parent: toolBank
             property bool offered: !win.textDoc
         }
-        // Recording (qt/docs/audio.md): self-contained, the tool bar only places it
+        // Recording (qt/docs/features/audio.md): self-contained, the tool bar only places it
         RecordButton { id: recordTool; parent: toolBank }
         IconButton {
             id: addPageTool
@@ -302,7 +303,7 @@ Item {
                 acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
                 onTapped: function(point) { Popups.openAt(addPageMenu, point.position) }
             }
-            // Its list: the templates used last (qt/docs/templates.md), all templates, the Insert pages dialog
+            // Its list: the templates used last (qt/docs/features/templates.md), all templates, the Insert pages dialog
             AdaptiveMenu {
                 id: addPageMenu
                 objectName: "addPageMenu"
@@ -400,7 +401,7 @@ Item {
             tip: qsTr("Settings") + win.keyNote("settings")
             onClicked: settingsPage.open()
         }
-        // New: the tab strip's "+" where the tab strip is shown (one place for each action, qt/docs/adaptive-layout.md);
+        // New: the tab strip's "+" where the tab strip is shown (one place for each action, qt/docs/features/adaptive-layout.md);
         // a button of the bar where it is not (the compact chrome's tools, the phone's sheet)
         IconButton {
             id: newTool
@@ -452,7 +453,8 @@ Item {
             tip: qsTr("Open externally (in the app the system has for this file)")
             onClicked: saveFlow.openExternally()
         }
-        // Commands of the top bar's first layout that ⋮ has too (qt/docs/toolbox.md, "The top bar": ⋮ is complete)
+        // Commands of the top bar's first layout that ⋮ has too (qt/docs/features/toolbox.md, "The top bar": ⋮ is
+        // complete)
         IconButton {
             id: shareTool
             objectName: "shareButton"
@@ -506,7 +508,7 @@ Item {
             tip: win.withKeys(qsTr("Read: Zen and read only, in full screen (the edges turn the pages)"), "read")
             onClicked: win.modes.startReading()
         }
-        // Zen: only the page and a faint dot in the lower left corner (qt/docs/zen.md)
+        // Zen: only the page and a faint dot in the lower left corner (qt/docs/features/zen.md)
         IconButton {
             id: zenTool
             objectName: "zenButton"

@@ -1,5 +1,6 @@
 /*
- * xournal-qt: a document view shows its document as of a moment of its timeline (qt/docs/timeline.md, "Replay").
+ * xournal-qt: a document view shows its document as of a moment of its timeline (qt/docs/features/timeline.md,
+ * "Replay").
  *
  * Read-only: the view is for reading while it replays (CanvasView::isReadingOnly); the document is never changed.
  *

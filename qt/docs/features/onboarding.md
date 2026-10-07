@@ -13,7 +13,7 @@ Settings button leads there).
 ## The introduction
 
 `qt/src/app/qml/IntroDialog.qml`, an `AdaptiveDialog` (a dialog in the middle of a desktop or tablet window, the whole
-screen on a phone, qt/docs/adaptive-layout.md).
+screen on a phone, qt/docs/features/adaptive-layout.md).
 
 | Page | Title | What it says |
 | --- | --- | --- |
@@ -54,7 +54,7 @@ as Qt resources (`:/xqt-help/…`, `qt/cmake/XqtApp.cmake`). Help → **Tutorial
   (Linux: `~/.local/share/xournal-qt/…`, Windows: `%APPDATA%\…`, Android: the app's own storage). Not in a library:
   the user's folders stay clean (VISION.md), and nothing new appears in their library or sync. It is in Recent
   once opened.
-- **What the copy is.** A **PDF text document** (qt/docs/md-pdf.md) made from the Markdown, as "Open as PDF document"
+- **What the copy is.** A **PDF text document** (qt/docs/features/md-pdf.md) made from the Markdown, as "Open as PDF document"
   makes one: the text is typeset on pages, the pen writes ink on top, the keyboard keeps editing the text, and the
   formatting bar is there. So every exercise (pen, highlighter, select, pages, Markdown) works on the tutorial itself,
   in both ways of keeping documents. The pictures the text links to are copied out of the resources into the
@@ -93,7 +93,7 @@ lists them all:
    1280 px wide keeps the tool bar in one row).
 2. Save it as `qt/resources/help/tutorial.assets/<name>.png` (short lowercase names, e.g. `more-menu.png`; PNG or
    JPEG; keep it under about 300 KB, it is compiled into the program).
-3. Replace the placeholder quote with `![The ⋮ menu with Save as, Share and Export](tutorial.assets/more-menu.png)`.
+3. Replace the placeholder quote with `![The ⋮ menu with Save as, Share and Export](../tutorial.assets/more-menu.png)`.
    Every file in `tutorial.assets/` is picked up by the next CMake run (a glob with `CONFIGURE_DEPENDS`).
 4. Rebuild and open Help → Start the tutorial again: the picture is in the copy (and inside its PDF once saved).
 

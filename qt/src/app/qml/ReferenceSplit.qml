@@ -5,8 +5,8 @@
 // both sides together (app.reference.scrollLocked), edit, fit width, swap sides, swap roles, close. While two versions
 // are compared (app.compare) a bar at the top of the reference says what changed, with the next and previous change. The main document has a thin frame, so it is always clear which side is the notes.
 // Side by side where the canvas area is landscape, top and bottom where it is portrait (h > w: a tablet or a phone
-// held upright); the divider keeps its ratio when that flips (qt/docs/reference-view.md). In a narrow half (< 480 px)
-// the pill shows only the page and a ⋮ with the rest.
+// held upright); the divider keeps its ratio when that flips (qt/docs/features/reference-view.md). In a narrow half (<
+// 480 px) the pill shows only the page and a ⋮ with the rest.
 // The reference may be the tab's own document (qt/self-reference): a second view of it with a page and a zoom of its
 // own.
 import QtQuick
@@ -108,7 +108,7 @@ Item {
             focus: true
             // For reading, unless the edit switch of its pill is on (per tab)
             readingOnly: !app.reference.editing
-            rotatable: false  // (only the notes turn: qt/docs/canvas-rotation.md)
+            rotatable: false  // (only the notes turn: qt/docs/features/canvas-rotation.md)
             view: split.active ? app.reference.view : null
         }
 

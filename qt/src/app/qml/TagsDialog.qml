@@ -1,5 +1,5 @@
-// "Tags…" of a document (a library card's menu, the document's ⋮ → Document; qt/docs/tags.md). A PDF (also one with
-// notes, a text document, an archive PDF) gets its tags as keywords of the file, without typing into it: the chips
+// "Tags…" of a document (a library card's menu, the document's ⋮ → Document; qt/docs/features/tags.md). A PDF (also one
+// with notes, a text document, an archive PDF) gets its tags as keywords of the file, without typing into it: the chips
 // with ✕, a field to add one (Enter, or a suggestion from the library's tags), Save writes them (an incremental update).
 // The #tags typed in the document are listed as well; they are changed where they are written. A Xournal++ file or a
 // Markdown file has only those: the dialog says how to add one.

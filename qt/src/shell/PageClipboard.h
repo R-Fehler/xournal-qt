@@ -43,9 +43,9 @@ public:
     /// Resolution of PDF pages turned into image backgrounds.
     static constexpr double IMAGE_DPI = 200;
 
-    /// (a page saved as a template, qt/docs/templates.md) The copied page `i` as copied, its PDF background page
-    /// (nullptr: none) and, when the clipboard holds this one page, its PDF page as a PDF of one page (empty: none, or
-    /// it could not be copied).
+    /// (a page saved as a template, qt/docs/features/templates.md) The copied page `i` as copied, its PDF background
+    /// page (nullptr: none) and, when the clipboard holds this one page, its PDF page as a PDF of one page (empty:
+    /// none, or it could not be copied).
     struct Copied {
         PageRef page;
         XojPdfPageSPtr pdfPage;

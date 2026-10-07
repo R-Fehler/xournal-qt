@@ -1,5 +1,6 @@
 /*
- * xournal-qt: the task lines of a Markdown text (qt/docs/todos.md): "- [ ] call the lab", "* [x] done", "1. [ ] …".
+ * xournal-qt: the task lines of a Markdown text (qt/docs/features/todos.md): "- [ ] call the lab", "* [x] done", "1. [
+ * ] …".
  *
  * They are found by the parser (md4c's task lists, as the boxes draw them), so an example in a code block is none. A
  * task's due date is written in the Obsidian Tasks way ("📅 2026-10-12") or as "due:2026-10-12". A check-box stamp

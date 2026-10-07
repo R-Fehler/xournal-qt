@@ -35,7 +35,7 @@ A PDF page turns in a copy of it (`pagerotate::PdfPages::InPdf`, in every docume
 (the way a pasted PDF page does, `PdfPageKeeper`), and the page shows it. The PDF the document annotates is never
 changed.
 - **A `.xopp`:** saving puts the merged PDF next to it as the hidden `.name.pages.pdf` (as for pasted pages,
-  `qt/docs/hybrid-pdf.md` / `MergedPdf.h`), and the `.xopp` refers to it. Upstream Xournal++ opens that pair as it is:
+  `qt/docs/features/hybrid-pdf.md` / `MergedPdf.h`), and the `.xopp` refers to it. Upstream Xournal++ opens that pair as it is:
   poppler shows the page with its `/Rotate`, and the `.xopp` has the turned size and the turned ink. The PDF next to
   the `.xopp` (`lecture.pdf`) stays as it was.
 - **A PDF with notes, and PDF files mode:** saving copies the turned page into the file as the page's base page:

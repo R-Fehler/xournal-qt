@@ -1,7 +1,7 @@
 /*
- * xournal-qt: tags (qt/docs/tags.md): `#tag` in typed text, Markdown boxes, sticky notes and Markdown files (with an
- * Obsidian front matter), keywords of PDFs (document information and XMP), read into the library index's "notes"
- * pack.
+ * xournal-qt: tags (qt/docs/features/tags.md): `#tag` in typed text, Markdown boxes, sticky notes and Markdown files
+ * (with an Obsidian front matter), keywords of PDFs (document information and XMP), read into the library index's
+ * "notes" pack.
  *
  * @license GNU GPLv2 or later
  */

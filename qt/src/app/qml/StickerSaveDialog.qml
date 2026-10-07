@@ -1,7 +1,7 @@
-// "Save as sticker…" (qt/docs/stickers.md): what is selected becomes a sticker of the library's Stickers folder (or,
-// "In all libraries", of the app-wide set). The name (the first words of its first text, else "Sticker <date>"), the
-// folder (the set itself, one of its folders, or a new one typed), "With the PDF behind it" where the page shows a PDF
-// page or a picture. Written in the background; it is on the clipboard too.
+// "Save as sticker…" (qt/docs/features/stickers.md): what is selected becomes a sticker of the library's Stickers
+// folder (or, "In all libraries", of the app-wide set). The name (the first words of its first text, else "Sticker
+// <date>"), the folder (the set itself, one of its folders, or a new one typed), "With the PDF behind it" where the
+// page shows a PDF page or a picture. Written in the background; it is on the clipboard too.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

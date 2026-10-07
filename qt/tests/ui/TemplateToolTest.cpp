@@ -1,6 +1,6 @@
 /*
- * xournal-qt: page templates in the real window (qt/docs/templates.md): "Save page as template…" (⋮ › Page, the
- * dialog: into the library's Templates folder, with or without background and content), the add-page button's list
+ * xournal-qt: page templates in the real window (qt/docs/features/templates.md): "Save page as template…" (⋮ › Page,
+ * the dialog: into the library's Templates folder, with or without background and content), the add-page button's list
  * (the templates used last, all of them in the picker), the Insert pages dialog's "From a template", and a new
  * document that starts from a template.
  *

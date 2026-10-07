@@ -1,5 +1,5 @@
-// arXiv (qt/docs/citations.md): search by title, or look up an arXiv ID, then download the paper's PDF into the
-// library, named by its title. The app's own networking is opt-in: the first request asks (what goes where), and
+// arXiv (qt/docs/features/citations.md): search by title, or look up an arXiv ID, then download the paper's PDF into
+// the library, named by its title. The app's own networking is opt-in: the first request asks (what goes where), and
 // Settings can turn it off. Every address is shown next to its button before anything is fetched.
 import QtQuick
 import QtQuick.Controls

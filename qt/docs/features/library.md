@@ -5,14 +5,14 @@ A **library** is a plain folder of documents that a window works in, like a work
 
 - `xournal-qt` opens the default library `<Documents>/Xournal_Libraries/Default` and creates it if needed.
   `<Documents>` is the user's Documents folder; on Android the phone's `Documents` (with "All files access"; until
-  then the app's own folder, which goes with the app: [android.md](android.md), "Where the documents are", which also
+  then the app's own folder, which goes with the app: [android.md](../development/android.md), "Where the documents are", which also
   says how the libraries move there safely).
 - `xournal-qt <folder> [files…]` opens a folder as library. Any folder with PDFs, `.xopp`, Markdown files or images
   works.
 - The library menu (▾ next to the library name) lists the libraries in `<Documents>/Xournal_Libraries`. The one of
   this window is highlighted; choosing another one opens it in a new window, as do "New library…" and "Open a folder
   as library…". A window never shows two libraries. On Android there is one window: it switches to the other library
-  (the open tabs stay), and a folder of the phone's storage needs "All files access" ([android.md](android.md));
+  (the open tabs stay), and a folder of the phone's storage needs "All files access" ([android.md](../development/android.md));
   with it, "Open a folder as library…" is the app's own folder list, which also offers the Download folder.
 - The Downloads folder is offered there too, as a quick library: all downloaded papers at once (on Android the
   phone's `Download` folder; without "All files access" tapping it asks for that first). Like every library
@@ -29,7 +29,7 @@ A **library** is a plain folder of documents that a window works in, like a work
 ## Documents on disk
 - `name.xopp` next to `name.pdf` is **one** document, and it opens as the `.xopp`. A lone `.xopp` (or `.xoj`) or a
   lone PDF is one document too. Older `name.pdf.xopp` files pair with `name.pdf`.
-- A **hybrid PDF** (`qt/docs/hybrid-pdf.md`) is one document, a PDF that carries its `.xopp`. Next to its `.xopp`
+- A **hybrid PDF** (`qt/docs/features/hybrid-pdf.md`) is one document, a PDF that carries its `.xopp`. Next to its `.xopp`
   export for Xournal++ (`name.xopp` with a hidden `.name.pages.pdf`), or the `.xopp` it was saved from and kept, the
   pair is one card that opens the hybrid PDF (such pairs look into the PDF; lone PDFs do not). A `.xopp` changed more
   than a minute after the hybrid PDF (edited in Xournal++) is listed as a document of its own beside it.
@@ -297,7 +297,7 @@ A cache folder holds a few **packs**, one file each, split by how often they cha
   (up to 48 MB of covers; the folders used least recently go first); new covers are written a few seconds
   later. Renamed or moved in the app, a document takes its cover along. Covers of documents outside a library
   (recent files) are PNG files in `~/.cache/xournal-qt/previews`. What the words cover, sketch, thumbnail and
-  stand-in mean, and the memory and workers of these pictures: [image-caches.md](image-caches.md).
+  stand-in mean, and the memory and workers of these pictures: [image-caches.md](../architecture/image-caches.md).
 
 A pack is CBOR (Qt's `QCborValue`) compressed with zlib, behind a header with a format number: a pack of another
 format is read anew. It is always written whole, under another name first (`QSaveFile`), never changed in place:

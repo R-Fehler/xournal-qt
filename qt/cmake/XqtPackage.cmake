@@ -10,7 +10,7 @@ install(DIRECTORY "${XQT_BUILD_RESOURCE_DIR}/palettes" "${XQT_BUILD_RESOURCE_DIR
     DESTINATION share/xournal-qt)
 
 # Windows: the program folder (bin/, share/) is what gets zipped, after windeployqt and the MinGW DLLs have been
-# added (qt/scripts/windows-deploy.sh, docs/windows.md). No desktop files and no .deb there.
+# added (qt/scripts/windows-deploy.sh, qt/docs/development/windows.md). No desktop files and no .deb there.
 if(WIN32)
     if(TARGET xournal-qt-cli)
         install(TARGETS xournal-qt-cli RUNTIME DESTINATION bin)

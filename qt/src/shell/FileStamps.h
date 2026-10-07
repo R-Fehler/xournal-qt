@@ -23,8 +23,8 @@ QString fileStamp(const fs::path& file);
 /// documentStamp with the stamps of the files from `stampOf` (sharing as a zip: the files as they are in the zip).
 QString documentStamp(const DocumentItem& item, const std::function<QString(const fs::path&)>& stampOf);
 /// A hash of a file's content (BLAKE2b-256, hex; "" if it cannot be read): a cache entry whose file has another time
-/// but the same size and this hash is the same file (copied, unzipped, synced: qt/docs/library.md, "Entries that
-/// survive a copy").
+/// but the same size and this hash is the same file (copied, unzipped, synced: qt/docs/features/library.md, "Entries
+/// that survive a copy").
 QString contentHash(const fs::path& file);
 /// The file whose stamp is a cache entry's own ("xopp" stamp): the .xopp, a Markdown file, a lone image or text file,
 /// a lone PDF (none for a PDF with its .xopp: the PDF has its own stamp).

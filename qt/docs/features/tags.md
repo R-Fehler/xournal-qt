@@ -1,6 +1,6 @@
 # Tags (`qt/tags`)
 
-Chosen by the author (2026-10-04, idea A13 of [the ideas of 2026-10](history/README.md), as in Apple Notes, Obsidian and
+Chosen by the author (2026-10-04, idea A13 of [the ideas of 2026-10](../history/README.md), as in Apple Notes, Obsidian and
 Zotero): `#tag` in typed text and Markdown, keywords of PDFs; indexed per folder; a Tags tab in the library like
 Favourites; `tag:` in the search; tags on the cards.
 

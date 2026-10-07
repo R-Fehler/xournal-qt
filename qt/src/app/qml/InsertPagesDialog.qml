@@ -1,6 +1,6 @@
 // Insert new pages with a chosen background (blank, ruled, graph, ...), paper size and orientation, before or after
-// a page. By default like the current page. Or "From a template" (qt/docs/templates.md): the template's page, as many
-// times as asked, as a pasted copy of it (one undo step).
+// a page. By default like the current page. Or "From a template" (qt/docs/features/templates.md): the template's page,
+// as many times as asked, as a pasted copy of it (one undo step).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -17,7 +17,7 @@ AdaptiveDialog {
     property int bgIndex: 0
     property int paper: -1  // -1: like the page
     property bool landscape: false
-    /// The paper (qt/docs/dark-pages.md): like the page, a page of the PDF: the paper of new pages
+    /// The paper (qt/docs/features/dark-pages.md): like the page, a page of the PDF: the paper of new pages
     property color paperColor: "#ffffff"
     property bool textured: false
     /// "From a template": the template's file ("": new pages)

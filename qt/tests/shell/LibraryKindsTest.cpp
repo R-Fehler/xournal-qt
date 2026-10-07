@@ -1,7 +1,7 @@
 /*
- * xournal-qt: the kinds of PDFs in the library (qt/docs/library.md, "Kinds of PDFs"): the index keeps what each PDF
- * is (plain, with notes, a text document, an archive PDF) from the read it does anyway, the cards and the "Show"
- * filter take it from there (no PDF is looked into on the UI thread), and saving in the app keeps it current.
+ * xournal-qt: the kinds of PDFs in the library (qt/docs/features/library.md, "Kinds of PDFs"): the index keeps what
+ * each PDF is (plain, with notes, a text document, an archive PDF) from the read it does anyway, the cards and the
+ * "Show" filter take it from there (no PDF is looked into on the UI thread), and saving in the app keeps it current.
  *
  * XQT_BENCH_KINDS=<n> [XQT_BENCH_PDF=<pdf>] xqt-shell-tests --gtest_filter='LibraryKindsTest.bench*' measures the
  * filter on a library of n PDFs (copies of that PDF, else small generated ones).
@@ -415,8 +415,8 @@ TEST_F(LibraryKindsTest, documentsThatKeepVersionsAreMarked) {
     }, 20000));
 }
 
-// A PDF protected with a password (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): the index never reads it, also while it
-// is open in the app with its password; its card shows a lock (the "locked" role), kept in notes.pack
+// A PDF protected with a password (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs"): the index never reads it, also
+// while it is open in the app with its password; its card shows a lock (the "locked" role), kept in notes.pack
 TEST_F(LibraryKindsTest, aProtectedPdfIsLockedAndNotRead) {
     QTemporaryDir elsewhere;  // (not in the library)
     const fs::path source = fs::path(elsewhere.path().toStdString()) / "source.pdf";

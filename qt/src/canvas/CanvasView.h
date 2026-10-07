@@ -102,14 +102,14 @@ public:
     /// Scrolling sideways comes to rest on whole pages (setting "snapPages" of ours, default on)
     static bool snapSetting(Settings& settings);
     /// Two fingers (and the touchpad's rotate gesture) turn the canvas (setting "rotateGesture" of ours, default on;
-    /// qt/docs/canvas-rotation.md)
+    /// qt/docs/features/canvas-rotation.md)
     static bool rotateGestureSetting(Settings& settings);
     /// The smallest zoom in percent of 100 % (setting "smallestZoom" of ours, Settings → Display; default 20,
     /// ViewController::SMALLEST_ZOOM_MIN..MAX)
     static int smallestZoomSetting(Settings& settings);
     /// A gesture may turn the canvas now: allowed here and the setting on
     bool rotationGestureAllowed() const;
-    /// Snapping up and down too, while the view is read (qt/docs/zen.md): with the setting snapPages
+    /// Snapping up and down too, while the view is read (qt/docs/features/zen.md): with the setting snapPages
     /// a drag or a fling comes to rest on a row of pages
     void setSnapVertically(bool on);
     /// Presenting: one page after the other, each filling the view, a swipe goes one page on; the layout and zoom
@@ -148,7 +148,7 @@ public:
     /// as the reference): each keeps its zoom. Both can go back to where they were.
     void swapPlacesWith(CanvasView& other);
 
-    // --- the audience's screen of the presenter view (qt/docs/presenter-view.md) -----------------------------------
+    // --- the audience's screen of the presenter view (qt/docs/features/presenter-view.md) ----------------------------
     /// Show what this view shows only for a moment on another view of the same document too, the audience's: a
     /// stroke while it is written, the laser pointer's ink, the curtain and the spotlight (the audience's view never
     /// shows their handles). nullptr: none. Either view may go first.
@@ -163,7 +163,7 @@ public:
     /// taps follow links, they do not switch the check boxes of Markdown tasks; no undo from gestures. Nothing
     /// lands in the document.
     void setReadingOnly(bool on);
-    /// Reading (qt/docs/zen.md): a tap that nothing else takes (a link, a covering note) within this
+    /// Reading (qt/docs/features/zen.md): a tap that nothing else takes (a link, a covering note) within this
     /// many pixels of the view's left or right edge turns the page (edgeTapped); 0: off. Only while reading only.
     void setEdgeTapWidth(double px) { edgeTapWidth = px; }
     /// A tap at `viewPos` that nothing else took: at an edge (setEdgeTapWidth) it is edgeTapped, and true
@@ -172,7 +172,7 @@ public:
     /// (`count` 2: the second tap of a double tap, which zooms)
     void middleTap(QPointF viewPos, int count);
 
-    // --- the canvas turned (qt/docs/canvas-rotation.md) --------------------------------------------------------
+    // --- the canvas turned (qt/docs/features/canvas-rotation.md) -----------------------------------------------------
     /// The canvas may be turned (the gesture, Ctrl+[ / Ctrl+]): not while presenting, not in a text file or a text
     /// document of notes (their text runs across the screen), not where the canvas item says no (the reference beside
     /// the notes: setRotatable)
@@ -186,7 +186,7 @@ public:
     void resetRotation(std::optional<QPointF> screenAnchor = std::nullopt);
     bool isReadingOnly() const { return readingOnly || replaying; }
 
-    // --- the replay of the timeline (qt/docs/timeline.md, "Replay") --------------------------------------------
+    // --- the replay of the timeline (qt/docs/features/timeline.md, "Replay") -----------------------------------------
     /// Shows the document as of bar time `at` of `timeline` (built from this view's document), read-only, until
     /// endReplay. The selection and text editing end first.
     void startReplay(std::shared_ptr<const timeline::Timeline> timeline, int64_t at);
@@ -296,13 +296,13 @@ public:
     /// Insert an image (file contents: PNG, JPEG, ...) on the current page, in the middle of its visible part and
     /// fitted into it, as a selection to move or resize (port of ImageHandler::addImageToDocument). False if the data
     /// is not an image. Into a sticky note when one is selected or lies there (`viewPos`: where it was pasted, else the
-    /// middle of the visible part), fitted into the note (qt/docs/sticky-notes.md, "Notes as containers").
+    /// middle of the visible part), fitted into the note (qt/docs/features/sticky-notes.md, "Notes as containers").
     /// `size`: its size on the page (points; a snip: the size it had on its page), else its pixels' (each a point).
     /// `inserted`: the image made.
     bool insertImage(const QByteArray& data, std::optional<QPointF> viewPos = std::nullopt,
                      std::optional<QSizeF> size = std::nullopt, const Image** inserted = nullptr);
 
-    // --- the snip tool (Snip.h, qt/docs/snip.md) ---
+    // --- the snip tool (Snip.h, qt/docs/features/snip.md) ---
     /// A snip dragged on a page: the picture of what `outline` encloses (page coordinates: a rectangle's corners or
     /// a lasso; `rectangle`: its bounds, else cut to its shape) is drawn off the UI thread, then `snipped`. False:
     /// nothing of the page in it, or a snip is still being drawn.
@@ -312,7 +312,7 @@ public:
     /// not a page of this view.
     bool inkSweep(CanvasPage& page, const std::vector<xoj::util::Point<double>>& path, bool tapped);
 
-    // --- stickers (qt/docs/stickers.md) ---
+    // --- stickers (qt/docs/features/stickers.md) ---
     /// What is selected, as a sticker's content: copies of the elements and notes (an element selection, several
     /// notes with elements, one selected note) where they are, their page, its paper, whether the page shows a PDF
     /// page or a picture (a picture of it can go with the sticker), and the lasso the selection was made with while
@@ -339,7 +339,7 @@ public:
     /// in the clipboard's format of notes and elements; a picture: the file's bytes) and whether it is a picture. Not
     /// called when the view goes first (it waits for the work). False: a sticker is still being read or written.
     bool loadSticker(fs::path file, std::function<void(const QString& error, const std::string& bytes, bool picture)> done);
-    // --- groups (qt/docs/groups.md) ---
+    // --- groups (qt/docs/features/groups.md) ---
     /// What the selected elements can do with groups (nothing in a view for reading or a read-only document). Grouping
     /// takes elements of one layer.
     groups::State groupState() const;
@@ -355,8 +355,8 @@ public:
     /// written.
     void offerSnipLink(const QString& title, const QString& link, const Image* image, const PageRef& page,
                        const std::string& markdown = {});
-    /// Add the link offered: a link marker under the picture (as "Copy link" pasted, qt/docs/links.md), or in the
-    /// Markdown being written a Markdown link after the picture's. False: the picture (or the text) is gone.
+    /// Add the link offered: a link marker under the picture (as "Copy link" pasted, qt/docs/features/links.md), or in
+    /// the Markdown being written a Markdown link after the picture's. False: the picture (or the text) is gone.
     bool addSnipLink();
     /// Where the mouse rests on this view's canvas (view coordinates; nothing: not over the canvas), asked by a paste
     /// with the keys: over a sticky note it goes into the note. Set by the canvas item that shows the view.
@@ -378,9 +378,9 @@ public:
     void doubleTapAt(QPointF viewPos);
     /// A web address in a text element under this point (nothing if there is none).
     std::optional<LinkTarget> textLinkAt(QPointF viewPos) const;
-    /// A link under the mouse or the hovering pen (qt/docs/links.md, "The mouse and hovering"): from the links each
-    /// page keeps (CanvasPage::linkSpots, looked for once per page and change), so it is cheap enough for every move.
-    /// The same links a tap finds (texts first, then the PDF's).
+    /// A link under the mouse or the hovering pen (qt/docs/features/links.md, "The mouse and hovering"): from the links
+    /// each page keeps (CanvasPage::linkSpots, looked for once per page and change), so it is cheap enough for every
+    /// move. The same links a tap finds (texts first, then the PDF's).
     struct LinkHover {
         LinkTarget target;
         /// It lies in the text being written (a Markdown text, a text box, a text file): a click puts the cursor
@@ -425,18 +425,18 @@ public:
     void scrollToPdfSelection();
     /// The selected PDF text ("" if none).
     std::string selectedPdfText() const;
-    /// The selected text for the look-up actions (qt/docs/citations.md): the selected PDF text, else the selection of
-    /// the text being written (a Markdown box, a text element, a .md). "": none.
+    /// The selected text for the look-up actions (qt/docs/features/citations.md): the selected PDF text, else the
+    /// selection of the text being written (a Markdown box, a text element, a .md). "": none.
     QString selectedText() const;
     /// The canvas page showing this page of the document (none: not shown).
     CanvasPage* canvasPageOf(const XojPage* page) const;
     /// Draw the marks of the setsquare's scale onto its page, every `spacingCm`, with the pen's color and width (one
     /// step to undo). False when there is no setsquare out.
     bool drawGeometryMarks(double spacingCm);
-    /// The sticky notes of this view: placing, the selected note, peeking, hiding (qt/docs/sticky-notes.md)
+    /// The sticky notes of this view: placing, the selected note, peeking, hiding (qt/docs/features/sticky-notes.md)
     StickyNotes& notes() const { return *stickyNotes; }
-    /// A selection of several notes, or of notes with elements of the page (qt/docs/sticky-notes.md, "Several notes
-    /// at once")
+    /// A selection of several notes, or of notes with elements of the page (qt/docs/features/sticky-notes.md, "Several
+    /// notes at once")
     MixedSelection& mixed() const { return *mixedSelection; }
     /// Anything selected: elements, a note, several notes (with elements)
     bool hasAnySelection() const;
@@ -454,7 +454,7 @@ public:
     /// How many things are selected: notes and elements (0: nothing)
     int selectedCount() const;
 
-    // --- "Select more" (qt/touch-multiselect; qt/docs/sticky-notes.md, "Several notes at once") -----------------
+    // --- "Select more" (qt/touch-multiselect; qt/docs/features/sticky-notes.md, "Several notes at once") -------------
     // The touch way of Ctrl + click: while it is on, a tap (finger, pen, mouse) on a note or an element adds it to the
     // selection or takes it away (toggleAt), a tap on empty paper does nothing, a drag on the selection moves it and a
     // rectangle or lasso beside it adds what it encloses. It ends with the selection, when the tool changes, when a
@@ -485,7 +485,7 @@ public:
     const CurtainLayer& curtain() const { return curtainLayer; }
     void pdfTextPress(CanvasPage& page, double x, double y);
     /// The play tool (upstream's TOOL_PLAY_OBJECT) tapped here: ink with a recording near it is played
-    /// (playRequested; qt/docs/audio.md). False if none is near.
+    /// (playRequested; qt/docs/features/audio.md). False if none is near.
     bool playAt(CanvasPage& page, double x, double y);
     void pdfTextMove(CanvasPage& page, double x, double y);
     void pdfTextRelease(CanvasPage& page);
@@ -522,15 +522,15 @@ public:
     /// A tap with the text tool at a page position (points).
     void startText(CanvasPage& page, double x, double y);
 
-    // --- a text file edited (DocumentSession::setTextFile, qt/docs/md-editor.md) ---
+    // --- a text file edited (DocumentSession::setTextFile, qt/docs/features/md-editor.md) ---
     /// The document is a text file that is edited here (not for reading only): every press with the pen or the mouse
     /// puts the cursor into its text (whatever the tool), a drag selects; a finger scrolls, and its tap puts the
     /// cursor there too.
     bool textMode() const;
     /// A press in text mode (page coordinates): the cursor goes there (the editor starts if needed).
     void textPress(CanvasPage& page, double x, double y);
-    /// A text document of notes (qt/docs/md-pdf.md: page 1 starts the page's Markdown text) that may be written in:
-    /// typing goes into its text, the tools stay as they are (the pen writes ink).
+    /// A text document of notes (qt/docs/features/md-pdf.md: page 1 starts the page's Markdown text) that may be
+    /// written in: typing goes into its text, the tools stay as they are (the pen writes ink).
     bool typesIntoFlow() const;
     /// Text mode (or a text document of notes) and no cursor yet: the editor starts at the top of the current page
     /// (keys typed go there; a text document of notes: at the end of what the page holds of its text, as the writing
@@ -551,8 +551,8 @@ public:
     /// being written.
     bool insertAtTextCursor(const std::string& text);
     /// The cursor of the text being written scrolled into view (with a little room around it), if it is out of it:
-    /// the view became shorter (the soft keyboard came, qt/docs/adaptive-layout.md "The soft keyboard"), or a text
-    /// editor that does not follow its cursor itself moved it. False if nothing is being written.
+    /// the view became shorter (the soft keyboard came, qt/docs/features/adaptive-layout.md "The soft keyboard"), or a
+    /// text editor that does not follow its cursor itself moved it. False if nothing is being written.
     bool scrollToTextCursor();
     /// Whether the page's Markdown text (the box at its margins) is at a point (page coordinates).
     bool markdownBoxAt(CanvasPage& page, double x, double y) const;
@@ -587,7 +587,7 @@ public:
     void markdownSelectionMade(const PageRef& page, Layer::Index before);
     /// The selection just set is of elements in the sticky note `note` (its own, or pasted or inserted into it): the
     /// note is the page's selected layer while it lives (they are dropped there; sticky::holdLayer), `before` again
-    /// after (qt/docs/sticky-notes.md, "Selecting in a note").
+    /// after (qt/docs/features/sticky-notes.md, "Selecting in a note").
     void noteSelectionMade(const PageRef& page, Layer::Index before, Layer* note);
     /// Make a note the page's selected layer for a selection in it; returns the layer selected before
     Layer::Index selectNoteLayer(const PageRef& page, const Layer* note);
@@ -616,7 +616,7 @@ Q_SIGNALS:
     /// Reading: a finger's tap in the middle (middleTap; the window's read only in Zen opens its pill)
     void middleTapped(QPointF viewPos, int count);
     /// Reading only: a stroke was tried with a tool that writes (released at `viewPos`); the window says once that
-    /// the page is read only (qt/docs/zen.md)
+    /// the page is read only (qt/docs/features/zen.md)
     void writingRefused(QPointF viewPos);
     /// The set or geometry of pages changed.
     void pagesChanged();
@@ -636,7 +636,8 @@ Q_SIGNALS:
     /// and redo buttons follow them.
     void markdownUndoChanged();
     /// A long press with a finger, or a right click: the UI shows what can be done here (paste, ...). Screen
-    /// coordinates (the canvas item's: the canvas may be turned, qt/docs/canvas-rotation.md), as for the signals below.
+    /// coordinates (the canvas item's: the canvas may be turned, qt/docs/features/canvas-rotation.md), as for the
+    /// signals below.
     void contextRequested(QPointF viewPos);
     /// The emoji suggestions for a shortcode being typed were shown, changed or closed (emojiCompletion()).
     void emojiCompletionChanged();
@@ -659,8 +660,8 @@ Q_SIGNALS:
     void curtainChanged();
     /// Something went wrong that the user should know (e.g. a pasted picture could not be saved).
     void messageRequested(const QString& title, const QString& text);
-    /// The "Load image" of a web picture in a Markdown text was tapped (qt/docs/md-images.md): the UI shows the
-    /// address and fetches it when the user agrees.
+    /// The "Load image" of a web picture in a Markdown text was tapped (qt/docs/features/md-images.md): the UI shows
+    /// the address and fetches it when the user agrees.
     void imageLoadRequested(const QString& url);
     /// A snip's picture was drawn (null: nothing to copy): of the page (0-based), the area (page points); `capped`:
     /// with fewer pixels than the resolution asked for (the size limit)

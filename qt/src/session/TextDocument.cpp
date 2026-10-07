@@ -167,7 +167,7 @@ std::vector<Attachment> attachments(Document& doc, const std::string& pdfName) {
         out.push_back(std::move(md));
     }
     // The pictures of its Markdown (the text's, and those of Markdown boxes of any notes), under the paths their links
-    // name (qt/docs/md-images.md)
+    // name (qt/docs/features/md-images.md)
     for (auto& [carried, data]: DocumentImages::picturesData(DocumentImages::carriedPicturesOf(doc))) {
         Attachment a;
         a.name = carried;

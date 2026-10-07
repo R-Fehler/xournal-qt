@@ -1,7 +1,7 @@
-// The editor of one of the toolbox's tools (qt/docs/toolbox.md, "Editing a tool"): a tap on the tool in hand opens it,
-// beside the tool towards the page (a bottom sheet on a phone). Every change is written at once and the tool in hand
-// follows; there is no OK. The same editor makes a new tool ("+": a draft prefilled from the last tool of that kind,
-// added with "Add").
+// The editor of one of the toolbox's tools (qt/docs/features/toolbox.md, "Editing a tool"): a tap on the tool in hand
+// opens it, beside the tool towards the page (a bottom sheet on a phone). Every change is written at once and the tool
+// in hand follows; there is no OK. The same editor makes a new tool ("+": a draft prefilled from the last tool of that
+// kind, added with "Add").
 //   a preview stroke · the color: the roles of the palette (they follow a palette switch), the colors used lately,
 //   another color (the picker, a hex code) · the width: a slider from 0.1 to 150 pt on a log scale, shown in mm, and
 //   the five sizes as dots · the line style · the filling (none, the line's color or another, its opacity) · the

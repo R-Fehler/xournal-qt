@@ -1,10 +1,10 @@
 /*
- * xournal-qt: turning pages by a quarter turn (PageRotate.h, qt/docs/page-rotation.md). The author: "rotate all pages /
- * selected pages / current page by 90 degree left or right". The size swaps, the content turns about the page (a
- * stroke at a known place ends up at the turned place), Markdown boxes and sticky notes stay upright, the page's
- * text flows anew, space for notes and image backgrounds turn, one undo step that puts everything back exactly, the
- * thumbnails are drawn again (the page revision). PDF pages: left alone in a .xopp; in a PDF with notes the PDF page
- * itself turns (its /Rotate), with our ink and the embedded document to match.
+ * xournal-qt: turning pages by a quarter turn (PageRotate.h, qt/docs/features/page-rotation.md). The author: "rotate
+ * all pages / selected pages / current page by 90 degree left or right". The size swaps, the content turns about the
+ * page (a stroke at a known place ends up at the turned place), Markdown boxes and sticky notes stay upright, the
+ * page's text flows anew, space for notes and image backgrounds turn, one undo step that puts everything back exactly,
+ * the thumbnails are drawn again (the page revision). PDF pages: left alone in a .xopp; in a PDF with notes the PDF
+ * page itself turns (its /Rotate), with our ink and the embedded document to match.
  *
  * @license GNU GPLv2 or later
  */

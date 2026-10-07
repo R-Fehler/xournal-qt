@@ -1,6 +1,6 @@
 // xournal-qt: opening a folder as library and importing into it: the folder chooser, the file and folder dialogs,
 // importing into Downloads, the sync conflicts of a document.
-// Part of HomeView.qml (the home screen, qt/docs/library.md), instantiated once there: it reads the home
+// Part of HomeView.qml (the home screen, qt/docs/features/library.md), instantiated once there: it reads the home
 // screen's state through `home`, and the other parts by their ids (HomeView.qml's context).
 import QtQuick
 import QtQuick.Controls

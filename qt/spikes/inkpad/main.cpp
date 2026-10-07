@@ -1,6 +1,6 @@
 /*
  * xournal-qt M0 spike ("inkpad"): compares a Qt Quick and a QWidget canvas host for pen/touch input on
- * the target device. See qt/docs/adr/0001-ui-host.md for the evaluation checklist.
+ * the target device. See qt/docs/decisions/0001-ui-host.md for the evaluation checklist.
  *
  *   xqt-inkpad [--host quick|widget] [--log FILE.jsonl | --no-log]
  *

@@ -54,7 +54,7 @@ Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is merged (2026-10-07).
     `ImageWorkers` owns every image pool at idle priority and shutdown stops them all (bug 5,
     `Sketches.nothingIsDrawnOrStoredAfterShutdown`); `AsyncImage` (one response, one LRU, one URL encoding); covers
     cancellable; `ImageMemory` and the words page preview / sketch / thumbnail / stand-in / cover
-    ([image-caches.md](qt/docs/image-caches.md)); `library.json` read once. Left: the session registry out of
+    ([image-caches.md](qt/docs/architecture/image-caches.md)); `library.json` read once. Left: the session registry out of
     `ThumbnailProvider` (shell §6.2, block 4 step 3: only TabManager registers); the cards' QML role `preview` →
     `cover` (with the QML); "preview" for covers and stand-ins in app/ comments and MainWindowTest names; LibraryTest.cpp
     split by topic (shell block 12); reading positions outside a library out of the cache folder (§6.6).
@@ -74,7 +74,7 @@ Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is merged (2026-10-07).
     canvas actions (`app.copySelection`, `app.zoomIn`, …) and the per-document properties stay on `AppController`
     until their features move (E–N); no per-path guard between background writes and a `DocumentSession` save (tags
     have theirs since `qt/session-io`); `WindowContext` for the feature objects not made yet.
-- [ ] **Wave 4**: `qt/architecture`: an architecture overview generated from `qt/docs/architecture/architecture.yaml`
+- [ ] **Wave 4**: `qt/architecture`: an architecture overview generated from a model in `qt/docs/architecture/` (`architecture.yaml`)
   (an SVG diagram and tables linking to the source on GitHub, and an interactive page on GitHub Pages), together
   with the docs restructure planned in [docs-plan.md](qt/docs/review/2026-10/docs-plan.md) (an entry page, feature
   docs under `features/`, a README per module, a testing and a building guide), once the code has settled.
@@ -224,12 +224,12 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
 - [ ] `qt/hwr-userdata` (later): a dataset of the user's own hand made in the app, for fine-tuning.
 
 ### Platforms
-- [ ] Android ([roadmap](qt/docs/android-roadmap.md)): some texts miss “ and — (probably the symbol
+- [ ] Android ([roadmap](qt/docs/development/android-roadmap.md)): some texts miss “ and — (probably the symbol
   fallback font); the tab strip does not scroll to the current tab after a reload; a Recent card drawn while access
   was missing stays blank; Google Play needs another way than `MANAGE_EXTERNAL_STORAGE`; SD cards as a home; the
   share sheet for a shared zip (today "Save a copy…"); exporting pictures into a `content://` folder; no zip password
   (Android's libzip has no crypto); after the move on the Fold 7, switch to the release-signed APK.
-- [ ] Windows ([roadmap](qt/docs/windows-roadmap.md)): a pressure calibration in Settings → Pen; an
+- [ ] Windows ([roadmap](qt/docs/development/windows-roadmap.md)): a pressure calibration in Settings → Pen; an
   installer; the author's `qt/windows-feel` on the Surface.
 - [ ] Platform builds run only at release: a weekly `schedule:` or a `master-qt` push filter (infra §8).
 

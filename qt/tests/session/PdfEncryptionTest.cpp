@@ -1,6 +1,6 @@
 /*
- * xournal-qt: encrypted PDFs (qt/docs/hybrid-pdf.md, "Encrypted PDFs"): opening with and without a password, an
- * owner password only, protecting, changing and removing a password, saving keeps the encryption, appended saves of
+ * xournal-qt: encrypted PDFs (qt/docs/features/hybrid-pdf.md, "Encrypted PDFs"): opening with and without a password,
+ * an owner password only, protecting, changing and removing a password, saving keeps the encryption, appended saves of
  * an encrypted PDF with notes (qpdf --check with the password, poppler, every earlier revision), version history, and
  * nothing of a protected document left unencrypted in the app's cache.
  *

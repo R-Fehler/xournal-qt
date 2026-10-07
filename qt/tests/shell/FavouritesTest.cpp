@@ -1,8 +1,8 @@
 /*
- * xournal-qt: favourites and the library's bookmarks (qt/docs/bookmarks.md): stars kept beside the documents (never in
- * them) that follow renames and moves in the app, the Favourites filter of the library (with the "Show" filter and the
- * search), the bookmarks read into the index's "notes" pack (read back without opening the documents, read again when
- * a file changes, found by the search), and the Bookmarks view.
+ * xournal-qt: favourites and the library's bookmarks (qt/docs/features/bookmarks.md): stars kept beside the documents
+ * (never in them) that follow renames and moves in the app, the Favourites filter of the library (with the "Show"
+ * filter and the search), the bookmarks read into the index's "notes" pack (read back without opening the documents,
+ * read again when a file changes, found by the search), and the Bookmarks view.
  *
  * @license GNU GPLv2 or later
  */
@@ -230,9 +230,9 @@ TEST_F(FavouritesTest, theBookmarksViewGroupsThemByDocument) {
     EXPECT_EQ(view.count(), 3);
 }
 
-// A Markdown file's bookmarks are comments in its text (qt/docs/bookmarks.md, "Markdown"): the index reads them on the
-// pages the file is laid out on as it opens, keeps them in its packs, finds their labels, and the Bookmarks view shows
-// them with a picture of their page
+// A Markdown file's bookmarks are comments in its text (qt/docs/features/bookmarks.md, "Markdown"): the index reads
+// them on the pages the file is laid out on as it opens, keeps them in its packs, finds their labels, and the Bookmarks
+// view shows them with a picture of their page
 TEST_F(FavouritesTest, theIndexReadsTheBookmarksOfMarkdownFiles) {
     std::string text = "<!-- xqt:bookmark -->\n# Notes\n\n";
     for (int i = 0; i < 40; ++i) {

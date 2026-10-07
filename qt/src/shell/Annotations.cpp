@@ -46,7 +46,7 @@ QRectF rectOf(const xoj::util::Rectangle<double>& r) { return QRectF(r.x, r.y, r
 
 uint32_t rgbOf(Color c);
 
-/// The sticky notes of a page (qt/docs/sticky-notes.md): a note's texts
+/// The sticky notes of a page (qt/docs/features/sticky-notes.md): a note's texts
 /// as its text (its Markdown text first, as shown), "(handwriting)" for a note with ink only.
 void stickyNotesOf(const XojPage& page, std::vector<Item>& notes) {
     for (const Layer* layer: page.getLayersView()) {

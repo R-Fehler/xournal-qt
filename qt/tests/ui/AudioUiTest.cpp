@@ -1,8 +1,8 @@
 /*
- * xournal-qt: recording and playing in the real window (qt/docs/audio.md, "In the app"), with the fake microphone and
- * speaker (their timers run as real devices would): the record button in the tool bar, the recording pill, ink tied
- * to the recording, the play tool and the playback pill, the list of recordings; the microphone permission (refused,
- * asked) and what the platform's hook hears (Android's notification) with its commands.
+ * xournal-qt: recording and playing in the real window (qt/docs/features/audio.md, "In the app"), with the fake
+ * microphone and speaker (their timers run as real devices would): the record button in the tool bar, the recording
+ * pill, ink tied to the recording, the play tool and the playback pill, the list of recordings; the microphone
+ * permission (refused, asked) and what the platform's hook hears (Android's notification) with its commands.
  *
  * @license GNU GPLv2 or later
  */

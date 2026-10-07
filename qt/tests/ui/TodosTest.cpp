@@ -1,8 +1,8 @@
 /*
- * xournal-qt: the To-dos tab of the library home in the real window (qt/docs/todos.md): the to-dos of the library's
- * documents grouped by document with their counts, the filters (state, due date, text, the setting "Collect to-dos
- * from"), a tap that opens the document at the to-do's page, and the check box that ticks the to-do in its file (a
- * Markdown file that is not open, written in the background) or in the open document (one undo step there).
+ * xournal-qt: the To-dos tab of the library home in the real window (qt/docs/features/todos.md): the to-dos of the
+ * library's documents grouped by document with their counts, the filters (state, due date, text, the setting "Collect
+ * to-dos from"), a tap that opens the document at the to-do's page, and the check box that ticks the to-do in its file
+ * (a Markdown file that is not open, written in the background) or in the open document (one undo step there).
  *
  * @license GNU GPLv2 or later
  */

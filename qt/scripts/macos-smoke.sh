@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke test of the macOS app bundle (the CI runs it after macos-deploy.sh, see qt/docs/macos.md):
+# Smoke test of the macOS app bundle (the CI runs it after macos-deploy.sh, see qt/docs/development/macos.md):
 #
 #   qt/scripts/macos-smoke.sh <xournal-qt.app> <output folder>
 #
@@ -9,9 +9,9 @@
 #   2. exports that tell apart what fails: strokes to PNG (raster, no text), text to PDF (text, no raster), text to
 #      PNG (both), images to PDF (gdk-pixbuf), a PDF background to PDF (poppler, qpdf)
 #   3. the app off-screen: opens a library and a document, saves a screenshot of its window after 5 s, quits
-#   4. recording (qt/docs/audio.md, "Platforms"): QtMultimedia.framework is in the bundle and Qt's media plugins and
-#      FFmpeg's libraries are not; `xournal-qt --audio-info` says "recording: available" (it lists the devices
-#      without opening the microphone, so macOS asks for no permission)
+#   4. recording (qt/docs/features/audio.md, "Platforms"): QtMultimedia.framework is in the bundle and Qt's media
+#      plugins and FFmpeg's libraries are not; `xournal-qt --audio-info` says "recording: available" (it lists the
+#      devices without opening the microphone, so macOS asks for no permission)
 #
 # The CI hides Homebrew (/opt/homebrew) while this runs, so that a library missing from the bundle fails here and not
 # on a Mac without Homebrew.

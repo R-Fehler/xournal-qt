@@ -1,9 +1,9 @@
 /*
- * xournal-qt: page templates in the window (qt/templates, qt/docs/templates.md): the picker's list, saving a page as
- * a template (into the library's Templates folder or the app-wide set) and adding a template's page to a document or
- * starting a new document with it. A template's page is added as a copied page is pasted (PageClipboard): one undo
- * step, its PDF page into the document's merged PDF. The files are written and read off the UI thread; the work
- * holds only copies, never the open document.
+ * xournal-qt: page templates in the window (qt/templates, qt/docs/features/templates.md): the picker's list, saving a
+ * page as a template (into the library's Templates folder or the app-wide set) and adding a template's page to a
+ * document or starting a new document with it. A template's page is added as a copied page is pasted (PageClipboard):
+ * one undo step, its PDF page into the document's merged PDF. The files are written and read off the UI thread; the
+ * work holds only copies, never the open document.
  *
  * @license GNU GPLv2 or later
  */
@@ -120,7 +120,7 @@ bool AppController::saveTemplate(int page, const QString& name, const QString& f
     }
     const fs::path target = stickers::uniqueTarget(into, file);
 
-    // The page as page copy takes it: its PDF page as a PDF of one page (qt/docs/templates.md)
+    // The page as page copy takes it: its PDF page as a PDF of one page (qt/docs/features/templates.md)
     PageClipboard copy;
     copy.copy(*s, {static_cast<size_t>(page)}, /*withPdf=*/withBackground);
     PageClipboard::Copied copied = copy.copied(0);
@@ -216,7 +216,7 @@ std::vector<PageRef> AppController::templatePagesFor(PageClipboard& copy, bool w
                 p->setBackgroundType(type);
                 p->setBackgroundColor(color);
             }
-            timeline::stampPage(*p);  // (a template's content is new on the new page: qt/docs/timeline.md)
+            timeline::stampPage(*p);  // (a template's content is new on the new page: qt/docs/features/timeline.md)
             pages.push_back(std::move(p));
         }
     }
