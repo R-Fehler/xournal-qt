@@ -57,5 +57,6 @@ choice you made); known gaps; where you found the spec or a review wrong.
 - Merge with `qt/scripts/agents/merge-block.sh <block> "<summary>"` (resolves Markdown conflicts, lists the rest).
   Build the merged integration branch, run what the merge could have broken (the labels of both sides), push; the
   integration branch's CI (`xqt-build.yml`) runs both Linux Qt versions with QML compiled ahead of time. Delete the
-  block's worktree and its remote branch afterwards (`git push origin --delete qt/<block>`).
+  block's worktree and its remote branch afterwards (`git push origin --delete qt/<block>`; a cloud session's proxy
+  refuses deleting branches, as it refuses tags: there the author deletes merged `qt/*` branches on GitHub).
 - Run two or three agents at once on a 4-core machine; more on a bigger one. Each full local build is ~1.2 GB.
