@@ -44,6 +44,14 @@ Wave 1 (`qt/compat-dead`, `qt/docs-structure`) is merged (2026-10-07).
 - [ ] **Wave 3**: `qt/qml-split-2` (HomeView, SettingsPage, the Escape/Back dispatcher, bug 4) · `qt/library-split`
   (`Library.*`, shared image-provider plumbing and shutdown, bug 5) · `qt/hybridpdf-split` (`HybridPdf.cpp`, one
   marker writer) · `qt/app-services` (`AppServices` / `OpenDocuments` / `CurrentDocument`, bug 1).
+  - [x] `qt/library-split`: `Library.*` split (Library, FileStamps, LibraryIndex + Entry/Packs/Read/Search/Queries);
+    `ImageWorkers` owns every image pool at idle priority and shutdown stops them all (bug 5,
+    `Sketches.nothingIsDrawnOrStoredAfterShutdown`); `AsyncImage` (one response, one LRU, one URL encoding); covers
+    cancellable; `ImageMemory` and the words page preview / sketch / thumbnail / stand-in / cover
+    ([image-caches.md](qt/docs/image-caches.md)); `library.json` read once. Left: the session registry out of
+    `ThumbnailProvider` (shell §6.2, block 4 step 3: only TabManager registers); the cards' QML role `preview` →
+    `cover` (with the QML); "preview" for covers and stand-ins in app/ comments and MainWindowTest names; LibraryTest.cpp
+    split by topic (shell block 12); reading positions outside a library out of the cache folder (§6.6).
 - [ ] **Wave 4**: `qt/architecture`: an architecture overview generated from `qt/docs/architecture/architecture.yaml`
   (an SVG diagram and tables linking to the source on GitHub, and an interactive page on GitHub Pages), together
   with the docs restructure planned in [docs-plan.md](qt/docs/review/2026-10/docs-plan.md) (an entry page, feature
@@ -97,6 +105,7 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
   (about 1 in 4 under `-j3`), `PhoneChromeTest.presentingWithoutControlsHasTheZenDot`,
   `PhoneChromeTest.theFold7FoldedAndUnfolded`, `AdaptiveLayoutTest.toolBarPlaceIsChosenPerSizeClass`,
   `AdaptiveLayoutTest.classesSidebarAndControlsAtFiveSizes`, `AdaptiveLayoutTest.colorsAndWidthsTakeTheRoomThereIs`,
+  `AdaptiveLayoutTest.menusAreSheetsOnPhones`, `AdaptiveLayoutTest.theFloatingToolboxFitsAShortWindow`,
   `SafeAreasKeyboardTest.theFormatBarDocksAboveTheKeyboardAndTheCursorStaysInView`,
   `ColorChooserTest.theHighlighterTakesHighlightColors`,
   `ToolboxAudioTest.recordingIsAFixedToolOfTheRailAndItsPillStaysInSight`,
