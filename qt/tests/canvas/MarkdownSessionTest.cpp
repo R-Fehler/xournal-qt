@@ -141,35 +141,6 @@ TEST_F(MarkdownSessionTest, theTextOfASmallPageHasSmallerMargins) {
     EXPECT_DOUBLE_EQ(next->getTransformation().shift.y, m);
     EXPECT_LE(md::boxRect(*box).y + md::boxRect(*box).height, card->getHeight() - m + 0.5) << "above the bottom margin";
 
-    // Text of a card written with the 2 cm margins: still its text, and at the new margins once edited
-    auto session2 = std::make_unique<DocumentSession>(*app);
-    const PageRef old = session2->getDocument()->getPage(0);
-    old->setSize(74 * mm, 105 * mm);
-    old->setBackgroundType(PageType(PageTypeFormat::Plain));
-    auto* layer = new Layer();
-    layer->setName(std::string(xoj::markdown::LAYER_NAME));
-    old->getLayers().insert(old->getLayers().begin(), layer);
-    auto t = std::make_unique<Text>();
-    t->setText("older text");
-    t->setWrap(old->getWidth() - 2 * TextFlow::MARGIN);
-    t->setTransformation(xoj::util::Matrix::TRANSLATION(TextFlow::MARGIN, TextFlow::MARGIN));
-    const Text* oldBox = t.get();
-    layer->addElement(std::move(t));
-    EXPECT_EQ(TextDocument::pageBoxOf(old), oldBox) << "the page's text, at 2 cm";
-    MarkdownSession edit2(*session2);
-    EXPECT_EQ(edit2.begin(0, style), "older text");
-    edit2.update("older text, edited");
-    edit2.finish();
-    const Text* moved = TextDocument::pageBoxOf(old);
-    ASSERT_NE(moved, nullptr);
-    EXPECT_EQ(moved->getText(), "older text, edited");
-    EXPECT_DOUBLE_EQ(moved->getTransformation().shift.x, m);
-    EXPECT_DOUBLE_EQ(moved->getTransformation().shift.y, m);
-    session2->getUndoRedoHandler()->undo();
-    const Text* back = TextDocument::pageBoxOf(old);
-    ASSERT_NE(back, nullptr);
-    EXPECT_EQ(back->getText(), "older text");
-    EXPECT_DOUBLE_EQ(back->getTransformation().shift.x, TextFlow::MARGIN) << "undo puts it back";
 }
 
 TEST_F(MarkdownSessionTest, nothingWrittenLeavesNoLayer) {

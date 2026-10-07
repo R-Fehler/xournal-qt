@@ -178,14 +178,14 @@ MarkdownSession::Page MarkdownSession::pageOf(const PageRef& page, double x, dou
         p.layer = md::markdownLayer(page);
         p.selectedBefore = page->getSelectedLayerId();
         if (p.layer) {
-            // (the page's text: at the margins, or where older text of a small page is, PageMargins::pageBox)
+            // (the page's text: at the margins, PageMargins::pageBox)
             p.box = pageText ? PageMargins::pageBox(*p.layer, page)
                     : wanted ? (p.layer->indexOf(wanted) != Element::InvalidIndex ? const_cast<Text*>(wanted) : nullptr)
                              : (p.layer->isVisible() ? md::boxAt(*p.layer, x, y) : nullptr);
         }
         if (p.box) {
             p.original = p.box->cloneText();
-            if (!pageText) {  // (the page's text stays at the margins: older text of a small page moves there)
+            if (!pageText) {  // (the page's text stays at the margins)
                 p.x = p.box->getTransformation().shift.x;
                 p.y = p.box->getTransformation().shift.y;
             }

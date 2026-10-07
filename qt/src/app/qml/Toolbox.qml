@@ -108,7 +108,7 @@ Rectangle {
     }
     /// The rail's items as the arrangement has them: {kind: "entry" | "app" | "group" | "divider", key, id, entry, name}
     /// The bar's list in the arrangement
-    readonly property var barList: (store.revision, isTop ? store.top : store.entries)
+    readonly property var barList: (store.revision, isTop ? store.top : store.rail)
     readonly property var itemsNow: {
         const out = []
         const list = barList

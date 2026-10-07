@@ -90,7 +90,7 @@ public:
     Q_INVOKABLE void resetScreenCalibration(QWindow* window);
 
     // --- the layout chosen by hand per size class (qt/docs/adaptive-layout.md) ---------------------------------
-    /// What was chosen for `what` ("sidebar", "toolbox", "chrome") in the size class `sizeClass` (AdaptiveLayout's
+    /// What was chosen for `what` ("sidebar", "toolbox", "zen") in the size class `sizeClass` (AdaptiveLayout's
     /// names), stored as "layout/<class>/<what>" in the xournalQt part; "": nothing, the automatic choice applies.
     /// Changes count as a revision, so `(settings.revision, settings.layoutChoice(...))` follows them.
     Q_INVOKABLE QString layoutChoice(const QString& sizeClass, const QString& what) const;

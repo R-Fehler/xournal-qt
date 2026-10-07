@@ -343,8 +343,7 @@ TEST(Windows, closingAWindowKeepsDocumentsWithUnsavedChanges) {
     QCoreApplication::processEvents();
 }
 
-// (the colors of the deprecated text mode's color row; the classic tool bar that let them be changed was removed in
-// 0.8.0)
+// (the colors of the deprecated text mode's color row)
 TEST(ToolbarColors, orangeByDefault) {
     AppController c;
     const QVariantList defaults = c.toolbarColors();

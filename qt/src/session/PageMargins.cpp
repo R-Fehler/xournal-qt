@@ -45,25 +45,9 @@ Margins of(const PageRef& page) {
     return around(page, forSize(w, h), rulingScale(w, h));
 }
 
-Margins unscaled(const PageRef& page) { return around(page, FULL, 1); }
-
 Text* pageBox(const Layer& layer, const PageRef& page) {
     const Margins m = of(page);
-    if (Text* box = md::pageBoxOf(layer, m.left, m.top)) {
-        return box;
-    }
-    if (m.top < FULL) {
-        // (a lined page's text from before its line scaled: after the line at 1 inch)
-        const Margins lined = around(page, m.top, 1);
-        if (lined.left != m.left) {
-            if (Text* box = md::pageBoxOf(layer, lined.left, lined.top)) {
-                return box;
-            }
-        }
-        const Margins old = unscaled(page);
-        return md::pageBoxOf(layer, old.left, old.top);
-    }
-    return nullptr;
+    return md::pageBoxOf(layer, m.left, m.top);
 }
 
 }  // namespace xqt::PageMargins

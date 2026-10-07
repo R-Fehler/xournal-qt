@@ -48,9 +48,6 @@ QString prefixOf(const fs::path& file) {
                     .left(12));
 }
 
-/// A folder of the layout before the names began with the document's prefix ("<prefix>-<hash>"): never used again
-bool oldLayout(const fs::path& folder) { return folder.filename().string().find('-') == std::string::npos; }
-
 /// Folder of the stored previews of a document as its files are now (empty: not saved)
 fs::path folderOf(DocumentSession& session) {
     const fs::path file = session.documentFile();
@@ -312,11 +309,6 @@ void PageSketches::trimDisk(qint64 bytes) {
     const fs::path root = Util::getCacheSubfolder("pages");
     for (auto it = fs::directory_iterator(root, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
         if (!it->is_directory(ec)) {
-            continue;
-        }
-        if (oldLayout(it->path())) {
-            fs::remove_all(it->path(), ec);  // (named the old way: never read again)
-            ec.clear();
             continue;
         }
         Folder f{it->path(), fs::last_write_time(it->path(), ec)};

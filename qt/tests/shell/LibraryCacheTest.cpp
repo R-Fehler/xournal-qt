@@ -175,30 +175,24 @@ TEST_F(LibraryCacheTest, theCacheIsInEachFolderOrMirroredInTheAppCache) {
 TEST_F(LibraryCacheTest, onlyOurFilesAreRemoved) {
     ASSERT_TRUE(Packs::write(dir, "notes", 1, {{QStringLiteral("a.xopp"), 1}}, true));
     ASSERT_TRUE(Packs::write(dir, "pdf-text", 1, {{QStringLiteral("a.xopp"), text(Packs::OWN_FILE_SIZE)}}, true));
-    touch(dir / "index" / "0123456789abcdef.json");  // the layout before the packs
-    touch(dir / "previews" / "0123.png");
-    touch(dir / "pages.json");
     EXPECT_TRUE(Packs::isOurs("notes.pack"));
     EXPECT_TRUE(Packs::isOurs("pdf-text-0123456789abcdef.pack"));
     EXPECT_TRUE(Packs::isOurs("notes.pack.a1B2c3"));
     EXPECT_FALSE(Packs::isOurs("notes.txt"));
-    EXPECT_TRUE(Packs::isOldLayout("pages.json"));
     EXPECT_GT(Packs::sizeOf(dir), 1000);
 
     touch(dir / "mine.txt");  // not ours: the folder stays
+    touch(dir / "index" / "0123456789abcdef.json");
     EXPECT_FALSE(Packs::removeIfOnlyOurs(dir));
     EXPECT_TRUE(fs::exists(dir / "notes.pack")) << "nothing removed";
     EXPECT_GT(Packs::removeOurs(dir), 0);
     EXPECT_TRUE(fs::exists(dir / "mine.txt"));
+    EXPECT_TRUE(fs::exists(dir / "index" / "0123456789abcdef.json"));
     EXPECT_FALSE(fs::exists(dir / "notes.pack"));
-    EXPECT_FALSE(fs::exists(dir / "index"));
-    EXPECT_FALSE(fs::exists(dir / "pages.json"));
 
     fs::remove(dir / "mine.txt");
+    fs::remove_all(dir / "index");
     ASSERT_TRUE(Packs::write(dir, "notes", 1, {{QStringLiteral("a.xopp"), 1}}, true));
-    touch(dir / "pages.json");
-    EXPECT_FALSE(Packs::removeIfOnlyOurs(dir)) << "the old layout is not removed on the way (not converted yet)";
-    fs::remove(dir / "pages.json");
     EXPECT_TRUE(Packs::removeIfOnlyOurs(dir));
     EXPECT_FALSE(fs::exists(dir));
 }

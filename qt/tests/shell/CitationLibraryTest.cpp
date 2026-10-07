@@ -126,7 +126,7 @@ TEST_F(CitationLibraryTest, hitsHaveTheirTitleAndAScoreAndTheBestComesFirst) {
     }
 }
 
-TEST_F(CitationLibraryTest, titlesAreKeptInTheIndexAndReadOnceForOldEntries) {
+TEST_F(CitationLibraryTest, titlesAreKeptInTheIndex) {
     {
         LibraryIndex idx(root);
         index(idx);
@@ -139,26 +139,4 @@ TEST_F(CitationLibraryTest, titlesAreKeptInTheIndexAndReadOnceForOldEntries) {
         EXPECT_EQ(again.documentsRead(), 0);
         EXPECT_EQ(top(again, "Language models are few-shot learners"), "2005.14165.pdf");
     }
-    // Entries written before titles were kept: only their titles are read, once
-    const fs::path cache = root / "Papers" / DocumentFiles::META_DIR;
-    auto notes = Packs::read(cache, LibraryIndex::NOTES_PACK, LibraryIndex::FORMAT);
-    ASSERT_TRUE(notes.has_value());
-    for (auto it = notes->begin(); it != notes->end(); ++it) {
-        QCborMap entry = it.value().toMap();
-        ASSERT_TRUE(entry.contains(QStringLiteral("title"))) << it.key().toString().toStdString();
-        entry.remove(QStringLiteral("title"));
-        entry.remove(QStringLiteral("heading"));
-        it.value() = entry;
-    }
-    ASSERT_TRUE(Packs::write(cache, LibraryIndex::NOTES_PACK, LibraryIndex::FORMAT, *notes, true));
-    LibraryIndex old(root);
-    index(old);
-    EXPECT_EQ(old.titlesRead(), 5) << "the five papers of the folder";
-    EXPECT_EQ(old.documentsRead(), 0) << "not the documents";
-    EXPECT_EQ(old.pdfPagesRead(), 0);
-    EXPECT_EQ(top(old, "Language models are few-shot learners"), "2005.14165.pdf");
-    old.flush();
-    LibraryIndex later(root);
-    index(later);
-    EXPECT_EQ(later.titlesRead(), 0) << "once";
 }

@@ -94,14 +94,6 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
         DocumentPlaces::setLibrary(lib->root(), lib->placesFile());
         adoptFolderCaches();
         openCache();
-        // A cache of the layout before the packs (in the library, or in the app cache for a library that could
-        // not be written): converted first
-        const CacheLocation& where = idx->location();
-        for (const fs::path& old: {where.inFolder(lib->root()), where.appCacheDir()}) {
-            if (LibraryIndex::hasOldLayout(old)) {
-                idx->convertOldLayout(old);
-            }
-        }
         watcher = std::make_unique<QFileSystemWatcher>();
         connect(watcher.get(), &QFileSystemWatcher::directoryChanged, this, [this] { refreshTimer.start(); });
     } else {
@@ -119,7 +111,7 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
 
 void LibraryModel::adoptFolderCaches() {
     // A library without a cache setting that goes into the app cache by default (Android), but has cache folders
-    // of its own (from before that default, or from a desktop): they are moved there once, so nothing is read again
+    // of its own (e.g. a folder synced from a desktop): they are moved there once, so nothing is read again
     // and the library's folders are left clean. The setting is written, so this happens only once.
     if (lib->hasCacheSetting() || lib->cacheMode() != CacheLocation::Mode::AppCache) {
         return;

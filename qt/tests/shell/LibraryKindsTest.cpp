@@ -175,7 +175,7 @@ std::map<std::string, std::string> kindsOf(const LibraryModel& m) {
 }  // namespace
 
 // The index finds out what each PDF is while it reads it anyway (one read of its marker, when it is opened), keeps it
-// in notes.pack, and reads only that for entries written before kinds were kept.
+// in notes.pack.
 TEST_F(LibraryKindsTest, theIndexKeepsWhatEachPdfIs) {
     fill();
     {
@@ -192,39 +192,11 @@ TEST_F(LibraryKindsTest, theIndexKeepsWhatEachPdfIs) {
         LibraryIndex again(root);
         index(again);
         EXPECT_EQ(again.documentsRead(), 0);
-        EXPECT_EQ(again.pdfKindsRead(), 0);
         EXPECT_EQ(HybridPdf::markerReads(), markers);
         expectKinds(again);
     }
-    // Entries written before kinds were kept: only their kind is read (the marker), once
-    const fs::path cache = root / DocumentFiles::META_DIR;
-    auto notes = Packs::read(cache, LibraryIndex::NOTES_PACK, LibraryIndex::FORMAT);
-    ASSERT_TRUE(notes.has_value());
-    int withKind = 0;
-    for (auto it = notes->begin(); it != notes->end(); ++it) {
-        QCborMap entry = it.value().toMap();
-        withKind += entry.contains(QStringLiteral("pdfKind"));
-        entry.remove(QStringLiteral("pdfKind"));
-        it.value() = entry;
-    }
-    EXPECT_EQ(withKind, 4) << "the PDFs, not the Markdown file";
-    ASSERT_TRUE(Packs::write(cache, LibraryIndex::NOTES_PACK, LibraryIndex::FORMAT, *notes, true));
-    {
-        LibraryIndex old(root);
-        EXPECT_EQ(old.pdfKind(root / "text.pdf"), PdfKind::Unknown) << "(not read yet)";
-        index(old);
-        EXPECT_EQ(old.pdfKindsRead(), 4);
-        EXPECT_EQ(old.documentsRead(), 0) << "not the documents";
-        EXPECT_EQ(old.pdfPagesRead(), 0);
-        EXPECT_EQ(old.titlesRead(), 0);
-        expectKinds(old);
-        old.flush();
-    }
     LibraryIndex later(root);
     index(later);
-    EXPECT_EQ(later.pdfKindsRead(), 0) << "once";
-    expectKinds(later);
-
     // Changed by another program: read again through its stamp (a text document that became a plain PDF)
     fs::remove(root / "text.pdf");
     makePlainPdf(root / "text.pdf", "flattened");
@@ -395,21 +367,12 @@ TEST_F(LibraryKindsTest, benchTheFilterOnManyPdfs) {
     model.setShown("onlyTextDocuments", false);
     EXPECT_EQ(model.count(), hybrids);
 
-    // Entries from before kinds were kept: the kind alone, per PDF (a marker read, cold)
-    freshStamps(pdfs);
-    t.restart();
-    for (const auto& p: pdfs) {
-        HybridPdf::markerOf(p);
-    }
-    const double kindAlone = ms(t) / n;
-
     std::printf("library kinds, %d PDFs (%d with notes)%s:\n"
                 "  before: the filter looks into each lone PDF on the UI thread: %.1f ms the first time, %.1f ms later\n"
                 "  now:    indexing all %.0f ms (in the background); \"Only PDFs with notes\" %.1f ms, text documents "
-                "%.1f ms, the listing again %.1f ms (no PDF looked into)\n"
-                "  the kind alone for an old entry: %.2f ms per PDF\n",
+                "%.1f ms, the listing again %.1f ms (no PDF looked into)\n",
                 n, hybrids, sample.isEmpty() ? "" : (" copies of " + sample).toUtf8().constData(), coldBefore,
-                warmBefore, indexing, filterOn, textOnly, relist, kindAlone);
+                warmBefore, indexing, filterOn, textOnly, relist);
 }
 
 // A PDF with notes that keeps its versions (version history): the index reads how many from the marker it reads anyway

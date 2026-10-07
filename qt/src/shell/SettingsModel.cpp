@@ -474,8 +474,7 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
         });
 
     // The variant last used of each cycling tool button (qt/docs/adaptive-layout.md, "Cycling buttons"), as
-    // "group=variant;…", e.g. "select=selectRegion;snip=snipLasso" (a "shape=" of the classic tool bar of before 0.8.0
-    // gives the toolbox's first shape, AppController::migratedToolbox)
+    // "group=variant;…", e.g. "select=selectRegion;snip=snipLasso"
     add("toolVariants",
         [&s] {
             std::string v;

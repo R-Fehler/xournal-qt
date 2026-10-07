@@ -2232,7 +2232,7 @@ TEST_F(ReadingTest, zenHidesEverythingButThePageAndTheDot) {
                 shortcuts->data(shortcuts->index(r, 0), keysRole).toString();
     }
     EXPECT_EQ(byId.value("zen"), "Ctrl+Alt+Z");
-    EXPECT_EQ(byId.value("readOnly"), "Ctrl+Alt+R");
+    EXPECT_EQ(byId.value("read"), "Ctrl+Alt+R");
 }
 
 // The dot's pill (qt/docs/zen.md): beside the dot over the page (the page does not move); Show controls, Read only, the

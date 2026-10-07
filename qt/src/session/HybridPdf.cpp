@@ -1891,7 +1891,6 @@ struct Existing {
         QPDFObjectHandle record;
     };
     std::map<std::string, Recorded> layers;
-    bool recorded = false;  ///< the marker has the record (files of older versions have not)
     Reuse reuse;
     long long base = 0;     ///< its size when it was last written in full
     long long updates = 0;  ///< incremental updates since
@@ -2057,55 +2056,25 @@ std::unique_ptr<Existing> openExisting(const fs::path& target, const Revision& r
         }
     }
     step("  its drawn pages");
-    if (QPDFObjectHandle record = e->marker.getKey("/Layers"); record.isDictionary()) {
-        e->recorded = true;
-        for (const auto& k: record.getKeys()) {
-            QPDFObjectHandle r = record.getKey(k);
-            if (!r.isArray() || r.getArrayNItems() < 3) {
-                continue;
-            }
-            QPDFObjectHandle sig = r.getArrayItem(0), form = r.getArrayItem(1);
-            if (!sig.isString() || !form.isIndirect() || !e->update->has(form.getObjGen())) {
-                continue;
-            }
-            e->formBySig.emplace(sig.getStringValue(), form);  // (not read yet)
-            e->reuse.layers.insert(sig.getStringValue());
-            e->layers[k.substr(1)] = {sig.getStringValue(), r};
-        }
-        step("  our layers");
-        return e;
+    QPDFObjectHandle record = e->marker.getKey("/Layers");
+    if (!record.isDictionary()) {
+        why = "no record of our layers";
+        return nullptr;
     }
-    for (QPDFObjectHandle page: e->tree) {  // (a file of an older version: our pages are read)
-        if (!e->ours.count(page.getObjGen())) {
+    for (const auto& k: record.getKeys()) {
+        QPDFObjectHandle r = record.getKey(k);
+        if (!r.isArray() || r.getArrayNItems() < 3) {
             continue;
         }
-        for (QPDFObjectHandle a: annotsOf(page)) {
-            const std::string sig = sigOfAnnot(a);
-            QPDFObjectHandle ap = a.getKey("/AP");
-            QPDFObjectHandle form = ap.isDictionary() ? ap.getKey("/N") : QPDFObjectHandle::newNull();
-            if (!sig.empty() && form.isStream() && isOurs(a)) {
-                e->formBySig.emplace(sig, form);
-                e->reuse.layers.insert(sig);
-            }
+        QPDFObjectHandle sig = r.getArrayItem(0), form = r.getArrayItem(1);
+        if (!sig.isString() || !form.isIndirect() || !e->update->has(form.getObjGen())) {
+            continue;
         }
-        if (archive) {
-            InkStreams ink = inkStreamsOf(contentsOf(page));
-            QPDFObjectHandle res = page.getKey("/Resources");
-            QPDFObjectHandle xobj = res.isDictionary() ? res.getKey("/XObject") : QPDFObjectHandle::newNull();
-            if (ink.mark.isDictionary() && xobj.isDictionary()) {
-                const auto names = stringsOf(ink.mark.getKey("/XObjects"));
-                const auto sigs = stringsOf(ink.mark.getKey("/Sigs"));
-                for (size_t k = 0; k < names.size() && k < sigs.size(); ++k) {
-                    QPDFObjectHandle form = xobj.getKey(names[k]);
-                    if (!sigs[k].empty() && form.isStream()) {
-                        e->formBySig.emplace(sigs[k], form);
-                        e->reuse.layers.insert(sigs[k]);
-                    }
-                }
-            }
-        }
+        e->formBySig.emplace(sig.getStringValue(), form);  // (not read yet)
+        e->reuse.layers.insert(sig.getStringValue());
+        e->layers[k.substr(1)] = {sig.getStringValue(), r};
     }
-    step("  our pages");
+    step("  our layers");
     return e;
 }
 
@@ -2511,7 +2480,7 @@ private:
     bool unchanged(size_t i) {
         QPDFObjectHandle page = order[i];
         auto was = oldIndex.find(page.getObjGen());
-        if (!e.recorded || was == oldIndex.end() || was->second != i || foreignFrom.count(i) || u.isNew(page) ||
+        if (was == oldIndex.end() || was->second != i || foreignFrom.count(i) || u.isNew(page) ||
             spaceChanged.count(i)) {
             return false;
         }

@@ -235,8 +235,7 @@ class AppController: public QObject {
     /// The adjustable width of the tool (points; 0: the tool has no sizes). Setting it selects it (size 5).
     Q_PROPERTY(double customWidth READ customWidth WRITE setCustomWidth NOTIFY toolChanged)
     Q_PROPERTY(QVariantList palette READ palette CONSTANT)
-    /// The colors of the deprecated text mode's color row (TextFlowPanel): the first colors of the palette, with orange
-    /// (or the colors the classic tool bar of before 0.8.0 kept in the setting "toolbarColors")
+    /// The colors of the deprecated text mode's color row (TextFlowPanel): upstream's palette without white
     Q_PROPERTY(QVariantList toolbarColors READ toolbarColors CONSTANT)
     /// Color of PDF text highlights, one of three presets
     Q_PROPERTY(QColor pdfHighlightColor READ pdfHighlightColor WRITE setPdfHighlightColor NOTIFY pdfTextModeChanged)
@@ -479,8 +478,6 @@ public:
     /// The tools' own widths and which are chosen (settings "customWidths": "pen=8.5*,highlighter=42.5,...")
     void loadCustomWidths();
     void storeCustomWidths();
-    /// Upstream's palette without white
-    QVariantList defaultToolbarColors() const;
     QColor pdfHighlightColor() const;
     void setPdfHighlightColor(const QColor& color);
     QVariantList pdfHighlightColors() const;
@@ -510,9 +507,6 @@ public:
     // --- the toolbox (qt/docs/toolbox.md; AppToolbox.cpp) ---
     QObject* toolboxObject() const;
     xqt::ToolboxModel* toolboxModel() const { return toolbox; }
-    /// The toolbox's first tools, made from the tool settings of before (the pen's color and width, the eraser's
-    /// kind, the font, the shape last used), as JSON
-    QString migratedToolbox() const;
     /// Takes the toolbox's entry `id`: its tool with all its settings (color, width, line style, filling, eraser kind,
     /// font, …), and it becomes the active entry. A sticky note entry puts a note in its color on the page instead.
     Q_INVOKABLE bool applyToolEntry(const QString& id);

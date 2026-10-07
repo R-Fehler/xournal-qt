@@ -234,7 +234,7 @@ ApplicationWindow {
     // tool dock) or "compact" (full screen's: the tab dots, the floating toolbox, the view pill). Full screen (F11,
     // fullScreenMode) is the compact chrome in a full-screen window. Apart from it: the window's state
     // (windowFullScreen), presenting (black, page by page), Zen (nothing around the page) and read only
-    // (qt/docs/zen.md). (The reader chrome and the chrome chosen per size class are gone since 0.8.0: Zen.)
+    // (qt/docs/zen.md).
     readonly property string chromeMode: fullScreenMode ? "compact" : "full"
     /// The full chrome is shown (not in Zen)
     readonly property bool fullChrome: chromeMode === "full" && !zenShown
@@ -245,12 +245,8 @@ ApplicationWindow {
     /// Zen turned on by hand (⋮ → View → Zen, its keys, the command bar's button, Read)
     property bool zenByHand: false
     /// Zen of itself: a tiny window (under 360 px either way: split screen, a pop-up window), unless it was left there
-    /// by hand (remembered for the class: layout/tiny/zen "off"; from 0.7.0, the reader chrome left there: chrome "full")
-    readonly property bool zenAuto: {
-        if (adaptive.layoutClass !== "tiny") return false
-        const z = layoutChoice("zen")
-        return z !== "off" && !(z === "" && layoutChoice("chrome") === "full")
-    }
+    /// by hand (remembered for the class: layout/tiny/zen "off")
+    readonly property bool zenAuto: adaptive.layoutClass === "tiny" && layoutChoice("zen") !== "off"
     /// Zen: everything around the page hidden (the toolbox, the command bar, the tab strip, the sidebar's arrow, the
     /// pills); its only mark is the dot in the lower left corner (zenDot), whose pill brings the controls back. The
     /// pen keeps writing. Presenting has its own: presenting without controls (presentClean).
@@ -265,7 +261,6 @@ ApplicationWindow {
         }
         if (adaptive.layoutClass === "tiny") {
             // (left by hand: remembered for tiny windows; on again: automatic again)
-            chooseLayout("chrome", "")  // (the reader chrome's choice of 0.7.0: replaced)
             chooseLayout("zen", on ? "" : "off")
             if (!on) zenByHand = false
             return
@@ -1675,7 +1670,7 @@ ApplicationWindow {
                         AdaptiveMenuItem {
                             objectName: "readItem"
                             offered: !win.textDoc
-                            text: win.withKeys(qsTr("Read (Zen, read only)"), "readOnly")
+                            text: win.withKeys(qsTr("Read (Zen, read only)"), "read")
                             icon.source: app.iconUrl("xqt-book-open")
                             onTriggered: win.startReading()
                         }
@@ -2259,7 +2254,7 @@ ApplicationWindow {
             property bool offered: !win.textDoc
             iconName: "xqt-book-open"
             label: qsTr("Read")
-            tip: win.withKeys(qsTr("Read: Zen and read only, in full screen (the edges turn the pages)"), "readOnly")
+            tip: win.withKeys(qsTr("Read: Zen and read only, in full screen (the edges turn the pages)"), "read")
             onClicked: win.startReading()
         }
         // Zen: only the page and a faint dot in the lower left corner (qt/docs/zen.md)
@@ -4969,7 +4964,7 @@ ApplicationWindow {
         }
     }
     // Read (Zen, read only, full screen) and Zen: their keys (changeable)
-    Shortcut { sequences: win.keysOf("readOnly"); enabled: !app.homeVisible && !win.textDoc && !win.replaying; onActivated: win.toggleReading() }
+    Shortcut { sequences: win.keysOf("read"); enabled: !app.homeVisible && !win.textDoc && !win.replaying; onActivated: win.toggleReading() }
     Shortcut { sequences: win.keysOf("zen"); enabled: !app.homeVisible; onActivated: win.setZen(!win.zenShown) }
     // Digits typed while the page is at hand: go to that page (Enter)
     PageJump {

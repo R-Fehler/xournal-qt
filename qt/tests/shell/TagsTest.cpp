@@ -224,47 +224,6 @@ TEST(Tags, theIndexReadsTheTags) {
     EXPECT_NE(again.tagChanges(), before);
 }
 
-// Entries indexed before tags were have none stored: read once more; a plain PDF only for its keywords
-TEST(Tags, entriesFromBeforeAreReadAgainOnce) {
-    QTemporaryDir tmp;
-    const fs::path root = fs::path(tmp.path().toStdString()) / "Library";
-    writeFile(root / "plan.md", "#one\n");
-    makeTaggedPdf(root / "paper.pdf", "two");
-    {
-        LibraryIndex index(root);
-        index.update(DocumentFiles::scanRecursive(root));
-        index.waitForDone();
-        index.flush();
-    }
-    // The pack as an older build wrote it: no "tags"
-    {
-        CacheLocation where(root);
-        auto notes = Packs::read(where.dirOf(root), LibraryIndex::NOTES_PACK, LibraryIndex::FORMAT);
-        ASSERT_TRUE(notes);
-        for (const char* name: {"plan.md", "paper.pdf"}) {
-            QCborMap entry = notes->value(QString::fromUtf8(name)).toMap();
-            ASSERT_TRUE(entry.contains(QStringLiteral("tags"))) << name;
-            entry.remove(QStringLiteral("tags"));
-            entry.remove(QStringLiteral("pdfTags"));
-            notes->insert(QString::fromUtf8(name), entry);
-        }
-        ASSERT_TRUE(Packs::write(where.dirOf(root), LibraryIndex::NOTES_PACK, LibraryIndex::FORMAT, *notes, true));
-    }
-    LibraryIndex again(root);
-    again.update(DocumentFiles::scanRecursive(root));
-    again.waitForDone();
-    EXPECT_EQ(again.documentsRead(), 1) << "the Markdown file";
-    EXPECT_EQ(again.keywordsRead(), 1) << "the plain PDF: only its keywords";
-    EXPECT_EQ(again.tagsOf(root / "plan.md"), list({"one"}));
-    EXPECT_EQ(again.tagsOf(root / "paper.pdf"), list({"two"}));
-    again.flush();
-    LibraryIndex third(root);
-    third.update(DocumentFiles::scanRecursive(root));
-    third.waitForDone();
-    EXPECT_EQ(third.documentsRead(), 0) << "once";
-    EXPECT_EQ(third.keywordsRead(), 0);
-}
-
 // `tag:` in the fuzzy syntax: a term of its own (never in names), negated with !, marked as `#tag` in text
 TEST(Tags, theFuzzySyntaxHasTagTerms) {
     const FuzzyQuery q("kalman tag:#Course/ !tag:draft");

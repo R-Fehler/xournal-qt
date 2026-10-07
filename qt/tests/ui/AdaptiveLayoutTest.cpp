@@ -2816,12 +2816,7 @@ TEST_F(PhoneChromeTest, zenIsAutomaticOnlyInATinyWindow) {
     wait(50);
     EXPECT_FALSE(flag("readOnlyOn"));
     EXPECT_TRUE(flag("zen")) << "Zen was on before Read";
-    // From 0.7.0: the reader chrome left in a tiny window (its choice "full") stays left
     QMetaObject::invokeMethod(settings, "resetLayoutChoices");
-    QMetaObject::invokeMethod(settings, "setLayoutChoice", Q_ARG(QString, "tiny"), Q_ARG(QString, "chrome"),
-                              Q_ARG(QString, "full"));
-    wait(50);
-    EXPECT_FALSE(flag("zen")) << "the reader left there in 0.7.0";
     window->showNormal();
 }
 

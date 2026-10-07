@@ -215,48 +215,20 @@ bool isOurs(const QString& name) {
     return pack.match(name).hasMatch();
 }
 
-bool isOldLayout(const QString& name) {
-    return name == QLatin1String("index") || name == QLatin1String("previews") || name == QLatin1String("pages.json") ||
-           name == QLatin1String("pages.json.part");
-}
-
 namespace {
-/// The folders of the layout before the packs ("index/", "previews/") hold only .json and .png files.
-bool isOldFile(const fs::path& f) {
-    const std::string n = f.filename().string();
-    for (const char* ext: {".json", ".png", ".json.part", ".png.part"}) {
-        const std::string e(ext);
-        if (n.size() > e.size() && n.compare(n.size() - e.size(), e.size(), e) == 0) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/// Walks our files (with those of the old layout: `old`); returns false if something else is in the folder.
+/// Walks our files; returns false if something else is in the folder.
 template <typename Fn>
-bool forOurs(const fs::path& dir, bool old, Fn fn) {
+bool forOurs(const fs::path& dir, Fn fn) {
     bool onlyOurs = true;
     std::error_code ec;
     for (auto it = fs::directory_iterator(dir, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
         const fs::path p = it->path();
-        const QString name = QString::fromStdString(p.filename().string());
-        if (!isOurs(name) && !(old && isOldLayout(name))) {
+        std::error_code dec;
+        if (!isOurs(QString::fromStdString(p.filename().string())) || fs::is_directory(p, dec)) {
             onlyOurs = false;
             continue;
         }
-        std::error_code dec;
-        if (fs::is_directory(p, dec)) {
-            for (auto sub = fs::directory_iterator(p, dec); !dec && sub != fs::directory_iterator(); sub.increment(dec)) {
-                if (isOldFile(sub->path()) && !sub->is_directory()) {
-                    fn(sub->path());
-                } else {
-                    onlyOurs = false;
-                }
-            }
-        } else {
-            fn(p);
-        }
+        fn(p);
     }
     return onlyOurs;
 }
@@ -267,7 +239,7 @@ bool removeIfOnlyOurs(const fs::path& dir) {
     if (!fs::exists(dir, ec)) {
         return true;
     }
-    if (!forOurs(dir, false, [](const fs::path&) {})) {
+    if (!forOurs(dir, [](const fs::path&) {})) {
         return false;
     }
     removeOurs(dir);
@@ -276,7 +248,7 @@ bool removeIfOnlyOurs(const fs::path& dir) {
 
 qint64 removeOurs(const fs::path& dir) {
     qint64 bytes = 0;
-    forOurs(dir, true, [&](const fs::path& f) {
+    forOurs(dir, [&](const fs::path& f) {
         std::error_code ec;
         const auto size = fs::file_size(f, ec);
         if (fs::remove(f, ec)) {
@@ -284,33 +256,13 @@ qint64 removeOurs(const fs::path& dir) {
         }
     });
     std::error_code ec;
-    for (const char* old: {"index", "previews"}) {
-        fs::remove(dir / old, ec);  // (only when empty)
-    }
-    fs::remove(dir, ec);
+    fs::remove(dir, ec);  // (only when empty)
     return bytes;
-}
-
-void removeOldLayout(const fs::path& dir) {
-    std::error_code ec;
-    for (const char* sub: {"index", "previews"}) {
-        for (auto it = fs::directory_iterator(dir / sub, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
-            if (isOldFile(it->path()) && !it->is_directory()) {
-                std::error_code rec;
-                fs::remove(it->path(), rec);
-            }
-        }
-        ec.clear();
-        fs::remove(dir / sub, ec);  // (only when empty)
-    }
-    for (const char* file: {"pages.json", "pages.json.part"}) {
-        fs::remove(dir / file, ec);
-    }
 }
 
 qint64 sizeOf(const fs::path& dir, int* files) {
     qint64 bytes = 0;
-    forOurs(dir, true, [&](const fs::path& f) {
+    forOurs(dir, [&](const fs::path& f) {
         std::error_code ec;
         const auto size = fs::file_size(f, ec);
         bytes += ec ? 0 : static_cast<qint64>(size);
@@ -394,7 +346,7 @@ qint64 removeAll(const CacheLocation& location, const std::vector<fs::path>& fol
     for (const fs::path& folder: folders) {
         bytes += Packs::removeOurs(location.inFolder(folder));
     }
-    // The library's folder in the app cache: its mirrors, and the old layout at its top
+    // The library's folder in the app cache and its mirrors
     std::vector<fs::path> dirs{location.appCacheDir()};
     std::error_code ec;
     for (auto it = fs::recursive_directory_iterator(location.appCacheDir(), ec);

@@ -9,9 +9,7 @@
  * its margin line (1 inch on A5 and bigger, upstream's), and the space above and below the lines. A7: the line at
  * half an inch.
  *
- * The page's text is found by where its box is (at the top-left margin, md::pageBoxOf). A page smaller than A5 whose
- * text was written before the margins scaled has its box at 2 cm, and a small lined page's text written before its
- * line scaled is after the line at 1 inch: those count as well (pageBox).
+ * The page's text is found by where its box is (at the top-left margin, md::pageBoxOf; pageBox).
  *
  * @license GNU GPLv2 or later
  */
@@ -44,11 +42,7 @@ struct Margins {
 /// The margins of the page's text on this page (forSize, and after the margin line of a lined page). Read under the
 /// document lock.
 Margins of(const PageRef& page);
-/// The margins as they were before they scaled (2 cm, after a margin line): where older text of a small page is.
-Margins unscaled(const PageRef& page);
-
-/// The page's own text box in its Markdown layer: at the top-left margin, or at the unscaled one (older text on a
-/// small page). nullptr: none.
+/// The page's own text box in its Markdown layer: at the top-left margin. nullptr: none.
 Text* pageBox(const Layer& layer, const PageRef& page);
 
 }  // namespace xqt::PageMargins

@@ -197,12 +197,12 @@ AppController::AppController(QObject* parent): QObject(parent) {
     });
     ownSettingsView = std::make_unique<SettingsModel>(*app);
     settingsView = ownSettingsView.get();
-    // The toolbox's tools (qt/docs/toolbox.md): stored in the settings; the first time made from the tools of before
+    // The toolbox's tools (qt/docs/toolbox.md): stored in the settings; without them, the first layout
     ownToolbox = std::make_unique<ToolboxModel>(
             [this] {
                 std::string stored;
                 app->getSettings()->getCustomElement("xournalQt").getString("toolbox", stored);
-                return stored.empty() ? migratedToolbox() : QString::fromStdString(stored);
+                return QString::fromStdString(stored);
             },
             [this](const QString& json) {
                 app->getSettings()->getCustomElement("xournalQt").setString("toolbox", json.toStdString());
@@ -1812,7 +1812,7 @@ QVariantList AppController::palette() const {
     return list;
 }
 
-QVariantList AppController::defaultToolbarColors() const {
+QVariantList AppController::toolbarColors() const {
     // Upstream's palette (black, green, light blue, light green, blue, gray, red, magenta, orange, yellow), not white
     QVariantList list;
     for (const QVariant& c: palette()) {
@@ -1821,20 +1821,6 @@ QVariantList AppController::defaultToolbarColors() const {
         }
     }
     return list;
-}
-
-QVariantList AppController::toolbarColors() const {
-    std::string stored;
-    QVariantList list;
-    if (app->getSettings()->getCustomElement(CUSTOM).getString("toolbarColors", stored)) {
-        for (const QString& c: QString::fromStdString(stored).split(',', Qt::SkipEmptyParts)) {
-            if (const QColor color(c.trimmed()); color.isValid()) {
-                list.append(color);
-            }
-        }
-        return list;
-    }
-    return defaultToolbarColors();
 }
 
 QVariantList AppController::colorPalettes() const { return ColorPalettes::builtIn().toVariant(); }
