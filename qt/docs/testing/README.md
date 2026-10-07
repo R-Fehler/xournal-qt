@@ -7,19 +7,19 @@ working directory.
 
 ## Binaries and labels
 
-1865 tests (2026-10-07, `ctest -N`):
+1908 tests (2026-10-07, `ctest -N`):
 
 | Label | Binary | Folder | Tests | Time (serial) | What it covers |
 | --- | --- | --- | --- | --- | --- |
 | `unit` | `xoj-unit-tests` | `qt/tests/unit` + upstream's `test/unit_tests` | 140 | ~3 s | upstream's unit tests, `PageRaster`, region renders, undo |
 | `markdown` | `xqt-markdown-tests` | `qt/tests/markdown` | 141 | ~5 s | the Markdown engine |
 | `audio` | `xqt-audio-tests` | `qt/tests/audio` | 21 | | Ogg Vorbis, recorder, player (fake devices) |
-| `session` | `xqt-session-tests` | `qt/tests/session` | 269 | ~26 s | `DocumentSession`, the PDF formats, file formats |
+| `session` | `xqt-session-tests` | `qt/tests/session` | 285 | ~26 s | `DocumentSession`, the PDF formats, file formats |
 | `canvas` | `xqt-canvas-tests` | `qt/tests/canvas` | 302 | ~65 s | views, input replay, editors, tools |
 | `hwr` | `xqt-hwr-tests` | `qt/tests/hwr` | 84 | | layout, recognisers (tiny stand-in models in `qt/tests/hwr/data`), search |
 | `quick` | `xqt-quick-tests` | `qt/tests/quick` | 64 | ~74 s | `DocumentCanvasItem`: rendering, input, fractional scales |
-| `shell` | `xqt-shell-tests` | `qt/tests/shell` | 424 | ~62 s | library, tabs, models, settings, CLI |
-| `ui` | `xqt-ui-tests` | `qt/tests/ui` | 419 | ~1700 s | the real window (`Main.qml` + `AppController`) driven off-screen |
+| `shell` | `xqt-shell-tests` | `qt/tests/shell` | 434 | ~62 s | library, tabs, models, settings, CLI |
+| `ui` | `xqt-ui-tests` | `qt/tests/ui` | 435 | ~1700 s | the real window (`Main.qml` + `AppController`) driven off-screen |
 | `golden` | `run_golden.sh` | `qt/tests/golden` | 2 | | `golden-roundtrip`: the CLI saves and loads again (same structure and picture), runs everywhere; `golden-quick`: CLI output against upstream's (skipped without upstream's binary, `XOJ_UPSTREAM_BIN`) |
 
 A few tests run twice with another environment: `FractionalScaleCanvas.quick@125/@167`, `FractionalScale.ui@150`,

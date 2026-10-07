@@ -32,7 +32,7 @@ cmake --build build-qt -j$(nproc) --target <what you need>  # e.g. xournal-qt, x
 
 A build of everything without a compiler cache takes about a quarter of an hour on the CI's runners and scales with
 the cores. On a machine with many cores and plenty of memory: `-j$(nproc)` for the build, and the full suite locally (`ctest --test-dir build-qt
--j$(nproc)`; 1865 tests, the `ui` label is most of the time). Several worktrees can build side by side (each build
+-j$(nproc)`; about 1900 tests, the `ui` label is most of the time). Several worktrees can build side by side (each build
 folder about 1.2 GB with FAST_DEV); ccache shares their objects.
 
 ### A small machine shared by several builds

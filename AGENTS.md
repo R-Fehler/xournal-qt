@@ -3,7 +3,8 @@
 xournal-qt is a **fork of Xournal++** ([FORK.md](FORK.md)): upstream's C++ core with a new Qt 6 / Qt Quick frontend.
 Everything of the fork lives under `qt/`; the rest of the tree is upstream and is touched as little as possible.
 `master` follows upstream, **`master-qt` is the fork's branch** and the one to work on. The developer docs start at
-[qt/docs/README.md](qt/docs/README.md).
+[qt/docs/README.md](qt/docs/README.md). Continuing on a local machine after the cloud sessions: read
+[the handover](qt/docs/agents/handover-2026-10.md) first.
 
 ## Build and test
 
@@ -11,7 +12,7 @@ Everything of the fork lives under `qt/`; the rest of the tree is upstream and i
 cmake -S qt -B build-qt -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DXQT_FAST_DEV=ON   # once
 cmake --build build-qt -j8 --target <the test binary you need>
 ctest --test-dir build-qt -j8 -L canvas    # labels: unit session canvas markdown audio hwr quick shell ui golden
-ctest --test-dir build-qt -j8              # the full suite: 1865 tests
+ctest --test-dir build-qt -j8              # the full suite: about 1900 tests
 ```
 
 - `XQT_FAST_DEV=ON` is for development builds only (QML not compiled ahead of time, `-g1`, lld); CI and releases

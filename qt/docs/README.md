@@ -66,7 +66,7 @@ its `xournalQt` part), in a config folder of its own (`~/.config/xournal-qt`).
 | [features/](features/README.md) | one doc per feature |
 | [architecture/](architecture/README.md) | the architecture overview (generated from `architecture.yaml`), and [image caches](architecture/image-caches.md) |
 | [decisions/](decisions/README.md) | the architecture decision records |
-| [agents/](agents/block-brief.md) | the brief every block agent gets, and the integrator's routine |
+| [agents/](agents/block-brief.md) | the brief every block agent gets, and the integrator's routine; [the handover](agents/handover-2026-10.md) from the cloud sessions to a local machine |
 | [user/](user/) | guides for users |
 | [release-notes/](release-notes/) | what each release brought; the next one is drafted as work is merged |
 | [review/2026-10/](review/2026-10/README.md) | the critical review of 2026-10 and the refactoring plan in waves |
