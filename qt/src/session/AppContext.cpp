@@ -12,6 +12,7 @@
 #include "util/PathUtil.h"
 #include "util/Util.h"
 
+#include "DocumentSession.h"
 #include "EmojiFont.h"
 #include "MdBox.h"
 #include "PageMargins.h"
@@ -27,6 +28,7 @@ AppContext::AppContext(fs::path resourceDir, fs::path settingsFile, int renderTh
     sticky::installDrawer();  // sticky notes: their content clipped to them, everywhere a page is drawn
     PageMargins::installRuling();  // the ruling of pages smaller than A5 to scale (its margin line), everywhere too
     paper::install();  // textured paper (qt/docs/dark-pages.md), everywhere a page is drawn
+    DocumentSession::installLoadHooks();  // the password of a .xopp's encrypted background PDF
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_WIN) && !defined(Q_OS_MACOS)
     // The colour emoji font that comes with the app, for Pango (Windows and Android have it in the fonts.conf they
     // write at start: WindowsSetup.cpp, AndroidSetup.cpp). Not on macOS: Pango draws with Core Text there, not

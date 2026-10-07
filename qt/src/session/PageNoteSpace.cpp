@@ -28,7 +28,12 @@ QPointF offsetOf(const XojPage& page) { return {page.getNoteSpace().left, page.g
 
 bool canHaveSpace(const XojPage& page) { return !page.getBackgroundType().isImagePage(); }
 
+std::function<void()> beforePdfDrawn;
+
 void renderPdf(cairo_t* cr, const XojPage& page, const XojPdfPage& pdf, bool forPrinting) {
+    if (beforePdfDrawn) {
+        beforePdfDrawn();
+    }
     const NoteSpace& s = page.getNoteSpace();
     cairo_save(cr);
     if (!s.empty()) {

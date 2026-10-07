@@ -54,6 +54,7 @@
 #include "HybridPdf.h"
 #include "MergedPdf.h"
 #include "PageBookmarks.h"
+#include "PageCopy.h"
 #include "TextDocument.h"
 #include "PageOrderUndoAction.h"
 #include "PdfEncryption.h"
@@ -178,7 +179,7 @@ auto DocumentSession::loadFile(const fs::path& path, bool attachPdf, const std::
         return result;
     }
     // Port of Control::openXoppFile
-    LoadHandler::pdfPassword = &PdfEncryption::backgroundPassword;  // (its background PDF may be encrypted)
+    installLoadHooks();  // (its background PDF may be encrypted)
     auto load = [&]() {
         PdfEncryption::askedBackground().clear();
         LoadHandler loadHandler(&result.warnings);
@@ -1277,45 +1278,28 @@ void DocumentSession::updateModified() {
     }
 }
 
-void DocumentSession::updatePreview(Document& document) {
-    Document* doc = &document;
-    // Port of SaveJob::updatePreview: 128 px preview of the first page stored in the file.
-    const int previewSize = 128;
-    xoj::util::CairoSurfaceSPtr crBuffer;
-
-    doc->lock_shared();
-    if (doc->getPageCount() > 0) {
-        PageRef page = doc->getPage(0);
-        double width = page->getWidth();
-        double height = page->getHeight();
-        const double zoom = width < height ? previewSize / height : previewSize / width;
-        width *= zoom;
-        height *= zoom;
-
-        crBuffer.reset(cairo_image_surface_create(CAIRO_FORMAT_ARGB32, ceil_cast<int>(width), ceil_cast<int>(height)),
-                       xoj::util::adopt);
-        cairo_t* cr = cairo_create(crBuffer.get());
-        cairo_scale(cr, zoom, zoom);
-
-        xoj::view::BackgroundFlags flags = xoj::view::BACKGROUND_SHOW_ALL;
-        // No PdfCache here: render the PDF background by hand (as upstream).
-        if (page->getBackgroundType().isPdfPage()) {
-            if (XojPdfPageSPtr pdfPage = doc->getPdfPage(page->getPdfPageNr())) {
-                notespace::renderPdf(cr, *page, *pdfPage);
+void DocumentSession::updatePreview(Document& doc) {
+    // The first page copied under the read lock, drawn without it (never hold the document lock while drawing a PDF)
+    PageRef first;
+    XojPdfPageSPtr pdf;
+    {
+        std::shared_lock lock(doc);
+        if (doc.getPageCount() > 0) {
+            const PageRef page = doc.getPage(0);
+            first = deepCopyOf(page);
+            if (page->getBackgroundType().isPdfPage()) {
+                pdf = doc.getPdfPage(page->getPdfPageNr());
             }
-            flags.showPDF = xoj::view::HIDE_PDF_BACKGROUND;
-        } else {
-            flags.forceBackgroundColor = xoj::view::FORCE_AT_LEAST_BACKGROUND_COLOR;
         }
-        DocumentView view;
-        view.drawPage(page, cr, true, flags);
-        cairo_destroy(cr);
     }
-    doc->unlock_shared();
+    xoj::util::CairoSurfaceSPtr preview = previewOf(first, pdf);
+    std::unique_lock lock(doc);
+    doc.setPreview(std::move(preview));
+}
 
-    doc->lock();
-    doc->setPreview(std::move(crBuffer));
-    doc->unlock();
+void DocumentSession::installLoadHooks() {
+    static std::once_flag once;
+    std::call_once(once, [] { LoadHandler::pdfPassword = &PdfEncryption::backgroundPassword; });
 }
 
 auto DocumentSession::writeDocument(Document& doc, const fs::path& target) -> SaveResult {

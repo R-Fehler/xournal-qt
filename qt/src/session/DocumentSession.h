@@ -92,6 +92,10 @@ public:
     /// run on a worker thread before the tab is created. `password`: for an encrypted PDF (or the encrypted background
     /// PDF of a .xopp); without it such a file is not opened (needsPassword): the library and previews never pass one.
     static LoadResult loadFile(const fs::path& path, bool attachPdf = false, const std::string& password = {});
+    /// The process-wide hooks of upstream's loader (LoadHandler::pdfPassword: the password of a .xopp's encrypted
+    /// background PDF), installed once (AppContext, and loadFile for callers without one); never written again while
+    /// workers load files.
+    static void installLoadHooks();
 
     /// A new document with one page from the page template settings.
     explicit DocumentSession(AppContext& app, QObject* parent = nullptr);
@@ -582,6 +586,9 @@ private:
     std::function<size_t()> recordingClock;
     void setLastAutosaveFile(fs::path file);
     static void updatePreview(Document& doc);
+    /// The 128 px preview of a page stored in a file (a port of SaveJob::updatePreview), drawn from `page` and its PDF
+    /// page: a copy, without the document's lock (any thread).
+    static xoj::util::CairoSurfaceSPtr previewOf(const PageRef& page, const XojPdfPageSPtr& pdf);
 
     // Saving in the background (DocumentSave.cpp): a save goes through steps, on this thread or on a worker.
     struct SaveTask;
