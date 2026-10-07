@@ -55,7 +55,7 @@ Item {
             required property var model
             name: model.name
             path: model.path
-            preview: model.preview
+            cover: model.cover
             isFolder: model.isLibrary
             isLibrary: model.isLibrary
             hasPdf: model.hasPdf

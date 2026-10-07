@@ -93,7 +93,7 @@ public:
         IsFolderRole,
         PathRole,          ///< absolute path of the folder, or of the document's main file (.xopp, else PDF)
         LocationRole,      ///< folder of the row relative to the library ("" = top)
-        CoverRole,         ///< image URL of its cover (QML: "preview")
+        CoverRole,         ///< image URL of its cover (QML: "cover")
         ModifiedRole,
         HasPdfRole,
         HasXoppRole,

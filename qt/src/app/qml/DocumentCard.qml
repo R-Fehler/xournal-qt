@@ -22,7 +22,7 @@ Item {
     readonly property string markedName: Fuzzy.marked(name, nameMarks, "#c2410c")
     property string path
     property string subtitle
-    property string preview
+    property string cover
     property bool isFolder: false
     /// A folder opened as a library (Recent): the folder with a library mark
     property bool isLibrary: false
@@ -143,7 +143,7 @@ Item {
                     anchors.margins: 6
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true
-                    source: card.isFolder || !card.active || card.kind === "other" ? "" : card.preview
+                    source: card.isFolder || !card.active || card.kind === "other" ? "" : card.cover
                     sourceSize.width: 360
                     // Paper look: a little shadow around the page
                     Rectangle {
@@ -158,7 +158,7 @@ Item {
                 }
                 BusyIndicator {
                     anchors.centerIn: parent
-                    visible: previewImage.visible && card.preview !== "" && previewImage.status === Image.Loading
+                    visible: previewImage.visible && card.cover !== "" && previewImage.status === Image.Loading
                     running: visible
                     implicitWidth: 36
                     implicitHeight: 36

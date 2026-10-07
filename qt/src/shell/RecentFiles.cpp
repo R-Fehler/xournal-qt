@@ -364,7 +364,7 @@ void RecentFiles::pdfKindsChanged() {
 }
 
 QHash<int, QByteArray> RecentFiles::roleNames() const {
-    return {{NameRole, "name"},     {PathRole, "path"},     {LocationRole, "location"}, {CoverRole, "preview"},
+    return {{NameRole, "name"},     {PathRole, "path"},     {LocationRole, "location"}, {CoverRole, "cover"},
             {OpenedRole, "opened"}, {HasPdfRole, "hasPdf"}, {HasXoppRole, "hasXopp"},   {SelectedRole, "selected"}, {LastPageRole, "lastPage"},
             {KindRole, "kind"}, {IsLibraryRole, "isLibrary"}, {PdfKindRole, "pdfKind"}, {VersionsRole, "versions"}};
 }

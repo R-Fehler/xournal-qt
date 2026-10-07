@@ -837,7 +837,7 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {IsFolderRole, "isFolder"},
             {PathRole, "path"},
             {LocationRole, "location"},
-            {CoverRole, "preview"},
+            {CoverRole, "cover"},
             {ModifiedRole, "modified"},
             {HasPdfRole, "hasPdf"},
             {HasXoppRole, "hasXopp"},
