@@ -49,7 +49,7 @@ A hybrid PDF is a normal PDF with four additions:
 ## Saving
 
 - A full rewrite with qpdf, from the clean base, our annotations built from the model, and the embedded `.xopp`.
-  The write is atomic (a temp file plus rename), in the background, with the document read under its lock. qpdf
+  The write is atomic (`fileio::AtomicFile`: a temp file next to it, synced to the storage, renamed over it), in the background, with the document read under its lock. qpdf
   has no incremental save; measure on a 1,300-page PDF to see whether the full rewrite is fast enough. (Since
   `qt/pdf-incremental`, Ctrl+S appends an incremental update instead: see "Saving: incremental updates" below.)
 - Pages removed from the document are removed from the file. Base pages are copied once and kept across saves.
