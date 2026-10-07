@@ -8,16 +8,17 @@
  * waits for their running renders, so a closed tab can be destroyed safely.
  *
  * Drawing a page (the PDF by poppler, then the ink) is what takes the time, so:
- *  - drawn thumbnails are kept in memory, up to a limit (Settings → Documents; the least recently used go first):
+ *  - drawn thumbnails are kept in memory, up to a limit (ImageMemory; the least recently used go first):
  *    scrolling back, switching tabs, opening the page grid or the overview again shows them at once; the sidebar,
  *    the page grid and the overview share them;
  *  - widths are rounded up to steps of 64 px (few different images of a page), and a smaller one is scaled down
  *    from a bigger one that is kept instead of being drawn;
  *  - the thumbnail asked for last is drawn first (what is in view now), and one that is not wanted any more (it was
  *    scrolled away) is not drawn at all;
- *  - one up to the width of the page's preview comes from it (PageSketches), and every drawn one gives the page its
- *    sketch (and preview).
- * The memory for page previews is shared: three quarters for these, one quarter for the sketches.
+ *  - one up to the width of the page's stand-in comes from it (PageSketches), and every drawn one gives the page its
+ *    sketch (and stand-in).
+ * Thumbnails and sketches are the page previews; the memory for them (the setting "previewMemory") is shared:
+ *  three quarters for these, one quarter for the sketches (ImageMemory).
  *
  * @license GNU GPLv2 or later
  */
@@ -51,7 +52,8 @@ public:
     static DocumentSession* acquireSession(quint64 id);
     static void releaseSession(quint64 id);
 
-    /// How much memory the page previews may take (bytes): the kept thumbnails and the sketches.
+    /// How much memory the kept thumbnails may take (bytes; their share of the memory for page previews, which
+    /// ImageMemory::setPreviewMemory hands out).
     static void setCacheLimit(qint64 bytes);
     static qint64 cacheBytes();  ///< of the kept thumbnails
     /// The smallest kept thumbnail of this revision at least `width` wide (any thread; null: none).
@@ -59,11 +61,10 @@ public:
     /// How many pages were drawn so far (tests).
     static int renderCount();
     static constexpr int WIDTH_STEP = 64;
-    static constexpr qint64 DEFAULT_CACHE_MB = 256;
 
     /// Renders one page `width` pixels wide (thread-safe; takes a shared document lock).
     static QImage render(DocumentSession& session, size_t page, int width);
-    /// Render a page of any document (e.g. one loaded only for a preview). Takes a shared lock.
+    /// Render a page of any document (e.g. one loaded only for its cover). Takes a shared lock.
     static QImage renderDocument(Document& doc, size_t page, int width);
     /// Render this page (any thread). The PDF is drawn without the document lock (poppler has its own), so edits
     /// do not wait for it; only the ink is drawn under a shared lock. `pdf`: another instance of the document's PDF

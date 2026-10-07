@@ -45,7 +45,8 @@ public:
     /// A page background (`base`, a pattern) on paper of this color, textured or not: its config with the texture and
     /// ruling colors that show on the paper (render/PaperTexture.h)
     static PageType paperType(PageType base, Color color, bool textured);
-    /// Memory for kept page thumbnails (MB, setting "previewMemory"); applyPreviewMemory hands it to them.
+    /// Memory for the page previews, the sharp thumbnails and the sketches (MB, setting "previewMemory");
+    /// applyPreviewMemory hands it to ImageMemory.
     static int previewMemory(Settings& settings);
     static void applyPreviewMemory(Settings& settings);
     /// Memory for rendered canvas pages (MB, setting "canvasMemory"; default a quarter of the RAM, at most a third)

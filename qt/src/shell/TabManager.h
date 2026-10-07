@@ -30,7 +30,7 @@ class TabManager final: public QAbstractListModel {
     Q_PROPERTY(int currentIndex READ currentIndex WRITE setCurrentIndex NOTIFY currentIndexChanged)
     Q_PROPERTY(int count READ count NOTIFY countChanged)
 public:
-    /// Hit marks on one page preview of the extended search (a one-letter search has hundreds)
+    /// Hit marks on one page picture of the extended search (a one-letter search has hundreds)
     static constexpr int MAX_PAGE_HITS = 50;
     /// The pages with hits of a document whose hits are placed for the overview (the first ones).
     static constexpr int PLACED_HIT_PAGES = 24;
@@ -160,7 +160,7 @@ private:
     void forgetUsed(const DocumentSession* s);
 
     /// Hits found while a search runs are told in one go now and then (rebuilding the list of pages with hits
-    /// makes the overview build its previews again).
+    /// makes the overview build its pictures again).
     void searchChanged(const DocumentSession* s, bool finished);
 
     AppContext& app;

@@ -31,6 +31,7 @@
 #include "render/RenderService.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
+#include "shell/ImageMemory.h"
 #include "shell/PageSketches.h"
 #include "CanvasMemory.h"
 #include "CanvasPage.h"
@@ -145,7 +146,7 @@ TEST(Thumbnails, aChangedPageIsDrawnAgain) {
 
 TEST(Thumbnails, theOverviewSharesThemWithTheSidebar) {
     AppController c;
-    c.newDocument();  // (a saved one shows its stored preview on its title page)
+    c.newDocument();  // (a saved one shows its stored cover on its title page)
     TabManager& tabs = c.tabManager();
     const QString overview = tabs.data(tabs.index(tabs.currentIndex()), TabManager::ThumbnailRole).toString();
     EXPECT_EQ(overview, urlOf(c, 0)) << "the overview names the current page like the sidebar";
@@ -157,7 +158,7 @@ TEST(Thumbnails, keptWithinTheMemoryLimit) {
     const qint64 page = request(urlOf(c, 0), 640).sizeInBytes();
     // Three quarters are for these (a quarter for the sketches): room for one page at 640 px, not for two
     const qint64 limit = page * 3 / 2 * 4 / 3;
-    ThumbnailProvider::setCacheLimit(limit);
+    ImageMemory::setPreviewMemory(limit);
     EXPECT_GT(ThumbnailProvider::cacheBytes(), 0);
     request(urlOf(c, 1), 640);
     EXPECT_LE(ThumbnailProvider::cacheBytes(), limit * 3 / 4);
@@ -168,7 +169,7 @@ TEST(Thumbnails, keptWithinTheMemoryLimit) {
     EXPECT_EQ(ThumbnailProvider::renderCount(), drawn) << "the one used last is still there";
     request(urlOf(c, 0), 640);
     EXPECT_EQ(ThumbnailProvider::renderCount(), drawn + 1) << "the least recently used one went first";
-    ThumbnailProvider::setCacheLimit(ThumbnailProvider::DEFAULT_CACHE_MB * 1024 * 1024);
+    ImageMemory::setPreviewMemory(ImageMemory::DEFAULT_PREVIEW_MB * ImageMemory::MB);
 }
 
 TEST(Thumbnails, closingATabForgetsItsThumbnails) {
@@ -200,7 +201,7 @@ class Sketches: public ::testing::Test {
 protected:
     void SetUp() override { PageSketches::instance().setDelays(0, 0); }
     void TearDown() override {
-        ThumbnailProvider::setCacheLimit(ThumbnailProvider::DEFAULT_CACHE_MB * 1024 * 1024);
+        ImageMemory::setPreviewMemory(ImageMemory::DEFAULT_PREVIEW_MB * ImageMemory::MB);
         PageSketches::instance().setDelays(400, 1500);
     }
 };
@@ -220,7 +221,7 @@ TEST_F(Sketches, allPagesAreSketchedWhenADocumentIsOpened) {
         EXPECT_EQ(provider.requestImage(url.mid(15), &size, {}).width(), 128) << "page " << p + 1;
     }
     EXPECT_EQ(ThumbnailProvider::renderCount(), sharp) << "no sharp thumbnail drawn for them";
-    EXPECT_LE(PageSketches::instance().bytes(), ThumbnailProvider::DEFAULT_CACHE_MB * 1024 * 1024 / 4);
+    EXPECT_LE(PageSketches::instance().bytes(), ImageMemory::DEFAULT_PREVIEW_MB * ImageMemory::MB / 4);
 }
 
 TEST_F(Sketches, smallThumbnailsComeFromTheSketch) {
@@ -266,7 +267,7 @@ TEST_F(Sketches, theyGetSmallerWhenManyPagesAreOpen) {
     const qint64 pages = pagesOf(c).rowCount();
     // Room for all pages at 64 px (11.5 kB), not at 96 (26 kB)
     const qint64 budget = pages * 20000;
-    ThumbnailProvider::setCacheLimit(budget * 4);
+    ImageMemory::setPreviewMemory(budget * 4);
     ASSERT_TRUE(sketched());
     EXPECT_EQ(PageSketches::instance().width(), 64);
     EXPECT_LE(PageSketches::instance().bytes(), budget);
@@ -280,7 +281,7 @@ TEST_F(Sketches, theDocumentShownLastComesFirstWhenNotAllFit) {
     openLecture(c);  // two pages
     openPages(c);    // shown now
     const qint64 pages = pagesOf(c).rowCount();
-    ThumbnailProvider::setCacheLimit(pages * 12000 * 4);  // this one at 64 px, no more
+    ImageMemory::setPreviewMemory(pages * 12000 * 4);  // this one at 64 px, no more
     ASSERT_TRUE(sketched());
     EXPECT_EQ(PageSketches::instance().width(), 64);
     for (int p = 0; p < pages; ++p) {
@@ -304,9 +305,9 @@ TEST_F(Sketches, closingADocumentForgetsItsSketches) {
     EXPECT_LT(PageSketches::instance().bytes(), before);
 }
 
-// --- previews: bigger pictures of all pages, for the canvas and for thumbnails ---
+// --- stand-ins: bigger pictures of all pages, for the canvas and for thumbnails ---
 
-TEST_F(Sketches, pagesAreDrawnOnceForTheirPreviewAndSketch) {
+TEST_F(Sketches, pagesAreDrawnOnceForTheirStandInAndSketch) {
     AppController c;
     openPages(c);
     const int drawn = PageSketches::instance().drawCount(), read = PageSketches::instance().readCount();
@@ -315,39 +316,39 @@ TEST_F(Sketches, pagesAreDrawnOnceForTheirPreviewAndSketch) {
     const quint64 id = ThumbnailProvider::idOf(s);
     const int pages = pagesOf(c).rowCount();
     for (int p = 0; p < pages; ++p) {
-        EXPECT_EQ(PageSketches::instance().preview(id, s->pageId(static_cast<size_t>(p))).width(), 768) << "page " << p + 1;
+        EXPECT_EQ(PageSketches::instance().standIn(id, s->pageId(static_cast<size_t>(p))).width(), 768) << "page " << p + 1;
         EXPECT_EQ(PageSketches::instance().image(id, s->pageId(static_cast<size_t>(p))).width(), 128) << "page " << p + 1;
     }
     EXPECT_EQ(PageSketches::instance().drawCount() - drawn + PageSketches::instance().readCount() - read, pages)
-            << "each page drawn (or read) once: the sketch is scaled from the preview";
-    EXPECT_FALSE(c.tabManager().currentView()->preview(3).isNull()) << "the canvas shows them until it rendered";
+            << "each page drawn (or read) once: the sketch is scaled from the stand-in";
+    EXPECT_FALSE(c.tabManager().currentView()->standIn(3).isNull()) << "the canvas shows them until it rendered";
 }
 
-TEST_F(Sketches, thumbnailsUpToThePreviewWidthAreNotDrawn) {
+TEST_F(Sketches, thumbnailsUpToTheStandInWidthAreNotDrawn) {
     AppController c;
     openPages(c);
     ASSERT_TRUE(sketched());
     const int drawn = ThumbnailProvider::renderCount();
     EXPECT_EQ(request(urlOf(c, 4), 360).width(), 384);
     EXPECT_EQ(request(urlOf(c, 5), 700).width(), 704);
-    EXPECT_EQ(ThumbnailProvider::renderCount(), drawn) << "scaled from the previews";
+    EXPECT_EQ(ThumbnailProvider::renderCount(), drawn) << "scaled from the stand-ins";
     request(urlOf(c, 5), 1000);
-    EXPECT_EQ(ThumbnailProvider::renderCount(), drawn + 1) << "bigger than the preview: drawn";
+    EXPECT_EQ(ThumbnailProvider::renderCount(), drawn + 1) << "bigger than the stand-in: drawn";
 }
 
-TEST_F(Sketches, previewsGetSmallerWhenTheMemoryForPagesIsShort) {
+TEST_F(Sketches, standInsGetSmallerWhenTheMemoryForPagesIsShort) {
     AppController c;
     openPages(c);
     const qint64 pages = pagesOf(c).rowCount();
-    // A tenth of it for previews: room for all pages at 384 px (~ 417 kB), not at 512 (~ 741 kB)
+    // A tenth of it for stand-ins: room for all pages at 384 px (~ 417 kB), not at 512 (~ 741 kB)
     CanvasMemory::instance().setLimit(pages * 600000 * 10);
     ASSERT_TRUE(sketched());
-    EXPECT_EQ(PageSketches::instance().previewWidth(), 384);
-    EXPECT_LE(PageSketches::instance().previewBytes(), pages * 600000);
+    EXPECT_EQ(PageSketches::instance().standInWidth(), 384);
+    EXPECT_LE(PageSketches::instance().standInBytes(), pages * 600000);
     CanvasMemory::instance().setLimit(CanvasMemory::defaultLimit());
 }
 
-// --- stored previews: the next opening reads them instead of drawing ---
+// --- stored stand-ins: the next opening reads them instead of drawing ---
 
 namespace {
 size_t storedFiles(const fs::path& folder) {
@@ -379,7 +380,7 @@ void scribble(DocumentSession& s) {
 }
 }  // namespace
 
-TEST_F(Sketches, previewsAreStoredForTheNextOpening) {
+TEST_F(Sketches, standInsAreStoredForTheNextOpening) {
     fs::path folder;
     int pages = 0;
     {
@@ -398,7 +399,7 @@ TEST_F(Sketches, previewsAreStoredForTheNextOpening) {
     EXPECT_EQ(PageSketches::instance().drawCount(), drawn) << "nothing drawn";
     EXPECT_EQ(PageSketches::instance().readCount() - read, pages) << "all read";
     DocumentSession* s = c.tabManager().currentSession();
-    EXPECT_EQ(PageSketches::instance().preview(ThumbnailProvider::idOf(s), s->pageId(3)).width(), 768);
+    EXPECT_EQ(PageSketches::instance().standIn(ThumbnailProvider::idOf(s), s->pageId(3)).width(), 768);
 }
 
 TEST_F(Sketches, changedPagesAreStoredOnceTheDocumentIsSaved) {
@@ -429,9 +430,9 @@ TEST_F(Sketches, changedPagesAreStoredOnceTheDocumentIsSaved) {
     EXPECT_NE(contentOf(now / "0.jpg"), before) << "the page as saved now";
 }
 
-// A page waiting for its sketch when the document is saved may get its preview another way before its turn (its
+// A page waiting for its sketch when the document is saved may get its stand-in another way before its turn (its
 // sharp thumbnail, drawn for the sidebar; or a draw from before the save): then it is stored all the same.
-TEST_F(Sketches, aPreviewThatArrivesWhileItsPageWaitsIsStoredAsWell) {
+TEST_F(Sketches, aStandInThatArrivesWhileItsPageWaitsIsStoredAsWell) {
     QTemporaryDir dir;
     AppController c;
     c.newDocument();
@@ -450,13 +451,13 @@ TEST_F(Sketches, aPreviewThatArrivesWhileItsPageWaitsIsStoredAsWell) {
     QImage sharp(1200, 1697, QImage::Format_RGB32);
     sharp.fill(Qt::white);
     PageSketches::instance().offer(id, s->pageId(1), s->pageRevision(1), sharp);
-    ASSERT_FALSE(PageSketches::instance().preview(id, s->pageId(1)).isNull()) << "the sharp one gave the preview";
+    ASSERT_FALSE(PageSketches::instance().standIn(id, s->pageId(1)).isNull()) << "the sharp one gave the stand-in";
     render->unblockRerenderZoom();
     ASSERT_TRUE(sketched());
     EXPECT_EQ(storedFiles(PageSketches::instance().diskFolder(id)), 4u) << "every page, also the one offered";
 }
 
-TEST_F(Sketches, theStoredPreviewsUsedLongestAgoGoFirst) {
+TEST_F(Sketches, theStoredStandInsUsedLongestAgoGoFirst) {
     const fs::path root = Util::getCacheSubfolder("pages");
     std::error_code ec;
     qint64 others = 0;  // (stored by other tests, newer)
@@ -559,7 +560,7 @@ TEST_F(Sketches, benchBigPdf) {
               << maxCanvasDraw << " ms\n";
 }
 
-// XQT_BENCH_PDF=<big pdf>: opening it a second time reads the stored previews
+// XQT_BENCH_PDF=<big pdf>: opening it a second time reads the stored stand-ins
 TEST_F(Sketches, benchReopen) {
     const QString pdf = qEnvironmentVariable("XQT_BENCH_PDF");
     if (pdf.isEmpty()) {

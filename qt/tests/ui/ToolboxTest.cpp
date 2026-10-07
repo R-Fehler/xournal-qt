@@ -40,7 +40,7 @@
 #include "shell/HitPages.h"
 #include "shell/MdSnippets.h"
 #include "shell/PageSketches.h"
-#include "shell/Previews.h"
+#include "shell/DocumentCovers.h"
 #include "shell/RecentFiles.h"
 #include "shell/SettingsModel.h"
 #include "shell/TabManager.h"

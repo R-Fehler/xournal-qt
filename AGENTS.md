@@ -83,14 +83,15 @@ Dependencies point down this list only (`xqt-shell` also compiles `src/app`; the
 
 ## What the moving parts assume
 
-- **Pages are drawn on many threads at once** (visible renders, two background renders, two preview workers). Cairo
-  and Pango objects belong to one thread (`thread_local`), poppler draws one page of an instance at a time (its own
-  mutex), and the document is read under `std::shared_lock`. Never hold the document lock while drawing a PDF.
+- **Pages are drawn on many threads at once** (visible renders, two background renders, two sketch workers, the
+  image providers' workers). Cairo and Pango objects belong to one thread (`thread_local`), poppler draws one page of
+  an instance at a time (its own mutex), and the document is read under `std::shared_lock`. Never hold the document
+  lock while drawing a PDF.
 - **Every page has a revision** (`DocumentSession::pageRevision`) that changes when its picture does. Thumbnails,
-  previews and their files on disk are named by it; a page keeps its revision when pages before it come or go.
-- **Memory has owners**: `CanvasMemory` for rendered pages (a setting, shared by all tabs), `PageSketches` for the
-  previews of every page, `ThumbnailProvider` for the sharp thumbnails. A cache without an owner and a limit is how
-  this got slow before.
+  sketches, stand-ins and their files on disk are named by it; a page keeps its revision when pages before it come or go.
+- **Memory has owners**: `CanvasMemory` for rendered pages (a setting, shared by all tabs), `ImageMemory` for the
+  limits of all image caches (thumbnails, sketches, stand-ins, covers, …; [qt/docs/image-caches.md](qt/docs/image-caches.md)),
+  `ImageWorkers` for their threads. A cache without an owner and a limit is how this got slow before.
 - **Work that is not for right now goes to a background worker** at idle priority, and nothing is ever drawn in front
   of the page the reader is looking at.
 - **QML items that a test needs carry an `objectName`.** UI tests drive the real window off-screen.

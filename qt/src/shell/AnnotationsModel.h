@@ -121,13 +121,12 @@ private:
 /// Annotations panel: the page under it washed out (its PDF page, else its image or paper colour), its layers on top
 /// (annotations::drawArea). A revision that is gone gives nothing (the panel has new items then).
 /// Only the rows on screen ask (the ListView makes delegates for them), the one asked for last is drawn first, one
-/// scrolled away before its turn is not drawn, and the pictures drawn last are kept (PICTURE_CACHE_BYTES).
+/// scrolled away before its turn is not drawn, and the pictures drawn last are kept (ImageMemory::ANNOTATION_PICTURE_BYTES).
 class AnnotationImageProvider final: public QQuickAsyncImageProvider {
 public:
     QQuickImageResponse* requestImageResponse(const QString& id, const QSize& requestedSize) override;
     /// How many pictures were drawn so far (tests).
     static int renderCount();
-    static constexpr qint64 PICTURE_CACHE_BYTES = 24LL << 20;
 };
 
 }  // namespace xqt

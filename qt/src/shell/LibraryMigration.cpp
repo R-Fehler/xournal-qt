@@ -574,7 +574,7 @@ void relocateState(const Plan& plan, const std::vector<fs::path>& journals) {
         }
         const Library before(m.from), after(m.to);
         mergeConfig(configs / before.key(), configs / after.key());
-        // The library's cache in the app cache (previews, search index): kept under the key of its new path
+        // The library's cache in the app cache (covers, search index): kept under the key of its new path
         const fs::path oldCache = CacheLocation(before.root(), CacheLocation::Mode::AppCache).appCacheDir();
         const fs::path newCache = CacheLocation(after.root(), CacheLocation::Mode::AppCache).appCacheDir();
         std::error_code ec;

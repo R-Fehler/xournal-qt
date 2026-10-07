@@ -161,7 +161,7 @@ TEST_F(CanvasItemRenderTest, visiblePagesShowTheirRenderAfterZooming) {
     // A preview that cannot be mistaken for the page: shown until a page is rendered
     QImage red(96, 136, QImage::Format_RGB32);
     red.fill(Qt::red);
-    view->setPreviewSource([red](size_t) { return red; });
+    view->setStandInSource([red](size_t) { return red; });
     ViewController& vc = view->getViewController();
     const QPointF center(canvas->width() / 2, canvas->height() / 2);
     auto wheel = [&](double factor) {  // (Ctrl+wheel: a few steps, a frame apart)

@@ -16,6 +16,7 @@
 #include "AsyncImage.h"
 #include "FileStamps.h"
 #include "HitPages.h"
+#include "ImageMemory.h"
 #include "ImageWorkers.h"
 #include "LibraryIndex.h"
 #include "MarkdownFile.h"
@@ -25,7 +26,6 @@
 namespace xqt {
 
 namespace {
-constexpr size_t MAX_FILES = 8;
 /// The width a card's text is laid out for (points), and the space around it
 constexpr double TEXT_WIDTH = 220;
 constexpr double PADDING = 6;
@@ -61,7 +61,7 @@ struct Caches {
         ++parses;
         std::lock_guard lock(mtx);
         files.emplace_front(key, parsed);
-        while (files.size() > MAX_FILES) {
+        while (files.size() > ImageMemory::SNIPPET_FILES) {
             files.pop_back();
         }
         return parsed;

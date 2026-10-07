@@ -11,7 +11,7 @@ class QObject;
 
 namespace xqt {
 
-/// The image providers of the window's pictures (thumbnails, sketches, previews, search hits, Markdown snippets,
+/// The image providers of the window's pictures (thumbnails, sketches, covers, search hits, Markdown snippets,
 /// annotations; the engine owns them) and `app`, the window's AppController, as the root context's property.
 void setUpEngine(QQmlEngine& engine, QObject* app);
 

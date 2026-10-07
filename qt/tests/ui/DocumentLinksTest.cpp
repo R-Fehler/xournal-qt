@@ -34,7 +34,7 @@
 #include "session/DocumentSession.h"
 #include "shell/LibraryModel.h"
 #include "shell/PageSketches.h"
-#include "shell/Previews.h"
+#include "shell/DocumentCovers.h"
 #include "shell/RecentFiles.h"
 #include "shell/ReferenceMode.h"
 #include "shell/SettingsModel.h"

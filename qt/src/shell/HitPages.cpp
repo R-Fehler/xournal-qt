@@ -20,6 +20,7 @@
 
 #include "AsyncImage.h"
 #include "FileStamps.h"
+#include "ImageMemory.h"
 #include "ImageWorkers.h"
 #include "LibraryIndex.h"
 #include "MarkdownFile.h"
@@ -29,8 +30,6 @@
 namespace xqt {
 
 namespace {
-constexpr size_t MAX_DOCUMENTS = 12;
-constexpr qint64 MAX_IMAGE_BYTES = 128 * 1024 * 1024;
 
 /// A loaded document; its mutex lets one thread at a time draw or search it.
 struct CachedDocument {
@@ -46,7 +45,7 @@ struct Caches {
     /// Most recently used first.
     std::list<std::pair<QString, std::shared_ptr<CachedDocument>>> documents;  ///< key: path + stamp
     /// Drawn pages without marks, by document, page and width (the one drawn last stays even if it is bigger)
-    LruImageCache<QString> images{MAX_IMAGE_BYTES, 1};
+    LruImageCache<QString> images{ImageMemory::HIT_PAGE_BYTES, 1};
     std::atomic<int> renders{0};
 
     std::shared_ptr<CachedDocument> document(const QString& key) {
@@ -58,7 +57,7 @@ struct Caches {
             }
         }
         documents.emplace_front(key, std::make_shared<CachedDocument>());
-        while (documents.size() > MAX_DOCUMENTS) {
+        while (documents.size() > ImageMemory::HIT_PAGE_DOCUMENTS) {
             documents.pop_back();  // still used by a running render: kept alive by its shared_ptr
         }
         return documents.front().second;

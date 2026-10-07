@@ -21,7 +21,7 @@
 #include "shell/DocumentFiles.h"
 #include "shell/LibraryIndex.h"
 #include "shell/LibraryModel.h"
-#include "shell/Previews.h"
+#include "shell/DocumentCovers.h"
 #include "shell/PageSketches.h"
 #include "shell/TabManager.h"
 #include "shell/Thumbnails.h"
@@ -228,8 +228,8 @@ void AppController::forgetDerivatives(const fs::path& file, bool locked) {
     const fs::path share = Util::getCacheSubfolder("share");  // (copies shared from it)
     fs::remove(share / file.filename(), ec);
     const DocumentItem item = DocumentFiles::itemOf(file);
-    PreviewCache::forget(item);  // (its card's picture, in the library's pack or for Recent)
-    PreviewCache::flush();
+    DocumentCovers::forget(item);  // (its card's picture, in the library's pack or for Recent)
+    DocumentCovers::flush();
     if (LibraryIndex* index = library->searchIndex(); index && locked) {
         index->documentProtected(file);  // (its text, title, tags, handwriting: an empty, locked entry)
         index->flush();

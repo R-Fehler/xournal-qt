@@ -81,7 +81,7 @@ class ReferenceMode final: public QObject {
     Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY navigationChanged)
     Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY navigationChanged)
     /// The pages of the reference, for its page grid (xqt::PagesModel; the page sidebar keeps the main document's).
-    /// It follows the reference only while the grid is shown (pagesShown): its previews come first then.
+    /// It follows the reference only while the grid is shown (pagesShown): its sketches come first then.
     Q_PROPERTY(QObject* pages READ pagesModel CONSTANT)
     Q_PROPERTY(bool pagesShown READ pagesShown WRITE setPagesShown NOTIFY pagesShownChanged)
     /// The share of the width for the main document (the divider), 0.2 ... 0.8.

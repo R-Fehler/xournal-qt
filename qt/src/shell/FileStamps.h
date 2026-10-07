@@ -1,6 +1,6 @@
 /*
  * xournal-qt: stamps and fingerprints of a document's files, which tell the library's caches whether a file changed
- * (the index, the previews, the page sketches, sharing).
+ * (the index, the covers, the page sketches, sharing).
  *
  * @license GNU GPLv2 or later
  */

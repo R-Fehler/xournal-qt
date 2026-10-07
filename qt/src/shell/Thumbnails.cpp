@@ -17,6 +17,7 @@
 #include "render/RenderService.h"
 
 #include "AsyncImage.h"
+#include "ImageMemory.h"
 #include "ImageWorkers.h"
 #include "PageSketches.h"
 #include "view/DocumentView.h"
@@ -61,7 +62,7 @@ struct Key {
     auto operator<=>(const Key&) const = default;
 };
 LruImageCache<Key>& cache() {
-    static LruImageCache<Key> c(ThumbnailProvider::DEFAULT_CACHE_MB * 1024 * 1024 * 3 / 4);
+    static LruImageCache<Key> c(ImageMemory::thumbnailShare(ImageMemory::DEFAULT_PREVIEW_MB * ImageMemory::MB));
     return c;
 }
 /// The smallest kept thumbnail of a revision at least `width` wide (`touch`: it counts as used)
@@ -74,10 +75,7 @@ std::atomic<int> renders{0};
 
 }  // namespace
 
-void ThumbnailProvider::setCacheLimit(qint64 bytes) {
-    cache().setLimit(bytes - bytes / 4);
-    PageSketches::instance().setBudget(bytes / 4);
-}
+void ThumbnailProvider::setCacheLimit(qint64 bytes) { cache().setLimit(bytes); }
 
 QImage ThumbnailProvider::keptImage(quint64 session, quint64 revision, int width) {
     const auto kept = keptAtLeast(session, revision, width, false);
@@ -213,13 +211,13 @@ QQuickImageResponse* ThumbnailProvider::requestImageResponse(const QString& id, 
     const int asked = requestedSize.width() > 0 ? requestedSize.width() : 160;
     const int width = (asked + WIDTH_STEP - 1) / WIDTH_STEP * WIDTH_STEP;
 
-    // Kept already (that width, or a bigger one to scale down), or small enough for the page's preview or sketch: no
+    // Kept already (that width, or a bigger one to scale down), or small enough for the page's stand-in or sketch: no
     // drawing at all
     QImage kept;
     if (const auto k = keptAtLeast(sessionId, revision, width, true)) {
         kept = k->first.width == width ? k->second : k->second.scaledToWidth(width, Qt::SmoothTransformation);
     }
-    if (kept.isNull() && width <= std::max(PageSketches::instance().previewWidth(), PageSketches::instance().width())) {
+    if (kept.isNull() && width <= std::max(PageSketches::instance().standInWidth(), PageSketches::instance().width())) {
         if (QImage sketch = PageSketches::instance().imageOfRevision(sessionId, revision); sketch.width() >= width) {
             kept = sketch.width() == width ? sketch : sketch.scaledToWidth(width, Qt::SmoothTransformation);
         }

@@ -19,16 +19,17 @@
 #include "CanvasMemory.h"
 #include "DocumentFiles.h"
 #include "DocumentPlaces.h"
+#include "ImageMemory.h"
 #include "ImageWorkers.h"
 #include "FileStamps.h"
-#include "Previews.h"
+#include "DocumentCovers.h"
 #include "Thumbnails.h"
 #include "DarkPages.h"
 
 namespace xqt {
 
 namespace {
-/// The start of the names of the folders of a document's stored previews (every version of it): a hash of its path.
+/// The start of the names of the folders of a document's stored stand-ins (every version of it): a hash of its path.
 QString prefixOf(const fs::path& file) {
     return QString::fromLatin1(
             QCryptographicHash::hash(QByteArray::fromStdString(file.lexically_normal().string()), QCryptographicHash::Sha1)
@@ -36,7 +37,7 @@ QString prefixOf(const fs::path& file) {
                     .left(12));
 }
 
-/// Folder of the stored previews of a document as its files are now (empty: not saved)
+/// Folder of the stored stand-ins of a document as its files are now (empty: not saved)
 fs::path folderOf(DocumentSession& session) {
     const fs::path file = session.documentFile();
     if (file.empty() || PdfEncryption::isProtected(file)) {
@@ -140,10 +141,10 @@ void PageSketches::Tier::keepOnly(quint64 session, const std::set<quint64>& keep
 // --- PageSketches ----------------------------------------------------------------------------------------------------
 
 PageSketches::PageSketches() {
-    sketches.budget = ThumbnailProvider::DEFAULT_CACHE_MB * 1024 * 1024 / 4;
+    sketches.budget = ImageMemory::sketchShare(ImageMemory::DEFAULT_PREVIEW_MB * ImageMemory::MB);
     sketches.level = WIDTHS[0];
-    previews.budget = CanvasMemory::instance().previewBudget();
-    previews.level = PREVIEW_WIDTHS[0];
+    standIns.budget = ImageMemory::standInBudget();
+    standIns.level = STAND_IN_WIDTHS[0];
     planTimer.setSingleShot(true);
     connect(&planTimer, &QTimer::timeout, this, &PageSketches::plan);
     visibleTimer.setSingleShot(true);
@@ -159,7 +160,7 @@ PageSketches::PageSketches() {
             Q_EMIT changed(id);
         }
     });
-    // The previews take a part of the memory for rendered pages
+    // The stand-ins take a part of the memory for rendered pages
     connect(&CanvasMemory::instance(), &CanvasMemory::limitChanged, this, [this] { planSoon(shownDelay); });
 }
 
@@ -175,7 +176,7 @@ void PageSketches::add(quint64 id, DocumentSession* session) {
     {
         std::lock_guard lock(mtx);
         sketches.pictures[id];  // (sharp thumbnails give pictures from now on)
-        previews.pictures[id];
+        standIns.pictures[id];
     }
     // Edited pages are drawn again when the edits paused (drawing does not keep the workers busy)
     connect(session, &DocumentSession::pageRevisionsChanged, this, [this] { editTimer.start(); });
@@ -245,12 +246,12 @@ void PageSketches::seedTitlePage(quint64 id) {
     const quint64 pageId = s->pageId(title);
     {
         std::lock_guard lock(mtx);
-        if (previews.find(id, pageId)) {
+        if (standIns.find(id, pageId)) {
             return;
         }
     }
-    if (const QImage img = PreviewCache::stored(item); !img.isNull()) {
-        // (smaller than a preview: it is drawn later, the canvas shows this one meanwhile)
+    if (const QImage img = DocumentCovers::stored(item); !img.isNull()) {
+        // (smaller than a stand-in: it is drawn later, the canvas shows this one meanwhile)
         store(id, pageId, s->pageRevision(title), img, true);
     }
 }
@@ -353,7 +354,7 @@ void PageSketches::remove(quint64 id) {
     {
         std::lock_guard lock(mtx);
         sketches.dropSession(id);
-        previews.dropSession(id);
+        standIns.dropSession(id);
         pdfCopies.erase(id);
         disks.erase(id);
     }
@@ -429,20 +430,20 @@ void PageSketches::plan() {
         }
         return widths.back();
     };
-    previews.budget = CanvasMemory::instance().previewBudget();
-    const qint64 sb = sketches.budget, pb = previews.budget;
-    const int sl = levelFor(WIDTHS, sb), pl = levelFor(PREVIEW_WIDTHS, pb);
+    standIns.budget = ImageMemory::standInBudget();
+    const qint64 sb = sketches.budget, pb = standIns.budget;
+    const int sl = levelFor(WIDTHS, sb), pl = levelFor(STAND_IN_WIDTHS, pb);
     sketches.level = sl;
-    previews.level = pl;
+    standIns.level = pl;
 
-    // Once after the start: the stored previews used longest ago go
+    // Once after the start: the stored stand-ins used longest ago go
     static bool trimmed = false;
     if (!std::exchange(trimmed, true)) {
         ImageWorkers::start(ImageWorkers::Pool::SketchFiles, [] { trimDisk(DISK_LIMIT); });
     }
 
     // Who gets pictures: in that order, while the budget lasts; the others lose theirs
-    std::vector<Job> missingSketch, missingPreview, outdated, toStore;
+    std::vector<Job> missingSketch, missingStandIn, outdated, toStore;
     qint64 plannedS = 0, plannedP = 0;
     {
         std::lock_guard lock(mtx);
@@ -458,18 +459,18 @@ void PageSketches::plan() {
                     keepP.insert(p.id);
                 }
                 const Picture* s = sketches.find(id, p.id);
-                const Picture* v = previews.find(id, p.id);
+                const Picture* v = standIns.find(id, p.id);
                 const bool sOk = s && s->revision == p.revision && s->image.width() == sl;
                 const bool pOk = v && v->revision == p.revision && v->image.width() == pl;
                 const Job job{id, p.id, p.revision, wantP};
                 if (wantS && !s) {
                     missingSketch.push_back(job);
                 } else if (wantP && !v) {
-                    missingPreview.push_back(job);
+                    missingStandIn.push_back(job);
                 } else if ((wantS && !sOk) || (wantP && !pOk)) {
                     outdated.push_back(job);
                 } else if (pOk && !diskFile(id, p.id, p.revision).empty()) {
-                    // As saved, with its preview: on disk for the next opening (unless it is there)
+                    // As saved, with its stand-in: on disk for the next opening (unless it is there)
                     const auto& d = disks.at(id);
                     if (!d.stored.count(d.saved.at(p.id).second)) {
                         toStore.push_back(Job{id, p.id, p.revision, true, true});
@@ -477,11 +478,11 @@ void PageSketches::plan() {
                 }
             }
             sketches.keepOnly(id, keepS);
-            previews.keepOnly(id, keepP);
+            standIns.keepOnly(id, keepP);
         }
     }
     jobs.assign(missingSketch.begin(), missingSketch.end());
-    jobs.insert(jobs.end(), missingPreview.begin(), missingPreview.end());
+    jobs.insert(jobs.end(), missingStandIn.begin(), missingStandIn.end());
     jobs.insert(jobs.end(), outdated.begin(), outdated.end());
     jobs.insert(jobs.end(), toStore.begin(), toStore.end());
     next();
@@ -496,10 +497,10 @@ void PageSketches::next() {
     while (running < WORKERS && !jobs.empty()) {
         const Job job = jobs.front();
         jobs.pop_front();
-        const int sl = sketches.level, pl = previews.level;
-        const int target = job.preview ? pl : sl;
+        const int sl = sketches.level, pl = standIns.level;
+        const int target = job.standIn ? pl : sl;
         QImage from;  // a picture of this revision at least as big
-        fs::path file;  // its stored preview (the page is as saved)
+        fs::path file;  // its stored stand-in (the page is as saved)
         bool stored = false;
         {
             std::lock_guard lock(mtx);
@@ -512,7 +513,7 @@ void PageSketches::next() {
                 stored = d.stored.count(d.saved.at(job.pageId).second) > 0;
             }
             if (job.write) {
-                const Picture* v = previews.find(job.session, job.pageId);
+                const Picture* v = standIns.find(job.session, job.pageId);
                 if (file.empty() || stored || !v || v->revision != job.revision) {
                     continue;
                 }
@@ -535,12 +536,12 @@ void PageSketches::next() {
                 continue;
             }
             const Picture* s = sketches.find(job.session, job.pageId);
-            const Picture* v = previews.find(job.session, job.pageId);
+            const Picture* v = standIns.find(job.session, job.pageId);
             const bool sOk = s && s->revision == job.revision && s->image.width() == sl;
             const bool pOk = v && v->revision == job.revision && v->image.width() == pl;
-            if (sOk && (!job.preview || pOk)) {
+            if (sOk && (!job.standIn || pOk)) {
                 // Made from a sharp thumbnail meanwhile (or by a draw that began before the document had its file):
-                // as saved, its preview still goes to disk
+                // as saved, its stand-in still goes to disk
                 if (pOk && !file.empty() && !stored) {
                     jobs.push_front(Job{job.session, job.pageId, job.revision, true, true});
                 }
@@ -600,10 +601,10 @@ void PageSketches::next() {
                 }
             }
             if (!img.isNull()) {
-                store(job.session, job.pageId, job.revision, img, job.preview);
+                store(job.session, job.pageId, job.revision, img, job.standIn);
                 if (fromDisk) {
                     markStored(job.session, job.pageId);
-                } else if (!file.empty() && !stored && job.preview && img.width() >= target) {
+                } else if (!file.empty() && !stored && job.standIn && img.width() >= target) {
                     writePage(file, img.width() == target ? img : img.scaledToWidth(target, Qt::SmoothTransformation));
                     markStored(job.session, job.pageId);
                 }
@@ -665,17 +666,17 @@ void PageSketches::givePdf(quint64 session, const fs::path& path, std::unique_pt
     }
 }
 
-void PageSketches::store(quint64 session, quint64 pageId, quint64 revision, const QImage& image, bool preview) {
+void PageSketches::store(quint64 session, quint64 pageId, quint64 revision, const QImage& image, bool standIn) {
     auto scaled = [&image](int width) {  // (never bigger: a smaller one is drawn later)
         QImage img = image.width() <= width ? image : image.scaledToWidth(width, Qt::SmoothTransformation);
         return img.format() == QImage::Format_RGB16 ? img : img.convertToFormat(QImage::Format_RGB16);
     };
-    QImage p = preview ? scaled(previews.level) : QImage();
+    QImage p = standIn ? scaled(standIns.level) : QImage();
     QImage s = scaled(sketches.level);
     {
         std::lock_guard lock(mtx);
-        if (preview) {
-            previews.put(session, pageId, revision, std::move(p));
+        if (standIn) {
+            standIns.put(session, pageId, revision, std::move(p));
         }
         sketches.put(session, pageId, revision, std::move(s));
     }
@@ -690,30 +691,30 @@ void PageSketches::announce(quint64 session) {
 }
 
 void PageSketches::offer(quint64 session, quint64 pageId, quint64 revision, const QImage& sharp) {
-    const int sl = sketches.level, pl = previews.level;
+    const int sl = sketches.level, pl = standIns.level;
     if (sharp.isNull() || sharp.width() < sl) {
         return;
     }
     const double aspect = double(sharp.height()) / sharp.width();
-    bool preview = false;
+    bool standIn = false;
     {
         std::lock_guard lock(mtx);
         if (!sketches.pictures.count(session)) {
             return;
         }
         const Picture* s = sketches.find(session, pageId);
-        const Picture* v = previews.find(session, pageId);
+        const Picture* v = standIns.find(session, pageId);
         const bool needS = !(s && s->revision == revision && s->image.width() == sl);
-        preview = sharp.width() >= pl && !(v && v->revision == revision && v->image.width() == pl) &&
-                  (v || previews.used + bytesAt(pl, aspect) <= previews.budget);
-        if (!needS && !preview) {
+        standIn = sharp.width() >= pl && !(v && v->revision == revision && v->image.width() == pl) &&
+                  (v || standIns.used + bytesAt(pl, aspect) <= standIns.budget);
+        if (!needS && !standIn) {
             return;  // has them
         }
         if (!s && sketches.used + bytesAt(sl, aspect) > sketches.budget) {
             return;  // (the plan decides who gets one then)
         }
     }
-    store(session, pageId, revision, sharp, preview);
+    store(session, pageId, revision, sharp, standIn);
 }
 
 QString PageSketches::url(quint64 session, quint64 pageId) const {
@@ -730,15 +731,15 @@ QImage PageSketches::image(quint64 session, quint64 pageId) const {
     return s ? s->image : QImage();
 }
 
-QImage PageSketches::preview(quint64 session, quint64 pageId) const {
+QImage PageSketches::standIn(quint64 session, quint64 pageId) const {
     std::lock_guard lock(mtx);
-    const Picture* v = previews.find(session, pageId);
+    const Picture* v = standIns.find(session, pageId);
     return v ? v->image : QImage();
 }
 
 QImage PageSketches::imageOfRevision(quint64 session, quint64 revision) const {
     std::lock_guard lock(mtx);
-    for (const Tier* tier: {&previews, &sketches}) {
+    for (const Tier* tier: {&standIns, &sketches}) {
         if (auto s = tier->pictures.find(session); s != tier->pictures.end()) {
             for (const auto& [page, picture]: s->second) {
                 if (picture.revision == revision) {
@@ -760,9 +761,9 @@ qint64 PageSketches::bytes() const {
     return sketches.used;
 }
 
-qint64 PageSketches::previewBytes() const {
+qint64 PageSketches::standInBytes() const {
     std::lock_guard lock(mtx);
-    return previews.used;
+    return standIns.used;
 }
 
 bool PageSketches::idle() const {

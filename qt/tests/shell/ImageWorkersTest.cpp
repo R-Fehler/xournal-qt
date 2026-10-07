@@ -17,7 +17,7 @@
 #include "shell/AsyncImage.h"
 #include "shell/DocumentFiles.h"
 #include "shell/ImageWorkers.h"
-#include "shell/Previews.h"
+#include "shell/DocumentCovers.h"
 
 #include "support/TestSupport.h"
 
@@ -65,13 +65,13 @@ TEST(ImageWorkers, aCancelledCoverIsNotDrawn) {
         test::makeTextPdf(pdf, test::numbered("Page ", 3));
         items.push_back(DocumentFiles::itemOf(pdf));
         ASSERT_TRUE(items.back().valid());
-        ASSERT_FALSE(fs::exists(PreviewCache::outsideFile(items.back())));
+        ASSERT_FALSE(fs::exists(DocumentCovers::outsideFile(items.back())));
     }
-    PreviewProvider provider;
+    CoverProvider provider;
     std::vector<std::unique_ptr<QQuickImageResponse>> responses;
     for (const DocumentItem& item: items) {
         responses.emplace_back(
-                provider.requestImageResponse(PreviewCache::url(item).mid(QString("image://preview/").size()), {}));
+                provider.requestImageResponse(DocumentCovers::url(item).mid(QString("image://cover/").size()), {}));
         responses.back()->cancel();  // (scrolled past at once)
     }
     int finished = 0;
@@ -81,7 +81,7 @@ TEST(ImageWorkers, aCancelledCoverIsNotDrawn) {
     ASSERT_TRUE(waitFor([&] { return finished == static_cast<int>(responses.size()); }, 20000));
     int drawn = 0;
     for (const DocumentItem& item: items) {
-        drawn += fs::exists(PreviewCache::outsideFile(item));
+        drawn += fs::exists(DocumentCovers::outsideFile(item));
     }
     EXPECT_LE(drawn, ImageWorkers::threadsOf(ImageWorkers::Pool::Covers))
             << "only those whose worker began before they were cancelled";

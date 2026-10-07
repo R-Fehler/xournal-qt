@@ -49,6 +49,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/AsyncImage.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/AsyncImage.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageMemory.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageMemory.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageWorkers.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ImageWorkers.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.h
@@ -145,8 +147,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/MdSnippets.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/MdSnippets.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Previews.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Previews.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentCovers.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentCovers.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentPlaces.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentPlaces.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/RecentFiles.h

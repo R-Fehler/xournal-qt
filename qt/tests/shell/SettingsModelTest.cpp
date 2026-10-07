@@ -23,6 +23,7 @@
 #include "session/DocumentSession.h"
 #include "session/FuzzyQuery.h"
 #include "session/TextMatch.h"
+#include "shell/ImageMemory.h"
 #include "shell/SettingsModel.h"
 
 using namespace xqt;
@@ -50,6 +51,19 @@ TEST_F(SettingsModelTest, everyKeyReadsAndWritesBack) {
         EXPECT_EQ(model->get(key), v) << key.toStdString();
     }
     EXPECT_FALSE(model->set("noSuchSetting", 1));
+}
+
+// "Page previews (sidebar, overviews)" in Settings → Documents is the memory for what those show: the sharp
+// thumbnails and the sketches (ImageMemory hands them their shares).
+TEST_F(SettingsModelTest, thePreviewMemoryIsHandedToThePagePreviews) {
+    EXPECT_EQ(model->get("previewMemory").toInt(), ImageMemory::DEFAULT_PREVIEW_MB);
+    ASSERT_TRUE(model->set("previewMemory", 128));
+    EXPECT_EQ(ImageMemory::previewMemory(), 128 * ImageMemory::MB);
+    EXPECT_EQ(ImageMemory::thumbnailShare(ImageMemory::previewMemory()) +
+                      ImageMemory::sketchShare(ImageMemory::previewMemory()),
+              128 * ImageMemory::MB);
+    ASSERT_TRUE(model->set("previewMemory", static_cast<int>(ImageMemory::DEFAULT_PREVIEW_MB)));
+    EXPECT_EQ(ImageMemory::previewMemory(), ImageMemory::DEFAULT_PREVIEW_MB * ImageMemory::MB);
 }
 
 TEST_F(SettingsModelTest, valuesReachUpstreamSettingsAndAreClamped) {

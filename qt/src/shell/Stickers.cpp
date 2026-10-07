@@ -15,7 +15,7 @@
 #include "DocumentFiles.h"
 #include "session/FileIo.h"
 #include "session/StickerFile.h"
-#include "Previews.h"
+#include "DocumentCovers.h"
 
 namespace xqt::stickers {
 
@@ -386,7 +386,7 @@ std::optional<fs::path> rename(const fs::path& sticker, const std::string& name,
     }
     carryCompanions(sticker, target, false);
     renameInOrder(sticker.parent_path(), sticker.filename().string(), target.filename().string(), kind);
-    PreviewCache::moved({{sticker, target}});
+    DocumentCovers::moved({{sticker, target}});
     return target;
 }
 
@@ -408,7 +408,7 @@ std::optional<fs::path> moveTo(const fs::path& sticker, const fs::path& folder, 
     }
     carryCompanions(sticker, target, false);
     renameInOrder(sticker.parent_path(), sticker.filename().string(), {}, kind);
-    PreviewCache::moved({{sticker, target}});
+    DocumentCovers::moved({{sticker, target}});
     return target;
 }
 
@@ -487,8 +487,8 @@ QVariant StickersModel::data(const QModelIndex& index, int role) const {
             return QString::fromStdString(e.path.string());
         case FolderRole:
             return QString::fromStdString(e.folder);
-        case PreviewRole:
-            return PreviewCache::url(DocumentFiles::itemOf(e.path));
+        case CoverRole:
+            return DocumentCovers::url(DocumentFiles::itemOf(e.path));
         case PictureRole:
             return e.picture;
         default:
@@ -500,7 +500,7 @@ QHash<int, QByteArray> StickersModel::roleNames() const {
     return {{NameRole, "name"},
             {PathRole, "path"},
             {FolderRole, "folder"},
-            {PreviewRole, "preview"},
+            {CoverRole, "preview"},
             {PictureRole, "picture"}};
 }
 

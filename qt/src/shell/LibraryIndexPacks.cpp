@@ -5,7 +5,7 @@
 
 #include <QCborArray>
 
-#include "Previews.h"
+#include "DocumentCovers.h"
 
 namespace xqt {
 
@@ -351,7 +351,7 @@ bool LibraryIndex::writeChanged() {
         const fs::path dir = where.dirOf(job.folder);
         if (job.docs.empty()) {
             // Its last document is gone: its cache folder goes too (unless something else is in it)
-            for (const QString& pack: {NOTES_PACK, PDF_TEXT_PACK, PreviewCache::PACK, PreviewCache::STAMPS_PACK}) {
+            for (const QString& pack: {NOTES_PACK, PDF_TEXT_PACK, DocumentCovers::PACK, DocumentCovers::STAMPS_PACK}) {
                 Packs::remove(dir, pack);
             }
             if (Packs::removeIfOnlyOurs(dir)) {

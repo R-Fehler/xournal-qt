@@ -14,7 +14,7 @@
 #include "session/HybridPdf.h"
 
 #include "Tags.h"
-#include "Previews.h"
+#include "DocumentCovers.h"
 
 namespace xqt {
 
@@ -460,7 +460,7 @@ LibraryIndex::EntryPtr LibraryIndex::adopt(const DocumentItem& item, const Entry
     adopted->xoppStamp = own;
     adopted->pdfStamp = pdfNow;
     ++adoptions;
-    // Its handwriting was read from the same content, and its preview shows it
+    // Its handwriting was read from the same content, and its cover shows it
     const QString inkWas = e->xoppStamp.isEmpty() ? e->pdfStamp : e->xoppStamp;
     const QString inkNow = own.isEmpty() ? pdfNow : own;
     if (inkWas != inkNow) {
@@ -473,7 +473,7 @@ LibraryIndex::EntryPtr LibraryIndex::adopt(const DocumentItem& item, const Entry
     if (pdfDiffers) {
         changes.emplace_back(e->pdfStamp, pdfNow);
     }
-    PreviewCache::adopt(item, changes);
+    DocumentCovers::adopt(item, changes);
     return adopted;
 }
 

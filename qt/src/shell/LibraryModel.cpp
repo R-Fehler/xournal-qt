@@ -23,7 +23,7 @@
 #include "HitPages.h"
 #include "session/FuzzyQuery.h"
 #include "MdSnippets.h"
-#include "Previews.h"
+#include "DocumentCovers.h"
 #include "SystemApps.h"
 
 namespace xqt {
@@ -71,7 +71,7 @@ LibraryModel::LibraryModel(QObject* parent): QAbstractListModel(parent) {
 
 LibraryModel::~LibraryModel() {
     if (lib) {
-        PreviewCache::setLibrary({});  // (writes what is not written yet)
+        DocumentCovers::setLibrary({});  // (writes what is not written yet)
     }
 }
 
@@ -97,7 +97,7 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
         watcher = std::make_unique<QFileSystemWatcher>();
         connect(watcher.get(), &QFileSystemWatcher::directoryChanged, this, [this] { refreshTimer.start(); });
     } else {
-        PreviewCache::setLibrary({});
+        DocumentCovers::setLibrary({});
         DocumentPlaces::setLibrary({}, {});
     }
     endResetModel();
@@ -128,7 +128,7 @@ void LibraryModel::adoptFolderCaches() {
 
 void LibraryModel::openCache() {
     const CacheLocation where = lib->cacheLocation();
-    PreviewCache::setLibrary(where);
+    DocumentCovers::setLibrary(where);
     idx = std::make_unique<LibraryIndex>(lib->root(), where);
     connect(idx.get(), &LibraryIndex::progress, this, [this] {
         Q_EMIT indexChanged();
@@ -167,7 +167,7 @@ void LibraryModel::setCacheInAppCache(bool inAppCache) {
     // Everything written where it is now, then moved
     const CacheLocation from = idx->location();
     idx.reset();
-    PreviewCache::setLibrary({});
+    DocumentCovers::setLibrary({});
     lib->setCacheMode(inAppCache ? CacheLocation::Mode::AppCache : CacheLocation::Mode::Folders);
     CacheFolders::move(from, lib->cacheLocation(), allFolders());
     openCache();
@@ -204,7 +204,7 @@ qint64 LibraryModel::removeCaches() {
     }
     // Nothing is written or indexed any more (the app closes after it, so the caches are not built again at once)
     idx->discard();
-    PreviewCache::discard();
+    DocumentCovers::discard();
     cachesRemoved = true;
     ++cacheCounts;
     const qint64 removed = CacheFolders::removeAll(idx->location(), allFolders());
@@ -486,10 +486,10 @@ void LibraryModel::refresh() {
         Q_EMIT folderChanged();
     }
     // The whole library: search index (with the text files when they are shown; other files are found by their
-    // names), previews, folders to watch.
+    // names), covers, folders to watch.
     auto all = DocumentFiles::scanRecursive(lib->root(), filter.text ? DocumentFiles::TextFiles : DocumentFiles::Documents);
     idx->update(all);
-    QThreadPool::globalInstance()->start([all] { PreviewCache::prune(all); });
+    QThreadPool::globalInstance()->start([all] { DocumentCovers::prune(all); });
     auto folders = DocumentFiles::foldersRecursive(lib->root());
     folders.push_back(lib->root());
     watchFolders(folders);
@@ -733,9 +733,9 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             const std::string rel = lib->relative(r.path.parent_path());
             return QString::fromStdString(rel);
         }
-        case PreviewRole:
+        case CoverRole:
             // (other files have none: an icon of their type)
-            return r.isFolder || r.item.kind() == DocumentItem::Kind::Other ? QString() : PreviewCache::url(r.item);
+            return r.isFolder || r.item.kind() == DocumentItem::Kind::Other ? QString() : DocumentCovers::url(r.item);
         case ModifiedRole:
             return r.modified;
         case HasPdfRole:
@@ -837,7 +837,7 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {IsFolderRole, "isFolder"},
             {PathRole, "path"},
             {LocationRole, "location"},
-            {PreviewRole, "preview"},
+            {CoverRole, "preview"},
             {ModifiedRole, "modified"},
             {HasPdfRole, "hasPdf"},
             {HasXoppRole, "hasXopp"},
@@ -978,7 +978,7 @@ void LibraryModel::followMoves(const std::vector<std::pair<fs::path, fs::path>>&
     }
     // (also for documents outside the library: their places are kept in the cache, by their whole path)
     DocumentPlaces::moved(moves);  // before the refresh: the entries are not read again
-    PreviewCache::moved(moves);
+    DocumentCovers::moved(moves);
 }
 
 void LibraryModel::applyResult(const DocumentFiles::Result& r) {

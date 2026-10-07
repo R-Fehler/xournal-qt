@@ -79,7 +79,7 @@
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentPlaces.h"
 #include "shell/ImageWorkers.h"
-#include "shell/Previews.h"
+#include "shell/DocumentCovers.h"
 #include "shell/FileStamps.h"
 #include "shell/Library.h"
 #include "shell/LibraryIndex.h"
@@ -661,7 +661,7 @@ void AppController::shutdown() {
     }
     // The image workers draw with Qt: they must be done before the application takes its plugins away
     ImageWorkers::shutdown();
-    PreviewCache::flush();  // (the covers not written yet)
+    DocumentCovers::flush();  // (the covers not written yet)
     settingsView->end();  // settings screen still open: save its changes
     if (recovery) {
         recovery->finish();  // a normal exit: reopen these tabs next time

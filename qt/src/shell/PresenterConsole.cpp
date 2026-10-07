@@ -206,11 +206,11 @@ void PresenterConsole::update() {
     }
     DocumentSession& session = presented->getSession();
     // A second view of the presented document (as the same document beside itself): its own page and zoom, the
-    // session's pages, previews and memory limit
+    // session's pages, stand-ins and memory limit
     audience = std::make_unique<CanvasView>(session);
     const quint64 id = ThumbnailProvider::idOf(&session);
-    audience->setPreviewSource([id, s = &session](size_t page) {
-        return PageSketches::instance().preview(id, s->pageId(page));
+    audience->setStandInSource([id, s = &session](size_t page) {
+        return PageSketches::instance().standIn(id, s->pageId(page));
     });
     audience->setReadingOnly(true);
     presented->setMirror(audience.get());
@@ -226,7 +226,7 @@ void PresenterConsole::update() {
     connections.push_back(connect(&session, &DocumentSession::pageRevisionsChanged, this, &PresenterConsole::pageChanged));
     connections.push_back(connect(&PageSketches::instance(), &PageSketches::changed, this, [a, id](qulonglong of) {
         if (of == id) {
-            a->previewsChanged();
+            a->standInsChanged();
         }
     }));
     follow();

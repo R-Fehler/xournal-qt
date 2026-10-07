@@ -1,5 +1,5 @@
 /*
- * xournal-qt: the pages of a document that matter besides its content - the title page (its preview in the library
+ * xournal-qt: the pages of a document that matter besides its content - the title page (its cover in the library
  * and in the overview of open documents; the first page unless chosen otherwise) and the page it was left at (to
  * open it there again, if wanted) - and whether it is a favourite (starred).
  *
@@ -9,7 +9,7 @@
  * their whole path). Renaming and moving in the app take the entries along; moved or renamed by another program, a
  * document loses them.
  *
- * Safe from any thread (previews are drawn by workers).
+ * Safe from any thread (covers are drawn by workers).
  *
  * @license GNU GPLv2 or later
  */

@@ -43,13 +43,13 @@ public:
     static constexpr double BEFORE_SHARE = 0.35;
     /// Pages at most this far away that have a buffer at another zoom are rendered again in advance
     static constexpr int NEAR_PAGES = 10;
-    /// A tenth of the limit is for the previews of all pages (PageSketches), the rest for rendered pages
-    static constexpr double PREVIEW_SHARE = 0.1;
+    /// A tenth of the limit is for the stand-ins of all pages (PageSketches), the rest for rendered pages
+    static constexpr double STAND_IN_SHARE = 0.1;
 
     void setLimit(qint64 bytes);
     qint64 limit() const { return max; }
-    qint64 previewBudget() const { return static_cast<qint64>(static_cast<double>(max) * PREVIEW_SHARE); }
-    qint64 pagesLimit() const { return max - previewBudget(); }
+    qint64 standInBudget() const { return static_cast<qint64>(static_cast<double>(max) * STAND_IN_SHARE); }
+    qint64 pagesLimit() const { return max - standInBudget(); }
 
     void add(CanvasView* view);
     void remove(CanvasView* view);

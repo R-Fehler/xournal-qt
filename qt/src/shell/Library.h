@@ -3,8 +3,9 @@
  *
  * A library is a plain folder with PDFs and .xopp files, in subfolders if wanted. By default it is
  * "<Documents>/Xournal_Libraries/Default"; any folder can be opened as one. Each process shows one library.
- * Metadata that only speeds things up (first-page previews, the search index: LibraryIndex.h) is kept per folder, in
- * its hidden folder ".xournal_library" or in the app cache (see LibraryCache.h); it can be deleted at any time.
+ * Metadata that only speeds things up (the documents' covers, the search index: LibraryIndex.h) is kept per
+ * folder, in its hidden folder ".xournal_library" or in the app cache (see LibraryCache.h); it can be deleted at any
+ * time.
  *
  * @license GNU GPLv2 or later
  */

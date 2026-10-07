@@ -12,7 +12,7 @@
 #include "shell/HitPages.h"
 #include "shell/MdSnippets.h"
 #include "shell/PageSketches.h"
-#include "shell/Previews.h"
+#include "shell/DocumentCovers.h"
 #include "shell/Thumbnails.h"
 
 namespace xqt {
@@ -20,7 +20,7 @@ namespace xqt {
 void setUpEngine(QQmlEngine& engine, QObject* app) {
     engine.addImageProvider("thumbnail", new ThumbnailProvider);  // the engine takes ownership
     engine.addImageProvider("sketch", new SketchProvider);
-    engine.addImageProvider("preview", new PreviewProvider);
+    engine.addImageProvider("cover", new CoverProvider);
     engine.addImageProvider("hitpage", new HitPageProvider);
     engine.addImageProvider("mdsnippet", new MdSnippetProvider);
     engine.addImageProvider("annotation", new AnnotationImageProvider);

@@ -32,7 +32,7 @@ public:
         NameRole = Qt::UserRole + 1,
         PathRole,
         LocationRole,
-        PreviewRole,
+        CoverRole,  ///< (QML: "preview")
         OpenedRole,
         HasPdfRole,
         HasXoppRole,

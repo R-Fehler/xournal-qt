@@ -93,7 +93,7 @@ public:
         IsFolderRole,
         PathRole,          ///< absolute path of the folder, or of the document's main file (.xopp, else PDF)
         LocationRole,      ///< folder of the row relative to the library ("" = top)
-        PreviewRole,       ///< image URL
+        CoverRole,         ///< image URL of its cover (QML: "preview")
         ModifiedRole,
         HasPdfRole,
         HasXoppRole,
@@ -322,7 +322,7 @@ private:
         LibraryIndex::Hit hit;
     };
     fs::path currentDir() const;
-    /// The index and the previews, where the library keeps its cache.
+    /// The index and the covers, where the library keeps its cache.
     void openCache();
     /// Cache folders in the library although it keeps its cache in the app cache by default: moved there (once).
     void adoptFolderCaches();
@@ -340,7 +340,7 @@ private:
     void updateSearch();
     void watchFolders(const std::vector<fs::path>& folders);
     void applyResult(const DocumentFiles::Result& r);
-    /// Files moved by the app: the index, the reading places and the previews follow.
+    /// Files moved by the app: the index, the reading places and the covers follow.
     void followMoves(const std::vector<std::pair<fs::path, fs::path>>& moves);
     void setRows(std::vector<Row> newRows);
     /// `foreign`: sources that are no paths (ContentFiles), copied to a staging folder first.

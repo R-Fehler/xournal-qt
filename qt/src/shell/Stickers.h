@@ -134,7 +134,7 @@ class StickersModel final: public QAbstractListModel {
     /// The set in scope has no sticker at all (not: none found)
     Q_PROPERTY(bool setEmpty READ setEmpty NOTIFY listChanged)
 public:
-    enum Roles { NameRole = Qt::UserRole + 1, PathRole, FolderRole, PreviewRole, PictureRole };
+    enum Roles { NameRole = Qt::UserRole + 1, PathRole, FolderRole, CoverRole, PictureRole };
     explicit StickersModel(stickers::Kind kind = stickers::Kind::Stickers, QObject* parent = nullptr);
     stickers::Kind kind() const { return setKind; }
     QString kindName() const {

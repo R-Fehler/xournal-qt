@@ -16,6 +16,7 @@
 #include "session/DocumentTextIndex.h"
 
 #include "AsyncImage.h"
+#include "ImageMemory.h"
 #include "ImageWorkers.h"
 #include "Thumbnails.h"
 
@@ -417,11 +418,11 @@ QHash<int, QByteArray> AnnotationsModel::roleNames() const {
 namespace {
 std::atomic<int> pictureRenders{0};
 
-/// The pictures drawn last, by their id and width, up to PICTURE_CACHE_BYTES (the least recently used go first):
+/// The pictures drawn last, by their id and width, up to ImageMemory::ANNOTATION_PICTURE_BYTES (the least recently used go first):
 /// scrolling back in the panel shows them at once. Their ids hold the page's revision, so an edited page's pictures
 /// are simply not asked for again.
 LruImageCache<QString>& pictureCache() {
-    static LruImageCache<QString> cache(AnnotationImageProvider::PICTURE_CACHE_BYTES, 1);
+    static LruImageCache<QString> cache(ImageMemory::ANNOTATION_PICTURE_BYTES, 1);
     return cache;
 }
 }  // namespace

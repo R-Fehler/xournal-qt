@@ -335,7 +335,7 @@ private:
     /// sample, the one with the same name first. Orphans by kind and stamp.
     EntryPtr movedHere(const DocumentItem& item, std::multimap<QString, EntryPtr>& orphans, bool& collected);
     /// The entry with the stamps of the files as they are now, if they differ from its stamps only in time (same
-    /// size, same content hash): its handwriting and preview follow. Null when it cannot be taken over (the lock is
+    /// size, same content hash): its handwriting and cover follow. Null when it cannot be taken over (the lock is
     /// not held).
     EntryPtr adopt(const DocumentItem& item, const EntryPtr& e);
     /// Compute the content hashes the entries of these documents lack (in the background, after an update).

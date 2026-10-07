@@ -76,7 +76,7 @@ TEST_F(RecentLibrariesTest, librariesAreListedAmongTheDocumentsByTime) {
     EXPECT_EQ(at(recent, 1, RecentFiles::KindRole), "library");
     EXPECT_EQ(at(recent, 1, RecentFiles::PathRole), qstr(root / "Lectures"));
     EXPECT_TRUE(at(recent, 1, RecentFiles::LocationRole).endsWith("/Lectures")) << "the folder's own path";
-    EXPECT_EQ(at(recent, 1, RecentFiles::PreviewRole), "");
+    EXPECT_EQ(at(recent, 1, RecentFiles::CoverRole), "");
 
     // Opened again: first, once
     recent.addLibrary(root / "Lectures" / "");

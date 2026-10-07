@@ -18,7 +18,7 @@
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "shell/DocumentFiles.h"
-#include "shell/Previews.h"
+#include "shell/DocumentCovers.h"
 #include "shell/RecentFiles.h"
 #include "shell/SystemApps.h"
 #include "shell/TabManager.h"
@@ -394,9 +394,9 @@ TEST_F(LibraryFilterTest, aTextFileOpensReadOnlyAsPlainText) {
     EXPECT_EQ(recent->data(recent->index(0), RecentFiles::KindRole).toString(), "text");
 
     // A card with its first lines
-    const QImage preview = PreviewCache::preview(DocumentFiles::itemOf(root / "kalman.py", DocumentFiles::TextFiles));
+    const QImage preview = DocumentCovers::cover(DocumentFiles::itemOf(root / "kalman.py", DocumentFiles::TextFiles));
     ASSERT_FALSE(preview.isNull());
-    EXPECT_EQ(preview.width(), PreviewCache::WIDTH);
+    EXPECT_EQ(preview.width(), DocumentCovers::WIDTH);
     int dark = 0;
     for (int y = 0; y < preview.height() / 4; ++y) {
         for (int x = 0; x < preview.width(); ++x) {
