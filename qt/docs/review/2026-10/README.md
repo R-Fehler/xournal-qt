@@ -35,8 +35,13 @@ Five reviews, one per area (read-only, 2026-10-07):
   the shared settings.xml), PDFs of other apps, Qt 6.7+.
 - **The deprecated text mode is removed** (`TextFlowPanel`, `TextFlowEditor`, most of `TextFlow`; `TextFlow::styleFor`
   stays for Markdown): it can no longer be opened.
-- **The text tool is always Markdown** (the `textMarkdown` setting could only be switched on).
-- **main.cpp's unused screenshot hooks** (77 lines) and the actions only they use are removed.
+- **The text tool is always Markdown** (the `textMarkdown` setting could only be switched on). Plain Xournal++ text
+  boxes in .xopp/.xoj files are still read, rendered and handled as before (the author: "still want to be able to read
+  and render normal xournal++ text boxes as intended. But my app always uses markdown.").
+- **main.cpp's unused screenshot hooks** (77 lines) and the actions only they use are removed if nothing calls them.
+- **Docs**: describe how the system works now; history keeps only the big decisions and turning points (the author:
+  "do not keep irrelevant old history on some obscure details … keep big blocks such as the classic toolbar"); git
+  keeps the rest.
 - `app` and `win` stay context properties (undocked windows share one engine, each with its own `app`); a QML-API
   test checks every `app.*` name QML uses against the C++ meta-objects instead.
 
