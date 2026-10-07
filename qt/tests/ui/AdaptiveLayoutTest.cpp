@@ -24,6 +24,7 @@
  * @license GNU GPLv2 or later
  */
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -437,8 +438,10 @@ protected:
     void settled(QObject* popup, std::source_location where = std::source_location::current()) {
         const bool done = upTo(
                 [&] {
-                    return popup->property("scale").toDouble() == 1.0 && popup->property("opacity").toDouble() == 1.0 &&
-                           (!popup->property("slide").isValid() || popup->property("slide").toDouble() == 0.0);
+                    // (within 1e-9: a popup's enter transition may end a hair short of its end value, e.g. the Material
+                    // menu's scale at 0.9999999999998, and stays there; it is opened all the same)
+                    const auto at = [&](const char* p, double v) { return std::abs(popup->property(p).toDouble() - v) < 1e-9; };
+                    return at("scale", 1.0) && at("opacity", 1.0) && (!popup->property("slide").isValid() || at("slide", 0.0));
                 },
                 untilMs);
         if (!done) {
