@@ -7,6 +7,7 @@ torch>=2.6,<2.14
 torchvision>=0.21,<0.29
 transformers>=4.46,<6
 tokenizers>=0.20
+sentencepiece>=0.2            # TrOCR-small ships only a SentencePiece model; without it transformers 5 fails with a "tiktoken" error
 huggingface_hub>=0.25
 safetensors
 onnx>=1.16

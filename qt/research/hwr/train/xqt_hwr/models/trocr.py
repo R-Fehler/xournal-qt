@@ -99,8 +99,13 @@ def load(base: str, texts: list[str] | None = None, tiny: dict | None = None, at
         model.encoder.pooler = None  # (unused by the decoder; DDP refuses parameters without gradients)
     model.decoder.model.decoder.layerdrop = 0.0  # (a skipped layer has no gradients either)
     tok = AutoTokenizer.from_pretrained(base, use_fast=True)
-    if model.config.decoder_start_token_id is None:
+    # (transformers 5 raises on a generation field the hub config does not set, where 4 returned None)
+    if getattr(model.config, "decoder_start_token_id", None) is None:
         model.config.decoder_start_token_id = 2
+    if getattr(model.config, "pad_token_id", None) is None:
+        model.config.pad_token_id = tok.pad_token_id
+    if getattr(model.config, "eos_token_id", None) is None:
+        model.config.eos_token_id = tok.eos_token_id
     size = model.config.encoder.image_size
     size = size if isinstance(size, int) else size[0]
     return TrocrBundle(model, tok, int(size))

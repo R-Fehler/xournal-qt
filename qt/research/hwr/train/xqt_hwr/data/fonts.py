@@ -17,7 +17,7 @@ from pathlib import Path
 
 CSS = "https://fonts.googleapis.com/css2?family={family}"
 _URL = re.compile(r"url\((https://[^)]+\.ttf)\)")
-OK_LICENCES = (("OFL", ("ofl", "open font license")), ("Apache-2.0", ("apache",)))
+OK_LICENCES = (("OFL", ("ofl", "open font license", "openfontlicense.org")), ("Apache-2.0", ("apache",)))
 
 
 @dataclass

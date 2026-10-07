@@ -38,5 +38,8 @@ def words(text: str) -> list[str]:
 
 
 def clean_line(text: str) -> str:
-    """A transcription as a training target: NFC, whitespace runs to one space, trimmed."""
-    return " ".join(nfc(text).split())
+    """A transcription as a training target: NFC, invisible format characters left out (zero-width spaces and
+    joiners, soft hyphens, byte order marks: Wikipedia's text has them, and ink never shows them), whitespace runs to
+    one space, trimmed."""
+    text = "".join(c for c in nfc(text) if unicodedata.category(c) != "Cf")
+    return " ".join(text.split())

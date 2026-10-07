@@ -8,7 +8,12 @@ datasets:
   # German scans: 15 writers, AFL-3.0
   - source: fhswf
     name: fhswf-german
-    pseudo_writers: 15            # used only if the parquet files carry no writer ids (see the README)
+    # The parquet files carry no writer ids. The image names are capture times (`collected_20240410_104822…`,
+    # `20240516_…`) or `datasetN_…`, and the files are in capture order. A writer group is a capture day or a
+    # `datasetN`: no session is split between train, validation and test (consecutive blocks cut through sessions).
+    # A person who wrote on several days can still be in two splits; there is no way to know from the data.
+    writer_regex: '(\d{8}(?=_\d{6})|dataset\d*(?=_))'
+    pseudo_writers: 15            # only without writer_regex
 
   # Synthetic lines, one font per "writer"
   - source: synthetic

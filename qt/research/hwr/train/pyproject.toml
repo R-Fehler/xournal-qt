@@ -13,6 +13,7 @@ dependencies = [
   "torchvision>=0.19",
   "transformers>=4.46",
   "tokenizers>=0.20",
+  "sentencepiece>=0.2",
   "huggingface_hub>=0.25",
   "safetensors",
   "onnx>=1.16",

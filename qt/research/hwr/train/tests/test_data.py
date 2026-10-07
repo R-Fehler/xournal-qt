@@ -181,3 +181,33 @@ def test_cvl_layout(tmp_path):
     _, lines = read_dataset(tmp_path / "out")
     t = {l.text: l.lang for l in lines}
     assert t == {"Imagine a vast": "en", "Die Größe ist": "de"}
+
+
+@pytest.mark.parametrize("tokenised, written", [
+    ("this one , but it 's a good start .", "this one, but it's a good start."),
+    ('of " Lady of Spain " and other big hits .', 'of "Lady of Spain" and other big hits.'),
+    ('" My September Love , " the big hit', '"My September Love," the big hit'),
+    ("( Parlophone ) , a song", "(Parlophone), a song"),
+    ("I do n't|know", "I don't know"),
+    ("You 're a star ... .", "You're a star...."),
+])
+def test_iam_transcriptions_are_written_as_handwritten(tokenised, written):
+    assert sources.iam_text(tokenised) == written
+
+
+def test_writer_splits_take_their_share_of_the_lines():
+    from xqt_hwr.data.dataset import assign_writer_splits
+    rnd = random.Random(7)
+    lines = []
+    for g in range(58):                                   # groups of 7 to 900 lines, like fhswf's capture days
+        lines += [f"day{g:02d}"] * rnd.randint(7, 900)
+    split = assign_writer_splits(lines)
+    share = Counter(split[w] for w in lines)
+    for name in ("test", "val"):
+        assert 0.07 < share[name] / len(lines) < 0.13, share
+    one_each = assign_writer_splits([f"font{i}" for i in range(30)])     # one line per writer: 3 test, 3 val
+    assert Counter(one_each.values()) == Counter({"train": 24, "test": 3, "val": 3})
+
+
+def test_targets_have_no_invisible_characters():
+    assert text.clean_line("Zeit​schrift  Ab­satz﻿") == "Zeitschrift Absatz"

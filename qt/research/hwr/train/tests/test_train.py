@@ -64,3 +64,10 @@ def test_ddp_two_cpu_processes(cfg, data_root, tmp_path, trained):
     assert "batch 4 x" in r.stdout and "x 2 =" in r.stdout
     m = meta(tmp_path / "checkpoints/best")
     assert m["step"] == 3
+
+
+def test_auto_precision_uses_fp32_where_bf16_is_only_emulated():
+    from xqt_hwr.train import auto_precision
+    assert auto_precision((8, 6), True) == "bf16"     # Ampere
+    assert auto_precision((7, 5), False) == "fp16"    # Turing
+    assert auto_precision((6, 1), False) == "fp32"    # Pascal (GTX 1080 Ti): emulated bf16 is slower than fp32

@@ -4,7 +4,7 @@
 |--------|-----------------------------------------------------------|---------------------------------|------------------------|
 | fhswf  | fhswf/german_handwriting: ~10.8k German lines, 15 writers | AFL-3.0                         | Hugging Face hub       |
 | iam    | IAM lines: ~13k English lines, 657 writers                | non-commercial research (free registration) | your copy (official layout), or Teklia/IAM-line on the hub |
-| cvl    | CVL database: 310 writers, 1 German and 6 English texts   | research use (see its record)   | your copy, or Zenodo   |
+| cvl    | CVL database: 310 writers, 1 German and 6 English texts   | CC BY-NC 4.0                    | your copy, or Zenodo   |
 
 All line pictures are framed as the app frames a line (images.frame_line).
 """
@@ -24,6 +24,29 @@ from . import hfparquet
 FHSWF_REPO = "fhswf/german_handwriting"
 IAM_HUB_REPO = "Teklia/IAM-line"
 CVL_URL = "https://zenodo.org/records/1492267/files/cvl-database-1-1.zip?download=1"
+
+
+def iam_text(text: str) -> str:
+    """IAM's transcriptions are tokenised: "this one , but it 's a good start ." and quotes as separate tokens
+    (" Lady of Spain "), in the official lines.txt (with | between words) and in the hub copy alike. Written text has
+    none of those spaces, and the app reads ink as written, so they are taken out."""
+    text = re.sub(r"\s+", " ", text.replace("|", " ")).strip()
+    out, quote_open = [], False
+    for tok in text.split(" "):
+        if tok == '"':
+            if quote_open and out:
+                out[-1] += '"'
+            else:
+                out.append('"')
+            quote_open = not quote_open
+            continue
+        if out and out[-1] == '"' and quote_open:
+            out[-1] += tok
+        else:
+            out.append(tok)
+    text = " ".join(out)
+    text = re.sub(r" ([.,;:!?)\]])", r"\1", text).replace("( ", "(").replace("[ ", "[")
+    return re.sub(r" (['’](s|t|re|ve|ll|d|m)\b|n['’]t\b)", r"\1", text)
 
 
 def fhswf(out: Path, cache: Path, source: Path | None = None, writer_column: str | None = None,
@@ -69,7 +92,7 @@ def iam(out: Path, source: Path | None, cache: Path, hub: bool = False, splits_d
         files = hfparquet.download(IAM_HUB_REPO, cache)
         info.source = f"https://huggingface.co/datasets/{IAM_HUB_REPO} (IAM lines, Aachen splits)"
         # No writer ids there; the files' splits are the writer-independent Aachen splits
-        return hfparquet.convert(files, out, info, "en", keep_splits=True, limit=limit)
+        return hfparquet.convert(files, out, info, "en", keep_splits=True, limit=limit, text_fn=iam_text)
     if source is None:
         raise SystemExit("iam: give --source <your IAM folder> (with ascii/lines.txt and lines/) or --hub")
     source = Path(source)
@@ -88,9 +111,7 @@ def iam(out: Path, source: Path | None, cache: Path, hub: bool = False, splits_d
                 continue
             p = s.split(" ")
             lid = p[0]
-            text = " ".join(p[8:]).replace("|", " ")
-            text = re.sub(r" ([.,;:!?)])", r"\1", text).replace("( ", "(")
-            text = re.sub(r" (['’](s|t|re|ve|ll|d|m)\b)", r"\1", text)
+            text = iam_text(" ".join(p[8:]))
             form = "-".join(lid.split("-")[:2])
             img = images.get(lid)
             if img is None:
@@ -117,7 +138,7 @@ def cvl(out: Path, source: Path | None, cache: Path, download: bool = False, lim
         z = cache / "cvl-database-1-1.zip"
         if not z.exists():
             cache.mkdir(parents=True, exist_ok=True)
-            print(f"downloading {CVL_URL} (about 1.6 GB)", file=sys.stderr)
+            print(f"downloading {CVL_URL} (about 4 GB)", file=sys.stderr)
             urllib.request.urlretrieve(CVL_URL, z)
         source = cache / "cvl"
         if not source.exists():
@@ -147,7 +168,7 @@ def cvl(out: Path, source: Path | None, cache: Path, download: bool = False, lim
     lang_of = {tx: c.most_common(1)[0][0] for tx, c in votes.items()}
     print(f"cvl: languages per text {dict(sorted(lang_of.items()))}", file=sys.stderr)
     info = DatasetInfo(name="cvl-lines", languages=sorted(set(lang_of.values())), kind="scan", noncommercial=True,
-                       licence="CVL Database terms (research use; see https://doi.org/10.5281/zenodo.1492267)",
+                       licence="CC BY-NC 4.0 (CVL Database, https://doi.org/10.5281/zenodo.1492267)",
                        source="https://doi.org/10.5281/zenodo.1492267")
     with DatasetWriter(out, info, overwrite=True) as w:
         for key in sorted(lines):

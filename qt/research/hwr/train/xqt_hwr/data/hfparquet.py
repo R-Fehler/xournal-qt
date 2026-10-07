@@ -49,7 +49,8 @@ def _pick(names: list[str], wanted: str | None, options: tuple) -> str | None:
 
 def convert(files: list[Path], out: Path, info: DatasetInfo, lang: str, image_column: str | None = None,
             text_column: str | None = None, writer_column: str | None = None, writer_regex: str | None = None,
-            keep_splits: bool = True, pseudo_writers: int = 0, frame: bool = True, limit: int | None = None) -> int:
+            keep_splits: bool = True, pseudo_writers: int = 0, frame: bool = True, limit: int | None = None,
+            text_fn=None) -> int:
     import io
 
     import pyarrow.parquet as pq
@@ -103,5 +104,6 @@ def convert(files: list[Path], out: Path, info: DatasetInfo, lang: str, image_co
             if frame:
                 im = frame_line(im)
             stem = Path(p).stem if p else f"{i:07d}"
-            w.add(f"{info.name}-{stem}", im, str(t), lang, str(wr), s if keep_splits else None)
+            text = text_fn(str(t)) if text_fn else str(t)
+            w.add(f"{info.name}-{stem}", im, text, lang, str(wr), s if keep_splits else None)
     return w.count

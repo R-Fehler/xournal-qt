@@ -105,8 +105,12 @@ datasets with their licences, the base model and the scores. Training stops at `
 | TrOCR-small, 384 × 384 | 24, gradient accumulation 2 | ~8–9 GB in bf16/fp16 with SDPA attention (estimated) | `batch_size: 16`, or `gradient_checkpointing: true` (about 3× less activation memory, ~25 % slower; then 48–64 fit) |
 | CTC, 64 px, lines up to 2048 px | 48 | ~3–5 GB (estimated) | `batch_size: 32` or `max_width: 1536` |
 
-- Precision is automatic: bf16 on GPUs that have it (Ampere or newer), otherwise fp16 with a gradient scaler
-  (Turing, for example the 2080 Ti).
+- Precision is automatic: bf16 on GPUs that have it (Ampere or newer), fp16 with a gradient scaler on Volta and
+  Turing (for example the 2080 Ti), fp32 on older GPUs. On a GTX 1080 Ti (Pascal) a matmul runs at 8.9 TFLOPS in
+  fp32, 8.4 in fp16 and 5.5 in emulated bf16 (measured). Measured there in fp32 at the configs' batch sizes:
+  TrOCR 9.1 GB and 44 lines/s per GPU, CTC 60–90 lines/s (8 loader workers; the augmentation on the CPU limits it).
+- PyTorch's CUDA 12.8 wheels are fine for Volta and newer. For Pascal, install from the `cu126` index instead (its
+  `sm_60` kernels run on `sm_61`): change the index URL in `requirements-gpu.txt`.
 - With N GPUs, one step sees `batch_size × grad_accum × N` lines. The learning rate is not scaled for you. With 4 or
   more GPUs, set `grad_accum: 1` for TrOCR to keep the step size the configs were written for.
 - Datasets are mixed by **weight** (`datasets:` in each config). A weight is a dataset's share of the samples,
@@ -116,7 +120,7 @@ datasets with their licences, the base model and the scores. Training stops at `
 
 | Step | One 11–12 GB GPU (RTX 3060 / 2080 Ti class) | 4 GPUs |
 |---|---|---|
-| `prepare.py all` | 30–60 min (downloads: fhswf 1.8 GB, CVL 1.6 GB; rendering 350k synthetic lines on 8 cores) | – |
+| `prepare.py all` | 30–60 min (downloads: fhswf 1.8 GB, CVL 4 GB; rendering 350k synthetic lines on 8 cores; about 75 min measured with 24 workers) | – |
 | German TrOCR (40k steps × 48 lines) | 6–10 h | 2–3 h |
 | German CTC (80k steps × 48 lines) | 2–4 h (often limited by the CPU's augmentation) | 1 h |
 | Combined TrOCR / CTC | 9–15 h / 3–5 h | 3–4 h / 1–1.5 h |
@@ -190,7 +194,7 @@ data was used), so a model always says what it learned from.
 |---|---|---|---|
 | `fhswf-german` | ~10.8k German lines, 15 writers | AFL-3.0 | [fhswf/german_handwriting](https://huggingface.co/datasets/fhswf/german_handwriting) |
 | `iam-lines` | ~13k English lines, 657 writers | IAM terms: non-commercial research, free registration | [IAM](https://fki.tic.heia-fr.ch/databases/iam-handwriting-database): your copy (`--source`), or [Teklia/IAM-line](https://huggingface.co/datasets/Teklia/IAM-line) (`--hub`, the default in `data.yaml`) |
-| `cvl-lines` | 310 writers, 1 German and 6 English texts | CVL database terms (research) | [Zenodo 1492267](https://doi.org/10.5281/zenodo.1492267) (`--download`) or your copy |
+| `cvl-lines` | 310 writers, 1 German and 6 English texts | CC BY-NC 4.0 | [Zenodo 1492267](https://doi.org/10.5281/zenodo.1492267) (`--download`) or your copy |
 | `synthetic-de`, `synthetic-en` | text in handwriting fonts | text: Tatoeba CC BY 2.0 FR, Wikipedia CC BY-SA 4.0 / GFDL, the built-in sample GPL-2.0-or-later; fonts: OFL or Apache-2.0 (read from each font file) | `prepare.py fonts`, `prepare.py synthetic` |
 | your ink | your lines, exported by the app | yours | `xournal-qt-cli hwr-lines` (block `qt/hwr-multilang`) |
 
@@ -201,9 +205,12 @@ data was used), so a model always says what it learned from.
 | CRNN | – | Trained from scratch here |
 
 Things to check on the first real run:
-- **fhswf's writers.** If its parquet files carry no writer column, the preparer cuts the lines into 15 blocks of
-  consecutive lines and says so. `prepare.py check` shows the writers. If the files name writers (a column or the
-  file names), pass `--writer-column` or `--writer-regex` so that the split is truly by writer.
+- **fhswf's writers.** Its parquet files carry no writer ids. The image names are capture times and the files are in
+  capture order, so `data.yaml` groups the lines by capture day (and the `datasetN` pages): no session is split
+  between train, validation and test. A person who wrote on several days can still be in two splits.
+- **IAM's transcriptions** are tokenised ("start ." , "it 's", `" Lady of Spain "`), in the official files and in
+  Teklia's hub copy alike; `sources.iam_text` writes them as they were handwritten. The hub copy has 10,373 of IAM's
+  13,353 lines (the Aachen splits), 128 px high as JPEG.
 - **CVL's layout** is read from the file names (`<writer>-<text>-<line>.tif` under `lines/`, the word pictures
   `…-<word>-<label>.tif` give the text). The download address may have moved; then download it by hand and use
   `--source`.
