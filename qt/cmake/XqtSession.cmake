@@ -247,6 +247,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/FuzzyQueryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/MergedPdfTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/HybridPdfTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/HybridMarkerTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/IncrementalPdfTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/PdfRevisionsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/PdfEncryptionTest.cpp
