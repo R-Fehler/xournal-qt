@@ -6,12 +6,13 @@ folder stay dormant here: they only run for pull requests to `master` or carry
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `xqt-build.yml` | a push to `master-qt` or `claude/**` that touches `qt/`, `src/`, `test/`, `cmake/` or the workflow; pull requests to `master-qt`; by hand | **Doc links**: `qt/scripts/check-doc-links.py` (below). **Linux**: the release configuration (QML compiled ahead of time) in two containers, Debian 13 (Qt 6.8) and Ubuntu 22.04 with KDE neon (Qt 6.7), the full suite in each, and veraPDF on the archive PDFs the tests write |
+| `xqt-build.yml` | a push to `master-qt` or `claude/**` that touches `qt/`, `src/`, `test/`, `cmake/` or the workflow; pull requests to `master-qt`; by hand | **Doc links**: `qt/scripts/check-doc-links.py` (below). **Architecture overview**: `qt/scripts/architecture/generate.py --check` (below). **Linux**: the release configuration (QML compiled ahead of time) in two containers, Debian 13 (Qt 6.8) and Ubuntu 22.04 with KDE neon (Qt 6.7), the full suite in each, and veraPDF on the archive PDFs the tests write |
 | `xqt-block-tests.yml` | every push to a block branch `qt/**` (no path filter) and to `master-qt`; by hand | **Block tests**: one development build (`XQT_FAST_DEV`, Debian 13, Qt 6.8), then the full suite in four shards side by side (`ctest -I <shard>,,4`) |
 | `xqt-release.yml` | a tag `v1.2.3`; by hand | builds, tests, packages, and opens a **draft** release with the packages ([releasing.md](releasing.md)) |
 | `xqt-android.yml` | by hand, a push to `qt/android-build`, the release | the APK ([android.md](android.md)) |
 | `xqt-windows.yml` | by hand, a push to `qt/windows-build` or `qt/windows-feel`, the release | the portable zip ([windows.md](windows.md)) |
 | `xqt-macos.yml` | by hand, a push to `qt/macos-build`, the release | the unsigned `.dmg` ([macos.md](macos.md)) |
+| `xqt-pages.yml` | a push to `master-qt` that touches `qt/docs/architecture/` or its generator; by hand | publishes the [architecture page](../architecture/README.md) to GitHub Pages (below) |
 
 Qt 6.5 or newer is needed, which the runners' own Ubuntu 24.04 does not have (6.4): every Linux job builds in a
 container, and `qt/scripts/linux-deps.sh` installs the packages (the same script as on a developer machine). The
@@ -40,6 +41,36 @@ python3 qt/scripts/check-doc-links.py      # prints file:line: target for each b
 
 Paths cited in the dated records (`review/`, `history/`, `release-notes/`) are not checked (they describe the tree as
 it was); their links are.
+
+## The architecture overview
+
+[architecture/README.md](../architecture/README.md), its diagram `architecture.svg` and the interactive page
+`architecture/site/index.html` are generated from `qt/docs/architecture/architecture.yaml` by
+`qt/scripts/architecture/generate.py` (Python 3, standard library only). The job "Architecture overview" of
+`xqt-build.yml` runs it with `--check`: it fails when the generated files are out of date, a path in the YAML does
+not exist (an upstream merge that moves a file in `src/` shows up here too), or the YAML's `links` edges and CMake's
+`target_link_libraries` between the targets it names disagree. Fix: edit the YAML, then
+
+```sh
+python3 qt/scripts/architecture/generate.py      # regenerates README.md, architecture.svg, site/index.html
+```
+
+## The architecture page (GitHub Pages)
+
+`xqt-pages.yml` publishes `qt/docs/architecture/site/index.html` (and the SVG) to GitHub Pages with
+`actions/upload-pages-artifact` and `actions/deploy-pages`, at `https://r-fehler.github.io/xournal-qt/`. Two things
+only the repository's owner can do:
+
+- **Enable Pages once**: Settings → Pages → Build and deployment → Source: **GitHub Actions**. Until then the
+  workflow's deploy job fails (the build job still checks the page). Then run the workflow by hand once (Actions →
+  "xournal-qt architecture page" → Run workflow), or push a change to the architecture.
+- **A private repository needs a paid plan** (GitHub Pro, Team or Enterprise) for Pages; on the free plan Pages
+  works for public repositories only. Even from a private repository the published page is public (anyone with
+  the address can read it); only GitHub Enterprise Cloud can restrict a page to the repository's readers.
+
+The README version of the overview needs neither: GitHub shows `qt/docs/architecture/README.md` with its diagram on
+any branch, and its links (relative) lead into the source. The page also works offline: open
+`qt/docs/architecture/site/index.html` from a checkout.
 
 ## A test that fails only on GitHub
 

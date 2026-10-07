@@ -42,7 +42,7 @@ release, building the `.deb` (block branches may be pushed for their tests).
 | how a feature works now: behaviour, settings, files, code and tests | its doc in [features/](../features/README.md) (no dates, no "the author said on …", no block history) |
 | why the fork is built a certain way | an ADR in [decisions/](../decisions/README.md) |
 | a change outside `qt/` (a seam in an upstream file) | [decisions/0002-upstream-seams.md](../decisions/0002-upstream-seams.md) |
-| what a module is for and what it may depend on | `qt/src/<module>/README.md`, and [architecture/](../architecture/README.md) |
+| what a module is for and what it may depend on | `qt/src/<module>/README.md`, and the architecture's model `qt/docs/architecture/architecture.yaml` (then run `qt/scripts/architecture/generate.py`: [architecture/](../architecture/README.md)) |
 | a user-visible change | the draft of the next release notes in [release-notes/](../release-notes/) |
 | what only a real device can show | the [device checklist](../testing/device-checklist.md), short, in the area it belongs to |
 | a turning point of the project (rare) | [history/README.md](../history/README.md) |

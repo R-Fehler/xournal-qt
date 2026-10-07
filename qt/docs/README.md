@@ -37,7 +37,8 @@ file), handwriting search, audio recordings and a replay of how a page was writt
 GTK application objects (`Control`, `XojPageView`, `Layout`, …, implemented by the fork's `DocumentSession`,
 `CanvasPage` and `CanvasView`), and through a few small hooks in upstream files (function pointers a frontend may set:
 Markdown texts, sticky notes, textured paper, the UI-thread dispatcher). Every edit of an upstream file is tiny, marked
-`xournal-qt:` and listed in [decisions/0002-upstream-seams.md](decisions/0002-upstream-seams.md), as are the
+`xournal-qt:` and listed in [decisions/0002-upstream-seams.md](decisions/0002-upstream-seams.md) (the overview shows
+them by module: [architecture](architecture/README.md#how-the-qt-frontend-uses-the-xournal-core)), as are the
 upstream classes the fork ported instead of reusing (`PageRaster` from `RenderJob`, `CanvasPage` from `XojPageView`,
 …). Both programs share the data: `.xopp`/`.xoj` files (attributes upstream does not know, `xqt-group`,
 `xqt-created`, `xqt-bookmark`, are written so Xournal++ ignores them) and upstream's `settings.xml` (the fork's keys in
@@ -48,8 +49,10 @@ its `xournalQt` part), in a config folder of its own (`~/.config/xournal-qt`).
 1. [AGENTS.md](../../AGENTS.md): the build and test commands, the rules that are easy to break (upstream files, the
    author's data, one feature per commit, failing test first), the module table with the direction of dependencies,
    and what the moving parts assume (threads, page revisions, memory owners). They apply to humans too.
-2. [architecture/](architecture/README.md): the architecture overview (in the making; until then the module table
-   and the module READMEs).
+2. [architecture/](architecture/README.md): the architecture overview, a diagram of the layers from the QML UI down
+   to the Xournal++ core with every block linked to its source, how the Qt frontend uses the core (direct calls,
+   `qt/compat`, the seams, the shared files), three paths through the code and where to change what. The same as an
+   interactive page: [site/index.html](architecture/site/index.html) (published to GitHub Pages).
 3. The README of the module you are about to change (`qt/src/<module>/README.md`).
 4. The feature doc of what you are changing: [features/](features/README.md) has one per user-facing feature (how it
    works now, its settings, its files, its code and tests).
@@ -61,6 +64,7 @@ its `xournalQt` part), in a config folder of its own (`~/.config/xournal-qt`).
 | [development/](development/README.md) | [building](development/building.md) (Linux, the cloud container, Android, Windows, macOS), [CI](development/ci.md) (the workflows, the block tests, the link check), [workflow](development/workflow.md) (blocks, worktrees, merging, where to record what), [releasing](development/releasing.md), [performance logging](development/performance-logging.md) |
 | [testing/](testing/README.md) | the testing guide; the [device checklist](testing/device-checklist.md): what only a real device can show |
 | [features/](features/README.md) | one doc per feature |
+| [architecture/](architecture/README.md) | the architecture overview (generated from `architecture.yaml`), and [image caches](architecture/image-caches.md) |
 | [decisions/](decisions/README.md) | the architecture decision records |
 | [agents/](agents/block-brief.md) | the brief every block agent gets, and the integrator's routine |
 | [user/](user/) | guides for users |

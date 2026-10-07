@@ -58,7 +58,10 @@ refactoring changes structure, not behaviour): [qt/docs/review/2026-10/README.md
 ## Where things are
 
 Dependencies point down this list only (`xqt-shell` also compiles `src/app`; the review plans to split them). Each
-`qt/src/<module>/` has a README (its classes, what it may depend on, its tests and docs).
+`qt/src/<module>/` has a README (its classes, what it may depend on, its tests and docs). The diagram and the
+overview, with the Xournal++ core and every connection to it: [qt/docs/architecture/](qt/docs/architecture/README.md),
+generated from `architecture.yaml` (a change that adds, moves or removes a module, a target or a key class updates
+it and runs `python3 qt/scripts/architecture/generate.py`; CI checks it).
 
 | Path | Target | What |
 | --- | --- | --- |
@@ -95,4 +98,5 @@ Dependencies point down this list only (`xqt-shell` also compiles `src/app`; the
 ## Documents
 
 [VISION.md](VISION.md) (goals) · [TODO.md](TODO.md) (open work) · [FORK.md](FORK.md) (branches, fork rules) ·
-[qt/docs/README.md](qt/docs/README.md) (the developer docs: features, decisions, development, testing, history).
+[qt/docs/README.md](qt/docs/README.md) (the developer docs: features, decisions, development, testing, history) ·
+[qt/docs/architecture/](qt/docs/architecture/README.md) (the architecture overview).

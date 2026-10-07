@@ -33,6 +33,16 @@ jobs:
       - name: Check the doc links
         run: python3 qt/scripts/check-doc-links.py
 
+  architecture:
+    name: Architecture overview
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Every path in qt/docs/architecture/architecture.yaml exists, its `links` edges and CMake's target_link_libraries
+      # agree, and the README, SVG and page generated from it are up to date (python3 qt/scripts/architecture/generate.py)
+      - name: Check the architecture overview
+        run: python3 qt/scripts/architecture/generate.py --check
+
   linux:
     name: ${{ matrix.name }}
     runs-on: ubuntu-latest
