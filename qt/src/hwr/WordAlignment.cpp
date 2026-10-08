@@ -2,13 +2,31 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <map>
 
 #include <QStringList>
 
 namespace xqt::hwr {
 
-std::vector<QString> align(const QString& reading, const std::vector<QRectF>& boxes) {
+namespace {
+/// The box a word from x0 to x1 overlaps most (or is nearest to: the overlap is minus the gap then)
+size_t boxOf(double x0, double x1, const std::vector<QRectF>& boxes) {
+    size_t best = 0;
+    double bestOverlap = -std::numeric_limits<double>::infinity();
+    for (size_t i = 0; i < boxes.size(); ++i) {
+        const double overlap = std::min(x1, boxes[i].right()) - std::max(x0, boxes[i].left());
+        if (overlap > bestOverlap) {
+            bestOverlap = overlap;
+            best = i;
+        }
+    }
+    return best;
+}
+}  // namespace
+
+std::vector<QString> align(const QString& reading, const std::vector<QRectF>& boxes,
+                           const std::vector<WordSpan>& spans) {
     std::vector<QString> out(boxes.size());
     const QStringList tokens = reading.split(u' ', Qt::SkipEmptyParts);
     if (boxes.empty() || tokens.isEmpty()) {
@@ -17,6 +35,15 @@ std::vector<QString> align(const QString& reading, const std::vector<QRectF>& bo
     if (static_cast<size_t>(tokens.size()) == boxes.size()) {
         for (size_t i = 0; i < boxes.size(); ++i) {
             out[i] = tokens[static_cast<qsizetype>(i)];
+        }
+        return out;
+    }
+    if (spans.size() == static_cast<size_t>(tokens.size())) {
+        // Where the model read them
+        for (size_t k = 0; k < spans.size(); ++k) {
+            const QString& t = tokens[static_cast<qsizetype>(k)];
+            const size_t i = boxOf(spans[k].left, spans[k].right, boxes);
+            out[i] += out[i].isEmpty() ? t : u' ' + t;
         }
         return out;
     }
@@ -75,7 +102,7 @@ std::vector<ink::Word> wordsOf(const std::vector<Beam>& beams, const std::vector
     };
     std::vector<std::map<QString, Reading>> perBox(boxes.size());  ///< by its letters (folded)
     for (size_t b = 0; b < beams.size(); ++b) {
-        const std::vector<QString> words = align(beams[b].text, boxes);
+        const std::vector<QString> words = align(beams[b].text, boxes, beams[b].spans);
         for (size_t i = 0; i < boxes.size(); ++i) {
             if (words[i].isEmpty()) {
                 continue;

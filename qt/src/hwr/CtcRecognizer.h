@@ -12,13 +12,18 @@
  * alphabet's characters, CtcDecode.h). A line is read whole; a line too wide for max_width at that height is cut at
  * word gaps into pieces that fit (as few as possible). Each piece is decoded with the CTC prefix beam search (BEAMS
  * prefixes, the TOP_K likeliest texts with their probabilities), its texts split into words at spaces and put on the
- * ink's word boxes as TrOCR's are (WordAlignment.h). The confidence of a word is the model's per character: exp of the
- * mean log-probability of the characters on the likeliest path (ctcConfidence), as TrOCR's is per token.
+ * ink's word boxes (WordAlignment.h): one to one when there are as many words as boxes, else each to the box it
+ * overlaps most where the model read it. A word's place: from the first frame of its first character to the last
+ * of its last (the frames are equal slices of the picture's width: T = W / 4 for the training's CRNN), mapped back
+ * through the picture's scale and margin to the line (LineImage.h xAt). The confidence of a word is the model's per
+ * character: exp of the mean log-probability of the characters on the likeliest path (ctcConfidence), as TrOCR's is
+ * per token.
  *
  * The id: the model's name, the first 12 hex digits of the manifest's sha256 and the version of this reading
- * ("crnn-de/0123456789ab/ctc1"). Files are checked against the manifest's sizes when asked whether it is ready, and
- * against their sha256 when the model is loaded (once). Two threads; the model is loaded on the worker the first time
- * a line is read and unloaded when the worker has been idle for a minute; interrupt() stops a run at once.
+ * ("crnn-de/0123456789ab/ctc2"; ctc2: words placed where they were read, so results of ctc1 are read again). Files
+ * are checked against the manifest's sizes when asked whether it is ready, and against their sha256 when the model
+ * is loaded (once). Two threads; the model is loaded on the worker the first time a line is read and unloaded when
+ * the worker has been idle for a minute; interrupt() stops a run at once.
  *
  * @license GNU GPLv2 or later
  */
@@ -53,12 +58,16 @@ struct CtcManifest {
     static CtcManifest read(const QString& dir);
 };
 
+/// Where the words of a reading are, as fractions of the picture's width (frame t of `frames` is t / frames to
+/// (t + 1) / frames of it); one per word of its text (simplified(), split at spaces), empty without its spans.
+std::vector<WordSpan> wordSpansOf(const CtcReading& reading, size_t frames, const CtcAlphabet& alphabet, int blank = 0);
+
 class CtcRecognizer final: public Recognizer {
 public:
     static constexpr int BEAMS = 8;
     static constexpr int TOP_K = 5;
     static constexpr int THREADS = 2;
-    static constexpr const char* VERSION = "ctc1";
+    static constexpr const char* VERSION = "ctc2";
 
     explicit CtcRecognizer(QString modelDir);
     ~CtcRecognizer() override;
@@ -69,8 +78,10 @@ public:
     void unload() override;
     void interrupt() override;
 
-    /// The readings of one picture (inkOf: height x width, ink 1), best first (tests).
+    /// The readings of one picture (inkOf: height x width, ink 1), best first (tests); their words' spans as
+    /// fractions of the picture's width (0 to 1).
     std::optional<std::vector<Beam>> readPicture(const std::vector<float>& ink, int width, const Context& context);
+
     bool loaded() const;
 
 private:

@@ -44,5 +44,8 @@ std::vector<float> pixelsOf(const LineInput& line, const LinePiece& piece, int s
 std::vector<float> inkOf(const LineInput& line, const LinePiece& piece, int height, int maxWidth, int& width);
 /// How wide the piece's picture is when drawn `height` pixels high (before any squeezing).
 double widthAt(const LinePiece& piece, int height);
+/// The line's x at `fraction` (0: left edge, 1: right edge) of the piece's picture (greyOf, pixelsOf, inkOf: the
+/// margin included, at any scale); how a CTC model's frames find their place on the ink.
+double xAt(const LinePiece& piece, double fraction);
 
 }  // namespace xqt::hwr

@@ -173,6 +173,45 @@ TEST(RecognizerTest, readingsArePutOnTheWordBoxes) {
               (std::vector<QString>{QStringLiteral("Th is"), QStringLiteral("is"), QStringLiteral("dumb")}));
 }
 
+// Where the model read the words (a CTC model's frames) puts them right where the letter shares cannot: a short word
+// written wide ("a" gets a tenth of the width by its letters, so "wonderful" slides onto its box), and a box the model
+// read nothing in (a drawn arrow before "Hello world" takes the letters' room)
+TEST(RecognizerTest, wordsArePutWhereTheModelReadThem) {
+    const QString aWonderful = QStringLiteral("a wonderful");
+    const std::vector<QRectF> wide{{0, 0, 40, 10}, {50, 0, 30, 10}, {90, 0, 10, 10}};  // "a", "wonderful", "."
+    EXPECT_EQ(align(aWonderful, wide), (std::vector<QString>{aWonderful, QString(), QString()}));
+    EXPECT_EQ(align(aWonderful, wide, {{2, 36}, {52, 79}}),
+              (std::vector<QString>{QStringLiteral("a"), QStringLiteral("wonderful"), QString()}));
+
+    const QString hello = QStringLiteral("Hello world");
+    const std::vector<QRectF> arrow{{0, 0, 40, 10}, {50, 0, 30, 10}, {90, 0, 30, 10}};  // "->", "Hello", "world"
+    EXPECT_EQ(align(hello, arrow), (std::vector<QString>{QStringLiteral("Hello"), QString(), QStringLiteral("world")}));
+    EXPECT_EQ(align(hello, arrow, {{49, 81}, {88, 121}}),
+              (std::vector<QString>{QString(), QStringLiteral("Hello"), QStringLiteral("world")}));
+
+    // More words than boxes: those of one box joined; a word beside every box goes to the nearest
+    const std::vector<QRectF> two{{0, 0, 40, 10}, {60, 0, 40, 10}};
+    EXPECT_EQ(align(QStringLiteral("in the box"), two, {{0, 10}, {14, 38}, {62, 98}}),
+              (std::vector<QString>{QStringLiteral("in the"), QStringLiteral("box")}));
+    EXPECT_EQ(align(QStringLiteral("x y z"), two, {{-30, -20}, {45, 50}, {120, 130}}),
+              (std::vector<QString>{QStringLiteral("x y"), QStringLiteral("z")}));
+    // As many words as boxes: one to one, wherever they were read
+    EXPECT_EQ(align(QStringLiteral("in box"), two, {{0, 10}, {14, 38}}),
+              (std::vector<QString>{QStringLiteral("in"), QStringLiteral("box")}));
+    // Spans that do not fit the words are not used (the letter shares then)
+    EXPECT_EQ(align(aWonderful, wide, {{52, 79}}), align(aWonderful, wide));
+    // Through the beams: each beam by its own spans
+    const std::vector<Beam> beams{{aWonderful, -0.1, -0.1, {{2, 36}, {52, 79}}},
+                                  {QStringLiteral("a wonderfull"), -2.0, -0.2, {{2, 36}, {52, 80}}}};
+    const auto words = wordsOf(beams, wide);
+    ASSERT_EQ(words.size(), 2u);
+    EXPECT_EQ(words[0].text, QStringLiteral("a"));
+    EXPECT_EQ(words[0].box, wide[0]);
+    EXPECT_EQ(words[1].text, QStringLiteral("wonderful"));
+    EXPECT_EQ(words[1].box, wide[1]);
+    EXPECT_EQ(words[1].candidates.size(), 2u);
+}
+
 TEST(RecognizerTest, beamsBecomeReadingsWithShares) {
     const std::vector<QRectF> boxes{{0, 0, 60, 10}, {70, 0, 60, 10}};
     const std::vector<Beam> beams{{QStringLiteral("Kalman filter."), -1.0, -0.1},

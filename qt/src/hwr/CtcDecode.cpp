@@ -27,7 +27,11 @@ double add(double a, double b) {
 struct Probs {
     double blank = NONE;    ///< paths ending in a blank
     double nonBlank = NONE; ///< paths ending in the prefix's last character
+    /// The frames of the characters, of the likeliest contribution to each (Viterbi-like: the largest term of the sum)
+    std::vector<CtcSpan> spansBlank, spansNonBlank;
+    double bestBlank = NONE, bestNonBlank = NONE;
     double total() const { return add(blank, nonBlank); }
+    const std::vector<CtcSpan>& spans() const { return nonBlank > blank ? spansNonBlank : spansBlank; }
 };
 }  // namespace
 
@@ -64,24 +68,46 @@ std::vector<CtcReading> ctcBeamSearch(const std::vector<float>& logits, size_t f
             tried.push_back(static_cast<size_t>(blank));
         }
         std::map<std::vector<int>, Probs> next;
+        const int frame = static_cast<int>(t);
         for (const auto& [prefix, p]: beams) {
             for (const size_t c: tried) {
                 const double lp = row[c];
                 if (static_cast<int>(c) == blank) {
                     Probs& n = next[prefix];
-                    n.blank = add(n.blank, p.total() + lp);
+                    const double v = p.total() + lp;
+                    n.blank = add(n.blank, v);
+                    if (v > n.bestBlank) {
+                        n.bestBlank = v;
+                        n.spansBlank = p.spans();
+                    }
                     continue;
                 }
                 std::vector<int> longer = prefix;
                 longer.push_back(static_cast<int>(c));
                 Probs& n = next[longer];
+                // A new character: its frames start here
+                auto start = [&](double v, const std::vector<CtcSpan>& before) {
+                    n.nonBlank = add(n.nonBlank, v);
+                    if (v > n.bestNonBlank) {
+                        n.bestNonBlank = v;
+                        n.spansNonBlank.reserve(before.size() + 1);
+                        n.spansNonBlank.assign(before.begin(), before.end());
+                        n.spansNonBlank.push_back({frame, frame});
+                    }
+                };
                 if (!prefix.empty() && prefix.back() == static_cast<int>(c)) {
                     // The same character again: a new one only after a blank; else the same one goes on
-                    n.nonBlank = add(n.nonBlank, p.blank + lp);
+                    start(p.blank + lp, p.spansBlank);
                     Probs& same = next[prefix];
-                    same.nonBlank = add(same.nonBlank, p.nonBlank + lp);
+                    const double v = p.nonBlank + lp;
+                    same.nonBlank = add(same.nonBlank, v);
+                    if (v > same.bestNonBlank) {
+                        same.bestNonBlank = v;
+                        same.spansNonBlank = p.spansNonBlank;
+                        same.spansNonBlank.back().last = frame;
+                    }
                 } else {
-                    n.nonBlank = add(n.nonBlank, p.total() + lp);
+                    start(p.total() + lp, p.spans());
                 }
             }
         }
@@ -98,11 +124,11 @@ std::vector<CtcReading> ctcBeamSearch(const std::vector<float>& logits, size_t f
                           [](const auto& a, const auto& b) { return a.first > b.first; });
         beams.clear();
         for (size_t i = 0; i < keep; ++i) {
-            beams[ranked[i].second] = next[ranked[i].second];
+            beams[ranked[i].second] = std::move(next[ranked[i].second]);
         }
     }
     for (const auto& [prefix, p]: beams) {
-        out.push_back({prefix, p.total()});
+        out.push_back({prefix, p.total(), p.spans()});
     }
     std::sort(out.begin(), out.end(), [](const CtcReading& a, const CtcReading& b) {
         return a.logProb != b.logProb ? a.logProb > b.logProb : a.labels < b.labels;
@@ -180,15 +206,17 @@ bool CtcAlphabet::parse(const QByteArray& text, QString* error) {
 QString CtcAlphabet::text(const std::vector<int>& labels, int blank) const {
     QString out;
     for (const int l: labels) {
-        if (l == blank || l < 0) {
-            continue;
-        }
-        const int i = l < blank ? l : l - 1;
-        if (i >= 0 && i < chars.size()) {
-            out += chars[i];
-        }
+        out += charOf(l, blank);
     }
     return out;
+}
+
+QString CtcAlphabet::charOf(int label, int blank) const {
+    if (label == blank || label < 0) {
+        return {};
+    }
+    const int i = label < blank ? label : label - 1;
+    return i >= 0 && i < chars.size() ? chars[i] : QString();
 }
 
 }  // namespace xqt::hwr

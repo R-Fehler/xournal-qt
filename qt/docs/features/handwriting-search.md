@@ -80,6 +80,27 @@ text in addition to normal copy and give the user a small popup with the text th
   the language, that gave it.
 - The results are named by the set of models: another set (a model added, another language) reads the library again.
 
+### How readings get their word boxes
+
+The layout finds the lines and the word boxes from the strokes alone (`InkLayout`); a model reads a whole line (or a
+piece of it) as text, in a few readings (the beams of its search). Each reading's words are put on the boxes
+(`WordAlignment`): one to one when it has as many words as the line has boxes, else each word to the box it overlaps
+most in x (the words of one box joined with a space; a box may get none). Where a word is:
+- **a CTC model** (the German model): where the model read it. Each of its output frames is a slice of the line's
+  picture (a quarter of its width in pixels: frame t of T covers t / T to (t + 1) / T), the beam search keeps per
+  character the first and last frame it was read on, and a word spans from its first character to its last, mapped
+  back through the picture's scale and margin to the page;
+- **TrOCR** (no positions): estimated, the words share the line's width by their letters and the boxes by their widths.
+
+The letters' shares misplace a short word written wide ("a wonderful": the "a" gets a tenth of the width), a box the
+model read nothing in (a drawn mark the layout kept), and a word the layout split in two. Measured on the handwriting in
+`test/files` with the German model (2026-10-08): of 439 lines, the best reading had another number of words than boxes
+in 14; the two ways differ in 11 of them. Looking at the 13 distinct lines where any reading differed: the frames put
+the words on the right boxes in 9 ("This is a" all on the box of "This" by the letters, each on its own by the frames;
+"Theis is" likewise), the letters in none, 4 could not be told (ink written over itself). The frames also give all
+readings of a line the same boxes, so their shares add up, where the letters' shares move with the spelling. (The
+German model's recogniser id ends in `ctc2` since: lines it read before are read once again.)
+
 ### Which language a document is in
 
 Reading a line costs about 0.2 s per model, and most documents are in one language. So with both models in use:
@@ -168,7 +189,9 @@ The sentences are the texts (`sentences-<lang>.txt`; `make_sample.py` makes the 
   the system's). Without it, Settings says so and nothing else changes. Packages will bundle it later.
 - Tests that need the runtime or the model are skipped unless `XQT_ONNXRUNTIME` (tiny models in
   `qt/tests/hwr/data`: a TrOCR stand-in and a CTC model, made by `tinytrocr.py` and `tinyctc.py`) or
-  `XQT_HWR_MODEL` is set; `XQT_BENCH_HWR=1` with the model prints the time per line. English and German are tested
+  `XQT_HWR_MODEL` is set; `XQT_BENCH_HWR=1` with the model prints the time per line; `XQT_HWR_BOXES_OUT=<folder>` with
+  `XQT_HWR_CTC_MODEL` draws the lines whose word boxes the two ways above give differently
+  (`CtcTest.wordBoxesOfRealInk`, more documents in `XQT_HWR_BOXES_FILES`). English and German are tested
   with scripted models (`MultiModelTest`: merging, the language of a document, the choice).
 
 - **Training models** (German, German + English, a person's own hand): `qt/research/hwr/train` ([README](../../research/hwr/train/README.md)),
