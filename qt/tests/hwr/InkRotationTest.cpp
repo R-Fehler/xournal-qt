@@ -27,6 +27,8 @@
 #include "support/SearchHits.h"
 #include "support/TestSupport.h"
 
+#include "BenchmarkInk.h"
+
 using namespace xqt;
 using namespace xqt::hwr;
 using xqt::test::waitFor;
@@ -90,25 +92,21 @@ bool inWord(const ink::Word& w, QPointF p) {
 }
 }  // namespace
 
-// At 0 and 15 degrees the page's rules lay the line out (a slope is fine); at 35, 90 and -90 (written upwards) it is
-// laid out in its own frame: one line, its words, and the angle it was written in
+// Level, the page's rules lay the line out (a slope of a few degrees is fine); at 15 (a line climbing by more than its
+// height), 35, 90 and -90 (written upwards) it is laid out in its own frame: one line, its words, and the angle it was
+// written in
 TEST(InkRotationTest, aLineAtAnAngleIsOneLineInItsOwnFrame) {
-    for (const double angle: {0.0, 15.0, 35.0, -35.0, 90.0, -90.0}) {
+    for (const double angle: {0.0, 15.0, -15.0, 35.0, -35.0, 90.0, -90.0}) {
         SCOPED_TRACE(angle);
-        // (at 15 degrees the page's rules take 3 words as one line: the 4th is too far below the 1st, as before)
-        const size_t words = angle == 15 ? 3 : 4;
+        const size_t words = 4;
         const auto strokes = lineAt({300, 400}, angle, static_cast<int>(words));
         const hwr::Layout l = layout(strokes);
         ASSERT_EQ(l.lines.size(), 1u);
         const InkLine& line = l.lines[0];
-        if (angle == 15) {
-            EXPECT_EQ(line.angle, 0);  // (its words: by the page's rules, as before)
-            continue;
-        }
         EXPECT_EQ(line.words.size(), words);
         EXPECT_EQ(line.strokes.size(), words);
         EXPECT_TRUE(l.drawings.empty());
-        if (std::abs(angle) < 20) {
+        if (std::abs(angle) < 10) {
             EXPECT_EQ(line.angle, 0);
         } else if (std::abs(angle) == 90) {
             EXPECT_EQ(line.angle, angle);  // (exactly)
@@ -131,6 +129,28 @@ TEST(InkRotationTest, aLineAtAnAngleIsOneLineInItsOwnFrame) {
         ASSERT_EQ(pieces.size(), 1u);
         greyOf(in, pieces[0], w, h);
         EXPECT_GT(w, 4 * h);
+    }
+}
+
+// Upside down (written leftwards: 160 to 180 degrees count as 180) and leftwards at a free angle (110 to 160) the line
+// is laid out in its own frame too and read upright, its origin where it starts
+TEST(InkRotationTest, aLineWrittenLeftwardsIsReadUpright) {
+    for (const double angle: {180.0, -178.0, 135.0, -135.0}) {
+        SCOPED_TRACE(angle);
+        const auto strokes = lineAt({300, 400}, angle, 4);
+        const hwr::Layout l = layout(strokes);
+        ASSERT_EQ(l.lines.size(), 1u);
+        const InkLine& line = l.lines[0];
+        if (std::abs(angle) >= 160) {
+            EXPECT_EQ(line.angle, 180);  // (exactly)
+        } else {
+            EXPECT_NEAR(line.angle, angle, 0.5);
+        }
+        EXPECT_EQ(line.words.size(), 4u);
+        const LineInput in = LineInput::of(strokes, l, line);
+        EXPECT_TRUE(std::abs(angle) == 178 || upright(in)) << in.size.width() << " x " << in.size.height();
+        EXPECT_NEAR(line.origin().x(), 300, std::abs(angle) == 178 ? 4 : 0.5);
+        EXPECT_NEAR(line.origin().y(), 400, std::abs(angle) == 178 ? 4 : 0.5);
     }
 }
 
@@ -222,6 +242,114 @@ TEST(InkRotationTest, aListIsNotALineWrittenDownwards) {
     ASSERT_EQ(l.lines.size(), 8u);
     for (const InkLine& line: l.lines) {
         EXPECT_EQ(line.angle, 0);
+    }
+}
+
+// Real handwriting (the benchmark's lines that stand alone) turned up, down and to a free angle is one line in its own
+// frame, with all the strokes the level line has, as many words as level, and nothing left on the page: the T's bar
+// (a straight stroke), a "Th" written in one stroke (its box turned is big), a word after a gap wider than a letter
+// and the dots after it belong to the line
+TEST(InkRotationTest, realHandwritingAtAnAngleIsOneLine) {
+    const auto lines = test::benchmarkLines();
+    ASSERT_GE(lines.size(), 4u);
+    for (size_t k = 0; k < lines.size(); ++k) {
+        const hwr::Layout level = layout(lines[k]);
+        ASSERT_EQ(level.lines.size(), 1u);
+        for (const double angle: {90.0, -90.0, 45.0, -45.0, 30.0, 180.0, 135.0, -135.0, 15.0, -15.0}) {
+            SCOPED_TRACE(QStringLiteral("line %1 at %2").arg(k).arg(angle).toStdString());
+            const hwr::Layout l = layout(test::turnedAround(lines[k], angle));
+            ASSERT_EQ(l.lines.size(), 1u);
+            if (std::abs(angle) == 90 || angle == 180) {
+                EXPECT_EQ(l.lines[0].angle, angle);
+            } else {
+                EXPECT_NEAR(l.lines[0].angle, angle, 3);
+            }
+            EXPECT_EQ(l.lines[0].strokes, level.lines[0].strokes);
+            EXPECT_EQ(l.drawings, level.drawings);
+        }
+    }
+}
+
+// A short note of real words (two or three: "dumb test", "dumb test, written", "many times...") written up, down or
+// at a free angle beside a page of level lines is a line of its own at its angle; the level lines are as without it
+TEST(InkRotationTest, aShortRealNoteAtAnAngleIsALineOfItsOwn) {
+    const auto lines = test::benchmarkLines();
+    ASSERT_GE(lines.size(), 4u);
+    std::vector<InkStroke> body;
+    for (size_t k = 1; k < lines.size(); ++k) {
+        body.insert(body.end(), lines[k].begin(), lines[k].end());
+    }
+    const hwr::Layout alone = layout(body);
+    const hwr::Layout first = layout(lines[0]);
+    ASSERT_GE(first.lines.at(0).words.size(), 8u);
+    QRectF page;
+    for (const InkStroke& st: body) {
+        page = page.isNull() ? st.box : page.united(st.box);
+    }
+    for (const auto& [from, to]: {std::pair<size_t, size_t>{3, 5}, {3, 6}, {6, 8}}) {
+        std::vector<uint32_t> which;
+        for (size_t w = from; w < to; ++w) {
+            const auto& ws = first.lines[0].words[w].strokes;
+            which.insert(which.end(), ws.begin(), ws.end());
+        }
+        std::sort(which.begin(), which.end());
+        std::vector<InkStroke> words;
+        for (const uint32_t i: which) {
+            words.push_back(lines[0][i]);
+        }
+        for (const double angle: {-90.0, 90.0, 45.0, -45.0}) {
+            SCOPED_TRACE(QStringLiteral("words %1-%2 at %3").arg(from).arg(to).arg(angle).toStdString());
+            std::vector<InkStroke> note = test::turnedAround(words, angle);
+            QRectF box;
+            for (const InkStroke& st: note) {
+                box = box.isNull() ? st.box : box.united(st.box);
+            }
+            // (in the left margin, 20 pt from the text, beside its middle)
+            const QPointF by(page.left() - 20 - box.right(), page.center().y() - box.center().y());
+            for (InkStroke& st: note) {
+                for (QPointF& p: st.points) {
+                    p += by;
+                }
+                st = InkStroke::of(st.points, st.width, st.widths);
+            }
+            std::vector<InkStroke> all = body;
+            all.insert(all.end(), note.begin(), note.end());
+            const hwr::Layout l = layout(all);
+            std::vector<const InkLine*> level, turnedLines;
+            for (const InkLine& x: l.lines) {
+                (x.angle == 0 ? level : turnedLines).push_back(&x);
+            }
+            EXPECT_EQ(level.size(), alone.lines.size());
+            for (size_t i = 0; i < level.size() && i < alone.lines.size(); ++i) {
+                EXPECT_EQ(level[i]->hash, alone.lines[i].hash);
+            }
+            EXPECT_EQ(turnedLines.size(), 1u);
+            if (turnedLines.size() != 1) {
+                continue;
+            }
+            // (at a free angle the frame's units of so few strokes may take the y's straight tail for a drawing)
+            EXPECT_GE(turnedLines[0]->strokes.size() + (std::abs(angle) == 90 ? 0 : 1), note.size());
+            EXPECT_EQ(turnedLines[0]->words.size(), to - from);
+            if (std::abs(angle) == 90) {
+                EXPECT_EQ(turnedLines[0]->angle, angle);
+            } else {
+                EXPECT_NEAR(turnedLines[0]->angle, angle, 5);
+            }
+        }
+    }
+}
+
+// The words of real lines written one below the other (lists, close or wide) are level lines, none at an angle
+TEST(InkRotationTest, aListOfRealWordsIsNotALineWrittenDownwards) {
+    for (const auto& line: test::benchmarkLines()) {
+        for (const double pitch: {1.2, 1.6}) {
+            SCOPED_TRACE(pitch);
+            const hwr::Layout l = layout(test::listOf(line, pitch));
+            EXPECT_GE(l.lines.size(), 8u);
+            for (const InkLine& x: l.lines) {
+                EXPECT_EQ(x.angle, 0);
+            }
+        }
     }
 }
 

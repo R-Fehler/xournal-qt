@@ -218,14 +218,14 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
 - [ ] The emoji button is out of reach while the soft keyboard is open on a phone.
 
 ### Handwriting
-- [x] `qt/hwr-library-search`: the library's search did not find handwriting found in open documents (the author,
-  2026-10-08). Open documents now go to the library's cache once read (and on saving, what is read so far); a
-  device's battery no longer stops the background reading. Left: the author's check with real notes on the device;
-  a document opened under another spelling of the library's path (a symlink) is still not matched to its entry.
-- [ ] Handwriting at an angle, what is left: writing leftwards (upside down) is read as level; a column of single
-  letters or digits can pass for a line written downwards; poppler splits words at a free angle into letters
-  ("K a l m a n"; 90° is fine); a level or 90° line turned by the lasso is read again; check real angled handwriting
-  on the device (handwriting-search.md, "On the device").
+- [ ] Library search for handwriting, what is left: the author's check with real notes; a document opened under
+  another spelling of the library's path (a symlink) is still not matched to its index entry.
+- [ ] Handwriting at an angle, what is left: the thresholds were tuned on one writer (the benchmark page): measure the
+  author's own angled notes (the forms, `hwr-bench`; `HwrRotationBenchmark`) before changing them; at a free angle the
+  frame includes the writer's own slope and a line's words can split differently than level; with few strokes a y's
+  straight tail may count as a drawing; a column of single letters or digits can pass for a line written downwards;
+  poppler splits words at a free angle into letters ("K a l m a n"; 90° is fine); a level or 90° line turned by the
+  lasso is read again.
 - [ ] The bundled handwriting model (`crnn-de-en`, ONNX Runtime 1.30.0 in every package), what is left: the first
   runs of `xqt-release.yml`, `xqt-windows.yml`, `xqt-macos.yml` and `xqt-android.yml` with it (their `--hwr-info`
   smoke tests); the device checks (handwriting-search.md, "On the device": Android's first start copying the model,

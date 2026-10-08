@@ -120,6 +120,7 @@ cmake --build /home/user/build-qt68 -j3 --target xqt-ui-tests && ctest --test-di
 | `XQT_SHOTS=<dir>` | regenerates the README's pictures from the UI tests (also `XQT_TOOLBAR_SHOTS`, `XQT_STICKY_SHOTS`, `XQT_MATH_SHOTS`) |
 | `XOJ_UPSTREAM_BIN` | upstream's `xournalpp` for the golden tests and `StickyNoteTest` |
 | `XQT_HWR_MODEL`, `XQT_HWR_CTC_MODEL` | run the handwriting tests with a real model folder |
+| `XQT_HWR_ROTATION_BENCH=<dir>` (with `XQT_ONNXRUNTIME`) | the built-in model reading the benchmark's handwriting turned to several angles: a table and the line pictures in `<dir>` (`HwrRotationBenchmark`) |
 | `XQT_PERF=1` | the running app writes a line a second about the canvas work ([performance-logging.md](../development/performance-logging.md)) |
 | `XQT_KEEP`, `XQT_KEEP_PDF=<file>` | keep the PDFs some Markdown tests write, to look at them |
 
