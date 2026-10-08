@@ -64,6 +64,11 @@ arrow, a line written steeply uphill) is found, marked, copied and put into the 
   `InkRotationTest.*` (`-L hwr`: 0°, 15°, 35°, 90°, 270°, a mixed page, a list, the hash, the scripted recogniser,
   marks, copying, poppler), `InkSearchTest.handwritingAtAnAngleIsMarkedTurned`,
   `InkLibraryTest.theAngleOfALineIsStored`, `CanvasItemRenderTest.aHitInHandwritingAtAnAngleIsMarkedTurned` (`-L quick`).
+- **Measured**: `HwrRotationBenchmark` (`XQT_HWR_ROTATION_BENCH=<folder>` and `XQT_ONNXRUNTIME`, about 30 s) turns the
+  benchmark's lines that stand alone (`qt/tests/hwr/BenchmarkInk.h`) to 90°, -90°, ±45°, 30°, 15°, ±135° and 180°, alone
+  and as a page, reads them with the built-in model and compares with the level reading: lines found, character error
+  rate, words the search finds; also lists of the same words and a margin note on a page. The table and every line's
+  picture go to the folder.
 
 ## Copy handwriting as text
 

@@ -97,7 +97,8 @@ if(XQT_BUILD_TESTS)
     if(XQT_HWR_ONNX)
         target_sources(xqt-hwr-tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/TrocrTest.cpp
             ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/CtcTest.cpp
-            ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/BundledModelTest.cpp)
+            ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/BundledModelTest.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/RotationBenchmarkTest.cpp)
     endif()
     target_link_libraries(xqt-hwr-tests PRIVATE xqt-hwr xqt-shell xqt-test-support Qt6::Test GTest::gtest)
     target_include_directories(xqt-hwr-tests PRIVATE "${TEST_CONFIG_DIR}")
