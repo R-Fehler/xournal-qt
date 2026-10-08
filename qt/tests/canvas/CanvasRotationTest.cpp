@@ -184,29 +184,26 @@ TEST(CanvasRotation, twoFingersTurnItOnlyAfterADeliberateTwist) {
     vc.pinchUpdate(c, 200, 18.0);
     EXPECT_EQ(vc.rotation(), 0) << "a little twist while pinching does not turn it";
     EXPECT_FALSE(vc.twisting());
-    vc.pinchUpdate(c, 200, 50.0);  // 40° in all: it turns, behind the fingers by the 12° it took to start
+    vc.pinchUpdate(c, 200, 50.0);  // 40° in all: a large pinch twists that much on its own
+    EXPECT_EQ(vc.rotation(), 0);
+    EXPECT_FALSE(vc.twisting());
+    vc.pinchUpdate(c, 200, 80.0);  // 70°: past TOUCH_ROTATE_START_DEGREES, the canvas is where the fingers are
     EXPECT_TRUE(vc.twisting());
-    EXPECT_NEAR(vc.rotation(), 28, 1e-9);
-    vc.pinchUpdate(c, 200, 108.0);  // 98 - 12 = 86: snaps to 90
+    EXPECT_NEAR(vc.rotation(), 70, 1e-9);
+    vc.pinchUpdate(c, 200, 98.0);  // 88: snaps to 90
     EXPECT_EQ(vc.rotation(), 90);
     // The fingers move and spread while turning: the document point under them stays under them
     const QPointF c2(300, 250);
-    vc.pinchUpdate(c2, 300, 70.0);  // 60 - 12 = 48
-    EXPECT_NEAR(vc.rotation(), 48, 1e-9);
+    vc.pinchUpdate(c2, 300, 55.0);  // back to 45, below the start: it still follows
+    EXPECT_NEAR(vc.rotation(), 45, 1e-9);
     expectNear(onScreen(vc, pages.layout, 1, underFingers), c2, 1e-6, "anchored under the fingers");
     vc.pinchEnd();
     EXPECT_FALSE(vc.twisting());
-    // Across the wrap of the fingers' angle (from 170° to -170° is 20°, not -340°)
+    // Across the wrap of the fingers' angle (from 120° to -170° is 70°, not -290°)
     vc.setRotation(0);
-    vc.pinchBegin(c, 200, 170.0);
+    vc.pinchBegin(c, 200, 120.0);
     vc.pinchUpdate(c, 200, -170.0);
-    EXPECT_NEAR(vc.rotation(), 8, 1e-9);
-    vc.pinchEnd();
-    // Without the fingers' angle (rotation gestures off) a pinch never turns it
-    vc.setRotation(0);
-    vc.pinchBegin(c, 200);
-    vc.pinchUpdate(c, 300);
-    EXPECT_EQ(vc.rotation(), 0);
+    EXPECT_NEAR(vc.rotation(), 70, 1e-9);
     vc.pinchEnd();
 }
 
@@ -223,5 +220,31 @@ TEST(CanvasRotation, touchpadTwistAddsUp) {
     vc.twistEnd();
     vc.twistBy(-30, at);  // a new gesture: -30 + 12 = -18 from 8
     EXPECT_NEAR(vc.rotation(), 350, 1e-9);
+    vc.twistEnd();
+}
+
+// Two fingers on a touch screen turn the canvas only after a deliberate twist (TOUCH_ROTATE_START_DEGREES): a large
+// pinch turns the fingers a little on its own. Once it turns, the canvas follows the fingers' angle, back too.
+TEST(CanvasRotation, fingersTurnTheCanvasOnlyAfterADeliberateTwistThenItFollowsThem) {
+    Pages pages(2);
+    ViewController vc(&pages.layout);
+    vc.setViewSize(QSizeF(800, 600));
+    const QPointF at(400, 300);
+    vc.twistBegin(0);
+    vc.twistTo(30, at);
+    vc.twistTo(55, at);
+    EXPECT_EQ(vc.rotation(), 0) << "a pinch's natural twist does not turn it";
+    EXPECT_FALSE(vc.twisting());
+    vc.twistTo(70, at);
+    EXPECT_NEAR(vc.rotation(), 70, 1e-9) << "past the threshold the canvas is where the fingers are";
+    EXPECT_TRUE(vc.twisting());
+    vc.twistTo(45, at);
+    EXPECT_NEAR(vc.rotation(), 45, 1e-9) << "and turns back with them";
+    vc.twistTo(87, at);
+    EXPECT_EQ(vc.rotation(), 90) << "snapping as before";
+    vc.twistTo(3, at);
+    EXPECT_EQ(vc.rotation(), 0);
+    vc.twistTo(-20, at);
+    EXPECT_NEAR(vc.rotation(), 340, 1e-9);
     vc.twistEnd();
 }

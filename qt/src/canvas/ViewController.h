@@ -75,9 +75,13 @@ public:
     void rotateBy(double degrees, std::optional<QPointF> screenAnchor = std::nullopt);
     /// The nearest multiple of 90° when `degrees` is within SNAP_DEGREES of it, else `degrees` (normalised)
     static double snapAngle(double degrees);
-    /// A turn of the fingers (or the touchpad's) smaller than this is not a rotation: pinching and scrolling do not
-    /// turn the canvas by accident
+    /// The touchpad's rotate gesture turns the canvas once it turned by more than this (scrolling does not turn it by
+    /// accident); the canvas then lags behind by it, so that nothing jumps
     static constexpr double ROTATE_START_DEGREES = 12;
+    /// Two fingers on a touch screen turn it only after a deliberate twist: a large pinch turns the fingers by a few
+    /// tens of degrees on its own (the author: "only trigger ... more than 60-70 degrees"). Past it the canvas is
+    /// where the fingers are and follows them, back below this angle too
+    static constexpr double TOUCH_ROTATE_START_DEGREES = 65;
     static constexpr double SNAP_DEGREES = 6;
     /// Screen (canvas item) coordinates to the upright view and back; deltas (a wheel, a drag) only turn
     QPointF screenToView(QPointF p) const {
@@ -111,8 +115,8 @@ public:
     double rotationSin() const { return sinA; }
 
     /// A turn of two fingers began (they are at this angle, degrees) / they turned to this angle: the canvas turns
-    /// with them once the turn exceeds ROTATE_START_DEGREES, snapping to multiples of 90° (SNAP_DEGREES). Used by
-    /// pinchBegin / pinchUpdate and the touchpad's rotate gesture (twistBy).
+    /// with them once the turn exceeds TOUCH_ROTATE_START_DEGREES (the touchpad's: ROTATE_START_DEGREES), snapping to
+    /// multiples of 90° (SNAP_DEGREES). Used by pinchBegin / pinchUpdate and the touchpad's rotate gesture (twistBy).
     void twistBegin(double fingerDegrees);
     void twistTo(double fingerDegrees, QPointF screenAnchor);
     /// The touchpad turned by this many degrees (clockwise) about a screen point
@@ -311,6 +315,7 @@ private:
     /// The angle the canvas takes for a turn of the fingers so far (none: not engaged yet)
     std::optional<double> twistTarget();
     bool twistEngaged = false;
+    bool twistTouchpad = false;   ///< the touchpad's gesture (twistBy), not two fingers on the screen
     bool twistActive = false;
     bool initialized = false;
     std::optional<size_t> pendingPage;

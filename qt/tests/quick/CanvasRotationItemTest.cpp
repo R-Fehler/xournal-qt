@@ -406,6 +406,25 @@ void twist(QQuickWindow* window, QPointF centre, double radius, double from, dou
     QTest::touchEvent(window, screen).release(0, at(to, 0)).release(1, at(to, 1));
     QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
 }
+/// The same along several angles in one touch (`steps` moves between each two)
+void twistAlong(QQuickWindow* window, QPointF centre, double radius, std::initializer_list<double> angles, int steps = 8) {
+    static QPointingDevice* screen = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
+    auto at = [&](double degrees, int finger) {
+        const double r = (degrees + (finger ? 180.0 : 0.0)) * M_PI / 180.0;
+        return (centre + QPointF(radius * std::cos(r), radius * std::sin(r))).toPoint();
+    };
+    const std::vector<double> a(angles);
+    QTest::touchEvent(window, screen).press(0, at(a.front(), 0)).press(1, at(a.front(), 1));
+    for (size_t k = 1; k < a.size(); ++k) {
+        for (int i = 1; i <= steps; ++i) {
+            const double d = a[k - 1] + (a[k] - a[k - 1]) * i / steps;
+            QTest::touchEvent(window, screen).move(0, at(d, 0)).move(1, at(d, 1));
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+        }
+    }
+    QTest::touchEvent(window, screen).release(0, at(a.back(), 0)).release(1, at(a.back(), 1));
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+}
 }  // namespace
 
 // Two fingers twisted turn the canvas once the twist is deliberate, snapping to quarters; the point between them stays
@@ -419,30 +438,37 @@ TEST_F(CanvasRotationItemTest, twoFingersTwistedTurnTheCanvas) {
     const auto [page, pt] = under(centre);
     twist(window, centre, 80, 0, 8);
     EXPECT_EQ(vc().rotation(), 0) << "a little twist does not turn it";
-    twist(window, centre, 80, 0, 52);  // 52 - 12 = 40
-    EXPECT_NEAR(vc().rotation(), 40, 1.5);
+    twist(window, centre, 80, 0, 50);
+    EXPECT_EQ(vc().rotation(), 0) << "nor does the twist of a large pinch";
+    twist(window, centre, 80, 0, 70);  // past TOUCH_ROTATE_START_DEGREES: where the fingers are
+    EXPECT_NEAR(vc().rotation(), 70, 1.5);
+    // (touch points are whole pixels: the fingers' middle and spread are rounded at every move, and the canvas turns
+    // by 65° in the one move that crosses the start; ViewController's own test checks the anchor exactly)
     const QPointF now = onScreen(page, pt);
-    EXPECT_NEAR(now.x(), centre.x(), 2) << "turned about the fingers";
-    EXPECT_NEAR(now.y(), centre.y(), 2);
-    twist(window, centre, 80, 0, 57);  // 40 + 45 = 85: snaps to 90
-    EXPECT_EQ(vc().rotation(), 90);
-    twist(window, centre, 80, 10, -50);  // back by 48
-    EXPECT_NEAR(vc().rotation(), 42, 1.5);
+    EXPECT_NEAR(now.x(), centre.x(), 4) << "turned about the fingers";
+    EXPECT_NEAR(now.y(), centre.y(), 4);
+    vc().setRotation(0);
+    twistAlong(window, centre, 80, {0, 75, 45});  // once turning, back below the start
+    EXPECT_NEAR(vc().rotation(), 45, 1.5);
+    vc().setRotation(0);
+    twistAlong(window, centre, 80, {0, 75, 87});
+    EXPECT_EQ(vc().rotation(), 90) << "snaps as before";
     EXPECT_TRUE(session->getUndoRedoHandler()->canUndo()) << "the twists undid nothing";
     // Quickly (as fast as a tap): still a turn, not an undo
-    twist(window, centre, 80, 0, 40, 2);
+    vc().setRotation(0);
+    twist(window, centre, 80, 0, 70, 2);
     EXPECT_NEAR(vc().rotation(), 70, 1.5);
     EXPECT_TRUE(session->getUndoRedoHandler()->canUndo());
 
     // Off in the settings: two fingers only pan and zoom
     vc().setRotation(0);
     session->getSettings()->getCustomElement("xournalQt").setBool("rotateGesture", false);
-    twist(window, centre, 80, 0, 60);
+    twist(window, centre, 80, 0, 80);
     EXPECT_EQ(vc().rotation(), 0);
     session->getSettings()->getCustomElement("xournalQt").setBool("rotateGesture", true);
     // Not where the canvas may not turn (the reference)
     view->setRotatable(false);
-    twist(window, centre, 80, 0, 60);
+    twist(window, centre, 80, 0, 80);
     EXPECT_EQ(vc().rotation(), 0);
     view->setRotatable(true);
 }
