@@ -110,6 +110,37 @@ TEST(CtcTest, theBeamSearchGivesTheTopReadings) {
     EXPECT_TRUE(ctcBeamSearch({}, 0, 2).empty());
 }
 
+// Where the characters were read: per character its first and last frame on the likeliest path ("-aa--b-a" reads
+// "aba": a on 1-2, b on 5, a on 7)
+TEST(CtcTest, theBeamSearchSaysWhereEachCharacterWasRead) {
+    // classes: blank, a, b
+    const std::vector<std::vector<double>> frames{{0.9, 0.05, 0.05}, {0.05, 0.9, 0.05}, {0.05, 0.9, 0.05},
+                                                  {0.9, 0.05, 0.05}, {0.9, 0.05, 0.05}, {0.05, 0.05, 0.9},
+                                                  {0.9, 0.05, 0.05}, {0.05, 0.9, 0.05}};
+    const auto r = ctcBeamSearch(logsOf(frames), frames.size(), 3);
+    ASSERT_FALSE(r.empty());
+    ASSERT_EQ(r[0].labels, (std::vector<int>{1, 2, 1}));
+    EXPECT_EQ(r[0].spans, (std::vector<CtcSpan>{{1, 2}, {5, 5}, {7, 7}}));
+    // Every reading has a span per character, in order and within the frames
+    for (const auto& reading: ctcBeamSearch(logsOf(frames), frames.size(), 3, 0, 8, 5)) {
+        ASSERT_EQ(reading.spans.size(), reading.labels.size());
+        int at = 0;
+        for (const CtcSpan& s: reading.spans) {
+            EXPECT_LE(at, s.first);
+            EXPECT_LE(s.first, s.last);
+            EXPECT_LT(s.last, static_cast<int>(frames.size()));
+            at = s.last + 1;
+        }
+    }
+    // A letter twice: two characters, each with its own frames ("a-a"); held over frames: one ("aaa")
+    const auto twice = ctcBeamSearch(logsOf({{0.05, 0.95}, {0.95, 0.05}, {0.05, 0.95}}), 3, 2);
+    ASSERT_EQ(twice[0].labels, (std::vector<int>{1, 1}));
+    EXPECT_EQ(twice[0].spans, (std::vector<CtcSpan>{{0, 0}, {2, 2}}));
+    const auto once = ctcBeamSearch(logsOf({{0.05, 0.95}, {0.05, 0.95}, {0.05, 0.95}}), 3, 2);
+    ASSERT_EQ(once[0].labels, std::vector<int>{1});
+    EXPECT_EQ(once[0].spans, (std::vector<CtcSpan>{{0, 2}}));
+}
+
 // How sure the model is: per character on the likeliest path (its best frame), not per frame
 TEST(CtcTest, theConfidenceIsPerCharacter) {
     // "a" (best frame 0.9), a blank, "a" (0.8) again; blanks do not count
