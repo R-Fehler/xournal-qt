@@ -38,9 +38,19 @@ QPointF turned(QPointF p, double degrees) {
     return {c * p.x() - s * p.y(), s * p.x() + c * p.y()};
 }
 
-QPolygonF quadOf(const QRectF& box, double angle) {
-    QPolygonF q;
-    q << box.topLeft() << box.topRight() << box.bottomRight() << box.bottomLeft();
+QRectF Quad::boundingRect() const {
+    double l = corners[0].x(), r = l, t = corners[0].y(), b = t;
+    for (const QPointF& p: corners) {
+        l = std::min(l, p.x());
+        r = std::max(r, p.x());
+        t = std::min(t, p.y());
+        b = std::max(b, p.y());
+    }
+    return QRectF(QPointF(l, t), QPointF(r, b));
+}
+
+Quad quadOf(const QRectF& box, double angle) {
+    Quad q{{box.topLeft(), box.topRight(), box.bottomRight(), box.bottomLeft()}};
     if (angle != 0) {
         const QPointF c = box.center();
         for (QPointF& p: q) {
@@ -50,7 +60,7 @@ QPolygonF quadOf(const QRectF& box, double angle) {
     return q;
 }
 
-QPolygonF quadOf(const Word& w) { return quadOf(w.box, w.angle); }
+Quad quadOf(const Word& w) { return quadOf(w.box, w.angle); }
 
 QRectF boundsOf(const Word& w) { return w.angle == 0 ? w.box : quadOf(w).boundingRect(); }
 
@@ -266,9 +276,8 @@ std::vector<std::pair<QRectF, double>> partsOf(const PageText& ink, const Hit& h
     return out;
 }
 
-QPolygonF quadOfPart(const QRectF& framed, double angle) {
-    QPolygonF q;
-    q << framed.topLeft() << framed.topRight() << framed.bottomRight() << framed.bottomLeft();
+Quad quadOfPart(const QRectF& framed, double angle) {
+    Quad q{{framed.topLeft(), framed.topRight(), framed.bottomRight(), framed.bottomLeft()}};
     for (QPointF& p: q) {
         p = turned(p, angle);
     }
@@ -284,8 +293,8 @@ std::vector<QRectF> rectsOf(const PageText& ink, const Hit& hit) {
     return out;
 }
 
-std::vector<QPolygonF> quadsOf(const PageText& ink, const Hit& hit) {
-    std::vector<QPolygonF> out;
+std::vector<Quad> quadsOf(const PageText& ink, const Hit& hit) {
+    std::vector<Quad> out;
     for (const auto& [box, angle]: partsOf(ink, hit)) {
         out.push_back(quadOfPart(box, angle));
     }

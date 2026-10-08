@@ -141,7 +141,7 @@ TEST_F(InkSearchTest, handwritingAtAnAngleIsMarkedTurned) {
     EXPECT_TRUE(places[0].quads.empty());
     EXPECT_EQ(places[0].rect, QRectF(100, 100, 40, 12).adjusted(-2, -2, 2, 2));
     ASSERT_EQ(places[1].quads.size(), 1u);
-    const QPolygonF& q = places[1].quads[0];
+    const ink::Quad& q = places[1].quads[0];
     ASSERT_EQ(q.size(), 4);
     // Written upwards from (30, 300): its top-left upright is at the bottom-left on the page
     EXPECT_NEAR(q[0].x(), 28, 1e-9);

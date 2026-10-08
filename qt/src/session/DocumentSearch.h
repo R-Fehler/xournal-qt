@@ -30,12 +30,12 @@
 #include <vector>
 
 #include <QObject>
-#include <QPolygonF>
 #include <QRectF>
 #include <QString>
 
 #include "DocumentTextIndex.h"
 #include "FuzzyQuery.h"
+#include "InkText.h"
 
 class Document;
 
@@ -59,7 +59,7 @@ public:
         bool faint = false;
         /// Handwriting written at an angle: the turned boxes that are marked (four corners each, one per line; `rect`
         /// and `more` are around them). Empty: the rects are marked
-        std::vector<QPolygonF> quads;
+        std::vector<ink::Quad> quads;
     };
 
     /// How the text is matched besides, the options of the find and replace bar (qt/docs/features/md-editor.md, "Find

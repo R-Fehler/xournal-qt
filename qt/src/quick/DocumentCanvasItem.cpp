@@ -1876,11 +1876,8 @@ void DocumentCanvasItem::updateSearchHits(QSGNode* pageNode, size_t pageIndex, d
         if (!(*places)[i].quads.empty()) {
             // (handwriting written at an angle: its turned boxes, each a rect in a turned frame, which every scene
             // graph backend draws, the software one too)
-            for (const QPolygonF& q: (*places)[i].quads) {
-                if (q.size() != 4) {
-                    continue;
-                }
-                marks.push_back(q);
+            for (const xqt::ink::Quad& q: (*places)[i].quads) {
+                marks.push_back(QPolygonF{q[0], q[1], q[2], q[3]});
                 const QPointF along = q[1] - q[0], across = q[3] - q[0];
                 QMatrix4x4 m;
                 m.translate(static_cast<float>(q[0].x() * scale), static_cast<float>(q[0].y() * scale));

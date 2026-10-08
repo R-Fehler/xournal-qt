@@ -37,12 +37,12 @@
  */
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <vector>
 
 #include <QPointF>
-#include <QPolygonF>
 #include <QRectF>
 #include <QString>
 
@@ -85,9 +85,22 @@ struct Word {
 /// A point turned by `degrees` around (0, 0), clockwise on the page (y down): (1, 0) turned by 90 is (0, 1). Exact for
 /// multiples of 90 degrees.
 QPointF turned(QPointF p, double degrees);
+/// Four corners on the page, clockwise from the top-left of a box upright: a box turned with its line. Its own type,
+/// not QPolygonF, so that the session stays free of Qt GUI (the canvas makes polygons of them).
+struct Quad {
+    std::array<QPointF, 4> corners;
+    const QPointF& operator[](int i) const { return corners[static_cast<size_t>(i)]; }
+    QPointF& operator[](int i) { return corners[static_cast<size_t>(i)]; }
+    static constexpr int size() { return 4; }
+    auto begin() { return corners.begin(); }
+    auto end() { return corners.end(); }
+    auto begin() const { return corners.begin(); }
+    auto end() const { return corners.end(); }
+    QRectF boundingRect() const;
+};
 /// The corners of a word's box on the page (its box for angle 0), clockwise from the top-left of the word upright.
-QPolygonF quadOf(const Word& w);
-QPolygonF quadOf(const QRectF& box, double angle);
+Quad quadOf(const Word& w);
+Quad quadOf(const QRectF& box, double angle);
 /// The box around a word's corners on the page.
 QRectF boundsOf(const Word& w);
 
@@ -137,7 +150,7 @@ bool contains(const PageText& ink, const textmatch::Term& term, int typos = -1);
 /// line at an angle: the box around its marked quad.
 std::vector<QRectF> rectsOf(const PageText& ink, const Hit& hit);
 /// The same as quads, turned like their lines (four corners each; plain boxes for lines at angle 0).
-std::vector<QPolygonF> quadsOf(const PageText& ink, const Hit& hit);
+std::vector<Quad> quadsOf(const PageText& ink, const Hit& hit);
 /// The hit has words at an angle (marked by quadsOf).
 bool atAnAngle(const PageText& ink, const Hit& hit);
 
