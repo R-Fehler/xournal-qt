@@ -26,6 +26,7 @@ struct ModelInfo {
     QStringList languages;
     QString version;
     QString licence;
+    bool noncommercial = false;  ///< its weights are for non-commercial use only (the manifest's "noncommercial")
     QString hash;   ///< the first 12 hex digits of the manifest's sha256
     QString error;  ///< why it is not a model ("" if it is one)
 

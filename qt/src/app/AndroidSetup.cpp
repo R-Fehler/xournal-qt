@@ -32,9 +32,29 @@ void setIfUnset(const char* name, const QString& value) {
     }
 }
 
+/// The handwriting models (hwr-models/<name>/, HandwritingSearch.h): a model trained again has files of the same size,
+/// so a model whose manifest (model.json, with its files' sha256) differs from the one copied before is copied anew.
+void dropChangedModels(const QString& from, const QString& to) {
+    QDirIterator it(from + QStringLiteral("/hwr-models"), QDir::Dirs | QDir::NoDotAndDotDot);
+    while (it.hasNext()) {
+        const QString source = it.next();
+        const QString target = to + source.mid(from.size());
+        QFile ours(source + QStringLiteral("/model.json"));
+        QFile copied(target + QStringLiteral("/model.json"));
+        if (!copied.exists()) {
+            continue;
+        }
+        if (!ours.open(QIODevice::ReadOnly) || !copied.open(QIODevice::ReadOnly) || ours.readAll() != copied.readAll()) {
+            copied.close();
+            QDir(target).removeRecursively();
+        }
+    }
+}
+
 /// Copies the resource tree below `from` (":/...") to the folder `to`, file by file where missing or changed in size
 /// (an update of the app replaces them; a start without changes only compares sizes).
 void copyResources(const QString& from, const QString& to) {
+    dropChangedModels(from, to);
     QDirIterator it(from, QDir::Files, QDirIterator::Subdirectories);
     while (it.hasNext()) {
         const QString source = it.next();

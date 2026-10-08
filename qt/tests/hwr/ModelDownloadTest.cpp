@@ -212,7 +212,8 @@ TEST_F(ModelDownloadTest, theBuildKnowsAnEnglishAndAGermanModel) {
 
 TEST_F(ModelDownloadTest, settingsOfferTheDownloadsAndUseTheModels) {
     qputenv("XDG_DATA_HOME", tmp.filePath(QStringLiteral("data")).toUtf8());
-    AppContext app(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(tmp.filePath(QStringLiteral("settings.xml")).toStdString()),
+    // (an installation without a built-in model: theBuiltInModelReadsWhatHasNoModelOfItsOwn has one)
+    AppContext app(fs::path(tmp.filePath(QStringLiteral("resources")).toStdString()), fs::path(tmp.filePath(QStringLiteral("settings.xml")).toStdString()),
                    1);
     int made = 0;
     hwr::HandwritingSearch::setFactory([&](const QString& dir) -> std::shared_ptr<hwr::Recognizer> {
@@ -340,4 +341,139 @@ TEST_F(ModelDownloadTest, theLanguagesChooseTheirModels) {
     // A kind this app does not read is no model
     put(tmp.filePath(QStringLiteral("odd")), R"({"kind": "seq2seq", "name": "x", "languages": ["en"]})");
     EXPECT_FALSE(hwr::ModelInfo::read(tmp.filePath(QStringLiteral("odd"))).valid());
+}
+
+namespace {
+void putManifest(const QString& folder, const QByteArray& json) {
+    QDir().mkpath(folder);
+    QFile f(folder + QStringLiteral("/model.json"));
+    ASSERT_TRUE(f.open(QIODevice::WriteOnly));
+    f.write(json);
+}
+}  // namespace
+
+// The order per language: the folder chosen in Settings, else the environment's, else the app's own downloaded one,
+// else any downloaded one that reads it, else one that comes with the app and reads it, else none. One built-in model
+// for both languages serves both, once.
+TEST_F(ModelDownloadTest, aBuiltInModelComesLastInTheLookup) {
+    qputenv("XDG_DATA_HOME", tmp.filePath(QStringLiteral("data3")).toUtf8());
+    AppContext app(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(tmp.filePath(QStringLiteral("settings3.xml")).toStdString()),
+                   1);
+    Settings& s = *app.getSettings();
+    const QString bundled = tmp.filePath(QStringLiteral("res/hwr-models"));
+    auto names = [](const hwr::HandwritingSearch::Choice& c) {
+        QStringList out;
+        for (const auto& m: c.models) {
+            out << m.name;
+        }
+        return out;
+    };
+    // Nothing built in: both missing
+    EXPECT_EQ(hwr::HandwritingSearch::choose(s, bundled).missing, (QStringList{QStringLiteral("en"), QStringLiteral("de")}));
+    // A built-in model for both: it serves both, read once
+    putManifest(bundled + QStringLiteral("/shared"), R"({"kind": "ctc", "name": "shared", "languages": ["de", "en"]})");
+    putManifest(bundled + QStringLiteral("/broken"), R"({"kind": "ctc", "languages": ["en"]})");  // (no name: none)
+    auto c = hwr::HandwritingSearch::choose(s, bundled);
+    EXPECT_EQ(names(c), QStringList{QStringLiteral("shared")});
+    EXPECT_TRUE(c.missing.isEmpty());
+    EXPECT_TRUE(hwr::HandwritingSearch::isBundled(c.models.at(0).folder, bundled));
+    // Without the bundled folder: as before
+    EXPECT_EQ(hwr::HandwritingSearch::choose(s).missing.size(), 2);
+    // English downloaded (the app's own): it reads English, the built-in one German
+    putManifest(hwr::HandwritingSearch::defaultModelDir(QStringLiteral("en")), R"({"name": "trocr-small-hw-int8"})");
+    c = hwr::HandwritingSearch::choose(s, bundled);
+    EXPECT_EQ(names(c), (QStringList{QStringLiteral("trocr-small-hw-int8"), QStringLiteral("shared")}));
+    // Another downloaded model that reads German comes before the built-in one
+    putManifest(hwr::HandwritingSearch::modelsDir() + QStringLiteral("/mine-de"),
+                R"({"kind": "ctc", "name": "mine-de", "languages": ["de"]})");
+    c = hwr::HandwritingSearch::choose(s, bundled);
+    EXPECT_EQ(names(c), (QStringList{QStringLiteral("trocr-small-hw-int8"), QStringLiteral("mine-de")}));
+    QDir(hwr::HandwritingSearch::modelsDir() + QStringLiteral("/mine-de")).removeRecursively();
+    // The environment's model for English comes first
+    QTemporaryDir env;
+    putManifest(env.path(), R"({"kind": "ctc", "name": "env-en", "languages": ["en"]})");
+    qputenv("XQT_HWR_MODEL", env.path().toUtf8());
+    EXPECT_EQ(names(hwr::HandwritingSearch::choose(s, bundled)), (QStringList{QStringLiteral("env-en"), QStringLiteral("shared")}));
+    qunsetenv("XQT_HWR_MODEL");
+    // A folder chosen in Settings comes first; one that holds no model is not replaced by the built-in one
+    hwr::HandwritingSearch::setModelDirIn(s, QStringLiteral("en"), env.path());
+    EXPECT_EQ(names(hwr::HandwritingSearch::choose(s, bundled)), (QStringList{QStringLiteral("env-en"), QStringLiteral("shared")}));
+    hwr::HandwritingSearch::setModelDirIn(s, QStringLiteral("en"), tmp.filePath(QStringLiteral("nothing")));
+    c = hwr::HandwritingSearch::choose(s, bundled);
+    EXPECT_EQ(c.missing, QStringList{QStringLiteral("en")});
+    EXPECT_EQ(names(c), QStringList{QStringLiteral("shared")});
+    hwr::HandwritingSearch::setModelDirIn(s, QStringLiteral("en"), QString());
+    // The app's own removed: the built-in one again for both
+    QDir(hwr::HandwritingSearch::defaultModelDir(QStringLiteral("en"))).removeRecursively();
+    EXPECT_EQ(names(hwr::HandwritingSearch::choose(s, bundled)), QStringList{QStringLiteral("shared")});
+    // The app's own bundled folder: the build's
+    hwr::HandwritingSearch search(app);
+    EXPECT_EQ(search.bundledModelsDir(), QStringLiteral(XQT_BUILD_RESOURCE_DIR "/hwr-models"));
+}
+
+// Settings with the model that comes with the app: "Built in" for the languages it reads, no download offered for
+// them, its licence note one click away; a downloaded model takes its language over, removing it gives it back
+TEST_F(ModelDownloadTest, theBuiltInModelReadsWhatHasNoModelOfItsOwn) {
+    qputenv("XDG_DATA_HOME", tmp.filePath(QStringLiteral("data4")).toUtf8());
+    const QString resources = tmp.filePath(QStringLiteral("res4"));
+    putManifest(resources + QStringLiteral("/hwr-models/shared"),
+                R"({"kind": "ctc", "name": "shared", "languages": ["de", "en"], "noncommercial": true})");
+    {
+        QFile licence(resources + QStringLiteral("/hwr-models/shared/LICENCE.md"));
+        ASSERT_TRUE(licence.open(QIODevice::WriteOnly));
+        licence.write("# Licence\n\nFor non-commercial use.\n");
+    }
+    AppContext app(fs::path(resources.toStdString()), fs::path(tmp.filePath(QStringLiteral("settings4.xml")).toStdString()), 1);
+    hwr::HandwritingSearch::setFactory([&](const QString& dir) -> std::shared_ptr<hwr::Recognizer> {
+        const hwr::ModelInfo info = hwr::ModelInfo::read(dir);
+        auto fake = std::make_shared<hwr::FakeRecognizer>(info.valid() ? info.id() : QStringLiteral("none"), info.languages);
+        fake->setReady(info.valid(), QStringLiteral("The model is not installed"));
+        return fake;
+    });
+    LibraryInkJob::setPowerSource([] { return true; });
+    hwr::HandwritingSearch search(app);
+    HandwritingSettings settings(app, search, nullptr);
+    EXPECT_FALSE(settings.enabled());  // (still off until switched on)
+    // The models that come with the app (About, Settings)
+    const QVariantList builtIn = settings.builtInModels();
+    ASSERT_EQ(builtIn.size(), 1);
+    const QVariantMap shared = builtIn[0].toMap();
+    EXPECT_EQ(shared.value(QStringLiteral("name")).toString(), QStringLiteral("shared"));
+    EXPECT_EQ(shared.value(QStringLiteral("languages")).toString(), QStringLiteral("German, English"));
+    EXPECT_TRUE(shared.value(QStringLiteral("noncommercial")).toBool());
+    EXPECT_TRUE(settings.licenceText(shared.value(QStringLiteral("folder")).toString()).contains(QStringLiteral("non-commercial")));
+    EXPECT_TRUE(settings.licenceText(tmp.path()).isEmpty());  // (only the notes of built-in models)
+    settings.setEnabled(true);
+    EXPECT_TRUE(settings.ready()) << settings.status().toStdString();
+    EXPECT_EQ(settings.status(), QStringLiteral("Ready"));
+    EXPECT_EQ(search.modelFoldersInUse(), QStringList{shared.value(QStringLiteral("folder")).toString()});
+    for (const char* language: {"en", "de"}) {
+        const QVariantMap m = settings.modelOf(QLatin1String(language));
+        EXPECT_TRUE(m.value(QStringLiteral("builtIn")).toBool()) << language;
+        EXPECT_TRUE(m.value(QStringLiteral("inUse")).toBool()) << language;
+        EXPECT_FALSE(m.value(QStringLiteral("installed")).toBool()) << language;
+        EXPECT_EQ(m.value(QStringLiteral("builtInName")).toString(), QStringLiteral("shared"));
+        EXPECT_TRUE(m.value(QStringLiteral("builtInNoncommercial")).toBool());
+        EXPECT_TRUE(m.value(QStringLiteral("state")).toString().startsWith(QStringLiteral("Built in, in use (shared, ")))
+                << m.value(QStringLiteral("state")).toString().toStdString();
+    }
+    // English downloaded: TrOCR reads English, the built-in one German (both read)
+    settings.download(QStringLiteral("en"));
+    ASSERT_TRUE(waitFor([&] { return !settings.modelOf(QStringLiteral("en")).value(QStringLiteral("downloading")).toBool(); }));
+    QVariantMap en = settings.modelOf(QStringLiteral("en"));
+    EXPECT_TRUE(en.value(QStringLiteral("installed")).toBool());
+    EXPECT_FALSE(en.value(QStringLiteral("builtIn")).toBool());
+    EXPECT_TRUE(settings.modelOf(QStringLiteral("de")).value(QStringLiteral("builtIn")).toBool());
+    EXPECT_EQ(search.modelFoldersInUse().size(), 2);
+    // Removed: the built-in one reads English again
+    EXPECT_TRUE(settings.removeModel(QStringLiteral("en")));
+    EXPECT_TRUE(settings.modelOf(QStringLiteral("en")).value(QStringLiteral("builtIn")).toBool());
+    EXPECT_EQ(search.modelFoldersInUse().size(), 1);
+    // German only: English (not read now) still says which model reads it
+    settings.setLanguages(QStringLiteral("de"));
+    EXPECT_TRUE(settings.modelOf(QStringLiteral("en")).value(QStringLiteral("builtIn")).toBool());
+    EXPECT_EQ(search.modelFoldersInUse().size(), 1);  // (the same model, for German)
+    settings.setEnabled(false);
+    hwr::HandwritingSearch::setFactory({});
+    LibraryInkJob::setPowerSource({});
 }

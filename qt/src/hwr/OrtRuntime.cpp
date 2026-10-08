@@ -23,16 +23,24 @@ struct Loaded {
     const OrtApi* api = nullptr;
     OrtEnv* env = nullptr;
     QString path;
+    QString version;
     QString why;
 };
 
-#ifdef _WIN32
-const char* LIB_NAME = "onnxruntime.dll";
-#elif defined(__APPLE__)
-const char* LIB_NAME = "libonnxruntime.1.dylib";
-#else
-const char* LIB_NAME = "libonnxruntime.so.1";
-#endif
+/// The library's file name on a platform.
+QString libraryName(Platform p) {
+    switch (p) {
+        case Platform::Windows:
+            return QStringLiteral("onnxruntime.dll");
+        case Platform::MacOS:
+            return QStringLiteral("libonnxruntime.1.dylib");
+        case Platform::Android:
+            return QStringLiteral("libonnxruntime.so");  // (the AAR's, unversioned)
+        case Platform::Linux:
+            break;
+    }
+    return QStringLiteral("libonnxruntime.so.1");
+}
 
 void* openLibrary(const QString& path) {
 #ifdef _WIN32
@@ -53,19 +61,11 @@ void* symbol(void* lib, const char* name) {
 Loaded& loaded() {
     static Loaded l = [] {
         Loaded r;
-        QStringList candidates;
-        if (const QString env = qEnvironmentVariable("XQT_ONNXRUNTIME"); !env.isEmpty()) {
-            candidates << env;
-        } else {
-            if (QCoreApplication::instance()) {
-                const QString dir = QCoreApplication::applicationDirPath();
-                candidates << dir + QStringLiteral("/../lib/xournal-qt/") + QLatin1String(LIB_NAME)
-                           << dir + u'/' + QLatin1String(LIB_NAME);
-            }
-            candidates << QString::fromLatin1(LIB_NAME);
-        }
+        const QStringList all =
+                candidates(thisPlatform(), QCoreApplication::instance() ? QCoreApplication::applicationDirPath() : QString(),
+                           qEnvironmentVariable("XQT_ONNXRUNTIME"));
         void* lib = nullptr;
-        for (const QString& c: candidates) {
+        for (const QString& c: all) {
             if (c.contains(u'/') && !QFileInfo::exists(c)) {
                 continue;
             }
@@ -75,13 +75,15 @@ Loaded& loaded() {
             }
         }
         if (!lib) {
-            r.path = candidates.join(QStringLiteral(", "));
-            r.why = QStringLiteral("ONNX Runtime (%1) is not installed").arg(QLatin1String(LIB_NAME));
+            r.why = QStringLiteral("ONNX Runtime (%1) is not installed").arg(all.isEmpty() ? QString() : all.last());
             return r;
         }
         using GetApiBase = const OrtApiBase* (*)();
         auto getBase = reinterpret_cast<GetApiBase>(symbol(lib, "OrtGetApiBase"));
         const OrtApiBase* base = getBase ? getBase() : nullptr;
+        if (base && base->GetVersionString) {
+            r.version = QString::fromUtf8(base->GetVersionString());
+        }
         r.api = base ? base->GetApi(API_VERSION) : nullptr;
         if (!r.api) {
             r.why = QStringLiteral("ONNX Runtime at %1 is too old (1.16 or newer is needed)").arg(r.path);
@@ -108,6 +110,52 @@ QString failed(OrtStatus* s) {
     return msg.isEmpty() ? QStringLiteral("ONNX Runtime failed") : msg;
 }
 }  // namespace
+
+QString loadedPath() {
+    api();
+    return loaded().api ? loaded().path : QString();
+}
+
+QString version() {
+    api();
+    return loaded().api ? loaded().version : QString();
+}
+
+Platform thisPlatform() {
+#if defined(Q_OS_ANDROID)
+    return Platform::Android;
+#elif defined(_WIN32)
+    return Platform::Windows;
+#elif defined(__APPLE__)
+    return Platform::MacOS;
+#else
+    return Platform::Linux;
+#endif
+}
+
+QStringList candidates(Platform platform, const QString& appDir, const QString& env) {
+    if (!env.isEmpty()) {
+        return {env};
+    }
+    const QString name = libraryName(platform);
+    QStringList out;
+    if (!appDir.isEmpty()) {
+        switch (platform) {
+            case Platform::Android:
+                break;  // (by its name: the APK's native libraries are where the linker looks)
+            case Platform::MacOS:
+                // The app bundle: Contents/MacOS/xournal-qt, Contents/Frameworks/ (qt/docs/development/macos.md)
+                out << appDir + QStringLiteral("/../Frameworks/") + name;
+                [[fallthrough]];
+            case Platform::Linux:
+            case Platform::Windows:
+                out << appDir + QStringLiteral("/../lib/xournal-qt/") + name << appDir + u'/' + name;
+                break;
+        }
+    }
+    out << name;
+    return out;
+}
 
 const OrtApi* api(QString* why) {
     static std::mutex mtx;

@@ -7373,14 +7373,28 @@ TEST_F(MainWindowTest, settingsSearchTabSwitchesTheHandwritingSearch) {
         auto* row = findItem(QString(QStringLiteral("handwritingModel_") + lang).toUtf8().constData());
         ASSERT_NE(row, nullptr) << lang.toStdString();
         until([&] { return row->isVisible(); });
-        if (m.value("own").toBool() && !m.value("installed").toBool()) {
+        if (m.value("builtIn").toBool()) {
+            // The model that comes with the app reads it: no download, its licence note one click away
+            auto* builtIn = findItem(QString(QStringLiteral("handwritingBuiltIn_") + lang).toUtf8().constData());
+            until([&] { return builtIn->isVisible(); });
+            EXPECT_TRUE(builtIn->isVisible());
+            EXPECT_FALSE(findItem(QString(QStringLiteral("handwritingDownload_") + lang).toUtf8().constData())->isVisible());
+            EXPECT_TRUE(m.value("state").toString().startsWith("Built in")) << m.value("state").toString().toStdString();
+            QObject* licence = find("modelLicenceDialog");
+            QMetaObject::invokeMethod(findItem(QString(QStringLiteral("handwritingLicence_") + lang).toUtf8().constData()), "clicked");
+            ASSERT_TRUE(waitOpened(licence, true));
+            until([&] { return findItem("modelLicenceDialogText")->property("text").toString().contains("non-commercial"); });
+            EXPECT_TRUE(findItem("modelLicenceDialogText")->property("text").toString().contains("non-commercial"));
+            QMetaObject::invokeMethod(licence, "close");
+            ASSERT_TRUE(waitOpened(licence, false));
+        } else if (m.value("own").toBool() && !m.value("installed").toBool()) {
             auto* offer = findItem(QString(QStringLiteral("handwritingDownload_") + lang).toUtf8().constData());
             until([&] { return offer->isVisible(); });
             EXPECT_TRUE(offer->isVisible());
             EXPECT_TRUE(findItem(QString(QStringLiteral("handwritingModelSource_") + lang).toUtf8().constData())->property("text").toString().startsWith("https://huggingface.co/"));
             EXPECT_FALSE(m.value("downloading").toBool()) << "nothing before the button";
         }
-        if (lang == QLatin1String("de") && !m.value("downloadAvailable").toBool()) {
+        if (lang == QLatin1String("de") && !m.value("downloadAvailable").toBool() && !m.value("builtIn").toBool()) {
             EXPECT_FALSE(findItem("handwritingDownloadButton_de")->property("enabled").toBool()) << "not published yet";
         }
     }
@@ -7388,6 +7402,32 @@ TEST_F(MainWindowTest, settingsSearchTabSwitchesTheHandwritingSearch) {
     click(toggle);
     until([&] { return !hw->property("enabled").toBool(); });
     EXPECT_FALSE(hw->property("enabled").toBool());
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+}
+
+// Settings → Help → About: the version and the licence, and a line per handwriting model that comes with the app (for
+// non-commercial use) with its licence note one click away
+TEST_F(MainWindowTest, aboutSaysTheHandwritingModelIsForNonCommercialUse) {
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("helpTab"));
+    auto* version = findItem("aboutVersion");
+    ASSERT_NE(version, nullptr);
+    until([&] { return version->isVisible(); });
+    EXPECT_TRUE(version->property("text").toString().contains("GNU General Public License"));
+    auto* model = findItem("aboutHandwritingModel0");
+    ASSERT_NE(model, nullptr) << "the build puts a model into the resource dir";
+    until([&] { return model->isVisible(); });
+    QObject* licence = find("aboutLicenceDialog");
+    QMetaObject::invokeMethod(findItem("aboutModelLicence0"), "clicked");
+    ASSERT_TRUE(waitOpened(licence, true));
+    auto* text = findItem("aboutLicenceDialogText");
+    ASSERT_NE(text, nullptr);
+    EXPECT_TRUE(text->property("text").toString().contains("non-commercial")) << text->property("text").toString().toStdString();
+    QMetaObject::invokeMethod(licence, "close");
+    ASSERT_TRUE(waitOpened(licence, false));
     key(Qt::Key_Escape);
     ASSERT_TRUE(waitOpened(sheet, false));
 }

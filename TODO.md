@@ -217,7 +217,10 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
   letters or digits can pass for a line written downwards; poppler splits words at a free angle into letters
   ("K a l m a n"; 90° is fine); a level or 90° line turned by the lasso is read again; check real angled handwriting
   on the device (handwriting-search.md, "On the device").
-- [ ] **The small shared model, bundled** (the author, 2026-10-08: if the shared German + English CTC wins, it ships
+- [x] **The small shared model, bundled** (`qt/hwr-bundle-app`: the app side is done: installed as
+  `share/xournal-qt/hwr-models/<name>/`, found by its manifest, Settings "Built in", About, `--hwr-info`, ORT looked for
+  per platform. Left: ONNX Runtime and the smoke tests in each package (the packaging block), the device checks in
+  handwriting-search.md "On the device".) (the author, 2026-10-08: if the shared German + English CTC wins, it ships
   inside the packages instead of downloading on demand). Needs: the model folder (~6 MB int8) in every package
   (`.deb`, AppImage, Windows zip, macOS bundle, APK assets) and found there before the data folder
   (`HandwritingSearch::modelDir`, the resource dir of `AppContext`); ONNX Runtime bundled too (today loaded at run

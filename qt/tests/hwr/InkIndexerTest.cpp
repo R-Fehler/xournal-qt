@@ -235,7 +235,8 @@ TEST_F(InkIndexerTest, theSettingSwitchesItOnAndOff) {
     hwr::HandwritingSearch::setEnabledIn(settings, true);
     Q_EMIT app->settingsChanged();
     EXPECT_TRUE(search.enabled());
-    EXPECT_EQ(madeFor, hwr::HandwritingSearch::defaultModelDir());
+    // (no model of the app's own in its data folder: the one that comes with the app)
+    EXPECT_TRUE(hwr::HandwritingSearch::isBundled(madeFor, search.bundledModelsDir())) << madeFor.toStdString();
     ASSERT_NE(search.indexerOf(a.get()), nullptr);
     ASSERT_NE(search.indexerOf(b.get()), nullptr);
     ASSERT_TRUE(waitFor([&] { return search.indexerOf(a.get())->done() && search.indexerOf(b.get())->done() &&

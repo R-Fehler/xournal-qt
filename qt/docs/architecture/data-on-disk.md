@@ -91,8 +91,19 @@ The user's own things that are not in a library:
 | `Tutorial/Tutorial.pdf` | the copy of the tutorial that Help → Tutorial opens to write on | `AppHelp.cpp` |
 | `Opened/` (translated) | files received from other apps when no library is open (else the library's `Opened/`) | `AppController::receivedFolder` |
 
-The handwriting models are in `GenericDataLocation/xournal-qt/models/` (one folder per model with its `model.json`;
-a download is staged in `<model>.part`), `HandwritingSearch::modelsDir` ([handwriting-search.md](../features/handwriting-search.md)).
+The handwriting models downloaded or installed by the user are in `GenericDataLocation/xournal-qt/models/` (one
+folder per model with its `model.json`; a download is staged in `<model>.part`), `HandwritingSearch::modelsDir`
+([handwriting-search.md](../features/handwriting-search.md)). The models that **come with the app** are read-only
+resources, `<resource dir>/hwr-models/<name>/` (`model.json`, its files, `LICENCE.md`;
+`HandwritingSearch::bundledModelsDir`), from `qt/resources/hwr/` (XqtHwr.cmake):
+
+| Where | Built-in models |
+| --- | --- |
+| Linux (`.deb`, AppImage, an install) | `<prefix>/share/xournal-qt/hwr-models/` |
+| Windows (the zip) | `share\xournal-qt\hwr-models\` next to `bin\` |
+| macOS | `xournal-qt.app/Contents/Resources/share/xournal-qt/hwr-models/` |
+| Android | in the APK's resources (`:/xqt-share/hwr-models/`), copied at start to `files/share/xournal-qt/hwr-models/` (a model whose `model.json` changed is copied anew) |
+| A build tree | `build-qt/share/xournal-qt/hwr-models/` |
 
 On Android the app's data folder `files/` also holds the resources copied from the APK (`share/xournal-qt/`),
 `fonts.conf`, the user's fonts (`fonts/`) and GLib's state folder (`state/`).
@@ -142,6 +153,8 @@ they never touch the author's folders ([testing/README.md](../testing/README.md)
 only, where the tests run. Some classes take a folder of their own for tests (`DocumentPlaces::setOutsideFile`,
 `Library::setPlatformFolders`, `DocumentSession::setAutosaveInAppCache`, `audio::setAppFolder`, `stickers::setAppSet`).
 `XQT_RESOURCE_DIR` points to the resources, `XQT_HWR_MODEL` and `XQT_HWR_MODEL_DE` to a handwriting model,
-`XQT_ONNXRUNTIME` to the ONNX Runtime library.
+`XQT_ONNXRUNTIME` to the ONNX Runtime library (else Linux `<prefix>/lib/xournal-qt/libonnxruntime.so.1`, Windows
+`bin\onnxruntime.dll`, macOS `Contents/Frameworks/libonnxruntime.1.dylib`, Android `libonnxruntime.so` among the
+APK's native libraries; `OrtRuntime.h`).
 
 The settings keys themselves are listed once they are typed in one table (TODO.md, infra B13).

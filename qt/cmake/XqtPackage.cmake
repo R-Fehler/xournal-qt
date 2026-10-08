@@ -8,6 +8,11 @@ install(TARGETS xournal-qt RUNTIME DESTINATION bin)
 install(FILES "${XQT_BUILD_RESOURCE_DIR}/pagetemplates.ini" DESTINATION share/xournal-qt)
 install(DIRECTORY "${XQT_BUILD_RESOURCE_DIR}/palettes" "${XQT_BUILD_RESOURCE_DIR}/icons" "${XQT_BUILD_RESOURCE_DIR}/fonts"
     DESTINATION share/xournal-qt)
+# The handwriting models that come with the app, each with its LICENCE.md (XqtHwr.cmake; macOS: macos-deploy.sh copies
+# share/xournal-qt into Contents/Resources/share/, Windows: the program folder's share/)
+if(EXISTS "${XQT_BUILD_RESOURCE_DIR}/hwr-models")
+    install(DIRECTORY "${XQT_BUILD_RESOURCE_DIR}/hwr-models" DESTINATION share/xournal-qt)
+endif()
 
 # Windows: the program folder (bin/, share/) is what gets zipped, after windeployqt and the MinGW DLLs have been
 # added (qt/scripts/windows-deploy.sh, qt/docs/development/windows.md). No desktop files and no .deb there.

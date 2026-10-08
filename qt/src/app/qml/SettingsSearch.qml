@@ -136,7 +136,8 @@ ScrollView {
                        + "model then reads only the lines the first one is unsure of. ⋮ → Document → "
                        + "Handwriting language sets it for one document.")
         }
-        // Per language its model: downloaded only when the user asks, its address and size shown first
+        // Per language its model: the one that comes with the app, else downloaded only when the user asks (its address
+        // and size shown first), or a folder of the user's own
         Repeater {
             model: app.handwriting.enabled ? app.handwriting.models : []
             delegate: ColumnLayout {
@@ -169,9 +170,30 @@ ScrollView {
                         }
                     }
                 }
+                // A model that comes with the app reads it: nothing to download (its licence note one click away)
+                RowLayout {
+                    objectName: "handwritingBuiltIn_" + hwModel.lang
+                    visible: hwModel.modelData.builtIn
+                    Layout.fillWidth: true
+                    Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: hwModel.modelData.builtInNoncommercial
+                              ? qsTr("Comes with the app, nothing to download. The model is for non-commercial use.")
+                              : qsTr("Comes with the app, nothing to download.")
+                        font.pixelSize: 12
+                        color: "#6b6f75"
+                    }
+                    Button {
+                        objectName: "handwritingLicence_" + hwModel.lang
+                        flat: true
+                        text: qsTr("Licence")
+                        onClicked: modelLicence.show(hwModel.modelData.builtInName, hwModel.modelData.builtInFolder)
+                    }
+                }
                 ColumnLayout {
                     objectName: "handwritingDownload_" + hwModel.lang
-                    visible: hwModel.modelData.own && !hwModel.modelData.installed
+                    visible: hwModel.modelData.own && !hwModel.modelData.installed && !hwModel.modelData.builtIn
                     Layout.fillWidth: true
                     spacing: 6
                     Label {
@@ -243,6 +265,10 @@ ScrollView {
                           .arg(hwModel.modelData.folder)
                 }
             }
+        }
+        ModelLicenceDialog {
+            id: modelLicence
+            objectName: "modelLicenceDialog"
         }
         FolderDialog {
             id: modelFolderDialog

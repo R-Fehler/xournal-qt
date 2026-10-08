@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 
 #include "control/settings/Settings.h"
@@ -97,7 +98,7 @@ QString HandwritingSettings::status() const {
     }
     // A language without a model
     QStringList missing;
-    for (const QString& l: hwr::HandwritingSearch::choose(*app.getSettings()).missing) {
+    for (const QString& l: search.choice().missing) {
         missing << labelOf(l);
     }
     if (!missing.isEmpty()) {
@@ -130,6 +131,30 @@ QVariantMap HandwritingSettings::modelOf(const QString& language) const {
     const ModelDownload::Model* model = ModelDownload::modelFor(language);
     const ModelDownload* fetch = downloadOf(language);
     const bool downloading = fetch && fetch->running();
+    // No model of its own there (nor downloaded for another language): one that comes with the app reads it
+    hwr::ModelInfo builtIn;
+    if (own && !installed) {
+        const QString bundledDir = search.bundledModelsDir();
+        const auto chosen = search.choice().models;
+        auto taken = std::find_if(chosen.begin(), chosen.end(), [&](const hwr::ModelInfo& m) { return m.reads(language); });
+        if (taken != chosen.end()) {
+            if (hwr::HandwritingSearch::isBundled(taken->folder, bundledDir)) {
+                builtIn = *taken;
+            }
+        } else {
+            // (a language not read now: the model that would read it)
+            for (const hwr::ModelInfo& b: hwr::HandwritingSearch::bundledModels(bundledDir)) {
+                if (b.reads(language)) {
+                    builtIn = b;
+                    break;
+                }
+            }
+        }
+    }
+    const bool isBuiltIn = !builtIn.folder.isEmpty();
+    const bool builtInUsed = isBuiltIn && std::any_of(inUse.begin(), inUse.end(), [&](const QString& f) {
+                                 return QDir::cleanPath(f) == QDir::cleanPath(builtIn.folder);
+                             });
     QString state;
     if (downloading) {
         state = tr("Downloading… %1 %")
@@ -138,6 +163,10 @@ QVariantMap HandwritingSettings::modelOf(const QString& language) const {
         const QString size = megabytes(ModelDownload::sizeOnDisk(folder));
         state = used ? tr("In use (%1)").arg(size)
                      : needed ? tr("Installed (%1)").arg(size) : tr("Installed (%1), its language is not read").arg(size);
+    } else if (isBuiltIn) {
+        const QString size = megabytes(ModelDownload::sizeOnDisk(builtIn.folder));
+        state = builtInUsed ? tr("Built in, in use (%1, %2)").arg(builtIn.name, size)
+                            : tr("Built in (%1, %2)").arg(builtIn.name, size);
     } else if (!own && QFileInfo::exists(folder)) {
         state = info.valid() ? tr("The model in this folder does not read %1").arg(labelOf(language)) : info.error;
     } else {
@@ -161,7 +190,7 @@ QVariantMap HandwritingSettings::modelOf(const QString& language) const {
     m[QStringLiteral("folder")] = folder;
     m[QStringLiteral("own")] = own;
     m[QStringLiteral("installed")] = installed;
-    m[QStringLiteral("inUse")] = used;
+    m[QStringLiteral("inUse")] = used || builtInUsed;
     m[QStringLiteral("state")] = state;
     m[QStringLiteral("source")] = !model ? QString()
                                          : model->revision.isEmpty() ? model->source
@@ -175,7 +204,40 @@ QVariantMap HandwritingSettings::modelOf(const QString& language) const {
                                                                     static_cast<double>(fetch->bytesTotal()))
                                             : 0.0;
     m[QStringLiteral("error")] = fetch ? fetch->error() : QString();
+    m[QStringLiteral("builtIn")] = isBuiltIn;
+    m[QStringLiteral("builtInName")] = builtIn.name;
+    m[QStringLiteral("builtInFolder")] = builtIn.folder;
+    m[QStringLiteral("builtInNoncommercial")] = builtIn.noncommercial;
     return m;
+}
+
+QVariantList HandwritingSettings::builtInModels() const {
+    QVariantList out;
+    for (const hwr::ModelInfo& info: hwr::HandwritingSearch::bundledModels(search.bundledModelsDir())) {
+        QStringList languages;
+        for (const QString& l: info.languages) {
+            languages << labelOf(l);
+        }
+        const QString licence = QDir(info.folder).filePath(QStringLiteral("LICENCE.md"));
+        QVariantMap m;
+        m[QStringLiteral("name")] = info.name;
+        m[QStringLiteral("languages")] = languages.join(QStringLiteral(", "));
+        m[QStringLiteral("size")] = megabytes(ModelDownload::sizeOnDisk(info.folder));
+        m[QStringLiteral("folder")] = info.folder;
+        m[QStringLiteral("noncommercial")] = info.noncommercial;
+        m[QStringLiteral("licenceFile")] = QFileInfo::exists(licence) ? licence : QString();
+        out << m;
+    }
+    return out;
+}
+
+QString HandwritingSettings::licenceText(const QString& folder) const {
+    // (only the notes of the models that come with the app)
+    if (!hwr::HandwritingSearch::isBundled(folder, search.bundledModelsDir())) {
+        return {};
+    }
+    QFile f(QDir(folder).filePath(QStringLiteral("LICENCE.md")));
+    return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()) : QString();
 }
 
 QVariantList HandwritingSettings::models() const {
