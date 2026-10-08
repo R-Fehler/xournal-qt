@@ -38,22 +38,7 @@ bool systemOnMains() {
     SYSTEM_POWER_STATUS status;
     return !GetSystemPowerStatus(&status) || status.ACLineStatus != 0;
 #elif defined(__linux__) && !defined(__ANDROID__)
-    const QDir dir(QStringLiteral("/sys/class/power_supply"));
-    bool battery = false;
-    for (const QString& name: dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
-        auto read = [&](const char* what) {
-            QFile f(dir.filePath(name) + u'/' + QLatin1String(what));
-            return f.open(QIODevice::ReadOnly) ? QString::fromLatin1(f.readAll()).trimmed() : QString();
-        };
-        const QString type = read("type");
-        if (type == QLatin1String("Battery")) {
-            battery = true;
-        } else if ((type == QLatin1String("Mains") || type.startsWith(QLatin1String("USB"))) &&
-                   read("online") == QLatin1String("1")) {
-            return true;
-        }
-    }
-    return !battery;  // (a computer without a battery is on mains)
+    return LibraryInkJob::onMainsIn(QStringLiteral("/sys/class/power_supply"));
 #else
     return false;  // (phones: not yet)
 #endif
@@ -63,6 +48,28 @@ bool systemOnMains() {
 bool LibraryInkJob::onMains() { return powerSource() ? powerSource()() : systemOnMains(); }
 
 void LibraryInkJob::setPowerSource(std::function<bool()> source) { powerSource() = std::move(source); }
+
+bool LibraryInkJob::onMainsIn(const QString& folder) {
+    const QDir dir(folder);
+    bool battery = false;
+    for (const QString& name: dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+        auto read = [&](const char* what) {
+            QFile f(dir.filePath(name) + u'/' + QLatin1String(what));
+            return f.open(QIODevice::ReadOnly) ? QString::fromLatin1(f.readAll()).trimmed() : QString();
+        };
+        if (read("scope") == QLatin1String("Device")) {
+            continue;  // (the battery of a device: a wireless mouse, keyboard or pen, not the computer's)
+        }
+        const QString type = read("type");
+        if (type == QLatin1String("Battery")) {
+            battery = true;
+        } else if ((type == QLatin1String("Mains") || type.startsWith(QLatin1String("USB"))) &&
+                   read("online") == QLatin1String("1")) {
+            return true;
+        }
+    }
+    return !battery;  // (a computer without a battery is on mains)
+}
 
 struct LibraryInkJob::Current {
     fs::path file;

@@ -6,7 +6,7 @@
  * read only while
  *  - the handwriting search is on and its recogniser is ready (the model is there),
  *  - and the computer runs on mains power (Linux: /sys/class/power_supply; a computer without a battery counts as on
- *    mains). Checked again every minute: unplugged, the job stops after the page it is reading.
+ *    mains, and the batteries of devices, a wireless mouse or pen, do not count). Checked again every minute: unplugged, the job stops after the page it is reading.
  * One document at a time: it is loaded on a worker at low priority, its pages go to the recognition worker
  * (InkRecognitionService) with the lowest priority (after every open document), two at a time, each a copy of its
  * strokes; lines read before (its entry in the library's cache, also of an older version of the file) are not read
@@ -57,6 +57,8 @@ public:
     /// Whether the computer runs on mains power; tests set their own (nullptr: the system's again).
     static bool onMains();
     static void setPowerSource(std::function<bool()> source);
+    /// Linux: whether the power supplies in this folder (as /sys/class/power_supply) say mains power.
+    static bool onMainsIn(const QString& folder);
 
     bool running() const { return current != nullptr || !waiting.empty(); }
     int documentsLeft() const { return static_cast<int>(waiting.size()) + (current ? 1 : 0); }

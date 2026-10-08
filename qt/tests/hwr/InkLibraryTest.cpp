@@ -4,6 +4,7 @@
  * @license GNU GPLv2 or later
  */
 #include <fstream>
+#include <map>
 #include <memory>
 
 #include <QCborArray>
@@ -299,6 +300,27 @@ TEST_F(InkLibraryTest, theLibrarysHandwritingIsReadOnMainsPower) {
     EXPECT_FALSE(job.running());
     EXPECT_EQ(fake->calls(), 6);
     LibraryInkJob::setPowerSource({});
+}
+
+// Mains power (Linux, /sys/class/power_supply): the computer's own battery counts; a device's battery (a wireless
+// mouse, keyboard or pen: scope "Device") does not, so a desktop with a wireless mouse is on mains
+TEST_F(InkLibraryTest, aDevicesBatteryDoesNotMeanTheComputerIsOnBattery) {
+    auto supply = [&](const char* name, std::map<const char*, const char*> values) {
+        const fs::path dir = root / "power" / name;
+        fs::create_directories(dir);
+        for (const auto& [key, value]: values) {
+            std::ofstream(dir / key) << value << "\n";
+        }
+    };
+    const QString power = QString::fromStdString((root / "power").string());
+    EXPECT_TRUE(LibraryInkJob::onMainsIn(power)) << "nothing there: a desktop";
+    supply("hidpp_battery_0", {{"type", "Battery"}, {"scope", "Device"}, {"status", "Discharging"}});
+    EXPECT_TRUE(LibraryInkJob::onMainsIn(power)) << "a desktop with a wireless mouse";
+    supply("BAT0", {{"type", "Battery"}, {"status", "Discharging"}});
+    supply("AC", {{"type", "Mains"}, {"online", "0"}});
+    EXPECT_FALSE(LibraryInkJob::onMainsIn(power)) << "a laptop unplugged";
+    supply("AC", {{"type", "Mains"}, {"online", "1"}});
+    EXPECT_TRUE(LibraryInkJob::onMainsIn(power)) << "a laptop plugged in";
 }
 
 TEST_F(InkLibraryTest, aSharedZipUnpackedWithOtherTimesIsNotReadAgain) {
