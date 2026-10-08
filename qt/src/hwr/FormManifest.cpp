@@ -114,6 +114,7 @@ FormManifest FormManifest::parse(const QByteArray& json) {
         i.search = it.contains(QStringLiteral("search")) ? stringsOf(it.value(QStringLiteral("search")))
                                                           : (i.textual() ? searchWords(i.text) : QStringList());
         i.context = it.value(QStringLiteral("context")).toString();
+        i.in = it.value(QStringLiteral("in")).toString();
         m.items.push_back(std::move(i));
     }
     return m;
@@ -186,8 +187,9 @@ std::vector<int> assign(const std::vector<InkStroke>& strokes, const std::vector
         if (points.empty()) {
             continue;
         }
-        size_t most = 0;
+        // Of the boxes holding more than half of its points, the smallest: a label lies in its drawing's box too
         int best = -1;
+        double bestArea = 0;
         for (size_t b = 0; b < items.size(); ++b) {
             // (quick: the stroke's box far from the box's circle)
             const QPointF c = boxes[b].center();
@@ -199,14 +201,13 @@ std::vector<int> assign(const std::vector<InkStroke>& strokes, const std::vector
             for (const QPointF& p: points) {
                 n += boxes[b].contains(items[b]->framed(p)) ? 1 : 0;
             }
-            if (n > most) {
-                most = n;
+            const double area = boxes[b].width() * boxes[b].height();
+            if (2 * n > points.size() && (best < 0 || area < bestArea)) {
                 best = static_cast<int>(b);
+                bestArea = area;
             }
         }
-        if (2 * most > points.size()) {
-            out[s] = best;
-        }
+        out[s] = best;
     }
     return out;
 }

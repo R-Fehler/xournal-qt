@@ -260,7 +260,15 @@ BenchReport runBench(Document& doc, const FormManifest& manifest, const std::vec
                 }
                 const FormItem& item = *box.item;
                 Reading& r = box.readings[m];
-                const std::vector<uint32_t> in = wordsIn(text, item);
+                std::vector<uint32_t> in = wordsIn(text, item);
+                if (!item.textual()) {
+                    // (the labels written inside a drawing or around a word to circle are boxes of their own)
+                    std::erase_if(in, [&](uint32_t i) {
+                        return std::any_of(items.begin(), items.end(), [&](const FormItem* other) {
+                            return other->in == item.id && other->contains(text.words[i].box.center());
+                        });
+                    });
+                }
                 ink::PageText own;
                 own.lineStarts.push_back(0);
                 QStringList read;

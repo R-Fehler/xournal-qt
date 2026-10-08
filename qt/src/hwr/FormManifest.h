@@ -8,8 +8,8 @@
  * (degrees, clockwise on the page, as ink::Word::angle) around their centre; here they are in page points (72 / 25.4
  * per mm). A form page is the PDF page of the document's page (1-based), else the document page's number.
  *
- * A stroke belongs to the box that holds most of its points, tested in the box's own turned frame, and only when more
- * than half of its points are in it (assign()). `xournal-qt-cli hwr-form` (FormDataset.h) and `hwr-bench`
+ * A stroke belongs to a box that holds more than half of its points, tested in the box's own turned frame; of several
+ * (a label inside its drawing's box, `in`) the smallest (assign()). `xournal-qt-cli hwr-form` (FormDataset.h) and `hwr-bench`
  * (FormBench.h) both map strokes so.
  *
  * Any thread.
@@ -52,6 +52,7 @@ struct FormItem {
     QStringList tags;
     QStringList search;  ///< the words a search should find in the box (the manifest's, else searchWords())
     QString context;
+    QString in;  ///< the drawing or mark box this box lies in (a label of a flow chart): its words are not the drawing's
 
     /// Text is expected (not drawing, mark or free).
     bool textual() const;
@@ -97,7 +98,7 @@ FormManifest manifestOf(const Document& document, const fs::path& file, const QS
 /// The form page of a document's page (`index` 0-based): its PDF page + 1, else index + 1.
 int formPageOf(const XojPage& page, size_t index);
 
-/// The box of each stroke: an index into `items`, or -1 (most of its points are in no box).
+/// The box of each stroke: an index into `items` (the smallest holding more than half of its points), or -1.
 std::vector<int> assign(const std::vector<InkStroke>& strokes, const std::vector<const FormItem*>& items);
 
 }  // namespace xqt::hwr

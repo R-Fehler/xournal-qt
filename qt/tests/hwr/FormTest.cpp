@@ -520,6 +520,55 @@ TEST(FormTest, theBenchmarkComparesThePipelineWithTheManifest) {
 // times" written twice, as the level reading shows) copied into boxes at several angles, read through the whole
 // pipeline. A rotation benchmark: it prints the report. The level line is one line; at ±90 degrees a line is found at
 // the box's angle (2026-10: a piece of the line is still taken as level there); all three are read
+// A label written inside a drawing (a flow chart's box: "in" names the drawing) is the label's text, not text read in
+// the drawing
+TEST(FormTest, aLabelInsideADrawingIsNotTextInTheDrawing) {
+    QString manifest = QString::fromUtf8(MANIFEST);
+    manifest.replace(QStringLiteral(R"({"id": "1.6",)"),
+                     QStringLiteral(R"({"id": "1.8", "page": 1, "section": "F", "kind": "label", "text": "words",
+                                        "box_mm": [24, 204, 30, 14], "angle": 0, "x_height_mm": 3, "in": "1.5"},
+                                       {"id": "1.6",)"));
+    const FormManifest m = FormManifest::parse(manifest.toUtf8());
+    ASSERT_EQ(itemById(m, QStringLiteral("1.8")).in, QStringLiteral("1.5"));
+    auto doc = filledForm(m);
+    const hwr::Layout layout = hwr::layout(strokesOf(*doc->getPage(0)));
+    auto fake = std::make_shared<FakeRecognizer>();
+    const QRectF label = itemById(m, QStringLiteral("1.8")).box();
+    int inLabel = 0;
+    for (const InkLine& line: layout.lines) {
+        if (label.contains(line.box.center())) {
+            fake->setLine(line.hash, {{{QStringLiteral("words"), 1.0f}}});
+            ++inLabel;
+        }
+    }
+    ASSERT_EQ(inLabel, 1) << "the scribble lies in the label's box";
+    const BenchReport report = runBench(*doc, m, {{QStringLiteral("fake"), fake, QString()}}, QStringLiteral("t.xopp"));
+    ASSERT_TRUE(report.ok) << report.error.toStdString();
+    const QJsonObject all = report.json.value(QStringLiteral("groups")).toObject().value(QStringLiteral("all")).toObject();
+    const QJsonObject fakeAll = all.value(QStringLiteral("models")).toObject().value(QStringLiteral("fake")).toObject();
+    EXPECT_EQ(fakeAll.value(QStringLiteral("text_in_drawings")).toInt(), 0);
+    const QJsonObject labels = report.json.value(QStringLiteral("groups")).toObject().value(QStringLiteral("kind:label")).toObject();
+    EXPECT_EQ(labels.value(QStringLiteral("models")).toObject().value(QStringLiteral("fake")).toObject()
+                      .value(QStringLiteral("words_found")).toDouble(), 1.0);
+}
+
+// The forms the project publishes (qt/research/hwr/forms/pdf) are read, labels with their drawing
+TEST(FormTest, thePublishedFormsManifestsAreRead) {
+    for (const char* name: {"xqt-hwr-en", "xqt-hwr-de", "xqt-hwr-en-de"}) {
+        QFile f(QStringLiteral(XQT_HWR_TEST_DATA "/../../../research/hwr/forms/pdf/%1.manifest.json").arg(QLatin1String(name)));
+        ASSERT_TRUE(f.open(QIODevice::ReadOnly)) << name;
+        const FormManifest m = FormManifest::parse(f.readAll());
+        EXPECT_GT(m.items.size(), 50u) << name;
+        for (const FormItem& i: m.items) {
+            if (!i.in.isEmpty()) {
+                EXPECT_TRUE(std::any_of(m.items.begin(), m.items.end(), [&](const FormItem& o) {
+                    return o.id == i.in && !o.textual();
+                })) << name << " " << i.id.toStdString() << " lies in " << i.in.toStdString();
+            }
+        }
+    }
+}
+
 TEST(FormTest, theBuiltInModelReadsRealInkInTurnedBoxes) {
     if (qEnvironmentVariableIsEmpty("XQT_ONNXRUNTIME")) {
         GTEST_SKIP() << "set XQT_ONNXRUNTIME to the path of libonnxruntime.so.1";
