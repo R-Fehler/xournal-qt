@@ -81,7 +81,8 @@ text in addition to normal copy and give the user a small popup with the text th
 - **The text**: the best reading of each word, in reading order: lines from the words' heights (a line written uphill
   or with tall letters stays one), top to bottom, words left to right; words by spaces, lines by line breaks, and an
   empty line where two lines are much further apart than the others (a paragraph). Only the clipboard gets it: nothing
-  is written into the document.
+  is written into the document. Pasted onto a page (Ctrl+V, the pill's Paste) it is a text in the text tool's
+  color, whatever tool is in hand (as any plain text pasted: `CanvasView::pasteText`).
 - **The card**: near the words (above them, or below where there is no room) "Copied as text" with the text, which
   can be selected (and copied again in part) but not edited: the clipboard has it as it is shown. Words the
   recogniser was unsure of (below 0.5, as the search's lighter marks) are grey, with a note. Long texts scroll. It

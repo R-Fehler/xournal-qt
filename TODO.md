@@ -88,6 +88,11 @@ All four waves are merged (2026-10-07). The architecture overview:
 
 ## Bugs
 
+- [x] **Pasted text was white** (or yellow) when the tool in hand was not the pen (the author, 2026-10-08: handwriting
+  copied as text, then Ctrl+V): a plain-text paste took the color of the tool in hand; it takes the text tool's now
+  (`qt/paste-colour`). Left: a Markdown box started in the panel (`AppController::startMarkdown`) and a new plain
+  text of `TextEditor` still take the color of the tool in hand; both are reached with the text tool in hand, except
+  the sticky note pill's "Text" with a select tool in panel mode. Untested: make them the text tool's too, with a test.
 - [ ] **Android: the top bar scrolls into a blank area at its end** (about the last quarter; the author on 0.8.0).
   Not reproduced off-screen. Likely the buttons pinned before "+" (`Toolbox.leadingTail`) take room while hidden.
   Needs the device (adb, a screenshot scrolled to the end): postponed by the author.

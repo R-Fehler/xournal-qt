@@ -641,7 +641,8 @@ bool CanvasView::pasteText(const QString& content, std::optional<QPointF> viewPo
     auto text = std::make_unique<Text>();
     text->setText(content.toStdString());
     text->setFont(session.getSettings()->getFont());
-    text->setColor(session.getToolHandler()->getColor());
+    // (the text tool's color, whatever tool is in hand: the lasso of "Copy as text", a highlighter, the hand)
+    text->setColor(session.getToolHandler()->getTool(TOOL_TEXT).getColor());
     text->move(std::max(0.0, onPage.x()), std::max(0.0, onPage.y()));
     timeline::stampNew(*text);
     const Text* raw = text.get();

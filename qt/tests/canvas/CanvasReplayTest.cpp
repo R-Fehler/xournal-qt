@@ -467,6 +467,38 @@ TEST_F(CanvasReplayTest, pastedTextLandsWhereItWasPasted) {
     EXPECT_NEAR(pasted->getBoundingBox().y, 220, 3);
 }
 
+TEST_F(CanvasReplayTest, pastedTextHasTheTextToolsColorWhateverToolIsInHand) {
+    // The bug: handwriting copied as text (the copy tool arms the lasso) and pasted came out white, the color of the
+    // tool in hand, not the text tool's; a highlighter in hand gave yellow text
+    ToolHandler* th = app->getToolHandler();
+    const Color textColor = th->getTool(TOOL_TEXT).getColor();
+    th->getTool(TOOL_SELECT_REGION).setColor(Colors::white);
+    const std::vector<std::pair<ToolType, const char*>> inHand{{TOOL_SELECT_REGION, "the lasso (copy tool)"},
+                                                               {TOOL_HIGHLIGHTER, "the highlighter"},
+                                                               {TOOL_ERASER, "the eraser"},
+                                                               {TOOL_HAND, "the hand"}};
+    double y = 120;
+    for (const auto& [tool, name]: inHand) {
+        th->selectTool(tool);
+        const std::string words = std::string("pasted with ") + name;
+        QGuiApplication::clipboard()->setText(QString::fromStdString(words));
+        ASSERT_TRUE(view->pasteElements(viewPos(0, QPointF(120, y)))) << name;
+        processEvents();
+        const Text* pasted = nullptr;
+        for (const auto& element: session->getDocument()->getPage(0)->getSelectedLayer()->getElements()) {
+            if (element->getType() == ELEMENT_TEXT && static_cast<const Text*>(element.get())->getText() == words) {
+                pasted = static_cast<const Text*>(element.get());
+            }
+        }
+        ASSERT_NE(pasted, nullptr) << name;
+        EXPECT_EQ(uint32_t(pasted->getColor()), uint32_t(textColor))
+                << "pasted with " << name << " in hand: the text tool's color, not the tool's "
+                << std::hex << uint32_t(th->getColor());
+        y += 60;
+    }
+    th->selectTool(TOOL_PEN);
+}
+
 TEST_F(CanvasReplayTest, aWebAddressInATextIsALink) {
     // A text with a link on the page
     auto text = std::make_unique<Text>();
