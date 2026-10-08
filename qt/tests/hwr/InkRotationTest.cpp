@@ -270,6 +270,75 @@ TEST(InkRotationTest, realHandwritingAtAnAngleIsOneLine) {
     }
 }
 
+// A short note of real words (two or three: "dumb test", "dumb test, written", "many times...") written up, down or
+// at a free angle beside a page of level lines is a line of its own at its angle; the level lines are as without it
+TEST(InkRotationTest, aShortRealNoteAtAnAngleIsALineOfItsOwn) {
+    const auto lines = test::benchmarkLines();
+    ASSERT_GE(lines.size(), 4u);
+    std::vector<InkStroke> body;
+    for (size_t k = 1; k < lines.size(); ++k) {
+        body.insert(body.end(), lines[k].begin(), lines[k].end());
+    }
+    const hwr::Layout alone = layout(body);
+    const hwr::Layout first = layout(lines[0]);
+    ASSERT_GE(first.lines.at(0).words.size(), 8u);
+    QRectF page;
+    for (const InkStroke& st: body) {
+        page = page.isNull() ? st.box : page.united(st.box);
+    }
+    for (const auto& [from, to]: {std::pair<size_t, size_t>{3, 5}, {3, 6}, {6, 8}}) {
+        std::vector<uint32_t> which;
+        for (size_t w = from; w < to; ++w) {
+            const auto& ws = first.lines[0].words[w].strokes;
+            which.insert(which.end(), ws.begin(), ws.end());
+        }
+        std::sort(which.begin(), which.end());
+        std::vector<InkStroke> words;
+        for (const uint32_t i: which) {
+            words.push_back(lines[0][i]);
+        }
+        for (const double angle: {-90.0, 90.0, 45.0, -45.0}) {
+            SCOPED_TRACE(QStringLiteral("words %1-%2 at %3").arg(from).arg(to).arg(angle).toStdString());
+            std::vector<InkStroke> note = test::turnedAround(words, angle);
+            QRectF box;
+            for (const InkStroke& st: note) {
+                box = box.isNull() ? st.box : box.united(st.box);
+            }
+            // (in the left margin, 20 pt from the text, beside its middle)
+            const QPointF by(page.left() - 20 - box.right(), page.center().y() - box.center().y());
+            for (InkStroke& st: note) {
+                for (QPointF& p: st.points) {
+                    p += by;
+                }
+                st = InkStroke::of(st.points, st.width, st.widths);
+            }
+            std::vector<InkStroke> all = body;
+            all.insert(all.end(), note.begin(), note.end());
+            const hwr::Layout l = layout(all);
+            std::vector<const InkLine*> level, turnedLines;
+            for (const InkLine& x: l.lines) {
+                (x.angle == 0 ? level : turnedLines).push_back(&x);
+            }
+            EXPECT_EQ(level.size(), alone.lines.size());
+            for (size_t i = 0; i < level.size() && i < alone.lines.size(); ++i) {
+                EXPECT_EQ(level[i]->hash, alone.lines[i].hash);
+            }
+            EXPECT_EQ(turnedLines.size(), 1u);
+            if (turnedLines.size() != 1) {
+                continue;
+            }
+            // (at a free angle the frame's units of so few strokes may take the y's straight tail for a drawing)
+            EXPECT_GE(turnedLines[0]->strokes.size() + (std::abs(angle) == 90 ? 0 : 1), note.size());
+            EXPECT_EQ(turnedLines[0]->words.size(), to - from);
+            if (std::abs(angle) == 90) {
+                EXPECT_EQ(turnedLines[0]->angle, angle);
+            } else {
+                EXPECT_NEAR(turnedLines[0]->angle, angle, 5);
+            }
+        }
+    }
+}
+
 // The words of real lines written one below the other (lists, close or wide) are level lines, none at an angle
 TEST(InkRotationTest, aListOfRealWordsIsNotALineWrittenDownwards) {
     for (const auto& line: test::benchmarkLines()) {

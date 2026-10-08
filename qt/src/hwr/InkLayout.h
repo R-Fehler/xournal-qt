@@ -24,8 +24,8 @@
  * uphill) is laid out in its own frame (framesOf): before step 3 the strokes are taken in runs, consecutive strokes in
  * the order of writing that are close to each other (within 4 `s`, the median of the strokes' smaller side: a few
  * words; dots and accents aside, and straight lines and big shapes, which the frame's own step 2 judges). A run long
- * and narrow enough (6 s, and 3 times as long as wide along its points' principal axis; not two strokes alone, an i
- * and its dot), whose strokes go one after the other along that axis (their steps along it at least 1.5 times those
+ * and narrow enough (6 s, and 3 times as long along its points' principal axis as its ink is wide across it, the
+ * tenth furthest out left out: loops, capitals; not two strokes alone, an i and its dot), whose strokes go one after the other along that axis (their steps along it at least 1.5 times those
  * across; a single stroke: from its start to its end) and do not lie across it (their median at most 3 times as long
  * across as along: words one below the other, a list), has a direction. More than 20 degrees off left-to-right it is
  * turned upright (more than 10 when it climbs by more than its width across: a long line written uphill, which the

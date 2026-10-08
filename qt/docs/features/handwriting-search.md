@@ -37,8 +37,8 @@ Text written at an angle or along the margin (a note written upwards along the e
 arrow, a line written steeply uphill) is found, marked, copied and put into the PDF text layer like level text.
 
 - **What counts**: a run of strokes written one after the other close together (a few words: gaps up to 4 times the
-  strokes' typical smaller side), long and narrow enough (at least 6 times that side and 3 times as long as wide; not
-  two strokes alone, an i and its dot), whose strokes follow each other along it, has a direction. Letters written in
+  strokes' typical smaller side), long and narrow enough (at least 6 times that side and 3 times as long as wide, a
+  descender's loop or a capital not counted: a note of two words is enough; not two strokes alone, an i and its dot), whose strokes follow each other along it, has a direction. Letters written in
   pieces (stems, bars, a "Th" in one stroke) and crossings written afterwards still count; a list of words one below
   the other does not. Within 10° of left to right it is laid out as level text (slopes are fine), and within 20°
   unless it climbs by more than its own height (a long line written uphill, which the page's rules would cut into

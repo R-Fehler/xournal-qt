@@ -442,7 +442,35 @@ std::optional<Direction> directionOf(const std::vector<InkStroke>& strokes, cons
     Direction d;
     d.length = a1 - a0;
     d.width = n1 - n0;
-    if (run.size() == 2 || d.length < 6 * s || d.length < 3 * d.width) {
+    // How wide its ink is across without the tenth of it furthest out (a descender's loop, a capital: a note of two
+    // words is not much longer than its letters are high from the top of a capital to the bottom of a loop)
+    std::vector<std::pair<double, double>> across;  ///< the segments' middles across the axis, with their lengths
+    for (const uint32_t i: run) {
+        const auto& p = strokes[i].points;
+        for (size_t k = 1; k < p.size(); ++k) {
+            across.emplace_back(dot((p[k] + p[k - 1]) / 2, n),
+                                std::hypot(p[k].x() - p[k - 1].x(), p[k].y() - p[k - 1].y()));
+        }
+    }
+    std::sort(across.begin(), across.end());
+    double lo = across.front().first, hi = across.back().first;
+    {
+        double sum = 0;
+        bool low = false;
+        for (const auto& [x, w]: across) {
+            sum += w;
+            if (!low && sum >= 0.05 * weight) {
+                lo = x;
+                low = true;
+            }
+            if (sum >= 0.95 * weight) {
+                hi = x;
+                break;
+            }
+        }
+    }
+    const double core = hi - lo;
+    if (run.size() == 2 || d.length < 6 * s || d.length < 3 * core) {
         return std::nullopt;  // (too short or not narrow, or two strokes: an i and its dot; no direction to tell)
     }
     if (median(shapes) > 3) {
