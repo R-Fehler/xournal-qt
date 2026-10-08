@@ -333,6 +333,9 @@ void DocumentSearch::place(size_t page) {
     if (const ink::PageText* ink = index.inkOf(page)) {
         for (const ink::Hit& h: ink::find(*ink, terms)) {
             add(ink::rectsOf(*ink, h), h.p < ink::WEAK_P);
+            if (ink::atAnAngle(*ink, h)) {
+                found.back().quads = ink::quadsOf(*ink, h);
+            }
         }
     }
     // Reading order on the page (lines in 4 pt bands, then left to right)

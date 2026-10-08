@@ -133,6 +133,33 @@ TEST_F(InkLibraryTest, anEntryIsStoredAndReadBack) {
     EXPECT_FALSE(InkTextStore::decode(QCborMap{{QStringLiteral("x"), 1}}));
 }
 
+// A line written at an angle keeps it in the pack (its words are stored upright); a line without one stores none
+TEST_F(InkLibraryTest, theAngleOfALineIsStored) {
+    InkDoc d;
+    d.stamp = QStringLiteral("1:2");
+    d.recognizer = QStringLiteral("fake/1");
+    auto line = lineOf({{{"margin", 1.0f}}, {{"note", 1.0f}}});
+    d.pages = {{{42, {40, 330}, line, -90}, {43, {100, 100}, line, 0}, {44, {150, 300}, line, 35.25}}};
+    const QCborMap stored = InkTextStore::encode(d);
+    const QCborArray refs = stored.value(QStringLiteral("pages")).toArray().at(0).toArray();
+    ASSERT_EQ(refs.size(), 3);
+    EXPECT_EQ(refs.at(1).toArray().size(), 3) << "no angle stored for a horizontal line";
+    auto back = InkTextStore::decode(stored);
+    ASSERT_TRUE(back);
+    ASSERT_EQ(back->pages.at(0).size(), 3u);
+    EXPECT_EQ(back->pages[0][0].angle, -90);
+    EXPECT_EQ(back->pages[0][1].angle, 0);
+    EXPECT_NEAR(back->pages[0][2].angle, 35.25, 0.005);
+    // Put together turned: "margin" goes up from (40, 330)
+    const auto& text = back->texts.at(0);
+    ASSERT_TRUE(text);
+    EXPECT_EQ(text->words[0].angle, -90);
+    const QRectF b = ink::boundsOf(text->words[0]);
+    EXPECT_NEAR(b.left(), 40, 0.06);
+    EXPECT_NEAR(b.bottom(), 330, 0.06);
+    EXPECT_GT(b.height(), b.width());
+}
+
 TEST_F(InkLibraryTest, theLibrarySearchFindsHandwriting) {
     const fs::path a = writeXopp(tmp, "a.xopp", 2);
     const fs::path b = writeXopp(tmp, "b.xopp", 1);

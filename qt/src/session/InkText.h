@@ -26,6 +26,11 @@
  * moved by the lasso keeps its result. PageText is a page's lines put together (page points), as DocumentTextIndex
  * keeps it per page next to the PDF text and the text elements.
  *
+ * A line written at an angle (a margin note written upwards, a label along an arrow; hwr/InkLayout.h) was read in its
+ * own frame, upright: its result's boxes are relative to its origin in that frame, and it is placed on the page with
+ * its angle (PlacedLine). Its words on the page keep the angle: Word::box is then the box upright with its middle
+ * where the word's middle is, turned by Word::angle around that middle (quadOf); 0, the common case, is a plain box.
+ *
  * Thread-safe (the types do not change once made).
  *
  * @license GNU GPLv2 or later
@@ -37,6 +42,7 @@
 #include <vector>
 
 #include <QPointF>
+#include <QPolygonF>
 #include <QRectF>
 #include <QString>
 
@@ -65,12 +71,25 @@ struct Candidate {
 };
 
 struct Word {
-    QRectF box;      ///< page points (PageText), relative to the line's origin (LineResult)
+    /// Page points (PageText), relative to the line's origin (LineResult). With an angle: the box upright, around the
+    /// word's middle (its corners on the page: quadOf)
+    QRectF box;
     float conf = 0;  ///< how sure the recogniser is of the best reading (0..1)
     QString text;    ///< the best reading as recognised (case, punctuation): for text layers and snippets
     std::vector<Candidate> candidates;  ///< best first
+    /// The direction of its line on the page (degrees, clockwise: 0 left to right, 90 downwards, -90 upwards; PageText)
+    float angle = 0;
     size_t bytes() const;
 };
+
+/// A point turned by `degrees` around (0, 0), clockwise on the page (y down): (1, 0) turned by 90 is (0, 1). Exact for
+/// multiples of 90 degrees.
+QPointF turned(QPointF p, double degrees);
+/// The corners of a word's box on the page (its box for angle 0), clockwise from the top-left of the word upright.
+QPolygonF quadOf(const Word& w);
+QPolygonF quadOf(const QRectF& box, double angle);
+/// The box around a word's corners on the page.
+QRectF boundsOf(const Word& w);
 
 /// A reading as a candidate: its words folded and joined, numbered in the dictionary.
 Candidate candidate(QStringView text, float p);
@@ -88,6 +107,7 @@ struct LineResult {
 struct PlacedLine {
     QPointF origin;  ///< where the line's origin is on the page
     std::shared_ptr<const LineResult> result;
+    double angle = 0;  ///< the line's direction (Word::angle): its words are turned by it around its origin
 };
 
 /// The handwriting of a page.
@@ -113,7 +133,12 @@ struct Hit {
 std::vector<Hit> find(const PageText& ink, const std::vector<textmatch::Term>& terms, int typos = -1);
 /// The term is on the page.
 bool contains(const PageText& ink, const textmatch::Term& term, int typos = -1);
-/// Where a hit is marked: the box of its words, MARK_MARGIN bigger; one per line (a phrase may go on in the next).
+/// Where a hit is marked: the box of its words, MARK_MARGIN bigger; one per line (a phrase may go on in the next). A
+/// line at an angle: the box around its marked quad.
 std::vector<QRectF> rectsOf(const PageText& ink, const Hit& hit);
+/// The same as quads, turned like their lines (four corners each; plain boxes for lines at angle 0).
+std::vector<QPolygonF> quadsOf(const PageText& ink, const Hit& hit);
+/// The hit has words at an angle (marked by quadsOf).
+bool atAnAngle(const PageText& ink, const Hit& hit);
 
 }  // namespace xqt::ink

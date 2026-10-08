@@ -6,7 +6,7 @@ never converted: the readings go into the search index (and an invisible text la
 | Class | Job |
 | --- | --- |
 | `HandwritingSearch` | the app's handwriting search: the setting, the recognisers, the worker, an indexer per open document |
-| `InkLayout` | a page's ink as lines and words, from the strokes' geometry alone |
+| `InkLayout` | a page's ink as lines and words, from the strokes' geometry alone; lines written at an angle in their own frame |
 | `Recognizer` | what a recogniser is to the search (one line in, per word several readings out) |
 | `TrocrRecognizer`, `CtcRecognizer` | the recognisers: TrOCR-small and small CTC line models in ONNX Runtime |
 | `MultiRecognizer`, `LanguagePlan` | several models (English, German) on the same lines; which models a document needs |

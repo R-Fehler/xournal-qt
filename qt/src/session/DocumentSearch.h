@@ -10,7 +10,8 @@
  *     the query or the page changes. Their text is the index's, matched the same way (TextMatch), so the count and
  *     the marks agree.
  * Handwriting is searched too, in the words its recogniser read (InkText.h, handed to the index by the handwriting
- * search): a hit is the box around the ink word(s), marked lighter when the recogniser was unsure.
+ * search): a hit is the box around the ink word(s), marked lighter when the recogniser was unsure (turned with words
+ * written at an angle).
  * The current hit is a page and a hit on it; stepping to a page whose hits are not placed yet counts on the page's
  * count and scrolls there once they are.
  *
@@ -29,6 +30,7 @@
 #include <vector>
 
 #include <QObject>
+#include <QPolygonF>
 #include <QRectF>
 #include <QString>
 
@@ -55,6 +57,9 @@ public:
         QRectF more;  ///< null: all on one line
         /// Handwriting the recogniser was not sure of (InkText.h: under WEAK_P of its guesses): marked lighter
         bool faint = false;
+        /// Handwriting written at an angle: the turned boxes that are marked (four corners each, one per line; `rect`
+        /// and `more` are around them). Empty: the rects are marked
+        std::vector<QPolygonF> quads;
     };
 
     /// How the text is matched besides, the options of the find and replace bar (qt/docs/features/md-editor.md, "Find

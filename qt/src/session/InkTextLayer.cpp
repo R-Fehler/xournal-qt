@@ -22,7 +22,7 @@ std::vector<Word> wordsOf(const ink::PageText& page) {
             }
         }
         if (!text.trimmed().isEmpty()) {
-            out.push_back({text.trimmed(), w.box});
+            out.push_back({text.trimmed(), w.box, w.angle});
         }
     }
     return out;
@@ -32,6 +32,20 @@ namespace {
 std::string num(double v) {
     char buf[32];
     std::snprintf(buf, sizeof buf, "%.2f", v);
+    std::string s(buf);
+    while (s.size() > 1 && s.back() == '0') {
+        s.pop_back();
+    }
+    if (!s.empty() && s.back() == '.') {
+        s.pop_back();
+    }
+    return s == "-0" ? "0" : s;
+}
+
+/// With 4 decimals (the text matrix's turn)
+std::string num4(double v) {
+    char buf[32];
+    std::snprintf(buf, sizeof buf, "%.4f", v);
     std::string s(buf);
     while (s.size() > 1 && s.back() == '0') {
         s.pop_back();
@@ -71,8 +85,20 @@ std::string contentOf(const std::vector<Word>& words, double pageHeight, const s
         const double natural = static_cast<double>(w.text.size()) * ADVANCE / 1000.0 * size;
         const double tz = natural > 0 ? 100.0 * w.box.width() / natural : 100.0;
         // (the baseline a fifth of the size above the box's bottom: the font's descent)
-        s += std::string(FONT_RESOURCE) + ' ' + num(size) + " Tf " + num(tz) + " Tz 1 0 0 1 " + num(w.box.left()) + ' ' +
-             num(pageHeight - w.box.bottom() + size * -DESCENT / 1000.0) + " Tm <" + hexOf(text) + "> Tj\n";
+        std::string tm;
+        if (w.angle == 0) {
+            tm = "1 0 0 1 " + num(w.box.left()) + ' ' + num(pageHeight - w.box.bottom() + size * -DESCENT / 1000.0);
+        } else {
+            // Turned with the word: its baseline's start, turned around its middle; the text's x axis along the
+            // direction it was written in (y up in PDF: clockwise on the page is counter-clockwise there)
+            const QPointF baseline(-w.box.width() / 2, w.box.height() / 2 + size * DESCENT / 1000.0);
+            const QPointF start = w.box.center() + ink::turned(baseline, w.angle);
+            const QPointF x = ink::turned(QPointF(1, 0), w.angle);
+            tm = num4(x.x()) + ' ' + num4(-x.y()) + ' ' + num4(x.y()) + ' ' + num4(x.x()) + ' ' + num(start.x()) + ' ' +
+                 num(pageHeight - start.y());
+        }
+        s += std::string(FONT_RESOURCE) + ' ' + num(size) + " Tf " + num(tz) + " Tz " + tm + " Tm <" + hexOf(text) +
+             "> Tj\n";
     }
     s += "ET\nQ\n";
     return s;

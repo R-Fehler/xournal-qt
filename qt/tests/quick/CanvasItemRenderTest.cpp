@@ -24,7 +24,10 @@
 #include "model/XojPage.h"
 #include "render/RenderService.h"
 #include "session/AppContext.h"
+#include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "session/DocumentTextIndex.h"
+#include "session/InkText.h"
 
 #include "CanvasMemory.h"
 #include "CanvasPage.h"
@@ -259,4 +262,46 @@ TEST_F(CanvasItemRenderTest, aTenCentimetreLineIsTenCentimetresLongAtHundredPerc
     // The round caps add half the line's width at each end
     const double length = (last - first + 1) - 1.0 * vc.zoom() * dpr;
     EXPECT_NEAR(length, 10.0 / 2.54 * dpi * dpr, 2.0) << "from x " << first << " to " << last;
+}
+
+// A search hit in handwriting written at an angle is marked with its turned box: the quad is drawn, not the box around
+// it (a point in that box beside the quad stays white)
+TEST_F(CanvasItemRenderTest, aHitInHandwritingAtAnAngleIsMarkedTurned) {
+    auto line = std::make_shared<ink::LineResult>();
+    ink::Word w;
+    w.box = QRectF(0, 0, 120, 20);
+    w.conf = 0.9f;
+    w.text = QStringLiteral("diagonal");
+    w.candidates.push_back(ink::candidate(w.text, 1.0f));
+    line->words.push_back(w);
+    session->search().textIndex().setInk(0, ink::PageText::assemble({{QPointF(150, 150), line, 35}}));
+    session->search().setQuery(QStringLiteral("diagonal"), false);
+    QElapsedTimer t;
+    t.start();
+    auto marks = [&] {
+        const auto shown = canvas->searchMarksShown();
+        auto it = shown.find(0);
+        return it == shown.end() ? std::vector<QPolygonF>() : it->second;
+    };
+    while (marks().empty() && t.elapsed() < 5000) {
+        canvas->update();
+        run(20);
+    }
+    const auto quads = marks();
+    ASSERT_EQ(quads.size(), 1u);
+    const QPolygonF& q = quads[0];
+    ASSERT_EQ(q.size(), 4);
+    // Turned: its first edge goes 35 degrees down to the right
+    const QPointF edge = q[1] - q[0];
+    EXPECT_NEAR(std::atan2(edge.y(), edge.x()) * 180 / M_PI, 35, 0.1);
+    // On the screen: its middle marked, a corner of the box around it not
+    run(100);
+    const QImage shot = window->grabWindow();
+    const QRectF page = view->pageViewRect(0);
+    const double zoom = view->getViewController().zoom();
+    auto onScreen = [&](QPointF p) { return (page.topLeft() + p * zoom).toPoint(); };
+    const QColor middle(xqt::test::pixelAt(shot, window, onScreen(q.boundingRect().center())));
+    const QColor corner(xqt::test::pixelAt(shot, window, onScreen(q.boundingRect().bottomLeft() + QPointF(3, -3))));
+    EXPECT_GT(middle.red(), middle.blue() + 40) << "marked (yellow): " << middle.name().toStdString();
+    EXPECT_LT(corner.red(), corner.blue() + 20) << "not marked: " << corner.name().toStdString();
 }

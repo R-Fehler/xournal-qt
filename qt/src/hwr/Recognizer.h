@@ -29,10 +29,12 @@
 
 namespace xqt::hwr {
 
-/// One line of ink as a recogniser gets it: its strokes relative to the line's origin (its top-left on the page).
+/// One line of ink as a recogniser gets it: its strokes relative to the line's origin (its top-left on the page). A
+/// line written at an angle comes upright: its strokes turned into its frame (InkLayout.h), relative to its origin
+/// there; the recogniser never sees the angle.
 struct LineInput {
     quint64 hash = 0;
-    QSizeF size;                     ///< of the line's box
+    QSizeF size;                     ///< of the line's box (upright)
     double h = 0;                    ///< the page's units (InkLayout.h)
     double u = 0;
     std::vector<InkStroke> strokes;  ///< relative to the origin, in the order they were written

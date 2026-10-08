@@ -5,12 +5,14 @@
 #include <limits>
 #include <numeric>
 #include <optional>
+#include <tuple>
 
 #include "model/Element.h"
 #include "model/Layer.h"
 #include "model/Point.h"
 #include "model/Stroke.h"
 #include "model/XojPage.h"
+#include "session/InkText.h"
 
 namespace xqt::hwr {
 
@@ -237,15 +239,20 @@ std::vector<InkWordBox> wordsOf(const std::vector<InkStroke>& strokes, const std
     return words;
 }
 
-Layout layout(const std::vector<InkStroke>& strokes) {
-    Layout out;
-    if (strokes.empty()) {
-        return out;
-    }
+namespace {
+/// The page's units (step 1) from the heights of these strokes' boxes
+std::pair<double, double> unitsOf(const std::vector<InkStroke>& strokes, const std::vector<uint32_t>* which) {
     std::vector<double> heights;
-    heights.reserve(strokes.size());
-    for (const InkStroke& s: strokes) {
-        heights.push_back(s.box.height());
+    if (which) {
+        heights.reserve(which->size());
+        for (const uint32_t i: *which) {
+            heights.push_back(strokes[i].box.height());
+        }
+    } else {
+        heights.reserve(strokes.size());
+        for (const InkStroke& s: strokes) {
+            heights.push_back(s.box.height());
+        }
     }
     double h = median(heights);
     h = h > 0 ? h : 1;
@@ -257,9 +264,13 @@ Layout layout(const std::vector<InkStroke>& strokes) {
     }
     double u = median(upper);
     u = u > 0 ? u : h;
-    out.h = h;
-    out.u = u;
+    return {h, u};
+}
 
+/// Steps 2-6 on these strokes (in the order of writing) with the units h, u: their lines (not sorted yet) to `lines`,
+/// the drawings to `drawings`
+void linesOf(const std::vector<InkStroke>& strokes, const std::vector<uint32_t>& which, double h, double u,
+             std::vector<InkLine>& lines, std::vector<uint32_t>& drawings) {
     // Lines in the order of writing
     struct Group {
         std::vector<uint32_t> strokes;
@@ -267,10 +278,10 @@ Layout layout(const std::vector<InkStroke>& strokes) {
     };
     std::vector<Group> groups;
     const InkStroke* previous = nullptr;
-    for (uint32_t i = 0; i < strokes.size(); ++i) {
+    for (const uint32_t i: which) {
         const InkStroke& s = strokes[i];
         if (s.points.empty() || isDrawing(s, u)) {
-            out.drawings.push_back(i);
+            drawings.push_back(i);
             continue;
         }
         const QPointF c = s.box.center();
@@ -360,8 +371,313 @@ Layout layout(const std::vector<InkStroke>& strokes) {
         for (const uint32_t i: line.strokes) {
             line.box = unite(line.box, strokes[i].box);
         }
-        line.hash = hashOf(strokes, line.strokes, line.origin());
-        out.lines.push_back(std::move(line));
+        line.upright = line.box;
+        line.hash = hashOf(strokes, line.strokes, line.box.topLeft());
+        lines.push_back(std::move(line));
+    }
+}
+
+/// How far apart two boxes are (0: they overlap)
+double distance(const QRectF& a, const QRectF& b) {
+    const double dx = std::max({0.0, a.left() - b.right(), b.left() - a.right()});
+    const double dy = std::max({0.0, a.top() - b.bottom(), b.top() - a.bottom()});
+    return std::hypot(dx, dy);
+}
+
+/// The direction of a run of strokes (degrees, clockwise on the page), if it has one (see InkLayout.h); its length
+/// along that direction and its width across it
+struct Direction {
+    double angle = 0;
+    double length = 0, width = 0;
+};
+std::optional<Direction> directionOf(const std::vector<InkStroke>& strokes, const std::vector<uint32_t>& run,
+                                     double s) {
+    // The principal axis of its ink: the segments' middles weighted by their lengths (not by how fast the pen went)
+    double weight = 0, mx = 0, my = 0;
+    for (const uint32_t i: run) {
+        const auto& p = strokes[i].points;
+        for (size_t k = 1; k < p.size(); ++k) {
+            const double w = std::hypot(p[k].x() - p[k - 1].x(), p[k].y() - p[k - 1].y());
+            mx += w * (p[k].x() + p[k - 1].x()) / 2;
+            my += w * (p[k].y() + p[k - 1].y()) / 2;
+            weight += w;
+        }
+    }
+    if (weight <= 0) {
+        return std::nullopt;
+    }
+    mx /= weight;
+    my /= weight;
+    double sxx = 0, sxy = 0, syy = 0;
+    for (const uint32_t i: run) {
+        const auto& p = strokes[i].points;
+        for (size_t k = 1; k < p.size(); ++k) {
+            const double w = std::hypot(p[k].x() - p[k - 1].x(), p[k].y() - p[k - 1].y());
+            const double x = (p[k].x() + p[k - 1].x()) / 2 - mx, y = (p[k].y() + p[k - 1].y()) / 2 - my;
+            sxx += w * x * x;
+            sxy += w * x * y;
+            syy += w * y * y;
+        }
+    }
+    const double theta = 0.5 * std::atan2(2 * sxy, sxx - syy);
+    const QPointF e(std::cos(theta), std::sin(theta)), n(-e.y(), e.x());
+    auto dot = [](QPointF a, QPointF b) { return a.x() * b.x() + a.y() * b.y(); };
+    double a0 = std::numeric_limits<double>::max(), a1 = std::numeric_limits<double>::lowest(), n0 = a0, n1 = a1;
+    std::vector<double> shapes;  ///< of each stroke: how much longer across the axis than along it
+    for (const uint32_t i: run) {
+        double sa0 = std::numeric_limits<double>::max(), sa1 = std::numeric_limits<double>::lowest(), sn0 = sa0,
+               sn1 = sa1;
+        for (const QPointF& p: strokes[i].points) {
+            sa0 = std::min(sa0, dot(p, e));
+            sa1 = std::max(sa1, dot(p, e));
+            sn0 = std::min(sn0, dot(p, n));
+            sn1 = std::max(sn1, dot(p, n));
+        }
+        a0 = std::min(a0, sa0);
+        a1 = std::max(a1, sa1);
+        n0 = std::min(n0, sn0);
+        n1 = std::max(n1, sn1);
+        shapes.push_back((sn1 - sn0) / std::max(sa1 - sa0, 1e-3));
+    }
+    Direction d;
+    d.length = a1 - a0;
+    d.width = n1 - n0;
+    if (run.size() == 2 || d.length < 6 * s || d.length < 3 * d.width) {
+        return std::nullopt;  // (too short or not narrow, or two strokes: an i and its dot; no direction to tell)
+    }
+    if (median(shapes) > 2) {
+        return std::nullopt;  // (its strokes lie across it: words written one below the other, a list)
+    }
+    // Which way along the axis: the strokes one after the other, or a single stroke from its start to its end
+    double along = 0;
+    if (run.size() >= 2) {
+        double forth = 0, across = 0;
+        for (size_t k = 1; k < run.size(); ++k) {
+            const QPointF step = strokes[run[k]].box.center() - strokes[run[k - 1]].box.center();
+            along += dot(step, e);
+            forth += std::abs(dot(step, e));
+            across += std::abs(dot(step, n));
+        }
+        if (forth < 2 * across || std::abs(along) < 0.5 * forth) {
+            return std::nullopt;  // (back and forth, or across: a list, a column of words)
+        }
+    } else {
+        const auto& p = strokes[run.front()].points;
+        along = dot(p.back() - p.front(), e);
+        if (std::abs(along) < 0.5 * d.length) {
+            return std::nullopt;
+        }
+    }
+    const QPointF v = along > 0 ? e : -e;
+    d.angle = std::atan2(v.y(), v.x()) * 180 / M_PI;
+    return d;
+}
+
+/// A run's angle as it is laid out: 0 (as on the page), ±90, or its own between 20 and 70 degrees either way
+double snapped(double angle) {
+    const double a = std::abs(angle);
+    if (a <= 20 || a >= 110) {
+        return 0;  // (about left to right; leftwards is not taken for writing)
+    }
+    if (a >= 70) {
+        return angle > 0 ? 90 : -90;
+    }
+    return angle;
+}
+}  // namespace
+
+InkStroke turned(const InkStroke& s, double degrees) {
+    std::vector<QPointF> points;
+    points.reserve(s.points.size());
+    for (const QPointF& p: s.points) {
+        points.push_back(ink::turned(p, degrees));
+    }
+    InkStroke t = InkStroke::of(std::move(points), s.width, s.widths);
+    t.filled = s.filled;
+    return t;
+}
+
+QPointF InkLine::origin() const { return angle == 0 ? box.topLeft() : ink::turned(upright.topLeft(), angle); }
+
+std::vector<Frame> framesOf(const std::vector<InkStroke>& strokes, double h, double u) {
+    std::vector<Frame> out;
+    // s: the median of the strokes' smaller sides (about a letter's width or height whichever way it was written)
+    std::vector<double> sides;
+    for (const InkStroke& st: strokes) {
+        if (!st.points.empty() && !st.filled && std::max(st.box.width(), st.box.height()) >= 0.5 * h) {
+            sides.push_back(std::min(st.box.width(), st.box.height()));
+        }
+    }
+    double s = median(std::move(sides));
+    s = s > 0 ? s : h;
+    // Runs: strokes written one after the other, close to each other; small ones (dots, accents) aside
+    struct Run {
+        std::vector<uint32_t> strokes;
+        double angle = 0;  ///< as laid out (0: as on the page)
+        bool directed = false;  ///< has a direction (even if 0)
+    };
+    std::vector<Run> runs;
+    std::vector<uint32_t> small;
+    std::vector<int> runOf(strokes.size(), -1);
+    const InkStroke* previous = nullptr;
+    for (uint32_t i = 0; i < strokes.size(); ++i) {
+        const InkStroke& st = strokes[i];
+        if (st.points.empty() || st.filled) {
+            continue;
+        }
+        const double len = pathLength(st);
+        const double chord = st.points.size() > 1 ? std::hypot(st.points.back().x() - st.points.front().x(),
+                                                               st.points.back().y() - st.points.front().y())
+                                                  : 0;
+        if ((len > 4 * u && chord > 0.95 * len) || std::min(st.box.width(), st.box.height()) > 5 * s) {
+            continue;  // (a straight line or a big shape: a drawing whichever way)
+        }
+        if (std::max(st.box.width(), st.box.height()) < 0.5 * h) {
+            small.push_back(i);
+            continue;
+        }
+        if (!previous || distance(previous->box, st.box) > 3 * s) {
+            runs.push_back({});
+        }
+        runs.back().strokes.push_back(i);
+        runOf[i] = static_cast<int>(runs.size() - 1);
+        previous = &st;
+    }
+    // Their directions; runs of about the same angle are one frame
+    struct Group {
+        double angle = 0;
+        double weight = 0;
+        std::vector<size_t> runs;
+    };
+    std::vector<Group> groups;
+    for (size_t r = 0; r < runs.size(); ++r) {
+        const auto d = directionOf(strokes, runs[r].strokes, s);
+        runs[r].directed = d.has_value();
+        runs[r].angle = d ? snapped(d->angle) : 0;
+        if (runs[r].angle == 0) {
+            continue;
+        }
+        Group* into = nullptr;
+        for (Group& g: groups) {
+            const bool right = std::abs(g.angle) == 90 ? g.angle == runs[r].angle
+                                                       : std::abs(runs[r].angle) != 90 &&
+                                                                 std::abs(g.angle - runs[r].angle) <= 8;
+            if (right) {
+                into = &g;
+                break;
+            }
+        }
+        if (!into) {
+            groups.push_back({runs[r].angle, 0, {}});
+            into = &groups.back();
+        }
+        if (std::abs(into->angle) != 90) {
+            // (the mean of its runs' angles, by their lengths)
+            into->angle = (into->angle * into->weight + runs[r].angle * d->length) / (into->weight + d->length);
+        }
+        into->weight += d->length;
+        into->runs.push_back(r);
+    }
+    if (groups.empty()) {
+        return out;
+    }
+    // Each frame takes its runs, and the dots and short runs inside the box of one of them (a little bigger)
+    std::vector<int> frameOf(strokes.size(), -1);
+    std::vector<std::vector<QRectF>> areas(groups.size());  ///< in the frame
+    for (size_t g = 0; g < groups.size(); ++g) {
+        for (const size_t r: groups[g].runs) {
+            QRectF box;
+            for (const uint32_t i: runs[r].strokes) {
+                frameOf[i] = static_cast<int>(g);
+                const QRectF b = turned(strokes[i], -groups[g].angle).box;
+                box = box.isNull() ? b : unite(box, b);
+            }
+            const double w = std::max(box.height(), s);
+            areas[g].push_back(box.adjusted(-1.5 * w, -0.25 * w, 1.5 * w, 0.25 * w));
+        }
+    }
+    auto take = [&](uint32_t i) {
+        for (size_t g = 0; g < groups.size(); ++g) {
+            const QPointF c = ink::turned(strokes[i].box.center(), -groups[g].angle);
+            for (const QRectF& a: areas[g]) {
+                if (a.contains(c)) {
+                    frameOf[i] = static_cast<int>(g);
+                    return;
+                }
+            }
+        }
+    };
+    for (const uint32_t i: small) {
+        take(i);
+    }
+    for (const Run& r: runs) {
+        if (!r.directed) {
+            for (const uint32_t i: r.strokes) {
+                take(i);
+            }
+        }
+    }
+    out.resize(groups.size());
+    for (size_t g = 0; g < groups.size(); ++g) {
+        out[g].angle = groups[g].angle;
+    }
+    for (uint32_t i = 0; i < strokes.size(); ++i) {
+        if (frameOf[i] >= 0) {
+            out[static_cast<size_t>(frameOf[i])].strokes.push_back(i);
+        }
+    }
+    return out;
+}
+
+Layout layout(const std::vector<InkStroke>& strokes) {
+    Layout out;
+    if (strokes.empty()) {
+        return out;
+    }
+    const auto [h, u] = unitsOf(strokes, nullptr);
+    out.h = h;
+    out.u = u;
+    const std::vector<Frame> frames = framesOf(strokes, h, u);
+    std::vector<uint32_t> upright;  ///< the strokes laid out on the page as they are
+    {
+        std::vector<bool> framed(strokes.size(), false);
+        for (const Frame& f: frames) {
+            for (const uint32_t i: f.strokes) {
+                framed[i] = true;
+            }
+        }
+        upright.reserve(strokes.size());
+        for (uint32_t i = 0; i < strokes.size(); ++i) {
+            if (!framed[i]) {
+                upright.push_back(i);
+            }
+        }
+    }
+    if (!frames.empty()) {
+        // (the units of the strokes as they are: those at an angle are as tall as they are long)
+        std::tie(out.h, out.u) = unitsOf(strokes, &upright);
+    }
+    linesOf(strokes, upright, out.h, out.u, out.lines, out.drawings);
+    for (const Frame& f: frames) {
+        // Turned upright and laid out as a page of their own
+        std::vector<InkStroke> turnedStrokes(strokes.size());
+        for (const uint32_t i: f.strokes) {
+            turnedStrokes[i] = turned(strokes[i], -f.angle);
+        }
+        const auto [fh, fu] = unitsOf(turnedStrokes, &f.strokes);
+        std::vector<InkLine> lines;
+        linesOf(turnedStrokes, f.strokes, fh, fu, lines, out.drawings);
+        for (InkLine& line: lines) {
+            line.angle = f.angle;
+            line.box = strokes[line.strokes.front()].box;
+            for (const uint32_t i: line.strokes) {
+                line.box = unite(line.box, strokes[i].box);
+            }
+            out.lines.push_back(std::move(line));
+        }
+    }
+    if (!frames.empty()) {
+        std::sort(out.drawings.begin(), out.drawings.end());
     }
     std::stable_sort(out.lines.begin(), out.lines.end(),
                      [](const InkLine& a, const InkLine& b) { return a.box.top() < b.box.top(); });

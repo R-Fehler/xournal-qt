@@ -213,6 +213,12 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
 - [ ] The emoji button is out of reach while the soft keyboard is open on a phone.
 
 ### Handwriting
+- [x] `qt/hwr-rotation`: handwriting at an angle (margin notes up or down, labels along arrows, lines at 20-70°) is
+  laid out in its own frame, read upright, marked turned, copied and put into the PDF text layer turned
+  ([handwriting-search.md](qt/docs/features/handwriting-search.md), "Handwriting at an angle"). Left: writing leftwards
+  (upside down) is read as level; a column of single letters/digits can pass for a line written downwards; poppler
+  splits words at a free angle into letters ("K a l m a n"; 90° is fine); a level or 90° line turned by the lasso is
+  read again (20-70° keep their result); check on the device (the feature doc's "On the device").
 - [ ] **The small shared model, bundled** (the author, 2026-10-08: if the shared German + English CTC wins, it ships
   inside the packages instead of downloading on demand). Needs: the model folder (~6 MB int8) in every package
   (`.deb`, AppImage, Windows zip, macOS bundle, APK assets) and found there before the data folder

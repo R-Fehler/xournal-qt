@@ -29,6 +29,40 @@ What to expect:
 - Drawings, arrows, underlines and filled shapes are left out; highlighter strokes never count.
 - Search terms of several words ("dumb test") find consecutive handwritten words, also across a line end.
 
+## Handwriting at an angle
+
+Text written at an angle or along the margin (a note written upwards along the edge of a PDF slide, a label along an
+arrow, a line written steeply uphill) is found, marked, copied and put into the PDF text layer like level text.
+
+- **What counts**: a run of strokes written one after the other close together, long and narrow enough (at least 6
+  times the strokes' typical smaller side and 3 times as long as wide; not two strokes alone, an i and its dot), whose
+  strokes follow each other along it, has a direction. Within 20° of left to right it is laid out as level text, as
+  before (slopes are fine). 70°–110° either way counts as exactly 90°: **written downwards** (90°) or **upwards**
+  (270°, -90°). Between 20° and 70° either way the line keeps its own angle. Writing leftwards (beyond 110°, upside
+  down) is not taken for text.
+- **How it is read**: the strokes of each direction are turned upright and laid out by the same rules as a page (lines,
+  words, drawings left out, in the frame's own units), so the recogniser gets the line upright. Dots and accents, and
+  short pieces too short to have a direction (a word written after a pause), join the line they lie on.
+- **Level text is unchanged**: a page without writing at an angle comes out exactly as before (the same lines, words
+  and hashes; `InkLayoutTest.theBenchmarkPageIsLaidOutAsBefore`). On a page with both, the level text's units leave the
+  strokes at an angle out (they are as tall as they are long).
+- **The results**: a line keeps its angle; its words are boxes in its upright frame, so a line moved with the lasso
+  keeps what was read in it, and the same words written at another angle are the same line to the cache. Turned with
+  the lasso, a line between 20° and 70° keeps its result while it stays in that range; a level line or one at 90°
+  turned by the lasso is read again. The angle is kept in the library's pack (older packs: level).
+- **Marked** with the box turned like the ink; **copied as text** as one line, a paragraph of its own (empty lines
+  around it), placed among the other lines by the top of the box around it; a sweep takes its words by their turned
+  boxes. **The PDF text layer** turns each word with its text matrix: viewers select along the ink. Poppler (Okular,
+  Evince) reads words written up or down as words; at a free angle it takes the letters one by one ("K a l m a n").
+- **Limits**: a column of single letters or digits, one below the other, may be taken for a line written downwards
+  (geometry alone cannot tell them apart; a list of words is not); handwriting written leftwards is read as level.
+- Code: `InkLayout.h` (`framesOf`, `InkLine::angle` / `upright`), `Recognizer.cpp` (`LineInput::of` turns the line
+  upright), `InkText.h` (`PlacedLine::angle`, `Word::angle`, `quadOf`, `quadsOf`), `DocumentSearch::Place::quads`,
+  `DocumentCanvasItem::updateSearchHits`, `InkCopy.cpp`, `InkTextLayer.cpp`, `InkTextStore.cpp`. Tests:
+  `InkRotationTest.*` (`-L hwr`: 0°, 15°, 35°, 90°, 270°, a mixed page, a list, the hash, the scripted recogniser,
+  marks, copying, poppler), `InkSearchTest.handwritingAtAnAngleIsMarkedTurned`,
+  `InkLibraryTest.theAngleOfALineIsStored`, `CanvasItemRenderTest.aHitInHandwritingAtAnAngleIsMarkedTurned` (`-L quick`).
+
 ## Copy handwriting as text
 
 The author: "copy handwritten text but make it its own tool similar to select pdf text (could be a cycle)
@@ -130,8 +164,8 @@ xournal-qt-cli hwr-lines notes.xopp --out ~/hwr-data/notes [--text transcripts.t
 
 - Every line of ink the search finds (the same layout of lines and words) becomes `images/<id>.png` (drawn exactly
   as the app draws a line for its recognisers: 128 px high, black ink with round caps on white), `strokes/<id>.json`
-  (the ink itself, in points relative to the line) and a line of `lines.jsonl` (`id`, `image`, `text`, `lang`,
-  `writer`, `strokes`, and the `page` and `line` it came from). `dataset.json` names the set (`kind` `ink`).
+  (the ink itself, in points relative to the line; a line written at an angle turned upright) and a line of
+  `lines.jsonl` (`id`, `image`, `text`, `lang`, `writer`, `strokes`, and the `page` and `line` it came from). `dataset.json` names the set (`kind` `ink`).
 - The ids are `<writer>-<document>-p<page>-l<line>`. Lines are in reading order: pages in order, lines top to bottom.
 - `--text`: a text file with one line of text per line of ink, in the same order (empty lines and lines starting
   with `#` are skipped; NFC). When the numbers differ, the texts are matched as far as they go and the tool warns:
@@ -209,5 +243,7 @@ The sentences are the texts (`sentences-<lang>.txt`; `make_sample.py` makes the 
 
 What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
 
+- [ ] A margin note written upwards along a slide's edge and a label along an arrow are found and marked over the
+      ink, copied as text, and selected along the ink in Okular and Firefox after saving as a PDF with notes.
 - [ ] The models download once with consent; the author's own notes in English and German are found by words
       written in them, also in the library search and in other PDF viewers (the invisible text layer).

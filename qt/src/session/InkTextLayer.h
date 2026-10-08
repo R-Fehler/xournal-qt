@@ -6,7 +6,8 @@
  * the page's own content: "q <placement> cm BT 3 Tr ... ET Q", the best reading of each word as text in render mode 3
  * (neither filled nor stroked: invisible, but found, selected and copied by viewers), over the word's box (the font
  * size is the box's height, the baseline a fifth above its bottom, Tz stretches it to the box's width; a space after
- * each word). Only readings safe enough
+ * each word). A word written at an angle (InkText.h: Word::angle) is turned with it by its text matrix, so a viewer's
+ * selection follows the ink. Only readings safe enough
  * for viewers go in (MIN_P of the recogniser's guesses and MIN_CONF): a viewer cannot weigh them, and a wrong word
  * found there is worse than one not found. The other readings are only searched in the app.
  *
@@ -40,7 +41,8 @@ constexpr const char* FONT_RESOURCE = "/XqtInkText";
 
 struct Word {
     QString text;
-    QRectF box;  ///< page points, y down
+    QRectF box;  ///< page points, y down; with an angle: upright around the word's middle (ink::Word::box)
+    double angle = 0;  ///< degrees clockwise on the page (ink::Word::angle)
 };
 /// The words of a page that go into its text layer.
 std::vector<Word> wordsOf(const ink::PageText& page);

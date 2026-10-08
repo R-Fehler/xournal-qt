@@ -18,6 +18,7 @@
 
 #include <array>
 #include <atomic>
+#include <map>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -27,6 +28,7 @@
 #include <QMatrix4x4>
 #include <QPointF>
 #include <QPointer>
+#include <QPolygonF>
 #include <QQuickItem>
 #include <QRectF>
 #include <QString>
@@ -197,6 +199,9 @@ public:
         double dpr = 0;
     };
     SelectionShown selectionShown() const { return selectionStats; }
+    /// The search's marks drawn in the last frame that drew them (tests), per page: their corners in page points
+    /// (four each; a turned quad for handwriting written at an angle).
+    std::map<size_t, std::vector<QPolygonF>> searchMarksShown() const;
     /// The pointer the canvas draws itself (tests; qt/docs/features/hover-cursors.md): for a pen the platform shows no
     /// cursor for, and an eraser too big for a cursor. Shown or not, where its middle is (item coordinates), its side
     /// (logical pixels), and the eraser it shows (none: the dot).
@@ -350,4 +355,5 @@ private:
     GeometryShown geometryStats;
     CurtainShown curtainStats;
     SelectionShown selectionStats;
+    std::map<size_t, std::vector<QPolygonF>> searchMarks;  ///< (the scene graph's thread writes it while the UI waits)
 };

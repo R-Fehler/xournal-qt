@@ -48,6 +48,7 @@ struct LineRef {
     quint64 hash = 0;
     QPointF origin;
     std::shared_ptr<const ink::LineResult> result;
+    double angle = 0;  ///< the direction it was written in (InkLine::angle; its result is upright, turned by this)
 };
 
 struct PageResult {

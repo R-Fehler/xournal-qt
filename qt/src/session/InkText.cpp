@@ -1,6 +1,7 @@
 #include "InkText.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "FuzzyQuery.h"
 #include "WordMatch.h"
@@ -18,6 +19,40 @@ QString folded(QStringView text) {
 }
 
 Candidate candidate(QStringView text, float p) { return {words::idOf(folded(text)), p}; }
+
+QPointF turned(QPointF p, double degrees) {
+    double c = 0, s = 0;
+    if (degrees == 0) {
+        return p;
+    } else if (degrees == 90) {
+        s = 1;
+    } else if (degrees == -90 || degrees == 270) {
+        s = -1;
+    } else if (degrees == 180 || degrees == -180) {
+        c = -1;
+    } else {
+        const double r = degrees * M_PI / 180;
+        c = std::cos(r);
+        s = std::sin(r);
+    }
+    return {c * p.x() - s * p.y(), s * p.x() + c * p.y()};
+}
+
+QPolygonF quadOf(const QRectF& box, double angle) {
+    QPolygonF q;
+    q << box.topLeft() << box.topRight() << box.bottomRight() << box.bottomLeft();
+    if (angle != 0) {
+        const QPointF c = box.center();
+        for (QPointF& p: q) {
+            p = c + turned(p - c, angle);
+        }
+    }
+    return q;
+}
+
+QPolygonF quadOf(const Word& w) { return quadOf(w.box, w.angle); }
+
+QRectF boundsOf(const Word& w) { return w.angle == 0 ? w.box : quadOf(w).boundingRect(); }
 
 size_t LineResult::bytes() const {
     size_t b = sizeof(LineResult);
@@ -41,7 +76,14 @@ std::shared_ptr<const PageText> PageText::assemble(const std::vector<PlacedLine>
         page->lineStarts.push_back(static_cast<uint32_t>(page->words.size()));
         for (const Word& w: l.result->words) {
             page->words.push_back(w);
-            page->words.back().box.translate(l.origin);
+            Word& placed = page->words.back();
+            if (l.angle == 0) {
+                placed.box.translate(l.origin);
+            } else {
+                // (upright around its middle, which is turned with the line around its origin)
+                placed.box.moveCenter(l.origin + turned(w.box.center(), l.angle));
+                placed.angle = static_cast<float>(l.angle);
+            }
         }
     }
     return page;
@@ -193,22 +235,70 @@ bool contains(const PageText& ink, const textmatch::Term& term, int typos) {
     return !find(ink, {term}, typos).empty();
 }
 
-std::vector<QRectF> rectsOf(const PageText& ink, const Hit& hit) {
-    std::vector<QRectF> out;
+namespace {
+/// The marked parts of a hit, one per line: the box of its words, MARK_MARGIN bigger, in the frame of the line (the
+/// page turned by -angle around (0, 0)), and that angle.
+std::vector<std::pair<QRectF, double>> partsOf(const PageText& ink, const Hit& hit) {
+    std::vector<std::pair<QRectF, double>> out;
     QRectF box;
+    double angle = 0;
     bool open = false;
+    auto close = [&] {
+        out.emplace_back(box.adjusted(-MARK_MARGIN, -MARK_MARGIN, MARK_MARGIN, MARK_MARGIN), angle);
+        open = false;
+    };
     for (uint32_t i = hit.first; i <= hit.last && i < ink.words.size(); ++i) {
-        if (open && std::binary_search(ink.lineStarts.begin(), ink.lineStarts.end(), i)) {
-            out.push_back(box.adjusted(-MARK_MARGIN, -MARK_MARGIN, MARK_MARGIN, MARK_MARGIN));
-            open = false;
+        const Word& w = ink.words[i];
+        if (open && (std::binary_search(ink.lineStarts.begin(), ink.lineStarts.end(), i) || w.angle != angle)) {
+            close();
         }
-        box = open ? box.united(ink.words[i].box) : ink.words[i].box;
+        QRectF framed = w.box;
+        if (w.angle != 0) {
+            framed.moveCenter(turned(w.box.center(), -w.angle));
+        }
+        box = open ? box.united(framed) : framed;
+        angle = w.angle;
         open = true;
     }
     if (open) {
-        out.push_back(box.adjusted(-MARK_MARGIN, -MARK_MARGIN, MARK_MARGIN, MARK_MARGIN));
+        close();
     }
     return out;
+}
+
+QPolygonF quadOfPart(const QRectF& framed, double angle) {
+    QPolygonF q;
+    q << framed.topLeft() << framed.topRight() << framed.bottomRight() << framed.bottomLeft();
+    for (QPointF& p: q) {
+        p = turned(p, angle);
+    }
+    return q;
+}
+}  // namespace
+
+std::vector<QRectF> rectsOf(const PageText& ink, const Hit& hit) {
+    std::vector<QRectF> out;
+    for (const auto& [box, angle]: partsOf(ink, hit)) {
+        out.push_back(angle == 0 ? box : quadOfPart(box, angle).boundingRect());
+    }
+    return out;
+}
+
+std::vector<QPolygonF> quadsOf(const PageText& ink, const Hit& hit) {
+    std::vector<QPolygonF> out;
+    for (const auto& [box, angle]: partsOf(ink, hit)) {
+        out.push_back(quadOfPart(box, angle));
+    }
+    return out;
+}
+
+bool atAnAngle(const PageText& ink, const Hit& hit) {
+    for (uint32_t i = hit.first; i <= hit.last && i < ink.words.size(); ++i) {
+        if (ink.words[i].angle != 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 }  // namespace xqt::ink

@@ -65,6 +65,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkTextTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkSearchTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkLayoutTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkRotationTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/RecognizerTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkIndexerTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkCopyTest.cpp

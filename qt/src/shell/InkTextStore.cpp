@@ -26,7 +26,7 @@ void InkDoc::assemble() {
     for (const auto& lines: pages) {
         std::vector<ink::PlacedLine> placed;
         for (const hwr::LineRef& l: lines) {
-            placed.push_back({l.origin, l.result});
+            placed.push_back({l.origin, l.result, l.angle});
         }
         auto text = ink::PageText::assemble(placed);
         texts.push_back(text->empty() ? nullptr : text);
@@ -56,7 +56,11 @@ QCborMap InkTextStore::encode(const InkDoc& doc) {
     for (const auto& page: doc.pages) {
         QCborArray refs;
         for (const hwr::LineRef& l: page) {
-            refs.append(QCborArray{asInt(l.hash), tenths(l.origin.x()), tenths(l.origin.y())});
+            QCborArray ref{asInt(l.hash), tenths(l.origin.x()), tenths(l.origin.y())};
+            if (l.angle != 0) {
+                ref.append(static_cast<qint64>(std::lround(l.angle * 100)));  // (a line at an angle: 0.01 degrees)
+            }
+            refs.append(ref);
             if (l.result) {
                 lines.emplace(l.hash, l.result);
             }
@@ -149,6 +153,9 @@ std::shared_ptr<InkDoc> InkTextStore::decode(const QCborMap& map) {
             hwr::LineRef ref;
             ref.hash = asHash(r.at(0));
             ref.origin = QPointF(fromTenths(r.at(1)), fromTenths(r.at(2)));
+            if (r.size() > 3) {
+                ref.angle = static_cast<double>(r.at(3).toInteger()) / 100;
+            }
             if (auto it = lines.find(ref.hash); it != lines.end()) {
                 ref.result = it->second;
             }
