@@ -231,6 +231,9 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
   quantization (QDQ with a calibration set) would make the convolutions int8 too, which VNNI desktops (Intel Alder
   Lake+, AMD Zen 4+) and ARM's dot product and i8mm (Apple M, Snapdragon, phones) run much faster; check it with
   `evaluate.py` on the test sets.
+- [x] `qt/hwr-ctc-boxes`: a CTC model's words go on the word boxes where it read them (its frames), TrOCR's still by
+  letter shares (the author, 2026-10-08). Left: the measurement had only 13 distinct differing lines (test/files has
+  little handwriting); measure again on a larger hand (`CtcTest.wordBoxesOfRealInk` with `XQT_HWR_BOXES_FILES`).
 - [ ] `qt/hwr-userdata` (later): a dataset of the user's own hand made in the app, for fine-tuning.
 
 ### Platforms

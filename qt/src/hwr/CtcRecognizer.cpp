@@ -180,10 +180,38 @@ std::optional<std::vector<Beam>> CtcRecognizer::readPicture(const std::vector<fl
     for (const CtcReading& r: readings) {
         const QString text = alphabet.text(r.labels, manifest.blank).simplified();
         if (!text.isEmpty()) {
-            beams.push_back({text, r.logProb, sure});
+            beams.push_back({text, r.logProb, sure, wordSpansOf(r, frames, alphabet, manifest.blank)});
         }
     }
     return beams;
+}
+
+std::vector<WordSpan> wordSpansOf(const CtcReading& reading, size_t frames, const CtcAlphabet& alphabet, int blank) {
+    // The words as simplified() splits the text: at characters that are spaces
+    std::vector<WordSpan> out;
+    if (reading.spans.size() != reading.labels.size() || frames == 0) {
+        return out;
+    }
+    const auto T = static_cast<double>(frames);
+    bool inWord = false;
+    for (size_t k = 0; k < reading.labels.size(); ++k) {
+        const QString c = alphabet.charOf(reading.labels[k], blank);
+        if (c.isEmpty()) {
+            continue;
+        }
+        if (c.trimmed().isEmpty()) {
+            inWord = false;
+            continue;
+        }
+        const double left = reading.spans[k].first / T, right = (reading.spans[k].last + 1) / T;
+        if (!inWord) {
+            out.push_back({left, right});
+            inWord = true;
+        } else {
+            out.back().right = std::max(out.back().right, right);
+        }
+    }
+    return out;
 }
 
 std::optional<ink::LineResult> CtcRecognizer::recognizeLine(const LineInput& line, const Context& context) {
@@ -212,13 +240,18 @@ std::optional<ink::LineResult> CtcRecognizer::recognizeLine(const LineInput& lin
         }
         int width = 0;
         const std::vector<float> ink = inkOf(line, piece, manifest.inputHeight, manifest.maxWidth, width);
-        const auto beams = readPicture(ink, width, context);
+        auto beams = readPicture(ink, width, context);
         if (!beams) {
             return std::nullopt;
         }
         std::vector<QRectF> boxes;
         for (size_t i = piece.first; i <= piece.last; ++i) {
             boxes.push_back(line.words[i].box);
+        }
+        for (Beam& b: *beams) {
+            for (WordSpan& s: b.spans) {
+                s = {xAt(piece, s.left), xAt(piece, s.right)};
+            }
         }
         for (ink::Word& w: wordsOf(*beams, boxes, TOP_K)) {
             result.words.push_back(std::move(w));

@@ -11,7 +11,7 @@ never converted: the readings go into the search index (and an invisible text la
 | `TrocrRecognizer`, `CtcRecognizer` | the recognisers: TrOCR-small and small CTC line models in ONNX Runtime |
 | `MultiRecognizer`, `LanguagePlan` | several models (English, German) on the same lines; which models a document needs |
 | `OrtRuntime` | ONNX Runtime loaded at run time (only its C API's headers are vendored) |
-| `BeamSearch`, `CtcDecode`, `WordAlignment`, `LineImage` | decoding and the pieces between the layout and a model |
+| `BeamSearch`, `CtcDecode`, `WordAlignment`, `LineImage` | decoding and the pieces between the layout and a model: a reading's words go on the word boxes where a CTC model read them (its frames), else by their letters' shares |
 | `InkRecognitionService` | the one worker thread at idle priority shared by all documents and the library |
 | `InkTextIndexer` | keeps one open document's handwriting searchable |
 | `InkCopy` | "Copy handwriting as text" |

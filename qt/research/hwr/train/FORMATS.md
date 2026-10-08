@@ -74,10 +74,13 @@ app runs today; the training's exporter must produce the same inputs and outputs
 - Input `image`: float32 `[1, 1, input_height, W]`, W ≤ `max_width`, values in [0, 1] with ink = 1 (white = 0), the
   line scaled to `input_height` keeping its aspect ratio.
 - Output `logits`: float32 `[T, 1, C]` (log-softmax over C = alphabet size + 1, class `blank` is the CTC blank).
+  The frames are equal slices of the input's width, left to right (the CRNN: T = W / 4): the app takes frame t of T
+  as t / T to (t + 1) / T of the picture to find where a word was read.
 - `alphabet.txt`: one character per line (UTF-8, NFC), class i+1 is line i (class 0 is the blank). A line holding
   only a space is the space.
-- The app decodes with a CTC beam search (top-k line readings with their probabilities) and splits them into words at
-  spaces, then aligns them to the ink's word boxes as it does for TrOCR.
+- The app decodes with a CTC beam search (top-k line readings with their probabilities, and per character the frames
+  it was read on) and splits them into words at spaces, then puts them on the ink's word boxes: one to one when the
+  numbers match, else each word on the box it overlaps most where it was read.
 
 `languages` tells the app which documents a model is for (`qt/hwr-multilang`: English, German, both).
 
