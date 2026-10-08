@@ -260,6 +260,14 @@ runs low; the library then reads its documents once again.
   while recording, a foreground service of type microphone (`RecordingService.java`) with a notification (time,
   Pause/Resume, Stop) and a partial wake lock keeps it going with the screen off, and the activity's
   `android.app.background_running` keeps Qt's event loop running in the background.
+- **Handwriting search** ([releasing.md](releasing.md#handwriting-onnx-runtime-and-the-model)): `android-build.sh apk`
+  fetches ONNX Runtime's AAR from Maven Central (pinned and checked: `qt/packaging/onnxruntime.env`,
+  `qt/scripts/onnxruntime-fetch.sh`) and puts its `jni/arm64-v8a/libonnxruntime.so` into
+  `qt/packaging/android/libs/arm64-v8a/` and its licence files into `qt/packaging/android/assets/share/doc/xournal-qt/onnxruntime/`
+  (both ignored by git). That folder is the package source folder (`QT_ANDROID_PACKAGE_SOURCE_DIR`): androiddeployqt
+  copies it and Gradle packs `libs/<abi>/` as native libraries (`lib/arm64-v8a/libonnxruntime.so` in the APK, which
+  the app opens by name) and `assets/` as assets. The models travel with the app's other resources. Native libraries
+  are stored uncompressed in the APK (Qt's default, no legacy packaging), so the runtime adds its full 33 MB.
 - **Folders**: `XDG_CONFIG_HOME`, `XDG_CACHE_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME`, `HOME` and `TMPDIR` point to
   the app's own folders before GLib first reads them, so upstream's `Util::getConfigFolder()` and friends work.
 
@@ -269,6 +277,9 @@ runs low; the library then reads its documents once again.
 Android" → Run workflow) or by a push to the `qt/android-build` branch. It runs `qt/scripts/android-build.sh deps`
 and `apk` with Qt 6.11.2 from aqt (with Qt Multimedia, `-m qtmultimedia`), NDK r27c, JDK 17 and vcpkg at the manifest's baseline. The first run builds the C
 libraries (an hour or two); they are cached for the next runs. The APK is the artifact `xournal-qt-android-arm64`.
+With no device to run it on, the job looks into the APK for the handwriting search instead
+(`qt/scripts/hwr-package-check.sh apk`): `lib/arm64-v8a/libonnxruntime.so`, ONNX Runtime's licence files, and every
+model file of `qt/resources/hwr/` (as an asset, or by name among the Qt resources of the app's library).
 
 Signing: an update installs over an app only when both are signed with the same key. Without a key in the
 repository secrets the CI APK keeps a throwaway debug signature (different on every run). With the secrets

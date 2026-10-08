@@ -3,7 +3,8 @@
 #
 #   qt/scripts/android-build.sh          # dependencies (vcpkg), configure, build the APK
 #   qt/scripts/android-build.sh deps     # only the C dependencies through vcpkg (hours the first time)
-#   qt/scripts/android-build.sh apk      # only configure + build (the dependencies must be there)
+#   qt/scripts/android-build.sh apk      # only configure + build (the dependencies must be there); fetches ONNX
+#                                        # Runtime for the handwriting search into qt/packaging/android/libs (git ignores it)
 #   qt/scripts/android-build.sh ksyntax  # only KSyntaxHighlighting (part of deps; Markdown code colours)
 #
 # Every heavy step runs with at most XQT_JOBS jobs (default 4), at low priority and, where systemd is there, in a
@@ -153,7 +154,24 @@ ksyntax() {
     cmake --install "$kf/android-build"
 }
 
+# ONNX Runtime for the handwriting search (qt/packaging/onnxruntime.env, from Maven Central's AAR): its arm64 library
+# goes into the APK's native libraries (lib/arm64-v8a/libonnxruntime.so, which the app opens by name), its licence
+# files into the APK's assets (assets/share/doc/xournal-qt/onnxruntime). Both through the Android package source
+# folder (qt/packaging/android: androiddeployqt copies it, Gradle packs libs/<abi>/ and assets/), where they are
+# ignored by git. The models travel with the app's other resources (qt/cmake/XqtAndroid.cmake).
+onnxruntime() {
+    local pkg="$qt_dir/packaging/android" tmp
+    tmp=$(mktemp -d)
+    XQT_DOWNLOAD_CACHE="${XQT_DOWNLOAD_CACHE:-$HOME/.cache/xqt-downloads}" \
+        bash "$here/onnxruntime-fetch.sh" android-arm64 "$tmp/rt"
+    mkdir -p "$pkg/libs/arm64-v8a" "$pkg/assets/share/doc/xournal-qt/onnxruntime"
+    cp "$tmp/rt/lib/libonnxruntime.so" "$pkg/libs/arm64-v8a/"
+    cp "$tmp/rt/LICENSE" "$tmp/rt/ThirdPartyNotices.txt" "$pkg/assets/share/doc/xournal-qt/onnxruntime/"
+    rm -rf "$tmp"
+}
+
 apk() {
+    onnxruntime
     # The ccache first on PATH (the toolchain's program search found an old /bin/ccache before ~/.local/bin; ccache
     # before 4.7 served stale objects across worktrees)
     local ccache_arg=()

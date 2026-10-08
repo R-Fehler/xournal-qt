@@ -137,6 +137,14 @@ jobs:
           rm -f "$keystore"
           "$tools/apksigner" verify --print-certs "$out" | grep -E 'Signer #1 certificate (DN|SHA-256)'
 
+      # No device here: the APK is looked into instead of `xournal-qt --hwr-info` (qt/docs/development/releasing.md,
+      # "Handwriting"): lib/arm64-v8a/libonnxruntime.so, ONNX Runtime's licence files and every model's files
+      - name: Check the APK for the handwriting search
+        run: |
+          set -euo pipefail
+          unzip -l dist/xournal-qt-arm64.apk | grep -E 'libonnxruntime|onnxruntime/|hwr-models' || true
+          bash qt/scripts/hwr-package-check.sh apk dist/xournal-qt-arm64.apk
+
       - name: What was built
         run: |
           ls -l dist
