@@ -136,6 +136,28 @@ TEST(InkRotationTest, aLineAtAnAngleIsOneLineInItsOwnFrame) {
     }
 }
 
+// Upside down (written leftwards: 160 to 180 degrees count as 180) and leftwards at a free angle (110 to 160) the line
+// is laid out in its own frame too and read upright, its origin where it starts
+TEST(InkRotationTest, aLineWrittenLeftwardsIsReadUpright) {
+    for (const double angle: {180.0, -178.0, 135.0, -135.0}) {
+        SCOPED_TRACE(angle);
+        const auto strokes = lineAt({300, 400}, angle, 4);
+        const hwr::Layout l = layout(strokes);
+        ASSERT_EQ(l.lines.size(), 1u);
+        const InkLine& line = l.lines[0];
+        if (std::abs(angle) >= 160) {
+            EXPECT_EQ(line.angle, 180);  // (exactly)
+        } else {
+            EXPECT_NEAR(line.angle, angle, 0.5);
+        }
+        EXPECT_EQ(line.words.size(), 4u);
+        const LineInput in = LineInput::of(strokes, l, line);
+        EXPECT_TRUE(std::abs(angle) == 178 || upright(in)) << in.size.width() << " x " << in.size.height();
+        EXPECT_NEAR(line.origin().x(), 300, std::abs(angle) == 178 ? 4 : 0.5);
+        EXPECT_NEAR(line.origin().y(), 400, std::abs(angle) == 178 ? 4 : 0.5);
+    }
+}
+
 // Two lines written upwards beside each other are two lines; a note written downwards and one upwards are apart
 TEST(InkRotationTest, parallelLinesAtAnAngleAreLinesOfTheirOwn) {
     std::vector<InkStroke> s = lineAt({100, 600}, -90, 4);
@@ -237,11 +259,11 @@ TEST(InkRotationTest, realHandwritingAtAnAngleIsOneLine) {
     for (size_t k = 0; k < lines.size(); ++k) {
         const hwr::Layout level = layout(lines[k]);
         ASSERT_EQ(level.lines.size(), 1u);
-        for (const double angle: {90.0, -90.0, 45.0, -45.0, 30.0}) {
+        for (const double angle: {90.0, -90.0, 45.0, -45.0, 30.0, 180.0, 135.0, -135.0}) {
             SCOPED_TRACE(QStringLiteral("line %1 at %2").arg(k).arg(angle).toStdString());
             const hwr::Layout l = layout(test::turnedAround(lines[k], angle));
             ASSERT_EQ(l.lines.size(), 1u);
-            if (std::abs(angle) == 90) {
+            if (std::abs(angle) == 90 || angle == 180) {
                 EXPECT_EQ(l.lines[0].angle, angle);
             } else {
                 EXPECT_NEAR(l.lines[0].angle, angle, 3);

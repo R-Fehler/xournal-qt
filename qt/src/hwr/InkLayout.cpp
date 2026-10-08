@@ -473,17 +473,24 @@ std::optional<Direction> directionOf(const std::vector<InkStroke>& strokes, cons
     return d;
 }
 
-/// A run's angle as it is laid out: 0 (as on the page), ±90, or its own between 20 and 70 degrees either way
+/// A run's angle as it is laid out: 0 (as on the page), ±90, 180 (upside down), or its own between 20 and 70 or 110
+/// and 160 degrees either way
 double snapped(double angle) {
     const double a = std::abs(angle);
-    if (a <= 20 || a >= 110) {
-        return 0;  // (about left to right; leftwards is not taken for writing)
+    if (a <= 20) {
+        return 0;  // (about left to right)
     }
-    if (a >= 70) {
+    if (a >= 70 && a <= 110) {
         return angle > 0 ? 90 : -90;
+    }
+    if (a >= 160) {
+        return 180;  // (leftwards: upside down)
     }
     return angle;
 }
+
+/// Angles that are exactly one of the directions above, not a mean of several runs'
+bool exact(double angle) { return std::abs(angle) == 90 || angle == 180; }
 }  // namespace
 
 InkStroke turned(const InkStroke& s, double degrees) {
@@ -558,9 +565,8 @@ std::vector<Frame> framesOf(const std::vector<InkStroke>& strokes, double h, dou
         }
         Group* into = nullptr;
         for (Group& g: groups) {
-            const bool right = std::abs(g.angle) == 90 ? g.angle == runs[r].angle
-                                                       : std::abs(runs[r].angle) != 90 &&
-                                                                 std::abs(g.angle - runs[r].angle) <= 8;
+            const bool right = exact(g.angle) ? g.angle == runs[r].angle
+                                              : !exact(runs[r].angle) && std::abs(g.angle - runs[r].angle) <= 8;
             if (right) {
                 into = &g;
                 break;
@@ -570,7 +576,7 @@ std::vector<Frame> framesOf(const std::vector<InkStroke>& strokes, double h, dou
             groups.push_back({runs[r].angle, 0, {}});
             into = &groups.back();
         }
-        if (std::abs(into->angle) != 90) {
+        if (!exact(into->angle)) {
             // (the mean of its runs' angles, by their lengths)
             into->angle = (into->angle * into->weight + runs[r].angle * d->length) / (into->weight + d->length);
         }
