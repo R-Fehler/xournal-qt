@@ -18,6 +18,8 @@ add_library(xqt-hwr STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/FormManifest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/FormDataset.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/FormDataset.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/FormBench.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/FormBench.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/LanguagePlan.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/MultiRecognizer.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/MultiRecognizer.cpp
@@ -59,8 +61,8 @@ foreach(_xqt_model_dir ${_xqt_hwr_models})
     endif()
 endforeach()
 
-# The CLI's "hwr-lines" and "hwr-form": a document's handwriting as a line dataset (LineDataset.h), a filled
-# handwriting form as a dataset (FormDataset.h); Qt only for these commands
+# The CLI's "hwr-lines", "hwr-form" and "hwr-bench": a document's handwriting as a line dataset (LineDataset.h), a
+# filled handwriting form as a dataset (FormDataset.h) and as a benchmark (FormBench.h); Qt only for these commands
 if(TARGET xournal-qt-cli)
     target_link_libraries(xournal-qt-cli PRIVATE xqt-hwr)
     target_compile_definitions(xournal-qt-cli PRIVATE XQT_CLI_HWR)

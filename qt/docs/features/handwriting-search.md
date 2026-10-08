@@ -259,11 +259,12 @@ The sentences are the texts (`sentences-<lang>.txt`; `make_sample.py` makes the 
 A **handwriting form** is a PDF that asks the writer to copy printed text into marked boxes, at given sizes and
 angles, plus a few drawings, marks and formulas ([the design](../../research/hwr/forms/DESIGN.md)). Its manifest
 (`<form>.manifest.json`, attached to the PDF) holds every box (mm, turned by its angle around its centre) and the
-text expected in it. Written on in xournal-qt and saved (a `.xopp` on the form's PDF, or the PDF with notes), it is
-training data without anyone transcribing anything:
+text expected in it. Written on in xournal-qt and saved (a `.xopp` on the form's PDF, or the PDF with notes), it gives
+two things without anyone transcribing anything:
 
 ```sh
 xournal-qt-cli hwr-form filled.xopp --out ~/hwr-data/form-w07 [--writer w07] [--licence private] [--manifest m.json]
+xournal-qt-cli hwr-bench filled.xopp [--model <folder>]... [--out reports/w07]
 ```
 
 - **`hwr-form`**: a line dataset ([FORMATS.md](../../research/hwr/train/FORMATS.md) §1, `kind: ink`), one line per box
@@ -272,16 +273,25 @@ xournal-qt-cli hwr-form filled.xopp --out ~/hwr-data/form-w07 [--writer w07] [--
   recognisers see a line (`LineImage`); `lines.jsonl` adds `angle`, `kind`, `box_id`, `form`, `page` and, for
   formulas, `"math": true`. Boxes of kind `drawing`, `mark` and `free` are left out, empty boxes skipped; the tool
   says how many, and how many strokes were in no box.
+- **`hwr-bench`**: runs the app's own pipeline on the whole pages, without the boxes (the layout with its angles, the
+  line pictures, the recogniser(s) in ONNX Runtime, the page's words and the search's matching `ink::find`), then
+  compares with the manifest per box: the layout's lines in it and their angle (±10°), the CER of the best readings,
+  words found (words of 3+ letters among the readings, as the plain search matches handwriting: the measure of
+  `train/evaluate.py`), search recall of the box's `search` words over the whole page, words read inside `drawing`
+  and `mark` boxes (should be none) and false hits (other boxes' words hitting this one). The report (JSON with
+  every box, and Markdown) is grouped by section, kind, size (`x_height_mm`), angle and overall, with timing; several
+  `--model` folders give columns side by side (default: the built-in model). Without `--out` the Markdown is printed.
 - The manifest is found attached to the document's background PDF, else to the file itself (a PDF with notes);
-  `--manifest` gives one instead. Code: `qt/src/hwr/FormManifest.h`, `FormDataset.h`; tests:
-  `FormTest` (a synthetic form at 0, ±90 and 45 degrees, a PDF with the manifest attached).
+  `--manifest` gives one instead. Code: `qt/src/hwr/FormManifest.h`, `FormDataset.h`, `FormBench.h`; tests:
+  `FormTest` (a synthetic form at 0, ±90 and 45 degrees with scripted readings; with `XQT_ONNXRUNTIME`, the built-in
+  model on the benchmark page's line copied into boxes at eight angles, a rotation benchmark that prints its report).
 
 ## For developers
 
 - Code: `qt/src/hwr` (layout of ink into lines and words, the recognisers — `TrocrRecognizer`, `CtcRecognizer`
   with `CtcDecode`, `MultiRecognizer` for several models, `LanguagePlan` for a document's language —, `ModelInfo`
   (a model's manifest), the worker, the indexer of an open document, `LineDataset` (the export), `FormManifest`,
-  `FormDataset` (handwriting forms)), `qt/src/session/InkText.h` (what was read and how the search matches it),
+  `FormDataset`, `FormBench` (handwriting forms)), `qt/src/session/InkText.h` (what was read and how the search matches it),
   `qt/src/session/InkTextLayer.h` (the PDF text layer), `qt/src/shell/InkTextStore.h` (the library's pack),
   `LibraryInkJob.h` (background reading), `ModelDownload.h`, `HandwritingSettings.h`. Tests: `xqt-hwr-tests`
   (label `hwr`), with a scripted recogniser.

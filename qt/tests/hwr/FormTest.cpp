@@ -1,6 +1,8 @@
 /*
  * xournal-qt: handwriting forms (qt/research/hwr/forms/DESIGN.md): the manifest attached to the form's PDF, strokes
- * mapped to boxes at any angle, the dataset of a filled form (`xournal-qt-cli hwr-form`, FormDataset.h).
+ * mapped to boxes at any angle, the dataset of a filled form (`xournal-qt-cli hwr-form`, FormDataset.h) and the
+ * benchmark (`hwr-bench`, FormBench.h) with scripted readings, and with the built-in model on real ink turned by the
+ * boxes' angles (XQT_ONNXRUNTIME=<path of libonnxruntime.so.1>).
  *
  * @license GNU GPLv2 or later
  */
@@ -23,8 +25,11 @@
 #include <qpdf/QPDFPageDocumentHelper.hh>
 #include <qpdf/QPDFWriter.hh>
 
+#include "hwr/FakeRecognizer.h"
+#include "hwr/FormBench.h"
 #include "hwr/FormDataset.h"
 #include "hwr/FormManifest.h"
+#include "hwr/HandwritingSearch.h"
 #include "hwr/InkLayout.h"
 #include "hwr/LineDataset.h"
 #include "hwr/Recognizer.h"
@@ -35,6 +40,10 @@
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
 #include "session/InkText.h"
+#ifdef XQT_HWR_ONNX
+#include "hwr/HwrInfo.h"
+#include "hwr/ModelInfo.h"
+#endif
 
 #include "config-test.h"
 
@@ -411,3 +420,197 @@ TEST(FormTest, theManifestComesFromTheFormsPdf) {
     ASSERT_TRUE(r.ok) << r.error.toStdString();
     EXPECT_EQ(r.lines, 5);
 }
+
+// The benchmark with scripted readings: the layout's lines per box and their angles, CER, words found, search recall,
+// text in the drawing, false hits, per group
+TEST(FormTest, theBenchmarkComparesThePipelineWithTheManifest) {
+    const FormManifest m = FormManifest::parse(MANIFEST);
+    auto doc = filledForm(m);
+    const std::vector<InkStroke> strokes = strokesOf(*doc->getPage(0));
+    const hwr::Layout layout = hwr::layout(strokes);
+    // The readings: each line reads its box's text ("Kalmar" for "Kalman"), the scribble in the drawing "words"
+    auto fake = std::make_shared<FakeRecognizer>();
+    const std::map<QString, QStringList> readings{
+            {QStringLiteral("1.1"), {QStringLiteral("Kalmar"), QStringLiteral("filter")}},
+            {QStringLiteral("1.2"), {QStringLiteral("margin"), QStringLiteral("note")}},
+            {QStringLiteral("1.3"), {QStringLiteral("upwards"), QStringLiteral("note")}},
+            {QStringLiteral("1.4"), {QStringLiteral("slanted"), QStringLiteral("words")}},
+            {QStringLiteral("1.5"), {QStringLiteral("words")}},
+            {QStringLiteral("1.7"), {QStringLiteral("a+b")}}};
+    int matched = 0;
+    for (const InkLine& line: layout.lines) {
+        for (const auto& [id, words]: readings) {
+            if (!itemById(m, id).contains(line.box.center())) {
+                continue;
+            }
+            EXPECT_EQ(line.words.size(), static_cast<size_t>(words.size())) << id.toStdString();
+            std::vector<FakeRecognizer::Readings> script;
+            for (const QString& w: words) {
+                script.push_back({{w, 1.0f}});
+            }
+            fake->setLine(line.hash, script);
+            ++matched;
+        }
+    }
+    ASSERT_EQ(matched, 6) << "a line per box";
+    const BenchReport report = runBench(*doc, m, {{QStringLiteral("fake"), fake, QString()}}, QStringLiteral("t.xopp"));
+    ASSERT_TRUE(report.ok) << report.error.toStdString();
+    const QJsonObject groups = report.json.value(QStringLiteral("groups")).toObject();
+    const QJsonObject all = groups.value(QStringLiteral("all")).toObject();
+    EXPECT_EQ(all.value(QStringLiteral("boxes")).toInt(), 7);
+    EXPECT_EQ(all.value(QStringLiteral("written")).toInt(), 6);
+    EXPECT_EQ(all.value(QStringLiteral("empty")).toInt(), 1);
+    EXPECT_EQ(all.value(QStringLiteral("text_boxes")).toInt(), 5);
+    EXPECT_EQ(all.value(QStringLiteral("one_line")).toDouble(), 1.0);
+    EXPECT_EQ(all.value(QStringLiteral("angle_ok")).toDouble(), 1.0);
+    const QJsonObject fakeAll = all.value(QStringLiteral("models")).toObject().value(QStringLiteral("fake")).toObject();
+    // CER: one letter wrong of 13 + 11 + 12 + 13 + 3 letters
+    EXPECT_NEAR(fakeAll.value(QStringLiteral("cer")).toDouble(), 1.0 / 52, 1e-4);
+    EXPECT_EQ(fakeAll.value(QStringLiteral("terms")).toInt(), 8);
+    EXPECT_EQ(fakeAll.value(QStringLiteral("words_found")).toDouble(), 1.0) << "Kalmar: Kalman with a typo";
+    EXPECT_EQ(fakeAll.value(QStringLiteral("search_words")).toInt(), 8);
+    EXPECT_EQ(fakeAll.value(QStringLiteral("search_recall")).toDouble(), 1.0);
+    EXPECT_EQ(fakeAll.value(QStringLiteral("text_in_drawings")).toInt(), 1);
+    EXPECT_EQ(fakeAll.value(QStringLiteral("drawing_boxes")).toInt(), 1);
+    // The page's search words: kalman filter margin note upwards slanted words (zebra: its box is empty, still a try)
+    // "words" hits the drawing: 1 of the 8 tried there
+    const QJsonObject drawing = groups.value(QStringLiteral("kind:drawing")).toObject();
+    const QJsonObject fakeDrawing = drawing.value(QStringLiteral("models")).toObject().value(QStringLiteral("fake")).toObject();
+    EXPECT_NEAR(fakeDrawing.value(QStringLiteral("false_hits")).toDouble(), 1.0 / 8, 1e-4);
+    EXPECT_EQ(fakeDrawing.value(QStringLiteral("false_tries")).toInt(), 8);
+    const QJsonObject level = groups.value(QStringLiteral("section:B")).toObject();
+    EXPECT_NEAR(level.value(QStringLiteral("models")).toObject().value(QStringLiteral("fake")).toObject()
+                        .value(QStringLiteral("cer")).toDouble(),
+                1.0 / 13, 1e-4);
+    EXPECT_TRUE(groups.contains(QStringLiteral("angle:90")));
+    EXPECT_TRUE(groups.contains(QStringLiteral("angle:-90")));
+    EXPECT_TRUE(groups.contains(QStringLiteral("angle:45")));
+    EXPECT_TRUE(groups.contains(QStringLiteral("size:3mm")));
+    EXPECT_TRUE(groups.contains(QStringLiteral("kind:math")));
+    // Per box
+    for (const QJsonValue& v: report.json.value(QStringLiteral("boxes")).toArray()) {
+        const QJsonObject b = v.toObject();
+        if (b.value(QStringLiteral("id")).toString() == QLatin1String("1.4")) {
+            EXPECT_EQ(b.value(QStringLiteral("lines")).toInt(), 1);
+            EXPECT_NEAR(b.value(QStringLiteral("line_angles")).toArray().at(0).toDouble(), 45, ANGLE_TOLERANCE);
+            EXPECT_EQ(b.value(QStringLiteral("read")).toObject().value(QStringLiteral("fake")).toObject()
+                              .value(QStringLiteral("text")).toString(),
+                      QStringLiteral("slanted words"));
+        }
+        if (b.value(QStringLiteral("id")).toString() == QLatin1String("1.6")) {
+            EXPECT_FALSE(b.value(QStringLiteral("written")).toBool());
+        }
+    }
+    // Two models side by side, and the Markdown
+    const BenchReport two = runBench(*doc, m, {{QStringLiteral("a"), fake, QString()}, {QStringLiteral("b"), std::make_shared<FakeRecognizer>(), QString()}},
+                                     QStringLiteral("t.xopp"));
+    ASSERT_TRUE(two.ok);
+    const QJsonObject twoAll = two.json.value(QStringLiteral("groups")).toObject().value(QStringLiteral("all")).toObject()
+                                       .value(QStringLiteral("models")).toObject();
+    EXPECT_EQ(twoAll.value(QStringLiteral("a")).toObject().value(QStringLiteral("words_found")).toDouble(), 1.0);
+    EXPECT_EQ(twoAll.value(QStringLiteral("b")).toObject().value(QStringLiteral("words_found")).toDouble(), 0.0);
+    EXPECT_TRUE(two.markdown.contains(QStringLiteral("CER (a)"))) << two.markdown.toStdString();
+    EXPECT_TRUE(two.markdown.contains(QStringLiteral("found (b)")));
+    EXPECT_TRUE(two.markdown.contains(QStringLiteral("## By angle")));
+    EXPECT_EQ(editsBetween(QStringLiteral("kitten"), QStringLiteral("sitting")), 3);
+}
+
+#ifdef XQT_HWR_ONNX
+// The built-in model on real ink: the benchmark's line at y 550-575 (the sentence "This is a dumb test, written many
+// times" written twice, as the level reading shows) copied into boxes at several angles, read through the whole
+// pipeline. A rotation benchmark: it prints the report. The level line is one line; at ±90 degrees a line is found at
+// the box's angle (2026-10: a piece of the line is still taken as level there); all three are read
+TEST(FormTest, theBuiltInModelReadsRealInkInTurnedBoxes) {
+    if (qEnvironmentVariableIsEmpty("XQT_ONNXRUNTIME")) {
+        GTEST_SKIP() << "set XQT_ONNXRUNTIME to the path of libonnxruntime.so.1";
+    }
+    auto loaded = DocumentSession::loadFile(GET_TESTFILE(u8"benchmark/handwritten-text.xopp"));
+    ASSERT_TRUE(loaded.document);
+    std::vector<InkStroke> band;
+    {
+        std::shared_lock lock(*loaded.document);
+        for (const InkStroke& s: strokesOf(*loaded.document->getPage(0))) {
+            double y = 0;
+            for (const QPointF& p: s.points) {
+                y += p.y();
+            }
+            y /= static_cast<double>(s.points.size());
+            if (y >= 550 && y <= 575) {
+                band.push_back(s);
+            }
+        }
+    }
+    ASSERT_FALSE(band.empty());
+    QRectF bounds;
+    for (const InkStroke& s: band) {
+        bounds = bounds.isNull() ? s.box : bounds.united(s.box);
+    }
+    for (InkStroke& s: band) {
+        for (QPointF& p: s.points) {
+            p -= bounds.center();
+        }
+        s = InkStroke::of(s.points, s.width, s.widths);
+    }
+    const QString TEXT = QStringLiteral("This is a dumb test, written many times. This is a dumb test, written many times.");
+    const std::vector<double> angles{0, 15, 30, 45, -45, 90, -90, 180};
+    QJsonArray items;
+    const double wMm = (bounds.width() + 20) / PT_PER_MM, hMm = (bounds.height() + 20) / PT_PER_MM;
+    for (size_t k = 0; k < angles.size(); ++k) {
+        items.append(QJsonObject{{QStringLiteral("id"), QStringLiteral("1.%1").arg(k + 1)},
+                                 {QStringLiteral("page"), static_cast<int>(k + 1)},
+                                 {QStringLiteral("section"), QStringLiteral("D")},
+                                 {QStringLiteral("kind"), QStringLiteral("line")},
+                                 {QStringLiteral("text"), TEXT},
+                                 {QStringLiteral("box_mm"), QJsonArray{105 - wMm / 2, 148 - hMm / 2, wMm, hMm}},
+                                 {QStringLiteral("angle"), angles[k]},
+                                 {QStringLiteral("x_height_mm"), 3}});
+    }
+    const QJsonObject json{{QStringLiteral("form"), QStringLiteral("xqt-hwr-rotation")},
+                           {QStringLiteral("version"), 1},
+                           {QStringLiteral("language"), QStringLiteral("en")},
+                           {QStringLiteral("items"), items}};
+    const FormManifest m = FormManifest::parse(QJsonDocument(json).toJson());
+    ASSERT_TRUE(m.valid()) << m.error.toStdString();
+    Document doc(nullptr);
+    for (const FormItem& item: m.items) {
+        auto page = std::make_shared<XojPage>(A4_W, A4_H);
+        page->setBackgroundType(PageType(PageTypeFormat::Plain));
+        for (const InkStroke& s: placed(band, item)) {
+            page->getSelectedLayer()->addElement(strokeOf(s));
+        }
+        doc.addPage(std::move(page));
+    }
+    const auto bundled = HandwritingSearch::bundledModels(HandwritingSearch::bundledModelsDir(fs::path(XQT_BUILD_RESOURCE_DIR)));
+    auto english = std::find_if(bundled.begin(), bundled.end(), [](const ModelInfo& i) { return i.reads(QStringLiteral("en")); });
+    ASSERT_NE(english, bundled.end());
+    BenchModel model{english->name, onnxRecognizerFor(english->folder), english->folder};
+    QString why;
+    ASSERT_TRUE(model.recognizer->ready(&why)) << why.toStdString();
+    const BenchReport report = runBench(doc, m, {model}, QStringLiteral("rotation"));
+    ASSERT_TRUE(report.ok) << report.error.toStdString();
+    std::cout << report.markdown.toStdString();
+    std::map<double, QJsonObject> byAngle;
+    for (const QJsonValue& v: report.json.value(QStringLiteral("boxes")).toArray()) {
+        const QJsonObject b = v.toObject();
+        byAngle[b.value(QStringLiteral("angle")).toDouble()] = b;
+        std::cout << "angle " << b.value(QStringLiteral("angle")).toDouble() << ": lines "
+                  << b.value(QStringLiteral("lines")).toInt() << " at "
+                  << QJsonDocument(b.value(QStringLiteral("line_angles")).toArray()).toJson(QJsonDocument::Compact).toStdString()
+                  << ", read \""
+                  << b.value(QStringLiteral("read")).toObject().value(model.name).toObject().value(QStringLiteral("text"))
+                             .toString()
+                             .toStdString()
+                  << "\"\n";
+    }
+    EXPECT_EQ(byAngle[0].value(QStringLiteral("lines")).toInt(), 1);
+    for (const double a: {0.0, 90.0, -90.0}) {
+        const QJsonObject b = byAngle[a];
+        const QJsonArray lineAngles = b.value(QStringLiteral("line_angles")).toArray();
+        EXPECT_TRUE(std::any_of(lineAngles.begin(), lineAngles.end(),
+                                [&](const QJsonValue& v) { return std::abs(v.toDouble() - a) <= ANGLE_TOLERANCE; }))
+                << a;
+        const QJsonObject read = b.value(QStringLiteral("read")).toObject().value(model.name).toObject();
+        EXPECT_GE(read.value(QStringLiteral("found")).toInt(), read.value(QStringLiteral("terms")).toInt() / 2) << a;
+    }
+}
+#endif

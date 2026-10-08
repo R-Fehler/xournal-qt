@@ -478,7 +478,7 @@ Used by:
 
 - [AppServices](#appservices) (`calls`): owns the handwriting search
 - [Library](#library) (`links`): xqt-shell links xqt-hwr: LibraryInkJob reads the library's handwriting
-- [CLI](#cli) (`links`): xournal-qt-cli links xqt-hwr: handwriting as text in exports
+- [CLI](#cli) (`links`): xournal-qt-cli links xqt-hwr: handwriting as text in exports; hwr-lines, hwr-form, hwr-bench
 
 ### Documents, headless
 
@@ -963,7 +963,7 @@ Headless export with upstream's flags (PNG, SVG, PDF, the PDF with notes); the g
 Depends on:
 
 - [session](#session) (`links`): xournal-qt-cli links xqt-session: the PDF with notes and the archive PDF
-- [hwr](#hwr) (`links`): xournal-qt-cli links xqt-hwr: handwriting as text in exports
+- [hwr](#hwr) (`links`): xournal-qt-cli links xqt-hwr: handwriting as text in exports; hwr-lines, hwr-form, hwr-bench
 - [control/xojfile](#controlxojfile) (`calls`): loads documents as upstream's CLI does
 - [pdf](#pdf) (`calls`): PDF export with upstream's flags
 - [control](#control) (`calls`): PNG/SVG export (ImageExport)
