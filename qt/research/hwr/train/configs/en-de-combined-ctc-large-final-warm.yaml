@@ -1,0 +1,17 @@
+# The large shared CTC's final run, from its best checkpoint (as en-de-combined-ctc-final-warm.yaml for the small one):
+# learns from the validation lines too, 12,000 steps at 3e-4 decaying to the floor. Ship checkpoints/last only if it is
+# at least as good on the test sets.
+extends: en-de-combined-ctc-large.yaml
+out_dir: runs/en-de-ctc-large-final-warm
+version: 2026.10.2
+finetune:
+  init_from: runs/en-de-ctc-large/checkpoints/best
+  freeze: none
+train:
+  splits: [train, val]
+  lr: 3.0e-4
+  warmup_steps: 200
+  max_steps: 12000
+  early_stopping: 1000
+val:
+  every_steps: 2000
