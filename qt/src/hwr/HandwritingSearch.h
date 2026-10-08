@@ -12,7 +12,9 @@
  * ("handwritingModel", "handwritingModelDe"), else its environment variable (XQT_HWR_MODEL, XQT_HWR_MODEL_DE), else
  * the app's own in its data folder, "~/.local/share/xournal-qt/models/<slot's name>/" (where qt/scripts/hwr-model.sh
  * and the download in Settings put it). Without a model there, any model in the app's models folder that reads the
- * language is taken; one model that reads both languages serves both. The recogniser of each model is made by a
+ * language is taken, else a model that comes with the app and reads it (built in: a folder with a model.json in
+ * "<resource dir>/hwr-models/", by name; qt/resources/hwr, installed by the build); one model that reads both
+ * languages serves both. Nothing here names a model: the manifests say what each reads. The recogniser of each model is made by a
  * factory the app sets (by the manifest's kind: TrocrRecognizer, CtcRecognizer; the tests' FakeRecognizer); several
  * models run together (MultiRecognizer), and their ids make the recogniser's id that names the results.
  *
@@ -76,13 +78,24 @@ public:
     static QString modelsDir();
     static QString defaultModelDir(const QString& language = QStringLiteral("en"));
 
+    /// The folder of the models that come with the app: "<resourceDir>/hwr-models".
+    static QString bundledModelsDir(const fs::path& resourceDir);
+    /// This app's (its AppContext's resource dir).
+    QString bundledModelsDir() const;
+    /// The models in such a folder (each subfolder whose manifest is valid), by name.
+    static std::vector<ModelInfo> bundledModels(const QString& bundledDir);
+    /// A model's folder is one of the app's own (in `bundledDir`).
+    static bool isBundled(const QString& folder, const QString& bundledDir);
+
     /// The models the languages need: the installed ones chosen for them (in the languages' order, each once), and
-    /// the languages without one.
+    /// the languages without one. `bundledDir`: the models that come with the app ("": none).
     struct Choice {
         std::vector<ModelInfo> models;
         QStringList missing;
     };
-    static Choice choose(Settings& settings);
+    static Choice choose(Settings& settings, const QString& bundledDir = QString());
+    /// This app's choice (with its bundled models).
+    Choice choice() const;
 
     /// Makes the recogniser for a model folder (null: none). The app sets one by the manifest's kind.
     using Factory = std::function<std::shared_ptr<Recognizer>(const QString& modelDir)>;

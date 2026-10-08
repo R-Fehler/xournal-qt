@@ -10,8 +10,9 @@ target_sources(xournal-qt PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidActivity.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidActivity.cpp)
 
-# The resources the core reads as files (page templates, palettes, icons, the emoji font) travel as Qt resources and are copied to
-# the app's data folder at start (AndroidSetup.cpp).
+# The resources the core reads as files (page templates, palettes, icons, the emoji font, the handwriting models of
+# hwr-models/: ONNX Runtime opens a model by its path) travel as Qt resources and are copied to the app's data folder at
+# start (AndroidSetup.cpp).
 file(GLOB_RECURSE _xqt_share_files LIST_DIRECTORIES false RELATIVE "${XQT_BUILD_RESOURCE_DIR}" "${XQT_BUILD_RESOURCE_DIR}/*")
 set(_xqt_share_abs)
 foreach(f ${_xqt_share_files})

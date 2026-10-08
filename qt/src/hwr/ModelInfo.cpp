@@ -37,6 +37,7 @@ ModelInfo ModelInfo::read(const QString& folder) {
     }
     m.version = o.value(QStringLiteral("version")).toString(o.value(QStringLiteral("revision")).toString());
     m.licence = o.value(QStringLiteral("licence")).toString(o.value(QStringLiteral("license")).toString());
+    m.noncommercial = o.value(QStringLiteral("noncommercial")).toBool(false);
     m.hash = QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex()).left(12);
     if (m.kind != QLatin1String("trocr") && m.kind != QLatin1String("ctc")) {
         m.error = QStringLiteral("The model in %1 is of a kind this app does not read (%2)").arg(folder, m.kind);

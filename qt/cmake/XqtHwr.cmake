@@ -37,6 +37,24 @@ target_include_directories(xqt-hwr PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src" "${
 target_link_libraries(xqt-hwr PUBLIC xqt-session Qt6::Gui)  # (QImage: the line dataset writes PNGs)
 set_target_properties(xqt-hwr PROPERTIES AUTOMOC ON)
 
+# The handwriting models that come with the app (qt/resources/hwr/<name>/: model.json, its files, LICENCE.md): copied
+# into the resource dir as hwr-models/<name>/, where HandwritingSearch finds them by their manifests (the build tree's
+# share/xournal-qt for development; installed with it by XqtPackage.cmake; on Android in the APK's /xqt-share
+# resources, copied to the app's data folder at start by AndroidSetup.cpp). Nothing here names a model: a folder with
+# a model.json is one.
+file(GLOB _xqt_hwr_models LIST_DIRECTORIES true "${CMAKE_CURRENT_LIST_DIR}/../resources/hwr/*")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/../resources/hwr")
+foreach(_xqt_model_dir ${_xqt_hwr_models})
+    if(IS_DIRECTORY "${_xqt_model_dir}" AND EXISTS "${_xqt_model_dir}/model.json")
+        get_filename_component(_xqt_model "${_xqt_model_dir}" NAME)
+        file(GLOB _xqt_model_files LIST_DIRECTORIES false "${_xqt_model_dir}/*")
+        foreach(_xqt_file ${_xqt_model_files})
+            get_filename_component(_xqt_file_name "${_xqt_file}" NAME)
+            configure_file("${_xqt_file}" "${XQT_BUILD_RESOURCE_DIR}/hwr-models/${_xqt_model}/${_xqt_file_name}" COPYONLY)
+        endforeach()
+    endif()
+endforeach()
+
 # The CLI's "hwr-lines": a document's handwriting as a line dataset (LineDataset.h; Qt only for this command)
 if(TARGET xournal-qt-cli)
     target_link_libraries(xournal-qt-cli PRIVATE xqt-hwr)

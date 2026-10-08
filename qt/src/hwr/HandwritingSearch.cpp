@@ -1,6 +1,7 @@
 #include "HandwritingSearch.h"
 
 #include <QDir>
+#include <QFileInfo>
 #include <QStandardPaths>
 
 #include "control/settings/Settings.h"
@@ -119,7 +120,36 @@ void HandwritingSearch::setModelDirIn(Settings& s, const QString& language, cons
     }
 }
 
-HandwritingSearch::Choice HandwritingSearch::choose(Settings& s) {
+QString HandwritingSearch::bundledModelsDir(const fs::path& resourceDir) {
+    return QString::fromStdU16String((resourceDir / "hwr-models").u16string());
+}
+
+QString HandwritingSearch::bundledModelsDir() const { return bundledModelsDir(app.getResourceDir()); }
+
+std::vector<ModelInfo> HandwritingSearch::bundledModels(const QString& bundledDir) {
+    std::vector<ModelInfo> out;
+    if (bundledDir.isEmpty()) {
+        return out;
+    }
+    const QDir dir(bundledDir);
+    for (const QString& name: dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+        if (ModelInfo info = ModelInfo::read(dir.filePath(name)); info.valid()) {
+            out.push_back(std::move(info));
+        }
+    }
+    return out;
+}
+
+bool HandwritingSearch::isBundled(const QString& folder, const QString& bundledDir) {
+    return !bundledDir.isEmpty() && !folder.isEmpty() &&
+           QDir::cleanPath(QFileInfo(folder).absolutePath()) == QDir::cleanPath(QFileInfo(bundledDir).absoluteFilePath());
+}
+
+HandwritingSearch::Choice HandwritingSearch::choice() const {
+    return choose(*app.getSettings(), bundledModelsDir());
+}
+
+HandwritingSearch::Choice HandwritingSearch::choose(Settings& s, const QString& bundledDir) {
     Choice c;
     // The models in the app's models folder (by name: the same choice every time)
     std::vector<ModelInfo> found;
@@ -131,6 +161,10 @@ HandwritingSearch::Choice HandwritingSearch::choose(Settings& s) {
         if (ModelInfo info = ModelInfo::read(models.filePath(name)); info.valid()) {
             found.push_back(std::move(info));
         }
+    }
+    // Then those that come with the app (by name too)
+    for (ModelInfo& m: bundledModels(bundledDir)) {
+        found.push_back(std::move(m));
     }
     for (const QString& language: languagesIn(s)) {
         if (std::any_of(c.models.begin(), c.models.end(), [&](const ModelInfo& m) { return m.reads(language); })) {
@@ -164,8 +198,8 @@ HandwritingSearch::HandwritingSearch(AppContext& app, QObject* parent): QObject(
 HandwritingSearch::~HandwritingSearch() { dropIndexers(); }
 
 namespace {
-QStringList foldersOf(Settings& s) {
-    const HandwritingSearch::Choice c = HandwritingSearch::choose(s);
+QStringList foldersOf(Settings& s, const QString& bundledDir) {
+    const HandwritingSearch::Choice c = HandwritingSearch::choose(s, bundledDir);
     QStringList folders;
     for (const ModelInfo& m: c.models) {
         folders << m.folder;
@@ -199,7 +233,7 @@ void HandwritingSearch::applySettings() {
     Settings& s = *app.getSettings();
     const bool wanted = enabledIn(s);
     if (wanted) {
-        const QStringList folders = foldersOf(s);
+        const QStringList folders = foldersOf(s, bundledModelsDir());
         if (!worker.recognizer() || folders != modelFolders) {
             makeRecognizer(folders);
         }
@@ -219,7 +253,7 @@ void HandwritingSearch::applySettings() {
 
 void HandwritingSearch::reloadModel() {
     if (on) {
-        makeRecognizer(foldersOf(*app.getSettings()));
+        makeRecognizer(foldersOf(*app.getSettings(), bundledModelsDir()));
     }
     Q_EMIT enabledChanged();
 }
