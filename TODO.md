@@ -220,8 +220,11 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
 - [ ] The bundled handwriting model (`crnn-de-en`, ONNX Runtime 1.30.0 in every package), what is left: the first
   runs of `xqt-release.yml`, `xqt-windows.yml`, `xqt-macos.yml` and `xqt-android.yml` with it (their `--hwr-info`
   smoke tests); the device checks (handwriting-search.md, "On the device": Android's first start copying the model,
-  dlopen by name; macOS and Windows); whether the APK compresses its native libraries
-  (`QT_ANDROID_LEGACY_PACKAGING`: about 20 MB less to download, more on the phone; the author's call).
+  dlopen by name; macOS and Windows). The APK keeps its native libraries uncompressed (the author, 2026-10-08: less
+  space on the phone and fast updates over 20 MB less download; `QT_ANDROID_LEGACY_PACKAGING` if that changes).
+- [ ] Later, if package size matters: a minimal ONNX Runtime build with only the operators the model uses (the full
+  Android library is 33 MB; a reduced build is often a few MB), built in the CI per platform and redone when the
+  model's operators change. Microsoft's ORT builds are 16 KB page aligned (checked for the Android AAR).
 - [ ] The text layer in plain "Export as PDF".
 - [?] **Text or drawing, and writing of any size** (the author is unsure how stable a size-aware layout would be;
   nothing changed yet). Today `InkLayout` calls a stroke a drawing when it is filled, taller than 2.5 times the
