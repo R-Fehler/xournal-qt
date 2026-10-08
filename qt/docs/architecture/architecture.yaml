@@ -1611,7 +1611,7 @@ edges:
   - from: cli
     to: hwr
     kind: links
-    what: "xournal-qt-cli links xqt-hwr: handwriting as text in exports"
+    what: "xournal-qt-cli links xqt-hwr: handwriting as text in exports; hwr-lines, hwr-form, hwr-bench"
     hide: true
   - from: cli
     to: core-xojfile

@@ -38,6 +38,11 @@ a dataset says so). It does not restrict anything: the app is free and non-comme
 - `text` is NFC-normalised Unicode (umlauts as one character).
 - `writer` is required: splits are by writer, never by line, so a test never sees a training writer's hand.
 - `split` is `train`, `val` or `test`; when missing, the training assigns splits by writer with a fixed seed.
+- Lines from a handwriting form (`xournal-qt-cli hwr-form`, [forms/DESIGN.md](../forms/DESIGN.md)) carry more
+  fields: `angle` (the box's writing direction in degrees, clockwise; the picture and strokes are upright), `kind`
+  (`line`, `word`, `chars`, `number`, `label`, `math`), `box_id`, `form` (the manifest's form id) and `page` (of the
+  form); formulas have `"math": true` (their `text` is the formula in plain characters: the training may skip them).
+  Readers ignore fields they do not know.
 - `strokes` (optional) is xournal-qt's ink of the line: `{ "width": w, "height": h, "strokes": [ { "points":
   [[x, y, pressure], …], "width": pt } ] }` in points, relative to the line's top-left.
 

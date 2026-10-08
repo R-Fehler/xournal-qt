@@ -14,6 +14,10 @@
  * and commands:
  *   hwr-lines DOC --out DIR [--text FILE] [--lang de] [--writer ID] [--licence ID]
  *                          the handwriting of DOC as a line dataset (qt/src/hwr/LineDataset.h; this command links Qt)
+ *   hwr-form FILLED --out DIR [--manifest FILE] [--writer ID] [--licence ID]
+ *                          a filled handwriting form as a line dataset (qt/src/hwr/FormDataset.h)
+ *   hwr-bench FILLED [--model DIR]... [--manifest FILE] [--out REPORT]
+ *                          a filled handwriting form as a benchmark of the handwriting search (qt/src/hwr/FormBench.h)
  *   export-xopp PDF [--version N] [-o OUT.xopp]
  *                          the .xopp of a PDF with notes, of its latest or any version (version history,
  *                          qt/src/session/PdfHistory.h; links Qt)
@@ -62,7 +66,22 @@
 #ifdef XQT_CLI_HWR
 #include <QCoreApplication>
 
+#include <QDir>
+#include <QFileInfo>
+#include <QJsonDocument>
+#include <QSaveFile>
+
+#include "hwr/FormBench.h"
+#include "hwr/FormDataset.h"
+#include "hwr/FormManifest.h"
+#include "hwr/HandwritingSearch.h"
 #include "hwr/LineDataset.h"
+#include "hwr/ModelInfo.h"
+#include "session/AppContext.h"
+#include "session/DocumentSession.h"
+#ifdef XQT_HWR_ONNX
+#include "hwr/HwrInfo.h"
+#endif
 #endif
 #ifdef XQT_CLI_SESSION
 #include "render/PaperTexture.h"
@@ -319,6 +338,181 @@ int hwrLines(int argc, char* argv[]) {
     std::cout << "\n";
     return 0;
 }
+
+/// xournal-qt-cli hwr-form FILLED --out DIR [--manifest FILE] [--writer ID] [--licence ID]
+int hwrForm(int argc, char* argv[]) {
+    QCoreApplication app(argc, argv);
+    xqt::hwr::FormExport job;
+    const QStringList args = QCoreApplication::arguments().mid(2);
+    auto usage = [] {
+        std::cerr << "usage: xournal-qt-cli hwr-form <filled.xopp|annotated.pdf> --out <dir> [--manifest <file>] "
+                     "[--writer <id>] [--licence <id>]\n"
+                     "  A filled handwriting form (qt/research/hwr/forms/DESIGN.md) as a line dataset\n"
+                     "  (qt/research/hwr/train/FORMATS.md): one line per box with strokes, with the box's text.\n"
+                     "  The manifest is the one attached to the form's PDF, else --manifest. --licence: of the\n"
+                     "  writer's own lines (default \"private\", marked noncommercial).\n";
+        return 1;
+    };
+    for (qsizetype i = 0; i < args.size(); ++i) {
+        const QString& a = args[i];
+        auto value = [&]() -> QString { return i + 1 < args.size() ? args[++i] : QString(); };
+        if (a == QLatin1String("--out")) {
+            job.out = value();
+        } else if (a == QLatin1String("--manifest")) {
+            job.manifest = value();
+        } else if (a == QLatin1String("--writer")) {
+            job.writer = value();
+        } else if (a == QLatin1String("--licence") || a == QLatin1String("--license")) {
+            job.licence = value();
+            job.noncommercial = job.licence == QLatin1String("private");
+        } else if (a == QLatin1String("--help") || a == QLatin1String("-h")) {
+            return usage();
+        } else if (!a.startsWith(QLatin1String("--")) && job.document.isEmpty()) {
+            job.document = a;
+        } else {
+            std::cerr << "unknown argument: " << a.toStdString() << "\n";
+            return usage();
+        }
+    }
+    if (job.document.isEmpty() || job.out.isEmpty()) {
+        return usage();
+    }
+    const xqt::hwr::FormExportResult r = xqt::hwr::exportForm(job);
+    for (const QString& w: r.warnings) {
+        std::cerr << "warning: " << w.toStdString() << "\n";
+    }
+    if (!r.ok) {
+        std::cerr << r.error.toStdString() << "\n";
+        return -3;
+    }
+    std::cout << r.lines << " lines of " << r.form.toStdString() << " written to " << job.out.toStdString() << " ("
+              << r.math << " formulas; " << r.empty << " boxes empty, " << r.left << " drawings and marks left out, "
+              << r.outside << " strokes in no box)\n";
+    return 0;
+}
+
+/// xournal-qt-cli hwr-bench FILLED [--model DIR]... [--manifest FILE] [--out REPORT]
+int hwrBench(int argc, char* argv[]) {
+    QCoreApplication app(argc, argv);
+    const QStringList args = QCoreApplication::arguments().mid(2);
+    auto usage = [] {
+        std::cerr << "usage: xournal-qt-cli hwr-bench <filled.xopp|annotated.pdf> [--model <folder>]... "
+                     "[--manifest <file>] [--out <report>]\n"
+                     "  Runs the handwriting search on the whole pages of a filled form and compares with its\n"
+                     "  manifest (qt/research/hwr/forms/DESIGN.md): lines and angles per box, CER, words found,\n"
+                     "  search recall, text read in drawings, false hits; per section, kind, size and angle.\n"
+                     "  --model: a model folder (model.json), several side by side (default: the built-in model).\n"
+                     "  --out: writes <report>.json and <report>.md (else the Markdown to the output).\n"
+                     "  ONNX Runtime: as the app finds it (XQT_ONNXRUNTIME=<path of the library> to choose).\n";
+        return 1;
+    };
+    QString document, manifestFile, out;
+    QStringList folders;
+    for (qsizetype i = 0; i < args.size(); ++i) {
+        const QString& a = args[i];
+        auto value = [&]() -> QString { return i + 1 < args.size() ? args[++i] : QString(); };
+        if (a == QLatin1String("--model")) {
+            folders << value();
+        } else if (a == QLatin1String("--manifest")) {
+            manifestFile = value();
+        } else if (a == QLatin1String("--out")) {
+            out = value();
+        } else if (a == QLatin1String("--help") || a == QLatin1String("-h")) {
+            return usage();
+        } else if (!a.startsWith(QLatin1String("--")) && document.isEmpty()) {
+            document = a;
+        } else {
+            std::cerr << "unknown argument: " << a.toStdString() << "\n";
+            return usage();
+        }
+    }
+    if (document.isEmpty()) {
+        return usage();
+    }
+#ifndef XQT_HWR_ONNX
+    std::cerr << "This build has no ONNX Runtime support (XQT_HWR_ONNX)\n";
+    return -3;
+#else
+    auto loaded = xqt::DocumentSession::loadFile(fs::path(document.toStdString()));
+    if (!loaded.document) {
+        std::cerr << (loaded.error.empty() ? "Cannot open " + document.toStdString() : loaded.error) << "\n";
+        return -2;
+    }
+    const xqt::hwr::FormManifest manifest =
+            xqt::hwr::manifestOf(*loaded.document, fs::path(document.toStdString()), manifestFile);
+    if (!manifest.valid()) {
+        std::cerr << manifest.error.toStdString() << "\n";
+        return -3;
+    }
+    if (folders.isEmpty()) {
+        // The built-in model that reads the form's language (else the first one)
+        const auto bundled = xqt::hwr::HandwritingSearch::bundledModels(
+                xqt::hwr::HandwritingSearch::bundledModelsDir(xqt::AppContext::defaultResourceDir()));
+        const QString lang = manifest.language.isEmpty() ? QStringLiteral("en") : manifest.language;
+        auto it = std::find_if(bundled.begin(), bundled.end(),
+                               [&](const xqt::hwr::ModelInfo& m) { return m.reads(lang); });
+        if (it == bundled.end() && !bundled.empty()) {
+            it = bundled.begin();
+        }
+        if (it == bundled.end()) {
+            std::cerr << "No built-in handwriting model found (give one with --model)\n";
+            return -3;
+        }
+        folders << it->folder;
+    }
+    std::vector<xqt::hwr::BenchModel> models;
+    for (const QString& folder: folders) {
+        const xqt::hwr::ModelInfo info = xqt::hwr::ModelInfo::read(folder);
+        if (!info.valid()) {
+            std::cerr << folder.toStdString() << ": " << info.error.toStdString() << "\n";
+            return -3;
+        }
+        xqt::hwr::BenchModel m;
+        m.name = info.name;
+        for (int n = 2; std::any_of(models.begin(), models.end(),
+                                    [&](const xqt::hwr::BenchModel& o) { return o.name == m.name; });
+             ++n) {
+            m.name = info.name + QStringLiteral("-%1").arg(n);
+        }
+        m.folder = folder;
+        m.recognizer = xqt::hwr::onnxRecognizerFor(folder);
+        QString why;
+        if (!m.recognizer->ready(&why)) {
+            std::cerr << folder.toStdString() << ": " << why.toStdString() << "\n";
+            return -3;
+        }
+        models.push_back(std::move(m));
+    }
+    const xqt::hwr::BenchReport report =
+            xqt::hwr::runBench(*loaded.document, manifest, models, QFileInfo(document).fileName());
+    if (!report.ok) {
+        std::cerr << report.error.toStdString() << "\n";
+        return -3;
+    }
+    if (out.isEmpty()) {
+        std::cout << report.markdown.toStdString();
+        return 0;
+    }
+    QString base = out;
+    if (base.endsWith(QLatin1String(".json")) || base.endsWith(QLatin1String(".md"))) {
+        base = base.left(base.lastIndexOf(u'.'));
+    }
+    if (const QString dir = QFileInfo(base).absolutePath(); !QDir().mkpath(dir)) {
+        std::cerr << "Cannot create " << dir.toStdString() << "\n";
+        return -3;
+    }
+    for (const auto& [path, data]: {std::pair{base + QStringLiteral(".json"), QJsonDocument(report.json).toJson()},
+                                    std::pair{base + QStringLiteral(".md"), report.markdown.toUtf8()}}) {
+        QSaveFile f(path);
+        if (!f.open(QIODevice::WriteOnly) || f.write(data) != data.size() || !f.commit()) {
+            std::cerr << "Cannot write " << path.toStdString() << "\n";
+            return -3;
+        }
+        std::cout << path.toStdString() << "\n";
+    }
+    return 0;
+#endif
+}
 }  // namespace
 #endif
 
@@ -389,6 +583,12 @@ int main(int argc, char* argv[]) {
 #ifdef XQT_CLI_HWR
     if (argc >= 2 && std::string(argv[1]) == "hwr-lines") {
         return hwrLines(argc, argv);
+    }
+    if (argc >= 2 && std::string(argv[1]) == "hwr-form") {
+        return hwrForm(argc, argv);
+    }
+    if (argc >= 2 && std::string(argv[1]) == "hwr-bench") {
+        return hwrBench(argc, argv);
     }
 #endif
 #ifdef XQT_CLI_SESSION

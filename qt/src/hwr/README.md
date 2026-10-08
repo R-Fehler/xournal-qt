@@ -17,6 +17,7 @@ never converted: the readings go into the search index (and an invisible text la
 | `InkTextIndexer` | keeps one open document's handwriting searchable |
 | `InkCopy` | "Copy handwriting as text" |
 | `LineDataset`, `ModelInfo` | a document's ink as a training dataset; what a model folder holds |
+| `FormManifest`, `FormDataset`, `FormBench` | handwriting forms ([DESIGN.md](../../research/hwr/forms/DESIGN.md)): the manifest attached to a form's PDF and which strokes are in which box; a filled form as a dataset (`xournal-qt-cli hwr-form`) and as a benchmark of the whole pipeline (`hwr-bench`) |
 | `FakeRecognizer` | scripted readings for the tests |
 
 **May depend on**: `xqt-session` and below (upstream's model: strokes and pages; `control/settings`), Qt Gui (PNGs of
