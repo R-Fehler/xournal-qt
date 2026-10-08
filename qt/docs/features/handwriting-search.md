@@ -38,13 +38,14 @@ arrow, a line written steeply uphill) is found, marked, copied and put into the 
 
 - **What counts**: a run of strokes written one after the other close together (a few words: gaps up to 4 times the
   strokes' typical smaller side), long and narrow enough (at least 6 times that side and 3 times as long as wide, a
-  descender's loop or a capital not counted: a note of two words is enough; not two strokes alone, an i and its dot), whose strokes follow each other along it, has a direction. Letters written in
-  pieces (stems, bars, a "Th" in one stroke) and crossings written afterwards still count; a list of words one below
-  the other does not. Within 10° of left to right it is laid out as level text (slopes are fine), and within 20°
-  unless it climbs by more than its own height (a long line written uphill, which the page's rules would cut into
-  pieces: it keeps its angle). 70°–110° either way counts as exactly 90°: **written downwards** (90°) or **upwards**
-  (270°, -90°), 160°–180° as exactly 180°: **upside down** (written leftwards, a note for the person across the table, a
-  page turned while writing). Between 20° and 70° and between 110° and 160° either way the line keeps its own angle.
+  descender's loop or a capital not counted: a note of two words is enough; not two strokes alone, an i and its dot),
+  whose strokes follow each other along it, has a direction. Letters written in pieces (stems, bars, a "Th" in one
+  stroke) and crossings written afterwards still count; a list of words one below the other does not. Within 10° of left
+  to right it is laid out as level text (slopes are fine), and within 20° unless it climbs by more than its own height
+  (a long line written uphill, which the page's rules would cut into pieces: it keeps its angle). 70°–110° either way
+  counts as exactly 90°: **written downwards** (90°) or **upwards** (270°, -90°), 160°–180° as exactly 180°: **upside
+  down** (written leftwards, a note for the person across the table, a page turned while writing). Between 20° and 70°
+  and between 110° and 160° either way the line keeps its own angle.
 - **How it is read**: the strokes of each direction are turned upright and laid out by the same rules as a page (lines,
   words, drawings left out, in the frame's own units), so the recogniser gets the line upright. Pieces too short to
   have a direction (a word written after a pause, a "This" apart from the rest) join the line they lie on whole, and
@@ -62,18 +63,24 @@ arrow, a line written steeply uphill) is found, marked, copied and put into the 
   boxes. **The PDF text layer** turns each word with its text matrix: viewers select along the ink. Poppler (Okular,
   Evince) reads words written up or down as words; at a free angle it takes the letters one by one ("K a l m a n").
 - **Limits**: a column of single letters or digits, one below the other, may be taken for a line written downwards
-  (geometry alone cannot tell them apart; a list of words is not).
+  (geometry alone cannot tell them apart; a list of words is not). The thresholds were measured on one writer's ink
+  (the benchmark page). At a free angle a line's words may split differently than level, and in a note of a few words
+  a straight descender tail may count as a drawing.
 - Code: `InkLayout.h` (`framesOf`, `InkLine::angle` / `upright`), `Recognizer.cpp` (`LineInput::of` turns the line
   upright), `InkText.h` (`PlacedLine::angle`, `Word::angle`, `quadOf`, `quadsOf`), `DocumentSearch::Place::quads`,
   `DocumentCanvasItem::updateSearchHits`, `InkCopy.cpp`, `InkTextLayer.cpp`, `InkTextStore.cpp`. Tests:
   `InkRotationTest.*` (`-L hwr`: 0°, ±15°, ±35°, 90°, 270°, 180°, ±135°, a mixed page, a list, the benchmark's real
-  lines at ±90°, ±45°, 30°, ±15°, 180° and ±135° and lists of their words, the hash, the scripted recogniser, marks, copying, poppler), `InkSearchTest.handwritingAtAnAngleIsMarkedTurned`,
-  `InkLibraryTest.theAngleOfALineIsStored`, `CanvasItemRenderTest.aHitInHandwritingAtAnAngleIsMarkedTurned` (`-L quick`).
+  lines at ±90°, ±45°, 30°, ±15°, 180° and ±135°, lists of their words, short notes of them in a page's margin, the
+  hash, the scripted recogniser, marks, copying, poppler), `InkSearchTest.handwritingAtAnAngleIsMarkedTurned`,
+  `InkLibraryTest.theAngleOfALineIsStored`, `CanvasItemRenderTest.aHitInHandwritingAtAnAngleIsMarkedTurned` (`-L
+  quick`).
 - **Measured**: `HwrRotationBenchmark` (`XQT_HWR_ROTATION_BENCH=<folder>` and `XQT_ONNXRUNTIME`, about 30 s) turns the
   benchmark's lines that stand alone (`qt/tests/hwr/BenchmarkInk.h`) to 90°, -90°, ±45°, 30°, 15°, ±135° and 180°, alone
   and as a page, reads them with the built-in model and compares with the level reading: lines found, character error
   rate, words the search finds; also lists of the same words and a margin note on a page. The table and every line's
-  picture go to the folder.
+  picture go to the folder. Now (2026-10): at ±90° and 180° each line is one line read exactly as level; at 15°–45°
+  and ±135° one line each, 11–13 % of the characters read differently from level (the frame includes the writer's own
+  slope of about a degree). Before the fixes of 2026-10: 7 pieces per line at 90°, 22 % different, 85 % at 180°.
 
 ## Copy handwriting as text
 

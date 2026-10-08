@@ -24,20 +24,20 @@
  * uphill) is laid out in its own frame (framesOf): before step 3 the strokes are taken in runs, consecutive strokes in
  * the order of writing that are close to each other (within 4 `s`, the median of the strokes' smaller side: a few
  * words; dots and accents aside, and straight lines and big shapes, which the frame's own step 2 judges). A run long
- * and narrow enough (6 s, and 3 times as long along its points' principal axis as its ink is wide across it, the
- * tenth furthest out left out: loops, capitals; not two strokes alone, an i and its dot), whose strokes go one after the other along that axis (their steps along it at least 1.5 times those
- * across; a single stroke: from its start to its end) and do not lie across it (their median at most 3 times as long
- * across as along: words one below the other, a list), has a direction. More than 20 degrees off left-to-right it is
- * turned upright (more than 10 when it climbs by more than its width across: a long line written uphill, which the
- * page's rules would cut into pieces): 70 to 110 degrees count as 90 exactly (downwards, -90 upwards), 160 to 180 as 180 (leftwards: upside
- * down), 20 to 70 and 110 to 160 keep their angle. Runs of the same angle (within 8 degrees) are one
- * frame: their strokes; the runs without a direction (or read as level) whose middle lies in the box of one of them
- * (a little bigger, and longer by half their own length), whole; and the dots, straight lines and short runs inside
- * the box of one of those; all turned by -angle around (0, 0) and laid out by steps 1-6 as a page of their own (its
- * own units). Their lines keep the angle (InkLine::angle) and their box in the frame (`upright`); the hash is of the
- * turned strokes, relative to that box. The other strokes are laid out as before, with their own units (not counting
- * those at an angle, which are as tall as they are long): a page without writing at an angle comes out exactly as it
- * did.
+ * and narrow enough (6 s, and 3 times as long along its points' principal axis as its ink is wide across it, the tenth
+ * furthest out left out: loops, capitals; not two strokes alone, an i and its dot), whose strokes go one after the
+ * other along that axis (their steps along it at least 1.5 times those across; a single stroke: from its start to its
+ * end) and do not lie across it (their median at most 3 times as long across as along: words one below the other, a
+ * list), has a direction. More than 20 degrees off left-to-right it is turned upright (more than 10 when it climbs by
+ * more than its width across: a long line written uphill, which the page's rules would cut into pieces): 70 to 110
+ * degrees count as 90 exactly (downwards, -90 upwards), 160 to 180 as 180 (leftwards: upside down), 20 to 70 and 110 to
+ * 160 keep their angle. Runs of the same angle (within 8 degrees) are one frame: their strokes; the runs without a
+ * direction (or read as level) whose middle lies in the box of one of them (a little bigger, and longer by half their
+ * own length), whole; and the dots, straight lines and short runs inside the box of one of those; all turned by -angle
+ * around (0, 0) and laid out by steps 1-6 as a page of their own (its own units). Their lines keep the angle
+ * (InkLine::angle) and their box in the frame (`upright`); the hash is of the turned strokes, relative to that box. The
+ * other strokes are laid out as before, with their own units (not counting those at an angle, which are as tall as they
+ * are long): a page without writing at an angle comes out exactly as it did.
  *
  * Measured on test/files/benchmark/handwritten-text.xopp (13,064 strokes): a few ms per page.
  *

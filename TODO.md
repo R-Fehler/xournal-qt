@@ -213,10 +213,15 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
 - [ ] The emoji button is out of reach while the soft keyboard is open on a phone.
 
 ### Handwriting
-- [ ] Handwriting at an angle, what is left: writing leftwards (upside down) is read as level; a column of single
-  letters or digits can pass for a line written downwards; poppler splits words at a free angle into letters
-  ("K a l m a n"; 90° is fine); a level or 90° line turned by the lasso is read again; check real angled handwriting
-  on the device (handwriting-search.md, "On the device").
+- [ ] Handwriting at an angle, what is left: a column of single letters or digits can pass for a line written
+  downwards; poppler splits words at a free angle into letters ("K a l m a n"; 90° is fine); a level or 90° line
+  turned by the lasso is read again; check real angled handwriting on the device (handwriting-search.md, "On the
+  device").
+- [x] **The quality of handwriting at an angle** (`qt/hwr-rotation-quality`): real lines at ±90° and 180° are read
+  exactly as level, 15°–45° and ±135° one line each (`HwrRotationBenchmark`). Left: the thresholds were tuned on one
+  writer (the benchmark page); measure other writers' angled notes (the author's own pages) with the benchmark before
+  changing them; at a free angle the frame includes the writer's own slope, and a line's words can split differently
+  than level (Otsu on a few gaps); with few strokes a y's straight tail may count as a drawing.
 - [ ] The bundled handwriting model (`crnn-de-en`, ONNX Runtime 1.30.0 in every package), what is left: the first
   runs of `xqt-release.yml`, `xqt-windows.yml`, `xqt-macos.yml` and `xqt-android.yml` with it (their `--hwr-info`
   smoke tests); the device checks (handwriting-search.md, "On the device": Android's first start copying the model,
