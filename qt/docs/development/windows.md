@@ -137,6 +137,13 @@ The workflow's steps:
    - Qt Multimedia's media plugins (`bin\multimedia\`: FFmpeg and Media Foundation players, which windeployqt adds
      because the program links Qt Multimedia) are removed again: the recordings need only `Qt6Multimedia.dll`, whose
      audio devices use WASAPI. So FFmpeg's DLLs (GPL-built in MSYS2, tens of MB) are not in the zip;
+   - ONNX Runtime for the handwriting search ([releasing.md](releasing.md#handwriting-onnx-runtime-and-the-model)):
+     Microsoft's `onnxruntime.dll` (pinned in `qt/packaging/onnxruntime.env`, fetched and checked by
+     `qt/scripts/onnxruntime-fetch.sh`; `unzip` from MSYS2) into `bin\`, where the app looks first (Windows 11 has an
+     older `onnxruntime.dll` of its own in System32, which is never used). It is built with Visual C++ and imports
+     `MSVCP140*.dll` and `VCRUNTIME140*.dll`, which a fresh Windows may lack: those go into `bin\` too, from Visual
+     Studio's redistributable folder on the runner (`vswhere`; app-local deployment). Its licence files go to
+     `share\doc\xournal-qt\onnxruntime\`; the models (`share\xournal-qt\hwr-models\`) come with `cmake --install`;
    - `bin\qt.conf`, so that Qt looks for plugins and QML modules next to the program;
    - the data of poppler, gdk-pixbuf and fontconfig;
    - every DLL from MSYS2 that any `.exe` or `.dll` in the folder imports, recursively (read with `objdump -p`;
@@ -150,7 +157,11 @@ The workflow's steps:
    Pango and Cairo alone drawing text into a PNG and a PDF with the folder's DLLs, with each of Pango's font backends
    and with and without the UTF-8 C locale. Then recording: `Qt6Multimedia.dll` is in `bin\` (its imports are
    listed), no media plugin and no FFmpeg DLL is, and `xournal-qt --audio-info` says "recording: available (Qt
-   Multimedia …)" (the runner has no microphone; the devices it lists are for information).
+   Multimedia …)" (the runner has no microphone; the devices it lists are for information). Last, handwriting:
+   `onnxruntime.dll` and the Visual C++ DLLs it imports are in `bin\` (checked by name: the runner has them in
+   System32, so the clean `PATH` alone would not notice), every model of `qt/resources/hwr/` is in the folder file for
+   file (`qt/scripts/hwr-package-check.sh`), and `xournal-qt --hwr-info` finds the runtime and the models and reads
+   its sample (exit code 0).
 
    A step that fails runs again under **gdb** (`<step>.gdb.log`: the backtraces of every thread, stopped at the
    crash, `abort()` or `exit()`, and the loaded DLLs; the build has `-g1` for function names). A failing text export

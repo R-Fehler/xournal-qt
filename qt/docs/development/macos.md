@@ -94,6 +94,12 @@ The workflow's steps:
    - Qt Multimedia's media plugins (`PlugIns/multimedia`: FFmpeg's and AVFoundation's players, which macdeployqt
      adds because the program links Qt Multimedia) are removed again, with every library only they used (FFmpeg and
      its codecs): the recordings need only `QtMultimedia.framework`, whose audio devices use Core Audio;
+   - ONNX Runtime for the handwriting search ([releasing.md](releasing.md#handwriting-onnx-runtime-and-the-model)):
+     Microsoft's `libonnxruntime.<ver>.dylib` (pinned in `qt/packaging/onnxruntime.env`, fetched and checked by
+     `qt/scripts/onnxruntime-fetch.sh`) as `Contents/Frameworks/libonnxruntime.1.dylib`, where the app looks; it refers
+     to macOS's own libraries only, and its install name `@rpath/libonnxruntime.1.dylib` resolves through the program's
+     rpath. Its licence files go to `Contents/Resources/share/doc/xournal-qt/onnxruntime/`; the models
+     (`share/xournal-qt/hwr-models/`) come with `cmake --install`;
    - what macdeployqt leaves out: Homebrew's libraries name some of their own through `@rpath` with an rpath like
      `@loader_path/../lib` (`libpoppler-glib` → `libpoppler`, `libbrotlidec` → `libbrotlicommon`, `libwebp` →
      `libsharpyuv`), which macdeployqt neither copies nor rewrites (without the fix the app does not start). The script points
@@ -115,7 +121,10 @@ The workflow's steps:
    with Qt Quick's software renderer, opening a library and a document and saving a screenshot of its window after
    5 s (`app.png` in the artifact `smoke-test-macos-arm64`); last, recording: `QtMultimedia.framework` is in the
    bundle, no media plugin and no FFmpeg library is, and `xournal-qt --audio-info` says "recording: available (Qt
-   Multimedia …)" (it lists the devices without opening the microphone, so macOS asks nothing). A step that fails runs again under **lldb**
+   Multimedia …)" (it lists the devices without opening the microphone, so macOS asks nothing); then handwriting:
+   `libonnxruntime.1.dylib` is in `Frameworks`, every model of `qt/resources/hwr/` is in the bundle file for file
+   (`qt/scripts/hwr-package-check.sh`), and `xournal-qt --hwr-info` finds the runtime and the models and reads its
+   sample (exit code 0). A step that fails runs again under **lldb**
    (`<step>.lldb.log`: the backtraces of every thread; the build has `-g1`).
 
 ### Why macOS 15, and not older Macs

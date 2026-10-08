@@ -20,6 +20,26 @@ Comment: The Marker palette uses Open Color (https://yeun.github.io/open-color/,
 License: Expat
  (the full Expat text is given for qt/3rdparty/md4c/* below)
 
+Files: usr/lib/xournal-qt/libonnxruntime.so*
+Copyright: Microsoft Corporation
+Comment: ONNX Runtime (https://github.com/microsoft/onnxruntime), Microsoft's release build, which the handwriting
+ search loads at run time (qt/packaging/onnxruntime.env names the version). It contains third-party code under their
+ own licences: /usr/share/doc/xournal-qt/onnxruntime/ThirdPartyNotices.txt (with its LICENSE in the same folder).
+License: Expat
+ (the full Expat text is given for qt/3rdparty/md4c/* below)
+
+Files: usr/share/xournal-qt/hwr-models/*
+Copyright: xournal-qt contributors (the trained weights); the datasets' authors, see each model's LICENCE.md
+Comment: The handwriting models that xournal-qt reads handwriting with, one folder each. They are not covered by the
+ GNU General Public License of the program: each folder's LICENCE.md says under which terms its model may be used.
+ The models shipped now were trained on datasets that may be used for non-commercial purposes only (the IAM
+ Handwriting Database: non-commercial research use; the CVL Database: CC BY-NC 4.0), so they are for non-commercial
+ use only. The program works without them: switching the handwriting search off, or removing the folder, leaves
+ everything else working.
+License: non-commercial
+ For non-commercial use only. The terms are those of /usr/share/xournal-qt/hwr-models/<name>/LICENCE.md, which
+ lists the datasets each model was trained on and their licences.
+
 Files: qt/3rdparty/md4c/*
 Copyright: 2016-2024 Martin Mitas
 License: Expat

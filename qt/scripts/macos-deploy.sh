@@ -13,7 +13,10 @@
 #   Contents/PlugIns/               Qt's plugins (cocoa, offscreen for scripted runs, SVG icons, image formats, ...);
 #                                   not Qt Multimedia's media plugins (the recordings need only its framework)
 #   Contents/Resources/qml/         the QML modules the QML files import (macdeployqt -qmldir)
-#   Contents/Resources/share/xournal-qt/   page templates, palettes, icons, fonts (AppContext looks there)
+#   Contents/Resources/share/xournal-qt/   page templates, palettes, icons, fonts (AppContext looks there), the
+#                                   handwriting models (hwr-models/<name>/, from cmake --install)
+#   Contents/Frameworks/libonnxruntime.1.dylib   ONNX Runtime for the handwriting search
+#   Contents/Resources/share/doc/xournal-qt/onnxruntime/   its LICENSE and ThirdPartyNotices.txt
 #   Contents/Resources/xournal-qt.icns     the program's icon (qt/packaging/xournal-qt.svg)
 #   Contents/Info.plist             from qt/packaging/macos/Info.plist.in
 #
@@ -158,6 +161,21 @@ if grep -q 'QtMultimedia.framework' <<< "$exe_libs"; then
 else
     warn "xournal-qt does not use QtMultimedia.framework: this build offers no recording"
 fi
+
+# --- ONNX Runtime (the handwriting search; qt/docs/development/releasing.md, "Handwriting") --------------------------
+# Microsoft's library (qt/packaging/onnxruntime.env) as Contents/Frameworks/libonnxruntime.1.dylib, where the app looks
+# (qt/src/hwr/OrtRuntime.cpp: <exe>/../Frameworks/). It refers only to macOS's own libraries and frameworks; its install
+# name is @rpath/libonnxruntime.1.dylib, which the program's rpath @executable_path/../Frameworks resolves. The ad-hoc
+# signature below covers it. Its licence files go to Resources/share/doc/xournal-qt/onnxruntime. The models
+# (share/xournal-qt/hwr-models) came with `cmake --install` above.
+step "ONNX Runtime"
+bash "$source_dir/qt/scripts/onnxruntime-fetch.sh" osx-arm64 "$staging/onnxruntime"
+cp "$staging/onnxruntime/lib/libonnxruntime.1.dylib" "$contents/Frameworks/"
+chmod 0755 "$contents/Frameworks/libonnxruntime.1.dylib"
+mkdir -p "$contents/Resources/share/doc/xournal-qt/onnxruntime"
+cp "$staging/onnxruntime/LICENSE" "$staging/onnxruntime/ThirdPartyNotices.txt" \
+    "$contents/Resources/share/doc/xournal-qt/onnxruntime/"
+otool -L "$contents/Frameworks/libonnxruntime.1.dylib"
 
 # --- What macdeployqt leaves out -------------------------------------------------------------------------------------
 # macdeployqt copies the libraries that the program and Qt name by their full path, but not those that Homebrew's
@@ -306,6 +324,11 @@ newer), or remove the quarantine flag in a terminal:
 
 Needs macOS $minimum_system or newer. Settings are kept in ~/.config/xournal-qt, caches in ~/.cache/xournal-qt; the
 default library is ~/Documents/Xournal_Libraries/Default.
+
+Handwriting search (Settings -> Search): the built-in handwriting model in
+xournal-qt.app/Contents/Resources/share/xournal-qt/hwr-models/ is for non-commercial use only (the LICENCE.md in its
+folder); ONNX Runtime (Contents/Frameworks/libonnxruntime.1.dylib, MIT, Microsoft) reads it, its licence and notices
+are in Contents/Resources/share/doc/xournal-qt/onnxruntime/.
 
 xournal-qt.app/Contents/MacOS/xournal-qt-cli is the command line tool (PDF and PNG export, as xournalpp --create-pdf).
 EOF

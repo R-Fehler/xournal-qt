@@ -230,6 +230,11 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
   IAM's non-commercial terms and CVL's CC BY-NC 4.0: for non-commercial use), in the package and the About dialog.
   Training state: `qt/research/hwr/train`, runs `de-ctc` and `en-de-ctc` (fhswf's writers checked:
   grouped by capture day; CVL's layout read fine).
+- [x] The packaging side of the bundled model (`qt/hwr-bundle-ci`): ONNX Runtime 1.30.0 pinned with sha256 in
+  `qt/packaging/onnxruntime.env` and put into every package, licences, `--hwr-info` smoke tests in every package job
+  (releasing.md, "Handwriting: ONNX Runtime and the model"). Left: a first run of `xqt-release.yml`, `xqt-windows.yml`,
+  `xqt-macos.yml` and `xqt-android.yml` (none ran yet); whether the APK should compress its native libraries
+  (the target property `QT_ANDROID_LEGACY_PACKAGING`: about 20 MB less to download, more on the phone).
 - [ ] The text layer in plain "Export as PDF".
 - [?] **Text or drawing, and writing of any size** (the author is unsure how stable a size-aware layout would be;
   nothing changed yet). Today `InkLayout` calls a stroke a drawing when it is filled, taller than 2.5 times the

@@ -90,6 +90,23 @@ What makes tests fail there and not on a desktop: other fonts (other text widths
 narrower), and Qt 6.8, whose own file dialogs are windows of their own (off-screen the app's window does not get the
 keys back when one closes) and whose menus take a click on their button only after they have faded out.
 
+## The packages' smoke tests
+
+Each package job tries what it built as a user would get it, and a failure fails the job (the package is published
+as an artifact first, so it can be looked at):
+
+| Job | What |
+| --- | --- |
+| `xqt-release.yml`, `.deb` (both containers) | installs the package in the container (`apt-get install ./…deb`); handwriting: every model of `qt/resources/hwr/` in `/usr/share/xournal-qt/hwr-models/` (`qt/scripts/hwr-package-check.sh models`), `/usr/lib/xournal-qt/libonnxruntime.so.1`, `xournal-qt --hwr-info` |
+| `xqt-release.yml`, AppImage | the models in the AppDir, then the AppImage itself: `--hwr-info` (off-screen) |
+| `xqt-windows.yml` | `qt/scripts/windows-smoke.sh`: CLI exports, the app, recording (`--audio-info`), handwriting (`onnxruntime.dll` and its Visual C++ DLLs in `bin\`, the models, `--hwr-info`) |
+| `xqt-macos.yml` | `qt/scripts/macos-smoke.sh`, with Homebrew hidden: CLI exports, the app, recording, handwriting (`Frameworks/libonnxruntime.1.dylib`, the models, `--hwr-info`) |
+| `xqt-android.yml` | no device: `qt/scripts/hwr-package-check.sh apk` looks into the APK for `lib/arm64-v8a/libonnxruntime.so`, ONNX Runtime's licence files and the model files |
+
+`xournal-qt --hwr-info` exits with 1 when ONNX Runtime or a model is missing or its built-in sample is not read. What
+each package carries for the handwriting search, and how to bump ONNX Runtime:
+[releasing.md](releasing.md#handwriting-onnx-runtime-and-the-model).
+
 ## Archive PDFs: veraPDF
 
 The Debian job downloads veraPDF's greenfield CLI from Maven Central (checked by SHA-1), runs the archive tests with
