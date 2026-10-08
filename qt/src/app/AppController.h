@@ -1860,8 +1860,11 @@ private:
     xqt::HandwritingSettings* handwritingView = nullptr;
     /// The open documents of this window to the handwriting search
     void syncHandwriting();
-    /// The handwriting read in a saved document, to the library's cache
+    /// The handwriting read in a document of the library (saved: the file holds what it shows), to the library's
+    /// cache: on saving (what is read so far), and when all of it is read while it has no unsaved changes
     void handOverHandwriting(xqt::DocumentSession& s);
+    void handOverReadHandwriting();
+    std::map<const xqt::DocumentSession*, int> inkHandedOver;  ///< pages read when last handed over (open documents)
     std::unique_ptr<xqt::TabManager> tabs;
     std::unique_ptr<xqt::ReferenceMode> referenceMode;  ///< (after `tabs`, reset before it)
     std::unique_ptr<xqt::VersionCompare> compareMode;   ///< (after `referenceMode`, reset before it)

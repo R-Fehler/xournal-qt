@@ -500,6 +500,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/DocumentLinksTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/SnipTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/CopyToolsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LibraryHandwritingTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/QuickNoteTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/StickerToolTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/TodosTest.cpp
