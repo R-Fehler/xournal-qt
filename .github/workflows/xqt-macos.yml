@@ -137,7 +137,7 @@ jobs:
           echo "BREW_PREFIX=$prefix" >> "$GITHUB_ENV"
           sudo mv "$prefix" "$prefix.hidden"
 
-      - name: Smoke test (CLI exports, the app off-screen; lldb backtraces of what fails)
+      - name: Smoke test (CLI exports, the app off-screen, recording, handwriting; lldb backtraces of what fails)
         timeout-minutes: 30
         shell: /bin/bash --noprofile --norc -eo pipefail {0}  # (the system's bash: Homebrew's is hidden)
         run: |

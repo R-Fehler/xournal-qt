@@ -12,6 +12,9 @@
 #   4. recording (qt/docs/features/audio.md, "Platforms"): QtMultimedia.framework is in the bundle and Qt's media
 #      plugins and FFmpeg's libraries are not; `xournal-qt --audio-info` says "recording: available" (it lists the
 #      devices without opening the microphone, so macOS asks for no permission)
+#   5. handwriting (qt/docs/development/releasing.md, "Handwriting"): Contents/Frameworks/libonnxruntime.1.dylib and
+#      every model of qt/resources/hwr/ in Resources/share/xournal-qt/hwr-models/ (hwr-package-check.sh); `xournal-qt
+#      --hwr-info` finds the runtime and the models and reads its sample (exit code 0)
 #
 # The CI hides Homebrew (/opt/homebrew) while this runs, so that a library missing from the bundle fails here and not
 # on a Mac without Homebrew.
@@ -181,6 +184,24 @@ fi
 if attempt audio-info 60 QT_QPA_PLATFORM=offscreen "$macos/xournal-qt" --audio-info; then
     grep -q '^recording: available (Qt Multimedia' "$out/audio-info.log" ||
         { echo "::error::audio-info: recording is not available through Qt Multimedia"; failures=$((failures + 1)); }
+else
+    failures=$((failures + 1))
+fi
+
+# --- Handwriting ------------------------------------------------------------------------------------------------------
+# ONNX Runtime in Frameworks, the models file for file, and `xournal-qt --hwr-info`: exit code 1 when the runtime or a
+# model is missing or the built-in sample is not read (qt/docs/development/releasing.md, "Handwriting")
+printf '\n=== handwriting: what the bundle has\n'
+if [[ -f "$app/Contents/Frameworks/libonnxruntime.1.dylib" ]]; then
+    echo "libonnxruntime.1.dylib: $(wc -c < "$app/Contents/Frameworks/libonnxruntime.1.dylib" | tr -d ' ') bytes"
+else
+    echo "::error::handwriting: no Contents/Frameworks/libonnxruntime.1.dylib in the bundle"
+    failures=$((failures + 1))
+fi
+/bin/bash "$source_dir/qt/scripts/hwr-package-check.sh" models "$app/Contents/Resources/share/xournal-qt" ||
+    failures=$((failures + 1))
+if attempt hwr-info 120 QT_QPA_PLATFORM=offscreen "$macos/xournal-qt" --hwr-info; then
+    grep -qi 'onnxruntime' "$out/hwr-info.log" || echo "::warning::hwr-info: the output does not name ONNX Runtime"
 else
     failures=$((failures + 1))
 fi
