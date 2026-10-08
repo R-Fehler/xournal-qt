@@ -81,6 +81,10 @@ Then choose the model in the app's settings (block `qt/hwr-multilang`: a model p
 More options:
 - `--resume` continues a run from `runs/<name>/checkpoints/last`, after a crash or to raise `max_steps`.
 - `--set key=value` overrides one config key, for example `--set train.batch_size=16 --set out_dir=runs/try2`.
+- **A final run** learns from the validation lines too: `--set "train.splits=[train, val]"`, with a fixed
+  `train.max_steps` (the best step of the experiment, plus about the share of lines added) and no early stopping to
+  speak of (the validation lines are no longer held out); the test lines stay out for the last comparison. To keep
+  the experiment's step size on more GPUs, lower `train.batch_size` (4 GPUs × 24 = 2 × 48).
 - `python prepare.py synthetic --lang de --lines 50000 --corpus tatoeba --corpus textfile:my-notes.txt` adds
   synthetic lines from your own text, which helps with your subject's vocabulary.
 - `python prepare.py hf --repo OWNER/NAME --name NAME --lang de --licence ...` converts any parquet line dataset on the
