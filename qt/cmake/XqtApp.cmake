@@ -301,6 +301,7 @@ set(XQT_QML_FILES
     src/app/qml/SettingsStorage.qml
     src/app/qml/SettingsShortcuts.qml
     src/app/qml/SettingsHelp.qml
+    src/app/qml/ModelLicenceDialog.qml
     src/app/qml/TabOverview.qml
     src/app/qml/SearchBar.qml
     src/app/qml/PageGrid.qml

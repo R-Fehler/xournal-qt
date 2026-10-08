@@ -1,5 +1,6 @@
-// xournal-qt: Settings → Help: the introduction, the tutorial and the keyboard shortcuts
-// (qt/docs/features/onboarding.md).
+// xournal-qt: Settings → Help: the introduction, the tutorial, the keyboard shortcuts (qt/docs/features/onboarding.md)
+// and About: the version, the licence, and the licence notes of the handwriting models that come with the app
+// (qt/docs/features/handwriting-search.md).
 // Part of SettingsPage.qml, instantiated once there: it reads the sheet through `sheet` (SettingsPage.qml's
 // context: `sheet.s` is app.settings, `sheet.narrow`, `sheet.win`); its rows are Settings*Row.qml.
 import QtQuick
@@ -55,6 +56,43 @@ ScrollView {
             objectName: "helpShortcutsButton"
             text: qsTr("Show the shortcuts")
             onClicked: sheet.showShortcuts()
+        }
+        SettingsSectionTitle { text: qsTr("About") }
+        SettingsHint {
+            objectName: "aboutVersion"
+            text: qsTr("Xournal Qt %1: Xournal++'s core with a Qt frontend. Free software under the GNU General "
+                       + "Public License, version 2 or later.").arg(Qt.application.version)
+        }
+        // The handwriting models that come with the app, each with its own licence note
+        Repeater {
+            model: app.handwriting.builtInModels
+            delegate: RowLayout {
+                id: aboutModel
+                required property var modelData
+                required property int index
+                objectName: "aboutHandwritingModel" + index
+                Layout.fillWidth: true
+                SettingsHint {
+                    Layout.fillWidth: true
+                    text: aboutModel.modelData.noncommercial
+                          ? qsTr("The handwriting model %1 (%2) is for non-commercial use: it was trained on data "
+                                 + "licensed for non-commercial research only. The app's code stays under the GPL.")
+                                .arg(aboutModel.modelData.name).arg(aboutModel.modelData.languages)
+                          : qsTr("The handwriting model %1 (%2) comes with its own licence.")
+                                .arg(aboutModel.modelData.name).arg(aboutModel.modelData.languages)
+                }
+                Button {
+                    objectName: "aboutModelLicence" + aboutModel.index
+                    visible: aboutModel.modelData.licenceFile !== ""
+                    flat: true
+                    text: qsTr("Licence")
+                    onClicked: aboutLicence.show(aboutModel.modelData.name, aboutModel.modelData.folder)
+                }
+            }
+        }
+        ModelLicenceDialog {
+            id: aboutLicence
+            objectName: "aboutLicenceDialog"
         }
     }
 }
