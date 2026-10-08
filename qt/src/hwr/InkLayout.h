@@ -28,7 +28,8 @@
  * and its dot), whose strokes go one after the other along that axis (their steps along it at least 1.5 times those
  * across; a single stroke: from its start to its end) and do not lie across it (their median at most 3 times as long
  * across as along: words one below the other, a list), has a direction. More than 20 degrees off left-to-right it is
- * turned upright: 70 to 110 degrees count as 90 exactly (downwards, -90 upwards), 160 to 180 as 180 (leftwards: upside
+ * turned upright (more than 10 when it climbs by more than its width across: a long line written uphill, which the
+ * page's rules would cut into pieces): 70 to 110 degrees count as 90 exactly (downwards, -90 upwards), 160 to 180 as 180 (leftwards: upside
  * down), 20 to 70 and 110 to 160 keep their angle. Runs of the same angle (within 8 degrees) are one
  * frame: their strokes; the runs without a direction (or read as level) whose middle lies in the box of one of them
  * (a little bigger, and longer by half their own length), whole; and the dots, straight lines and short runs inside
@@ -83,7 +84,7 @@ struct InkLine {
     std::vector<InkWordBox> words;  ///< left to right (in its frame)
     quint64 hash = 0;               ///< of its strokes relative to its origin (in its frame)
     /// The direction it was written in: degrees clockwise on the page, 0 left to right (the common case: its frame is
-    /// the page), 90 downwards, -90 upwards, 180 leftwards (upside down), others between 20 and 70 or 110 and 160
+    /// the page), 90 downwards, -90 upwards, 180 leftwards (upside down), others between 10 and 70 or 110 and 160
     /// either way
     double angle = 0;
     /// Its box in its frame, the page turned by -angle around (0, 0) (`box` for angle 0)

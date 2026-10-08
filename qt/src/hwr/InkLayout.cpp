@@ -560,6 +560,12 @@ std::vector<Frame> framesOf(const std::vector<InkStroke>& strokes, double h, dou
         const auto d = directionOf(strokes, runs[r].strokes, s);
         runs[r].directed = d.has_value();
         runs[r].angle = d ? snapped(d->angle) : 0;
+        if (d && runs[r].angle == 0 && std::abs(d->angle) > 10 &&
+            std::tan(std::abs(d->angle) * M_PI / 180) * d->length > d->width) {
+            // (a line climbing by more than its own height between 10 and 20 degrees: the page's rules would cut it
+            // into pieces; a short run at that angle is a slope, or its axis is not sure)
+            runs[r].angle = d->angle;
+        }
         if (runs[r].angle == 0) {
             continue;
         }

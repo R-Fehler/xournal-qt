@@ -40,8 +40,9 @@ arrow, a line written steeply uphill) is found, marked, copied and put into the 
   strokes' typical smaller side), long and narrow enough (at least 6 times that side and 3 times as long as wide; not
   two strokes alone, an i and its dot), whose strokes follow each other along it, has a direction. Letters written in
   pieces (stems, bars, a "Th" in one stroke) and crossings written afterwards still count; a list of words one below
-  the other does not. Within 20° of left to right it is laid out as level text, as
-  before (slopes are fine). 70°–110° either way counts as exactly 90°: **written downwards** (90°) or **upwards**
+  the other does not. Within 10° of left to right it is laid out as level text (slopes are fine), and within 20°
+  unless it climbs by more than its own height (a long line written uphill, which the page's rules would cut into
+  pieces: it keeps its angle). 70°–110° either way counts as exactly 90°: **written downwards** (90°) or **upwards**
   (270°, -90°), 160°–180° as exactly 180°: **upside down** (written leftwards, a note for the person across the table, a
   page turned while writing). Between 20° and 70° and between 110° and 160° either way the line keeps its own angle.
 - **How it is read**: the strokes of each direction are turned upright and laid out by the same rules as a page (lines,
@@ -65,8 +66,8 @@ arrow, a line written steeply uphill) is found, marked, copied and put into the 
 - Code: `InkLayout.h` (`framesOf`, `InkLine::angle` / `upright`), `Recognizer.cpp` (`LineInput::of` turns the line
   upright), `InkText.h` (`PlacedLine::angle`, `Word::angle`, `quadOf`, `quadsOf`), `DocumentSearch::Place::quads`,
   `DocumentCanvasItem::updateSearchHits`, `InkCopy.cpp`, `InkTextLayer.cpp`, `InkTextStore.cpp`. Tests:
-  `InkRotationTest.*` (`-L hwr`: 0°, 15°, 35°, 90°, 270°, 180°, ±135°, a mixed page, a list, the benchmark's real lines
-  at ±90°, ±45°, 30°, 180° and ±135° and lists of their words, the hash, the scripted recogniser, marks, copying, poppler), `InkSearchTest.handwritingAtAnAngleIsMarkedTurned`,
+  `InkRotationTest.*` (`-L hwr`: 0°, ±15°, ±35°, 90°, 270°, 180°, ±135°, a mixed page, a list, the benchmark's real
+  lines at ±90°, ±45°, 30°, ±15°, 180° and ±135° and lists of their words, the hash, the scripted recogniser, marks, copying, poppler), `InkSearchTest.handwritingAtAnAngleIsMarkedTurned`,
   `InkLibraryTest.theAngleOfALineIsStored`, `CanvasItemRenderTest.aHitInHandwritingAtAnAngleIsMarkedTurned` (`-L quick`).
 - **Measured**: `HwrRotationBenchmark` (`XQT_HWR_ROTATION_BENCH=<folder>` and `XQT_ONNXRUNTIME`, about 30 s) turns the
   benchmark's lines that stand alone (`qt/tests/hwr/BenchmarkInk.h`) to 90°, -90°, ±45°, 30°, 15°, ±135° and 180°, alone

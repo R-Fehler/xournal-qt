@@ -92,25 +92,21 @@ bool inWord(const ink::Word& w, QPointF p) {
 }
 }  // namespace
 
-// At 0 and 15 degrees the page's rules lay the line out (a slope is fine); at 35, 90 and -90 (written upwards) it is
-// laid out in its own frame: one line, its words, and the angle it was written in
+// Level, the page's rules lay the line out (a slope of a few degrees is fine); at 15 (a line climbing by more than its
+// height), 35, 90 and -90 (written upwards) it is laid out in its own frame: one line, its words, and the angle it was
+// written in
 TEST(InkRotationTest, aLineAtAnAngleIsOneLineInItsOwnFrame) {
-    for (const double angle: {0.0, 15.0, 35.0, -35.0, 90.0, -90.0}) {
+    for (const double angle: {0.0, 15.0, -15.0, 35.0, -35.0, 90.0, -90.0}) {
         SCOPED_TRACE(angle);
-        // (at 15 degrees the page's rules take 3 words as one line: the 4th is too far below the 1st, as before)
-        const size_t words = angle == 15 ? 3 : 4;
+        const size_t words = 4;
         const auto strokes = lineAt({300, 400}, angle, static_cast<int>(words));
         const hwr::Layout l = layout(strokes);
         ASSERT_EQ(l.lines.size(), 1u);
         const InkLine& line = l.lines[0];
-        if (angle == 15) {
-            EXPECT_EQ(line.angle, 0);  // (its words: by the page's rules, as before)
-            continue;
-        }
         EXPECT_EQ(line.words.size(), words);
         EXPECT_EQ(line.strokes.size(), words);
         EXPECT_TRUE(l.drawings.empty());
-        if (std::abs(angle) < 20) {
+        if (std::abs(angle) < 10) {
             EXPECT_EQ(line.angle, 0);
         } else if (std::abs(angle) == 90) {
             EXPECT_EQ(line.angle, angle);  // (exactly)
@@ -259,7 +255,7 @@ TEST(InkRotationTest, realHandwritingAtAnAngleIsOneLine) {
     for (size_t k = 0; k < lines.size(); ++k) {
         const hwr::Layout level = layout(lines[k]);
         ASSERT_EQ(level.lines.size(), 1u);
-        for (const double angle: {90.0, -90.0, 45.0, -45.0, 30.0, 180.0, 135.0, -135.0}) {
+        for (const double angle: {90.0, -90.0, 45.0, -45.0, 30.0, 180.0, 135.0, -135.0, 15.0, -15.0}) {
             SCOPED_TRACE(QStringLiteral("line %1 at %2").arg(k).arg(angle).toStdString());
             const hwr::Layout l = layout(test::turnedAround(lines[k], angle));
             ASSERT_EQ(l.lines.size(), 1u);
