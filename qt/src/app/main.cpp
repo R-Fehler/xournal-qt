@@ -39,10 +39,8 @@
 #include "EngineSetup.h"
 #include "audio/AudioDevice.h"
 #include "hwr/HandwritingSearch.h"
-#include "hwr/ModelInfo.h"
 #ifdef XQT_HWR_ONNX
-#include "hwr/CtcRecognizer.h"
-#include "hwr/TrocrRecognizer.h"
+#include "hwr/HwrInfo.h"
 #endif
 #include "EmojiFont.h"
 #include "shell/Library.h"
@@ -170,11 +168,30 @@ int main(int argc, char* argv[]) {
             "audio-info", "Print whether recording is offered and the microphones and speakers found, then exit "
                           "(exit code 1: recording is not offered)");
     parser.addOption(audioInfoOption);
+    // What the handwriting search runs on (qt/docs/features/handwriting-search.md, "The built-in model"; the CI's smoke
+    // tests of the packages ask)
+    const QCommandLineOption hwrInfoOption(
+            "hwr-info", "Print whether ONNX Runtime was found, the handwriting models that come with the app and what "
+                        "they read in a sample line, then exit (exit code 1: the handwriting search cannot read)");
+    parser.addOption(hwrInfoOption);
     parser.process(qapp);
     if (parser.isSet(audioInfoOption)) {
         std::fputs(xqt::audio::describe().c_str(), stdout);
         std::fflush(stdout);
         return xqt::audio::available() ? 0 : 1;
+    }
+    if (parser.isSet(hwrInfoOption)) {
+#ifdef XQT_HWR_ONNX
+        const xqt::hwr::HwrReport report = xqt::hwr::describe(
+                xqt::hwr::HandwritingSearch::bundledModelsDir(xqt::AppContext::defaultResourceDir()));
+        std::fputs(report.text.c_str(), stdout);
+        std::fflush(stdout);
+        return report.ok ? 0 : 1;
+#else
+        std::fputs("onnxruntime: not offered (this build has no ONNX Runtime support)\nhwr: not ready\n", stdout);
+        std::fflush(stdout);
+        return 1;
+#endif
     }
     const bool quickNote = parser.isSet(quickNoteOption);
 
@@ -225,12 +242,7 @@ int main(int argc, char* argv[]) {
 #ifdef XQT_HWR_ONNX
     // The handwriting search's recognisers, by their manifests' kind: TrOCR or a CTC model in ONNX Runtime (loaded
     // only when the search is switched on); a folder without a model gets TrOCR's, which says what is missing
-    xqt::hwr::HandwritingSearch::setFactory([](const QString& dir) -> std::shared_ptr<xqt::hwr::Recognizer> {
-        if (xqt::hwr::ModelInfo::read(dir).kind == QLatin1String("ctc")) {
-            return std::make_shared<xqt::hwr::CtcRecognizer>(dir);
-        }
-        return std::make_shared<xqt::hwr::TrocrRecognizer>(dir);
-    });
+    xqt::hwr::HandwritingSearch::setFactory(&xqt::hwr::onnxRecognizerFor);
 #endif
     // What the windows share (settings, tools, library, the background jobs): made before the first window, gone
     // after the last one

@@ -71,7 +71,9 @@ if(XQT_HWR_ONNX)
         ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/TrocrRecognizer.h
         ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/TrocrRecognizer.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/CtcRecognizer.h
-        ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/CtcRecognizer.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/CtcRecognizer.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/HwrInfo.h
+        ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/HwrInfo.cpp)
     target_include_directories(xqt-hwr PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/onnxruntime/include")
     target_compile_definitions(xqt-hwr PUBLIC XQT_HWR_ONNX)
     target_link_libraries(xqt-hwr PRIVATE ${CMAKE_DL_LIBS})
