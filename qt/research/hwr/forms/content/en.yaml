@@ -1,0 +1,404 @@
+# The English handwriting form (DESIGN.md). Content only: what to write, its kind, size, angle and tags.
+# Where it goes on the page is decided by layout.py. Texts are the project's own sentences (free to use) or
+# traditional pangrams.
+#
+# Item fields: text, kind (line word chars number label math drawing mark free), x_height (mm), angle (degrees,
+# clockwise), guides (a faint baseline), tags, search (default: its words of 3 or more letters), prompt (when the
+# printed prompt differs from the text), width/height (mm, when the layout should not decide).
+form: xqt-hwr-en
+page_id: XQT-HWR-EN
+title: "Handwriting form (English)"
+language: en
+version: 1
+
+sections:
+  - id: "0"
+    title: "Handwriting form: start here"
+    instruction: >-
+      Open this PDF in xournal-qt and write on it with the pen. Copy each printed text by hand into the box that
+      belongs to it, once, in your normal handwriting.
+    blocks:
+      - type: para
+        paragraphs:
+          - >-
+            This form collects your handwriting with known texts: every box expects exactly the text printed
+            above it (or beside it). Written in xournal-qt, it becomes training data for a handwriting model of your
+            own hand, and a test of the whole handwriting search: lines, sizes, angles, words, drawings and formulas.
+        bullets:
+          - "Write in your own normal hand. Copy the printed text; do not trace it."
+          - "One box, one text: write all of it inside its box, starting at the left end, or where the arrow starts."
+          - >-
+            The height of a box shows the size to write at; the faint line is the baseline. A box without a line is
+            meant to be written without one.
+          - "An arrow shows the writing direction. Turn the page or the tablet as you like."
+          - "A mistake: strike it out and write on, or erase it. Skip a box rather than guess."
+          - "Grey numbers (like 3.12) are box ids: leave them alone. The core form takes about 30 minutes."
+      - type: para
+        heading: "If you share this form"
+        paragraphs:
+          - >-
+            Sharing is optional and decided later. If you might give this filled form to a common handwriting
+            dataset, tick the licence for your handwriting and choose a writer id (any name or code).
+      - type: ticks
+        items:
+          - {text: "CC0 1.0: no rights reserved (public domain dedication)", tags: [licence, cc0]}
+          - {text: "CC BY 4.0: free to use with credit to my writer id", tags: [licence, cc-by]}
+          - {text: "Private: for my own models only, not for sharing", tags: [licence, private]}
+      - type: rows
+        items:
+          - {kind: free, prompt: "Writer id", width: 70, height: 10, tags: [writer-id]}
+          - {kind: free, prompt: "Writing hand (left or right)", width: 60, height: 10, tags: [hand]}
+          - {kind: free, prompt: "Device and pen", width: 44, height: 10, tags: [device]}
+      - type: lines
+        heading: "Warm-up"
+        items:
+          - "Warm up: this is my handwriting on a tablet."
+          - "Notes taken on a Monday morning, with a pen."
+          - {text: "Small steps, clear letters, steady lines.", guides: false}
+
+  - id: A
+    title: "A. Characters"
+    instruction: >-
+      Copy each group as printed, with the spaces between the characters. The typewriter font only shows clearly
+      which character is meant; write in your normal hand.
+    blocks:
+      - type: rows
+        heading: "Alphabet, digits, punctuation and symbols"
+        justify: true
+        defaults: {kind: chars, x_height: 3}
+        items:
+          - {text: "a b c d e f g h i j k l m", tags: [lower]}
+          - {text: "n o p q r s t u v w x y z", tags: [lower]}
+          - {text: "A B C D E F G H I J K L M", tags: [upper]}
+          - {text: "N O P Q R S T U V W X Y Z", tags: [upper]}
+          - {text: "0 1 2 3 4 5 6 7 8 9", tags: [digits]}
+          - {text: '. , ; : ! ? '' " ( ) [ ] { }', tags: [punctuation]}
+          - {text: '- – / \ @ # % & * + = < > € $ § °', tags: [symbols]}
+      - type: lines
+        heading: "Pangrams"
+        items:
+          - {text: "The quick brown fox jumps over the lazy dog.", tags: [pangram]}
+          - {text: "Sphinx of black quartz, judge my vow.", tags: [pangram], guides: false}
+          - {text: "WALTZ, BAD NYMPH, FOR QUICK JIGS VEX.", tags: [pangram, upper]}
+      - type: rows
+        heading: "Characters that look alike"
+        note: "Write each group with its characters apart, then the words below, as you would in a note."
+        justify: true
+        defaults: {kind: chars, x_height: 3, tags: [confusable]}
+        items:
+          - "rn m"
+          - "cl d"
+          - "0 O o"
+          - "1 l I |"
+          - "u v"
+          - "a o"
+          - "5 S"
+          - "2 Z"
+          - "g q 9"
+      - type: rows
+        justify: true
+        defaults: {kind: word, x_height: 3, tags: [confusable]}
+        items:
+          - "modern"
+          - "clad"
+          - {text: "Oslo 2030", search: ["Oslo", "2030"]}
+          - "Illinois"
+          - "vacuum"
+          - "avocado"
+          - {text: "SOS 55", search: ["SOS", "55"]}
+          - {text: "quiz 99", search: ["quiz", "99"]}
+          - {text: "l1 I1 |1", kind: chars}
+          - {text: "O0 o0 Q0", kind: chars}
+
+  - id: B
+    title: "B. Running text"
+    instruction: >-
+      Copy each sentence into the box below it, on one line, in your normal size. Numbers, dates, units and
+      addresses as printed.
+    blocks:
+      - type: lines
+        items:
+          - "The meeting starts at 9:30 in room 2.14."
+          - "Today we discuss the budget for next year."
+          - "Please read chapter 4 before the lecture."
+          - {text: "The sensor reads 23.5 °C and 41 % humidity.", tags: [units]}
+          - "We agreed to test the new design in May."
+          - {text: "The bridge is 340 m long and 12 m wide.", tags: [units], guides: false}
+          - {text: "Send the slides to lena.marsh@example.org", tags: [email],
+             search: ["Send", "the", "slides", "lena.marsh@example.org"]}
+          - {text: "Notes: https://example.org/hwr/notes", tags: [url],
+             search: ["Notes", "https://example.org/hwr/notes"]}
+          - "Lecture 7: signals, noise and filters"
+          - {text: "Deadline for the report: Friday, 3 June 2027.", tags: [date]}
+          - {text: "Approx. 2.5 kg of flour, 1 l of milk, 6 eggs.", tags: [units, abbreviation]}
+          - {text: "Questions? Ask Dr. Weber after class.", tags: [abbreviation], guides: false}
+          - {text: "The error dropped from 8.4 % to 3.1 %.", tags: [numbers]}
+          - {text: "Call me back at +44 20 7946 0123.", tags: [numbers]}
+          - "Next steps: draft, review, then print."
+          - {text: "The train leaves at 17:05 from platform 3.", tags: [time]}
+          - {text: "Our plan for Q3: fewer meetings, more focus.", tags: [abbreviation]}
+          - {text: "A short summary fits on one page.", guides: false}
+          - {text: "Bring a pen, a ruler and your student ID.", tags: [abbreviation]}
+          - {text: "Results vary between 0.75 and 1.25 V.", tags: [units, numbers]}
+          - {text: "Room booked Tue 14:00-15:30, max. 12 people.", tags: [time, abbreviation]}
+          - {text: "The draft goes to the editor on 2027-01-15.", tags: [date]}
+          - "Write clearly, even when you are in a hurry."
+          - {text: "See you next week at the same time!", guides: false}
+
+  - id: C
+    title: "C. Search words"
+    instruction: >-
+      Write each word once in its box, at the size of the box: headline, large, normal and small. These words are
+      what a search for this form looks for.
+    blocks:
+      - type: rows
+        heading: "Headline"
+        justify: true
+        defaults: {kind: word, x_height: 10, tags: [animal]}
+        items: ["Okapi", "Quoll", "Ibex", "Tapir", "Gecko", "Lemur"]
+      - type: rows
+        heading: "Large"
+        justify: true
+        defaults: {kind: word, x_height: 6}
+        items:
+          - {text: "Marrowbend", tags: [place]}
+          - {text: "Thandeka", tags: [name]}
+          - {text: "Ljubljana", tags: [place]}
+          - {text: "Okonkwo", tags: [name]}
+          - {text: "Saskatoon", tags: [place]}
+          - {text: "Brackwater", tags: [place]}
+          - {text: "QX-4471", tags: [digits, acronym], search: ["QX-4471"]}
+          - {text: "Wexford", tags: [place]}
+          - {text: "McAllister", tags: [name, mixed-case]}
+          - {text: "isotherm", tags: [term]}
+      - type: rows
+        heading: "Normal"
+        justify: true
+        defaults: {kind: word, x_height: 3}
+        items:
+          - {text: "eigendecomposition", tags: [term, long]}
+          - {text: "photolithography", tags: [term, long]}
+          - {text: "LIDAR", tags: [acronym]}
+          - {text: "OAuth", tags: [acronym, mixed-case]}
+          - {text: "CRISPR", tags: [acronym]}
+          - {text: "Gate 47B", tags: [digits], search: ["Gate", "47B"]}
+          - {text: "Siobhan", tags: [name]}
+          - {text: "Reykjavik", tags: [place]}
+          - {text: "deGroot", tags: [name, mixed-case]}
+          - {text: "hydrofoil", tags: [term]}
+          - {text: "Route 9X", tags: [digits], search: ["Route", "9X"]}
+          - {text: "Wojciech", tags: [name]}
+      - type: rows
+        heading: "Small"
+        justify: true
+        defaults: {kind: word, x_height: 2}
+        items:
+          - {text: "Aotearoa", tags: [place]}
+          - {text: "Ouagadougou", tags: [place, long]}
+          - {text: "zeolite", tags: [term]}
+          - {text: "MacGregor", tags: [name, mixed-case]}
+          - {text: "NTSB", tags: [acronym]}
+          - {text: "B12", tags: [digits], search: ["B12"]}
+          - {text: "quasicrystal", tags: [term, long]}
+          - {text: "Ingrid", tags: [name]}
+          - {text: "Kalmar", tags: [place]}
+          - {text: "pH 7.4", tags: [digits], search: ["pH", "7.4"]}
+          - {text: "Vexholm", tags: [place]}
+          - {text: "counterintuitive", tags: [long]}
+
+  - id: D
+    title: "D. Angles"
+    instruction: >-
+      Write each line along its box, in the direction of its arrow, as if the box were level: turn the page or the
+      tablet if that helps. The printed text is turned with its box.
+    blocks:
+      - type: angles
+        groups:
+          - angle: 15
+            items: ["fifteen degrees", "tilted a little", "slightly downhill", "lab at 10:15"]
+          - angle: -15
+            items: ["a gentle slope", "the other way", "rising notes", "page 15 of 40"]
+          - angle: 30
+            items: ["thirty degrees", "a steeper note", "room 3.07"]
+          - angle: -30
+            items: ["thirty, going up", "climbing words", "step 2 of 5"]
+          - angle: 45
+            items: ["a diagonal remark", "halfway down", "45 min left"]
+          - angle: -45
+            items: ["diagonal, going up", "forty five", "version 2.1"]
+          - angle: 60
+            items: ["sixty degrees", "almost a column", "due 12 May"]
+          - angle: -60
+            items: ["sixty, going up", "steep annotation", "Fig. 6 here"]
+          - angle: 0
+            items: ["level line to compare", "written straight", "as on ruled paper", "no angle at all"]
+          - angle: 180
+            items: ["upside down text", "turn the page", "written from right", "half a turn"]
+          - angle: 135
+            items: ["down to the left", "three eighths", "box 135"]
+          - angle: -135
+            items: ["up to the left", "backwards, rising", "line 7"]
+
+  - id: D
+    title: "D. Angles: short notes"
+    instruction: >-
+      Short notes of one, two and four words at every angle, the kind written beside a figure or a formula. Write
+      each along its box, in the direction of its arrow.
+    blocks:
+      - type: angles
+        gap: 5
+        groups:
+          - {angle: 15, same_width: false, items: [{text: "Okay", tags: [one-word]},
+                                                    {text: "see p. 12", tags: [two-words, digits]}]}
+          - {angle: -15, same_width: false, items: [{text: "Why?", tags: [one-word]},
+                                                     {text: "check this again", tags: [three-words]}]}
+          - {angle: 30, same_width: false, items: [{text: "True", tags: [one-word]},
+                                                    {text: "not here", tags: [two-words]},
+                                                    {text: "ask her on Friday", tags: [four-words]}]}
+          - {angle: -30, same_width: false, items: [{text: "x2", tags: [one-word, digits]},
+                                                     {text: "too long", tags: [two-words]},
+                                                     {text: "fix the second axis", tags: [four-words]}]}
+          - {angle: 45, same_width: false, items: [{text: "Done", tags: [one-word]},
+                                                    {text: "nice idea", tags: [two-words]},
+                                                    {text: "add 3 more samples", tags: [four-words, digits]}]}
+          - {angle: -45, same_width: false, items: [{text: "Maybe", tags: [one-word]},
+                                                     {text: "see below", tags: [two-words]},
+                                                     {text: "this was in 2019", tags: [four-words, digits]}]}
+          - {angle: 60, same_width: false, items: [{text: "Wrong", tags: [one-word]},
+                                                    {text: "units missing", tags: [two-words]},
+                                                    {text: "split into two parts", tags: [four-words]}]}
+          - {angle: -60, same_width: false, items: [{text: "Q4", tags: [one-word, digits]},
+                                                     {text: "good point", tags: [two-words]},
+                                                     {text: "move up a level", tags: [four-words]}]}
+          - {angle: 135, same_width: false, items: [{text: "Later", tags: [one-word]},
+                                                     {text: "why so?", tags: [two-words]},
+                                                     {text: "compare with table 4", tags: [four-words, digits]}]}
+          - {angle: -135, same_width: false, items: [{text: "Yes", tags: [one-word]},
+                                                      {text: "and then?", tags: [two-words]},
+                                                      {text: "same as last week", tags: [four-words]}]}
+          - {angle: 180, same_width: false, items: [{text: "Upside", tags: [one-word]},
+                                                     {text: "room 101", tags: [two-words, digits]}]}
+          - {angle: 90, items: [{text: "Idea", tags: [one-word]}]}
+          - {angle: 90, items: [{text: "send it to Ana", tags: [four-words]}]}
+
+  - id: D
+    title: "D. Angles: notes upwards and downwards"
+    instruction: >-
+      Short notes written downwards (arrow down) and upwards (arrow up), long notes along the page edges, and labels
+      written upwards inside the bars. Follow each arrow.
+    edge_width: 20
+    edge_notes:
+      - {text: "This note runs up along the left edge of the page.", angle: -90}
+      - {text: "And this one runs down along the right edge.", angle: 90}
+    blocks:
+      - type: angles
+        heading: "Short notes"
+        groups:
+          - {angle: 90, items: [{text: "Check", tags: [one-word]}]}
+          - {angle: 90, items: [{text: "see above", tags: [two-words]}]}
+          - {angle: 90, items: [{text: "ask about the deadline", tags: [four-words]}]}
+          - {angle: -90, items: [{text: "Note", tags: [one-word]}]}
+          - {angle: -90, items: [{text: "page five", tags: [two-words]}]}
+          - {angle: -90, items: [{text: "move this to Monday", tags: [four-words]}]}
+      - type: bars
+        heading: "Labels inside a chart"
+        caption: "A bar chart of three seasons"
+        heights: [62, 78, 70]
+        items:
+          - {text: "spring", x_height: 3}
+          - {text: "summer peak", x_height: 3}
+          - {text: "autumn", x_height: 3}
+
+  - id: E
+    title: "E. Notes on a page"
+    instruction: >-
+      Annotate the printed text as you would a handout: margin notes (small), a word inserted between two lines, a
+      note at the end; then a list, two columns and a table.
+    blocks:
+      - type: annotate
+        paragraph1: >-
+          A filter estimates a quantity that cannot be measured directly. It combines a model of how the quantity
+          changes with measurements that are noisy. When the model is good, the filter trusts it more; when the
+          measurements are precise, it trusts them more.
+        paragraph2: >-
+          The balance between the two is called the gain. It is computed again at every step, so the filter adapts
+          when conditions change. The same idea guides a robot through a room and a phone through a city.
+        insertion: {text: "noisy sensor data", prompt: "insert here: noisy sensor data"}
+        end_note: {text: "Ask: how is the gain tuned?"}
+        margin_left:
+          - {text: "key idea", prompt: "key idea"}
+          - {text: "see lecture 5", prompt: "see lecture 5"}
+        margin_right:
+          - {text: "model vs data", prompt: "model vs data"}
+          - {text: "example!", prompt: "example!"}
+      - type: lines
+        heading: "A list"
+        bullet: true
+        items:
+          - "buy a new notebook for the lab"
+          - "send the corrected figures to Priya"
+          - {text: "book the seminar room for June", guides: false}
+      - type: columns
+        heading: "Two columns"
+        columns:
+          - ["Pros: fast and cheap", "works offline", "easy to repair"]
+          - ["Cons: heavy to carry", "short battery life", "loud fan"]
+      - type: table
+        heading: "A table: copy it into the empty grid"
+        rows:
+          - ["Sample", "Mass", "Date"]
+          - ["Copper", "12.4 g", "3 May"]
+          - ["Zinc", "8.75 g", "17 May"]
+
+  - id: F
+    title: "F. Drawings and marks"
+    instruction: >-
+      Draw, mark and label as asked. Labels are text; frames, arrows, circles, lines and sketches are not, so keep
+      them out of the label boxes where you can.
+    blocks:
+      - type: flowchart
+        prompt: "Flow chart: write the labels, draw a frame around each, connect them with arrows"
+        height: 38
+        labels: ["collect data", "train model", "evaluate"]
+      - type: marks
+        heading: "Marks"
+        printed:
+          - {word: "Sandpiper", mark: circle, prompt: "circle the printed word"}
+          - {word: "Heronsgate", mark: underline, prompt: "underline the printed word"}
+          - {word: "Bitterling", mark: strike, prompt: "strike out the printed word"}
+        written:
+          - {text: "Tarragon", mark: circle, prompt_word: "Tarragon", prompt: "write the word in the middle, then circle it"}
+          - {text: "Juniper", mark: underline, prompt_word: "Juniper", prompt: "then underline it"}
+      - type: drawings
+        height: 36
+        items:
+          - {prompt: "Sketch: draw a small house", tags: [sketch]}
+          - {prompt: "Hatch this whole area with lines", tags: [hatching]}
+      - type: plot
+        prompt: "Plot: draw two axes and a rising curve"
+        width: 110
+        height: 44
+        title: {text: "Speed over time", tags: [plot-title]}
+        x_label: {text: "time in s"}
+        y_label: {text: "speed in m/s"}
+
+  - id: G
+    title: "G. Formulas"
+    instruction: >-
+      Write each formula as you would in your notes, on one line where you can. Formulas are a benchmark only; they
+      are not used for training.
+    blocks:
+      - type: formulas
+        items:
+          - {text: "a^2 + b^2 = c^2", latex: "a^2 + b^2 = c^2"}
+          - {text: "x = (-b ± √(b^2 - 4ac)) / 2a", latex: "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}", height: 15}
+          - {text: "f(x) = 3x^2 - 2x + 1", latex: "f(x) = 3x^2 - 2x + 1"}
+          - {text: "Σ_{k=1}^{n} k = n(n+1)/2", latex: "\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}", height: 17}
+          - {text: "∫_0^1 x^2 dx = 1/3", latex: "\\int_0^1 x^2 \\, dx = \\frac{1}{3}", height: 17}
+          - {text: "sin^2 α + cos^2 α = 1", latex: "\\sin^2\\alpha + \\cos^2\\alpha = 1"}
+          - {text: "A = [[1, 2], [3, 4]]", latex: "A = \\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}", height: 17}
+          - {text: "E = m c^2", latex: "E = m c^2"}
+          - {text: "lim_{x→0} sin(x)/x = 1", latex: "\\lim_{x \\to 0} \\frac{\\sin x}{x} = 1", height: 15}
+          - {text: "2 H2 + O2 → 2 H2O", latex: "2\\,\\mathrm{H_2} + \\mathrm{O_2} \\rightarrow 2\\,\\mathrm{H_2O}"}
+          - {text: "R = 3,5 kΩ", latex: "R = 3{,}5\\,\\mathrm{k}\\Omega"}
+          - {text: "Δx · Δp ≥ ħ/2", latex: "\\Delta x \\cdot \\Delta p \\geq \\frac{\\hbar}{2}", height: 15}

@@ -86,6 +86,29 @@ distinctive in a library (a search for them should find this form and nothing el
 - `search`: the words a search should find in that box (default: its words of 3 or more letters).
 - A box may hold `context`: the printed text it belongs to (a margin note's paragraph), for the layout measures.
 
+As built (`build.py`, see [README.md](README.md)), with these additions and details:
+
+- `x_height_mm` is `null` for `drawing`, `mark` and `free` boxes; `latex` is there for `math` only.
+- `in` (optional): the id of the box this one lies inside. Only a `drawing` or `mark` box holds others: the labels of
+  the flow chart inside its drawing area, a written word inside the area it is to be circled in. Text read inside
+  such a box's children is theirs and does not count as text read in the drawing or mark.
+- `context` is also given for table cells (the printed table), the labels inside the bar chart (its caption) and the
+  marks on printed words (the printed word).
+- The combined form `xqt-hwr-en-de` has `"language": "en"` (its main language); its German chapter's boxes have
+  `"section": "H"`, `"lang": "de"` and a tag naming their German section (`de-A` to `de-D`).
+- Tags used: the size from the x-height (`small` 2, `normal` 3, `medium` 4, `large` 6, `headline` 10 mm), what a text
+  is (`name`, `place`, `term`, `acronym`, `long`, `mixed-case`, `digits`, `date`, `time`, `units`, `email`, `url`,
+  `quotes`, `compound`, `umlauts`, `pangram`, `confusable`, …), where it is (`edge`, `margin`, `margin-left`,
+  `margin-right`, `insertion`, `end-note`, `column-1`, `column-2`, `table`, `flowchart`, `plot`, `axis-label`), the
+  short notes at ±90° (`one-word`, `two-words`, `four-words`), and the marks (`circle`, `underline`, `strike`,
+  `printed-word`, `circled`, `underlined`, `sketch`, `hatching`, `tick`, `licence`).
+- The page id line reads `XQT-HWR-EN v1 · page 3/13`; the box id (`3.12`) is printed small at the end of each box's
+  prompt row.
+- The forms came out longer than planned above: English 15 pages (238 boxes, 211 with text), German 6 pages (87),
+  combined 20. Section D has at least 6 boxes of text at each angle in each direction (lines, and notes of one, two
+  and four words, some with digits; 3 pages), the German chapter at least 4 at 0, ±45, ±90 and 180. The effort
+  estimate above is untested: time a real fill before relying on it.
+
 ## From a filled form to data and numbers
 
 1. **Write:** open the PDF in xournal-qt, write with the pen, save (`.xopp` beside the PDF, or the PDF with notes).

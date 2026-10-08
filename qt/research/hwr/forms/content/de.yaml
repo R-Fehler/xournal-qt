@@ -1,0 +1,186 @@
+# The German handwriting form (DESIGN.md, section H: sections A to D in German). Content only; layout.py places it.
+# In the combined form (xqt-hwr-en-de) these sections, without the start page, follow the English form as
+# chapter H ("chapter_prefix" goes before their titles). Texts are the project's own sentences, or traditional
+# pangrams.
+form: xqt-hwr-de
+page_id: XQT-HWR-DE
+title: "Handschrift-Formular (Deutsch)"
+combined_title: "Handwriting form (English, with a German chapter)"
+chapter_prefix: "H. Deutsch · "
+language: de
+version: 1
+continued: " (Fortsetzung)"
+
+sections:
+  - id: "0"
+    title: "Handschrift-Formular: Anfang"
+    instruction: >-
+      Dieses PDF in xournal-qt öffnen und mit dem Stift darauf schreiben. Jeden gedruckten Text einmal von Hand in
+      das Feld darunter abschreiben, in der eigenen Handschrift.
+    blocks:
+      - type: para
+        paragraphs:
+          - >-
+            Das Formular sammelt Handschrift mit bekannten Texten: Jedes Feld erwartet genau den Text, der darüber
+            (oder daneben) steht. In xournal-qt geschrieben, wird daraus Trainingsmaterial für ein Modell der eigenen
+            Handschrift und ein Test der ganzen Handschriftsuche.
+        bullets:
+          - "In der eigenen, normalen Handschrift schreiben. Den Text abschreiben, nicht nachzeichnen."
+          - "Ein Feld, ein Text: alles in das Feld schreiben, links beginnend oder dort, wo der Pfeil beginnt."
+          - >-
+            Die Höhe eines Felds zeigt die Schriftgröße; die blasse Linie ist die Grundlinie. Felder ohne Linie
+            sind dafür gedacht, ohne Linie zu schreiben.
+          - "Ein Pfeil zeigt die Schreibrichtung. Seite oder Tablet dürfen gedreht werden."
+          - "Ein Fehler: durchstreichen und weiterschreiben, oder radieren. Lieber ein Feld auslassen als raten."
+          - "Graue Nummern (wie 3.12) sind Feld-Nummern: bitte nicht beschreiben."
+      - type: para
+        heading: "Falls das Formular geteilt wird"
+        paragraphs:
+          - >-
+            Teilen ist freiwillig und wird später entschieden. Wer das ausgefüllte Formular einem gemeinsamen
+            Datensatz geben möchte, kreuzt eine Lizenz an und wählt eine Schreiber-Kennung (Name oder Kürzel).
+      - type: ticks
+        items:
+          - {text: "CC0 1.0: keine Rechte vorbehalten (gemeinfrei)", tags: [licence, cc0]}
+          - {text: "CC BY 4.0: frei nutzbar mit Nennung meiner Kennung", tags: [licence, cc-by]}
+          - {text: "Privat: nur für meine eigenen Modelle, nicht zum Teilen", tags: [licence, private]}
+      - type: rows
+        items:
+          - {kind: free, prompt: "Kennung", width: 70, height: 10, tags: [writer-id]}
+          - {kind: free, prompt: "Schreibhand (links oder rechts)", width: 60, height: 10, tags: [hand]}
+          - {kind: free, prompt: "Gerät und Stift", width: 44, height: 10, tags: [device]}
+      - type: lines
+        heading: "Zum Einschreiben"
+        items:
+          - "Das ist meine Handschrift auf dem Tablet."
+          - "Notizen vom Montagmorgen, mit dem Stift."
+          - {text: "Kleine Schritte, klare Buchstaben.", guides: false}
+
+  - id: A
+    title: "A. Zeichen"
+    instruction: >-
+      Jede Gruppe wie gedruckt abschreiben, mit den Abständen zwischen den Zeichen. Die Schreibmaschinenschrift zeigt
+      nur deutlich, welches Zeichen gemeint ist; in der normalen Handschrift schreiben.
+    blocks:
+      - type: rows
+        heading: "Umlaute, ß und Zeichen"
+        justify: true
+        defaults: {kind: chars, x_height: 3}
+        items:
+          - {text: "ä ö ü Ä Ö Ü ß ẞ", tags: [umlauts]}
+          - {text: "„ “ ‚ ‘ » « – … € § °", tags: [punctuation]}
+          - {text: "Ää Öö Üü ßss", tags: [umlauts]}
+      - type: lines
+        heading: "Pangramme"
+        items:
+          - {text: "Victor jagt zwölf Boxkämpfer quer über den großen Sylter Deich.", tags: [pangram], x_height: 2.5}
+          - {text: "Falsches Üben von Xylophonmusik quält jeden größeren Zwerg.", tags: [pangram], x_height: 2.5}
+          - {text: "Zwölf Bären übten Jazz, quälend schief.", tags: [pangram], guides: false}
+      - type: rows
+        heading: "Wörter mit Umlauten und ß"
+        justify: true
+        defaults: {kind: word, x_height: 3, tags: [umlauts]}
+        items: ["Größe", "Straße", "Fußgänger", "Bäckerei", "übermorgen", "Öffnungszeit", "Grüße", "weiß",
+                "Gemüse", "Maßstab", "Bürotür", "Ärger"]
+
+  - id: B
+    title: "B. Fließtext"
+    same_page: true
+    instruction: >-
+      Jeden Satz in das Feld darunter abschreiben, in einer Zeile, in normaler Größe. Zahlen, Daten, Einheiten und
+      Anführungszeichen wie gedruckt.
+    blocks:
+      - type: lines
+        items:
+          - "Die Besprechung beginnt um 9:30 Uhr in Raum 2.14."
+          - "Bitte lest Kapitel 4 vor der Vorlesung."
+          - {text: "Die Kalman-Verstärkung wird neu berechnet.", tags: [compound]}
+          - {text: "Die Zwischenprüfung ist am 14. März 2027.", tags: [date, compound]}
+          - {text: "Der Zug fährt um 17:05 Uhr von Gleis 3.", tags: [time]}
+          - {text: "Er sagte: „Wir sehen uns nächste Woche.“", tags: [quotes]}
+          - {text: "Ca. 2,5 kg Mehl, 1 l Milch und 6 Eier.", tags: [units, abbreviation], guides: false}
+          - {text: "Die Messung ergab 23,5 °C bei 41 % Feuchte.", tags: [units]}
+          - {text: "Fragen bitte an jonas.weiss@example.org", tags: [email],
+             search: ["Fragen", "bitte", "jonas.weiss@example.org"]}
+          - {text: "Übermorgen schließt die Bücherei früher.", tags: [umlauts]}
+          - {text: "Das Lösungsverfahren konvergiert schnell.", tags: [compound]}
+          - {text: "Größere Abweichungen bitte z. B. melden.", tags: [abbreviation], guides: false}
+          - {text: "Die Brücke ist 340 m lang und 12 m breit.", tags: [units]}
+          - {text: "Kurz gesagt: „weniger ist mehr“.", tags: [quotes]}
+          - {text: "Die Straßenbahnhaltestelle liegt gegenüber.", tags: [compound, umlauts]}
+          - {text: "Bis nächste Woche, viele Grüße!", guides: false}
+
+  - id: C
+    title: "C. Suchwörter"
+    same_page: true
+    instruction: >-
+      Jedes Wort einmal in sein Feld schreiben, in der Größe des Felds: groß, normal und klein. Nach diesen Wörtern
+      sucht die Suche in diesem Formular.
+    blocks:
+      - type: rows
+        heading: "Groß"
+        justify: true
+        defaults: {kind: word, x_height: 6}
+        items:
+          - {text: "Zwischenprüfung", tags: [compound, long]}
+          - {text: "Kalman-Verstärkung", tags: [compound, long]}
+          - {text: "Würzburg", tags: [place]}
+          - {text: "Grünkohl", tags: [compound]}
+          - {text: "Jürgen", tags: [name]}
+          - {text: "Rhabarber", tags: [term]}
+      - type: rows
+        heading: "Normal"
+        justify: true
+        defaults: {kind: word, x_height: 3}
+        items:
+          - {text: "Eigenwertzerlegung", tags: [compound, long, term]}
+          - {text: "Übertragungsfunktion", tags: [compound, long, term]}
+          - {text: "Schwarzwälder", tags: [place]}
+          - {text: "Ölmühle", tags: [compound]}
+          - {text: "Weißgerber", tags: [name]}
+          - {text: "DIN-A4-Blatt", tags: [digits, compound], search: ["DIN-A4-Blatt"]}
+          - {text: "Quäker", tags: [term]}
+          - {text: "Spätzle", tags: [term]}
+      - type: rows
+        heading: "Klein"
+        justify: true
+        defaults: {kind: word, x_height: 2}
+        items:
+          - {text: "Flusspferd", tags: [compound]}
+          - {text: "Gänseblümchen", tags: [compound, long]}
+          - {text: "Bösendorfer", tags: [name]}
+          - {text: "Zugspitze", tags: [place]}
+          - {text: "Kühlschrank", tags: [compound]}
+          - {text: "Schäfer", tags: [name]}
+
+  - id: D
+    title: "D. Winkel"
+    instruction: >-
+      Jede Zeile entlang ihres Felds schreiben, in Richtung des Pfeils, als ob das Feld waagerecht wäre. Seite oder
+      Tablet dürfen gedreht werden.
+    blocks:
+      - type: angles
+        groups:
+          - angle: 30
+            items: ["dreißig Grad", "schräg nach unten"]
+          - angle: -30
+            items: ["schräg nach oben", "Grüße von oben"]
+          - angle: 45
+            items: ["diagonal abwärts", "Größe prüfen", "Seite 45 lesen"]
+          - angle: -45
+            items: ["diagonal aufwärts", "nächster Schritt", "Übung 3b"]
+          - angle: 180
+            items: ["auf dem Kopf", "Seite umdrehen", "um 180 Grad", "Rückseite"]
+      - type: angles
+        heading: "Kurze Notizen nach unten und oben"
+        groups:
+          - {angle: 90, items: [{text: "Prüfen", tags: [one-word]}]}
+          - {angle: 90, items: [{text: "siehe oben", tags: [two-words]}]}
+          - {angle: 90, items: [{text: "bis Mai fertig machen", tags: [four-words]}]}
+          - {angle: -90, items: [{text: "Wichtig", tags: [one-word]}]}
+          - {angle: -90, items: [{text: "Seite fünf", tags: [two-words]}]}
+          - {angle: -90, items: [{text: "am Montag neu planen", tags: [four-words]}]}
+          - {angle: 45, items: [{text: "Gut", tags: [one-word]}]}
+          - {angle: -45, items: [{text: "warum so?", tags: [two-words]}]}
+          - {angle: 90, items: [{text: "Daten fehlen", tags: [two-words]}]}
+          - {angle: -90, items: [{text: "Ja", tags: [one-word]}]}

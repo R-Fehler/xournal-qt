@@ -255,6 +255,9 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
   (`FormTest.theBuiltInModelReadsRealInkInTurnedBoxes`, 2026-10-08): at ±90° the layout takes a piece of the line as
   level (2 lines, one at 0°), at 15° the line falls apart into 6 level lines, 180° is read as level (nonsense).
 - [ ] `qt/hwr-userdata` (later): a dataset of the user's own hand made in the app, for fine-tuning.
+- [x] `qt/hwr-forms`: the handwriting forms (`qt/research/hwr/forms/`: generator, `pdf/xqt-hwr-en.pdf`, `-de`,
+  `-en-de`, manifests embedded). Left: fill one on the device and time it (15 pages came out longer than the
+  plan's 8 to 10); the app side (`hwr-form`, `hwr-bench`) must read the manifest's new optional `in` (DESIGN.md).
 
 ### Platforms
 - [ ] Android ([roadmap](qt/docs/development/android-roadmap.md)): some texts miss “ and — (probably the symbol
