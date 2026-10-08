@@ -12,3 +12,6 @@ Only the headers: the runtime itself (`libonnxruntime.so.1`) is loaded when the 
 - Files: `onnxruntime_c_api.h`, `onnxruntime_ep_c_api.h` (included by the former) and `onnxruntime_error_code.h`,
   copied unchanged.
 - License: MIT (see `LICENSE`).
+- The packages carry the runtime itself, Microsoft's release build of the version in
+  `qt/packaging/onnxruntime.env` (fetched and checked by `qt/scripts/onnxruntime-fetch.sh`; see
+  `qt/docs/development/releasing.md`, "Handwriting: ONNX Runtime and the model").

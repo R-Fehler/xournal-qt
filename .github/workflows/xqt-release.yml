@@ -76,19 +76,33 @@ jobs:
         # UI tests still wait fixed times; each one that needed a repeat is listed in the log. TODO.md: harden them)
         run: ctest --test-dir build -j "$(nproc)" --output-on-failure --timeout 300 --repeat until-pass:3
 
-      - name: Make the package
+      # The handwriting search: ONNX Runtime goes into the package beside what `cmake --install` puts there (the
+      # models, share/xournal-qt/hwr-models/). CPack adds the staged folder to /usr.
+      - name: Make the package (with ONNX Runtime)
         run: |
+          stage="$PWD/ort-stage"
+          bash qt/scripts/linux-onnxruntime.sh "$stage"
           cd build
-          cpack -G DEB
+          cpack -G DEB -D "CPACK_INSTALLED_DIRECTORIES=$stage;."
           cd packages
           for f in *.deb; do mv "$f" "${f%.deb}_${{ matrix.suffix }}.deb"; done
           ls -l
+          dpkg-deb -c ./*.deb | grep -E 'onnxruntime|hwr-models' || true
 
       - uses: actions/upload-artifact@v4
         with:
           name: package-${{ matrix.suffix }}
           path: build/packages/*.deb
           if-no-files-found: error
+
+      # Installed as a user would, then asked whether handwriting can be read (exit code 1 when ONNX Runtime or a model
+      # is missing, or the sample is not read): qt/docs/development/releasing.md, "Handwriting"
+      - name: Smoke test of the package (handwriting)
+        run: |
+          apt-get install -y --no-install-recommends ./build/packages/*.deb
+          bash qt/scripts/hwr-package-check.sh models /usr/share/xournal-qt
+          test -e /usr/lib/xournal-qt/libonnxruntime.so.1
+          QT_QPA_PLATFORM=offscreen xournal-qt --hwr-info
 
   appimage:
     name: AppImage (Ubuntu 22.04 and newer)
@@ -109,6 +123,8 @@ jobs:
                 -DCMAKE_INSTALL_PREFIX=/usr
           cmake --build build -j "$(nproc)"
           DESTDIR="$PWD/AppDir" cmake --install build
+          # The handwriting search: ONNX Runtime beside the program (usr/lib/xournal-qt; the models came with the install)
+          bash qt/scripts/linux-onnxruntime.sh "$PWD/AppDir/usr"
 
       - name: Pack it
         run: |
@@ -123,6 +139,8 @@ jobs:
           version="$(sed -n 's/^project(xournal-qt VERSION \([0-9.]*\).*/\1/p' qt/CMakeLists.txt)"
           case "$GITHUB_REF_NAME" in v*) export VERSION="${GITHUB_REF_NAME#v}" ;; *) export VERSION="$version" ;; esac
           export OUTPUT="xournal-qt-$VERSION-x86_64.AppImage"  # else it is named after the desktop entry
+          # (the off-screen platform as well, for scripted runs such as the smoke test below; a few hundred KB)
+          export EXTRA_PLATFORM_PLUGINS="libqoffscreen.so"
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage \
               -d AppDir/usr/share/applications/xournal-qt.desktop \
               -i AppDir/usr/share/icons/hicolor/scalable/apps/xournal-qt.svg
@@ -142,6 +160,14 @@ jobs:
           name: package-appimage
           path: out/*.AppImage
           if-no-files-found: error
+
+      # The AppImage as a user starts it, asked whether handwriting can be read (exit code 1 when ONNX Runtime or a
+      # model is missing, or the sample is not read): qt/docs/development/releasing.md, "Handwriting"
+      - name: Smoke test of the AppImage (handwriting)
+        run: |
+          bash qt/scripts/hwr-package-check.sh models AppDir/usr/share/xournal-qt
+          export APPIMAGE_EXTRACT_AND_RUN=1  # the runners have no FUSE
+          QT_QPA_PLATFORM=offscreen out/*.AppImage --hwr-info
 
   windows:
     name: Windows
