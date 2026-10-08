@@ -27,6 +27,8 @@
 #include "support/SearchHits.h"
 #include "support/TestSupport.h"
 
+#include "BenchmarkInk.h"
+
 using namespace xqt;
 using namespace xqt::hwr;
 using xqt::test::waitFor;
@@ -222,6 +224,45 @@ TEST(InkRotationTest, aListIsNotALineWrittenDownwards) {
     ASSERT_EQ(l.lines.size(), 8u);
     for (const InkLine& line: l.lines) {
         EXPECT_EQ(line.angle, 0);
+    }
+}
+
+// Real handwriting (the benchmark's lines that stand alone) turned up, down and to a free angle is one line in its own
+// frame, with all the strokes the level line has, as many words as level, and nothing left on the page: the T's bar
+// (a straight stroke), a "Th" written in one stroke (its box turned is big), a word after a gap wider than a letter
+// and the dots after it belong to the line
+TEST(InkRotationTest, realHandwritingAtAnAngleIsOneLine) {
+    const auto lines = test::benchmarkLines();
+    ASSERT_GE(lines.size(), 4u);
+    for (size_t k = 0; k < lines.size(); ++k) {
+        const hwr::Layout level = layout(lines[k]);
+        ASSERT_EQ(level.lines.size(), 1u);
+        for (const double angle: {90.0, -90.0, 45.0, -45.0, 30.0}) {
+            SCOPED_TRACE(QStringLiteral("line %1 at %2").arg(k).arg(angle).toStdString());
+            const hwr::Layout l = layout(test::turnedAround(lines[k], angle));
+            ASSERT_EQ(l.lines.size(), 1u);
+            if (std::abs(angle) == 90) {
+                EXPECT_EQ(l.lines[0].angle, angle);
+            } else {
+                EXPECT_NEAR(l.lines[0].angle, angle, 3);
+            }
+            EXPECT_EQ(l.lines[0].strokes, level.lines[0].strokes);
+            EXPECT_EQ(l.drawings, level.drawings);
+        }
+    }
+}
+
+// The words of real lines written one below the other (lists, close or wide) are level lines, none at an angle
+TEST(InkRotationTest, aListOfRealWordsIsNotALineWrittenDownwards) {
+    for (const auto& line: test::benchmarkLines()) {
+        for (const double pitch: {1.2, 1.6}) {
+            SCOPED_TRACE(pitch);
+            const hwr::Layout l = layout(test::listOf(line, pitch));
+            EXPECT_GE(l.lines.size(), 8u);
+            for (const InkLine& x: l.lines) {
+                EXPECT_EQ(x.angle, 0);
+            }
+        }
     }
 }
 

@@ -36,15 +36,19 @@ What to expect:
 Text written at an angle or along the margin (a note written upwards along the edge of a PDF slide, a label along an
 arrow, a line written steeply uphill) is found, marked, copied and put into the PDF text layer like level text.
 
-- **What counts**: a run of strokes written one after the other close together, long and narrow enough (at least 6
-  times the strokes' typical smaller side and 3 times as long as wide; not two strokes alone, an i and its dot), whose
-  strokes follow each other along it, has a direction. Within 20° of left to right it is laid out as level text, as
+- **What counts**: a run of strokes written one after the other close together (a few words: gaps up to 4 times the
+  strokes' typical smaller side), long and narrow enough (at least 6 times that side and 3 times as long as wide; not
+  two strokes alone, an i and its dot), whose strokes follow each other along it, has a direction. Letters written in
+  pieces (stems, bars, a "Th" in one stroke) and crossings written afterwards still count; a list of words one below
+  the other does not. Within 20° of left to right it is laid out as level text, as
   before (slopes are fine). 70°–110° either way counts as exactly 90°: **written downwards** (90°) or **upwards**
   (270°, -90°). Between 20° and 70° either way the line keeps its own angle. Writing leftwards (beyond 110°, upside
   down) is not taken for text.
 - **How it is read**: the strokes of each direction are turned upright and laid out by the same rules as a page (lines,
-  words, drawings left out, in the frame's own units), so the recogniser gets the line upright. Dots and accents, and
-  short pieces too short to have a direction (a word written after a pause), join the line they lie on.
+  words, drawings left out, in the frame's own units), so the recogniser gets the line upright. Pieces too short to
+  have a direction (a word written after a pause, a "This" apart from the rest) join the line they lie on whole, and
+  dots, accents and straight strokes (a T's bar) the line or piece they lie on; whether a straight stroke is a drawing
+  is decided in the frame.
 - **Level text is unchanged**: a page without writing at an angle comes out exactly as before (the same lines, words
   and hashes; `InkLayoutTest.theBenchmarkPageIsLaidOutAsBefore`). On a page with both, the level text's units leave the
   strokes at an angle out (they are as tall as they are long).
@@ -61,8 +65,8 @@ arrow, a line written steeply uphill) is found, marked, copied and put into the 
 - Code: `InkLayout.h` (`framesOf`, `InkLine::angle` / `upright`), `Recognizer.cpp` (`LineInput::of` turns the line
   upright), `InkText.h` (`PlacedLine::angle`, `Word::angle`, `quadOf`, `quadsOf`), `DocumentSearch::Place::quads`,
   `DocumentCanvasItem::updateSearchHits`, `InkCopy.cpp`, `InkTextLayer.cpp`, `InkTextStore.cpp`. Tests:
-  `InkRotationTest.*` (`-L hwr`: 0°, 15°, 35°, 90°, 270°, a mixed page, a list, the hash, the scripted recogniser,
-  marks, copying, poppler), `InkSearchTest.handwritingAtAnAngleIsMarkedTurned`,
+  `InkRotationTest.*` (`-L hwr`: 0°, 15°, 35°, 90°, 270°, a mixed page, a list, the benchmark's real lines at ±90°,
+  ±45° and 30° and lists of their words, the hash, the scripted recogniser, marks, copying, poppler), `InkSearchTest.handwritingAtAnAngleIsMarkedTurned`,
   `InkLibraryTest.theAngleOfALineIsStored`, `CanvasItemRenderTest.aHitInHandwritingAtAnAngleIsMarkedTurned` (`-L quick`).
 - **Measured**: `HwrRotationBenchmark` (`XQT_HWR_ROTATION_BENCH=<folder>` and `XQT_ONNXRUNTIME`, about 30 s) turns the
   benchmark's lines that stand alone (`qt/tests/hwr/BenchmarkInk.h`) to 90°, -90°, ±45°, 30°, 15°, ±135° and 180°, alone

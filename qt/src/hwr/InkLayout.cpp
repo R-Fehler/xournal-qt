@@ -445,7 +445,7 @@ std::optional<Direction> directionOf(const std::vector<InkStroke>& strokes, cons
     if (run.size() == 2 || d.length < 6 * s || d.length < 3 * d.width) {
         return std::nullopt;  // (too short or not narrow, or two strokes: an i and its dot; no direction to tell)
     }
-    if (median(shapes) > 2) {
+    if (median(shapes) > 3) {
         return std::nullopt;  // (its strokes lie across it: words written one below the other, a list)
     }
     // Which way along the axis: the strokes one after the other, or a single stroke from its start to its end
@@ -458,7 +458,7 @@ std::optional<Direction> directionOf(const std::vector<InkStroke>& strokes, cons
             forth += std::abs(dot(step, e));
             across += std::abs(dot(step, n));
         }
-        if (forth < 2 * across || std::abs(along) < 0.5 * forth) {
+        if (forth < 1.5 * across || std::abs(along) < 0.5 * forth) {
             return std::nullopt;  // (back and forth, or across: a list, a column of words)
         }
     } else {
@@ -510,7 +510,8 @@ std::vector<Frame> framesOf(const std::vector<InkStroke>& strokes, double h, dou
     }
     double s = median(std::move(sides));
     s = s > 0 ? s : h;
-    // Runs: strokes written one after the other, close to each other; small ones (dots, accents) aside
+    // Runs: strokes written one after the other, close to each other; small ones (dots, accents) aside, and straight
+    // lines and big shapes (their own frame's rules tell whether they are drawings: a T's bar is a straight line)
     struct Run {
         std::vector<uint32_t> strokes;
         double angle = 0;  ///< as laid out (0: as on the page)
@@ -529,14 +530,12 @@ std::vector<Frame> framesOf(const std::vector<InkStroke>& strokes, double h, dou
         const double chord = st.points.size() > 1 ? std::hypot(st.points.back().x() - st.points.front().x(),
                                                                st.points.back().y() - st.points.front().y())
                                                   : 0;
-        if ((len > 4 * u && chord > 0.95 * len) || std::min(st.box.width(), st.box.height()) > 5 * s) {
-            continue;  // (a straight line or a big shape: a drawing whichever way)
-        }
-        if (std::max(st.box.width(), st.box.height()) < 0.5 * h) {
+        if ((len > 4 * u && chord > 0.95 * len) || std::min(st.box.width(), st.box.height()) > 5 * s ||
+            std::max(st.box.width(), st.box.height()) < 0.5 * h) {
             small.push_back(i);
             continue;
         }
-        if (!previous || distance(previous->box, st.box) > 3 * s) {
+        if (!previous || distance(previous->box, st.box) > 4 * s) {
             runs.push_back({});
         }
         runs.back().strokes.push_back(i);
@@ -581,20 +580,51 @@ std::vector<Frame> framesOf(const std::vector<InkStroke>& strokes, double h, dou
     if (groups.empty()) {
         return out;
     }
-    // Each frame takes its runs, and the dots and short runs inside the box of one of them (a little bigger)
+    // Each frame takes its runs; then the runs without a direction of their own (or read as level) that lie on one of
+    // them, whole: their middle inside its box (a little bigger; longer by half their own length); then the dots and
+    // other strokes aside inside the box of one of those
     std::vector<int> frameOf(strokes.size(), -1);
     std::vector<std::vector<QRectF>> areas(groups.size());  ///< in the frame
+    auto boxIn = [&](const std::vector<uint32_t>& run, double angle) {
+        QRectF box;
+        for (const uint32_t i: run) {
+            const QRectF b = turned(strokes[i], -angle).box;
+            box = box.isNull() ? b : unite(box, b);
+        }
+        return box;
+    };
+    auto areaOf = [&](const QRectF& box) {
+        const double w = std::max(box.height(), s);
+        return box.adjusted(-1.5 * w, -0.25 * w, 1.5 * w, 0.25 * w);
+    };
     for (size_t g = 0; g < groups.size(); ++g) {
         for (const size_t r: groups[g].runs) {
-            QRectF box;
             for (const uint32_t i: runs[r].strokes) {
                 frameOf[i] = static_cast<int>(g);
-                const QRectF b = turned(strokes[i], -groups[g].angle).box;
-                box = box.isNull() ? b : unite(box, b);
             }
-            const double w = std::max(box.height(), s);
-            areas[g].push_back(box.adjusted(-1.5 * w, -0.25 * w, 1.5 * w, 0.25 * w));
+            areas[g].push_back(areaOf(boxIn(runs[r].strokes, groups[g].angle)));
         }
+    }
+    std::vector<std::vector<QRectF>> taken(groups.size());  ///< the boxes of the runs taken (in the frame)
+    for (const Run& r: runs) {
+        if (r.angle != 0) {
+            continue;
+        }
+        for (size_t g = 0; g < groups.size() && frameOf[r.strokes.front()] < 0; ++g) {
+            const QRectF box = boxIn(r.strokes, groups[g].angle);
+            for (const QRectF& a: areas[g]) {
+                if (a.adjusted(-box.width() / 2, 0, box.width() / 2, 0).contains(box.center())) {
+                    for (const uint32_t i: r.strokes) {
+                        frameOf[i] = static_cast<int>(g);
+                    }
+                    taken[g].push_back(areaOf(box));
+                    break;
+                }
+            }
+        }
+    }
+    for (size_t g = 0; g < groups.size(); ++g) {
+        areas[g].insert(areas[g].end(), taken[g].begin(), taken[g].end());
     }
     auto take = [&](uint32_t i) {
         for (size_t g = 0; g < groups.size(); ++g) {
@@ -611,7 +641,7 @@ std::vector<Frame> framesOf(const std::vector<InkStroke>& strokes, double h, dou
         take(i);
     }
     for (const Run& r: runs) {
-        if (!r.directed) {
+        if (!r.directed && frameOf[r.strokes.front()] < 0) {
             for (const uint32_t i: r.strokes) {
                 take(i);
             }
