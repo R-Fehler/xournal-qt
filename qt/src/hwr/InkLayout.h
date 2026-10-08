@@ -20,6 +20,20 @@
  *     line moved with the lasso keeps its hash and its recognised words (InkText.h: boxes relative to the origin).
  * Lines whose strokes are all small are left out.
  *
+ * Handwriting at an angle (a note written upwards along the margin, a label along an arrow, a line written steeply
+ * uphill) is laid out in its own frame (framesOf): before step 3 the strokes are taken in runs, consecutive strokes in
+ * the order of writing that are close to each other (within 3 `s`, the median of the strokes' smaller side; dots and
+ * accents aside). A run long and narrow enough (6 s, and 3 times as long as wide along its points' principal axis;
+ * not two strokes alone, an i and its dot), whose strokes go one after the other along that axis (a single stroke:
+ * from its start to its end) and do not lie across it (words one below the other, a list), has a direction. More
+ * than 20 degrees off left-to-right (and not leftwards: beyond 110 degrees it is not taken for writing) it is turned
+ * upright: 70 to 110 degrees count as 90 exactly (downwards, -90 upwards), 20 to 70 keep their angle. Runs of the same
+ * angle (within 8 degrees) are one frame: their strokes, and the dots and short runs inside the box of one of them, are
+ * turned by -angle around (0, 0) and laid out by steps 1-6 as a page of their own (its own units). Their lines keep
+ * the angle (InkLine::angle) and their box in the frame (`upright`); the hash is of the turned strokes, relative to
+ * that box. The other strokes are laid out as before, with their own units (not counting those at an angle, which
+ * are as tall as they are long): a page without writing at an angle comes out exactly as it did.
+ *
  * Measured on test/files/benchmark/handwritten-text.xopp (13,064 strokes): a few ms per page.
  *
  * @license GNU GPLv2 or later
@@ -55,21 +69,27 @@ std::vector<InkStroke> strokesOf(const XojPage& page);
 std::vector<InkStroke> strokesOf(const std::vector<const Element*>& elements);
 
 struct InkWordBox {
-    QRectF box;                     ///< page points
+    QRectF box;                     ///< page points; a line at an angle: in its frame (InkLine::upright)
     std::vector<uint32_t> strokes;  ///< indices into the page's strokes
 };
 
 struct InkLine {
     QRectF box;                     ///< page points, of all its strokes
     std::vector<uint32_t> strokes;  ///< indices into the page's strokes, in the order they were written
-    std::vector<InkWordBox> words;  ///< left to right
-    quint64 hash = 0;               ///< of its strokes relative to its origin
-    QPointF origin() const { return box.topLeft(); }
+    std::vector<InkWordBox> words;  ///< left to right (in its frame)
+    quint64 hash = 0;               ///< of its strokes relative to its origin (in its frame)
+    /// The direction it was written in: degrees clockwise on the page, 0 left to right (the common case: its frame is
+    /// the page), 90 downwards, -90 upwards, others between 20 and 70 or -70 and -20
+    double angle = 0;
+    /// Its box in its frame, the page turned by -angle around (0, 0) (`box` for angle 0)
+    QRectF upright;
+    /// Where its origin (the top-left of its box upright) is on the page
+    QPointF origin() const;
 };
 
 struct Layout {
     std::vector<InkLine> lines;  ///< top to bottom
-    double h = 0;                ///< the units of the page (see above)
+    double h = 0;                ///< the units of the page (see above; of the strokes not at an angle)
     double u = 0;
     std::vector<uint32_t> drawings;  ///< strokes left out
 };
@@ -79,6 +99,17 @@ Layout layout(const std::vector<InkStroke>& strokes);
 
 /// The hash of these strokes relative to `origin`.
 quint64 hashOf(const std::vector<InkStroke>& strokes, const std::vector<uint32_t>& which, QPointF origin);
+
+/// The groups of strokes written at an angle (see above), each with its angle; the rest are laid out as on a page.
+/// `h`, `u`: the page's units. Exposed for tests.
+struct Frame {
+    double angle = 0;
+    std::vector<uint32_t> strokes;  ///< in the order of writing
+};
+std::vector<Frame> framesOf(const std::vector<InkStroke>& strokes, double h, double u);
+
+/// A stroke turned by `degrees` around (0, 0) (ink::turned), with its box.
+InkStroke turned(const InkStroke& s, double degrees);
 
 /// The words of a line's strokes (step 5), with `h` the page's median stroke height. Exposed for tests.
 std::vector<InkWordBox> wordsOf(const std::vector<InkStroke>& strokes, const std::vector<uint32_t>& line, double h);

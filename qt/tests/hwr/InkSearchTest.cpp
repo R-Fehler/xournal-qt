@@ -120,3 +120,32 @@ TEST_F(InkSearchTest, termRectsMarkHandwriting) {
     ASSERT_EQ(rects.size(), 1u);
     EXPECT_EQ(rects[0], QRectF(10, 20, 90, 12).adjusted(-2, -2, 2, 2));
 }
+
+// Handwriting written at an angle is marked with its turned box (the quad drawn), the rect around it for the rest
+TEST_F(InkSearchTest, handwritingAtAnAngleIsMarkedTurned) {
+    auto line = std::make_shared<ink::LineResult>();
+    ink::Word w;
+    w.box = QRectF(0, 0, 40, 12);
+    w.conf = 0.9f;
+    w.text = QStringLiteral("margin");
+    w.candidates.push_back(ink::candidate(w.text, 1.0f));
+    line->words.push_back(w);
+    index().setInk(1, ink::PageText::assemble({{QPointF(30, 300), line, -90}, {QPointF(100, 100), line}}));
+    DocumentSearch& search = session->search();
+    search.setQuery(QStringLiteral("margin"), false);
+    ASSERT_TRUE(test::waitForCounts(search));
+    EXPECT_EQ(search.countOn(1), 2);
+    const auto places = test::placesOn(search, 1);
+    ASSERT_EQ(places.size(), 2u);
+    // (reading order: the one at the top first)
+    EXPECT_TRUE(places[0].quads.empty());
+    EXPECT_EQ(places[0].rect, QRectF(100, 100, 40, 12).adjusted(-2, -2, 2, 2));
+    ASSERT_EQ(places[1].quads.size(), 1u);
+    const QPolygonF& q = places[1].quads[0];
+    ASSERT_EQ(q.size(), 4);
+    // Written upwards from (30, 300): its top-left upright is at the bottom-left on the page
+    EXPECT_NEAR(q[0].x(), 28, 1e-9);
+    EXPECT_NEAR(q[0].y(), 302, 1e-9);
+    EXPECT_NEAR(q[1].y(), 300 - 42, 1e-9);
+    EXPECT_EQ(places[1].rect, QRectF(QPointF(28, 258), QPointF(44, 302)));
+}

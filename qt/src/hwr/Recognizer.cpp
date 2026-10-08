@@ -24,13 +24,14 @@ QStringList Capabilities::languagesOf(uint32_t bits) const {
 LineInput LineInput::of(const std::vector<InkStroke>& page, const Layout& layout, const InkLine& line) {
     LineInput in;
     in.hash = line.hash;
-    in.size = line.box.size();
     in.h = layout.h;
     in.u = layout.u;
-    const QPointF origin = line.origin();
+    in.size = line.angle == 0 ? line.box.size() : line.upright.size();
+    // (a line at an angle: turned upright, its origin in its frame)
+    const QPointF origin = line.angle == 0 ? line.origin() : line.upright.topLeft();
     std::map<uint32_t, uint32_t> index;  ///< page stroke -> stroke of the line
     for (const uint32_t i: line.strokes) {
-        InkStroke s = page[i];
+        InkStroke s = line.angle == 0 ? page[i] : turned(page[i], -line.angle);
         for (QPointF& p: s.points) {
             p -= origin;
         }

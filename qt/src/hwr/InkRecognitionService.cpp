@@ -277,7 +277,7 @@ int InkRecognitionService::process(Queued& q, bool& yielded) {
         if (!q.job.area.isEmpty() && !line.box.intersects(q.job.area)) {
             continue;  // (only the lines of the area)
         }
-        LineRef ref{line.hash, line.origin(), known(line.hash)};
+        LineRef ref{line.hash, line.origin(), known(line.hash), line.angle};
         std::shared_ptr<Recognizer> r = recognizer();
         Context context;
         context.cancelled = cancelled;
@@ -320,7 +320,7 @@ int InkRecognitionService::process(Queued& q, bool& yielded) {
             }
         }
         result.complete = result.complete && ref.result != nullptr;
-        placed.push_back({ref.origin, ref.result});
+        placed.push_back({ref.origin, ref.result, ref.angle});
         result.lines.push_back(std::move(ref));
     }
     result.text = ink::PageText::assemble(placed);

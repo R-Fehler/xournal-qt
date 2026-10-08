@@ -1861,6 +1861,8 @@ void DocumentCanvasItem::updateSearchHits(QSGNode* pageNode, size_t pageIndex, d
         node->searchRoot->removeChildNode(child);
         delete child;
     }
+    std::vector<QPolygonF>& marks = searchMarks[pageIndex];
+    marks.clear();
     const auto* places = search.placesOn(pageIndex);  // (asked for if not known: drawn when they are)
     if (!places) {
         return;
@@ -1871,15 +1873,40 @@ void DocumentCanvasItem::updateSearchHits(QSGNode* pageNode, size_t pageIndex, d
         const bool faint = (*places)[i].faint;
         const QColor color = static_cast<int>(i) == current ? QColor(255, 120, 0, faint ? 100 : 150)
                                                              : QColor(255, 210, 0, faint ? 60 : 110);
+        if (!(*places)[i].quads.empty()) {
+            // (handwriting written at an angle: its turned boxes, each a rect in a turned frame, which every scene
+            // graph backend draws, the software one too)
+            for (const QPolygonF& q: (*places)[i].quads) {
+                if (q.size() != 4) {
+                    continue;
+                }
+                marks.push_back(q);
+                const QPointF along = q[1] - q[0], across = q[3] - q[0];
+                QMatrix4x4 m;
+                m.translate(static_cast<float>(q[0].x() * scale), static_cast<float>(q[0].y() * scale));
+                m.rotate(static_cast<float>(std::atan2(along.y(), along.x()) * 180 / M_PI), 0, 0, 1);
+                auto* turn = new QSGTransformNode;
+                turn->setMatrix(m);
+                const QRectF box(0, 0, std::hypot(along.x(), along.y()) * scale,
+                                 std::hypot(across.x(), across.y()) * scale);
+                turn->appendChildNode(new QSGSimpleRectNode(box, color));
+                node->searchRoot->appendChildNode(turn);
+            }
+            continue;
+        }
         for (const QRectF& rect: {(*places)[i].rect, (*places)[i].more}) {
             if (rect.isNull()) {
                 continue;
             }
+            marks.push_back(QPolygonF(rect));
+            marks.back().removeLast();  // (QPolygonF(QRectF) closes it: five points)
             const QRectF r(rect.x() * scale, rect.y() * scale, rect.width() * scale, rect.height() * scale);
             node->searchRoot->appendChildNode(new QSGSimpleRectNode(r.adjusted(-1, -1, 1, 1), color));
         }
     }
 }
+
+std::map<size_t, std::vector<QPolygonF>> DocumentCanvasItem::searchMarksShown() const { return searchMarks; }
 
 QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*) {
     xqt::Perf::add(xqt::Perf::Frames);

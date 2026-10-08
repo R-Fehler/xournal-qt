@@ -9,7 +9,11 @@
  *  - words by a space, lines by a line break; where two lines are further apart than one and a half of their height
  *    and twice the usual gap between the lines (the lower median), an empty line between them (a paragraph);
  *  - each word its best reading, as recognised (case, punctuation), with its confidence (unsure: below
- *    ink::WEAK_P, the search's mark for unsure words).
+ *    ink::WEAK_P, the search's mark for unsure words);
+ *  - words written at an angle (InkLayout.h) make lines in their own frame by the same rule, words in the direction
+ *    they were written in; such a line is one line of the text, a paragraph of its own (empty lines around it),
+ *    placed among the others by the top of the box around it on the page.
+ * A sweep takes a word at an angle by its turned box.
  * Qt-free apart from the geometry and the strings; any thread.
  *
  * @license GNU GPLv2 or later
@@ -29,8 +33,11 @@ namespace xqt::hwr {
 struct CopiedWord {
     QString text;    ///< the best reading
     float conf = 0;  ///< how sure the recogniser is of it (0..1)
-    QRectF box;      ///< page points
+    QRectF box;      ///< page points; with an angle: upright around its middle (ink::Word::box)
+    float angle = 0;  ///< the direction it was written in (ink::Word::angle)
     bool unsure() const { return conf < ink::WEAK_P; }
+    /// The box around it on the page.
+    QRectF bounds() const;
 };
 
 struct CopiedText {

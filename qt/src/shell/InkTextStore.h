@@ -8,10 +8,10 @@
  *
  * An entry (by file name): the stamp of the document's main file when its pages were read (a .xopp, or a PDF with
  * notes), the recogniser's id (results of another model are read again), whether every line was read, per page its
- * lines (hash and origin, 0.1 pt), and per line hash its words: [x, y, w, h (0.1 pt, relative to the line's origin),
- * confidence (0-255), reading, share, reading, share, ...] (a share: 0-255, plus the models that gave the reading
- * times 256 when several models read the line, ink::Candidate::models), then those models as a number. A line
- * written on several pages is stored once.
+ * lines (hash and origin, 0.1 pt; a line written at an angle also that angle, 0.01 degrees), and per line hash its
+ * words: [x, y, w, h (0.1 pt, relative to the line's origin, upright), confidence (0-255), reading, share, reading,
+ * share, ...] (a share: 0-255, plus the models that gave the reading times 256 when several models read the line,
+ * ink::Candidate::models), then those models as a number. A line written on several pages is stored once.
  * About 2-5 KB per page of handwriting, compressed. An entry of over 1 MB gets a file of its own (Packs).
  *
  * An entry also keeps the document's handwriting language (hwr/LanguagePlan.h): the one decided from its first lines

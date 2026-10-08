@@ -165,3 +165,46 @@ TEST(InkLayoutTest, aMovedLineKeepsItsHash) {
     changed[10].points[1] += QPointF(0.5, 0);
     EXPECT_NE(layout(changed).lines[0].hash, before.lines[0].hash);
 }
+
+namespace {
+/// Everything the layout found (lines, their strokes and hashes, words, their strokes and boxes in 0.01 pt, drawings)
+/// as one number.
+quint64 fingerprint(const hwr::Layout& l) {
+    quint64 f = 1469598103934665603ULL;
+    auto mix = [&](qint64 v) {
+        for (int i = 0; i < 8; ++i) {
+            f ^= (static_cast<quint64>(v) >> (8 * i)) & 0xff;
+            f *= 1099511628211ULL;
+        }
+    };
+    auto box = [&](const QRectF& b) {
+        for (const double v: {b.left(), b.top(), b.right(), b.bottom()}) {
+            mix(std::llround(v * 100));
+        }
+    };
+    for (const auto& line: l.lines) {
+        mix(static_cast<qint64>(line.hash));
+        box(line.box);
+        for (const uint32_t s: line.strokes) {
+            mix(s);
+        }
+        for (const auto& w: line.words) {
+            box(w.box);
+            for (const uint32_t s: w.strokes) {
+                mix(s);
+            }
+        }
+    }
+    for (const uint32_t d: l.drawings) {
+        mix(d);
+    }
+    return f;
+}
+}  // namespace
+
+TEST(InkLayoutTest, theBenchmarkPageIsLaidOutAsBefore) {
+    // Horizontal handwriting comes out exactly as before lines at an angle were found (the same lines, words and
+    // hashes): the value of the layout of 2026-10-08
+    const hwr::Layout l = layout(benchmark());
+    EXPECT_EQ(fingerprint(l), 14858811291843322082ULL);
+}
