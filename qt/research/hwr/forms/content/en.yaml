@@ -215,29 +215,71 @@ sections:
       - type: angles
         groups:
           - angle: 15
-            items: ["fifteen degrees", "tilted a little", "slightly downhill"]
+            items: ["fifteen degrees", "tilted a little", "slightly downhill", "lab at 10:15"]
           - angle: -15
-            items: ["a gentle slope", "the other way", "rising notes"]
+            items: ["a gentle slope", "the other way", "rising notes", "page 15 of 40"]
           - angle: 30
-            items: ["thirty degrees", "a steeper note"]
+            items: ["thirty degrees", "a steeper note", "room 3.07"]
           - angle: -30
-            items: ["thirty, going up", "climbing words"]
+            items: ["thirty, going up", "climbing words", "step 2 of 5"]
           - angle: 45
-            items: ["a diagonal remark", "halfway down"]
+            items: ["a diagonal remark", "halfway down", "45 min left"]
           - angle: -45
-            items: ["diagonal, going up", "forty five"]
+            items: ["diagonal, going up", "forty five", "version 2.1"]
           - angle: 60
-            items: ["sixty degrees", "almost a column"]
+            items: ["sixty degrees", "almost a column", "due 12 May"]
           - angle: -60
-            items: ["sixty, going up", "steep annotation"]
+            items: ["sixty, going up", "steep annotation", "Fig. 6 here"]
           - angle: 0
             items: ["level line to compare", "written straight", "as on ruled paper", "no angle at all"]
           - angle: 180
             items: ["upside down text", "turn the page", "written from right", "half a turn"]
           - angle: 135
-            items: ["down to the left", "three eighths"]
+            items: ["down to the left", "three eighths", "box 135"]
           - angle: -135
-            items: ["up to the left", "backwards, rising"]
+            items: ["up to the left", "backwards, rising", "line 7"]
+
+  - id: D
+    title: "D. Angles: short notes"
+    instruction: >-
+      Short notes of one, two and four words at every angle, the kind written beside a figure or a formula. Write
+      each along its box, in the direction of its arrow.
+    blocks:
+      - type: angles
+        gap: 5
+        groups:
+          - {angle: 15, same_width: false, items: [{text: "Okay", tags: [one-word]},
+                                                    {text: "see p. 12", tags: [two-words, digits]}]}
+          - {angle: -15, same_width: false, items: [{text: "Why?", tags: [one-word]},
+                                                     {text: "check this again", tags: [three-words]}]}
+          - {angle: 30, same_width: false, items: [{text: "True", tags: [one-word]},
+                                                    {text: "not here", tags: [two-words]},
+                                                    {text: "ask her on Friday", tags: [four-words]}]}
+          - {angle: -30, same_width: false, items: [{text: "x2", tags: [one-word, digits]},
+                                                     {text: "too long", tags: [two-words]},
+                                                     {text: "fix the second axis", tags: [four-words]}]}
+          - {angle: 45, same_width: false, items: [{text: "Done", tags: [one-word]},
+                                                    {text: "nice idea", tags: [two-words]},
+                                                    {text: "add 3 more samples", tags: [four-words, digits]}]}
+          - {angle: -45, same_width: false, items: [{text: "Maybe", tags: [one-word]},
+                                                     {text: "see below", tags: [two-words]},
+                                                     {text: "this was in 2019", tags: [four-words, digits]}]}
+          - {angle: 60, same_width: false, items: [{text: "Wrong", tags: [one-word]},
+                                                    {text: "units missing", tags: [two-words]},
+                                                    {text: "split into two parts", tags: [four-words]}]}
+          - {angle: -60, same_width: false, items: [{text: "Q4", tags: [one-word, digits]},
+                                                     {text: "good point", tags: [two-words]},
+                                                     {text: "move up a level", tags: [four-words]}]}
+          - {angle: 135, same_width: false, items: [{text: "Later", tags: [one-word]},
+                                                     {text: "why so?", tags: [two-words]},
+                                                     {text: "compare with table 4", tags: [four-words, digits]}]}
+          - {angle: -135, same_width: false, items: [{text: "Yes", tags: [one-word]},
+                                                      {text: "and then?", tags: [two-words]},
+                                                      {text: "same as last week", tags: [four-words]}]}
+          - {angle: 180, same_width: false, items: [{text: "Upside", tags: [one-word]},
+                                                     {text: "room 101", tags: [two-words, digits]}]}
+          - {angle: 90, items: [{text: "Idea", tags: [one-word]}]}
+          - {angle: 90, items: [{text: "send it to Ana", tags: [four-words]}]}
 
   - id: D
     title: "D. Angles: notes upwards and downwards"

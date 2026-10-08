@@ -6,9 +6,9 @@ What a form contains and why, and the manifest format: [DESIGN.md](DESIGN.md).
 
 | Form | Pages | Boxes | What |
 | --- | --- | --- | --- |
-| [`pdf/xqt-hwr-en.pdf`](pdf/xqt-hwr-en.pdf) | 13 | 196 | English: start, A characters, B running text, C search words, D angles, E notes on a page, F drawings and marks, G formulas |
-| [`pdf/xqt-hwr-de.pdf`](pdf/xqt-hwr-de.pdf) | 5 | 79 | German: start, A Zeichen, B Fließtext, C Suchwörter, D Winkel |
-| [`pdf/xqt-hwr-en-de.pdf`](pdf/xqt-hwr-en-de.pdf) | 17 | 266 | the English form, then the German one (without its start page) as chapter H |
+| [`pdf/xqt-hwr-en.pdf`](pdf/xqt-hwr-en.pdf) | 15 | 238 | English: start, A characters, B running text, C search words, D angles, E notes on a page, F drawings and marks, G formulas |
+| [`pdf/xqt-hwr-de.pdf`](pdf/xqt-hwr-de.pdf) | 6 | 87 | German: start, A Zeichen, B Fließtext, C Suchwörter, D Winkel |
+| [`pdf/xqt-hwr-en-de.pdf`](pdf/xqt-hwr-en-de.pdf) | 20 | 316 | the English form, then the German one (without its start page) as chapter H |
 
 Each PDF carries its manifest as an attached file (`<form>.manifest.json`, also next to it in `pdf/`):
 `pdfdetach -list`, or `python3 pdfread.py pdf/xqt-hwr-en.pdf`.
@@ -44,7 +44,7 @@ content gives the same PDF bytes. **After changing the content or the layout, re
 | `layout.py` | where everything goes: the blocks (lines, rows, angle groups, the annotated paragraph, table, flow chart, marks, plot, formulas, …) placed on A4 pages in mm; every box and printed text a polygon |
 | `tex.py` | the LaTeX: one TikZ overlay per page on `current page` (`remember picture, overlay`), the manifest embedded with `embedfile` |
 | `build.py` | lays out, writes the manifest and the `.tex`, runs `lualatex` twice, copies to `pdf/`, checks |
-| `checks.py`, `test_forms.py` | the checks: boxes and texts inside the printable margin (10 mm; turned boxes by all four corners), no two boxes overlapping (turned: polygons), no printed text on a box or on another text, every text in the room it was given (TeX measures each one and writes its size into the log), no overfull box or missing glyph, the manifest's fields and ids, every angle with enough lines, the manifest read back from the PDF |
+| `checks.py`, `test_forms.py` | the checks: boxes and texts inside the printable margin (10 mm; turned boxes by all four corners), no two boxes overlapping (turned: polygons), no printed text on a box or on another text, every text in the room it was given (TeX measures each one and writes its size into the log), no overfull box or missing glyph, the manifest's fields and ids, at least 6 boxes of text at each angle in each direction (English; 4 at 0, ±45, ±90 and 180 in German), the manifest read back from the PDF |
 | `geometry.py`, `pdfread.py` | turned boxes and polygon overlap; reading the embedded manifest back with the standard library |
 
 Writing a new section: add a block to the content (`type:` one of the `BLOCKS` in `layout.py`), rebuild with

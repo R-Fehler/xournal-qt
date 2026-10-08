@@ -104,8 +104,10 @@ As built (`build.py`, see [README.md](README.md)), with these additions and deta
   `printed-word`, `circled`, `underlined`, `sketch`, `hatching`, `tick`, `licence`).
 - The page id line reads `XQT-HWR-EN v1 · page 3/13`; the box id (`3.12`) is printed small at the end of each box's
   prompt row.
-- The forms came out longer than planned above: English 13 pages (196 boxes, 169 with text), German 5 pages (79),
-  combined 17. The effort estimate above is unchanged in spirit but untested: time a real fill before relying on it.
+- The forms came out longer than planned above: English 15 pages (238 boxes, 211 with text), German 6 pages (87),
+  combined 20. Section D has at least 6 boxes of text at each angle in each direction (lines, and notes of one, two
+  and four words, some with digits; 3 pages), the German chapter at least 4 at 0, ±45, ±90 and 180. The effort
+  estimate above is untested: time a real fill before relying on it.
 
 ## From a filled form to data and numbers
 

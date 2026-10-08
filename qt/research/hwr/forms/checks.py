@@ -118,19 +118,20 @@ def check_manifest(m, pages=None):
     return problems
 
 
-def check_angles(m, minimum=4):
-    """Every angle of DESIGN.md is there, and each angle class (15, 30, ... 180, both signs) has enough lines."""
+def check_angles(m, angles=ANGLES, minimum=6, section=None):
+    """Every angle given has at least `minimum` boxes of text (each direction counted on its own), in `section`
+    when given (the German chapter: "H")."""
     problems = []
-    texts = [it for it in m["items"] if it["kind"] in ("line", "word", "label")]
-    seen = {it["angle"] for it in texts}
-    for a in ANGLES:
-        if a not in seen:
-            problems.append("no box at %d degrees" % a)
-    for a in sorted({abs(a) for a in ANGLES}):
-        n = sum(1 for it in texts if abs(it["angle"]) == a)
+    texts = [it for it in m["items"] if it["kind"] in ("line", "word", "label", "number")
+             and (section is None or it["section"] == section)]
+    for a in angles:
+        n = sum(1 for it in texts if it["angle"] == a)
         if n < minimum:
-            problems.append("only %d boxes at +-%d degrees" % (n, a))
+            problems.append("only %d boxes at %d degrees%s" % (n, a, " in section %s" % section if section else ""))
     return problems
+
+
+GERMAN_ANGLES = (0, 45, -45, 90, -90, 180)
 
 
 def check_measures(form, measures, tol=0.3):

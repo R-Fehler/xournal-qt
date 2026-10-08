@@ -75,6 +75,18 @@ class Built:
         return p
 
 
+def angle_problems(name, m):
+    """Enough boxes at every angle: 6 per direction in the English form, 4 for the German angle set."""
+    p = []
+    if name in ("xqt-hwr-en", "xqt-hwr-en-de"):
+        p += checks.check_angles(m)
+    if name == "xqt-hwr-de":
+        p += checks.check_angles(m, checks.GERMAN_ANGLES, 4)
+    if name == "xqt-hwr-en-de":
+        p += checks.check_angles(m, checks.GERMAN_ANGLES, 4, section="H")
+    return p
+
+
 def pdf_pages(path):
     with open(path, "rb") as f:
         data = f.read()
@@ -159,8 +171,7 @@ def main():
             os.makedirs(work, exist_ok=True)
         b = build(name, args.out, work)
         problems = b.problems()
-        if name in ("xqt-hwr-en", "xqt-hwr-en-de"):
-            problems += checks.check_angles(b.manifest)
+        problems += angle_problems(name, b.manifest)
         n = len(b.manifest["items"])
         print("%s: %d pages, %d boxes -> %s" % (name, b.manifest["pages"], n, os.path.relpath(b.pdf)))
         for p in problems:

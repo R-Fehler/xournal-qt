@@ -56,9 +56,11 @@ def test_manifest(built, name):
     assert {"line", "word", "chars"} <= kinds
 
 
-@pytest.mark.parametrize("name", ["xqt-hwr-en", "xqt-hwr-en-de"])
+@pytest.mark.parametrize("name", build.FORMS)
 def test_every_angle_class(built, name):
-    assert checks.check_angles(built[name].manifest) == []
+    """At least 6 boxes of text at each angle in each direction (English), 4 at 0, ±45, ±90, 180 (German)."""
+    assert build.angle_problems(name, built[name].manifest) == []
+    assert checks.check_angles({"items": []}) != []   # (the check does count)
 
 
 def test_english_sections_and_kinds(built):

@@ -598,9 +598,10 @@ def block_angles(form, sec, block):
             s.setdefault("arrow", True)
         probe = [make_item(form, sec, s) for s in specs]
         # one width for the whole group, so its lines line up
-        same_w = max(it.w for it in probe)
-        for s in specs:
-            s.setdefault("width", same_w)
+        if g.get("same_width", True):
+            same_w = max(it.w for it in probe)
+            for s in specs:
+                s.setdefault("width", same_w)
         probe = [make_item(form, sec, s) for s in specs]
         W, H, _ = group_geometry(probe, gap)
         poly = Frame(0, 0, a).rect(-W / 2, -H / 2, W / 2, H / 2)

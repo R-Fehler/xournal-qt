@@ -166,11 +166,11 @@ sections:
           - angle: -30
             items: ["schräg nach oben", "Grüße von oben"]
           - angle: 45
-            items: ["diagonal abwärts", "Größe prüfen"]
+            items: ["diagonal abwärts", "Größe prüfen", "Seite 45 lesen"]
           - angle: -45
-            items: ["diagonal aufwärts", "nächster Schritt"]
+            items: ["diagonal aufwärts", "nächster Schritt", "Übung 3b"]
           - angle: 180
-            items: ["auf dem Kopf", "Seite umdrehen"]
+            items: ["auf dem Kopf", "Seite umdrehen", "um 180 Grad", "Rückseite"]
       - type: angles
         heading: "Kurze Notizen nach unten und oben"
         groups:
@@ -180,3 +180,7 @@ sections:
           - {angle: -90, items: [{text: "Wichtig", tags: [one-word]}]}
           - {angle: -90, items: [{text: "Seite fünf", tags: [two-words]}]}
           - {angle: -90, items: [{text: "am Montag neu planen", tags: [four-words]}]}
+          - {angle: 45, items: [{text: "Gut", tags: [one-word]}]}
+          - {angle: -45, items: [{text: "warum so?", tags: [two-words]}]}
+          - {angle: 90, items: [{text: "Daten fehlen", tags: [two-words]}]}
+          - {angle: -90, items: [{text: "Ja", tags: [one-word]}]}
