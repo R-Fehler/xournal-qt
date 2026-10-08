@@ -224,6 +224,13 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
   Training state: `qt/research/hwr/train`, runs `de-ctc` and `en-de-ctc` (fhswf's writers checked:
   grouped by capture day; CVL's layout read fine).
 - [ ] The text layer in plain "Export as PDF".
+- [ ] Later, if reading speed matters: **static int8 quantization** of the CTC model. The export quantizes
+  dynamically, so only the LSTMs and the output layer are int8 (`DynamicQuantizeLSTM`, `MatMulInteger`) and the six
+  convolutions stay fp32: int8 is 6-14 % faster than fp32 on an AVX2 CPU without VNNI (measured on a Zen+, the German
+  CTC: 30 against 34 ms for a 400 px line on 2 threads) and 2.5 times smaller, with the same accuracy. Static
+  quantization (QDQ with a calibration set) would make the convolutions int8 too, which VNNI desktops (Intel Alder
+  Lake+, AMD Zen 4+) and ARM's dot product and i8mm (Apple M, Snapdragon, phones) run much faster; check it with
+  `evaluate.py` on the test sets.
 - [ ] `qt/hwr-userdata` (later): a dataset of the user's own hand made in the app, for fine-tuning.
 
 ### Platforms
