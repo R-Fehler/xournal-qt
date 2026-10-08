@@ -204,8 +204,11 @@ Reading a line costs about 0.2 s per model, and most documents are in one langua
 - **Open documents**: in memory, per page; an edit reads only the line it touched, about two seconds after you stop
   writing. Moving a line with the lasso reads nothing again.
 - **The library's cache**: `.xournal_library/ink-text.pack` in each folder (or the app's cache folder, wherever the
-  library keeps its cache), next to the search index. It is written when you save a document and by the background
-  reading; opening a document takes what was read before. It also keeps each document's handwriting language (the
+  library keeps its cache), next to the search index. An open document of the library goes into it **once its
+  handwriting is read** while it has no unsaved changes (the file holds what was read), and **when it is saved** (what
+  is read so far: the rest follows once it is read, or the background reading reads it); the background reading writes
+  it too. Opening a document takes what was read before. A document outside the library gets no cache beside it
+  (`AppController::handOverHandwriting`; test `LibraryHandwritingTest.*`, `-L ui`). It also keeps each document's handwriting language (the
   one found and the one chosen). Deleting the cache only means reading again (and choosing the language again).
 - **The `.xopp`**: nothing. The file stays as Xournal++ writes it.
 - **PDFs with notes and archive PDFs**: an invisible text layer with the best reading of each word the recogniser

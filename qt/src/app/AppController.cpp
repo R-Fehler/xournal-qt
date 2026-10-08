@@ -257,6 +257,8 @@ void AppController::makeTabs() {
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::syncHandwriting);
     connect(tabs.get(), &TabManager::countChanged, this, &AppController::syncHandwriting);
+    // What an open document's indexer read goes to the library's cache once it is read (not only on saving)
+    connect(handwriting, &hwr::HandwritingSearch::progress, this, &AppController::handOverReadHandwriting);
     referenceMode = std::make_unique<ReferenceMode>(*tabs, context().getSettings());
     compareMode = std::make_unique<VersionCompare>(*tabs, *referenceMode);
     presenter = std::make_unique<PresenterConsole>(context());
@@ -3509,22 +3511,53 @@ void AppController::handOverHandwriting(DocumentSession& s) {
     // The handwriting it read goes to the library's cache (searched there; not read again when it is opened next)
     LibraryIndex* index = library->searchIndex();
     hwr::InkTextIndexer* indexer = handwriting ? handwriting->indexerOf(&s) : nullptr;
-    if (!index || !indexer || !s.hasFilePath() || s.isProtected()) {
-        return;  // (a protected document: its handwriting is read into memory only, never into the library's cache)
+    if (!index || !indexer || !s.hasFilePath() || s.isProtected() || !index->location().contains(s.getFilePath())) {
+        return;  // (a protected document: its handwriting is read into memory only, never into the library's cache;
+                 // a document outside the library: no cache beside it)
     }
     const auto pages = indexer->pages();
-    if (pages.empty() || !std::all_of(pages.begin(), pages.end(), [](const auto& p) { return p.known; })) {
-        return;  // (not all read yet: the library's job reads it)
+    if (std::none_of(pages.begin(), pages.end(), [](const auto& p) { return p.known; })) {
+        return;  // (nothing read yet)
     }
+    // What is read so far: pages not read yet are empty and the entry incomplete (handed over again once they are
+    // read, handOverReadHandwriting; else the library's job reads them)
     InkDoc doc;
     doc.stamp = fileStamp(s.getFilePath());
     doc.recognizer = handwriting->service().recognizerId();
-    doc.complete = std::all_of(pages.begin(), pages.end(), [](const auto& p) { return p.complete; });
+    doc.complete = std::all_of(pages.begin(), pages.end(), [](const auto& p) { return p.known && p.complete; });
     doc.language = indexer->plan()->decided();
     for (const auto& p: pages) {
         doc.pages.push_back(p.lines);
     }
+    if (const auto before = index->inkText().find(s.getFilePath());
+        before && before->complete && doc.complete && before->stamp == doc.stamp &&
+        before->recognizer == doc.recognizer && before->language == doc.language) {
+        return;  // (there as it is: opened from the library, read from its cache)
+    }
     index->inkText().put(s.getFilePath(), std::move(doc));
+}
+
+void AppController::handOverReadHandwriting() {
+    if (!tabs || !handwriting) {
+        return;
+    }
+    std::map<const DocumentSession*, int> now;
+    for (int i = 0; i < tabs->count(); ++i) {
+        DocumentSession* s = tabs->session(i);
+        hwr::InkTextIndexer* indexer = s ? handwriting->indexerOf(s) : nullptr;
+        if (!indexer) {
+            continue;
+        }
+        auto it = inkHandedOver.find(s);
+        int& handed = now[s] = it != inkHandedOver.end() ? it->second : -1;
+        // Read to the end while the file holds what it shows (unsaved changes go over when they are saved)
+        if (indexer->done() && indexer->pagesRead() != handed && s->hasFilePath() && !s->isModified() &&
+            !s->isSaving()) {
+            handOverHandwriting(*s);
+            handed = indexer->pagesRead();
+        }
+    }
+    inkHandedOver = std::move(now);  // (closed documents go)
 }
 
 namespace {
