@@ -1,0 +1,14 @@
+# The final run of the shipped shared CTC: the same model and data as en-de-combined-ctc.yaml, now also learning
+# from the validation lines (the test lines stay out for the last comparison). No early stopping (the validation
+# lines are no longer held out): a fixed length, the experiment's best step (62,000) plus about the share of lines
+# added, with the learning rate's cosine ending there. The model to ship is checkpoints/last; keep it only if it is
+# at least as good on the test sets (evaluate.py run --split test).
+extends: en-de-combined-ctc.yaml
+out_dir: runs/en-de-ctc-final
+version: 2026.10.2
+train:
+  splits: [train, val]
+  max_steps: 71000
+  early_stopping: 1000
+val:
+  every_steps: 5000

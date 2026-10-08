@@ -1,0 +1,17 @@
+# The same final run, started from the experiment's best checkpoint instead of from scratch: learns from the
+# validation lines too, for 12,000 steps at a learning rate about where the experiment was at its best step (3e-4),
+# decaying to the floor. Compare with en-de-combined-ctc-final.yaml on the test sets.
+extends: en-de-combined-ctc.yaml
+out_dir: runs/en-de-ctc-final-warm
+version: 2026.10.2
+finetune:
+  init_from: runs/en-de-ctc/checkpoints/best
+  freeze: none
+train:
+  splits: [train, val]
+  lr: 3.0e-4
+  warmup_steps: 200
+  max_steps: 12000
+  early_stopping: 1000
+val:
+  every_steps: 2000
