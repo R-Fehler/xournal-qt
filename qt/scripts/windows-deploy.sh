@@ -8,7 +8,10 @@
 #                       imageformats/, ...), the QML modules (qml/), qt.conf. Qt6Multimedia.dll for the recordings,
 #                       without Qt's media plugins (multimedia/: FFmpeg and Windows Media Foundation players, not
 #                       needed for audio in and out, see qt/docs/features/audio.md) and so without FFmpeg's DLLs
-#   share/xournal-qt/   page templates, palettes, icons (AppContext looks for them next to bin/)
+#   share/xournal-qt/   page templates, palettes, icons (AppContext looks for them next to bin/), the handwriting
+#                       models (hwr-models/<name>/, from cmake --install)
+#   bin/onnxruntime.dll ONNX Runtime for the handwriting search, with the Visual C++ runtime DLLs it imports
+#   share/doc/xournal-qt/onnxruntime/   its LICENSE and ThirdPartyNotices.txt
 #   share/poppler/      poppler's encoding data (poppler finds it relative to its DLL)
 #   lib/gdk-pixbuf-2.0/ gdk-pixbuf's image loaders
 #   etc/fonts/          fontconfig's configuration (fontconfig finds it relative to its DLL; it lists C:\Windows\Fonts)
@@ -196,6 +199,53 @@ copy_data "$prefix/share/poppler" "$dist/share/poppler"
 copy_data "$prefix/lib/gdk-pixbuf-2.0" "$dist/lib/gdk-pixbuf-2.0"
 copy_data "$prefix/etc/fonts" "$dist/etc/fonts"
 
+# --- ONNX Runtime (the handwriting search; qt/docs/development/releasing.md, "Handwriting") --------------------------
+# Microsoft's onnxruntime.dll (qt/packaging/onnxruntime.env) next to the program, where the app looks first
+# (qt/src/hwr/OrtRuntime.cpp: never the older onnxruntime.dll that Windows 11 has in System32), with its licence
+# files. It is built with Visual C++ and imports its runtime (MSVCP140*.dll, VCRUNTIME140*.dll), which a fresh
+# Windows may not have: those DLLs go next to it, from Visual Studio's redistributable folder (app-local deployment
+# as the Visual C++ licence allows; the runners have Visual Studio). The models (share/xournal-qt/hwr-models) came
+# with `cmake --install`.
+step "ONNX Runtime"
+ort_dir=$(mktemp -d)
+bash "$source_dir/qt/scripts/onnxruntime-fetch.sh" win-x64 "$ort_dir/rt"
+cp "$ort_dir/rt/lib/onnxruntime.dll" "$bin/"
+mkdir -p "$dist/share/doc/xournal-qt/onnxruntime"
+cp "$ort_dir/rt/LICENSE" "$ort_dir/rt/ThirdPartyNotices.txt" "$dist/share/doc/xournal-qt/onnxruntime/"
+rm -rf "$ort_dir"
+vc_crt=""
+vswhere="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+if [[ -x "$vswhere" ]]; then
+    while IFS= read -r d; do
+        d=$(cygpath -u "$d")
+        [[ -f "$d/msvcp140.dll" ]] && vc_crt=$d
+    done < <("$vswhere" -latest -products '*' -find 'VC/Redist/MSVC/*/x64/Microsoft.VC*.CRT' 2> /dev/null | tr -d '\r' | sort)
+fi
+if [[ -z "$vc_crt" ]]; then
+    vc_crt=$(find "/c/Program Files/Microsoft Visual Studio" "/c/Program Files (x86)/Microsoft Visual Studio" \
+        -path '*/VC/Redist/MSVC/*/x64/Microsoft.VC*.CRT/msvcp140.dll' 2> /dev/null | sort | tail -n 1 || true)
+    vc_crt=${vc_crt%/msvcp140.dll}
+fi
+echo "Visual C++ runtime: ${vc_crt:-not found}"
+while IFS= read -r dll; do
+    case "${dll,,}" in
+        msvcp140*.dll | vcruntime140*.dll | concrt140.dll) ;;
+        *) continue ;;
+    esac
+    if [[ -n "$vc_crt" && -f "$vc_crt/${dll,,}" ]]; then
+        cp "$vc_crt/${dll,,}" "$bin/$dll"
+        echo "  $dll (from $vc_crt)"
+    else
+        system32_dll="$(cygpath -u "${SYSTEMROOT:-C:\\Windows}")/System32/$dll"
+        if [[ -f "$system32_dll" ]]; then
+            cp "$system32_dll" "$bin/$dll"
+            warn "$dll copied from System32 (no Visual Studio redistributable folder found)"
+        else
+            warn "$dll (imported by onnxruntime.dll) not found: the handwriting search needs the Visual C++ runtime"
+        fi
+    fi
+done < <(objdump -p "$bin/onnxruntime.dll" 2> /dev/null | tr -d '\r' | sed -n 's/^[[:space:]]*DLL Name: //p')
+
 # --- The MinGW DLLs: everything that a binary in the folder imports, recursively ------------------------------------
 # objdump reads the import tables without running anything (ldd would load the DLLs).
 imports_of() { objdump -p "$1" 2> /dev/null | tr -d '\r' | sed -n 's/^[[:space:]]*DLL Name: //p'; }
@@ -254,6 +304,10 @@ Settings are kept in %LOCALAPPDATA%\xournal-qt, caches in %LOCALAPPDATA%\cache\x
 Documents\Xournal_Libraries\Default.
 
 bin\xournal-qt-cli.exe is the command line tool (PDF and PNG export, as `xournalpp --create-pdf`).
+
+Handwriting search (Settings -> Search): the built-in handwriting model in share\xournal-qt\hwr-models\ is for
+non-commercial use only (the LICENCE.md in its folder); ONNX Runtime (bin\onnxruntime.dll, MIT, Microsoft) reads
+it, its licence and notices are in share\doc\xournal-qt\onnxruntime\.
 
 xournal-qt-debug.bat starts the program with a log of the pen, touch and mouse input (input-log.txt next to it), for
 reporting problems with the pen.

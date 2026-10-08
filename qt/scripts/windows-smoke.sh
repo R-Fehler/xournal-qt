@@ -17,12 +17,15 @@
 #   5. recording (qt/docs/features/audio.md, "Platforms"): Qt6Multimedia.dll is in the folder and Qt's FFmpeg media
 #      plugin and FFmpeg's DLLs are not; `xournal-qt --audio-info` says "recording: available" (the runner has no
 #      microphone: the devices it lists are for information)
+#   6. handwriting (qt/docs/development/releasing.md, "Handwriting"): onnxruntime.dll and the Visual C++ runtime DLLs it
+#      imports are in bin/, every model of qt/resources/hwr/ is in share/xournal-qt/hwr-models/ (hwr-package-check.sh),
+#      and `xournal-qt --hwr-info` finds the runtime and the models and reads its sample (exit code 0)
 #
 # When a step fails (not when it hangs), it runs again under gdb, which stops at the crash, abort() or exit() and
 # prints the backtraces and the loaded DLLs into <step>.gdb.log. A failing text export also runs with FC_DEBUG=1 and
 # G_MESSAGES_DEBUG=all and without the UTF-8 C locale (XQT_NO_UTF8_LOCALE=1); a failing app with Qt's plugin and QML
 # import traces, without the UTF-8 C locale, and without a document. The text export with Pango's win32 backend
-# (XQT_WIN_PANGO_WIN32=1) always runs, for information. Only the steps of 1, 2 and 4 count as failures.
+# (XQT_WIN_PANGO_WIN32=1) always runs, for information. Only the steps of 1, 2, 4, 5 and 6 count as failures.
 #
 # Exit codes as MSYS2 reports them for Windows programs: 139 an access violation (SIGSEGV), 127 any other fatal
 # NTSTATUS (stack overflow, heap corruption, __fastfail from abort() or an invalid C runtime parameter) or a DLL that
@@ -253,6 +256,36 @@ fi
 if attempt audio-info 60 QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 "$bin/xournal-qt.exe" --audio-info; then
     grep -q '^recording: available (Qt Multimedia' "$out/audio-info.log" ||
         { echo "::error::audio-info: recording is not available through Qt Multimedia"; failures=$((failures + 1)); }
+else
+    failures=$((failures + 1))
+fi
+
+# --- Handwriting ------------------------------------------------------------------------------------------------------
+# ONNX Runtime next to the program, with the Visual C++ runtime it imports (the runner has that in System32, so the
+# clean PATH alone would not notice it missing), the models file for file, and `xournal-qt --hwr-info`: exit code 1
+# when the runtime or a model is missing or the built-in sample is not read (qt/docs/development/releasing.md)
+printf '\n=== handwriting: what the folder has\n'
+if [[ -f "$bin/onnxruntime.dll" ]]; then
+    echo "onnxruntime.dll: $(stat -c %s "$bin/onnxruntime.dll") bytes"
+    while IFS= read -r dll; do
+        case "${dll,,}" in
+            msvcp140*.dll | vcruntime140*.dll | concrt140.dll)
+                if [[ -f "$bin/$dll" ]]; then
+                    echo "  $dll: in bin/"
+                else
+                    echo "::error::handwriting: onnxruntime.dll imports $dll, which is not in bin/"
+                    failures=$((failures + 1))
+                fi
+                ;;
+        esac
+    done < <(objdump -p "$bin/onnxruntime.dll" 2> /dev/null | tr -d '\r' | sed -n 's/^[[:space:]]*DLL Name: //p')
+else
+    echo "::error::handwriting: no onnxruntime.dll in bin/"
+    failures=$((failures + 1))
+fi
+bash "$source_dir/qt/scripts/hwr-package-check.sh" models "$dist/share/xournal-qt" || failures=$((failures + 1))
+if attempt hwr-info 120 QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 "$bin/xournal-qt.exe" --hwr-info; then
+    grep -qi 'onnxruntime' "$out/hwr-info.log" || echo "::warning::hwr-info: the output does not name ONNX Runtime"
 else
     failures=$((failures + 1))
 fi
