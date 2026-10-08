@@ -11,6 +11,24 @@ from torchvision.transforms import v2 as T
 from torchvision.transforms.v2 import functional as F
 
 
+def elastic(img: Image.Image, alpha: float, sigma: float, coarse: int = 4) -> Image.Image:
+    """torchvision's ElasticTransform, with its random displacement field made at 1/`coarse` of the size and scaled up.
+    The field is a blur of noise with sigma of several pixels, so it is smooth at that scale anyway; torchvision blurs
+    it at full size with a kernel of 8 sigma, which took 590 ms for a 1600 px line, most of a CTC worker's time (the
+    GPUs waited). This takes 6 ms, with the same strength and smoothness (the blur at 1/coarse leaves noise `coarse`
+    times stronger, hence the division). Scaled as torchvision does: dx by alpha / width, dy by alpha / height."""
+    w, h = img.size
+    hc, wc = -(-h // coarse) + 1, -(-w // coarse) + 1
+    sc = sigma / coarse
+    k = int(8 * sc + 1)
+    k += k % 2 == 0
+    d = torch.rand(1, 2, hc, wc) * 2 - 1
+    if sc > 0:
+        d = F.gaussian_blur(d, [k, k], [sc, sc])
+    d = torch.nn.functional.interpolate(d, size=(h, w), mode="bilinear", align_corners=False) / coarse
+    d = torch.cat([d[:, 0:1] * alpha / w, d[:, 1:2] * alpha / h], 1).permute(0, 2, 3, 1)
+    return F.elastic(img, d, fill=255)
+
 @dataclass
 class AugmentConfig:
     p: float = 0.9            # any augmentation at all
@@ -72,7 +90,7 @@ class LineAugment:
             img = F.affine(canvas, angle=angle, translate=[0, 0], scale=1.0, shear=[shear, 0.0], fill=255,
                            interpolation=T.InterpolationMode.BILINEAR)
         if _p(c.elastic):
-            img = T.ElasticTransform(alpha=c.elastic_alpha, sigma=c.elastic_sigma, fill=255)(img)
+            img = elastic(img, c.elastic_alpha, c.elastic_sigma)
         if _p(c.morph):
             img = img.filter(ImageFilter.MinFilter(3) if _p(0.5) else ImageFilter.MaxFilter(3))
         if _p(c.contrast):
