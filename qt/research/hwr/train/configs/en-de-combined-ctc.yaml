@@ -11,3 +11,8 @@ datasets:
   - {name: cvl-lines, weight: 0.20, optional: true}
 train:
   max_steps: 100000
+  early_stopping: 5               # evaluations without more words found (real handwriting only, so less noise)
+  num_workers: 12                 # per GPU; the CTC model is fast, its pictures are made on the CPU
+val:
+  datasets: [fhswf-german, iam-lines, cvl-lines]   # real handwriting only: synthetic lines flatter every model
+  max_lines: 1500

@@ -211,3 +211,16 @@ def test_writer_splits_take_their_share_of_the_lines():
 
 def test_targets_have_no_invisible_characters():
     assert text.clean_line("Zeit​schrift  Ab­satz﻿") == "Zeitschrift Absatz"
+
+
+def test_elastic_moves_ink_a_little_and_keeps_the_size():
+    from xqt_hwr.data.augment import elastic
+    torch.manual_seed(0)
+    img = Image.new("L", (400, 64), 255)
+    img.paste(0, (50, 20, 350, 44))                       # a dark bar
+    out = elastic(img, alpha=25.0, sigma=6.0)
+    assert out.size == img.size
+    a, b = np.asarray(img, dtype=float), np.asarray(out, dtype=float)
+    changed = (np.abs(a - b) > 64).mean()
+    assert 0.001 < changed < 0.2                          # its edges move, the picture stays the picture
+    assert abs(a.mean() - b.mean()) < 10
