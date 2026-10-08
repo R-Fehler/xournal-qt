@@ -599,16 +599,19 @@ void ViewController::twistBegin(double fingerDegrees) {
     twistLastFinger = fingerDegrees;
     twistTotal = 0;
     twistOffset = 0;
+    twistTouchpad = false;
 }
 
 std::optional<double> ViewController::twistTarget() {
     if (!twistEngaged) {
-        if (std::abs(twistTotal) < ROTATE_START_DEGREES) {
+        const double start = twistTouchpad ? ROTATE_START_DEGREES : TOUCH_ROTATE_START_DEGREES;
+        if (std::abs(twistTotal) < start) {
             return std::nullopt;
         }
-        // From here on it turns with the fingers, behind them by the start (so that nothing jumps)
+        // From here on it turns with the fingers: on the touchpad behind them by the start (so that nothing jumps),
+        // on the screen where the fingers are (it catches up once; a lag of 65° could not be turned back)
         twistEngaged = true;
-        twistOffset = std::copysign(ROTATE_START_DEGREES, twistTotal);
+        twistOffset = twistTouchpad ? std::copysign(ROTATE_START_DEGREES, twistTotal) : 0;
     }
     return snapAngle(twistStartAngle + twistTotal - twistOffset);
 }
@@ -628,6 +631,7 @@ void ViewController::twistTo(double fingerDegrees, QPointF screenAnchor) {
 void ViewController::twistBy(double deltaDegrees, QPointF screenAnchor) {
     if (!twistActive) {
         twistBegin(0);
+        twistTouchpad = true;
     }
     twistTotal += deltaDegrees;
     if (const auto target = twistTarget()) {

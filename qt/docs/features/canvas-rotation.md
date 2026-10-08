@@ -9,8 +9,8 @@ the rotate gesture and reset with double tap or fit to X buttons on the layout p
 
 | How | What |
 | --- | --- |
-| Two fingers twist | The canvas turns with them once they turned about 12° (so pinching and scrolling never turn it by accident), behind the fingers by those 12° so that nothing jumps. Within 6° of 0°, 90°, 180° or 270° it snaps there. The point between the fingers stays under them while it turns and zooms. |
-| Touchpad rotate gesture | The same (`Qt::RotateNativeGesture`: macOS, Wayland with libinput's pinch-rotate). |
+| Two fingers twist | The canvas turns only after a deliberate twist of about 65° (`ViewController::TOUCH_ROTATE_START_DEGREES`): a large pinch turns the fingers by a few tens of degrees on its own, and that only zooms. Past it the canvas is where the fingers are and follows them, also back below 65° (to 45°, say) until they are lifted. Within 6° of 0°, 90°, 180° or 270° it snaps there. The point between the fingers stays under them while it turns and zooms. |
+| Touchpad rotate gesture | `Qt::RotateNativeGesture` (macOS, Wayland with libinput's pinch-rotate): turns once it turned about 12° (`ROTATE_START_DEGREES`; no pinch to tell it apart), behind the gesture by those 12° so that nothing jumps; it snaps the same. |
 | Ctrl+] / Ctrl+[ | A quarter turn clockwise / counter-clockwise (from a free angle: to the next quarter that way). Changeable in Settings → Shortcuts. |
 | The chip "↺ 37°" in the layout pill | Shown while the canvas is turned (-90° rather than 270°); a tap turns it upright. |
 | Two taps on the page (the middle button too) | Turned: upright again, the point tapped staying where it is; nothing else (the next two taps zoom as before). |
