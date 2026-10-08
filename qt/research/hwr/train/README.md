@@ -201,6 +201,7 @@ data was used), so a model always says what it learned from.
 | `cvl-lines` | 310 writers, 1 German and 6 English texts | CC BY-NC 4.0 | [Zenodo 1492267](https://doi.org/10.5281/zenodo.1492267) (`--download`) or your copy |
 | `synthetic-de`, `synthetic-en` | text in handwriting fonts | text: Tatoeba CC BY 2.0 FR, Wikipedia CC BY-SA 4.0 / GFDL, the built-in sample GPL-2.0-or-later; fonts: OFL or Apache-2.0 (read from each font file) | `prepare.py fonts`, `prepare.py synthetic` |
 | your ink | your lines, exported by the app | yours | `xournal-qt-cli hwr-lines` (block `qt/hwr-multilang`) |
+| a filled form | your hand copying known texts, at sizes and angles | yours | `xournal-qt-cli hwr-form` ([forms/DESIGN.md](../forms/DESIGN.md)) |
 
 | Base model | Licence | Note |
 |---|---|---|

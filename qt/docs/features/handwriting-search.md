@@ -254,11 +254,34 @@ xournal-qt-cli hwr-lines handwriting-sample-de.xopp --text qt/research/hwr/sampl
 
 The sentences are the texts (`sentences-<lang>.txt`; `make_sample.py` makes the pages from them again after a change).
 
+## Forms and the benchmark
+
+A **handwriting form** is a PDF that asks the writer to copy printed text into marked boxes, at given sizes and
+angles, plus a few drawings, marks and formulas ([the design](../../research/hwr/forms/DESIGN.md)). Its manifest
+(`<form>.manifest.json`, attached to the PDF) holds every box (mm, turned by its angle around its centre) and the
+text expected in it. Written on in xournal-qt and saved (a `.xopp` on the form's PDF, or the PDF with notes), it is
+training data without anyone transcribing anything:
+
+```sh
+xournal-qt-cli hwr-form filled.xopp --out ~/hwr-data/form-w07 [--writer w07] [--licence private] [--manifest m.json]
+```
+
+- **`hwr-form`**: a line dataset ([FORMATS.md](../../research/hwr/train/FORMATS.md) §1, `kind: ink`), one line per box
+  with strokes. A stroke belongs to the box that holds most (more than half) of its points, tested in the box's own
+  turned frame; the search's layout plays no part. The box's strokes are turned upright (by -angle) and drawn as the
+  recognisers see a line (`LineImage`); `lines.jsonl` adds `angle`, `kind`, `box_id`, `form`, `page` and, for
+  formulas, `"math": true`. Boxes of kind `drawing`, `mark` and `free` are left out, empty boxes skipped; the tool
+  says how many, and how many strokes were in no box.
+- The manifest is found attached to the document's background PDF, else to the file itself (a PDF with notes);
+  `--manifest` gives one instead. Code: `qt/src/hwr/FormManifest.h`, `FormDataset.h`; tests:
+  `FormTest` (a synthetic form at 0, ±90 and 45 degrees, a PDF with the manifest attached).
+
 ## For developers
 
 - Code: `qt/src/hwr` (layout of ink into lines and words, the recognisers — `TrocrRecognizer`, `CtcRecognizer`
   with `CtcDecode`, `MultiRecognizer` for several models, `LanguagePlan` for a document's language —, `ModelInfo`
-  (a model's manifest), the worker, the indexer of an open document, `LineDataset` (the export)), `qt/src/session/InkText.h` (what was read and how the search matches it),
+  (a model's manifest), the worker, the indexer of an open document, `LineDataset` (the export), `FormManifest`,
+  `FormDataset` (handwriting forms)), `qt/src/session/InkText.h` (what was read and how the search matches it),
   `qt/src/session/InkTextLayer.h` (the PDF text layer), `qt/src/shell/InkTextStore.h` (the library's pack),
   `LibraryInkJob.h` (background reading), `ModelDownload.h`, `HandwritingSettings.h`. Tests: `xqt-hwr-tests`
   (label `hwr`), with a scripted recogniser.

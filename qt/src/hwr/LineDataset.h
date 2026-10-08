@@ -22,12 +22,16 @@
  */
 #pragma once
 
+#include <QImage>
+#include <QJsonObject>
 #include <QString>
 #include <QStringList>
 
 class Document;
 
 namespace xqt::hwr {
+
+struct LineInput;
 
 struct LineExport {
     QString document;  ///< a .xopp, or a PDF with notes
@@ -53,5 +57,12 @@ QStringList transcriptsOf(const QByteArray& text);
 LineExportResult exportLines(const LineExport& job);
 /// The same for a document in memory (`job.document` only names it: the ids and the source).
 LineExportResult exportLines(const LineExport& job, Document& document);
+
+/// The pieces of a dataset (also the forms', FormDataset.h): a line's picture, its ink as strokes/<id>.json holds it, a
+/// name of letters, digits and "_" only, and a file written whole or not at all.
+QImage lineImage(const LineInput& line);
+QJsonObject strokesJson(const LineInput& line);
+QString safeName(const QString& s);
+bool writeDatasetFile(const QString& path, const QByteArray& data);
 
 }  // namespace xqt::hwr

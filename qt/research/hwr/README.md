@@ -24,6 +24,7 @@ Data and models:
 | `kraken_finetune_time.py` | seconds per training step (CTC, AdamW, the model's line height, lines cut to 1,200 px) on a CPU, i.e. the cost of personalisation: `kraken_finetune_time.py threads batch model…`. Batch 4 or more exceeds a 3 GB cap. Also tries a dynamic-width ONNX export, which fails. |
 | `kraken_onnx_fixed.py` | fixed-width ONNX export of a PP-OCRv6 model with two monkey-patches, compared with torch on a real line: `kraken_onnx_fixed.py 2 768 medium.safetensors` |
 | `sample/` | the "Handwriting sample" pages (`handwriting-sample-en.xopp`, `-de.xopp`: 20 numbered sentences each, room to write under each) made by `make_sample.py` from `sentences-<lang>.txt`; written by hand and exported with `xournal-qt-cli hwr-lines … --text sentences-<lang>.txt`, they are an evaluation set of one's own handwriting (qt/docs/features/handwriting-search.md) |
+| `forms/` | handwriting forms ([DESIGN.md](forms/DESIGN.md)): copy-out PDFs whose manifest knows every box's text; a filled one becomes training data (`xournal-qt-cli hwr-form`; qt/docs/features/handwriting-search.md, "Forms and the benchmark") |
 | `wordmatch.py`, `eval_lines_common.py` | a Python port of the app's fuzzy word rules (`qt/src/session/WordMatch.h`); CER and WER |
 
 **Setup** (2026-09-26): Python 3.10 and onnxruntime 1.23.2, plus

@@ -36,13 +36,14 @@ QStringList transcriptsOf(const QByteArray& text) {
     return out;
 }
 
-namespace {
-bool writeFile(const QString& path, const QByteArray& data) {
+bool writeDatasetFile(const QString& path, const QByteArray& data) {
     QSaveFile f(path);
     return f.open(QIODevice::WriteOnly) && f.write(data) == data.size() && f.commit();
 }
 
+namespace {
 double round2(double v) { return std::round(v * 100.0) / 100.0; }
+}  // namespace
 
 QJsonObject strokesJson(const LineInput& line) {
     QJsonArray strokes;
@@ -60,15 +61,29 @@ QJsonObject strokesJson(const LineInput& line) {
                        {QStringLiteral("strokes"), strokes}};
 }
 
-/// A file name of letters, digits, "-" and "_" only
-QString safe(const QString& s) {
+QString safeName(const QString& s) {
     QString out;
     for (const QChar c: s) {
         out += c.isLetterOrNumber() && c.unicode() < 128 ? c : u'_';
     }
     return out.isEmpty() ? QStringLiteral("doc") : out;
 }
-}  // namespace
+
+QImage lineImage(const LineInput& line) {
+    // The whole line as one piece, as the recognisers draw it
+    const std::vector<LinePiece> pieces = piecesOf(line, std::numeric_limits<int>::max());
+    if (pieces.empty()) {
+        return {};
+    }
+    int w = 0, h = 0;
+    const std::vector<unsigned char> grey = greyOf(line, pieces.front(), w, h);
+    QImage image(w, h, QImage::Format_Grayscale8);
+    for (int y = 0; y < h; ++y) {
+        std::copy(grey.begin() + static_cast<std::ptrdiff_t>(y * w),
+                  grey.begin() + static_cast<std::ptrdiff_t>((y + 1) * w), image.scanLine(y));
+    }
+    return image;
+}
 
 LineExportResult exportLines(const LineExport& job) {
     auto loaded = DocumentSession::loadFile(fs::path(job.document.toStdString()));
@@ -98,7 +113,7 @@ LineExportResult exportLines(const LineExport& job, Document& doc) {
         r.error = QStringLiteral("Cannot create %1").arg(job.out);
         return r;
     }
-    const QString base = safe(QFileInfo(job.document).completeBaseName());
+    const QString base = safeName(QFileInfo(job.document).completeBaseName());
     const QString writer = job.writer.isEmpty() ? QStringLiteral("me") : job.writer;
     QByteArray jsonl;
     std::shared_lock lock(doc);
@@ -114,22 +129,14 @@ LineExportResult exportLines(const LineExport& job, Document& doc) {
                 continue;
             }
             const QString id = QStringLiteral("%1-%2-p%3-l%4")
-                                       .arg(safe(writer), base)
+                                       .arg(safeName(writer), base)
                                        .arg(p + 1, 2, 10, QChar(u'0'))
                                        .arg(l + 1, 3, 10, QChar(u'0'));
-            // The picture: the whole line as one piece, as the recognisers draw it
-            const std::vector<LinePiece> pieces = piecesOf(line, std::numeric_limits<int>::max());
-            int w = 0, h = 0;
-            const std::vector<unsigned char> grey = greyOf(line, pieces.front(), w, h);
-            QImage image(w, h, QImage::Format_Grayscale8);
-            for (int y = 0; y < h; ++y) {
-                std::copy(grey.begin() + static_cast<std::ptrdiff_t>(y * w),
-                          grey.begin() + static_cast<std::ptrdiff_t>((y + 1) * w), image.scanLine(y));
-            }
+            const QImage image = lineImage(line);
             const QString imagePath = QStringLiteral("images/") + id + QStringLiteral(".png");
             const QString strokesPath = QStringLiteral("strokes/") + id + QStringLiteral(".json");
             if (!image.save(out.filePath(imagePath), "PNG") ||
-                !writeFile(out.filePath(strokesPath), QJsonDocument(strokesJson(line)).toJson(QJsonDocument::Compact))) {
+                !writeDatasetFile(out.filePath(strokesPath), QJsonDocument(strokesJson(line)).toJson(QJsonDocument::Compact))) {
                 r.error = QStringLiteral("Cannot write into %1").arg(job.out);
                 return r;
             }
@@ -152,7 +159,7 @@ LineExportResult exportLines(const LineExport& job, Document& doc) {
                               .arg(r.lines)
                               .arg(texts.size());
     }
-    QJsonObject dataset{{QStringLiteral("name"), safe(writer) + u'-' + base},
+    QJsonObject dataset{{QStringLiteral("name"), safeName(writer) + u'-' + base},
                         {QStringLiteral("version"), 1},
                         {QStringLiteral("languages"), QJsonArray{job.language}},
                         {QStringLiteral("licence"), job.licence},
@@ -161,8 +168,8 @@ LineExportResult exportLines(const LineExport& job, Document& doc) {
     if (job.noncommercial) {
         dataset.insert(QStringLiteral("noncommercial"), true);
     }
-    if (!writeFile(out.filePath(QStringLiteral("lines.jsonl")), jsonl) ||
-        !writeFile(out.filePath(QStringLiteral("dataset.json")), QJsonDocument(dataset).toJson())) {
+    if (!writeDatasetFile(out.filePath(QStringLiteral("lines.jsonl")), jsonl) ||
+        !writeDatasetFile(out.filePath(QStringLiteral("dataset.json")), QJsonDocument(dataset).toJson())) {
         r.error = QStringLiteral("Cannot write into %1").arg(job.out);
         return r;
     }

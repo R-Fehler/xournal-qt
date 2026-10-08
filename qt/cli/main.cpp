@@ -14,6 +14,8 @@
  * and commands:
  *   hwr-lines DOC --out DIR [--text FILE] [--lang de] [--writer ID] [--licence ID]
  *                          the handwriting of DOC as a line dataset (qt/src/hwr/LineDataset.h; this command links Qt)
+ *   hwr-form FILLED --out DIR [--manifest FILE] [--writer ID] [--licence ID]
+ *                          a filled handwriting form as a line dataset (qt/src/hwr/FormDataset.h)
  *   export-xopp PDF [--version N] [-o OUT.xopp]
  *                          the .xopp of a PDF with notes, of its latest or any version (version history,
  *                          qt/src/session/PdfHistory.h; links Qt)
@@ -62,6 +64,7 @@
 #ifdef XQT_CLI_HWR
 #include <QCoreApplication>
 
+#include "hwr/FormDataset.h"
 #include "hwr/LineDataset.h"
 #endif
 #ifdef XQT_CLI_SESSION
@@ -319,6 +322,58 @@ int hwrLines(int argc, char* argv[]) {
     std::cout << "\n";
     return 0;
 }
+
+/// xournal-qt-cli hwr-form FILLED --out DIR [--manifest FILE] [--writer ID] [--licence ID]
+int hwrForm(int argc, char* argv[]) {
+    QCoreApplication app(argc, argv);
+    xqt::hwr::FormExport job;
+    const QStringList args = QCoreApplication::arguments().mid(2);
+    auto usage = [] {
+        std::cerr << "usage: xournal-qt-cli hwr-form <filled.xopp|annotated.pdf> --out <dir> [--manifest <file>] "
+                     "[--writer <id>] [--licence <id>]\n"
+                     "  A filled handwriting form (qt/research/hwr/forms/DESIGN.md) as a line dataset\n"
+                     "  (qt/research/hwr/train/FORMATS.md): one line per box with strokes, with the box's text.\n"
+                     "  The manifest is the one attached to the form's PDF, else --manifest. --licence: of the\n"
+                     "  writer's own lines (default \"private\", marked noncommercial).\n";
+        return 1;
+    };
+    for (qsizetype i = 0; i < args.size(); ++i) {
+        const QString& a = args[i];
+        auto value = [&]() -> QString { return i + 1 < args.size() ? args[++i] : QString(); };
+        if (a == QLatin1String("--out")) {
+            job.out = value();
+        } else if (a == QLatin1String("--manifest")) {
+            job.manifest = value();
+        } else if (a == QLatin1String("--writer")) {
+            job.writer = value();
+        } else if (a == QLatin1String("--licence") || a == QLatin1String("--license")) {
+            job.licence = value();
+            job.noncommercial = job.licence == QLatin1String("private");
+        } else if (a == QLatin1String("--help") || a == QLatin1String("-h")) {
+            return usage();
+        } else if (!a.startsWith(QLatin1String("--")) && job.document.isEmpty()) {
+            job.document = a;
+        } else {
+            std::cerr << "unknown argument: " << a.toStdString() << "\n";
+            return usage();
+        }
+    }
+    if (job.document.isEmpty() || job.out.isEmpty()) {
+        return usage();
+    }
+    const xqt::hwr::FormExportResult r = xqt::hwr::exportForm(job);
+    for (const QString& w: r.warnings) {
+        std::cerr << "warning: " << w.toStdString() << "\n";
+    }
+    if (!r.ok) {
+        std::cerr << r.error.toStdString() << "\n";
+        return -3;
+    }
+    std::cout << r.lines << " lines of " << r.form.toStdString() << " written to " << job.out.toStdString() << " ("
+              << r.math << " formulas; " << r.empty << " boxes empty, " << r.left << " drawings and marks left out, "
+              << r.outside << " strokes in no box)\n";
+    return 0;
+}
 }  // namespace
 #endif
 
@@ -389,6 +444,9 @@ int main(int argc, char* argv[]) {
 #ifdef XQT_CLI_HWR
     if (argc >= 2 && std::string(argv[1]) == "hwr-lines") {
         return hwrLines(argc, argv);
+    }
+    if (argc >= 2 && std::string(argv[1]) == "hwr-form") {
+        return hwrForm(argc, argv);
     }
 #endif
 #ifdef XQT_CLI_SESSION
