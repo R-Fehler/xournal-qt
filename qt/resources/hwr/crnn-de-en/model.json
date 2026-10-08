@@ -1,0 +1,93 @@
+{
+  "kind": "ctc",
+  "name": "crnn-de-en",
+  "languages": [
+    "de",
+    "en"
+  ],
+  "version": "2026.10.1",
+  "model": "model_int8.onnx",
+  "alphabet": "alphabet.txt",
+  "blank": 0,
+  "input_height": 64,
+  "max_width": 2048,
+  "licence": "weights: trained from scratch; training data: fhswf-german: AFL-3.0; synthetic-de: text: CC BY 2.0 FR (Tatoeba); CC BY-SA 4.0 / GFDL (Wikipedia); GPL-2.0-or-later (xournal-qt); fonts: Apache-2.0, OFL; synthetic-en: text: CC BY 2.0 FR (Tatoeba); CC BY-SA 4.0 / GFDL (Wikipedia); GPL-2.0-or-later (xournal-qt); fonts: Apache-2.0, OFL; iam-lines: IAM Handwriting Database terms: non-commercial research use; cvl-lines: CC BY-NC 4.0 (CVL Database, https://doi.org/10.5281/zenodo.1492267); includes data licensed for non-commercial research only",
+  "trained_on": [
+    "fhswf-german",
+    "synthetic-de",
+    "synthetic-en",
+    "iam-lines",
+    "cvl-lines"
+  ],
+  "datasets": [
+    {
+      "name": "fhswf-german",
+      "licence": "AFL-3.0",
+      "noncommercial": false,
+      "source": "https://huggingface.co/datasets/fhswf/german_handwriting",
+      "languages": [
+        "de"
+      ]
+    },
+    {
+      "name": "synthetic-de",
+      "licence": "text: CC BY 2.0 FR (Tatoeba); CC BY-SA 4.0 / GFDL (Wikipedia); GPL-2.0-or-later (xournal-qt); fonts: Apache-2.0, OFL",
+      "noncommercial": false,
+      "source": "xqt_hwr synthetic: tatoeba, wikipedia, builtin",
+      "languages": [
+        "de"
+      ]
+    },
+    {
+      "name": "synthetic-en",
+      "licence": "text: CC BY 2.0 FR (Tatoeba); CC BY-SA 4.0 / GFDL (Wikipedia); GPL-2.0-or-later (xournal-qt); fonts: Apache-2.0, OFL",
+      "noncommercial": false,
+      "source": "xqt_hwr synthetic: tatoeba, wikipedia, builtin",
+      "languages": [
+        "en"
+      ]
+    },
+    {
+      "name": "iam-lines",
+      "licence": "IAM Handwriting Database terms: non-commercial research use",
+      "noncommercial": true,
+      "source": "https://huggingface.co/datasets/Teklia/IAM-line (IAM lines, Aachen splits)",
+      "languages": [
+        "en"
+      ]
+    },
+    {
+      "name": "cvl-lines",
+      "licence": "CC BY-NC 4.0 (CVL Database, https://doi.org/10.5281/zenodo.1492267)",
+      "noncommercial": true,
+      "source": "https://doi.org/10.5281/zenodo.1492267",
+      "languages": [
+        "de",
+        "en"
+      ]
+    }
+  ],
+  "noncommercial": true,
+  "base_model": "crnn",
+  "validation": {
+    "lines": 1500.0,
+    "terms": 8460.0,
+    "cer": 0.0239,
+    "wer": 0.1087,
+    "words_found": 0.9757,
+    "words_found_exact": 0.9392,
+    "words_found_fuzzy": 0.9766,
+    "words_found_top1": 0.9641,
+    "false_hits": 0.0094
+  },
+  "files": {
+    "model_int8.onnx": {
+      "sha256": "a83c4fd42ad31f3b1eb6cef8bf70f50859c6669d056a788a0fbc75ccc36a6e13",
+      "size": 9151215
+    },
+    "alphabet.txt": {
+      "sha256": "7140b3de5baae6df5eaa6ce38cc3775827c5b853c985b0ae35dc0316d1836f9f",
+      "size": 650
+    }
+  }
+}
