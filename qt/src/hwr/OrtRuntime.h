@@ -2,10 +2,12 @@
  * xournal-qt: ONNX Runtime, loaded when it is needed (qt/docs/features/handwriting-search.md).
  *
  * The app is built without linking ONNX Runtime: only its C API's headers are vendored (qt/3rdparty/onnxruntime). The
- * library is opened (dlopen) the first time the handwriting search wants a model: XQT_ONNXRUNTIME (a path), else next
- * to the program ("<app>/../lib/xournal-qt/", "<app>/"), else the system's ("libonnxruntime.so.1"). Without it the
- * handwriting search says so in Settings and nothing else changes. The app asks for C API version 16, so ONNX Runtime
- * 1.16 or newer works.
+ * library is opened (dlopen) the first time the handwriting search wants a model: XQT_ONNXRUNTIME (a path), else where
+ * the packages put it next to the program (candidates(): Linux "<app>/../lib/xournal-qt/libonnxruntime.so.1", Windows
+ * "<app>/onnxruntime.dll", macOS "<app>/../Frameworks/libonnxruntime.1.dylib" in the app bundle), else the system's
+ * by its name; on Android "libonnxruntime.so" by its name (the AAR's library among the APK's native libraries). Without
+ * it the handwriting search says so in Settings and nothing else changes. The app asks for C API version 16, so ONNX
+ * Runtime 1.16 or newer works.
  *
  * Session wraps one model with the few calls the recogniser needs: its inputs' names and shapes, and a run with
  * float, int64 and bool tensors whose outputs are copied out (float).
@@ -31,6 +33,15 @@ constexpr uint32_t API_VERSION = 16;
 
 /// The runtime's API (loaded once); nullptr and `why` if it cannot be loaded.
 const OrtApi* api(QString* why = nullptr);
+/// The runtime loaded (after api()): the path or name it was opened by and its version ("1.20.1"); "" if none.
+QString loadedPath();
+QString version();
+
+enum class Platform { Linux, Windows, MacOS, Android };
+Platform thisPlatform();
+/// Where the runtime is looked for, in this order (`appDir`: the program's folder, "" if unknown; `env`:
+/// XQT_ONNXRUNTIME, which alone is tried when set). A name without a folder is the system's search.
+QStringList candidates(Platform platform, const QString& appDir, const QString& env);
 
 struct Tensor {
     enum class Type { Float, Int64, Bool };
