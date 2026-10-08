@@ -86,6 +86,12 @@ All four waves are merged (2026-10-07). The architecture overview:
   editor's hit test need column cases); not built.
 - [?] Qt's own `ToolSeparator` / `MenuSeparator` stay uneven at fractional scales.
 
+- [?] **Licence of a bundled handwriting model**: the trained models learned from IAM (non-commercial research terms)
+  and CVL (CC BY-NC 4.0); their `model.json` says `noncommercial: true`. Downloaded on demand that stays the user's
+  choice; bundled, every package (GPL-2.0-or-later, which allows commercial use) carries non-commercial weights. Ship
+  it with its own licence note beside the GPL, train the bundled one without IAM and CVL (fhswf AFL-3.0 and the
+  synthetic lines only: worse on English), or keep it a download?
+
 ## Bugs
 
 - [ ] **Android: the top bar scrolls into a blank area at its end** (about the last quarter; the author on 0.8.0).
@@ -213,9 +219,15 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
 - [ ] The emoji button is out of reach while the soft keyboard is open on a phone.
 
 ### Handwriting
-- [ ] Pin the German model's revision and sha256s when the training publishes it (`ModelDownload.cpp`; the English one
-  is pinned); bundle ONNX Runtime in the packages; the text layer in plain "Export as PDF".
-- [ ] The GPU training runs (`qt/research/hwr/train`), checking fhswf's writer ids and CVL's layout on the real data.
+- [ ] **The small shared model, bundled** (the author, 2026-10-08: if the shared German + English CTC wins, it ships
+  inside the packages instead of downloading on demand). Needs: the model folder (~6 MB int8) in every package
+  (`.deb`, AppImage, Windows zip, macOS bundle, APK assets) and found there before the data folder
+  (`HandwritingSearch::modelDir`, the resource dir of `AppContext`); ONNX Runtime bundled too (today loaded at run
+  time from the system or `XQT_ONNXRUNTIME`: `OrtRuntime.cpp`; about 15-20 MB per platform); Settings then shows the
+  built-in model instead of a download (the English TrOCR download can stay as an option or go); the next release
+  notes say so. Training state: `qt/research/hwr/train`, runs `de-ctc` and `en-de-ctc` (fhswf's writers checked:
+  grouped by capture day; CVL's layout read fine).
+- [ ] The text layer in plain "Export as PDF".
 - [ ] `qt/hwr-userdata` (later): a dataset of the user's own hand made in the app, for fine-tuning.
 
 ### Platforms
