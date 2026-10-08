@@ -94,7 +94,10 @@ class Run:
     def setup_data(self):
         c = self.cfg
         self.sources = load_sources(c["datasets"], c.get("data_root"), seed=int(c["seed"]))
-        self.train_texts = [l.text for s in self.sources for l in s.lines if l.split == "train"]
+        # train.splits: which splits it learns from; ["train", "val"] for a final run on all but the test lines (then
+        # with a fixed max_steps: the validation lines are no longer held out)
+        self.train_splits = list(self.cfg["train"].get("splits") or ["train"])
+        self.train_texts = [l.text for s in self.sources for l in s.lines if l.split in self.train_splits]
         if not self.train_texts:
             raise SystemExit("no training lines")
 
@@ -335,7 +338,7 @@ class Run:
                 __import__("yaml").safe_dump({k: v for k, v in c.items() if not k.startswith("_")},
                                              allow_unicode=True, sort_keys=False), encoding="utf-8")
         tf = self.transform()
-        train = Lines(self.sources, "train", tf, augment=LineAugment(c["augment"]))
+        train = Lines(self.sources, self.train_splits, tf, augment=LineAugment(c["augment"]))
         vsrc = [s for s in self.sources if not c["val"].get("datasets") or s.info.name in c["val"]["datasets"]]
         self.val = Lines(vsrc, "val", tf, max_lines=int(c["val"]["max_lines"]), seed=int(c["seed"]))
         if len(self.val) == 0:

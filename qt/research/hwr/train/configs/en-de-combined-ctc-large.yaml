@@ -1,0 +1,7 @@
+# The combined German + English CTC at about twice the size (12.7 M parameters instead of 5.7 M): does one model for
+# two languages gain from more capacity? Same data, validation and stopping as en-de-combined-ctc.yaml.
+extends: en-de-combined-ctc.yaml
+name: crnn-de-en-large
+out_dir: runs/en-de-ctc-large
+model:
+  arch: {channels: [48, 96, 192, 192, 384, 384], proj: 384, lstm_hidden: 384, lstm_layers: 3, dropout: 0.2}

@@ -71,3 +71,12 @@ def test_auto_precision_uses_fp32_where_bf16_is_only_emulated():
     assert auto_precision((8, 6), True) == "bf16"     # Ampere
     assert auto_precision((7, 5), False) == "fp16"    # Turing
     assert auto_precision((6, 1), False) == "fp32"    # Pascal (GTX 1080 Ti): emulated bf16 is slower than fp32
+
+
+def test_a_final_run_learns_from_train_and_val(data_root, tmp_path, capsys):
+    import re
+    run("tiny-ctc.yaml", data_root, tmp_path / "a")
+    only_train = int(re.search(r"(\d+) training lines", capsys.readouterr().out).group(1))
+    run("tiny-ctc.yaml", data_root, tmp_path / "b", "train.splits=[train, val]")
+    with_val = int(re.search(r"(\d+) training lines", capsys.readouterr().out).group(1))
+    assert with_val > only_train

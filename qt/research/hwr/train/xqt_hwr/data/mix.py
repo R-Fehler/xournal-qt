@@ -61,9 +61,10 @@ class Lines(Dataset):
     """Lines of one split (several datasets), each read as a framed grey picture and passed through `transform`
     (a function of the picture and the text giving the model's sample)."""
 
-    def __init__(self, sources: list[Source], split: str, transform, augment=None, max_lines: int | None = None,
+    def __init__(self, sources: list[Source], split: str | list[str], transform, augment=None, max_lines: int | None = None,
                  seed: int = 0):
-        self.items: list[tuple[Line, Source]] = [(l, s) for s in sources for l in s.lines if l.split == split]
+        splits = {split} if isinstance(split, str) else set(split)  # (the final run trains on train and val)
+        self.items: list[tuple[Line, Source]] = [(l, s) for s in sources for l in s.lines if l.split in splits]
         if max_lines and len(self.items) > max_lines:
             rnd = random.Random(seed)
             self.items = rnd.sample(self.items, max_lines)
