@@ -83,3 +83,53 @@ newer, arm64) into the draft, and (also since 0.4.0) the unsigned **macOS** `.dm
 - Open questions on both: the pen and touch input (Qt's tablet events on Windows Ink and on macOS), the file
   associations (declared in the macOS bundle, untested; none on Windows yet), and the places where the fork writes
   its settings and cache (`Util::getCacheSubfolder`: GLib's XDG folders, `~/.config` and `~/.cache` on macOS).
+
+## Handwriting: ONNX Runtime and the model
+
+Every package carries the handwriting search whole: **ONNX Runtime** (Microsoft's release build, which the app loads
+at run time, [OrtRuntime.cpp](../../src/hwr/OrtRuntime.cpp)) and **the models**, one folder
+`share/xournal-qt/hwr-models/<name>/` for each folder under `qt/resources/hwr/` (installed by `cmake --install`; the
+packaging names no model). Each model folder keeps its `LICENCE.md`: the model shipped now is for **non-commercial use
+only** (trained on IAM and CVL), which the `.deb`'s `copyright`, the README of the zip and of the `.dmg` say too.
+
+| Package | ONNX Runtime | Its licence files | The models | Checked in the job |
+| --- | --- | --- | --- | --- |
+| `.deb` (both) | `/usr/lib/xournal-qt/libonnxruntime.so.1` → `libonnxruntime.so.<ver>` (CPack adds a staged folder: `cpack -D CPACK_INSTALLED_DIRECTORIES=…`) | `/usr/share/doc/xournal-qt/onnxruntime/`, and paragraphs in `copyright` | `/usr/share/xournal-qt/hwr-models/` | the package installed in the container, then `xournal-qt --hwr-info` |
+| AppImage | `usr/lib/xournal-qt/` in the AppDir, before linuxdeploy | `usr/share/doc/xournal-qt/onnxruntime/` | `usr/share/xournal-qt/hwr-models/` | the AppImage itself: `--hwr-info` (it now carries the off-screen platform plugin for that) |
+| Windows zip | `bin\onnxruntime.dll`, with the Visual C++ runtime DLLs it imports (`MSVCP140*.dll`, `VCRUNTIME140*.dll`) | `share\doc\xournal-qt\onnxruntime\` | `share\xournal-qt\hwr-models\` | `windows-smoke.sh`: the DLLs by name, `--hwr-info` |
+| macOS `.dmg` | `Contents/Frameworks/libonnxruntime.1.dylib` | `Contents/Resources/share/doc/xournal-qt/onnxruntime/` | `Contents/Resources/share/xournal-qt/hwr-models/` | `macos-smoke.sh` (Homebrew hidden): `--hwr-info` |
+| Android APK | `lib/arm64-v8a/libonnxruntime.so` (from the AAR on Maven Central) | `assets/share/doc/xournal-qt/onnxruntime/` | with the app's resources (copied to the data folder at start) | no device: `hwr-package-check.sh apk` looks into the APK |
+
+`xournal-qt --hwr-info` prints whether ONNX Runtime was found (path, version) and the models found, reads a built-in
+sample, and exits with 1 when the runtime or a model is missing or the sample is not read; a non-zero exit fails the
+job. Next to it, `qt/scripts/hwr-package-check.sh models <share/xournal-qt>` checks that every model of
+`qt/resources/hwr/` is in the package file for file (sha256). Only the runtime library is taken from Microsoft's
+archives: not the headers, debug symbols or `onnxruntime_providers_shared` (only GPU and other execution providers
+load it).
+
+What it adds to each package (ONNX Runtime 1.30.0, the model of 2026-10 at 9.2 MB, which hardly compresses):
+
+| Package | ONNX Runtime (as packed) | The model (as packed) | Growth, about |
+| --- | --- | --- | --- |
+| `.deb` (gzip) | 29.0 MB → 11.1 MB | 7.7 MB | +19 MB |
+| AppImage | 29.0 MB → about 11 MB | about 7.7 MB | +19 MB |
+| Windows zip | 16.5 MB → 6.1 MB, the Visual C++ runtime about 0.5 MB | 7.7 MB | +14 MB |
+| macOS `.dmg` | 43.9 MB → 12.5 MB | 7.7 MB | +20 MB |
+| Android APK | 33.0 MB (native libraries are stored uncompressed) | about 7.7-9 MB | +41 MB (installed: the same) |
+
+These are estimates from compressing the files alone (`gzip -6`); the packages were not built for them.
+
+**Bumping ONNX Runtime** is one file, [qt/packaging/onnxruntime.env](../../packaging/onnxruntime.env): the version,
+then the sha256 of the three GitHub archives, of the AAR and of `LICENSE` and `ThirdPartyNotices.txt` at the release's
+tag (download them and run `sha256sum`; GitHub's release page shows the digests too, Maven Central a `.sha1`). Check
+before: the C API version stays 16 or newer (`OrtRuntime.cpp` asks for 16); the Linux library needs no glibc newer
+than Ubuntu 22.04's 2.35 (`objdump -T libonnxruntime.so.1.* | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1`; 1.30.0
+needs 2.28); the macOS library's minimum macOS is not above the bundle's. Then run the release workflow by hand (or
+`xqt-windows.yml`, `xqt-macos.yml`, `xqt-android.yml`): every smoke test reads the sample with the new runtime.
+`qt/scripts/onnxruntime-fetch.sh <platform> <folder>` downloads and checks one platform's files locally
+(`XQT_DOWNLOAD_CACHE=<folder>` keeps the downloads, or serves them offline).
+
+**Swapping the model**: replace or add the folder under `qt/resources/hwr/` (its `model.json`, the files it names, and
+its `LICENCE.md`). Nothing in the packaging names a model, so the packages and their checks follow. If the new model's
+licence differs, change the `Files: usr/share/xournal-qt/hwr-models/*` paragraph of
+[qt/packaging/copyright](../../packaging/copyright) and the README lines in `windows-deploy.sh` and `macos-deploy.sh`.
