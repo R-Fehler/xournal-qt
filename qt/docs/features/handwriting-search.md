@@ -8,12 +8,14 @@ clipboard (below).
 ## Using it
 
 1. **Settings → Search → "Search handwriting"** (off until you switch it on).
-2. **Handwriting languages**: English, German, or English and German (the default). Each language needs its model;
-   Settings shows, per language, whether it is there, where it comes from and how big it is. **Download** fetches
-   it once into `~/.local/share/xournal-qt/models/<name>/` (with a progress bar; Cancel and a later Download go on
-   where it stopped), **Remove** frees the space again, **Choose a folder…** uses a model of your own. Nothing is
-   downloaded unless you press the button. English is TrOCR-small (about 64 MB); the German model is the project's
-   own and says "not published yet" until it is (meanwhile a folder holding one can be chosen).
+2. **Handwriting languages**: English, German, or English and German (the default). The app **comes with a model
+   that reads both** (see "The built-in model"): Settings says "Built in, in use (<name>, <size>)" per language,
+   with its **Licence** note one click away, and nothing needs to be downloaded. **Choose a folder…** uses a model of
+   your own for a language instead. A language no built-in model reads offers its model's **Download** (once into
+   `~/.local/share/xournal-qt/models/<name>/`, with a progress bar; Cancel and a later Download go on where it
+   stopped) and **Remove**; nothing is downloaded unless you press the button. An English TrOCR-small model
+   downloaded before (about 64 MB) keeps reading English, next to the built-in model for German, until it is
+   removed.
 3. Open a document with handwriting: after a few seconds (the page you look at first) its words are found by
    Ctrl+F. The box around the ink word is marked; a word the recogniser was unsure of is marked lighter.
 4. The library's search finds documents by their handwriting too. A document found only through readings the
@@ -100,13 +102,60 @@ text in addition to normal copy and give the user a small popup with the text th
   sweep, the urgent jobs), `CopyToolsTest.*` (`-L ui`, with the scripted recogniser: the tool and the pen back, the
   card and the unsure word, the pill's entry, the search off and no model).
 
+## The built-in model
+
+The author (2026-10-08): "ship the small model with the next pre-release … bundle it, not download on demand … the
+pipeline should be somewhat model agnostic: if the big model is better we just swap model and weights"; the licence:
+"ship it with its own licence note".
+
+- **What**: the project's own CTC model for German and English (`qt/resources/hwr/<name>/`: `model.json`,
+  `model_int8.onnx`, `alphabet.txt`, `LICENCE.md`; about 9 MB). The build copies every folder there that holds a
+  `model.json` into the resource dir as `hwr-models/<name>/` (`XqtHwr.cmake`; installed with `share/xournal-qt`;
+  where that is per platform: [data-on-disk.md](../architecture/data-on-disk.md)). On Android the folder travels in
+  the APK's resources and is copied to the app's data folder at start (`AndroidSetup.cpp`), where ONNX Runtime opens
+  it by its path; a model whose `model.json` changed is copied anew.
+- **Model agnostic**: no code names the model. The app scans `<resource dir>/hwr-models/*/model.json`
+  (`HandwritingSearch::bundledModels`) and takes for each language a model that reads it. Another model (the bigger
+  one, a third language) is a swap of the folder in `qt/resources/hwr/`; a model the manifest marks
+  `"noncommercial": true` says so in Settings and About.
+- **Checked as a downloaded one**: the recogniser checks the files against the manifest's sizes before it reads and
+  against their sha256 when it loads the model (`CtcRecognizer`); a damaged file is said in Settings and read no
+  further.
+- **Licence**: the weights are for non-commercial use (trained on IAM and CVL, whose terms are non-commercial); the
+  note `LICENCE.md` ships beside the model, shown from Settings → Search (Licence) and Settings → Help → About, which
+  says the model is for non-commercial use and the app's code stays under the GPL.
+- **ONNX Runtime** is looked for where each platform's package puts it (`ort::candidates`, `OrtRuntime.h`):
+  `XQT_ONNXRUNTIME` when set; Linux `<prefix>/lib/xournal-qt/libonnxruntime.so.1`; Windows `bin\onnxruntime.dll`
+  next to the program; macOS `Contents/Frameworks/libonnxruntime.1.dylib` in the bundle (then the Linux-style places);
+  Android `libonnxruntime.so` by its name (the ONNX Runtime AAR's library among the APK's native libraries); last
+  the system's by its name.
+- **`xournal-qt --hwr-info`** (for the packages' smoke tests, like `--audio-info`) prints one fact per line and exits
+  with 0 when the search can read, else 1:
+
+  ```
+  onnxruntime: found (/usr/lib/xournal-qt/libonnxruntime.so.1, version 1.20.1)
+  models: /usr/share/xournal-qt/hwr-models
+  model: <name> (ctc; de, en; version 2026.10.1; non-commercial) in /usr/share/xournal-qt/hwr-models/<name>
+    reads the sample line: "Hallo" (126 ms)
+  hwr: ready
+  ```
+
+  Without the runtime: `onnxruntime: not found (<why>)` and `  cannot read the sample line (<why>)`; without a
+  model: `models: none in <folder>`. The sample line is the word "Hallo" written with eight strokes, built into the
+  app (`hwr::sampleLine`, `HwrInfo.cpp`).
+- Tests: `BundledModelTest.*`, `OrtRuntimeTest.*` (`-L hwr`; with `XQT_ONNXRUNTIME`: the sample line, a damaged
+  file, the benchmark's real handwritten line read by the built-in model), `ModelDownloadTest.aBuiltInModelComesLastInTheLookup`,
+  `ModelDownloadTest.theBuiltInModelReadsWhatHasNoModelOfItsOwn`, `MainWindowTest.settingsSearchTabSwitchesTheHandwritingSearch`,
+  `MainWindowTest.aboutSaysTheHandwritingModelIsForNonCommercialUse` (`-L ui`).
+
 ## Languages and models
 
 - A model is a folder with a manifest `model.json` (its `kind`: `trocr` or `ctc`, its `languages`, its files with
   sha256 and size; [FORMATS.md](../../research/hwr/train/FORMATS.md) §2). Per language the app takes the folder chosen
   in Settings, else `XQT_HWR_MODEL` (English) / `XQT_HWR_MODEL_DE` (German), else its own in
   `~/.local/share/xournal-qt/models/` (`trocr-small-hw-int8`, `crnn-de`); without one there, any model in that folder
-  that reads the language. A model that reads both languages serves both.
+  that reads the language; else a model that comes with the app and reads it (above). A model that reads both
+  languages serves both (read once per line).
 - With English and German, **both models read the handwriting** and their readings of each ink word go into one list:
   a word is found through either. Nothing is transcribed. A reading both models gave is there once, with the
   probability that one of them is right, 1 − (1 − p₁)(1 − p₂) (two models agreeing make a word surer than either
@@ -218,9 +267,9 @@ The sentences are the texts (`sentences-<lang>.txt`; `make_sample.py` makes the 
   `qt/scripts/hwr-model.sh` puts the English model in place and writes its manifest `model.json`; a CTC model of the
   training block brings its own. The recogniser's id is derived from the manifests (results of other models are read
   again); several models' ids are joined with `+`.
-- **ONNX Runtime** is not linked: only its C API's headers are vendored (`qt/3rdparty/onnxruntime`), and
-  `libonnxruntime.so.1` is opened when the search is switched on (`XQT_ONNXRUNTIME`, else next to the program, else
-  the system's). Without it, Settings says so and nothing else changes. Packages will bundle it later.
+- **ONNX Runtime** is not linked: only its C API's headers are vendored (`qt/3rdparty/onnxruntime`), and the library
+  is opened when the search is switched on (where: "The built-in model"). Without it, Settings says so and nothing
+  else changes. The packages bring it (the packaging's job: `qt/packaging`, the CI).
 - Tests that need the runtime or the model are skipped unless `XQT_ONNXRUNTIME` (tiny models in
   `qt/tests/hwr/data`: a TrOCR stand-in and a CTC model, made by `tinytrocr.py` and `tinyctc.py`) or
   `XQT_HWR_MODEL` is set; `XQT_BENCH_HWR=1` with the model prints the time per line; `XQT_HWR_BOXES_OUT=<folder>` with
@@ -239,14 +288,16 @@ The sentences are the texts (`sentences-<lang>.txt`; `make_sample.py` makes the 
 - Typo tolerance applies to handwriting even with Fuzzy off.
 - The library is read in the background only on mains power; open documents always.
 - Nothing is stored in the `.xopp`; the PDF text layer has the best reading only (no file of all readings in PDFs).
-- **The model is downloaded on demand** (the author's choice): the app ships without it, and Settings offers the
-  download once the search is switched on, with the address and size shown first (as the arXiv search does: opt-in,
-  the address in view), into the app's data folder, checked against sha256s pinned in the app
-  (`qt/src/shell/ModelDownload.cpp`), retryable and cancellable, with "Remove the model". The source is a pinned
-  revision of `huggingface.co/Xenova/trocr-small-handwritten` (`2432e24d`, about 64 MB). A model without a pinned
-  revision and sha256s (the German one until it is published) is not downloaded: the button says why. To move to
-  another revision, `XQT_HWR_REVISION=<commit> qt/scripts/hwr-model.sh` prints the lines to pin.
-- The runtime is opened at run time (dlopen); bundling it in the packages is a later step.
+- **The model is bundled** (the author, 2026-10-08; before: downloaded on demand): the shared German and English
+  model ships inside the app with its own licence note (non-commercial), found by its manifest, not by name ("The
+  built-in model"). The download stays for a language no built-in model reads, with the address and size shown first
+  (opt-in), checked against sha256s pinned in the app (`qt/src/shell/ModelDownload.cpp`), retryable and
+  cancellable, with "Remove the model"; the English TrOCR (a pinned revision of
+  `huggingface.co/Xenova/trocr-small-handwritten`, `2432e24d`, about 64 MB) is not offered while the built-in model
+  reads English (kept simple; one downloaded before keeps reading English until removed). To move to another
+  revision, `XQT_HWR_REVISION=<commit> qt/scripts/hwr-model.sh` prints the lines to pin.
+- Bundled files are checked like downloaded ones (sizes before reading, sha256 when loading), not trusted blindly.
+- The runtime is opened at run time (dlopen), from where the package put it.
 
 ### English and German
 
@@ -255,8 +306,8 @@ The sentences are the texts (`sentences-<lang>.txt`; `make_sample.py` makes the 
   agreeing is evidence; not a sum: it goes over 1).
 - "English and German" is the default; a language whose model is missing is read by the other model meanwhile, and
   Settings says so.
-- The German model is pinned in the app once it is published (`ModelDownload.cpp`, `builtIn()`); until then its
-  download says "not published yet" and a folder can be chosen.
+- German (and English) come with the app in the shared built-in model; the catalogue's German download entry
+  (`ModelDownload.cpp`, `builtIn()`, "not published yet") is only offered where no built-in model reads German.
 - A document's language: both models on its first 6 lines, then the clearly surer one, the other on unsure lines;
   revisited when the confidence drops; the user's choice per document wins. Kept in the library's cache, not in the
   `.xopp` (there is no clean place in the file: upstream would drop an unknown attribute on its next save).
@@ -270,3 +321,6 @@ What only a real device, screen or another app can show; walked before a release
       ink, copied as text, and selected along the ink in Okular and Firefox after saving as a PDF with notes.
 - [ ] The models download once with consent; the author's own notes in English and German are found by words
       written in them, also in the library search and in other PDF viewers (the invisible text layer).
+- [ ] Each package (`.deb`, AppImage, Windows zip, macOS bundle, APK): `--hwr-info` says "hwr: ready" (on Android:
+      Settings → Search says "Built in, in use" after switching the search on), and a German and an English note are
+      found without downloading anything; Settings → Help → About shows the model's licence note.
