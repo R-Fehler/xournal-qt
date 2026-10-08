@@ -224,6 +224,15 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
   Training state: `qt/research/hwr/train`, runs `de-ctc` and `en-de-ctc` (fhswf's writers checked:
   grouped by capture day; CVL's layout read fine).
 - [ ] The text layer in plain "Export as PDF".
+- [?] **Text or drawing, and writing of any size** (the author is unsure how stable a size-aware layout would be;
+  nothing changed yet). Today `InkLayout` calls a stroke a drawing when it is filled, taller than 2.5 times the
+  page's letter height, or long and straight: big writing (headlines) is dropped, and curvy letter-sized drawings
+  (circles around words, sketches, hatching, formulas) are read as text, their nonsense readings kept as weak
+  candidates (the text layer's MIN_CONF keeps them out of PDFs; the in-app search takes readings from 5 %). The robust
+  direction: geometry only proposes lines at their own scale, the small CTC model (about 35 ms a line) reads them,
+  and its confidence accepts or rejects them. First a labelled set of real pages (diagrams with labels, headlines,
+  margin notes, formulas: "text here / drawing here", a dozen of the author's pages) to measure text found and
+  nonsense admitted; without it no change.
 - [ ] Later, if reading speed matters: **static int8 quantization** of the CTC model. The export quantizes
   dynamically, so only the LSTMs and the output layer are int8 (`DynamicQuantizeLSTM`, `MatMulInteger`) and the six
   convolutions stay fp32: int8 is 6-14 % faster than fp32 on an AVX2 CPU without VNNI (measured on a Zen+, the German
