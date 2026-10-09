@@ -275,6 +275,11 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
 
 ## Not started (decide before building)
 
+- [ ] **Collaboration with people and agents** (E2E-encrypted, peer to peer; agents through MCP): research in
+  [qt/research/collaboration.md](qt/research/collaboration.md) (2026-10-05, restored; possibly outdated). Its
+  permission-checked operations layer is being built with the plugins (`qt/js-plugins`, ADR 0008), so plugins and
+  collaboration share one checked path for changes to a document.
+
 - [ ] Forms (only on PDFs that have fields) and a "My signature" stamp; cryptographic signing (backlog).
 - [ ] OCR (Tesseract): photo import with cropping, a text layer in PDFs; never automatic.
 - [ ] Selected elements in autosave and crash saves (upstream holds them in the selection while it exists).

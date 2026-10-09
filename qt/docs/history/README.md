@@ -101,7 +101,7 @@ They were deleted from the tree in the docs restructure; read them with `git sho
 | `qt/docs/platform-research.md` | native libraries and PDF engines compared |
 | `qt/docs/md-columns.md` | two-column Markdown: doable but not easy, not built |
 | `qt/docs/text-mode.md` | the removed text mode |
-| `qt/docs/research/collaboration.md` | research on E2E-encrypted collaboration and agents as collaborators (nothing decided) |
+| `qt/docs/research/collaboration.md` | research on E2E-encrypted collaboration and agents as collaborators (nothing decided); **restored** as [qt/research/collaboration.md](../../research/collaboration.md) on 2026-10-09 |
 | `qt/docs/research/version-history.md` | the plan of version history inside PDFs (built: hybrid-pdf.md) |
 | `TODO.md` | the done tasks of every block |
 | `qt/docs/testing/device-checklist.md` | 1546 manual checks, one section per block |
