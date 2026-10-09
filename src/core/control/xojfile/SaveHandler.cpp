@@ -192,6 +192,9 @@ static void writeGroup(XmlNode* node, const Element* e) {
     if (e->getCreated() > 0) {
         node->setAttrib(xoj::xml_attrs::CREATED_STR, std::to_string(e->getCreated()));
     }
+    if (!e->getData().empty()) {  // xournal-qt: plugin data (ADR 0008)
+        node->setAttrib(xoj::xml_attrs::DATA_STR, e->getData());
+    }
 }
 
 void SaveHandler::visitLayer(XmlNode* page, const Layer* l) {
