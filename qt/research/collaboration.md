@@ -14,9 +14,9 @@ commentary. Nothing here is implemented or decided.
 
 - **Checked** means read on the project's page or in a search result quoting it (2026-10-05). **Not opened** means
   the page itself was blocked by this machine's proxy and only search summaries were read. **To check** marks
-  anything that must be verified before deciding. Sizes use the scale of [ideas-2026-10.md](../ideas-2026-10.md)
+  anything that must be verified before deciding. Sizes use the scale of ideas-2026-10.md (the ideas page of 2026-10, removed; in git history)
   (S 1–2 days, M 3–5 days, L more); they are estimates, not measured.
-- The combined app is GPL-3.0-or-later ([FORK.md](../../../FORK.md)), so MIT, BSD, MPL-2.0 and Apache-2.0
+- The combined app is GPL-3.0-or-later ([FORK.md](../../FORK.md)), so MIT, BSD, MPL-2.0 and Apache-2.0
   libraries can be linked ([FSF](https://www.gnu.org/licenses/license-list.html),
   [Apache](https://www.apache.org/licenses/GPL-compatibility.html)).
 
@@ -79,7 +79,7 @@ on `Document`, and upstream merges must stay cheap. Put a **sync layer beside th
 ### Stable IDs, compatibly with `.xopp`
 
 - `xqt-id="…"` (random 128 bits, about 22 characters) on `stroke`, `text`, `image`, `teximage`, `link`, `layer`
-  and `page`, through the seam `xqt-group` uses ([groups.md](../groups.md)). Xournal++ ignores it and drops it on
+  and `page`, through the seam `xqt-group` uses ([groups.md](../docs/features/groups.md)). Xournal++ ignores it and drops it on
   save.
 - A file back from Xournal++ without IDs gets **content-derived IDs** (a hash of type, points, style), so unchanged
   elements map onto the same CRDT entries. Paste and duplicate give new IDs, like `groups::renumber`.
@@ -91,7 +91,7 @@ on `Document`, and upstream merges must stay cheap. Put a **sync layer beside th
   [Stewen & Kleppmann 2024](https://arxiv.org/abs/2404.11308)). Upstream's pointer-based stack cannot survive a
   remote delete, so in a shared document undo works by ID (inverse ops of the sync layer).
 - **Offline edits** are normal: ops carry a version vector; on reconnect peers send each other what is missing.
-- **The saved form stays the file** (`.xopp` or the [hybrid PDF](../hybrid-pdf.md)). The op history lives in the
+- **The saved form stays the file** (`.xopp` or the [hybrid PDF](../docs/features/hybrid-pdf.md)). The op history lives in the
   **app cache**, keyed by a document ID in the file: folders stay clean and shared files carry no erased ink (as a
   PDF attachment it would have B9 Level 3's privacy cost).
 - **PDF backgrounds** are blobs named by hash (the hybrid PDF's clean copy), sent once in chunks; pages refer to
@@ -236,7 +236,7 @@ page 3").
 - **Output:** generated speech. Locally this needs a vendored TTS model (Qt TextToSpeech needs speech-dispatcher on
   Linux, against "self-contained", as idea A15 notes).
 - **Synchronised with ink:** the conversation is recorded as `qt/audio` recordings (mono Ogg Vorbis, attachments in
-  the PDF with notes; [audio.md](../audio.md)), strokes and agent notes carry upstream's `ts`/`fn`, and the
+  the PDF with notes; [audio.md](../docs/features/audio.md)), strokes and agent notes carry upstream's `ts`/`fn`, and the
   transcript is kept as Markdown. The **B9 timeline** then replays the session: who wrote what, what the agent said.
 
 ## 6. What fits VISION, sizes, and a roadmap
