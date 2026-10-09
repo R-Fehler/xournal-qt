@@ -4,6 +4,7 @@
 import { xournal, ui, elements, selection } from "xournal"
 import { defaultSpec, valuesOf, specOf, fieldsOf, syncParams, pickColor } from "./lib/spec.mjs"
 import { draw, analyse, ranges, exactSize, POINTS_PER_MM } from "./lib/plot.mjs"
+import { membersOf, changedByHand } from "./lib/members.mjs"
 
 const TR = {
     functions: "Functions", addFunction: "+ Function", addCurve: "+ Curve x(t), y(t)", dashed: "dashed", width: "Line",
@@ -113,13 +114,18 @@ export function insert(values, ctx) {
         if (old.length > 0) elements.remove(old.map(function (e) { return e.ref }), { withGroups: true })
     }
     const refs = elements.insert(frame.page, drawn.shapes, { group: true })
-    // The description on both groups, with where the frame lies from the ink's box (for "Edit plot")
+    // The description on the ink and on the boxes, with where the frame lies from the ink's box and the members as
+    // drawn (for "Edit plot": was it changed by hand since?)
     const inkRefs = refs.filter(function (r, i) { return drawn.shapes[i].type === "stroke" })
     const boxRefs = refs.filter(function (r, i) { return drawn.shapes[i].type !== "stroke" })
     const listed = elements.list(frame.page, { withData: false })
     const ink = listed.filter(function (e) { return inkRefs.indexOf(e.ref) >= 0 })
     const box = boxOf(ink)
-    const data = { plot: spec, frame: { dx: frame.x - box.x, dy: frame.y - box.y, width: frame.width, height: frame.height } }
+    const data = {
+        plot: spec,
+        frame: { dx: frame.x - box.x, dy: frame.y - box.y, width: frame.width, height: frame.height },
+        members: membersOf(listed.filter(function (e) { return refs.indexOf(e.ref) >= 0 }))
+    }
     if (inkRefs.length > 0) elements.setData(inkRefs[0], data)
     if (boxRefs.length > 0) elements.setData(boxRefs[0], data)
     current = null
@@ -149,6 +155,17 @@ export function editPlot() {
     const members = sel.elements.filter(function (e) {
         return picked.group !== 0 ? e.group === picked.group : e === picked
     })
+    // Update draws it anew from its description: parts erased, moved or added by hand would come back or go
+    if (changedByHand(data.members, members)) {
+        const go = ui.dialog({
+            title: "Edit plot", ok: "Edit anyway", cancel: "Cancel",
+            fields: [{
+                type: "label",
+                text: "This plot was changed by hand. Editing redraws it: erased or moved parts come back."
+            }]
+        })
+        if (go === null) return
+    }
     selection.clear()
     // (its layer: the selected elements are back in it now)
     const listed = elements.list(sel.page)

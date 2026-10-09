@@ -16,6 +16,7 @@
 
 #include "model/Document.h"
 #include "model/Layer.h"
+#include "model/Stroke.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
@@ -370,6 +371,62 @@ TEST_F(PluginsUiTest, aCopiedPlotIsEditedOnItsOwnWherePasted) {
     EXPECT_EQ(second->getUndoRedoHandler()->undoDescription(), "Undo: Edit plot…");
     EXPECT_EQ(withText(groupsOf(first), "x^{3}"), 0u);
     EXPECT_EQ(groupsOf(first).size(), 2u);
+}
+
+// A plot changed by hand (a member erased): "Edit plot…" asks first, in the app's dialog; Cancel changes nothing,
+// "Edit anyway" opens the plot's dialog
+TEST_F(PluginsUiTest, editingAPlotChangedByHandAsksFirst) {
+    host().setGrant("org.xournalqt.function-plotter", "edit", "allow");
+    auto* plugins = controller->pluginControl();
+    ASSERT_TRUE(plugins->run("plugin:org.xournalqt.function-plotter/plot"));
+    ASSERT_TRUE(until([&] { return plugins->liveOpen(); }));
+    ASSERT_TRUE(plugins->liveInsert(plugins->liveSpec().value("values").toMap()));
+    xqt::DocumentSession* session = controller->tabManager().currentSession();
+    {
+        std::unique_lock lock(*session->getDocument());
+        Layer* layer = session->getDocument()->getPage(0)->getSelectedLayer();
+        for (const Element* e: layer->getElementsView()) {
+            if (e->getType() == ELEMENT_STROKE) {
+                layer->removeElement(e);  // (erased)
+                break;
+            }
+        }
+    }
+    const size_t before = elements();
+    for (const char* button: {"pluginDialogCancel", "pluginDialogOk"}) {
+        SCOPED_TRACE(button);
+        controller->selectAllOnPage();
+        QString ok;
+        QString text;
+        auto* timer = new QTimer(window);
+        timer->setInterval(30);
+        QObject::connect(timer, &QTimer::timeout, window, [&, timer, button] {
+            QObject* dialog = find<QObject>("pluginDialog");
+            QQuickItem* b = findInScene(button, true);
+            if (dialog && dialog->property("opened").toBool() && b) {
+                timer->stop();
+                timer->deleteLater();
+                ok = findInScene("pluginDialogOk", true)->property("text").toString();
+                const QVariantList fields = plugins->dialogSpec().value("fields").toList();
+                text = fields.isEmpty() ? QString() : fields[0].toMap().value("text").toString();
+                QMetaObject::invokeMethod(b, "clicked");
+            }
+        });
+        timer->start();
+        ASSERT_TRUE(plugins->run("plugin:org.xournalqt.function-plotter/editPlot"));
+        EXPECT_EQ(ok, "Edit anyway");
+        EXPECT_EQ(text, "This plot was changed by hand. Editing redraws it: erased or moved parts come back.");
+        if (QString(button) == "pluginDialogCancel") {
+            EXPECT_FALSE(plugins->liveOpen());
+            controller->clearSelection();
+            EXPECT_EQ(elements(), before) << "Cancel changes nothing";
+            EXPECT_EQ(session->getUndoRedoHandler()->undoDescription(), "Undo: Plot a function…");
+        } else {
+            ASSERT_TRUE(until([&] { return plugins->liveOpen(); }));
+            EXPECT_EQ(plugins->liveSpec().value("title").toString(), "Edit plot");
+            plugins->liveCancel();
+        }
+    }
 }
 
 // Pictures of plots for looking at them (XQT_PLOT_GALLERY=<folder>; skipped otherwise): poles, π steps, a curve,

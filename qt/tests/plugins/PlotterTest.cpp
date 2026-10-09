@@ -8,7 +8,10 @@
  * @license GNU GPLv2 or later
  */
 #include <cmath>
+#include <functional>
 #include <set>
+#include <utility>
+#include <vector>
 
 #include <QElapsedTimer>
 #include <QJSEngine>
@@ -535,6 +538,87 @@ TEST_F(PlotterFixture, aPlotPastedIntoAnotherDocumentIsEditedThere) {
     EXPECT_EQ(session->getUndoRedoHandler()->undoDescription(), "Undo: Plot a function…");
     other.getUndoRedoHandler()->undo();
     EXPECT_EQ(members(other, copy).size(), n);
+}
+
+// "Edit plot" redraws the plot from its description: when its members are no longer what the plotter drew (erased, cut,
+// one moved, one added), it asks first; Cancel changes nothing, "Edit anyway" opens the dialog
+TEST_F(PlotterFixture, aPlotChangedByHandAsksBeforeEditing) {
+    const uint32_t g = insertPlot();
+    const size_t n = members(*session, g).size();
+    const auto strokeOf = [&] {
+        for (Element* e: members(*session, g)) {
+            if (e->getType() == ELEMENT_STROKE) {
+                return e;
+            }
+        }
+        return static_cast<Element*>(nullptr);
+    };
+    const std::vector<std::pair<const char*, std::function<std::function<void()>()>>> changes = {
+            {"a member erased",
+             [&]() -> std::function<void()> {
+                 Element* e = strokeOf();
+                 InsertionPosition removed = layerOf(*session)->removeElement(e);
+                 Element* raw = removed.e.release();
+                 const Element::Index index = removed.pos;
+                 return [this, raw, index] { layerOf(*session)->insertElement(ElementPtr(raw), index); };
+             }},
+            {"a member moved",
+             [&]() -> std::function<void()> {
+                 Element* e = strokeOf();
+                 e->move(30, 20);
+                 return [e] { e->move(-30, -20); };
+             }},
+            {"a stroke cut in two (a member more)",
+             [&]() -> std::function<void()> {
+                 ElementPtr piece = strokeOf()->clone();
+                 piece->setGroup(g);
+                 Element* raw = piece.get();
+                 layerOf(*session)->addElement(std::move(piece));
+                 return [this, raw] { layerOf(*session)->removeElement(raw); };
+             }},
+    };
+    for (const auto& [what, change]: changes) {
+        SCOPED_TRACE(what);
+        const auto undoChange = change();
+        selected = {static_cast<int>(g)};
+        ui.live.reset();
+        ui.lastDialog.clear();
+        ui.dialogAnswer.reset();  // (Cancel)
+        auto r = host().run("org.xournalqt.function-plotter", "editPlot", env());
+        ASSERT_TRUE(r.ok) << r.error.toStdString();
+        EXPECT_EQ(ui.lastDialog.value("ok").toString(), "Edit anyway");
+        EXPECT_EQ(ui.lastDialog.value("cancel").toString(), "Cancel");
+        const QVariantList fields = ui.lastDialog.value("fields").toList();
+        ASSERT_EQ(fields.size(), 1);
+        EXPECT_EQ(fields[0].toMap().value("text").toString(),
+                  "This plot was changed by hand. Editing redraws it: erased or moved parts come back.");
+        EXPECT_FALSE(ui.live) << "Cancel: no dialog";
+        EXPECT_EQ(selected, QList<int>{static_cast<int>(g)}) << "Cancel: still selected";
+        EXPECT_EQ(session->getUndoRedoHandler()->undoDescription(), "Undo: Plot a function…");
+        // Edit anyway
+        ui.dialogAnswer = QVariantMap{};
+        r = host().run("org.xournalqt.function-plotter", "editPlot", env());
+        ASSERT_TRUE(r.ok) << r.error.toStdString();
+        EXPECT_TRUE(ui.live) << "Edit anyway: the dialog";
+        undoChange();
+        ASSERT_EQ(members(*session, g).size(), n);
+    }
+}
+
+// Moved and scaled as a whole (also not keeping its proportions), the plot is as the plotter drew it: no question
+TEST_F(PlotterFixture, aPlotMovedOrScaledAsAWholeDoesNotAsk) {
+    const uint32_t g = insertPlot();
+    for (Element* e: members(*session, g)) {
+        e->move(40, 260);
+        e->scale(140, 410, 1.6, 0.7, 0, false);
+    }
+    selected = {static_cast<int>(g)};
+    ui.live.reset();
+    ui.dialogAnswer.reset();
+    auto r = host().run("org.xournalqt.function-plotter", "editPlot", env());
+    ASSERT_TRUE(r.ok) << r.error.toStdString();
+    EXPECT_TRUE(ui.lastDialog.isEmpty()) << "no question";
+    EXPECT_TRUE(ui.live);
 }
 
 TEST_F(PlotterFixture, aPlotWithAMistakeIsNotInsertedAndNothingChanges) {

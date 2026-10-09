@@ -65,7 +65,14 @@ insert commands: **Plot a function…** in ⋮ → Tools and in the toolbox's "+
   the frame where the plot is; **Update** replaces it, one undo step. A **copy** of a plot (copied and pasted, here or
   in another document, as often as wanted) keeps the description and is a plot of its own: "Edit plot…" on it
   changes only it, and editing the original leaves the copies. (The plot is its group: the plotter replaces the
-  group of the plot it was opened on, and a pasted copy is in a new group.) In Xournal++ the plot is plain strokes
+  group of the plot it was opened on, and a pasted copy is in a new group.) **A plot changed by hand** asks first,
+  since Update draws it anew from its description (erased or moved parts would come back, added ones go): "This plot
+  was changed by hand. Editing redraws it: erased or moved parts come back." with **Edit anyway** / **Cancel**
+  (Cancel changes nothing). The plotter keeps its members with the description when it inserts the plot: their count
+  and where each lies within the plot (a stroke by the middle of its box, a box by its corner, as fractions of the
+  plot), compared within 1.5 % of the plot's size and in any order (`lib/members.mjs`). So a member erased, cut by the
+  eraser, moved, added to or taken out of the group asks; the whole plot moved or scaled (also unevenly) does not. A
+  plot inserted before this kept nothing to compare and opens directly. In Xournal++ the plot is plain strokes
   and texts (the boxes show their `$…$` source); saving there drops its description and group.
 - Not yet (TODO.md, "Plotting"): polar curves r(θ), an empty coordinate system, points and value tables, shading,
   tangents and derivatives, number lines, piecewise functions, function families.
@@ -277,12 +284,14 @@ commands, the window's operations, the questions, dialogs and the live dialog), 
 `SettingsPlugins.qml`; `qt/cli/PluginRun.cpp` (the CLI); the commands as shortcuts (`ShortcutsModel::setPluginActions`) and as toolbox items
 (`ToolboxModel::setPluginItems`). The function plotter: `qt/resources/plugins/function-plotter` (`main.mjs`; `lib/parse.mjs` the expression language,
 evaluation and LaTeX; `lib/ticks.mjs`; `lib/sample.mjs` the adaptive sampling, roots and extrema; `lib/plot.mjs` the
-shapes; `lib/spec.mjs` the description and the dialog's fields), copied to `<share>/plugins/` by `XqtPlugins.cmake`.
+shapes; `lib/spec.mjs` the description and the dialog's fields; `lib/members.mjs` whether a plot was changed by
+hand), copied to `<share>/plugins/` by `XqtPlugins.cmake`.
 Tests: `OperationsTest` (label `ops`), `PluginHostTest`, `ExamplesTest` and `PlotterTest` (label `plugins`: the parser, LaTeX, ticks,
 sampling at poles and jumps, the exact scale, insert and edit as one step each, a pasted copy edited on its own, a plot
-with a mistake),
+changed by hand asks and one moved or scaled whole does not, a plot with a mistake),
 `PluginsUiTest` (label `ui`: the menu, the question, the note with Undo, the key, the live dialog with its preview
-and frame, a copied plot edited where it is pasted, Settings → Plugins), `Cli.runsAPluginCommandOnADocument` (label `shell`).
+and frame, a copied plot edited where it is pasted, the question before editing a plot changed by hand, Settings →
+Plugins), `Cli.runsAPluginCommandOnADocument` (label `shell`).
 
 ## On the device
 
