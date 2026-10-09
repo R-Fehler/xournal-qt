@@ -21,6 +21,10 @@
  *   export-xopp PDF [--version N] [-o OUT.xopp]
  *                          the .xopp of a PDF with notes, of its latest or any version (version history,
  *                          qt/src/session/PdfHistory.h; links Qt)
+ *   plugin list | plugin run ID COMMAND [FILE...] [--set k=v]... [--allow CLASS]... (-o OUT | --out-dir DIR |
+ *                          --in-place)
+ *                          a plugin's command on documents, without a window (qt/cli/PluginRun.cpp,
+ *                          qt/docs/features/plugins.md; links QtQml)
  *
  * @license GNU GPLv2 or later
  */
@@ -566,6 +570,10 @@ int exportVersion(int argc, char* argv[]) {
 }  // namespace
 #endif
 
+#ifdef XQT_CLI_PLUGINS
+int pluginCommand(int argc, char* argv[]);  // (PluginRun.cpp)
+#endif
+
 int main(int argc, char* argv[]) {
     // Same as upstream initCAndCoutLocales(): numbers in C locale for cairo/PDF output.
     setlocale(LC_ALL, "");
@@ -589,6 +597,11 @@ int main(int argc, char* argv[]) {
     }
     if (argc >= 2 && std::string(argv[1]) == "hwr-bench") {
         return hwrBench(argc, argv);
+    }
+#endif
+#ifdef XQT_CLI_PLUGINS
+    if (argc >= 2 && std::string(argv[1]) == "plugin") {
+        return pluginCommand(argc, argv);
     }
 #endif
 #ifdef XQT_CLI_SESSION

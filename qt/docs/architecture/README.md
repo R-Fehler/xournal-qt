@@ -616,6 +616,7 @@ Depends on:
 Used by:
 
 - [AppController](#appcontroller) (`links`): xqt-shell links xqt-plugins: PluginControl runs a window's plugin commands, AppServices holds the host
+- [CLI](#cli) (`links`): xournal-qt-cli plugin run: a plugin's command on documents without a window (qt/cli/PluginRun.cpp)
 
 #### ops
 
@@ -1017,6 +1018,7 @@ Headless export with upstream's flags (PNG, SVG, PDF, the PDF with notes); the g
 
 Depends on:
 
+- [plugins](#plugins) (`links`): xournal-qt-cli plugin run: a plugin's command on documents without a window (qt/cli/PluginRun.cpp)
 - [session](#session) (`links`): xournal-qt-cli links xqt-session: the PDF with notes and the archive PDF
 - [hwr](#hwr) (`links`): xournal-qt-cli links xqt-hwr: handwriting as text in exports; hwr-lines, hwr-form, hwr-bench
 - [control/xojfile](#controlxojfile) (`calls`): loads documents as upstream's CLI does

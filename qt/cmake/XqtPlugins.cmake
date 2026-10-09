@@ -18,6 +18,13 @@ set_target_properties(xqt-plugins PROPERTIES AUTOMOC ON)
 qt_add_resources(xqt-plugins xqt_plugins_api PREFIX /xqt-plugins BASE "${CMAKE_CURRENT_LIST_DIR}/../src/plugins"
     FILES "${CMAKE_CURRENT_LIST_DIR}/../src/plugins/api.js")
 
+# The CLI's "plugin" commands (qt/cli/PluginRun.cpp: plugin commands on documents, without a window)
+if(TARGET xournal-qt-cli)
+    target_sources(xournal-qt-cli PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../cli/PluginRun.cpp")
+    target_link_libraries(xournal-qt-cli PRIVATE xqt-plugins)
+    target_compile_definitions(xournal-qt-cli PRIVATE XQT_CLI_PLUGINS)
+endif()
+
 # The bundled plugins (qt/resources/plugins/<folder>/): copied into the resource dir as plugins/<folder>/, where the
 # host finds them (the build tree's share/xournal-qt for development; installed with it by XqtPackage.cmake; on
 # Android in the APK's /xqt-share, copied to the app's data folder at start like the handwriting models)

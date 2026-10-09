@@ -1463,6 +1463,10 @@ edges:
     to: plugins
     kind: links
     what: "xqt-shell links xqt-plugins: PluginControl runs a window's plugin commands, AppServices holds the host"
+  - from: cli
+    to: plugins
+    kind: links
+    what: "xournal-qt-cli plugin run: a plugin's command on documents without a window (qt/cli/PluginRun.cpp)"
   - from: plugins
     to: ops
     kind: links

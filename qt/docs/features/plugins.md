@@ -81,6 +81,22 @@ Off until switched on in Settings → Plugins; small ports of Xournal++'s plugin
 Upstream's others: SpaceForNotes and QuickScreenshot are app features here (note space, snip), HighlightPosition has
 nothing to toggle, ImageActions needs an image API, BeamerPresentation PDF page labels (neither is in API 1.0).
 
+## From the command line
+
+`xournal-qt-cli plugin list` lists the plugins (bundled and the user's) with their commands and permissions.
+`xournal-qt-cli plugin run <id> <command> [FILE…] [--set key=value]… [--allow edit|pages|tools|files]… [--page N]
+[--frame x,y,width,height] (-o OUT.xopp | --out-dir DIR | --in-place)` runs a command on each `.xopp`/`.xoj` (none: a
+new document) and writes the result; a command that fails writes nothing for that file (exit code -3 when any failed).
+Without a window: permissions only by `--allow` (never asked), a dialog's fields from `--set` (numbers, `true`/`false`,
+else text; the rest keep the plugin's values), and a live dialog is answered at once (its preview with those values in
+its frame, then Insert). The window's operations (the selection, the tool, files) are not there. Settings are the
+defaults (the user's are never read). Example, a worksheet with a plot at 1 unit = 1 cm:
+
+```sh
+xournal-qt-cli plugin run org.xournalqt.function-plotter plot sheet.xopp --allow edit \
+    --set f0_expr="0,5x^2 - 2" --set exact=true --set yAuto=false --set yMin=-3 --set yMax=5 --out-dir plotted
+```
+
 ## How a command runs
 
 - The plugins are found in two folders: the bundled ones (`<share>/xournal-qt/plugins/<id>/`, beside the handwriting
@@ -251,14 +267,14 @@ Xournal++'s Lua plugins do not run here; porting one is mostly mechanical:
 commands, the window's operations, the questions, dialogs and the live dialog), the preview in
 `CanvasView::setPluginPreview` and `DocumentCanvasItem` (a node above the pages), and the QML parts
 `PluginDialogs.qml`, `PluginLiveDialog.qml`, `PluginFrame.qml`, `PluginFields.qml`, `PluginCommandItem.qml`,
-`SettingsPlugins.qml`; the commands as shortcuts (`ShortcutsModel::setPluginActions`) and as toolbox items
+`SettingsPlugins.qml`; `qt/cli/PluginRun.cpp` (the CLI); the commands as shortcuts (`ShortcutsModel::setPluginActions`) and as toolbox items
 (`ToolboxModel::setPluginItems`). The function plotter: `qt/resources/plugins/function-plotter` (`main.mjs`; `lib/parse.mjs` the expression language,
 evaluation and LaTeX; `lib/ticks.mjs`; `lib/sample.mjs` the adaptive sampling, roots and extrema; `lib/plot.mjs` the
 shapes; `lib/spec.mjs` the description and the dialog's fields), copied to `<share>/plugins/` by `XqtPlugins.cmake`.
 Tests: `OperationsTest` (label `ops`), `PluginHostTest`, `ExamplesTest` and `PlotterTest` (label `plugins`: the parser, LaTeX, ticks,
 sampling at poles and jumps, the exact scale, insert and edit as one step each, a plot with a mistake),
 `PluginsUiTest` (label `ui`: the menu, the question, the note with Undo, the key, the live dialog with its preview
-and frame, Settings → Plugins).
+and frame, Settings → Plugins), `Cli.runsAPluginCommandOnADocument` (label `shell`).
 
 ## On the device
 
