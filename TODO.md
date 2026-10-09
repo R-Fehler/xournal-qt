@@ -76,10 +76,9 @@ All four waves are merged (2026-10-07). The architecture overview:
 
 The author's decisions of 2026-10-09: [ADR 0008](qt/docs/decisions/0008-js-plugins.md); the research:
 [js-plugins-research.md](qt/docs/review/2026-10/js-plugins-research.md); how it works: [plugins.md](qt/docs/features/plugins.md).
-- [x] Plugin data on elements (`qt/plot-copies`: copied with the elements, a pasted plot is a plot of its own; "Edit
-  plot…" asks before redrawing a plot changed by hand), what is left: the selection of notes' clipboard format
-  (`MixedSelection`) carries neither the data nor the Markdown mark; a plot that was ungrouped by hand is found by the
-  id in its description (copies of it that were ungrouped too would be replaced together).
+- [ ] Plugin data on elements, what is left: the clipboard format of a selection of notes with elements
+  (`MixedSelection`) carries neither the data nor the Markdown mark; a plot ungrouped by hand is found by the id in
+  its description (copies of it that were ungrouped too would be replaced together).
 - [ ] The operations layer `qt/src/ops`, what is left: stable element ids (`xqt-id`) instead of per-call references;
   peers' and agents' principals (only the plugin principal is built).
 - [ ] The host `qt/src/plugins`, what is left: a file watcher for authors (Reload is by hand); `async`/`await` is not
