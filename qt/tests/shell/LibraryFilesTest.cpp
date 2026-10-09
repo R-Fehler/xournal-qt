@@ -22,10 +22,15 @@
 #include <QUrl>
 #include <gtest/gtest.h>
 
+#include "audio/AudioFiles.h"
+#include "audio/DocumentAudio.h"
 #include "model/BackgroundImage.h"
 #include "model/Document.h"
 #include "model/DocumentHandler.h"
+#include "model/Layer.h"
 #include "model/PageType.h"
+#include "model/Point.h"
+#include "model/Stroke.h"
 #include "model/XojPage.h"
 #include "session/DocumentImages.h"
 #include "session/DocumentSearch.h"
@@ -235,6 +240,67 @@ TEST_F(LibraryFilesTest, attachedBackgroundImagesTravelWithTheirXopp) {
     // Its files: trashed together
     const auto files = DocumentFiles::filesOf(DocumentFiles::itemOf(root / "Whiteboard.xopp"));
     EXPECT_NE(std::find(files.begin(), files.end(), root / "Whiteboard.xopp.bg_1.png"), files.end());
+}
+
+// qt/docs/features/audio.md, "Storage": a .xopp and its recordings in "name.audio/" are one document (the author: "I
+// want the data locations to be connected, the audio is otherwise lost when moving dirs or data"). The library shows
+// one card and no folder, its search does not go in; rename, move, copy and trash take both; opened again after a
+// move, the stroke's recording is found by its bare name
+TEST_F(LibraryFilesTest, aXoppAndItsRecordingsAreOneDocument) {
+    const std::string name = "2026-10-04_10-00-00.ogg";
+    {
+        DocumentHandler handler;
+        Document doc(&handler);
+        auto page = std::make_shared<XojPage>(400, 300);
+        auto st = std::make_unique<Stroke>();
+        st->setWidth(1.5);
+        st->addPoint(Point(10, 10));
+        st->addPoint(Point(90, 40));
+        audio::stamp(*st, name, 500);
+        page->getSelectedLayer()->addElement(std::move(st));
+        doc.addPage(page);
+        ASSERT_TRUE(DocumentSession::writeDocument(doc, root / "lecture.xopp").ok);
+    }
+    writeFile(root / "lecture.audio" / name, "OggS recording");
+    fs::create_directories(root / "lonely.audio");  // (no .xopp of its name: a folder)
+
+    auto listing = DocumentFiles::scan(root, DocumentFiles::AllFiles);
+    EXPECT_EQ(listing.folders, (std::vector<fs::path>{root / "lonely.audio"}));
+    ASSERT_EQ(listing.items.size(), 1u);
+    EXPECT_EQ(DocumentFiles::scanRecursive(root, DocumentFiles::AllFiles).size(), 1u)
+            << "all files: the recordings are no documents, the search does not see them";
+    EXPECT_EQ(DocumentFiles::recordingsOf(listing.items[0]), root / "lecture.audio");
+    const auto files = DocumentFiles::filesOf(listing.items[0]);
+    EXPECT_NE(std::find(files.begin(), files.end(), root / "lecture.audio"), files.end()) << "trashed together";
+
+    // Renamed: the folder goes along (an open tab follows: moved)
+    auto r = DocumentFiles::rename(listing.items[0], "Physics 1");
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(fs::exists(root / "Physics 1.audio" / name));
+    EXPECT_FALSE(fs::exists(root / "lecture.audio"));
+    EXPECT_NE(std::find(r.moved.begin(), r.moved.end(),
+                        std::pair<fs::path, fs::path>(root / "lecture.audio", root / "Physics 1.audio")),
+              r.moved.end());
+    // Moved: the folder too; opened there, the recording is found
+    fs::create_directories(root / "Term");
+    r = DocumentFiles::move(r.item, root / "Term");
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_FALSE(fs::exists(root / "Physics 1.audio"));
+    auto loaded = DocumentSession::loadFile(root / "Term" / "Physics 1.xopp");
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    const auto recordings = audio::recordingsOf(*loaded.document);
+    ASSERT_EQ(recordings.size(), 1u);
+    EXPECT_EQ(recordings[0].name, name) << "named bare, as Xournal++ names them";
+    EXPECT_EQ(audio::find(recordings[0].name, root / "Term" / "Physics 1.xopp"),
+              root / "Term" / "Physics 1.audio" / name);
+    // Copied (a free name): with a copy of its recordings
+    r = DocumentFiles::import(root / "Term" / "Physics 1.xopp", root / "Term");
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(fs::exists(root / "Term" / "Physics 1 (2).audio" / name));
+    EXPECT_TRUE(fs::exists(root / "Term" / "Physics 1.audio" / name));
+    // A name whose recordings' folder is there (left behind) is taken
+    fs::create_directories(root / "Term" / "taken.audio");
+    EXPECT_FALSE(DocumentFiles::rename(DocumentFiles::itemOf(root / "Term" / "Physics 1 (2).xopp"), "taken").ok);
 }
 
 // A .xopp kept next to the hybrid PDF of its name ("Keep it as it is" when it was saved as a PDF with notes): the

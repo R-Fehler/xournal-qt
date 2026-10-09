@@ -337,6 +337,9 @@ LibraryShare::Survey LibraryShare::survey(const fs::path& source) {
         ++s.documents;
         for (const fs::path& f: DocumentFiles::filesOf(item)) {
             std::error_code ec;
+            if (f == DocumentFiles::recordingsOf(item)) {
+                continue;  // (its recordings: counted with the .xopp's, below)
+            }
             if (fs::is_directory(f, ec)) {
                 for (auto it = fs::recursive_directory_iterator(f, ec); !ec && it != fs::recursive_directory_iterator();
                      it.increment(ec)) {
@@ -743,6 +746,9 @@ public:
     void appFormat(const DocumentItem& item) {
         for (const fs::path& f: DocumentFiles::filesOf(item)) {
             std::error_code ec;
+            if (f == DocumentFiles::recordingsOf(item)) {
+                continue;  // (its recordings: with the .xopp, when they are shared)
+            }
             if (fs::is_directory(f, ec)) {
                 addFolderAsIs(f);
             } else if (const std::string ext = lower(f.extension().string()); ext == ".xopp" || ext == ".xoj") {

@@ -110,6 +110,8 @@ QVariantMap AppController::tabRenameInfo(int index) const {
         } else if (!i.md.empty() && fs::is_directory(DocumentImages::assetsFolder(i.md))) {
             note = tr("Its pictures (%1) are renamed with it; its links to them follow.")
                            .arg(qstr(DocumentImages::assetsFolder(i.md).filename()));
+        } else if (const fs::path rec = DocumentFiles::recordingsOf(i); !rec.empty()) {
+            note = tr("Its recordings (%1) are renamed with it.").arg(qstr(rec.filename()));
         }
         if (!DocumentFiles::renamable(i)) {
             problem = renameProblemText(static_cast<int>(DocumentFiles::RenameProblem::ReadOnly), t.name);

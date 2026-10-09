@@ -2,6 +2,7 @@
 #include "AppServices.h"
 #include "CurrentDocument.h"
 #include "AudioControl.h"
+#include "audio/AudioFiles.h"
 #include "TimelineControl.h"
 
 #include "hwr/HandwritingSearch.h"
@@ -3477,6 +3478,18 @@ void AppController::trashOldXopp(DocumentSession& s, const fs::path& xopp, const
         Q_EMIT message(tr("Could not move %1 to the trash").arg(name), QString::fromStdString(error), true);
         return;
     }
+    // Its recordings ("name.audio"): the PDF carries them, and a PDF with notes finds and records them in the app's
+    // audio folder, so a copy goes there before the folder goes (qt/docs/features/audio.md, "Storage")
+    if (const fs::path rec = DocumentFiles::recordingsOf(item); !rec.empty()) {
+        const fs::path app = audio::appFolder();
+        for (auto it = fs::directory_iterator(rec, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+            std::error_code cec;
+            if (it->is_regular_file(cec)) {
+                fs::copy_file(it->path(), app / it->path().filename(), fs::copy_options::skip_existing, cec);
+            }
+        }
+        ec.clear();
+    }
     DocumentFiles::Result r = DocumentFiles::trash(item);
     if (r.ok && !ownPdf.empty() && !SystemApps::instance().moveToTrash(QString::fromStdString(ownPdf.string()))) {
         r = {};
@@ -3767,6 +3780,13 @@ bool AppController::handOver(const QStringList& given, bool toClipboard) {
             const fs::path assets = DocumentImages::assetsFolder(p);
             if (QFileInfo(QString::fromStdString(assets.string())).isDir()) {
                 files.push_back(QString::fromStdString(assets.string()));
+            }
+        }
+        // A .xopp with its recordings: the "name.audio" folder next to it goes along (qt/docs/features/audio.md)
+        if (audio::keepsSidecar(p)) {
+            const fs::path rec = audio::sidecarOf(p);
+            if (QFileInfo(QString::fromStdString(rec.string())).isDir()) {
+                files.push_back(QString::fromStdString(rec.string()));
             }
         }
     }

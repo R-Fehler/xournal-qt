@@ -6,7 +6,9 @@ page number in the filetitle so it's easy to recover/use even with archived PDFs
 years."
 
 Decided with the author: Qt audio (`QAudioSource`/`QAudioSink`) with a bundled Ogg Vorbis
-codec, mono at about 64 kbit/s; `.xopp` recordings in the app's audio folder with bare names, as upstream; voice
+codec, mono at about 64 kbit/s; `.xopp` recordings in `name.audio/` next to the `.xopp` with bare names (2026-10-09,
+the author: "keep audio files in the sidecar dir for xopp files ... I want the data locations to be connected, the
+audio is otherwise lost when moving dirs or data"); voice
 memos per page with the `xqt-audio` page attribute; flat attachment names with page numbers in PDFs with notes,
 renamed when pages move; no visible speaker annotation for other PDF apps; "Export for Xournal++" copies the
 recordings to `name.audio/` with absolute names; an Android foreground service while recording; a 2 s lead-in when
@@ -82,7 +84,7 @@ real microphone with `XQT_AUDIO_DEVICE=1` in a build with Qt Multimedia (skipped
   and it follows its page when pages move; a duplicated page keeps it, as its strokes keep theirs. Xournal++ ignores
   the attribute and drops it when it saves; the strokes' recordings keep working there.
 - **Names**: as upstream, the time the recording started, `2026-10-04_14-03-22.ogg` (`-2`, `-3` … when taken), written
-  bare into the file and found in the audio folder (see "Storage").
+  bare into the file and found in the document's `name.audio/` folder (see "Storage").
 - `recordingsOf(doc)`: every recording a document refers to, with its pages (memos and elements), its count of
   elements and their first and last moments; `momentsOf(doc, name)`: its elements in time order (the ticks on the
   playback slider); `hitAt(page, x, y)`: what the play tool plays (the nearest visible element with a recording within
@@ -99,13 +101,40 @@ them and `xqt-audio` on the page and its duplicate); upstream's `old.xopp` with 
 
 ## Storage
 
-`qt/src/audio/AudioFiles.*`; `HybridPdf` (PDFs with notes and archives), `DocumentSave` (Save as).
+`qt/src/audio/AudioFiles.*`; `HybridPdf` (PDFs with notes and archives), `DocumentSave` (Save as),
+`DocumentFiles` (the library's file operations), `AudioControl` (where a recording is written).
 
-- **`.xopp`, as upstream**: the strokes name their recordings bare (`fn="2026-10-04_14-03-22.ogg"`), the files are
-  in the app's audio folder (`<app data>/audio`, e.g. `~/.local/share/xournal-qt/audio`; user data, never the cache).
-  A recording is found, in this order: the name itself when it is an absolute path that exists; next to the
-  document and in its `name.audio` folder; the app's audio folder; the recordings a PDF with notes brought (below);
-  Xournal++'s audio folder when set in the settings (read only, `setExtraFolders`); folders added by the app.
+- **`.xopp` (and `.xoj`): next to it, in `name.audio/`** (its sidecar, as a `.md` has `name.assets/`): `lecture.xopp`
+  keeps `lecture.audio/2026-10-04_14-03-22.ogg`, and its strokes name the recording bare
+  (`fn="2026-10-04_14-03-22.ogg"`). So the document and its recordings are one: moved or copied together in a file
+  manager or a sync folder, they still play. The folder is made when the document first records or is saved with
+  recordings; a `.xopp` without recordings has none.
+- **Not saved yet**: a new document (or a PDF opened to write on) records into the app's audio folder
+  (`<app data>/audio`, e.g. `~/.local/share/xournal-qt/audio`; user data, never the cache). Its **first save** as a
+  `.xopp` **moves** them into the new sidecar (renamed; on another disk copied, checked by size, then deleted).
+  **Save as** another `.xopp` **copies** them into the new file's sidecar: the file saved before keeps its own. A
+  recording still running when the document is saved stays where it is until it ends, then goes into the sidecar
+  (`AudioControl::endRecording`; `audio::setBusy` keeps the save off it). Ctrl+S moves nothing.
+- **A recording is found**, in this order (`audio::find`): the name itself when it is an absolute path that exists;
+  the document's `name.audio/`; next to the document; the app's audio folder, **only for a document that keeps no
+  sidecar** (not saved yet, a PDF with notes); the recordings a PDF with notes brought (below); Xournal++'s audio
+  folder when set in the settings (read only, `setExtraFolders`); folders added by the app. Recordings that an older
+  version (0.10.0 and before) put into the app's folder for a saved `.xopp` are not found by it any more (no
+  compatibility, decided 2026-10-09: "we have 0 users"); they stay in that folder.
+- **The library** takes `name.audio/` as part of its `.xopp` (`DocumentFiles::recordingsOf`, `filesOf`): not listed
+  as a folder, not searched; renaming, moving, copying (import), the trash and sharing (zip, the system's share) take
+  it along, and a name whose `name.audio` folder is there is taken. Moving the libraries to another home
+  (`LibraryMigration`) copies every file, so the folders go too; a received zip is unpacked as it is.
+- **Saved as a PDF with notes**: the PDF carries the recordings (below); the `.xopp` it was, when it goes to the trash,
+  leaves a copy of its recordings in the app's audio folder first, where a PDF with notes finds and records them.
+- **Markdown (`.md`) and other text files** do not record (the record button is not offered there).
+- **Xournal++** resolves a bare name against its own audio folder setting (`PageViewFindObjectHelper`: a name without
+  a folder is joined to `Settings::getAudioFolder()`; a relative path with a folder is taken from the working
+  directory, so `lecture.audio/x.ogg` would not work there; an absolute path is used as it is). The names stay bare,
+  the least intrusive choice: the `.xopp` stays exactly as upstream writes it, and Xournal++ opens it unchanged. The
+  trade-off: Xournal++ plays them only when its audio folder is set to that `name.audio` folder, or from **Export for
+  Xournal++** (below), which writes absolute names. Absolute names in our own files would play in Xournal++ but break
+  as soon as the folder moves, which is what the sidecar is for.
 - **PDFs with notes**: every recording the document refers to is an attachment named with its pages, so it is found
   without the app (the author: "with the page number in the filetitle so it's easy to recover/use even with archived
   PDFs"): `audio-p012-2026-10-04_14-03-22.ogg`, `audio-p012-p015-…` when it is on several pages (the first and last
@@ -119,20 +148,32 @@ them and `xqt-audio` on the page and its duplicate); upstream's `old.xopp` with 
     a new recording is appended. A recording removed from the document, or a new one in an archive PDF, makes the
     save a full write.
   - **Opening** takes the recordings out into the PDF's cache entry (`audio/`, next to the clean copy, once per version
-    of the file); they are found for that PDF from there. "Save as" `.xopp` copies the recordings found only there
-    into the app's audio folder, where the `.xopp`'s bare names find them.
+    of the file); they are found for that PDF from there. "Save as" `.xopp` copies them into the `.xopp`'s
+    `name.audio/`, where its bare names find them. New recordings of a PDF with notes are written into the app's audio
+    folder until the PDF is saved (which carries them).
   - Archive PDFs (PDF/A-3): associated files with `/AFRelationship /Supplement` in the catalog's `/AF`.
   - A recording whose file is nowhere is left out (its strokes keep their names); a log line says so.
 - **Export for Xournal++**: the recordings are copied into `name.audio/` next to the exported `name.xopp`, and its
   strokes name them by their **absolute** paths (Xournal++ plays an absolute `fn` as it is), so Xournal++ plays them
   without setting its audio folder. Our app finds them there too (also after the two were moved together: by name in
-  `name.audio/`). Voice memos stay bare names (Xournal++ does not read them).
+  `name.audio/`, the same folder a `.xopp` of ours keeps them in). Voice memos stay bare names (Xournal++ does not
+  read them).
 
 Tests: `AudioStorageTest` (label `session`): the search order and attachment names; a PDF with notes carries the
 recording (bytes unchanged, `audio/ogg`, the marker), `qpdf --check`, the clean copy without it, found again from the
 PDF with the app's file gone; Ctrl+S after moving pages renames the attachment keeping its stream, and removing the
 recording writes the file in full without it; an archive lists it in `/AF` as `/Supplement`; Export for Xournal++
-copies it and writes absolute names; Save as `.xopp` puts it into the app's audio folder.
+copies it and writes absolute names; a PDF with notes saved as `.xopp` puts it into the `.xopp`'s `name.audio/`
+(`savedAsXoppTheRecordingsGoIntoItsSidecar`); the first save moves the app folder's recordings into the sidecar, a
+recording still being written stays until it ends, the `.xopp` names them bare, Save as copies them, Ctrl+S moves
+nothing, the file opened from the new place finds them, a document without recordings gets no folder
+(`theFirstSaveMovesTheRecordingsIntoTheSidecarAndSaveAsCopiesThem`). `LibraryFilesTest.aXoppAndItsRecordingsAreOneDocument`
+(label `shell`): one card and no folder, not in the listing of all files, trashed together, renamed, moved and copied
+with it, found by its bare name when opened after the move, a left-behind folder takes the name.
+`LibraryShareTest.recordingsGoAlongOrStayBehind`: shared in the zip at `name.audio/`, or left out.
+`AudioUiTest.aSavedDocumentKeepsItsRecordingsNextToIt` (label `ui`): recorded before the first save, saved as a
+`.xopp` while recording, the file goes into `name.audio/` when the recording ends; the next one is recorded there;
+both play.
 
 ## In the app
 
@@ -158,6 +199,9 @@ the user puts it.
   ink starts **2 s earlier** (Settings → Documents → Audio recordings, 0–10 s), so the words before the ink are heard.
   The playback pill: 5 s back and forward, play/pause, a slider with a tick at every moment ink was written, the time,
   ×. Playing stops when another tab comes in front.
+- **In the replay** ([timeline.md](timeline.md), "Replay"): the recordings play with the ink as it is written again,
+  each at the moment the ink was written in it; the play bar's speaker (key A) switches them on and off, and the
+  choice is kept. So a lecture is heard with its notes from ⋮ → View → Replay the writing, without the record button.
 - Not built yet: upstream's fading of ink without a recording while the play tool is chosen (upstream's
   `DocumentView::setMarkAudioStroke`), a speaker chip on pages and thumbnails, "Play from here" in the selection pill,
   a field for Xournal++'s audio folder in the settings (`audio::setExtraFolders` is there).
@@ -257,6 +301,11 @@ release run builds them); the Java checked only against stubs of the Android API
 What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
 
 - [ ] Linux: recording with the built-in microphone and a headset; playing from a stroke at the right speed.
+- [ ] Linux and Android: a `.xopp` with recordings, moved to another folder in the system's file manager (with its
+      `name.audio` folder) and opened from there: its ink still plays its recordings.
+- [ ] Linux and Android: a replay with sound (⋮ → View → Replay the writing of a document with two recordings): the
+      words are heard as their ink is written, the speaker on the play bar (and A) silences them and brings them back,
+      a drag of the slider is silent and heard again where it is let go.
 - [ ] Windows: recording (`bin\xournal-qt.exe --audio-info` lists the microphones); with the microphone blocked in
       Windows' privacy settings the app says so.
 - [ ] macOS: the first recording asks for the microphone with the app's text; refused, the app says where to allow it.

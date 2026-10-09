@@ -205,6 +205,13 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
   by the stickers' text.
 - [ ] Audio: the play tool's fading of ink without a recording, a speaker chip on pages, "Play from here" in the
   selection pill, a setting for Xournal++'s audio folder.
+- [x] Audio in the replay (qt/replay-audio): a speaker on the play bar and the key A switch the recordings on and off
+  (setting `replay/audio`). Left: not run on Qt 6.8 (the play bar's keys and a new button); the device check.
+- [x] Recordings next to the `.xopp` in `name.audio/` (qt/replay-audio): recorded there, moved there by the first
+  save, copied by Save as, carried by the library's rename/move/copy/trash/share. Left: ink pasted from another
+  document keeps a recording that is not gathered into this one's sidecar (it plays only where it is found); the
+  0.10.0 recordings in the app's folder are not found by saved `.xopp`s (decided: no migration); a sidecar restored
+  from the system's trash is restored by the user beside its `.xopp` (they are two trash entries).
 - [ ] Dark pages: "print with white pages"; thumbnails turn their pictures dark too.
 - [ ] The onboarding tutorial: the author's screenshots and ink in place of the `PLACEHOLDER` quotes of
   `qt/resources/help/tutorial.md`.

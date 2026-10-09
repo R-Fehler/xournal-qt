@@ -7,7 +7,8 @@
  * .jpg, .jpeg, .webp, and .heic where Qt can read it) are items, too. Renaming, moving and
  * importing keep the two files together; the .xopp's reference to its PDF follows (it is rewritten with upstream's
  * LoadHandler / SaveHandler). Attached PDFs ("name.xopp.bg.pdf"), attached background images ("name.xopp.bg_1.png")
- * and the hidden merged PDF of pasted PDF pages (".name.pages.pdf", see session/MergedPdf.h) travel with their .xopp.
+ * and the hidden merged PDF of pasted PDF pages (".name.pages.pdf", see session/MergedPdf.h) travel with their .xopp,
+ * as does the folder of its recordings ("name.audio"), which the library does not list as a folder.
  *
  * Every other file can be listed too, when asked for (`Include`): a text or code file (.txt, .tex, .py, ...: shown as
  * plain text, read-only) or any other file (Office files and the rest: opened with the system app). Each is an item of
@@ -153,7 +154,10 @@ fs::path attachmentOf(const fs::path& xopp);
 fs::path pagesOf(const fs::path& xopp);
 /// The images a .xopp keeps next to it as page backgrounds (upstream attaches them as "name.xopp.bg_1.png", ...).
 std::vector<fs::path> imageAttachmentsOf(const fs::path& xopp);
-/// The files of a document that exist: the .xopp, its attached PDF, background images and pages PDF, the PDF.
+/// The folder of a .xopp's recordings ("name.audio" next to it, qt/docs/features/audio.md) if it exists, else empty.
+fs::path recordingsOf(const DocumentItem& item);
+/// The files of a document that exist: the .xopp, its attached PDF, background images, pages PDF and recordings
+/// folder, the PDF; a Markdown file's pictures folder.
 std::vector<fs::path> filesOf(const DocumentItem& item);
 
 /// Outcome of a file operation.

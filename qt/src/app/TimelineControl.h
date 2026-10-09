@@ -8,7 +8,9 @@
  * the sidebar), the replay ends.
  *
  * The clock: a timer moves the bar's time on (at the chosen speed). Where a recording is on the bar, it is heard
- * (through app.audio) at 1×, and the clock follows what is heard; at other speeds it is silent.
+ * (through app.audio) at 1× while the replay's audio is on (`audioOn`, a setting; the play bar's speaker button, the
+ * key A), and the clock follows what is heard; at other speeds, with the audio off and while the slider is held, it is
+ * silent.
  *
  * @license GNU GPLv2 or later
  */
@@ -57,6 +59,10 @@ class TimelineControl: public QObject {
     Q_PROPERTY(QString momentText READ momentText NOTIFY positionChanged)
     /// A recording is heard now
     Q_PROPERTY(bool hearing READ hearing NOTIFY hearingChanged)
+    /// The recordings are heard with the ink (a setting, on by default; the play bar's speaker button)
+    Q_PROPERTY(bool audioOn READ audioOn WRITE setAudioOn NOTIFY audioOnChanged)
+    /// The document has recordings on the bar (the speaker button is shown)
+    Q_PROPERTY(bool hasRecordings READ hasRecordings NOTIFY activeChanged)
     /// How many elements are shown now, of all
     Q_PROPERTY(int shownCount READ shownCount NOTIFY positionChanged)
     Q_PROPERTY(int elementCount READ elementCount NOTIFY activeChanged)
@@ -79,6 +85,9 @@ public:
     QString elapsedText() const;
     QString momentText() const;
     bool hearing() const { return heard; }
+    bool audioOn() const { return withAudio; }
+    void setAudioOn(bool on);
+    bool hasRecordings() const;
     int shownCount() const;
     int elementCount() const;
 
@@ -102,6 +111,8 @@ public:
     Q_INVOKABLE void previousMark();
     /// The next speed (0.5 → 1 → 2 → 4 → 8 → 0.5)
     Q_INVOKABLE void cycleSpeed();
+    /// The recordings on or off (audioOn)
+    Q_INVOKABLE void toggleAudio();
 
     /// The current tab changed: a replay of another document ends
     void currentChanged();
@@ -112,6 +123,7 @@ Q_SIGNALS:
     void positionChanged();
     void speedChanged();
     void hearingChanged();
+    void audioOnChanged();
     void message(const QString& text);
 
 private:
@@ -136,6 +148,7 @@ private:
     bool heard = false;  ///< a recording is heard (we started it)
     QString silent;      ///< a recording that ended or could not be played: not again until a jump
     bool scrubbing = false;
+    bool withAudio = true;  ///< audioOn
 };
 
 }  // namespace xqt

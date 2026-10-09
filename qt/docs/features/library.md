@@ -38,7 +38,9 @@ A **library** is a plain folder of documents that a window works in, like a work
   pictures in `name.assets/` next to them are part of them: that folder is not listed (nor its pictures, in any view
   or the index); renaming, moving, copying, the trash and sharing take it along, and a new name rewrites the
   links to it in the `.md` (and in its open tab) ([md-images.md](md-images.md)). A `name.assets` folder without its
-  `.md` is an ordinary folder, and it keeps its name from being given to another document there.
+  `.md` is an ordinary folder, and it keeps its name from being given to another document there. A `.xopp`'s
+  recordings in `name.audio/` next to it are the same: not listed, not searched, and they go with it
+  ([audio.md](audio.md), "Storage").
 - **Images** (`.png`, `.jpg` / `.jpeg`, `.webp`, and `.heic` / `.heif` where Qt can read them) are documents: a card
   with a thumbnail. `name.xopp` next to `name.jpg` is one document, like a PDF and its `.xopp`: it opens as the `.xopp`
   (the image is the background of its page). A `.xopp` next to a PDF of its name belongs to the PDF; of several
@@ -110,6 +112,7 @@ list and the links to and from it follow (`LibraryModel::followMoves`, `AppContr
   only the `.xopp` (its reference to the PDF is written anew).
 - a PDF with notes, a PDF text document: the PDF (and its copy for Xournal++ next to it, if there is one).
 - a `.md` with its `name.assets/`: both, and its links to the pictures ([md-images.md](md-images.md)).
+- a `.xopp` with its recordings in `name.audio/`: both ([audio.md](audio.md)).
 - a text or other file: the file.
 
 Where:
@@ -129,7 +132,7 @@ Where:
   Escape cancels the name, not the overview.
 
 The checks, the same everywhere (`DocumentFiles::renameProblem`): no empty name, no `/` or `\`, no hidden name (a
-leading dot), not a name another document here has (any kind: `.xopp`, PDF, `.md`, image, a `name.assets` folder), and
+leading dot), not a name another document here has (any kind: `.xopp`, PDF, `.md`, image, a `name.assets` or `name.audio` folder), and
 not a read-only file or folder ("read-only: it cannot be renamed"). From a tab, a document being saved at that moment is
 asked to wait. A **new document that was never saved** has no file: its rename sets its tab's title and the name it is
 saved under ("Ideas" → "Ideas.xopp" in Save as). A new document that shows an image or a read-only file renames that

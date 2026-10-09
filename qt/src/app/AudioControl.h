@@ -4,8 +4,9 @@
  *
  * One recording at a time, for the document of the tab it was started in: that tab's pen strokes and new texts are
  * tied to it (DocumentSession::setRecording), and it is a voice memo of the page that was shown when it started. It
- * ends with stop, when its tab closes, or when the device fails. Recordings go into the app's audio folder
- * (audio/AudioFiles.h) under upstream's names.
+ * ends with stop, when its tab closes, or when the device fails. Recordings go into the document's sidecar
+ * ("name.audio" next to its .xopp), or the app's audio folder while it is not saved (audio/AudioFiles.h), under
+ * upstream's names.
  *
  * Playing: a recording of the current document from a moment (the play tool on ink, a recording in the list), with a
  * lead-in (a setting, 2 s by default) so the words before the ink are heard too.
@@ -32,6 +33,7 @@
 #include <QVariantList>
 
 #include "WindowContext.h"
+#include "filesystem.h"
 
 namespace xqt {
 class DocumentSession;
@@ -189,6 +191,7 @@ private:
     std::unique_ptr<audio::Recorder> recorder;
     std::unique_ptr<audio::Player> player;
     QPointer<DocumentSession> recordingFor;
+    fs::path recordingFile;  ///< the file being recorded
     QPointer<DocumentSession> playingFor;
     QString played;
     QVariantList ticks;

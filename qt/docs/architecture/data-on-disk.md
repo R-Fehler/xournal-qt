@@ -86,7 +86,7 @@ The user's own things that are not in a library:
 
 | Folder | What | Code |
 | --- | --- | --- |
-| `audio/` | the recordings ([audio.md](../features/audio.md), "Storage") | `AudioFiles.cpp` |
+| `audio/` | the recordings of documents not saved yet and of PDFs with notes (a `.xopp`'s are in its `name.audio/`; [audio.md](../features/audio.md), "Storage") | `AudioFiles.cpp` |
 | `stickers/`, `templates/` | the app-wide stickers and page templates (a library has its own `Stickers/` and `Templates/` folders) | `Stickers.cpp` |
 | `Tutorial/Tutorial.pdf` | the copy of the tutorial that Help → Tutorial opens to write on | `AppHelp.cpp` |
 | `Opened/` (translated) | files received from other apps when no library is open (else the library's `Opened/`) | `AppController::receivedFolder` |
@@ -128,7 +128,7 @@ docs):
 | `.name.pages.pdf` (staged as `.name.next.pdf`) | a `.xopp` with PDF pages pasted from other PDFs ([page-files.md](../features/page-files.md)) | `MergedPdf.cpp`, `PdfPageKeeper.cpp` |
 | `name.original.pdf` | Xournal++ files mode: a user's PDF the first time notes are saved into it | `DocumentSave.cpp` |
 | `name.assets/` | the pictures of a Markdown file | `DocumentImages.cpp` |
-| `name.audio/` | the recordings of a `.xopp` exported for Xournal++ | `AudioFiles.cpp` |
+| `name.audio/` | the recordings of a `.xopp` (made when it records, or saved with recordings; also the copies of an export for Xournal++); not listed by the library, moved, renamed and trashed with its `.xopp` | `AudioFiles.cpp`, `DocumentFiles.cpp` |
 | `name.annotations.md` | the Annotations panel exported | `Annotations.cpp` |
 | `.sticker-order.json`, `.template-order.json` | in a library's `Stickers/` and `Templates/` folders: their order | `Stickers.cpp` |
 | `.xqt-moving-<name>/` | Android, while the libraries move to the shared storage | `LibraryMigration.cpp` |
