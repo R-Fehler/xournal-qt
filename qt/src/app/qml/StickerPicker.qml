@@ -5,6 +5,11 @@
 // Save selection" makes a sticker of what is selected. A bottom sheet in the phone classes; elsewhere it opens beside
 // `owner` (none: in the middle of the window).
 //
+// "Built in" (stickers only) shows the collections that come with the app, read-only: their names in the app's
+// language (the search finds English and German), the collections as chips (press and hold or right click: "Hide this
+// collection"; "n collections hidden · Show" brings them back), "In the pen's colour", and in the card's menu only
+// "Copy to my stickers" (to change one).
+//
 // With `mode: "templates"` it is the page template picker (qt/docs/features/templates.md): the library's Templates
 // folder and the app-wide set; a tap adds the template's page at `insertAt` (or, `pickOnly`, only says which:
 // `chosen`), and "+ Save this page" saves the current page as a template. The object names begin with "template" then
@@ -45,7 +50,8 @@ Popup {
     dim: asSheet
     x: asSheet ? win.insets.sheetX : owner ? ownerX : Math.round((parent.width - width) / 2)
     y: asSheet ? win.insets.sheetBottom - height : owner ? ownerY : Math.round((parent.height - height) / 2)
-    width: asSheet ? win.insets.sheetWidth : 400
+    // (wide enough for the three scopes beside "+ Save selection" of the stickers)
+    width: asSheet ? win.insets.sheetWidth : templates ? 400 : 460
     height: asSheet ? Math.min(560, Math.round((win.insets.sheetBottom - win.insets.top) * 0.85)) : 480
     margins: asSheet ? 0 : 8
     padding: 8
@@ -130,7 +136,7 @@ Popup {
             TabBar {
                 id: scopes
                 Layout.fillWidth: true
-                currentIndex: picker.model.scope === "app" ? 1 : 0
+                currentIndex: picker.model.scope === "app" ? 1 : picker.model.scope === "builtin" ? 2 : 0
                 TabButton {
                     objectName: picker.key + "ScopeLibrary"
                     text: qsTr("This library")
@@ -141,6 +147,16 @@ Popup {
                     objectName: picker.key + "ScopeApp"
                     text: qsTr("All libraries")
                     onClicked: picker.model.scope = "app"
+                }
+                // (stickers only: added below)
+                Component.onCompleted: if (!picker.templates) addItem(builtinTab.createObject(scopes))
+                Component {
+                    id: builtinTab
+                    TabButton {
+                        objectName: "stickerScopeBuiltin"
+                        text: qsTr("Built in")
+                        onClicked: picker.model.scope = "builtin"
+                    }
                 }
             }
             Button {
@@ -174,7 +190,34 @@ Popup {
                 implicitWidth: 140
             }
         }
-        // The folders of the set (lectures, topics): "All", then each
+        // Built in: the hidden collections, the pen's colour
+        RowLayout {
+            Layout.fillWidth: true
+            visible: picker.model.scope === "builtin"
+            spacing: 4
+            CheckBox {
+                objectName: "stickerPenColour"
+                text: qsTr("In the pen's colour")
+                checked: picker.model.penColour
+                onToggled: picker.model.penColour = checked
+            }
+            Item { Layout.fillWidth: true }
+            Label {
+                objectName: "stickerHiddenNote"
+                visible: picker.model.hiddenCount > 0
+                color: "#5f6368"
+                text: picker.model.hiddenCount === 1 ? qsTr("1 collection hidden")
+                                                     : qsTr("%1 collections hidden").arg(picker.model.hiddenCount)
+            }
+            Button {
+                objectName: "stickerShowHidden"
+                visible: picker.model.hiddenCount > 0
+                text: qsTr("Show")
+                flat: true
+                onClicked: picker.model.restoreCollections()
+            }
+        }
+        // The folders of the set (lectures, topics; the built-in collections): "All", then each
         Flickable {
             Layout.fillWidth: true
             Layout.preferredHeight: 36
@@ -188,15 +231,25 @@ Popup {
                 Repeater {
                     model: [""].concat(picker.model.folders)
                     delegate: Button {
+                        id: chip
                         required property string modelData
                         objectName: picker.key + "FolderChip_" + modelData
-                        text: modelData === "" ? qsTr("All") : modelData
+                        text: modelData === "" ? qsTr("All") : picker.model.folderTitle(modelData)
                         checkable: true
                         checked: picker.model.folder === modelData
                         flat: !checked
                         height: 34
                         font.pixelSize: 13
                         onClicked: picker.model.folder = modelData
+                        // A built-in collection's menu: hide it
+                        readonly property bool collection: modelData !== "" && picker.model.scope === "builtin"
+                        onPressAndHold: if (collection) chipMenu.openFor(modelData, text)
+                        TapHandler {
+                            acceptedButtons: Qt.RightButton
+                            acceptedDevices: PointerDevice.Mouse
+                            enabled: chip.collection
+                            onTapped: chipMenu.openFor(chip.modelData, chip.text)
+                        }
                     }
                 }
             }
@@ -272,6 +325,7 @@ Popup {
         }
         Label {
             objectName: picker.key + "Empty"
+            // (Built in: every collection hidden)
             visible: picker.model.count === 0
             Layout.fillWidth: true
             wrapMode: Text.Wrap
@@ -282,6 +336,8 @@ Popup {
                        ? qsTr("No templates in all libraries yet. Save a page with “In all libraries”, or copy one here from a library (its menu).")
                        : qsTr("No templates yet. Choose “Save page as template…” in the page's menu (⋮ › Page), or “+ Save this page” here."))
                   : !picker.model.setEmpty ? qsTr("No sticker found")
+                  : picker.model.scope === "builtin"
+                    ? qsTr("Every built-in collection is hidden. “Show” brings them back.")
                   : picker.model.scope === "app"
                     ? qsTr("No stickers in all libraries yet. Save one with “In all libraries”, or copy one here from a library (its menu).")
                     : qsTr("No stickers yet. Select something on a page (ink, text, pictures, notes) and choose “Save as sticker…” in its pill, or “+ Save selection” here.")
@@ -295,6 +351,8 @@ Popup {
         property string path: ""
         property string name: ""
         readonly property string scope: path !== "" ? picker.model.scopeOf(path) : ""
+        /// A built-in sticker: read-only, only copied
+        readonly property bool builtin: scope === "builtin"
         title: name
         titleShown: true
         function openFor(card) {
@@ -303,33 +361,50 @@ Popup {
             Popups.openAt(cardMenu)
         }
         AdaptiveMenuItem {
+            objectName: "stickerCopyToMine"
+            offered: cardMenu.builtin
+            text: qsTr("Copy to my stickers")
+            onTriggered: {
+                if (picker.model.copyToMine(cardMenu.path) !== "")
+                    app.pageActionDone(picker.model.hasLibrary ? qsTr("Copied to this library's stickers")
+                                                               : qsTr("Copied to the stickers of all libraries"), false)
+                else
+                    app.pageActionDone(qsTr("That did not work"), false)
+            }
+        }
+        AdaptiveMenuItem {
             objectName: picker.key + "Rename"
+            offered: !cardMenu.builtin
             text: qsTr("Rename…")
             onTriggered: ask.openFor("rename", cardMenu.path, cardMenu.name)
         }
         AdaptiveMenuItem {
             objectName: picker.key + "MoveUp"
+            offered: !cardMenu.builtin
             text: qsTr("Move up (own order)")
             onTriggered: picker.model.moveBy(cardMenu.path, -1)
         }
         AdaptiveMenuItem {
             objectName: picker.key + "MoveDown"
+            offered: !cardMenu.builtin
             text: qsTr("Move down (own order)")
             onTriggered: picker.model.moveBy(cardMenu.path, 1)
         }
         AdaptiveMenuItem {
             objectName: picker.key + "MoveToFolder"
+            offered: !cardMenu.builtin
             text: qsTr("Move to folder…")
             onTriggered: ask.openFor("folder", cardMenu.path, "")
         }
         AdaptiveMenuItem {
             objectName: picker.key + "Open"
+            offered: !cardMenu.builtin
             text: qsTr("Open (to change it)")
             onTriggered: { picker.close(); app.openPath(cardMenu.path) }
         }
         AdaptiveMenuItem {
             objectName: picker.key + "CopyOther"
-            offered: picker.model.hasLibrary
+            offered: picker.model.hasLibrary && !cardMenu.builtin
             text: cardMenu.scope === "app" ? qsTr("Copy to this library") : qsTr("Copy to all libraries")
             onTriggered: {
                 if (picker.model.copyToOtherSet(cardMenu.path))
@@ -342,14 +417,35 @@ Popup {
         }
         AdaptiveMenuItem {
             objectName: picker.key + "CopyToLibrary"
+            offered: !cardMenu.builtin
             text: qsTr("Copy to library…")
             onTriggered: ask.openFor("library", cardMenu.path, "")
         }
         AdaptiveMenuItem {
             objectName: picker.key + "Delete"
+            offered: !cardMenu.builtin
             text: qsTr("Delete")
             icon.source: app.iconUrl("xqt-delete")
             onTriggered: picker.model.remove(cardMenu.path)
+        }
+    }
+
+    // A built-in collection's chip: hide it (Settings → Documents → Built-in stickers, or "Show" here, bring it back)
+    AdaptiveMenu {
+        id: chipMenu
+        objectName: "stickerChipMenu"
+        property string collection: ""
+        title: ""
+        titleShown: true
+        function openFor(id, shown) {
+            collection = id
+            title = shown
+            Popups.openAt(chipMenu)
+        }
+        AdaptiveMenuItem {
+            objectName: "stickerHideCollection"
+            text: qsTr("Hide this collection")
+            onTriggered: picker.model.setCollectionHidden(chipMenu.collection, true)
         }
     }
 

@@ -1,5 +1,5 @@
 // xournal-qt: Settings → Documents: how documents are saved, PDFs with notes, autosave,
-// the library.
+// the library, the built-in stickers.
 // Part of SettingsPage.qml, instantiated once there: it reads the sheet through `sheet` (SettingsPage.qml's
 // context: `sheet.s` is app.settings, `sheet.narrow`, `sheet.win`); its rows are Settings*Row.qml.
 import QtQuick
@@ -346,6 +346,49 @@ ScrollView {
         }
         SettingsHint { text: qsTr("Copy page as image (Ctrl+Shift+C) puts the page on the clipboard at this resolution; a screenshot has the screen's. Export as pictures starts with it.") }
         // Audio recordings (qt/docs/features/audio.md)
+        // The built-in stickers (qt/docs/features/stickers.md, "Built in"): a collection hidden is not listed in the
+        // picker nor searched; nothing on disk changes
+        SettingsSectionTitle { text: qsTr("Built-in stickers") }
+        Repeater {
+            model: app.stickers.collections
+            delegate: RowLayout {
+                required property var modelData
+                Layout.fillWidth: true
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: qsTr("%1 (%2)").arg(modelData.title).arg(modelData.count)
+                }
+                Switch {
+                    objectName: "stickerCollectionSwitch_" + modelData.id
+                    checked: !modelData.hidden
+                    onToggled: app.stickers.setCollectionHidden(modelData.id, !checked)
+                }
+            }
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Paste built-in stickers in the pen's colour (else black)")
+            }
+            Switch {
+                objectName: "stickerPenColourSwitch"
+                checked: app.stickers.penColour
+                onToggled: app.stickers.penColour = checked
+            }
+        }
+        Button {
+            objectName: "stickerRestoreCollections"
+            visible: app.stickers.hiddenCount > 0
+            text: qsTr("Restore hidden collections")
+            onClicked: app.stickers.restoreCollections()
+        }
+        SettingsHint {
+            text: qsTr("Hidden collections are left out of the sticker picker's “Built in” and its search; they stay "
+                       + "with the app and come back here or with “Show” in the picker.")
+        }
         SettingsSectionTitle { visible: app.audio.available; text: qsTr("Audio recordings") }
         RowLayout {
             visible: app.audio.available

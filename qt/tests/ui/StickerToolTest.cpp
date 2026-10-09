@@ -2,7 +2,9 @@
  * xournal-qt: stickers in the real window (qt/docs/features/stickers.md): what is selected saved as a sticker (the
  * selection's pill and its dialog, into the library's Stickers folder or a folder of it, onto the clipboard too), and a
  * sticker pasted from the picker: at its size in the middle of the visible part of the page, selected, one undo step,
- * smaller only when it is larger than the page; not into a document opened for reading only.
+ * smaller only when it is larger than the page; not into a document opened for reading only. The built-in collections
+ * (BuiltinStickerToolTest): "Built in", found in English and German, pasted as one group, the card's menu only copying,
+ * a collection hidden from its chip or in the settings and shown again, the pen's colour.
  *
  * @license GNU GPLv2 or later
  */
@@ -26,6 +28,9 @@
 #include <cairo.h>
 #include <gtest/gtest.h>
 
+#include "control/Tool.h"
+#include "control/ToolHandler.h"
+#include "control/settings/Settings.h"
 #include "control/tools/EditSelection.h"
 #include "model/Document.h"
 #include "model/Image.h"
@@ -34,6 +39,7 @@
 #include "model/Stroke.h"
 #include "model/XojPage.h"
 #include "canvas/CanvasView.h"
+#include "session/AppContext.h"
 #include "session/DocumentSession.h"
 #include "session/StickerFile.h"
 #include "session/StickyNote.h"
@@ -499,4 +505,229 @@ TEST_F(StickerToolTest, theLibrarysStickersFolderHasItsMark) {
     };
     until([&] { return !marked().empty(); });
     EXPECT_EQ(marked(), std::vector<std::string>{"Stickers"}) << "the Stickers folder's card, and only it";
+}
+
+// --- built in (the collections that come with the app) -------------------------------------------------------------
+
+class BuiltinStickerToolTest: public StickerToolTest {
+protected:
+    /// The picker of the first sticker button, opened on "Built in"
+    QObject* openBuiltin() {
+        auto* button = find<QQuickItem>("stickerButton");
+        picker = button->property("picker").value<QObject*>();
+        EXPECT_NE(picker, nullptr);
+        QMetaObject::invokeMethod(button, "clicked");
+        until([&] { return picker->property("opened").toBool(); });
+        auto* tab = in("stickerScopeBuiltin");
+        EXPECT_NE(tab, nullptr);
+        if (tab) {
+            QMetaObject::invokeMethod(tab, "clicked");
+        }
+        until([&] { return model()->scope() == "builtin"; });
+        return picker;
+    }
+    /// An object of the picker (a menu, a field) or an item in its view (a chip)
+    QObject* in(const QString& name) const {
+        if (auto* o = picker->findChild<QObject*>(name)) {
+            return o;
+        }
+        std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* item) -> QQuickItem* {
+            if (!item) {
+                return nullptr;
+            }
+            if (item->objectName() == name) {
+                return item;
+            }
+            for (QQuickItem* child: item->childItems()) {
+                if (auto* found = walk(child)) {
+                    return found;
+                }
+            }
+            return nullptr;
+        };
+        return walk(picker->property("contentItem").value<QQuickItem*>());
+    }
+    xqt::StickersModel* model() const { return qobject_cast<xqt::StickersModel*>(controller->stickersModel()); }
+    void search(const QString& text) {
+        auto* field = in("stickerSearch");
+        ASSERT_NE(field, nullptr);
+        field->setProperty("text", text);
+        wait(50);
+    }
+    /// An entry of a menu, by its object name ("" when it is not offered)
+    QQuickItem* menuEntry(QObject* menu, const QString& name) const {
+        const int n = menu->property("count").toInt();
+        for (int i = 0; i < n; ++i) {
+            QQuickItem* it = nullptr;
+            QMetaObject::invokeMethod(menu, "itemAt", Q_RETURN_ARG(QQuickItem*, it), Q_ARG(int, i));
+            if (it && it->objectName() == name) {
+                return it;
+            }
+        }
+        return nullptr;
+    }
+    /// The groups of the elements of page 1 (the selection let go first)
+    std::vector<int> groupsOnPage() const {
+        std::vector<int> out;
+        Document* doc = current()->getDocument();
+        std::shared_lock lock(*doc);
+        for (const Layer* l: doc->getPage(0)->getLayers()) {
+            for (const Element* e: l->getElementsView()) {
+                out.push_back(static_cast<int>(e->getGroup()));
+            }
+        }
+        return out;
+    }
+    QObject* picker = nullptr;
+};
+
+// "Built in": the collections as chips, found by an English or a German name, a tap pastes it as one group
+TEST_F(BuiltinStickerToolTest, theBuiltInScopeFindsInBothLanguagesAndPastesOneGroup) {
+    controller->newDocument();
+    wait(200);
+    openBuiltin();
+    EXPECT_NE(in("stickerFolderChip_circuits-iec"), nullptr);
+    auto* solids = in("stickerFolderChip_solids");
+    ASSERT_NE(solids, nullptr);
+    EXPECT_EQ(solids->property("text").toString(), "3D solids");
+    search("Widerstand");
+    QQuickItem* card = nullptr;
+    until([&] { return (card = stickerCard("Resistor")) != nullptr; });
+    ASSERT_NE(card, nullptr) << "the German name finds it, shown by its English one";
+    search("beaker");
+    until([&] { return (card = stickerCard("Beaker")) != nullptr; });
+    ASSERT_NE(card, nullptr);
+
+    QSignalSpy pasted(controller.get(), &AppController::stickerPasted);
+    QMetaObject::invokeMethod(card, "clicked");
+    until([&] { return pasted.count() > 0; });
+    ASSERT_EQ(pasted.count(), 1);
+    EXPECT_EQ(pasted.first().at(1).toString(), "");
+    EXPECT_TRUE(view()->getSelection());
+    view()->clearSelection();
+    const auto groups = groupsOnPage();
+    ASSERT_GE(groups.size(), 2u);
+    for (const int g: groups) {
+        EXPECT_EQ(g, groups.front()) << "one group";
+    }
+    EXPECT_NE(groups.front(), 0);
+    // Black, as drawn
+    {
+        std::shared_lock lock(*current()->getDocument());
+        for (const Element* e: current()->getDocument()->getPage(0)->getLayers()[0]->getElementsView()) {
+            EXPECT_EQ(e->getColor(), Colors::black);
+        }
+    }
+}
+
+// Read-only: the card's menu only copies it to the user's stickers
+TEST_F(BuiltinStickerToolTest, theCardsMenuOnlyCopiesToMyStickers) {
+    controller->newDocument();
+    wait(100);
+    openBuiltin();
+    search("Resistor");
+    QQuickItem* card = nullptr;
+    until([&] { return (card = stickerCard("Resistor")) != nullptr; });
+    ASSERT_NE(card, nullptr);
+    auto* menu = in("stickerCardMenu");
+    ASSERT_NE(menu, nullptr);
+    QMetaObject::invokeMethod(card, "pressAndHold");
+    until([&] { return menu->property("visible").toBool(); });
+    for (const char* entry: {"stickerRename", "stickerMoveUp", "stickerMoveDown", "stickerMoveToFolder", "stickerOpen",
+                             "stickerCopyOther", "stickerCopyToLibrary", "stickerDelete"}) {
+        auto* it = menuEntry(menu, entry);
+        ASSERT_NE(it, nullptr) << entry;
+        EXPECT_FALSE(it->property("offered").toBool()) << entry;
+    }
+    auto* copy = menuEntry(menu, "stickerCopyToMine");
+    ASSERT_NE(copy, nullptr);
+    EXPECT_TRUE(copy->property("offered").toBool());
+    QMetaObject::invokeMethod(copy, "triggered");
+    until([&] { return fs::exists(library / "Stickers" / "Resistor.xopp"); });
+    EXPECT_TRUE(fs::exists(library / "Stickers" / "Resistor.xopp")) << "a copy of the user's to change";
+    until([&] { return !snackbar().isEmpty(); });
+    EXPECT_EQ(snackbar(), "Copied to this library's stickers");
+}
+
+// A collection hidden from its chip's menu: not listed, not searched, kept in the settings; "Show" brings it back
+TEST_F(BuiltinStickerToolTest, aCollectionHiddenFromItsChipAndShownAgain) {
+    controller->newDocument();
+    wait(100);
+    openBuiltin();
+    auto* chip = in("stickerFolderChip_solids");
+    ASSERT_NE(chip, nullptr);
+    auto* menu = in("stickerChipMenu");
+    ASSERT_NE(menu, nullptr);
+    QMetaObject::invokeMethod(chip, "pressAndHold");
+    until([&] { return menu->property("visible").toBool(); });
+    auto* hide = menuEntry(menu, "stickerHideCollection");
+    ASSERT_NE(hide, nullptr);
+    QMetaObject::invokeMethod(hide, "triggered");
+    until([&] { return model()->hiddenCount() == 1; });
+    EXPECT_FALSE(model()->folderList().contains("solids"));
+    EXPECT_EQ(xqt::stickers::hiddenCollections(*controller->context().getSettings()), QStringList{"solids"});
+    search("Cube");
+    wait(100);
+    EXPECT_EQ(model()->rowCount(), 0);
+    search("");
+    auto* note = qobject_cast<QQuickItem*>(in("stickerHiddenNote"));
+    ASSERT_NE(note, nullptr);
+    until([&] { return note->isVisible(); });
+    EXPECT_EQ(note->property("text").toString(), "1 collection hidden");
+    QMetaObject::invokeMethod(in("stickerShowHidden"), "clicked");
+    until([&] { return model()->hiddenCount() == 0; });
+    EXPECT_TRUE(model()->folderList().contains("solids"));
+    EXPECT_TRUE(xqt::stickers::hiddenCollections(*controller->context().getSettings()).isEmpty());
+}
+
+// Settings → Documents → Built-in stickers: a switch per collection, "Restore hidden collections"
+TEST_F(BuiltinStickerToolTest, hiddenAndRestoredInTheSettings) {
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("documentsTab"));
+    auto* lab = findItem("stickerCollectionSwitch_lab");
+    ASSERT_NE(lab, nullptr);
+    until([&] { return lab->isVisible(); });
+    EXPECT_TRUE(lab->property("checked").toBool());
+    scrollIntoView(lab);
+    click(lab);
+    until([&] { return model()->hiddenCount() == 1; });
+    EXPECT_EQ(xqt::stickers::hiddenCollections(*controller->context().getSettings()), QStringList{"lab"});
+    auto* restore = findItem("stickerRestoreCollections");
+    ASSERT_NE(restore, nullptr);
+    until([&] { return restore->isVisible(); });
+    scrollIntoView(restore);
+    click(restore);
+    until([&] { return model()->hiddenCount() == 0; });
+    lab = findItem("stickerCollectionSwitch_lab");  // (the rows are made anew when the list changes)
+    ASSERT_NE(lab, nullptr);
+    EXPECT_TRUE(lab->property("checked").toBool());
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+}
+
+// "In the pen's colour": a built-in sticker takes the pen's colour; the user's own stickers stay as they are
+TEST_F(BuiltinStickerToolTest, inThePensColour) {
+    controller->newDocument();
+    wait(100);
+    openBuiltin();
+    auto* box = in("stickerPenColour");
+    ASSERT_NE(box, nullptr);
+    EXPECT_FALSE(box->property("checked").toBool()) << "black by default";
+    box->setProperty("checked", true);
+    QMetaObject::invokeMethod(box, "toggled");
+    EXPECT_TRUE(model()->penColour());
+    QMetaObject::invokeMethod(picker, "close");
+    controller->context().getToolHandler()->getTool(TOOL_PEN).setColor(Color(0x2060c0U));
+    ASSERT_TRUE(paste(QString::fromStdString(
+            (xqt::stickers::builtinSet() / "circuits-iec" / "Resistor.xopp").string())));
+    view()->clearSelection();
+    std::shared_lock lock(*current()->getDocument());
+    size_t n = 0;
+    for (const Element* e: current()->getDocument()->getPage(0)->getLayers()[0]->getElementsView()) {
+        EXPECT_EQ(e->getColor(), Color(0x2060c0U));
+        ++n;
+    }
+    EXPECT_EQ(n, 3u);
 }

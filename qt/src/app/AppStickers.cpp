@@ -13,6 +13,7 @@
 #include <QImage>
 #include <QMimeData>
 
+#include "control/Tool.h"
 #include "control/ToolHandler.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
@@ -30,6 +31,7 @@ using namespace xqt;
 QObject* AppController::stickersModel() const {
     if (!stickers) {
         stickers = std::make_unique<StickersModel>();
+        stickers->setSettings(context().getSettings());  // (the hidden built-in collections, the pen's colour)
         syncStickers();
         connect(library, &LibraryModel::libraryChanged, stickers.get(), [this] { syncStickers(); });
     }
@@ -128,6 +130,12 @@ bool AppController::pasteSticker(const QString& path) {
     if (!view || !canPasteSticker() || path.isEmpty()) {
         return false;
     }
+    // A built-in sticker in the pen's colour, when that is chosen (else black, as drawn)
+    std::optional<Color> colour;
+    auto* model = static_cast<StickersModel*>(stickersModel());
+    if (model->penColour() && model->isBuiltin(path)) {
+        colour = context().getToolHandler()->getTool(TOOL_PEN).getColor();
+    }
     QPointer<AppController> self(this);
     QPointer<CanvasView> target(view);
     return view->loadSticker(fs::path(path.toStdString()), [self, target, path](const QString& error,
@@ -172,5 +180,5 @@ bool AppController::pasteSticker(const QString& path) {
             self->stickers->markUsed(path);
         }
         Q_EMIT self->stickerPasted(path, QString());
-    });
+    }, colour);
 }

@@ -595,6 +595,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CitationLibraryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ArxivTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/StickersTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/BuiltinStickersTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TemplatesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PageFilesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/VersionsTest.cpp)

@@ -197,12 +197,12 @@ bool CanvasView::saveSticker(std::shared_ptr<StickerSource> source, bool withPic
     return true;
 }
 
-bool CanvasView::loadSticker(fs::path file,
-                             std::function<void(const QString&, const std::string&, bool)> done) {
+bool CanvasView::loadSticker(fs::path file, std::function<void(const QString&, const std::string&, bool)> done,
+                             std::optional<Color> colour) {
     if (stickerJob.valid() && stickerJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
         return false;
     }
-    stickerJob = std::async(std::launch::async, [this, file = std::move(file), done = std::move(done)] {
+    stickerJob = std::async(std::launch::async, [this, file = std::move(file), done = std::move(done), colour] {
         std::string error;
         std::string bytes;
         std::string ext = file.extension().string();
@@ -217,6 +217,9 @@ bool CanvasView::loadSticker(fs::path file,
                 error = "could not read the picture";
             }
         } else if (auto content = stickers::read(file, &error)) {
+            if (colour) {
+                stickers::recolour(*content, *colour);
+            }
             bytes = stickers::clipboardBytes(*content);
         }
         QMetaObject::invokeMethod(

@@ -10,6 +10,12 @@
  * "Templates", the app-wide "<AppDataLocation>/templates", ".template-order.json", "templates.json"; a template is a
  * .xopp only (TemplateFile.h), with the PDF attached to it ("name.xopp.bg.pdf"), which goes wherever it goes.
  *
+ * The built-in set ("Built in", Kind::Stickers only): the collections that come with the app, read-only, in
+ * "<resources>/stickers/<collection>/" (qt/resources/stickers, made by its generate.py): each collection's names.json
+ * names it and its stickers in English and German (the shown name follows the app's language; the search finds every
+ * name), collections.json gives their order. Collections can be hidden (a list in the settings), nothing on disk
+ * changes.
+ *
  * StickersModel is the picker's list: the stickers of one set (all of it, or one folder with its subfolders), found
  * by a search of their names, sorted by last use, the own order, the name or the date added. Listing reads the folders
  * (a few hundred files at most: on the UI thread, when the picker opens or a sticker changes).
@@ -27,6 +33,8 @@
 #include <QStringList>
 
 #include "filesystem.h"
+
+class Settings;
 
 namespace xqt::stickers {
 
@@ -49,6 +57,35 @@ fs::path appSet(Kind kind = Kind::Stickers);
 /// (tests) Another folder for the app-wide set (empty: the app's again)
 void setAppSet(const fs::path& folder, Kind kind = Kind::Stickers);
 
+// --- the built-in set (read-only) ---------------------------------------------------------------------------------
+/// "<resources>/stickers" (AppContext::defaultResourceDir() until set)
+fs::path builtinSet();
+/// The app's resources tell where it is; tests use another folder (empty: the default again)
+void setBuiltinSet(const fs::path& folder);
+
+struct BuiltinSticker {
+    std::string file;                 ///< its file name in the collection's folder
+    std::vector<std::string> en, de;  ///< its names in each language: the first is shown, all are searched
+};
+struct Collection {
+    std::string id;  ///< its folder
+    std::string titleEn, titleDe;
+    std::vector<BuiltinSticker> stickers;  ///< in their order (names.json)
+};
+/// The collections of a built-in set (folders with a names.json), in the order of its collections.json (others after
+/// them, by id)
+std::vector<Collection> collections(const fs::path& set);
+/// The language of the names shown: "de" when the app's locale (QLocale()) is German, else "en"
+std::string nameLanguage();
+
+/// The ids of the hidden built-in collections (settings: "hiddenStickerCollections" in the xournalQt part, the ids
+/// joined by "+")
+QStringList hiddenCollections(Settings& settings);
+void setHiddenCollections(Settings& settings, const QStringList& ids);
+/// Built-in stickers pasted in the pen's colour instead of black (settings: "builtinStickersInPenColour", off)
+bool penColour(Settings& settings);
+void setPenColour(Settings& settings, bool on);
+
 /// A sticker's file: a .xopp, or a picture (.png, .jpg, .jpeg, .webp); not hidden, not a backup. A template's: a .xopp.
 bool isStickerFile(const fs::path& file, Kind kind = Kind::Stickers);
 bool isPicture(const fs::path& file);
@@ -62,6 +99,10 @@ struct Entry {
     std::string name;    ///< the file name without its extension
     qint64 added = 0;    ///< when it was made (ms since the epoch; the modification time where birth is unknown)
     bool picture = false;
+    // Built-in stickers: `name` is the name in the app's language
+    bool builtin = false;
+    int rank = 0;                      ///< its place in the set (the collections' order, then names.json's)
+    std::vector<std::string> aliases;  ///< every name in every language (the search)
 };
 /// Every sticker of a set (its subfolders too), in no particular order. A picture of the name of a .xopp beside it is
 /// that sticker's (not one of its own).
@@ -117,7 +158,8 @@ class StickersModel final: public QAbstractListModel {
     Q_OBJECT
     /// "stickers" or "templates" (the picker's mode)
     Q_PROPERTY(QString kind READ kindName CONSTANT)
-    /// "library" (the library's Stickers folder) or "app" (the app-wide set, "All libraries")
+    /// "library" (the library's Stickers folder), "app" (the app-wide set, "All libraries") or "builtin" (the
+    /// collections that come with the app; stickers only)
     Q_PROPERTY(QString scope READ scope WRITE setScope NOTIFY scopeChanged)
     /// A folder of the set (relative; "": all of it)
     Q_PROPERTY(QString folder READ folder WRITE setFolder NOTIFY folderChanged)
@@ -133,6 +175,12 @@ class StickersModel final: public QAbstractListModel {
     Q_PROPERTY(QString libraryFolder READ libraryFolder NOTIFY scopeChanged)
     /// The set in scope has no sticker at all (not: none found)
     Q_PROPERTY(bool setEmpty READ setEmpty NOTIFY listChanged)
+    /// The built-in collections: [{id, title, hidden, count}] in their order (stickers only; empty without them)
+    Q_PROPERTY(QVariantList collections READ collectionList NOTIFY collectionsChanged)
+    /// How many built-in collections are hidden
+    Q_PROPERTY(int hiddenCount READ hiddenCount NOTIFY collectionsChanged)
+    /// Built-in stickers are pasted in the pen's colour (else black, as drawn)
+    Q_PROPERTY(bool penColour READ penColour WRITE setPenColour NOTIFY penColourChanged)
 public:
     enum Roles { NameRole = Qt::UserRole + 1, PathRole, FolderRole, CoverRole, PictureRole };
     explicit StickersModel(stickers::Kind kind = stickers::Kind::Stickers, QObject* parent = nullptr);
@@ -143,6 +191,8 @@ public:
 
     /// The library (its root, and its config folder for the last uses; empty: none)
     void setLibrary(const fs::path& root, const fs::path& configDir);
+    /// The settings that keep the hidden built-in collections and the pen colour (none: kept in the model only)
+    void setSettings(Settings* settings);
     fs::path rootOf(const QString& scope) const;
     fs::path currentSet() const { return rootOf(scopeName); }
 
@@ -161,6 +211,10 @@ public:
     QStringList folderList() const { return folderNames; }
     bool hasLibrary() const { return !libraryRoot.empty(); }
     bool setEmpty() const { return allCount == 0; }
+    QVariantList collectionList() const;
+    int hiddenCount() const;
+    bool penColour() const { return inPenColour; }
+    void setPenColour(bool on);
     QString libraryFolder() const {
         return libraryRoot.empty() ? QString()
                                    : QString::fromStdString(stickers::librarySet(libraryRoot, setKind).string());
@@ -184,8 +238,19 @@ public:
     /// A copy in another library's Stickers (Templates) folder (its root)
     Q_INVOKABLE bool copyToLibrary(const QString& path, const QString& libraryRoot);
     Q_INVOKABLE bool remove(const QString& path);
-    /// The set a path is in: "library", "app" or ""
+    /// The set a path is in: "library", "app", "builtin" or ""
     Q_INVOKABLE QString scopeOf(const QString& path) const;
+    /// A built-in sticker (read-only: not renamed, moved or deleted)
+    Q_INVOKABLE bool isBuiltin(const QString& path) const { return scopeOf(path) == QLatin1String("builtin"); }
+    /// A folder's name to show: a built-in collection's title in the app's language, else the folder itself
+    Q_INVOKABLE QString folderTitle(const QString& folder) const;
+    /// A copy of a sticker (a built-in one, to change it) in the library's set, or the app-wide one without a
+    /// library, at its root, named as it is shown; its path ("" when it failed)
+    Q_INVOKABLE QString copyToMine(const QString& path);
+    /// Hide a built-in collection (not listed, not searched) or show it again; kept in the settings
+    Q_INVOKABLE void setCollectionHidden(const QString& id, bool hidden);
+    /// Show every hidden collection again
+    Q_INVOKABLE void restoreCollections();
 
 Q_SIGNALS:
     void scopeChanged();
@@ -193,9 +258,14 @@ Q_SIGNALS:
     void searchChanged();
     void sortChanged();
     void listChanged();
+    void collectionsChanged();
+    void penColourChanged();
 
 private:
     void apply();
+    /// The built-in set's stickers and folders (the collections not hidden)
+    void listBuiltin();
+    void storeHidden();
 
     stickers::Kind setKind = stickers::Kind::Stickers;
     fs::path libraryRoot;
@@ -208,6 +278,11 @@ private:
     std::vector<stickers::Entry> all;  ///< of the set in scope
     std::vector<stickers::Entry> shown;
     size_t allCount = 0;
+    Settings* settings = nullptr;
+    QStringList hidden;  ///< built-in collections
+    bool inPenColour = false;
+    std::vector<stickers::Collection> builtins;  ///< read with the set
+    QString language;                            ///< of the names shown ("en", "de")
 };
 
 }  // namespace xqt

@@ -51,6 +51,9 @@ bool write(Document& doc, const fs::path& target, std::string* error = nullptr);
 /// (with `error`) if it cannot be read or holds nothing.
 std::optional<sticky::Group> read(const fs::path& file, std::string* error = nullptr);
 
+/// The content's ink and texts in `colour` (a built-in sticker pasted in the pen's colour; pictures and notes stay)
+void recolour(sticky::Group& content, Color colour);
+
 /// The content in the clipboard's format of a selection of notes and elements (sticky::GROUP_CLIPBOARD_MIME)
 std::string clipboardBytes(const sticky::Group& content);
 
