@@ -489,6 +489,7 @@ One open document without a view (session), and what it builds on: the Markdown 
 | [audio](#audio) | Records and plays Ogg Vorbis, compatible with Xournal++'s audio (a stroke tied to a moment of a recording). | `xqt-audio` |
 | [markdown](#markdown) | Parses (md4c), lays out (Pango), paginates and draws (cairo) Markdown text, with the same text stack as upstream's text elements; registers the renderer upstream's TextView asks for Markdown texts. | `xqt-markdown` |
 | [session](#session) | One open document without a view: load, new, save in the background, autosave, undo, page revisions; the fork's formats (the PDF with notes, incremental saves, version history), search; process-wide AppContext. | `xqt-session` |
+| [plugins](#plugins) | The plugins of the process: one QJSEngine per plugin with the frozen API module "xournal", commands run for a window as one transaction of the operations layer, permissions asked on first use, a watchdog (ADR 0008). | `xqt-plugins` |
 | [ops](#ops) | Every change a plugin (later a remote peer or an agent) makes to a document: an operation of the collaboration vocabulary, checked against what its principal may do, applied with undo, one undo step per transaction or rolled back (ADR 0008). | `xqt-ops` |
 | [render](#render) | Turns a page of upstream's model into pixels with upstream's views and cairo, on worker threads; Qt-free, so the CLI and the tests use it too. | `xoj-render` |
 
@@ -592,6 +593,24 @@ Used by:
 - [CLI](#cli) (`links`): xournal-qt-cli links xqt-session: the PDF with notes and the archive PDF
 - [Tests](#tests) (`calls`): one test binary per module, label per module
 
+#### plugins
+
+The plugins of the process: one QJSEngine per plugin with the frozen API module "xournal", commands run for a window as one transaction of the operations layer, permissions asked on first use, a watchdog (ADR 0008).
+
+**Where**: [`qt/src/plugins/`](../../src/plugins/). **Target**: `xqt-plugins`. **Kind**: xournal-qt module.
+
+**Docs**: [plugins/README.md](../../src/plugins/README.md), [plugins.md](../features/plugins.md).
+
+| Key class or file | What |
+| --- | --- |
+| [`PluginHost`](../../src/plugins/PluginHost.h) | finds and runs plugins; settings, logs; the window as PluginUi and its operations |
+| [`PluginScript, PluginBridge`](../../src/plugins/PluginScript.h) | a plugin's engine and the bridge behind the API (api.js) |
+| [`Watchdog`](../../src/plugins/Watchdog.h) | stops JavaScript that runs longer than 2 s |
+
+Depends on:
+
+- [ops](#ops) (`links`): xqt-plugins links xqt-ops: every API call is an operation checked for the plugin
+
 #### ops
 
 Every change a plugin (later a remote peer or an agent) makes to a document: an operation of the collaboration vocabulary, checked against what its principal may do, applied with undo, one undo step per transaction or rolled back (ADR 0008).
@@ -611,6 +630,10 @@ Depends on:
 - [session](#session) (`links`): xqt-ops links xqt-session: operations act on a DocumentSession, a transaction is an UndoGathering
 - [markdown](#markdown) (`calls`): Markdown boxes measured as drawn (labels placed by an anchor)
 - [undo](#undo) (`calls`): upstream's undo actions (InsertsUndoAction, DeleteUndoAction, InsertLayerUndoAction, …) for every change
+
+Used by:
+
+- [plugins](#plugins) (`links`): xqt-plugins links xqt-ops: every API call is an operation checked for the plugin
 
 #### render
 

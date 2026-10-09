@@ -3,7 +3,7 @@
 - Status: **Accepted** (the author's decisions of 2026-10-09, in two rounds). The research behind it:
   [review/2026-10/js-plugins-research.md](../review/2026-10/js-plugins-research.md); the collaboration research it
   shares the operations with: [research/collaboration.md](../../research/collaboration.md). How it works and the API:
-  the feature doc `features/plugins.md` (with the block `qt/js-plugins`).
+  [features/plugins.md](../features/plugins.md).
 
 ## Context
 Xournal++ has Lua plugins: commands in menus and the tool bar, shortcuts, dialogs, and an `app.*` API of about 56

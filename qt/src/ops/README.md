@@ -19,4 +19,5 @@ whole; the document lock is held only while the model changes.
 **May depend on**: `xqt-session`, `xqt-markdown`, from upstream the model, undo, `control/layer`, `control/pagetype`.
 Nothing depends on it but the plugin host and the app.
 
-**Tests**: `qt/tests/ops` (label `ops`). **Docs**: [ADR 0008](../../docs/decisions/0008-js-plugins.md).
+**Tests**: `qt/tests/ops` (label `ops`). **Docs**: [ADR 0008](../../docs/decisions/0008-js-plugins.md),
+[plugins.md](../../docs/features/plugins.md).

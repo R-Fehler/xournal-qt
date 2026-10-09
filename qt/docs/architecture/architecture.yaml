@@ -589,6 +589,27 @@ blocks:
         path: qt/src/session/StickyNote.h
         what: the fork's features in the document model (several through seams)
     docs: [qt/src/session/README.md, qt/docs/features/hybrid-pdf.md]
+  - id: plugins
+    name: plugins
+    layer: document
+    kind: qt
+    label: JavaScript plugins
+    target: xqt-plugins
+    paths: [qt/src/plugins/]
+    responsibility: >-
+      The plugins of the process: one QJSEngine per plugin with the frozen API module "xournal", commands run for a
+      window as one transaction of the operations layer, permissions asked on first use, a watchdog (ADR 0008).
+    key:
+      - name: PluginHost
+        path: qt/src/plugins/PluginHost.h
+        what: finds and runs plugins; settings, logs; the window as PluginUi and its operations
+      - name: PluginScript, PluginBridge
+        path: qt/src/plugins/PluginScript.h
+        what: a plugin's engine and the bridge behind the API (api.js)
+      - name: Watchdog
+        path: qt/src/plugins/Watchdog.h
+        what: stops JavaScript that runs longer than 2 s
+    docs: [qt/src/plugins/README.md, qt/docs/features/plugins.md]
   - id: ops
     name: ops
     layer: document
@@ -1435,6 +1456,10 @@ edges:
     hide: true
 
   # --- Documents --------------------------------------------------------------------------------------------------
+  - from: plugins
+    to: ops
+    kind: links
+    what: "xqt-plugins links xqt-ops: every API call is an operation checked for the plugin"
   - from: ops
     to: session
     kind: links
