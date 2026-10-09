@@ -2,6 +2,7 @@
 
 #include <QDateTime>
 #include <QLocale>
+#include <QSettings>
 #include <QVariantMap>
 #include <algorithm>
 #include <cmath>
@@ -25,6 +26,8 @@ constexpr int FRAME_MS = 16;
 /// The clock follows what is heard when they are this far apart (ms)
 constexpr qint64 AUDIO_DRIFT = 250;
 const qreal SPEEDS[] = {0.5, 1, 2, 4, 8};
+/// The setting of audioOn
+constexpr const char* AUDIO_KEY = "replay/audio";
 
 QString clockText(qint64 ms) {
     const qint64 s = std::max<qint64>(0, ms / 1000);
@@ -48,6 +51,7 @@ TimelineControl::TimelineControl(const WindowContext& w, AudioControl* a, QObjec
     clock.setInterval(FRAME_MS);
     clock.setTimerType(Qt::PreciseTimer);
     connect(&clock, &QTimer::timeout, this, &TimelineControl::tick);
+    withAudio = QSettings().value(AUDIO_KEY, true).toBool();
 }
 
 TimelineControl::~TimelineControl() { stop(); }
@@ -70,6 +74,21 @@ void TimelineControl::cycleSpeed() {
     const auto it = std::find(std::begin(SPEEDS), std::end(SPEEDS), rate);
     setSpeed(it == std::end(SPEEDS) || std::next(it) == std::end(SPEEDS) ? SPEEDS[0] : *std::next(it));
 }
+
+void TimelineControl::setAudioOn(bool on) {
+    if (on == withAudio) {
+        return;
+    }
+    withAudio = on;
+    QSettings().setValue(AUDIO_KEY, on);
+    Q_EMIT audioOnChanged();
+    silent.clear();  // (heard again from where the replay is)
+    syncAudio();
+}
+
+void TimelineControl::toggleAudio() { setAudioOn(!withAudio); }
+
+bool TimelineControl::hasRecordings() const { return line && !line->tracks().empty(); }
 
 QVariantList TimelineControl::marks() const {
     QVariantList out;
@@ -288,10 +307,15 @@ void TimelineControl::seek(qint64 ms) {
 void TimelineControl::skip(qint64 deltaMs) { seek(at + deltaMs); }
 
 void TimelineControl::setScrubbing(bool on) {
+    if (on == scrubbing) {
+        return;
+    }
     scrubbing = on;
     if (!on && view) {
         view->settleReplay();
     }
+    silent.clear();
+    syncAudio();  // (silent while the slider is held; heard from where it is let go)
 }
 
 void TimelineControl::nextMark() {
@@ -375,7 +399,7 @@ void TimelineControl::syncAudio() {
     if (!line || !audio) {
         return;
     }
-    const auto h = playing() && rate == 1 ? line->heardAt(at) : std::nullopt;
+    const auto h = playing() && rate == 1 && withAudio && !scrubbing ? line->heardAt(at) : std::nullopt;
     if (!h) {
         stopAudio();
         return;

@@ -60,3 +60,6 @@ style, after Lucide's `replace`.
 
 `xqt-zen` (a page with a small dot in its lower left corner: Zen, only the page and the dot; qt/docs/features/zen.md) is drawn
 in the same style.
+
+`xqt-volume` and `xqt-volume-off` are Lucide's `volume-2` and `volume-x`: the recordings on or off in the replay's play
+bar (qt/docs/features/timeline.md).

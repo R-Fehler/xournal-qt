@@ -95,6 +95,8 @@ Item {
     Shortcut { sequence: "Right"; enabled: win.modes.replaying && !app.homeVisible; onActivated: app.timeline.skip(5000) }
     Shortcut { sequence: "Home"; enabled: win.modes.replaying && !app.homeVisible; onActivated: app.timeline.seek(0) }
     Shortcut { sequence: "End"; enabled: win.modes.replaying && !app.homeVisible; onActivated: app.timeline.seek(app.timeline.duration) }
+    // (A is the hand's key otherwise: the tools' keys are off while replaying)
+    Shortcut { objectName: "replayAudioShortcut"; sequence: "A"; enabled: win.modes.replaying && !app.homeVisible && app.timeline.hasRecordings; onActivated: app.timeline.toggleAudio() }
     // Recording (qt/docs/features/audio.md): starts or stops it for this document
     Shortcut { sequences: win.keysOf("record"); enabled: app.audio.available && !app.homeVisible; onActivated: app.audio.toggleRecording() }
     // Document shortcuts do nothing while the home screen is shown.

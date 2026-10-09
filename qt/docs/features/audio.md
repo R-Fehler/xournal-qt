@@ -158,6 +158,9 @@ the user puts it.
   ink starts **2 s earlier** (Settings → Documents → Audio recordings, 0–10 s), so the words before the ink are heard.
   The playback pill: 5 s back and forward, play/pause, a slider with a tick at every moment ink was written, the time,
   ×. Playing stops when another tab comes in front.
+- **In the replay** ([timeline.md](timeline.md), "Replay"): the recordings play with the ink as it is written again,
+  each at the moment the ink was written in it; the play bar's speaker (key A) switches them on and off, and the
+  choice is kept. So a lecture is heard with its notes from ⋮ → View → Replay the writing, without the record button.
 - Not built yet: upstream's fading of ink without a recording while the play tool is chosen (upstream's
   `DocumentView::setMarkAudioStroke`), a speaker chip on pages and thumbnails, "Play from here" in the selection pill,
   a field for Xournal++'s audio folder in the settings (`audio::setExtraFolders` is there).
@@ -257,6 +260,9 @@ release run builds them); the Java checked only against stubs of the Android API
 What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
 
 - [ ] Linux: recording with the built-in microphone and a headset; playing from a stroke at the right speed.
+- [ ] Linux and Android: a replay with sound (⋮ → View → Replay the writing of a document with two recordings): the
+      words are heard as their ink is written, the speaker on the play bar (and A) silences them and brings them back,
+      a drag of the slider is silent and heard again where it is let go.
 - [ ] Windows: recording (`bin\xournal-qt.exe --audio-info` lists the microphones); with the microphone blocked in
       Windows' privacy settings the app says so.
 - [ ] macOS: the first recording asks for the microphone with the app's text; refused, the app says where to allow it.

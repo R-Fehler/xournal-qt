@@ -82,12 +82,20 @@ short.
 - **Entered** from ⋮ → View → **Replay the writing** (not in text files), or from the playback pill's replay button
   (the replay starts where the recording is heard and plays on). The document is replayed from the start, paused.
 - **The play bar** at the bottom of the page (`timelineBar`, below "The play bar"). ← and → go 5 s, Home and End to
-  the ends, Space plays and pauses, Esc leaves. **The tools are put away** (`win.modes.replaying`): the toolbox (docked or
+  the ends, Space plays and pauses, A switches the recordings on and off (A is the hand's key otherwise; the tools'
+  keys are off while replaying), Esc leaves. **The tools are put away** (`win.modes.replaying`): the toolbox (docked or
   floating), the top bar with its tab, the phone's dock, the view pill and the pills; the tab strip and a phone's
   app bar (with ⋮) stay (`TimelineUiTest.theToolboxModeShowsNoClassicToolBarDuringOrAfterAReplay`).
-- **Audio** plays where it overlaps, through `app.audio` (the same player as the playback pill, which is hidden
-  meanwhile): at 1× only (at other speeds the replay is silent); the clock follows what is heard when they drift
-  apart by more than 250 ms; a recording that ended or cannot be played is not started again until the next jump.
+- **Audio** (the author: "for the replay button I want to be able to toggle the recorded audio when using the replay
+  feature"): the recordings tied to the ink play where they overlap, through `app.audio` (the same player as the
+  playback pill, which is hidden meanwhile), so the recording that ran while the ink being replayed was written is
+  heard at that moment. **On or off** with the play bar's speaker (`timelineAudio`, shown when the document has
+  recordings on the bar) or the key **A**; remembered (`TimelineControl::audioOn`, the setting `replay/audio`, on by
+  default). What is heard follows the replay: a seek, a skip, a tap on ink or the next session plays the recording
+  there from its moment; at the end of one recording the next is started where it begins; between recordings, while
+  paused, while the slider is held (heard again from where it is let go) and at speeds other than 1× it is silent. The
+  clock follows what is heard when they drift apart by more than 250 ms; a recording that ended or cannot be played is
+  not started again until the next jump.
 - **Read-only**: the view is for reading (`CanvasView::isReadingOnly`): every tool scrolls, as the hand does; the
   session refuses changes (`DocumentSession::setReplaying`: `isReadOnly`, so no paste, stickers, notes, templates,
   bookmarks; no undo or redo), and the document's keys are off. **A tap on ink** goes to the moment it was written
@@ -120,7 +128,9 @@ overlay is full, then commits; read-only (the pen writes nothing, a tap gives th
 sticky note's paper and ink come when they were made. `TimelineUiTest` (label `ui`): ⋮ → View → Replay the writing,
 the slider, the speed, play, the pen writes nothing, ✕ and Esc, the document the same to the byte, not modified, the
 same undo step and page revision; a tap on ink; another tab ends it; a recording heard where it is (the fake speaker),
-the playback pill's replay button.
+the playback pill's replay button; the speaker on the bar (`theRecordingsAreSwitchedOnAndOffInThePlayBar`: hidden
+without recordings; two recordings with a gap: a seek into the second plays it at its moment, the gap, a pause and the
+held slider are silent; off with the button, on with A, kept as the setting).
 
 ## The play bar
 
@@ -131,8 +141,10 @@ understand for the first time user." `TimelineBar.qml`, placed by `Main.qml`.
   (`app.timeline.elapsedText`) and the clock time of the moment shown (`momentText`: day, month, hour; the year too
   when it is not this one; "Before the times were kept" in the prelude). Its tip has the long forms ("1:23 / 4:56",
   "Sun 4 Oct 2026, 14:03"). Then the session before (`timelinePreviousMark`), **play/pause** (`timelinePlay`, a filled
-  accent circle), the next session (`timelineNextMark`), the **slider** (`timelineSlider`), the speed (`timelineSpeed`:
-  ½×, 1×, 2×, 4×, 8×) and ✕ (`timelineClose`).
+  accent circle), the next session (`timelineNextMark`), the **slider** (`timelineSlider`), the recordings on or off
+  (`timelineAudio`: a speaker in the accent, crossed out and grey when off; only when the document has recordings; its
+  tip names the key A), the speed (`timelineSpeed`: ½×, 1×, 2×, 4×, 8×) and ✕ (`timelineClose`). On a phone (two
+  rows) the speaker is in the touch-sized row of buttons under the slider.
 - **The slider**: a track you can see (`timelineTrack`, grey) with the elapsed part filled in the accent
   (`timelineElapsed`), a large round handle (`timelineHandle`: 18 px, 26 px in the touch profile, larger while held)
   with a ring of the bar's color; while it is held, the time is shown above it (`timelineBubble`), where a finger does

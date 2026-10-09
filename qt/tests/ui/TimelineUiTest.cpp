@@ -2,7 +2,9 @@
  * xournal-qt: the replay of a document's timeline in the real window (qt/docs/features/timeline.md, "Replay"): ⋮ → View
  * → Replay the writing, the play bar at the bottom (play, the slider, the speed, ✕ and Esc), read-only (the pen writes
  * nothing, a tap on ink goes to its moment), the document exactly as it was afterwards; with a recording (the fake
- * speaker), the recording is heard where it is on the bar, and the playback pill starts the replay at its moment.
+ * speaker), the recording is heard where it is on the bar, and the playback pill starts the replay at its moment; the
+ * play bar's speaker switches the recordings on and off (a setting, the key A), and what is heard follows seeks,
+ * pauses, the slider and the boundaries between recordings.
  *
  * @license GNU GPLv2 or later
  */
@@ -15,6 +17,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QRegularExpression>
+#include <QSettings>
 #include <QTemporaryDir>
 #include <QTest>
 #include <functional>
@@ -307,6 +310,91 @@ TEST_F(TimelineUiTest, theRecordingIsHeardWhereItIs) {
     EXPECT_LT(position(), 1500);
     EXPECT_TRUE(timeline()->property("playing").toBool());
     QMetaObject::invokeMethod(timeline(), "stop");
+}
+
+// The replay's audio (the author: "for the replay button I want to be able to toggle the recorded audio"): the speaker
+// on the play bar is shown only when the document has recordings; on, what is heard follows the replay (a seek into
+// the other recording plays that one at its moment, a gap between them is silent, pause and the held slider are
+// silent); off (the button or A), nothing is heard and the choice is kept as a setting
+TEST_F(TimelineUiTest, theRecordingsAreSwitchedOnAndOffInThePlayBar) {
+    writeTwoStrokes();
+    startReplay();
+    EXPECT_FALSE(timeline()->property("hasRecordings").toBool());
+    EXPECT_FALSE(find<QQuickItem>("timelineAudio")->isVisible()) << "no recordings: no speaker";
+    QMetaObject::invokeMethod(timeline(), "stop");
+
+    // Two recordings a minute apart, each with a stroke written 400 ms into it
+    controller->newDocument();
+    view()->getViewController().scrollToPageRect(0, QRectF(0, 0, 500, 500));
+    wait(200);
+    controller->selectTool("pen");
+    for (int k = 0; k < 2; ++k) {
+        clock = T0 + k * 60000;
+        QMetaObject::invokeMethod(audio(), "startRecording");
+        ASSERT_TRUE(until([&] { return audio()->property("recordedMs").toLongLong() >= 400; }));
+        clock = T0 + k * 60000 + audio()->property("recordedMs").toLongLong();
+        drag({100, 150.0 + 100 * k}, {300, 150.0 + 100 * k});
+        ASSERT_TRUE(until([&] { return audio()->property("recordedMs").toLongLong() >= 1500; }));
+        QMetaObject::invokeMethod(audio(), "stopRecording");
+        ASSERT_FALSE(audio()->property("recording").toBool());
+    }
+    startReplay();
+    ASSERT_TRUE(timeline()->property("hasRecordings").toBool());
+    QQuickItem* speaker = find<QQuickItem>("timelineAudio");
+    ASSERT_TRUE(shown(speaker));
+    EXPECT_TRUE(timeline()->property("audioOn").toBool()) << "on by default";
+    const QVariantList tracks = timeline()->property("tracks").toList();
+    ASSERT_EQ(tracks.size(), 2);
+    const qint64 first = tracks[0].toMap()["at"].toLongLong(), second = tracks[1].toMap()["at"].toLongLong();
+    const qint64 firstEnd = first + tracks[0].toMap()["length"].toLongLong();
+    ASSERT_GT(second, firstEnd + 500) << "a gap between them";
+    const auto heard = [&] { return timeline()->property("hearing").toBool() && audio()->property("playing").toBool(); };
+    const auto playName = [&] { return audio()->property("playName").toString(); };
+
+    click(find<QObject>("timelinePlay"));
+    ASSERT_TRUE(until(heard));
+    const QString firstName = playName();
+    // A seek into the second recording: that one, at its moment
+    seek(second + 300);
+    ASSERT_TRUE(until([&] { return heard() && playName() != firstName; }));
+    EXPECT_NEAR(audio()->property("playPositionMs").toLongLong(), 300, 250);
+    // The gap between them: silent
+    seek(firstEnd + 100);
+    EXPECT_TRUE(until([&] { return !audio()->property("playing").toBool(); }));
+    EXPECT_FALSE(timeline()->property("hearing").toBool());
+    // Paused: silent; played again: heard
+    seek(first + 200);
+    ASSERT_TRUE(until(heard));
+    click(find<QObject>("timelinePlay"));
+    EXPECT_TRUE(until([&] { return !audio()->property("playing").toBool(); }));
+    click(find<QObject>("timelinePlay"));
+    ASSERT_TRUE(until(heard));
+    // The slider held: silent; let go: heard from there
+    QMetaObject::invokeMethod(timeline(), "setScrubbing", Q_ARG(bool, true));
+    EXPECT_FALSE(audio()->property("playing").toBool());
+    seek(second + 100);
+    EXPECT_FALSE(audio()->property("playing").toBool());
+    QMetaObject::invokeMethod(timeline(), "setScrubbing", Q_ARG(bool, false));
+    ASSERT_TRUE(until([&] { return heard() && playName() != firstName; }));
+
+    // Off: the button
+    click(speaker);
+    EXPECT_FALSE(timeline()->property("audioOn").toBool());
+    EXPECT_TRUE(until([&] { return !audio()->property("playing").toBool(); }));
+    EXPECT_FALSE(timeline()->property("hearing").toBool());
+    seek(first + 100);
+    wait(150);
+    EXPECT_FALSE(audio()->property("playing").toBool()) << "off: nothing is heard";
+    EXPECT_TRUE(timeline()->property("playing").toBool()) << "the ink goes on";
+    EXPECT_FALSE(QSettings().value("replay/audio").toBool()) << "remembered";
+    // On again: A
+    QTest::keyClick(window, Qt::Key_A);
+    EXPECT_TRUE(timeline()->property("audioOn").toBool());
+    EXPECT_TRUE(until(heard));
+    EXPECT_TRUE(QSettings().value("replay/audio").toBool());
+    QMetaObject::invokeMethod(timeline(), "stop");
+    EXPECT_TRUE(until([&] { return !audio()->property("playing").toBool(); }));
+    QSettings().remove("replay/audio");
 }
 
 // The author's test of 0.6.0: "when replay is on the classic toolbar appears again". A replay hides the tools and

@@ -1,7 +1,8 @@
 // The play bar of the document's timeline (qt/docs/features/timeline.md, "The play bar"): the pages as of a moment,
 // read-only. A title ("Replay"; a tap: what it is), the time "12:04 · 3 Oct, 14:20" (the bar's time and the clock time
 // of the moment), the previous / next session, play / pause, a slider with a large handle and its elapsed part filled,
-// the sessions as ticks (their dates as tips) and the recordings as bands under it, the speed and ✕. One row on a wide
+// the sessions as ticks (their dates as tips) and the recordings as bands under it, the recordings on/off (a speaker,
+// shown when the document has recordings; key A), the speed and ✕. One row on a wide
 // bar; two on a narrow one (a phone: the slider on its own row). Touch-sized (48 px) in the touch profile. The first
 // replay shows a hint above the bar, once (setting replayHintSeen). Self-contained: Main.qml places it and sets
 // `touch`.
@@ -92,6 +93,7 @@ Item {
                 Label {
                     Layout.fillWidth: true
                     text: qsTr("Drag the bar or press ▶ to play. The marks on the bar are the sessions it was written in. ✕ leaves the replay.")
+                          + (app.timeline.hasRecordings ? " " + qsTr("The speaker (A) switches the recordings on or off.") : "")
                     font.pixelSize: 13
                     color: bar.muted
                     wrapMode: Text.WordWrap
@@ -141,7 +143,7 @@ Item {
             GridLayout {
                 id: grid
                 anchors.fill: parent
-                columns: 7
+                columns: 8
                 rowSpacing: 0
                 columnSpacing: bar.twoRows ? 0 : 2
 
@@ -240,7 +242,7 @@ Item {
                 RowLayout {
                     Layout.row: 0
                     Layout.column: bar.twoRows ? 0 : 4
-                    Layout.columnSpan: bar.twoRows ? 7 : 1
+                    Layout.columnSpan: bar.twoRows ? 8 : 1
                     Layout.fillWidth: true
                     spacing: 0
                     // (two rows: the title before the slider)
@@ -374,10 +376,27 @@ Item {
                     }
                 }
 
+                // The recordings heard with the ink, or not (a setting); only when the document has recordings
+                IconButton {
+                    objectName: "timelineAudio"
+                    visible: app.timeline.hasRecordings
+                    Layout.row: bar.twoRows ? 1 : 0
+                    Layout.column: 5
+                    iconName: app.timeline.audioOn ? "xqt-volume" : "xqt-volume-off"
+                    implicitWidth: bar.target
+                    implicitHeight: bar.target
+                    icon.width: 22
+                    icon.height: 22
+                    icon.color: app.timeline.audioOn ? bar.accent : bar.muted
+                    tip: app.timeline.audioOn ? qsTr("Recordings are heard with the ink: switch them off (A)")
+                                              : qsTr("Recordings are off: hear them with the ink (A)")
+                    label: app.timeline.audioOn ? qsTr("Recordings on") : qsTr("Recordings off")
+                    onClicked: app.timeline.toggleAudio()
+                }
                 ToolButton {
                     objectName: "timelineSpeed"
                     Layout.row: bar.twoRows ? 1 : 0
-                    Layout.column: 5
+                    Layout.column: 6
                     implicitWidth: bar.target
                     implicitHeight: bar.target
                     focusPolicy: Qt.NoFocus
@@ -395,7 +414,7 @@ Item {
                 IconButton {
                     objectName: "timelineClose"
                     Layout.row: bar.twoRows ? 1 : 0
-                    Layout.column: 6
+                    Layout.column: 7
                     iconName: "xqt-close"
                     implicitWidth: bar.target
                     implicitHeight: bar.target
