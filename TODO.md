@@ -217,6 +217,17 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
 - [ ] A list view of the library for phones; the tab menu (rename, reference, share) from the phone's app bar.
 - [ ] The emoji button is out of reach while the soft keyboard is open on a phone.
 
+### Plotting (after the core plugin block `qt/js-plugins` is merged; the author, 2026-10-09: "do them once we have
+the core part done")
+- [ ] Polar functions `r(θ)` (parametric `x(t), y(t)` is in the core block).
+- [ ] An empty coordinate system: a scaled grid with axes and no function, for students to draw into.
+- [ ] Points and value tables: mark `(1, 2)`, or type a small table and get its points, optionally a fitted line.
+- [ ] Shading: the area under a curve or between two curves; inequalities like `y > 2x + 1`.
+- [ ] The tangent at a point; the derivative as a second curve.
+- [ ] Number lines (intervals, marked points) for lower grades.
+- [ ] Piecewise functions in a friendly notation.
+- [ ] Function families: several values of a parameter drawn at once.
+
 ### Handwriting
 - [ ] Library search for handwriting, what is left: the author's check with real notes; a document opened under
   another spelling of the library's path (a symlink) is still not matched to its index entry.
