@@ -143,6 +143,9 @@ The author's decisions of 2026-10-09: [ADR 0008](qt/docs/decisions/0008-js-plugi
   (PdfEncryption) or on the clean copy; find it. Not the dangling file name of `QPDFWriter` (fixed in
   `qt/canvas-rest`): it still fails after that, and the TSan run shows no race in it.
 
+- [ ] `MainWindowTest.markdownTextBoxesAreSelectedAndMoved` segfaulted once after 0.4 s in a full run (2026-10-09,
+  right after merging `qt/js-plugins`, which lets Markdown boxes live in the ink's layer); 45 of 45 runs alone and 16 in
+  parallel passed. Watch for it; if it returns, run it under the TSan build.
 Rerun a failure alone before calling it a flake; harden a test by waiting for the state, not for time.
 
 - [ ] The CI repeats a failed test up to twice (`--repeat until-pass:3`): drop it once the suite passes 5× under
