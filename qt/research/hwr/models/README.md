@@ -6,8 +6,8 @@ there goes into every package, and the app uses whichever reads a language, so k
 
 | Folder | What | fhswf test (German) | IAM test (English) | Time per line* | Size |
 | --- | --- | ---: | ---: | ---: | ---: |
-| `qt/resources/hwr/crnn-de-en` (**shipped**) | shared CTC, 5.7 M parameters, best at step 62,000 | 97.5 % | 90.3 % | 0.070 s | 9.2 MB |
-| `crnn-de-en-large` | shared CTC, 12.7 M parameters (`configs/en-de-combined-ctc-large.yaml`), best at step 70,000 | 98.0 % | 91.0 % | 0.130 s | 20.4 MB |
+| `qt/resources/hwr/crnn-de-en` (**shipped**) | shared CTC, 5.7 M parameters; best at step 62,000, then 12,000 steps on train and val (`en-de-combined-ctc-final-warm.yaml`) | 98.0 % | 91.3 % | 0.058 s | 9.2 MB |
+| `crnn-de-en-large` | shared CTC, 12.7 M parameters; best at step 70,000, then 12,000 steps on train and val (`en-de-combined-ctc-large-final-warm.yaml`) | 98.2 % | 92.1 % | 0.115 s | 20.4 MB |
 
 Words found on the held-out test lines, read as the app reads them (int8, ONNX Runtime on 2 threads, the app's
 decoding). *On a Zen+ desktop CPU (2018); a phone is in the same range.

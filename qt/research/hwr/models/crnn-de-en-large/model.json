@@ -5,13 +5,13 @@
     "de",
     "en"
   ],
-  "version": "2026.10.1",
+  "version": "2026.10.2",
   "model": "model_int8.onnx",
   "alphabet": "alphabet.txt",
   "blank": 0,
   "input_height": 64,
   "max_width": 2048,
-  "licence": "weights: trained from scratch; training data: fhswf-german: AFL-3.0; synthetic-de: text: CC BY 2.0 FR (Tatoeba); CC BY-SA 4.0 / GFDL (Wikipedia); GPL-2.0-or-later (xournal-qt); fonts: Apache-2.0, OFL; synthetic-en: text: CC BY 2.0 FR (Tatoeba); CC BY-SA 4.0 / GFDL (Wikipedia); GPL-2.0-or-later (xournal-qt); fonts: Apache-2.0, OFL; iam-lines: IAM Handwriting Database terms: non-commercial research use; cvl-lines: CC BY-NC 4.0 (CVL Database, https://doi.org/10.5281/zenodo.1492267); includes data licensed for non-commercial research only",
+  "licence": "weights: trained from scratch, fine-tuned as crnn-de-en-large; training data: fhswf-german: AFL-3.0; synthetic-de: text: CC BY 2.0 FR (Tatoeba); CC BY-SA 4.0 / GFDL (Wikipedia); GPL-2.0-or-later (xournal-qt); fonts: Apache-2.0, OFL; synthetic-en: text: CC BY 2.0 FR (Tatoeba); CC BY-SA 4.0 / GFDL (Wikipedia); GPL-2.0-or-later (xournal-qt); fonts: Apache-2.0, OFL; iam-lines: IAM Handwriting Database terms: non-commercial research use; cvl-lines: CC BY-NC 4.0 (CVL Database, https://doi.org/10.5281/zenodo.1492267); includes data licensed for non-commercial research only",
   "trained_on": [
     "fhswf-german",
     "synthetic-de",
@@ -68,21 +68,21 @@
     }
   ],
   "noncommercial": true,
-  "base_model": "crnn",
+  "base_model": "runs/en-de-ctc-large/checkpoints/best",
   "validation": {
     "lines": 1500.0,
     "terms": 8460.0,
-    "cer": 0.0217,
-    "wer": 0.1,
-    "words_found": 0.9764,
-    "words_found_exact": 0.9468,
-    "words_found_fuzzy": 0.9773,
-    "words_found_top1": 0.9689,
-    "false_hits": 0.0097
+    "cer": 0.0005,
+    "wer": 0.0025,
+    "words_found": 0.9998,
+    "words_found_exact": 0.9995,
+    "words_found_fuzzy": 0.9998,
+    "words_found_top1": 0.9998,
+    "false_hits": 0.0094
   },
   "files": {
     "model_int8.onnx": {
-      "sha256": "2c6bc09280da33b46b9abb3ebacd9f9771f40f495f3a6168e25db3ea0f776c25",
+      "sha256": "10b5403b557377ad6039651fbc02f57c8c781d6eb778d3c2cd7aa5ebc4cde4ad",
       "size": 20432373
     },
     "alphabet.txt": {
