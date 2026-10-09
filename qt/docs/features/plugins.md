@@ -11,7 +11,8 @@ undo step; when a command fails, nothing of it stays. Why it is built this way: 
   the page (`"place": "insert"`, like "Plot a function…") is also in ⋮ → Tools beside Image and Sticker, and in the
   toolbox's **+** catalog under Insert (the others under Plugins), to be placed on a bar like the app's own commands
   ([toolbox.md](toolbox.md)). A command that needs a selection is offered only while something is selected.
-- **Keys**: a command's key from its manifest is used when it has Ctrl, Alt or Meta and no other action has it;
+- **Keys**: a command's key from its manifest is used when it has Ctrl, Alt or Meta and no action of the app has it
+  (also later: an app action given that key in Settings takes it);
   Settings → Shortcuts lists the commands in the group **Plugins** (change or add a key there; conflicts are shown as
   for the app's actions).
 - **The first time** a command needs a permission, the window asks ("Allow Function plotter? … wants to change what is

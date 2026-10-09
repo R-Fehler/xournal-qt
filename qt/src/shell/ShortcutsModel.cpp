@@ -168,7 +168,31 @@ QStringList ShortcutsModel::keys(const QString& id) const {
         return it->second.isEmpty() ? QStringList{} : QStringList{it->second};
     }
     const Action* action = find(id);
-    return action ? action->defaults : QStringList{};
+    if (!action) {
+        return {};
+    }
+    if (!id.startsWith(QLatin1String("plugin:")) || action->defaults.isEmpty()) {
+        return action->defaults;
+    }
+    // A plugin's default key gives way to an action of the app that has it now (the user gave it one later): two
+    // shortcuts on one key would make Qt do neither
+    QStringList kept;
+    for (const QString& k: action->defaults) {
+        const QKeySequence wanted(k, QKeySequence::PortableText);
+        const bool taken = std::any_of(actions.begin(), actions.end(), [&](const Action& other) {
+            if (other.id.startsWith(QLatin1String("plugin:"))) {
+                return false;
+            }
+            const QStringList otherKeys = keys(other.id);
+            return std::any_of(otherKeys.begin(), otherKeys.end(), [&](const QString& o) {
+                return QKeySequence(o, QKeySequence::PortableText) == wanted;
+            });
+        });
+        if (!taken) {
+            kept << k;
+        }
+    }
+    return kept;
 }
 
 QString ShortcutsModel::conflict(const QString& id, const QString& keys) const {

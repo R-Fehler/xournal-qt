@@ -259,6 +259,11 @@ TEST_F(PluginsUiTest, theFunctionPlotterIsOfferedWithTheInsertCommandsAndInserts
     ASSERT_TRUE(until([&] { return (entry = entryOf(tools, "pluginCommand_" + key)) != nullptr; }));
     EXPECT_TRUE(entry->property("text").toString().startsWith("Plot a function…"));
     EXPECT_EQ(controller->services().shortcuts().keys(key), QStringList{"Ctrl+Alt+P"});
+    // (an action of the app given that key later takes it: the plugin's default gives way)
+    controller->services().shortcuts().setKeys("addPage", "Ctrl+Alt+P");
+    EXPECT_TRUE(controller->services().shortcuts().keys(key).isEmpty());
+    controller->services().shortcuts().setKeys("addPage", "");
+    EXPECT_EQ(controller->services().shortcuts().keys(key), QStringList{"Ctrl+Alt+P"});
     QTest::keyClick(window, Qt::Key_P, Qt::ControlModifier | Qt::AltModifier);
     auto* dialog = find<QObject>("pluginLiveDialog");
     ASSERT_TRUE(until([&] { return dialog->property("opened").toBool(); }));
