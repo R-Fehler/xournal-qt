@@ -4,6 +4,7 @@
 import { xournal, ui, elements, selection } from "xournal"
 import { defaultSpec, valuesOf, specOf, fieldsOf, syncParams, pickColor } from "./lib/spec.mjs"
 import { draw, analyse, ranges, exactSize, POINTS_PER_MM } from "./lib/plot.mjs"
+import { membersOf, changedByHand } from "./lib/members.mjs"
 
 const TR = {
     functions: "Functions", addFunction: "+ Function", addCurve: "+ Curve x(t), y(t)", dashed: "dashed", width: "Line",
@@ -15,7 +16,8 @@ const TR = {
     size: "Size", exact: "Exact scale", unit: "1 unit =", decimalComma: "Decimal comma (1,5)"
 }
 
-/// The open dialog's plot: {spec, editing (the plot's id being edited, or null), exact (it was at the exact scale)}
+/// The open dialog's plot: {spec, editing (the plot being edited: {page, layer, group, id}, or null), exact (it was at
+/// the exact scale)}
 let current = null
 
 function decimalComma() { return xournal.decimalPoint === "," }
@@ -104,54 +106,79 @@ export function insert(values, ctx) {
     if (errors.length > 0) throw new Error("the plot has a mistake: " + drawn.errors[errors[0]])
     if (drawn.shapes.length === 0) throw new Error("nothing to plot")
     if (current.editing) {
-        const old = elements.list(frame.page, { onlyWithData: true }).filter(function (e) {
-            return e.data && e.data.plot && e.data.plot.id === current.editing
+        // (the plot is its group: a pasted copy has the same description in a group of its own)
+        const ed = current.editing
+        const old = elements.list(ed.page, { layer: ed.layer }).filter(function (e) {
+            return ed.group !== 0 ? e.group === ed.group : e.data && e.data.plot && e.data.plot.id === ed.id
         })
         if (old.length > 0) elements.remove(old.map(function (e) { return e.ref }), { withGroups: true })
     }
     const refs = elements.insert(frame.page, drawn.shapes, { group: true })
-    // The description on both groups, with where the frame lies from the ink's box (for "Edit plot")
+    // The description on the ink and on the boxes, with where the frame lies from the ink's box and the members as
+    // drawn (for "Edit plot": was it changed by hand since?)
     const inkRefs = refs.filter(function (r, i) { return drawn.shapes[i].type === "stroke" })
     const boxRefs = refs.filter(function (r, i) { return drawn.shapes[i].type !== "stroke" })
     const listed = elements.list(frame.page, { withData: false })
     const ink = listed.filter(function (e) { return inkRefs.indexOf(e.ref) >= 0 })
     const box = boxOf(ink)
-    const data = { plot: spec, frame: { dx: frame.x - box.x, dy: frame.y - box.y, width: frame.width, height: frame.height } }
+    const data = {
+        plot: spec,
+        frame: { dx: frame.x - box.x, dy: frame.y - box.y, width: frame.width, height: frame.height },
+        members: membersOf(listed.filter(function (e) { return refs.indexOf(e.ref) >= 0 }))
+    }
     if (inkRefs.length > 0) elements.setData(inkRefs[0], data)
     if (boxRefs.length > 0) elements.setData(boxRefs[0], data)
     current = null
 }
 
-/// "Edit plot": the selected plot's dialog again, its frame where the plot is now
+/// The same box (an element listed again in another call: references do not last)
+function sameBox(a, b) {
+    return a.type === b.type && Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6 &&
+           Math.abs(a.width - b.width) < 1e-6 && Math.abs(a.height - b.height) < 1e-6
+}
+
+/// "Edit plot": the selected plot's dialog again, its frame where the plot is now. The plot is the group of the
+/// selected element that keeps the description: a copy (pasted, with the description) is a plot of its own.
 export function editPlot() {
     const sel = selection.get()
-    let data = null
+    let picked = null
     if (sel) {
         sel.elements.forEach(function (e) {
-            if (!data && e.data && e.data.plot) data = e.data
+            if (!picked && e.data && e.data.plot) picked = e
         })
     }
-    if (!data) {
+    if (!picked) {
         ui.notify("Select a plot made with “Plot a function…” first")
         return
     }
-    selection.clear()
-    // (the plot's ink where it is now: the group of the element that keeps the description, in its layer)
-    const listed = elements.list(sel.page)
-    const anchor = listed.filter(function (e) {
-        return e.data && e.data.plot && e.data.plot.id === data.plot.id && e.type === "stroke"
-    })[0]
-    let frame = { page: sel.page, width: data.frame.width, height: data.frame.height }
-    if (anchor) {
-        const group = listed.filter(function (e) {
-            return e.type === "stroke" && e.layer === anchor.layer &&
-                   (anchor.group !== 0 ? e.group === anchor.group : e.ref === anchor.ref)
+    const data = picked.data
+    const members = sel.elements.filter(function (e) {
+        return picked.group !== 0 ? e.group === picked.group : e === picked
+    })
+    // Update draws it anew from its description: parts erased, moved or added by hand would come back or go
+    if (changedByHand(data.members, members)) {
+        const go = ui.dialog({
+            title: "Edit plot", ok: "Edit anyway", cancel: "Cancel",
+            fields: [{
+                type: "label",
+                text: "This plot was changed by hand. Editing redraws it: erased or moved parts come back."
+            }]
         })
-        const box = boxOf(group)
+        if (go === null) return
+    }
+    selection.clear()
+    // (its layer: the selected elements are back in it now)
+    const listed = elements.list(sel.page)
+    const holders = listed.filter(function (e) { return e.data && e.data.plot && e.group === picked.group })
+    const anchor = holders.filter(function (e) { return sameBox(e, picked) })[0] || holders[0]
+    let frame = { page: sel.page, width: data.frame.width, height: data.frame.height }
+    const ink = members.filter(function (e) { return e.type === "stroke" })
+    if (ink.length > 0) {
+        const box = boxOf(ink)
         frame.x = box.x + data.frame.dx
         frame.y = box.y + data.frame.dy
     }
     const spec = data.plot
     if (spec.decimalComma === undefined) spec.decimalComma = decimalComma()
-    open(spec, frame, spec.id)
+    open(spec, frame, { page: sel.page, layer: anchor ? anchor.layer : undefined, group: picked.group, id: spec.id })
 }

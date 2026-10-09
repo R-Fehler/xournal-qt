@@ -38,11 +38,16 @@ element is in one group or in none) and lie in one layer, like a selection of el
   `application/x-xournal-qt-groups`: the group number of each element in the same order, as text (`"3 3 0 7"`), only
   when something copied is grouped. The fork's own formats (a sticky note, notes with elements) carry the number after
   each element (format names `StickyNote3`, `StickyGroup2`; data copied by an older version is not pasted).
-- **Markdown texts outside the Markdown layer** (a plot's labels, marked in their data: `session/InlineMarkdown.h`)
-  stay Markdown texts when pasted: the fork writes `application/x-xournal-qt-markdown` beside it, a `1` or `0` per
-  copied element. A plugin's other data is not copied (a pasted plot is no plot to edit again).
+- **The plugins' data on elements** (the attribute `xqt-data`, [plugins.md](plugins.md)) goes with them:
+  `application/x-xournal-qt-data`, a JSON array with each copied element's data as a string (`""` for none), only when
+  some copied element has data (`session/ElementData.h`). So a pasted plot is a plot again: its description and its
+  Markdown labels (marked in their data: `session/InlineMarkdown.h`) come along, and as a group of its own (below) it
+  is a plot of its own, edited apart from the original. For versions before that the fork also writes
+  `application/x-xournal-qt-markdown`, a `1` or `0` per copied element (whether it is such a Markdown text); a paste
+  without the data uses it.
 - **Pasting** gives every copied group a new number (`groups::renumber`): a pasted copy never joins the group it was
-  copied from. Data from Xournal++ (no fork entry) is pasted ungrouped.
+  copied from, and a plugin that tells its things apart by their group (the plotter) sees a new one. Data from
+  Xournal++ (no fork entry) is pasted ungrouped and without data.
 - **Moving into another layer** (a selection dragged onto another page, several notes with elements dropped on
   another page, elements moved into a sticky note): where a group of that layer already has the number (a duplicated
   page), the arriving group gets a new one (`groups::separate`, when the selection ends), so two groups never merge by
@@ -52,10 +57,13 @@ Code: `qt/src/session/ElementGroups.*` (numbers, members, undo step, clipboard n
 (group / ungroup the selection), the selection paths in `CanvasPage` (tap, rectangle, lasso, in a note) and
 `CanvasView` (`selectTogether`, `toggleSelected`, `clearSelection`), `MixedSelection` (paste, drop on another page),
 `StickerFile::read` (a sticker as a group). Tests: `GroupsTest` (session: the attribute, a loader without groups, the
-helpers), `GroupsCanvasTest` (canvas: group/ungroup with undo, selecting, moving, the clipboard, stickers).
+helpers), `GroupsCanvasTest` (canvas: group/ungroup with undo, selecting, moving, the clipboard with the elements' data,
+stickers).
 
 ## Not (yet)
 
+- The elements' plugin data in a copied selection of notes with elements (`MixedSelection`'s format): pasted
+  without it (and without the Markdown mark).
 - Nested groups; a group across layers (a sticker with Markdown boxes is two groups); sticky notes in a group (a note
   is a layer of its own: several notes with elements are selected together with Select more, as before).
 - A group drawn differently while not selected (no frame around it); a member edited alone without ungrouping (a text

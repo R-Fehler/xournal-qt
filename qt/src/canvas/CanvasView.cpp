@@ -75,6 +75,7 @@
 #include "session/DocumentSearch.h"
 #include "session/DocumentLink.h"
 #include "session/DocumentSession.h"
+#include "session/ElementData.h"
 #include "session/ElementTimes.h"
 #include "session/InlineMarkdown.h"
 #include "session/Timeline.h"
@@ -572,8 +573,12 @@ bool CanvasView::copySelection() {
     if (groups::stateOf(copied).canUngroup) {
         mime->setData(groups::CLIPBOARD_MIME, QByteArray::fromStdString(groups::clipboardNumbers(copied)));
     }
-    // xournal-qt: which texts are Markdown outside the Markdown layer (a plot's labels, InlineMarkdown.h); the
-    // plugins' other data stays behind (a copy is no plot to edit: the original's id would be twice on the page)
+    // xournal-qt: the plugins' data on the elements (a copied plot is a plot again where it is pasted: ElementData.h)
+    if (const std::string data = elementdata::clipboardData(copied); !data.empty()) {
+        mime->setData(elementdata::CLIPBOARD_MIME, QByteArray::fromStdString(data));
+    }
+    // xournal-qt: which texts are Markdown outside the Markdown layer (a plot's labels, InlineMarkdown.h), for a
+    // version that pastes no data
     if (std::any_of(copied.begin(), copied.end(), [](const Element* e) {
             return e->getType() == ELEMENT_TEXT && md::isInlineMarkdown(*static_cast<const Text*>(e));
         })) {
@@ -893,6 +898,9 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
             pastedGroups = groups::fromClipboard(mime->data(groups::CLIPBOARD_MIME).toStdString(),
                                                  static_cast<size_t>(std::max(0, count)));
         }
+        // xournal-qt: their data (ElementData.h); from an older version only whether texts are Markdown
+        const std::vector<std::string> pastedData = elementdata::fromClipboard(
+                mime->data(elementdata::CLIPBOARD_MIME).toStdString(), static_cast<size_t>(std::max(0, count)));
         const QByteArray inlineMarks = mime->data(md::INLINE_CLIPBOARD_MIME);  // (InlineMarkdown.h)
         std::vector<Element*> pasted;
         for (int i = 0; i < count; i++) {
@@ -913,7 +921,9 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
             }
             element->readSerialized(in);
             element->setGroup(pastedGroups.empty() ? 0 : pastedGroups[static_cast<size_t>(i)]);
-            if (i < inlineMarks.size() && inlineMarks[i] == '1') {
+            if (!pastedData.empty()) {
+                element->setData(pastedData[static_cast<size_t>(i)]);
+            } else if (i < inlineMarks.size() && inlineMarks[i] == '1') {
                 element->setData(md::withInlineMark({}));
             }
             pasted.push_back(element.get());

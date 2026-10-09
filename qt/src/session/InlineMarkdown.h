@@ -16,8 +16,8 @@ class Text;
 namespace xqt::md {
 
 inline constexpr const char* INLINE_KEY = "xqt:markdown";
-/// On the clipboard beside upstream's data: a "1" or "0" per copied element, whether it is such a text (the rest of
-/// the data is not copied: a copied plot is no plot to edit)
+/// On the clipboard beside upstream's data: a "1" or "0" per copied element, whether it is such a text (for versions
+/// before the whole data went with it: ElementData.h)
 inline constexpr const char* INLINE_CLIPBOARD_MIME = "application/x-xournal-qt-markdown";
 
 /// The text's data marks it as a Markdown text

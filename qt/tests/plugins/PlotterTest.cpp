@@ -8,6 +8,10 @@
  * @license GNU GPLv2 or later
  */
 #include <cmath>
+#include <functional>
+#include <set>
+#include <utility>
+#include <vector>
 
 #include <QElapsedTimer>
 #include <QJSEngine>
@@ -15,6 +19,7 @@
 
 #include "model/Stroke.h"
 #include "model/Text.h"
+#include "session/ElementGroups.h"
 #include "undo/UndoRedoHandler.h"
 
 #include "PluginTestSupport.h"
@@ -311,6 +316,73 @@ protected:
         EXPECT_TRUE(ui.live);
         return ui.live ? ui.live->spec() : QVariantMap();
     }
+    plugins::Environment envOf(DocumentSession& s) { return {&ops, &s, nullptr, &ui}; }
+    static Layer* layerOf(DocumentSession& s) { return s.getDocument()->getPage(0)->getSelectedLayer(); }
+    /// The elements of group `g` on page 0
+    static std::vector<Element*> members(DocumentSession& s, uint32_t g) {
+        std::vector<Element*> out;
+        for (const ElementPtr& e: layerOf(s)->getElements()) {
+            if (e->getGroup() == g) {
+                out.push_back(e.get());
+            }
+        }
+        return out;
+    }
+    /// The groups on page 0, each once
+    static std::set<uint32_t> groupsOf(DocumentSession& s) {
+        std::set<uint32_t> out;
+        for (const Element* e: layerOf(s)->getElementsView()) {
+            out.insert(e->getGroup());
+        }
+        return out;
+    }
+    /// Group `g` has a text with `what` in it (a formula)
+    static bool hasText(DocumentSession& s, uint32_t g, const std::string& what) {
+        for (const Element* e: members(s, g)) {
+            if (e->getType() == ELEMENT_TEXT &&
+                static_cast<const Text*>(e)->getText().find(what) != std::string::npos) {
+                return true;
+            }
+        }
+        return false;
+    }
+    /// A copy of group `g` pasted into `to` as CanvasView::pasteElements makes it: the elements with their data
+    /// (application/x-xournal-qt-data), moved, in a group of their own (groups::renumber); its number
+    uint32_t pasteCopy(uint32_t g, double dx, double dy, DocumentSession& to) {
+        std::vector<Element*> pasted;
+        std::unique_lock lock(*to.getDocument());
+        for (Element* e: members(*session, g)) {
+            ElementPtr copy = e->clone();
+            copy->setGroup(e->getGroup());
+            copy->setData(e->getData());
+            copy->move(dx, dy);
+            pasted.push_back(copy.get());
+            layerOf(to)->addElement(std::move(copy));
+        }
+        groups::renumber(pasted, *to.getDocument());
+        return pasted.front()->getGroup();
+    }
+    /// The plot inserted at `frame`; its group
+    uint32_t insertPlot() {
+        openPlot();
+        EXPECT_TRUE(ui.live->insert(ui.live->spec().value("values").toMap(), frame));
+        return layerOf(*session)->getElementsView().front()->getGroup();
+    }
+    /// "Edit plot" on group `g` of `s`: the dialog opens with the plot where it is; its function becomes `expr`, Update
+    void editTo(DocumentSession& s, uint32_t g, const QString& expr, QVariantMap* openedAt = nullptr) {
+        selected = {static_cast<int>(g)};
+        ui.live.reset();
+        auto r = host().run("org.xournalqt.function-plotter", "editPlot", envOf(s));
+        ASSERT_TRUE(r.ok) << r.error.toStdString();
+        ASSERT_TRUE(ui.live) << "no dialog";
+        QVariantMap values = ui.live->spec().value("values").toMap();
+        values["f0_expr"] = expr;
+        const QVariantMap f = ui.live->spec().value("frame").toMap();
+        if (openedAt) {
+            *openedAt = f;
+        }
+        ASSERT_TRUE(ui.live->insert(values, f));
+    }
     QVariantMap frame{{"page", 0}, {"x", 100}, {"y", 150}, {"width", 240}, {"height", 200}};
     QList<int> selected;  ///< the groups "selected"
 };
@@ -410,6 +482,143 @@ TEST_F(PlotterFixture, editPlotReplacesItAsOneUndoStep) {
     EXPECT_EQ(undo.undoDescription(), "Undo: Edit plot…");
     undo.undo();  // (the old plot back, whole)
     EXPECT_EQ(elements(), first);
+}
+
+// A copied plot keeps its description (the plugin's data is copied with it) and is a plot of its own: its group is new
+// (groups::renumber), and "Edit plot" on it changes only it, one undo step; the original's edit leaves the copies
+TEST_F(PlotterFixture, aPastedPlotIsEditedOnItsOwn) {
+    const uint32_t original = insertPlot();
+    const size_t n = members(*session, original).size();
+    ASSERT_GT(n, 20u);
+    const uint32_t first = pasteCopy(original, 0, 300, *session);
+    const uint32_t second = pasteCopy(original, 300, 0, *session);  // (pasted twice: two plots)
+    ASSERT_EQ(groupsOf(*session).size(), 3u);
+
+    QVariantMap at;
+    ASSERT_NO_FATAL_FAILURE(editTo(*session, first, "sin(x)", &at));
+    EXPECT_NEAR(at.value("x").toDouble(), 100, 0.01) << "the frame where the copy is";
+    EXPECT_NEAR(at.value("y").toDouble(), 450, 0.01);
+    EXPECT_TRUE(members(*session, first).empty()) << "the copy replaced";
+    EXPECT_EQ(members(*session, original).size(), n) << "the original stays";
+    EXPECT_EQ(members(*session, second).size(), n) << "the other copy stays";
+    EXPECT_FALSE(hasText(*session, original, "\\sin"));
+    EXPECT_FALSE(hasText(*session, second, "\\sin"));
+    std::set<uint32_t> groups = groupsOf(*session);
+    ASSERT_EQ(groups.size(), 3u);
+    groups.erase(original);
+    groups.erase(second);
+    EXPECT_TRUE(hasText(*session, *groups.begin(), "\\sin"));
+    UndoRedoHandler& undo = *session->getUndoRedoHandler();
+    EXPECT_EQ(undo.undoDescription(), "Undo: Edit plot…");
+    undo.undo();  // (one step: the copy as it was)
+    EXPECT_EQ(members(*session, first).size(), n);
+    EXPECT_EQ(elements(), 3 * n);
+
+    // The original edited: the copies stay
+    ASSERT_NO_FATAL_FAILURE(editTo(*session, original, "x^3"));
+    EXPECT_TRUE(members(*session, original).empty());
+    EXPECT_EQ(members(*session, first).size(), n);
+    EXPECT_EQ(members(*session, second).size(), n);
+    EXPECT_EQ(groupsOf(*session).size(), 3u);
+}
+
+// Pasted into another document: edited there, one undo step there; the original stays as it is
+TEST_F(PlotterFixture, aPlotPastedIntoAnotherDocumentIsEditedThere) {
+    const uint32_t original = insertPlot();
+    const size_t n = members(*session, original).size();
+    DocumentSession other(*app);
+    const uint32_t copy = pasteCopy(original, 0, 0, other);
+    ASSERT_NO_FATAL_FAILURE(editTo(other, copy, "sin(x)"));
+    const std::set<uint32_t> there = groupsOf(other);
+    ASSERT_EQ(there.size(), 1u);
+    EXPECT_TRUE(hasText(other, *there.begin(), "\\sin"));
+    EXPECT_EQ(other.getUndoRedoHandler()->undoDescription(), "Undo: Edit plot…");
+    EXPECT_EQ(members(*session, original).size(), n);
+    EXPECT_FALSE(hasText(*session, original, "\\sin"));
+    EXPECT_EQ(session->getUndoRedoHandler()->undoDescription(), "Undo: Plot a function…");
+    other.getUndoRedoHandler()->undo();
+    EXPECT_EQ(members(other, copy).size(), n);
+}
+
+// "Edit plot" redraws the plot from its description: when its members are no longer what the plotter drew (erased, cut,
+// one moved, one added), it asks first; Cancel changes nothing, "Edit anyway" opens the dialog
+TEST_F(PlotterFixture, aPlotChangedByHandAsksBeforeEditing) {
+    const uint32_t g = insertPlot();
+    const size_t n = members(*session, g).size();
+    const auto strokeOf = [&] {
+        for (Element* e: members(*session, g)) {
+            if (e->getType() == ELEMENT_STROKE) {
+                return e;
+            }
+        }
+        return static_cast<Element*>(nullptr);
+    };
+    const std::vector<std::pair<const char*, std::function<std::function<void()>()>>> changes = {
+            {"a member erased",
+             [&]() -> std::function<void()> {
+                 Element* e = strokeOf();
+                 InsertionPosition removed = layerOf(*session)->removeElement(e);
+                 Element* raw = removed.e.release();
+                 const Element::Index index = removed.pos;
+                 return [this, raw, index] { layerOf(*session)->insertElement(ElementPtr(raw), index); };
+             }},
+            {"a member moved",
+             [&]() -> std::function<void()> {
+                 Element* e = strokeOf();
+                 e->move(30, 20);
+                 return [e] { e->move(-30, -20); };
+             }},
+            {"a stroke cut in two (a member more)",
+             [&]() -> std::function<void()> {
+                 ElementPtr piece = strokeOf()->clone();
+                 piece->setGroup(g);
+                 Element* raw = piece.get();
+                 layerOf(*session)->addElement(std::move(piece));
+                 return [this, raw] { layerOf(*session)->removeElement(raw); };
+             }},
+    };
+    for (const auto& [what, change]: changes) {
+        SCOPED_TRACE(what);
+        const auto undoChange = change();
+        selected = {static_cast<int>(g)};
+        ui.live.reset();
+        ui.lastDialog.clear();
+        ui.dialogAnswer.reset();  // (Cancel)
+        auto r = host().run("org.xournalqt.function-plotter", "editPlot", env());
+        ASSERT_TRUE(r.ok) << r.error.toStdString();
+        EXPECT_EQ(ui.lastDialog.value("ok").toString(), "Edit anyway");
+        EXPECT_EQ(ui.lastDialog.value("cancel").toString(), "Cancel");
+        const QVariantList fields = ui.lastDialog.value("fields").toList();
+        ASSERT_EQ(fields.size(), 1);
+        EXPECT_EQ(fields[0].toMap().value("text").toString(),
+                  "This plot was changed by hand. Editing redraws it: erased or moved parts come back.");
+        EXPECT_FALSE(ui.live) << "Cancel: no dialog";
+        EXPECT_EQ(selected, QList<int>{static_cast<int>(g)}) << "Cancel: still selected";
+        EXPECT_EQ(session->getUndoRedoHandler()->undoDescription(), "Undo: Plot a function…");
+        // Edit anyway
+        ui.dialogAnswer = QVariantMap{};
+        r = host().run("org.xournalqt.function-plotter", "editPlot", env());
+        ASSERT_TRUE(r.ok) << r.error.toStdString();
+        EXPECT_TRUE(ui.live) << "Edit anyway: the dialog";
+        undoChange();
+        ASSERT_EQ(members(*session, g).size(), n);
+    }
+}
+
+// Moved and scaled as a whole (also not keeping its proportions), the plot is as the plotter drew it: no question
+TEST_F(PlotterFixture, aPlotMovedOrScaledAsAWholeDoesNotAsk) {
+    const uint32_t g = insertPlot();
+    for (Element* e: members(*session, g)) {
+        e->move(40, 260);
+        e->scale(140, 410, 1.6, 0.7, 0, false);
+    }
+    selected = {static_cast<int>(g)};
+    ui.live.reset();
+    ui.dialogAnswer.reset();
+    auto r = host().run("org.xournalqt.function-plotter", "editPlot", env());
+    ASSERT_TRUE(r.ok) << r.error.toStdString();
+    EXPECT_TRUE(ui.lastDialog.isEmpty()) << "no question";
+    EXPECT_TRUE(ui.live);
 }
 
 TEST_F(PlotterFixture, aPlotWithAMistakeIsNotInsertedAndNothingChanges) {
