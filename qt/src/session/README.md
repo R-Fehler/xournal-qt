@@ -17,7 +17,7 @@ undo, the fork's file formats and the PDF machinery. The CLI and the tests use i
 | `AdoptAnnotations`, `DocumentAdopt` | annotations of other apps made editable |
 | `DocumentSearch`, `DocumentTextIndex`, `TextMatch`, `TextReplace`, `FuzzyQuery`, `FuzzyMatch`, `WordMatch`, `Vocabulary`, `InkText` | search in one document, the fuzzy search, recognised handwriting |
 | `TextFile`, `TextDocument`, `DocumentImages`, `PictureSaveHandler`, `DocumentLink`, `DocumentMode`, `PageFiles` | text files and text documents, the pictures of Markdown, links, how documents are kept, pages as files |
-| `StickyNote`, `ElementGroups`, `ElementTimes`, `Timeline`, `PageNoteSpace`, `PageMargins`, `PageBookmarks`, `StickerFile`, `TemplateFile`, `PenFill`, `Tags`, `Citation` | the fork's features in the document model |
+| `StickyNote`, `ElementGroups`, `ElementData`, `ElementTimes`, `Timeline`, `PageNoteSpace`, `PageMargins`, `PageBookmarks`, `StickerFile`, `TemplateFile`, `PenFill`, `Tags`, `Citation` | the fork's features in the document model |
 
 **May depend on**: `xoj-render`, `xoj-core`, `xqt-markdown`, `xqt-audio`, Qt Core. From upstream: the model, `undo`,
 `control/xojfile` (`LoadHandler`, `SaveHandler`), `control/settings`, `control/layer`, `control/ToolHandler`,

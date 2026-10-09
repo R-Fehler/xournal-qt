@@ -15,7 +15,8 @@ const TR = {
     size: "Size", exact: "Exact scale", unit: "1 unit =", decimalComma: "Decimal comma (1,5)"
 }
 
-/// The open dialog's plot: {spec, editing (the plot's id being edited, or null), exact (it was at the exact scale)}
+/// The open dialog's plot: {spec, editing (the plot being edited: {page, layer, group, id}, or null), exact (it was at
+/// the exact scale)}
 let current = null
 
 function decimalComma() { return xournal.decimalPoint === "," }
@@ -104,8 +105,10 @@ export function insert(values, ctx) {
     if (errors.length > 0) throw new Error("the plot has a mistake: " + drawn.errors[errors[0]])
     if (drawn.shapes.length === 0) throw new Error("nothing to plot")
     if (current.editing) {
-        const old = elements.list(frame.page, { onlyWithData: true }).filter(function (e) {
-            return e.data && e.data.plot && e.data.plot.id === current.editing
+        // (the plot is its group: a pasted copy has the same description in a group of its own)
+        const ed = current.editing
+        const old = elements.list(ed.page, { layer: ed.layer }).filter(function (e) {
+            return ed.group !== 0 ? e.group === ed.group : e.data && e.data.plot && e.data.plot.id === ed.id
         })
         if (old.length > 0) elements.remove(old.map(function (e) { return e.ref }), { withGroups: true })
     }
@@ -122,36 +125,43 @@ export function insert(values, ctx) {
     current = null
 }
 
-/// "Edit plot": the selected plot's dialog again, its frame where the plot is now
+/// The same box (an element listed again in another call: references do not last)
+function sameBox(a, b) {
+    return a.type === b.type && Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6 &&
+           Math.abs(a.width - b.width) < 1e-6 && Math.abs(a.height - b.height) < 1e-6
+}
+
+/// "Edit plot": the selected plot's dialog again, its frame where the plot is now. The plot is the group of the
+/// selected element that keeps the description: a copy (pasted, with the description) is a plot of its own.
 export function editPlot() {
     const sel = selection.get()
-    let data = null
+    let picked = null
     if (sel) {
         sel.elements.forEach(function (e) {
-            if (!data && e.data && e.data.plot) data = e.data
+            if (!picked && e.data && e.data.plot) picked = e
         })
     }
-    if (!data) {
+    if (!picked) {
         ui.notify("Select a plot made with “Plot a function…” first")
         return
     }
+    const data = picked.data
+    const members = sel.elements.filter(function (e) {
+        return picked.group !== 0 ? e.group === picked.group : e === picked
+    })
     selection.clear()
-    // (the plot's ink where it is now: the group of the element that keeps the description, in its layer)
+    // (its layer: the selected elements are back in it now)
     const listed = elements.list(sel.page)
-    const anchor = listed.filter(function (e) {
-        return e.data && e.data.plot && e.data.plot.id === data.plot.id && e.type === "stroke"
-    })[0]
+    const holders = listed.filter(function (e) { return e.data && e.data.plot && e.group === picked.group })
+    const anchor = holders.filter(function (e) { return sameBox(e, picked) })[0] || holders[0]
     let frame = { page: sel.page, width: data.frame.width, height: data.frame.height }
-    if (anchor) {
-        const group = listed.filter(function (e) {
-            return e.type === "stroke" && e.layer === anchor.layer &&
-                   (anchor.group !== 0 ? e.group === anchor.group : e.ref === anchor.ref)
-        })
-        const box = boxOf(group)
+    const ink = members.filter(function (e) { return e.type === "stroke" })
+    if (ink.length > 0) {
+        const box = boxOf(ink)
         frame.x = box.x + data.frame.dx
         frame.y = box.y + data.frame.dy
     }
     const spec = data.plot
     if (spec.decimalComma === undefined) spec.decimalComma = decimalComma()
-    open(spec, frame, spec.id)
+    open(spec, frame, { page: sel.page, layer: anchor ? anchor.layer : undefined, group: picked.group, id: spec.id })
 }

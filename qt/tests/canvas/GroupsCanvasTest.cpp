@@ -37,6 +37,7 @@
 #include "render/RenderService.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
+#include "session/ElementData.h"
 #include "session/ElementGroups.h"
 #include "session/StickerFile.h"
 #include "session/StickyNote.h"
@@ -347,16 +348,20 @@ TEST_F(GroupsCanvasTest, aCopiedGroupIsPastedAsANewGroup) {
     EXPECT_EQ(after[7], 0u);
 }
 
-// A plot's labels (Markdown texts outside the Markdown layer, session/InlineMarkdown.h) stay Markdown when the plot is
-// copied; the plugin's own data stays behind (a copy is no plot to edit)
-TEST_F(GroupsCanvasTest, copiedPlotLabelsStayMarkdown) {
-    addStroke(100, 100, 200, 100, 4);
+// A plot copied: the plugins' data goes with it (application/x-xournal-qt-data beside upstream's data, which stays
+// upstream's), so the pasted copy is a plot again, in a group of its own; its labels stay Markdown
+// (session/ElementData.h)
+TEST_F(GroupsCanvasTest, copiedElementsKeepTheirPluginData) {
+    Stroke* ink = addStroke(100, 100, 200, 100, 4);
+    ink->setData(R"({"org.xournalqt.function-plotter":{"plot":{"id":"p1"}}})");
+    addStroke(100, 130, 200, 130, 4);
     auto t = std::make_unique<Text>();
     t->setText("$x$");
     t->setFont(XojFont("Sans", 10));
     t->setTransformation(xoj::util::Matrix::TRANSLATION(150, 120));
     t->setGroup(4);
-    t->setData(R"({"org.xournalqt.function-plotter":{"plot":1},"xqt:markdown":true})");
+    const std::string labelData = R"({"org.xournalqt.function-plotter":{"plot":{"id":"p1"}},"xqt:markdown":true})";
+    t->setData(labelData);
     {
         std::unique_lock lock(*session->getDocument());
         layer()->addElement(std::move(t));
@@ -364,15 +369,42 @@ TEST_F(GroupsCanvasTest, copiedPlotLabelsStayMarkdown) {
     ASSERT_TRUE(static_cast<const Text*>(layer()->getElementsView().back())->isMarkdown());
     view->selectAllOnPage();
     ASSERT_TRUE(view->copySelection());
-    EXPECT_EQ(QGuiApplication::clipboard()->mimeData()->data(md::INLINE_CLIPBOARD_MIME).toStdString(), "01");
+    const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+    EXPECT_EQ(mime->data(md::INLINE_CLIPBOARD_MIME).toStdString(), "001");  // (as older versions read it)
+    ASSERT_TRUE(mime->hasFormat(elementdata::CLIPBOARD_MIME));
     view->clearSelection();
+    for (int i = 0; i < 2; ++i) {  // (twice: two copies)
+        ASSERT_TRUE(view->pasteElements());
+        view->clearSelection();
+    }
+    const auto all = layer()->getElementsView();
+    ASSERT_EQ(all.size(), 9u);
+    std::set<uint32_t> groups;
+    for (size_t copy = 1; copy <= 2; ++copy) {
+        const Element* pastedInk = *std::next(all.begin(), static_cast<long>(3 * copy));
+        const Element* plain = *std::next(all.begin(), static_cast<long>(3 * copy + 1));
+        const auto* label = static_cast<const Text*>(*std::next(all.begin(), static_cast<long>(3 * copy + 2)));
+        EXPECT_EQ(pastedInk->getData(), ink->getData());
+        EXPECT_EQ(plain->getData(), "");
+        EXPECT_EQ(label->getData(), labelData);
+        EXPECT_TRUE(label->isMarkdown());
+        EXPECT_EQ(pastedInk->getGroup(), label->getGroup());
+        groups.insert(pastedInk->getGroup());
+    }
+    EXPECT_EQ(groups.size(), 2u) << "each copy a group of its own";
+    EXPECT_FALSE(groups.count(4)) << "not the original's";
+
+    // Copied by an older version (only the Markdown marks): the labels stay Markdown, without the plugin's data
+    auto* older = new QMimeData;
+    older->setData("application/xournal", mime->data("application/xournal"));
+    older->setData(md::INLINE_CLIPBOARD_MIME, "001");
+    QGuiApplication::clipboard()->setMimeData(older);
     ASSERT_TRUE(view->pasteElements());
     view->clearSelection();
-    const auto all = layer()->getElementsView();
-    ASSERT_EQ(all.size(), 4u);
-    const auto* pasted = static_cast<const Text*>(*std::next(all.begin(), 3));
-    EXPECT_TRUE(pasted->isMarkdown());
-    EXPECT_EQ(pasted->getData(), R"({"xqt:markdown":true})");
+    const auto after = layer()->getElementsView();
+    ASSERT_EQ(after.size(), 12u);
+    EXPECT_EQ((*std::next(after.begin(), 9))->getData(), "");
+    EXPECT_EQ((*std::next(after.begin(), 11))->getData(), R"({"xqt:markdown":true})");
 }
 
 // A selection of notes with elements keeps its groups on the clipboard (the fork's format), pasted with new numbers

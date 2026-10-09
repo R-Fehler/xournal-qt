@@ -5,6 +5,9 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
+#include <map>
+
 #include <QDir>
 #include <QFile>
 #include <QStandardPaths>
@@ -13,6 +16,7 @@
 
 #include "model/Document.h"
 #include "model/Layer.h"
+#include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
 #include "shell/ShortcutsModel.h"
@@ -294,6 +298,78 @@ TEST_F(PluginsUiTest, theFunctionPlotterIsOfferedWithTheInsertCommandsAndInserts
         nextFrame();
         window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT") + "-plotter-inserted.png");
     }
+}
+
+namespace {
+/// The groups of page 0's selected layer, each with its elements
+std::map<uint32_t, std::vector<const Element*>> groupsOf(xqt::DocumentSession* s) {
+    std::map<uint32_t, std::vector<const Element*>> out;
+    for (const Element* e: s->getDocument()->getPage(0)->getSelectedLayer()->getElementsView()) {
+        out[e->getGroup()].push_back(e);
+    }
+    return out;
+}
+/// How many of these groups have a text with `what` in it
+size_t withText(const std::map<uint32_t, std::vector<const Element*>>& groups, const std::string& what) {
+    size_t n = 0;
+    for (const auto& [g, list]: groups) {
+        n += std::any_of(list.begin(), list.end(), [&](const Element* e) {
+            return e->getType() == ELEMENT_TEXT &&
+                   static_cast<const Text*>(e)->getText().find(what) != std::string::npos;
+        });
+    }
+    return n;
+}
+}  // namespace
+
+// A plot copied and pasted (Ctrl+C, Ctrl+V) is a plot of its own: "Edit plot…" on the pasted copy opens its dialog and
+// Update changes only the copy, one undo step; pasted into another document, the same there
+TEST_F(PluginsUiTest, aCopiedPlotIsEditedOnItsOwnWherePasted) {
+    host().setGrant("org.xournalqt.function-plotter", "edit", "allow");
+    auto* plugins = controller->pluginControl();
+    const QString plot = "plugin:org.xournalqt.function-plotter/plot";
+    const QString edit = "plugin:org.xournalqt.function-plotter/editPlot";
+    ASSERT_TRUE(plugins->run(plot));
+    ASSERT_TRUE(until([&] { return plugins->liveOpen(); }));
+    ASSERT_TRUE(plugins->liveInsert(plugins->liveSpec().value("values").toMap()));
+    xqt::DocumentSession* first = controller->tabManager().currentSession();
+    const auto inserted = groupsOf(first);
+    ASSERT_EQ(inserted.size(), 1u);
+    const size_t n = inserted.begin()->second.size();
+    controller->selectAllOnPage();
+    ASSERT_TRUE(controller->copySelection());
+    controller->clearSelection();
+    ASSERT_TRUE(controller->pasteElements());  // (the copy selected: out of the layer meanwhile)
+
+    ASSERT_TRUE(plugins->run(edit));
+    ASSERT_TRUE(until([&] { return plugins->liveOpen(); })) << "Edit plot… on the pasted copy";
+    EXPECT_EQ(plugins->liveSpec().value("title").toString(), "Edit plot");
+    QVariantMap values = plugins->liveSpec().value("values").toMap();
+    values["f0_expr"] = "sin(x)";
+    ASSERT_TRUE(plugins->liveInsert(values));
+    auto after = groupsOf(first);
+    ASSERT_EQ(after.size(), 2u);
+    EXPECT_EQ(after.count(inserted.begin()->first), 1u) << "the original stays";
+    EXPECT_EQ(after[inserted.begin()->first].size(), n);
+    EXPECT_EQ(withText(after, "\\sin"), 1u) << "only the copy changed";
+    EXPECT_EQ(first->getUndoRedoHandler()->undoDescription(), "Undo: Edit plot…");
+
+    // Into another document: a plot there
+    controller->newDocument();
+    xqt::DocumentSession* second = controller->tabManager().currentSession();
+    ASSERT_NE(second, first);
+    ASSERT_TRUE(controller->pasteElements());
+    ASSERT_TRUE(plugins->run(edit));
+    ASSERT_TRUE(until([&] { return plugins->liveOpen(); }));
+    values = plugins->liveSpec().value("values").toMap();
+    values["f0_expr"] = "x^3";
+    ASSERT_TRUE(plugins->liveInsert(values));
+    const auto there = groupsOf(second);
+    ASSERT_EQ(there.size(), 1u);
+    EXPECT_EQ(withText(there, "x^{3}"), 1u);
+    EXPECT_EQ(second->getUndoRedoHandler()->undoDescription(), "Undo: Edit plot…");
+    EXPECT_EQ(withText(groupsOf(first), "x^{3}"), 0u);
+    EXPECT_EQ(groupsOf(first).size(), 2u);
 }
 
 // Pictures of plots for looking at them (XQT_PLOT_GALLERY=<folder>; skipped otherwise): poles, π steps, a curve,

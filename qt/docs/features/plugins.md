@@ -62,8 +62,11 @@ insert commands: **Plot a function…** in ⋮ → Tools and in the toolbox's "+
   deletes as one.
 - **Edit plot**: the plot keeps its description (functions, ranges, options, and where its frame was) as the plugin's
   data on the group (`xqt-data`); select the plot and choose **Edit plot…** (⋮ → Tools): the dialog opens with it and
-  the frame where the plot is; **Update** replaces it, one undo step. In Xournal++ the plot is plain strokes and texts
-  (the boxes show their `$…$` source); saving there drops its description and group.
+  the frame where the plot is; **Update** replaces it, one undo step. A **copy** of a plot (copied and pasted, here or
+  in another document, as often as wanted) keeps the description and is a plot of its own: "Edit plot…" on it
+  changes only it, and editing the original leaves the copies. (The plot is its group: the plotter replaces the
+  group of the plot it was opened on, and a pasted copy is in a new group.) In Xournal++ the plot is plain strokes
+  and texts (the boxes show their `$…$` source); saving there drops its description and group.
 - Not yet (TODO.md, "Plotting"): polar curves r(θ), an empty coordinate system, points and value tables, shading,
   tangents and derivatives, number lines, piecewise functions, function families.
 
@@ -193,7 +196,10 @@ Coordinates are points (1/72 inch) on the page. Errors are thrown as JavaScript 
 **References** (`ref`) name an element for the call they were handed out in (a command, one callback of a dialog);
 an element that is gone meanwhile gives a `StaleReferenceError`. **Data** on elements: `insert(…, {data})` and
 `setData` keep a JSON value under the plugin's id (the element attribute `xqt-data`, which Xournal++ ignores and drops
-when it saves); `list` shows a plugin only its own.
+when it saves); `list` shows a plugin only its own. **Data on elements is copied with them** (copy and paste, here
+or into another document; a duplicated page), unchanged; **a pasted copy gets a new identity**: its groups get new
+numbers. So an id inside your data is the same on the original and every copy: tell your things apart by their
+`group` (and page and layer), as the plotter does, not by an id in the data.
 
 ### Shapes
 
@@ -273,9 +279,10 @@ commands, the window's operations, the questions, dialogs and the live dialog), 
 evaluation and LaTeX; `lib/ticks.mjs`; `lib/sample.mjs` the adaptive sampling, roots and extrema; `lib/plot.mjs` the
 shapes; `lib/spec.mjs` the description and the dialog's fields), copied to `<share>/plugins/` by `XqtPlugins.cmake`.
 Tests: `OperationsTest` (label `ops`), `PluginHostTest`, `ExamplesTest` and `PlotterTest` (label `plugins`: the parser, LaTeX, ticks,
-sampling at poles and jumps, the exact scale, insert and edit as one step each, a plot with a mistake),
+sampling at poles and jumps, the exact scale, insert and edit as one step each, a pasted copy edited on its own, a plot
+with a mistake),
 `PluginsUiTest` (label `ui`: the menu, the question, the note with Undo, the key, the live dialog with its preview
-and frame, Settings → Plugins), `Cli.runsAPluginCommandOnADocument` (label `shell`).
+and frame, a copied plot edited where it is pasted, Settings → Plugins), `Cli.runsAPluginCommandOnADocument` (label `shell`).
 
 ## On the device
 
