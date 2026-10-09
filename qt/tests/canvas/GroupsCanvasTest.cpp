@@ -25,6 +25,10 @@
 #include "control/ToolEnums.h"
 #include "control/ToolHandler.h"
 #include "control/tools/EditSelection.h"
+#include "model/Font.h"
+#include "model/Text.h"
+#include "util/Matrix.h"
+#include "session/InlineMarkdown.h"
 #include "model/Document.h"
 #include "model/Layer.h"
 #include "model/Point.h"
@@ -341,6 +345,34 @@ TEST_F(GroupsCanvasTest, aCopiedGroupIsPastedAsANewGroup) {
     ASSERT_EQ(after.size(), 9u);
     EXPECT_EQ(after[6], 0u);
     EXPECT_EQ(after[7], 0u);
+}
+
+// A plot's labels (Markdown texts outside the Markdown layer, session/InlineMarkdown.h) stay Markdown when the plot is
+// copied; the plugin's own data stays behind (a copy is no plot to edit)
+TEST_F(GroupsCanvasTest, copiedPlotLabelsStayMarkdown) {
+    addStroke(100, 100, 200, 100, 4);
+    auto t = std::make_unique<Text>();
+    t->setText("$x$");
+    t->setFont(XojFont("Sans", 10));
+    t->setTransformation(xoj::util::Matrix::TRANSLATION(150, 120));
+    t->setGroup(4);
+    t->setData(R"({"org.xournalqt.function-plotter":{"plot":1},"xqt:markdown":true})");
+    {
+        std::unique_lock lock(*session->getDocument());
+        layer()->addElement(std::move(t));
+    }
+    ASSERT_TRUE(static_cast<const Text*>(layer()->getElementsView().back())->isMarkdown());
+    view->selectAllOnPage();
+    ASSERT_TRUE(view->copySelection());
+    EXPECT_EQ(QGuiApplication::clipboard()->mimeData()->data(md::INLINE_CLIPBOARD_MIME).toStdString(), "01");
+    view->clearSelection();
+    ASSERT_TRUE(view->pasteElements());
+    view->clearSelection();
+    const auto all = layer()->getElementsView();
+    ASSERT_EQ(all.size(), 4u);
+    const auto* pasted = static_cast<const Text*>(*std::next(all.begin(), 3));
+    EXPECT_TRUE(pasted->isMarkdown());
+    EXPECT_EQ(pasted->getData(), R"({"xqt:markdown":true})");
 }
 
 // A selection of notes with elements keeps its groups on the clipboard (the fork's format), pasted with new numbers

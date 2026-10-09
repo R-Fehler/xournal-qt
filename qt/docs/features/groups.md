@@ -38,6 +38,9 @@ element is in one group or in none) and lie in one layer, like a selection of el
   `application/x-xournal-qt-groups`: the group number of each element in the same order, as text (`"3 3 0 7"`), only
   when something copied is grouped. The fork's own formats (a sticky note, notes with elements) carry the number after
   each element (format names `StickyNote3`, `StickyGroup2`; data copied by an older version is not pasted).
+- **Markdown texts outside the Markdown layer** (a plot's labels, marked in their data: `session/InlineMarkdown.h`)
+  stay Markdown texts when pasted: the fork writes `application/x-xournal-qt-markdown` beside it, a `1` or `0` per
+  copied element. A plugin's other data is not copied (a pasted plot is no plot to edit again).
 - **Pasting** gives every copied group a new number (`groups::renumber`): a pasted copy never joins the group it was
   copied from. Data from Xournal++ (no fork entry) is pasted ungrouped.
 - **Moving into another layer** (a selection dragged onto another page, several notes with elements dropped on

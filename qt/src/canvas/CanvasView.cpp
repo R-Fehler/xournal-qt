@@ -76,6 +76,7 @@
 #include "session/DocumentLink.h"
 #include "session/DocumentSession.h"
 #include "session/ElementTimes.h"
+#include "session/InlineMarkdown.h"
 #include "session/Timeline.h"
 #include "session/StickyNote.h"
 #include "audio/DocumentAudio.h"
@@ -571,6 +572,17 @@ bool CanvasView::copySelection() {
     if (groups::stateOf(copied).canUngroup) {
         mime->setData(groups::CLIPBOARD_MIME, QByteArray::fromStdString(groups::clipboardNumbers(copied)));
     }
+    // xournal-qt: which texts are Markdown outside the Markdown layer (a plot's labels, InlineMarkdown.h); the
+    // plugins' other data stays behind (a copy is no plot to edit: the original's id would be twice on the page)
+    if (std::any_of(copied.begin(), copied.end(), [](const Element* e) {
+            return e->getType() == ELEMENT_TEXT && md::isInlineMarkdown(*static_cast<const Text*>(e));
+        })) {
+        QByteArray marks;
+        for (const Element* e: copied) {
+            marks += e->getType() == ELEMENT_TEXT && md::isInlineMarkdown(*static_cast<const Text*>(e)) ? "1" : "0";
+        }
+        mime->setData(md::INLINE_CLIPBOARD_MIME, marks);
+    }
     QString text;
     for (const Element* e: selection->getElementsView()) {
         if (e->getType() == ELEMENT_TEXT) {
@@ -881,6 +893,7 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
             pastedGroups = groups::fromClipboard(mime->data(groups::CLIPBOARD_MIME).toStdString(),
                                                  static_cast<size_t>(std::max(0, count)));
         }
+        const QByteArray inlineMarks = mime->data(md::INLINE_CLIPBOARD_MIME);  // (InlineMarkdown.h)
         std::vector<Element*> pasted;
         for (int i = 0; i < count; i++) {
             const std::string name = in.getNextObjectName();
@@ -900,6 +913,9 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
             }
             element->readSerialized(in);
             element->setGroup(pastedGroups.empty() ? 0 : pastedGroups[static_cast<size_t>(i)]);
+            if (i < inlineMarks.size() && inlineMarks[i] == '1') {
+                element->setData(md::withInlineMark({}));
+            }
             pasted.push_back(element.get());
             undo->addElement(layer, element.get(), layer->indexOf(element.get()));
             sel->addElement(std::move(element), std::numeric_limits<Element::Index>::max());
