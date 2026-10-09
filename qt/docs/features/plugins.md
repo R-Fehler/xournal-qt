@@ -66,6 +66,21 @@ insert commands: **Plot a function…** in ⋮ → Tools and in the toolbox's "+
 - Not yet (TODO.md, "Plotting"): polar curves r(θ), an empty coordinate system, points and value tables, shading,
   tangents and derivatives, number lines, piecewise functions, function families.
 
+## The example plugins
+
+Off until switched on in Settings → Plugins; small ports of Xournal++'s plugins, as examples of the API
+(`qt/resources/plugins/<name>/`):
+
+| Plugin | Commands | Shows |
+| --- | --- | --- |
+| Color cycle | "Next color" (Alt+C): the tool in hand takes the palette's next color | `tools`, `ui.palette()` |
+| Toggle grid | squared paper on or off, on this page or all | `pages.setBackground`: many pages, one undo step |
+| Layer actions | a new top layer on every page (its name asked), only the first layer shown, all shown | `layers`, a modal dialog |
+| Export | "Export as PDF…", "Export a list of the pages as Markdown…" | `files`: a file only through a dialog |
+
+Upstream's others: SpaceForNotes and QuickScreenshot are app features here (note space, snip), HighlightPosition has
+nothing to toggle, ImageActions needs an image API, BeamerPresentation PDF page labels (neither is in API 1.0).
+
 ## How a command runs
 
 - The plugins are found in two folders: the bundled ones (`<share>/xournal-qt/plugins/<id>/`, beside the handwriting
@@ -240,7 +255,7 @@ commands, the window's operations, the questions, dialogs and the live dialog), 
 (`ToolboxModel::setPluginItems`). The function plotter: `qt/resources/plugins/function-plotter` (`main.mjs`; `lib/parse.mjs` the expression language,
 evaluation and LaTeX; `lib/ticks.mjs`; `lib/sample.mjs` the adaptive sampling, roots and extrema; `lib/plot.mjs` the
 shapes; `lib/spec.mjs` the description and the dialog's fields), copied to `<share>/plugins/` by `XqtPlugins.cmake`.
-Tests: `OperationsTest` (label `ops`), `PluginHostTest` and `PlotterTest` (label `plugins`: the parser, LaTeX, ticks,
+Tests: `OperationsTest` (label `ops`), `PluginHostTest`, `ExamplesTest` and `PlotterTest` (label `plugins`: the parser, LaTeX, ticks,
 sampling at poles and jumps, the exact scale, insert and edit as one step each, a plot with a mistake),
 `PluginsUiTest` (label `ui`: the menu, the question, the note with Undo, the key, the live dialog with its preview
 and frame, Settings → Plugins).

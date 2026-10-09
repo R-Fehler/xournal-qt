@@ -33,7 +33,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/plugins/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/plugins/PluginTestSupport.h
         ${CMAKE_CURRENT_LIST_DIR}/../tests/plugins/PluginHostTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/plugins/PlotterTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/plugins/PlotterTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/plugins/ExamplesTest.cpp)
     target_link_libraries(xqt-plugins-tests PRIVATE xqt-plugins xqt-test-support Qt6::Test GTest::gtest)
     target_include_directories(xqt-plugins-tests PRIVATE "${TEST_CONFIG_DIR}")
     target_compile_definitions(xqt-plugins-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}"
