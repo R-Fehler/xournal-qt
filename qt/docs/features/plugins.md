@@ -284,3 +284,15 @@ and frame, Settings → Plugins), `Cli.runsAPluginCommandOnADocument` (label `sh
 - A tablet in portrait and landscape: the live dialog at the right does not cover the frame where it starts (the
   middle of what is in view); the frame's corner is big enough for a finger.
 - The permission question and a plugin's modal dialog close with Android's back key (as "Don't allow" / Cancel).
+- Android: after an update of the app, a changed bundled plugin is the new one (the resources are copied from the APK
+  at start; a plugin's files are compared byte for byte); the plotter's engine (QJSEngine, JIT on arm64) is as fast as
+  on the desktop (the preview follows a slider without stutter).
+- macOS: the signed build runs plugins (QJSEngine's JIT needs the `allow-jit` entitlement the QML engine already has).
+
+## Not yet
+
+- Installing a plugin on Android or iOS (the user's folder is in the app's private storage there): "Install from
+  file…" (a `.xqtplugin` zip) in Settings → Plugins. On the desktop a plugin is a folder copied into the user's.
+- A file watcher that reloads a plugin while it is written (Reload in Settings does it by hand).
+- Plugin QML or panels, events (page added, tool changed), images, PDF page labels, network: not in API 1.0.
+- References name elements for one call; stable element ids (`xqt-id`) would let plugins, peers and agents keep them.

@@ -339,3 +339,40 @@ TEST_F(PluginsUiTest, plotGallery) {
     nextFrame();
     window->grabWindow().save(folder + "/curve-params.png");
 }
+
+namespace {
+/// The same window at a phone's size (the phone classes: the live dialog is a bottom sheet)
+class PluginsPhoneTest: public PluginsUiTest {
+protected:
+    void SetUp() override {
+        makeController();
+        controller->newDocument();
+        host().setGrant("org.xournalqt.function-plotter", "edit", "allow");
+        ASSERT_NO_FATAL_FAILURE(loadWindow({QSize(412, 915), true}));
+    }
+};
+}  // namespace
+
+TEST_F(PluginsPhoneTest, theLiveDialogIsABottomSheetWithThePageAbove) {
+    ASSERT_TRUE(controller->pluginControl()->run("plugin:org.xournalqt.function-plotter/plot"));
+    auto* dialog = find<QObject>("pluginLiveDialog");
+    ASSERT_TRUE(until([&] { return dialog->property("opened").toBool(); }));
+    const double y = dialog->property("y").toDouble(), h = dialog->property("height").toDouble();
+    EXPECT_EQ(dialog->property("width").toDouble(), window->width());
+    EXPECT_GT(y, window->height() * 0.4);
+    EXPECT_LE(y + h, window->height() + 0.5);
+    auto* canvas = find<DocumentCanvasItem>("canvas");
+    ASSERT_TRUE(until([&] { return canvas->pluginPreviewShown().shown; }));
+    // The frame starts in the part of the page the sheet leaves free
+    QQuickItem* frame = findItem("pluginFrame", true);
+    ASSERT_NE(frame, nullptr);
+    const QPointF bottom = frame->mapToScene(QPointF(0, frame->height()));
+    EXPECT_LT(bottom.y(), y + 1);
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        nextFrame();
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT") + "-plotter-phone.png");
+    }
+    controller->pluginControl()->liveCancel();
+    ASSERT_TRUE(until([&] { return !dialog->property("visible").toBool(); }));
+    EXPECT_FALSE(canvas->pluginPreviewShown().shown || controller->pluginControl()->liveOpen());
+}

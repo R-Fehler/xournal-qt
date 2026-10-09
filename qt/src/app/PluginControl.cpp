@@ -322,8 +322,8 @@ QVariantMap PluginControl::defaultFrame(const QVariantMap& wanted) const {
         pw = doc->getPage(page)->getWidth();
         ph = doc->getPage(page)->getHeight();
     }
-    const double w = std::clamp(wanted.value("width", 240).toDouble(), 20.0, pw);
-    const double h = std::clamp(wanted.value("height", 180).toDouble(), 20.0, ph);
+    double w = std::clamp(wanted.value("width", 240).toDouble(), 20.0, pw);
+    double h = std::clamp(wanted.value("height", 180).toDouble(), 20.0, ph);
     // The middle of what of the page is in view (else the page's middle)
     QPointF middle(pw / 2, ph / 2);
     double seenLeft = 0, seenRight = pw;
@@ -342,6 +342,12 @@ QVariantMap PluginControl::defaultFrame(const QVariantMap& wanted) const {
             seenLeft = (seen.left() - r.left()) / zoom;
             seenRight = (seen.right() - r.left()) / zoom;
         }
+    }
+    // (a new frame fits into what is free: smaller, its proportions kept, on a phone)
+    if (!wanted.contains("x") && seenRight > seenLeft) {
+        const double fit = std::min(1.0, 0.9 * (seenRight - seenLeft) / w);
+        w = std::max(20.0, w * fit);
+        h = std::max(20.0, h * fit);
     }
     // (in the middle of what is free; where that is narrower than the frame, at its right end, clear of the dialog)
     double x = middle.x() - w / 2;

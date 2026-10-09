@@ -75,19 +75,24 @@ All four waves are merged (2026-10-07). The architecture overview:
 ## JavaScript plugins (`qt/js-plugins`)
 
 The author's decisions of 2026-10-09: [ADR 0008](qt/docs/decisions/0008-js-plugins.md); the research:
-[js-plugins-research.md](qt/docs/review/2026-10/js-plugins-research.md).
-- [~] The undo sink seam and `SequenceUndoAction` (one command, one undo step; rollback) (`qt/js-plugins`)
-- [~] Plugin data on elements (`xqt-data`, a seam like `xqt-group`) (`qt/js-plugins`)
-- [~] The operations layer: module `qt/src/ops` (principals, authority, transactions, the document's operations),
-  label `ops` (`qt/js-plugins`)
-- [~] The host: module `qt/src/plugins` (manifest, registry, engine per plugin, watchdog, log, permissions, API v1),
-  label `plugins` (`qt/js-plugins`)
-- [~] The UI: Plugins in ⋮, the "+" catalog, shortcuts, Settings → Plugins, the permission prompt, dialogs, the toast
-  with Undo (`qt/js-plugins`)
-- [~] The live dialog with the preview on the page (a bottom sheet on phones) (`qt/js-plugins`)
-- [~] The function plotter (bundled, "Plot a function…" with the insert commands; parametric curves; labels as
-  Markdown math), and example ports of upstream's plugins (`qt/js-plugins`)
-- [~] `xournal-qt-cli plugin run <id> <command> [files…] [--set k=v] [--allow class]` (`qt/js-plugins`)
+[js-plugins-research.md](qt/docs/review/2026-10/js-plugins-research.md); how it works: [plugins.md](qt/docs/features/plugins.md).
+- [x] The undo sink seam and `SequenceUndoAction` (one command, one undo step; rollback). Left: nothing.
+- [x] Plugin data on elements (`xqt-data`). Left: a pasted plot keeps its Markdown labels but not its description
+  (it cannot be edited as a plot; a duplicated page keeps it); the selection of notes' clipboard format
+  (`MixedSelection`) does not carry the Markdown mark.
+- [x] The operations layer `qt/src/ops`. Left: stable element ids (`xqt-id`) instead of per-call references; peers'
+  and agents' principals (only the plugin principal is built).
+- [x] The host `qt/src/plugins`. Left: a file watcher for authors (Reload is by hand); `async`/`await` is not in Qt
+  6.7's engine (documented).
+- [x] The UI (⋮ → Tools → Plugins, the "+" catalog, shortcuts, Settings → Plugins, the question, dialogs, the note
+  with Undo). Left: plugin icons that are files show in the bars, but the catalog and ⋮ show the plugin icon.
+- [x] The live dialog with the preview on the page (a bottom sheet on phones). Left: the old plot stays visible under
+  the preview while it is edited; the preview's frame on a turned canvas is its bounding box.
+- [x] The function plotter and the example ports. Left: TODO "Plotting" below; tick labels can touch a curve (no halo).
+- [x] `xournal-qt-cli plugin list | run`. Left: the CLI's own picture export draws Markdown boxes as their source
+  (as before for every box: the CLI's export does not install the Markdown renderer).
+- [ ] Plugins on Android and iOS: "Install from file…" (a zip) in Settings → Plugins (the user's plugin folder is in
+  the app's private storage there); the device checks of plugins.md "On the device".
 
 ## Decisions for the author
 - [ ] Reading library cache packs from the other cache location (shell review §4 #15) stays: it also serves read-only
