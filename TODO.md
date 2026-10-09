@@ -76,21 +76,20 @@ All four waves are merged (2026-10-07). The architecture overview:
 
 The author's decisions of 2026-10-09: [ADR 0008](qt/docs/decisions/0008-js-plugins.md); the research:
 [js-plugins-research.md](qt/docs/review/2026-10/js-plugins-research.md); how it works: [plugins.md](qt/docs/features/plugins.md).
-- [x] The undo sink seam and `SequenceUndoAction` (one command, one undo step; rollback). Left: nothing.
-- [x] Plugin data on elements (`xqt-data`). Left: a pasted plot keeps its Markdown labels but not its description
-  (it cannot be edited as a plot; a duplicated page keeps it); the selection of notes' clipboard format
+- [ ] Plugin data on elements, what is left: a pasted plot keeps its Markdown labels but not its description (it
+  cannot be edited as a plot; a duplicated page keeps it); the selection of notes' clipboard format
   (`MixedSelection`) does not carry the Markdown mark.
-- [x] The operations layer `qt/src/ops`. Left: stable element ids (`xqt-id`) instead of per-call references; peers'
-  and agents' principals (only the plugin principal is built).
-- [x] The host `qt/src/plugins`. Left: a file watcher for authors (Reload is by hand); `async`/`await` is not in Qt
-  6.7's engine (documented).
-- [x] The UI (⋮ → Tools → Plugins, the "+" catalog, shortcuts, Settings → Plugins, the question, dialogs, the note
-  with Undo). Left: plugin icons that are files show in the bars, but the catalog and ⋮ show the plugin icon.
-- [x] The live dialog with the preview on the page (a bottom sheet on phones). Left: the old plot stays visible under
-  the preview while it is edited; the preview's frame on a turned canvas is its bounding box.
-- [x] The function plotter and the example ports. Left: TODO "Plotting" below; tick labels can touch a curve (no halo).
-- [x] `xournal-qt-cli plugin list | run`. Left: the CLI's own picture export draws Markdown boxes as their source
-  (as before for every box: the CLI's export does not install the Markdown renderer).
+- [ ] The operations layer `qt/src/ops`, what is left: stable element ids (`xqt-id`) instead of per-call references;
+  peers' and agents' principals (only the plugin principal is built).
+- [ ] The host `qt/src/plugins`, what is left: a file watcher for authors (Reload is by hand); `async`/`await` is not
+  in Qt 6.7's engine (documented).
+- [ ] The UI, what is left: plugin icons that are files show in the bars, but the catalog and ⋮ show the plugin icon.
+- [ ] The live dialog with the preview on the page, what is left: the old plot stays visible under the preview while
+  it is edited; the preview's frame on a turned canvas is its bounding box.
+- [ ] The function plotter and the example ports, what is left: TODO "Plotting" below; tick labels can touch a curve
+  (no halo).
+- [ ] `xournal-qt-cli plugin list | run`, what is left: the CLI's own picture export draws Markdown boxes as their
+  source (as before for every box: the CLI's export does not install the Markdown renderer).
 - [ ] Plugins on Android and iOS: "Install from file…" (a zip) in Settings → Plugins (the user's plugin folder is in
   the app's private storage there); the device checks of plugins.md "On the device".
 
@@ -110,11 +109,10 @@ The author's decisions of 2026-10-09: [ADR 0008](qt/docs/decisions/0008-js-plugi
 
 ## Bugs
 
-- [x] **Pasted text was white** (or yellow) when the tool in hand was not the pen (the author, 2026-10-08: handwriting
-  copied as text, then Ctrl+V): a plain-text paste took the color of the tool in hand; it takes the text tool's now
-  (`qt/paste-colour`). Left: a Markdown box started in the panel (`AppController::startMarkdown`) and a new plain
-  text of `TextEditor` still take the color of the tool in hand; both are reached with the text tool in hand, except
-  the sticky note pill's "Text" with a select tool in panel mode. Untested: make them the text tool's too, with a test.
+- [ ] Pasted text was white, what is left: a Markdown box started in the panel (`AppController::startMarkdown`) and a
+  new plain text of `TextEditor` still take the color of the tool in hand; both are reached with the text tool in
+  hand, except the sticky note pill's "Text" with a select tool in panel mode. Untested: make them the text tool's
+  too, with a test.
 - [ ] **Android: the top bar scrolls into a blank area at its end** (about the last quarter; the author on 0.8.0).
   Not reproduced off-screen. Likely the buttons pinned before "+" (`Toolbox.leadingTail`) take room while hidden.
   Needs the device (adb, a screenshot scrolled to the end): postponed by the author.
@@ -227,13 +225,11 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
   by the stickers' text.
 - [ ] Audio: the play tool's fading of ink without a recording, a speaker chip on pages, "Play from here" in the
   selection pill, a setting for Xournal++'s audio folder.
-- [x] Audio in the replay (qt/replay-audio): a speaker on the play bar and the key A switch the recordings on and off
-  (setting `replay/audio`). Left: not run on Qt 6.8 (the play bar's keys and a new button); the device check.
-- [x] Recordings next to the `.xopp` in `name.audio/` (qt/replay-audio): recorded there, moved there by the first
-  save, copied by Save as, carried by the library's rename/move/copy/trash/share. Left: ink pasted from another
-  document keeps a recording that is not gathered into this one's sidecar (it plays only where it is found); the
-  0.10.0 recordings in the app's folder are not found by saved `.xopp`s (decided: no migration); a sidecar restored
-  from the system's trash is restored by the user beside its `.xopp` (they are two trash entries).
+- [ ] Audio in the replay, what is left: the device check (real audio on desktop and Android).
+- [ ] Recordings next to the `.xopp` in `name.audio/`, what is left: ink pasted from another document keeps a
+  recording that is not gathered into this one's sidecar (it plays only where it is found); the 0.10.0 recordings in
+  the app's folder are not found by saved `.xopp`s (decided: no migration); a sidecar restored from the system's
+  trash is restored by the user beside its `.xopp` (they are two trash entries).
 - [ ] Dark pages: "print with white pages"; thumbnails turn their pictures dark too.
 - [ ] The onboarding tutorial: the author's screenshots and ink in place of the `PLACEHOLDER` quotes of
   `qt/resources/help/tutorial.md`.
@@ -265,11 +261,9 @@ the core part done")
   its own below the writing (so it is not erased by accident), as new pages or on the current page. Later: holidays.
 
 ### Built-in stickers (`qt/stickers-builtin`; the author, 2026-10-09; [stickers.md](qt/docs/features/stickers.md), "Built in")
-- [x] The collections, generated (`qt/resources/stickers/generate.py`) and bundled as resources: circuit symbols
-  (IEC, 26), logic gates (distinctive shapes and IEC, 7 each), 3D solids (8), lab glassware and benzene (12), names in
-  English and German, CC0. Left: the author's look at them, and a check on Android that they are copied.
-- [x] "Built in" in the sticker picker (read-only, Copy to my stickers, search in both languages), hiding and
-  restoring collections (chip menu, Settings → Documents), the pen's colour. Left: the scopes on a narrow phone sheet.
+- [ ] The collections, generated, what is left: the author's look at them, and a check on Android that they are
+  copied.
+- [ ] "Built in" in the sticker picker, what is left: the scopes on a narrow phone sheet.
 - [ ] More collections later (the author: "with the option to add more later"), each a list in `generate.py`; names
   in more languages when the app has translations.
 
@@ -309,15 +303,13 @@ the core part done")
   `evaluate.py` on the test sets.
 - [ ] CTC word boxes: measure again on a larger real hand (only 13 distinct lines differed in test/files:
   `CtcTest.wordBoxesOfRealInk` with `XQT_HWR_BOXES_FILES`).
-- [x] `qt/hwr-bench`: handwriting forms as data and benchmark, `xournal-qt-cli hwr-form` and `hwr-bench`
-  (handwriting-search.md, "Forms and the benchmark"). Left: run both on the forms block's real PDFs and filled forms
-  (only synthetic forms and the benchmark page's line in turned boxes so far); what the rotation benchmark shows
+- [ ] `qt/hwr-bench`, what is left: run both on the forms block's real PDFs and filled forms (only synthetic forms
+  and the benchmark page's line in turned boxes so far); what the rotation benchmark shows
   (`FormTest.theBuiltInModelReadsRealInkInTurnedBoxes`, 2026-10-08): at ±90° the layout takes a piece of the line as
   level (2 lines, one at 0°), at 15° the line falls apart into 6 level lines, 180° is read as level (nonsense).
 - [ ] `qt/hwr-userdata` (later): a dataset of the user's own hand made in the app, for fine-tuning.
-- [x] `qt/hwr-forms`: the handwriting forms (`qt/research/hwr/forms/`: generator, `pdf/xqt-hwr-en.pdf`, `-de`,
-  `-en-de`, manifests embedded). Left: fill one on the device and time it (15 pages came out longer than the
-  plan's 8 to 10); the app side (`hwr-form`, `hwr-bench`) must read the manifest's new optional `in` (DESIGN.md).
+- [ ] `qt/hwr-forms`, what is left: fill one on the device and time it (15 pages came out longer than the plan's 8 to
+  10); the app side (`hwr-form`, `hwr-bench`) must read the manifest's new optional `in` (DESIGN.md).
 
 ### Platforms
 - [ ] Android ([roadmap](qt/docs/development/android-roadmap.md)): some texts miss “ and — (probably the symbol
