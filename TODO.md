@@ -146,6 +146,11 @@ The author's decisions of 2026-10-09: [ADR 0008](qt/docs/decisions/0008-js-plugi
 - [ ] `MainWindowTest.markdownTextBoxesAreSelectedAndMoved` segfaulted once after 0.4 s in a full run (2026-10-09,
   right after merging `qt/js-plugins`, which lets Markdown boxes live in the ink's layer); 45 of 45 runs alone and 16 in
   parallel passed. Watch for it; if it returns, run it under the TSan build.
+- [ ] **`CitationsTest.selectedTextIsSearchedInTheDocumentTheTabsAndTheLibrary` stopped a release**: the 0.11.1 release
+  run's Debian 13 job failed it 3 of 3 tries (the CI's repeat), while the same commit passed in `xqt-build.yml` on
+  Debian 13 and passes alone locally. It fails at `click("pdfLookUpButton")` after `selectReference()` (line ~362):
+  the look-up button does not appear within 5 s after the PDF text is selected again. Find what it waits for
+  (the selection's pill after the tab overview closed) and wait for that state.
 Rerun a failure alone before calling it a flake; harden a test by waiting for the state, not for time.
 
 - [ ] The CI repeats a failed test up to twice (`--repeat until-pass:3`): drop it once the suite passes 5× under
