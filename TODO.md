@@ -228,6 +228,13 @@ the core part done")
 - [ ] Piecewise functions in a friendly notation.
 - [ ] Function families: several values of a parameter drawn at once.
 
+### Calendar pages (a bundled plugin like the plotter, after the core plugin block; the author, 2026-10-09)
+- [ ] A dialog with a live preview that generates planning pages from the current date: a **week overview**, a
+  **month overview**, the **next 3 months**, or a **whole year** at 1 to 3 months per page (3 at most). The day cell
+  is at least 5 mm high and every size is a multiple of 5 mm, laid on the page's 5 mm grid so the lines coincide.
+  Week start (Monday/Sunday), ISO week numbers, month and day names in the app's language; the calendar on a layer of
+  its own below the writing (so it is not erased by accident), as new pages or on the current page. Later: holidays.
+
 ### Handwriting
 - [ ] Library search for handwriting, what is left: the author's check with real notes; a document opened under
   another spelling of the library's path (a symlink) is still not matched to its index entry.
