@@ -93,6 +93,9 @@ public:
     Q_INVOKABLE void moveLiveFrame(double x, double y, double width, double height);
     Q_INVOKABLE bool liveInsert(const QVariantMap& values);
     Q_INVOKABLE void liveCancel();
+    /// What of the canvas the live dialog covers (item pixels at its right, at its bottom on a phone): a new frame is
+    /// placed in the middle of the rest
+    Q_INVOKABLE void setReserved(double right, double bottom);
 
     // --- PluginUi ---
     bool askPermission(const plugins::PluginInfo& plugin, const QString& opClass, const QString& what) override;
@@ -150,6 +153,8 @@ private:
     QVariantMap frame;
     QVariantMap lastValues;
     int logRev = 0;
+    double reservedRight = 0;
+    double reservedBottom = 0;
 };
 
 }  // namespace xqt

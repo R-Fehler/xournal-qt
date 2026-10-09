@@ -23,6 +23,11 @@ Popup {
     padding: 0
     visible: plugins.liveOpen
     onVisibleChanged: if (visible) fields.values = Object.assign({}, spec.values || {})
+    // What of the canvas it covers: the plugin's frame starts in the middle of the rest
+    readonly property var covers: sheet ? [0, Math.round(win.height * 0.46)]
+                                        : [Math.max(0, (canvasItem ? canvasItem.x + canvasItem.width : win.width) - placedX + 12), 0]
+    onCoversChanged: plugins.setReserved(covers[0], covers[1])
+    Component.onCompleted: plugins.setReserved(covers[0], covers[1])
 
     // (the window's coordinates: the overlay's; the layout's are the content's, below the window's header)
     readonly property real roomTop: win.contentItem.y + win.layout.canvasControlsTop
@@ -31,7 +36,9 @@ Popup {
     width: sheet ? win.width : Math.min(380, win.width - 32)
     height: sheet ? Math.round(Math.min(win.height * 0.46, implicitHeight))
                   : Math.min(implicitHeight, roomBottom - roomTop - 24)
-    x: sheet ? 0 : Math.max(8, win.layout.canvasControlsRight - width - 12)
+    /// (where it goes: read before it is open too, which a popup's x is not)
+    readonly property real placedX: sheet ? 0 : Math.max(8, win.layout.canvasControlsRight - width - 12)
+    x: placedX
     y: sheet ? win.height - height - (win.insets.keyboardOpen ? win.height - win.insets.keyboardTop : win.insets.bottom)
              : roomTop + 12
 

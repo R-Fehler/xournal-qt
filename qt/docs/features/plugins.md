@@ -27,6 +27,45 @@ undo step; when a command fails, nothing of it stays. Why it is built this way: 
   every plugin's engine made anew: for writing plugins). A plugin that cannot run says why (a broken `plugin.json`, a
   newer API, a module that imports outside its folder).
 
+## The function plotter
+
+A plugin that comes with the app (`qt/resources/plugins/function-plotter`, on by default), offered like the app's own
+insert commands: **Plot a function…** in ⋮ → Tools and in the toolbox's "+" catalog (Insert), on **Ctrl+Alt+P**.
+
+- **The dialog** opens beside the page (a bottom sheet on a phone) and the plot is previewed on the page at once, in
+  the middle of what is in view, in a frame: drag it to move the plot, its corner to size it. Every change redraws
+  the preview. **Insert** puts the plot on the page; the note "Plot a function… · Undo" takes it away again.
+- **Functions** are typed as on paper: `x^2 - 2x + 1`, `2x`, `3(x+1)`, `2pi`, `sin x`, `sin 2x` (= sin(2x)),
+  `sin^2 x`, `sqrt x`, `|x - 1|`, `exp`, `ln`, `log` (base 10; `log(2, x)`), `lg`, `abs`, `floor`, `min`, `max`,
+  `root(x, n)`, `pi`/`π`, `e`; `^` or `²`/`³` for powers, `·` `×` `÷` `−` as typed on a phone; a decimal comma (`1,5x`)
+  where it cannot separate arguments (`max(1,5)` is max(1, 5); `max(1,5; 2)` is max(1.5, 2)). A mistake is named under
+  the field ("unknown function "sni" - did you mean sin?") and that curve is left out until it is right.
+- **+ Function** adds another, **+ Curve x(t), y(t)** a parametric curve (a t range from, to; `2pi` works); ✕ removes
+  one. Each has its color (the palette's), its line width and "dashed".
+- **Parameters**: any other single letter (`a*x^2 + b`) gets a slider, with its range (from, to): the preview follows
+  the slider.
+- **Axes**: the x range (`-2pi` … `2pi` works), the y range automatic (fitted to the curves, the far ends of poles left
+  out, rounded to ticks) or typed; **π steps** labels the x axis in multiples of π (π/4, π/2, π, …); the axes' names
+  (`x`, `y`, or words). **Look**: grid, numbers along the axes (steps of 1, 2, 5 × 10ⁿ, at least a finger apart), arrows,
+  the 0 at the origin, the decimal comma (from the language of the system), and the **formulas** next to their curves,
+  in a legend, or none. **Mark** the zeros, extrema and intersections (a dot with its coordinates).
+- **Exact scale**: "1 unit = 10 mm" (any mm): the plot is as large as its ranges at that scale, printed true to size at
+  100 % (a page is in points, 1/72 inch); the frame then keeps its size (the dialog says "Printed at 100 %: 7 × 6 cm").
+- **The curves** are sampled adaptively (more points where they bend), broken at poles and jumps (1/x, tan x, floor x:
+  no vertical lines), cut exactly at the plot's border and thinned where straight.
+- **What it inserts**: ink and Markdown boxes with math, editable as anything else: strokes for the grid, the axes,
+  the arrows, the ticks and the curves; boxes (`$…$`, drawn by MicroTeX) for the numbers (`$-2$`, `$\frac{\pi}{2}$`,
+  `$1{,}5$`), the axes' names and the formulas (`$f(x) = x^{2} - 2x + 1$`, `\sqrt{x}`, `\frac{a}{b}`, `\sin`) in the
+  curve's color. All of it is **one group** in the page's selected layer (the boxes are marked as Markdown in their
+  data, `{"xqt:markdown": true}`, so they stay with the ink: a group lies in one layer), so the plot moves, scales and
+  deletes as one.
+- **Edit plot**: the plot keeps its description (functions, ranges, options, and where its frame was) as the plugin's
+  data on the group (`xqt-data`); select the plot and choose **Edit plot…** (⋮ → Tools): the dialog opens with it and
+  the frame where the plot is; **Update** replaces it, one undo step. In Xournal++ the plot is plain strokes and texts
+  (the boxes show their `$…$` source); saving there drops its description and group.
+- Not yet (TODO.md, "Plotting"): polar curves r(θ), an empty coordinate system, points and value tables, shading,
+  tangents and derivatives, number lines, piecewise functions, function families.
+
 ## How a command runs
 
 - The plugins are found in two folders: the bundled ones (`<share>/xournal-qt/plugins/<id>/`, beside the handwriting
@@ -198,7 +237,11 @@ commands, the window's operations, the questions, dialogs and the live dialog), 
 `CanvasView::setPluginPreview` and `DocumentCanvasItem` (a node above the pages), and the QML parts
 `PluginDialogs.qml`, `PluginLiveDialog.qml`, `PluginFrame.qml`, `PluginFields.qml`, `PluginCommandItem.qml`,
 `SettingsPlugins.qml`; the commands as shortcuts (`ShortcutsModel::setPluginActions`) and as toolbox items
-(`ToolboxModel::setPluginItems`). Tests: `OperationsTest` (label `ops`), `PluginHostTest` (label `plugins`),
+(`ToolboxModel::setPluginItems`). The function plotter: `qt/resources/plugins/function-plotter` (`main.mjs`; `lib/parse.mjs` the expression language,
+evaluation and LaTeX; `lib/ticks.mjs`; `lib/sample.mjs` the adaptive sampling, roots and extrema; `lib/plot.mjs` the
+shapes; `lib/spec.mjs` the description and the dialog's fields), copied to `<share>/plugins/` by `XqtPlugins.cmake`.
+Tests: `OperationsTest` (label `ops`), `PluginHostTest` and `PlotterTest` (label `plugins`: the parser, LaTeX, ticks,
+sampling at poles and jumps, the exact scale, insert and edit as one step each, a plot with a mistake),
 `PluginsUiTest` (label `ui`: the menu, the question, the note with Undo, the key, the live dialog with its preview
 and frame, Settings → Plugins).
 

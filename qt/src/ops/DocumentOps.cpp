@@ -20,6 +20,7 @@
 #include "session/DocumentSession.h"
 #include "session/ElementGroups.h"
 #include "session/ElementTimes.h"
+#include "session/InlineMarkdown.h"
 #include "undo/DeleteUndoAction.h"
 #include "undo/InsertLayerUndoAction.h"
 #include "undo/InsertUndoAction.h"
@@ -229,11 +230,18 @@ QVariant elementInsert(Context& c, const QVariantMap& args) {
     for (const QVariant& v: shapes) {
         c.check(insertOperationOf(v.toMap()), QStringLiteral("edit"));
     }
+    // A group lies in one layer: grouped Markdown boxes stay with the ink, marked as Markdown (InlineMarkdown.h);
+    // others go into the page's Markdown layer
+    const bool grouped = args.value("group").toBool();
     std::vector<ElementPtr> ink;
     std::vector<ElementPtr> boxes;
     std::vector<int> order;  // (per shape: its place among ink (>= 0) or boxes (< 0, -1 - i))
     for (const QVariant& v: shapes) {
         MadeElement made = makeElement(v.toMap());
+        if (made.markdown && grouped) {
+            made.element->setData(md::withInlineMark(made.element->getData()));
+            made.markdown = false;
+        }
         if (made.markdown) {
             order.push_back(-1 - static_cast<int>(boxes.size()));
             boxes.push_back(std::move(made.element));
@@ -273,7 +281,6 @@ QVariant elementInsert(Context& c, const QVariantMap& args) {
             inkLayer = page->getLayers()[inkIndex + 1];
         }
     }
-    const bool grouped = args.value("group").toBool();
     const QVariant data = args.value("data");
     std::vector<const Element*> inkRaw, boxRaw;
     {
@@ -289,7 +296,7 @@ QVariant elementInsert(Context& c, const QVariantMap& args) {
                 }
             }
             if (data.isValid() && !data.isNull()) {
-                list->front()->setData(withData({}, c.principal, data));
+                list->front()->setData(withData(list->front()->getData(), c.principal, data));
             }
         }
         for (auto& e: ink) {

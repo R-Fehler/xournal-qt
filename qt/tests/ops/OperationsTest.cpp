@@ -176,7 +176,7 @@ TEST_F(OperationsTest, aFailureRollsTheTransactionBack) {
     EXPECT_EQ(elements(), 1u);
 }
 
-TEST_F(OperationsTest, insertedShapesAreGroupedWithDataAndMarkdownBoxesGoToTheirLayer) {
+TEST_F(OperationsTest, groupedShapesAreOneGroupInOneLayerWithTheirData) {
     auto c = context(authority);
     const QVariantList refs =
             c->apply("element.insert",
@@ -190,45 +190,60 @@ TEST_F(OperationsTest, insertedShapesAreGroupedWithDataAndMarkdownBoxesGoToTheir
                     .toList();
     ASSERT_EQ(refs.size(), 4);
     XojPage& page = *session->getDocument()->getPage(0);
-    Layer* markdown = md::markdownLayer(session->getDocument()->getPage(0));
-    ASSERT_NE(markdown, nullptr);
-    ASSERT_EQ(markdown->getElementsView().size(), 2u);
+    // A group lies in one layer: the boxes stay with the ink (no Markdown layer made), marked as Markdown texts
+    EXPECT_EQ(md::markdownLayer(session->getDocument()->getPage(0)), nullptr);
     Layer* ink = page.getSelectedLayer();
-    ASSERT_NE(ink, markdown);
-    ASSERT_EQ(ink->getElementsView().size(), 2u);
-    const Element* s0 = ink->getElementsView().front();
-    const Element* s1 = ink->getElementsView().back();
+    ASSERT_EQ(ink->getElementsView().size(), 4u);
+    const auto all = ink->getElementsView();
+    const Element* s0 = *all.begin();
+    const auto* x = static_cast<const Text*>(*std::next(all.begin(), 2));
     EXPECT_NE(s0->getGroup(), 0u);
-    EXPECT_EQ(s0->getGroup(), s1->getGroup());
+    for (const Element* e: all) {
+        EXPECT_EQ(e->getGroup(), s0->getGroup());
+    }
     EXPECT_EQ(s0->getColor(), Color(0xff, 0, 0));
-    const auto* x = static_cast<const Text*>(markdown->getElementsView().front());
-    EXPECT_NE(x->getGroup(), 0u);
-    EXPECT_EQ(x->getGroup(), markdown->getElementsView().back()->getGroup());
+    EXPECT_TRUE(x->isMarkdown());
     EXPECT_EQ(x->getColor(), Color(0, 0, 0xff));
-    // The data on the first of each group, under the plugin's id
+    // The data on the first element, under the plugin's id
     EXPECT_NE(s0->getData().find("org.example.test"), std::string::npos);
-    EXPECT_TRUE(s1->getData().empty());
-    EXPECT_FALSE(x->getData().empty());
+    EXPECT_TRUE((*std::next(all.begin()))->getData().empty());
     // "top": the box's top middle at (100, 20); as wide as its formula
     const auto box = md::boxRect(*x);
     EXPECT_NEAR(box.y, 20, 0.01);
     EXPECT_NEAR(box.x + box.width / 2, 100, 1.0);
     EXPECT_GT(box.width, 2);
     EXPECT_LT(box.width, 20);
+    // Saved and read back: still a Markdown text in that layer
+    ASSERT_TRUE(DocumentSession::writeDocument(*session->getDocument(), fs::path(tmp.filePath("g.xopp").toStdString())).ok);
+    auto loaded = DocumentSession::loadFile(fs::path(tmp.filePath("g.xopp").toStdString()));
+    ASSERT_TRUE(loaded.document);
+    const auto back = loaded.document->getPage(0)->getSelectedLayer()->getElementsView();
+    ASSERT_EQ(back.size(), 4u);
+    EXPECT_TRUE(static_cast<const Text*>(*std::next(back.begin(), 2))->isMarkdown());
 
-    // Listed with its data (only the plugin's own), and deleted with the rest of its groups
+    // Listed with its data (only the plugin's own), and deleted with the rest of its group
     const QVariantList listed = c->apply("element.list", {{"onlyWithData", true}}).toList();
-    ASSERT_EQ(listed.size(), 2);
+    ASSERT_EQ(listed.size(), 1);
     EXPECT_EQ(listed[0].toMap().value("data").toMap().value("f").toString(), "x^2");
-    QVariantList withData;
-    for (const QVariant& v: listed) {
-        withData << v.toMap().value("ref");
-    }
-    EXPECT_EQ(c->apply("element.delete", {{"refs", withData}, {"withGroups", true}}).toInt(), 4);
+    EXPECT_EQ(c->apply("element.delete", {{"refs", QVariantList{listed[0].toMap().value("ref")}}, {"withGroups", true}})
+                      .toInt(),
+              4);
     EXPECT_EQ(elements(), 0u);
     EXPECT_THROW(c->apply("element.delete", {{"refs", QVariantList{refs[0]}}}), Error);  // (gone: stale)
     undo().undo();
     EXPECT_EQ(elements(), 4u);
+}
+
+TEST_F(OperationsTest, aMarkdownBoxOnItsOwnGoesToTheMarkdownLayer) {
+    auto c = context(authority);
+    c->apply("element.insert", {{"shapes", QVariantList{QVariantMap{{"type", "markdown"}, {"text", "**Note**"},
+                                                                     {"x", 50}, {"y", 50}}}}});
+    Layer* markdown = md::markdownLayer(session->getDocument()->getPage(0));
+    ASSERT_NE(markdown, nullptr);
+    ASSERT_EQ(markdown->getElementsView().size(), 1u);
+    EXPECT_TRUE(static_cast<const Text*>(markdown->getElementsView().front())->isMarkdown());
+    undo().undo();  // (the box and its new layer: one step)
+    EXPECT_EQ(md::markdownLayer(session->getDocument()->getPage(0)), nullptr);
 }
 
 TEST_F(OperationsTest, dataLayersAndReadOnly) {

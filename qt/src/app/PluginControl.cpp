@@ -326,16 +326,27 @@ QVariantMap PluginControl::defaultFrame(const QVariantMap& wanted) const {
     const double h = std::clamp(wanted.value("height", 180).toDouble(), 20.0, ph);
     // The middle of what of the page is in view (else the page's middle)
     QPointF middle(pw / 2, ph / 2);
+    double seenLeft = 0, seenRight = pw;
     if (v && page < v->pageCount()) {
         const double zoom = v->getViewController().zoom();
         const QRectF r = v->pageViewRect(page);
         const QSizeF view = v->getViewController().viewSize();
-        const QRectF seen = r.intersected(QRectF(QPointF(0, 0), view));
+        // (what the live dialog leaves free of the canvas, when that is still a good part of it)
+        QSizeF free(view.width() - reservedRight, view.height() - reservedBottom);
+        if (free.width() < view.width() * 0.4 || free.height() < view.height() * 0.3) {
+            free = view;
+        }
+        const QRectF seen = r.intersected(QRectF(QPointF(0, 0), free));
         if (!seen.isEmpty() && zoom > 0) {
             middle = (seen.center() - r.topLeft()) / zoom;
+            seenLeft = (seen.left() - r.left()) / zoom;
+            seenRight = (seen.right() - r.left()) / zoom;
         }
     }
-    const double x = wanted.contains("x") ? wanted.value("x").toDouble() : middle.x() - w / 2;
+    // (in the middle of what is free; where that is narrower than the frame, at its right end, clear of the dialog)
+    double x = middle.x() - w / 2;
+    x = std::max(seenLeft + 8, std::min(x, seenRight - w - 8));
+    x = wanted.contains("x") ? wanted.value("x").toDouble() : x;
     const double y = wanted.contains("y") ? wanted.value("y").toDouble() : middle.y() - h / 2;
     f.insert("page", static_cast<int>(page));
     f.insert("x", std::clamp(x, 0.0, std::max(0.0, pw - w)));
@@ -485,6 +496,11 @@ bool PluginControl::liveInsert(const QVariantMap& edited) {
 }
 
 void PluginControl::liveCancel() { closeLive(); }
+
+void PluginControl::setReserved(double right, double bottom) {
+    reservedRight = std::max(0.0, right);
+    reservedBottom = std::max(0.0, bottom);
+}
 
 void PluginControl::closeLive() {
     if (!live) {

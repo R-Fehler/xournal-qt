@@ -121,7 +121,8 @@ ColumnLayout {
             property var field: ({})
             objectName: "pluginField_" + field.id
             text: String(form.valueOf(field) === undefined ? "" : form.valueOf(field))
-            placeholderText: field.placeholder || ""
+            // (Material shows a placeholder as a floating label: only where the field has no label of its own)
+            placeholderText: (field.label || "") === "" ? (field.placeholder || "") : ""
             selectByMouse: true
             inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
             onTextEdited: form.set(field.id, text)

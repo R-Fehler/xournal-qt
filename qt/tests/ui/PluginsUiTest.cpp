@@ -238,7 +238,104 @@ TEST_F(PluginsUiTest, settingsListThePluginWithItsPermissionsAndSwitch) {
     QMetaObject::invokeMethod(on, "toggled");
     ASSERT_TRUE(until([&] { return !host().plugin("org.test.ui")->enabled; }));
     // Off: its commands are gone from the menus, the keys and the catalog
-    EXPECT_TRUE(controller->pluginControl()->commands().isEmpty());
+    for (const QVariant& c: controller->pluginControl()->commands()) {
+        EXPECT_NE(c.toMap().value("plugin").toString(), "org.test.ui");
+    }
+    // (closed before the window goes: a popup's animation must not outlive its engine)
+    QMetaObject::invokeMethod(settings, "close");
+    ASSERT_TRUE(until([&] { return !settings->property("visible").toBool(); }));
     EXPECT_TRUE(controller->services().shortcuts().keys("plugin:org.test.ui/lines").isEmpty());
     EXPECT_FALSE(controller->services().toolbox().unplaced().contains("plugin:org.test.ui/live"));
+}
+
+// The bundled function plotter as the app offers it: "Plot a function…" with the insert commands, its dialog beside
+// the page with the preview, Insert (XQT_TEST_SHOT: pictures of the dialog and of the plot inserted)
+TEST_F(PluginsUiTest, theFunctionPlotterIsOfferedWithTheInsertCommandsAndInsertsAPlot) {
+    const QString key = "plugin:org.xournalqt.function-plotter/plot";
+    ASSERT_NE(host().plugin("org.xournalqt.function-plotter"), nullptr);
+    host().setGrant("org.xournalqt.function-plotter", "edit", "allow");
+    QObject* tools = find<QObject>("moreToolsMenu");
+    QObject* entry = nullptr;
+    ASSERT_TRUE(until([&] { return (entry = entryOf(tools, "pluginCommand_" + key)) != nullptr; }));
+    EXPECT_TRUE(entry->property("text").toString().startsWith("Plot a function…"));
+    EXPECT_EQ(controller->services().shortcuts().keys(key), QStringList{"Ctrl+Alt+P"});
+    QTest::keyClick(window, Qt::Key_P, Qt::ControlModifier | Qt::AltModifier);
+    auto* dialog = find<QObject>("pluginLiveDialog");
+    ASSERT_TRUE(until([&] { return dialog->property("opened").toBool(); }));
+    auto* canvas = find<DocumentCanvasItem>("canvas");
+    ASSERT_TRUE(until([&] { return canvas->pluginPreviewShown().shown; }));
+    QQuickItem* expr = findInScene("pluginField_f0_expr", true);
+    ASSERT_NE(expr, nullptr);
+    expr->forceActiveFocus();
+    QTest::keyClick(window, Qt::Key_A, Qt::ControlModifier);
+    type("sin(x)+x/2");
+    ASSERT_TRUE(until([&] { return controller->pluginControl()->liveState().value("errors").toMap().isEmpty() &&
+                                   canvas->pluginPreviewShown().shown; }));
+    wait(200);
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        nextFrame();
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT") + "-plotter-dialog.png");
+    }
+    QQuickItem* insert = findInScene("pluginInsertButton", true);
+    ASSERT_NE(insert, nullptr);
+    QMetaObject::invokeMethod(insert, "clicked");
+    ASSERT_TRUE(until([&] { return !dialog->property("visible").toBool(); }));
+    EXPECT_GT(elements(), 20u);
+    EXPECT_EQ(controller->tabManager().currentSession()->getUndoRedoHandler()->undoDescription(),
+              "Undo: Plot a function…");
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        controller->setZoomPercent(200);
+        wait(800);
+        nextFrame();
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT") + "-plotter-inserted.png");
+    }
+}
+
+// Pictures of plots for looking at them (XQT_PLOT_GALLERY=<folder>; skipped otherwise): poles, π steps, a curve,
+// parameters, marks, a legend, the exact scale
+TEST_F(PluginsUiTest, plotGallery) {
+    const QString folder = qEnvironmentVariable("XQT_PLOT_GALLERY");
+    if (folder.isEmpty()) {
+        GTEST_SKIP() << "XQT_PLOT_GALLERY not set";
+    }
+    host().setGrant("org.xournalqt.function-plotter", "edit", "allow");
+    ASSERT_TRUE(controller->pluginControl()->run("plugin:org.xournalqt.function-plotter/plot"));
+    auto* canvas = find<DocumentCanvasItem>("canvas");
+    ASSERT_TRUE(until([&] { return canvas->pluginPreviewShown().shown; }));
+    auto* plugins = controller->pluginControl();
+    const QVariantMap base = plugins->liveSpec().value("values").toMap();
+    struct Case {
+        const char* name;
+        QVariantMap values;
+        const char* action = "";
+    };
+    const std::vector<Case> cases = {
+            {"tan-pi", {{"f0_expr", "tan(x)"}, {"xMin", "-2pi"}, {"xMax", "2pi"}, {"piTicks", true}}},
+            {"reciprocal", {{"f0_expr", "1/x"}, {"xMin", "-5"}, {"xMax", "5"}}},
+            {"marks", {{"f0_expr", "x^3/4 - x"}, {"roots", true}, {"extrema", true}, {"xMin", "-3"}, {"xMax", "3"}}},
+            {"legend", {{"f0_expr", "sqrt(x)"}, {"labels", "legend"}, {"xMin", "-1"}, {"xMax", "6"}}},
+            {"exact", {{"f0_expr", "0,5x + 1"}, {"exact", true}, {"unitMm", 10}, {"yAuto", false}, {"yMin", "-2"},
+                       {"yMax", "4"}, {"xMin", "-3"}, {"xMax", "4"}}},
+    };
+    for (const Case& c: cases) {
+        QVariantMap v = base;
+        for (auto it = c.values.begin(); it != c.values.end(); ++it) {
+            v[it.key()] = it.value();
+        }
+        plugins->liveEdited(v, c.action);
+        wait(300);
+        nextFrame();
+        window->grabWindow().save(folder + "/" + c.name + ".png");
+    }
+    // A curve and a second function, with parameters
+    QVariantMap v = base;
+    plugins->liveEdited(v, "addCurve");
+    wait(100);
+    v = plugins->liveState().value("values").toMap();
+    v["f0_expr"] = "a*x^2 + b";
+    v["labels"] = "legend";
+    plugins->liveEdited(v, "");
+    wait(300);
+    nextFrame();
+    window->grabWindow().save(folder + "/curve-params.png");
 }

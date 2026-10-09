@@ -1,5 +1,7 @@
 #include "StickyNote.h"
 
+#include "InlineMarkdown.h"
+
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -480,7 +482,10 @@ bool draw(const Layer& layer, const xoj::view::Context& ctx) {
 
 void installDrawer() {
     xoj::view::layerDrawer.store(&draw);
-    xoj::markdown::classifier.store(&isNoteText, std::memory_order_release);  // (a note's text is a Markdown text)
+    // (a note's text is a Markdown text; and a text marked as one in its data: InlineMarkdown.h)
+    xoj::markdown::classifier.store(
+            +[](const Layer& layer, const Text& text) { return isNoteText(layer, text) || md::isInlineMarkdown(text); },
+            std::memory_order_release);
 }
 
 NoteUndoAction::NoteUndoAction(const PageRef& page, Layer* layer, const Look& before, const Look& after,

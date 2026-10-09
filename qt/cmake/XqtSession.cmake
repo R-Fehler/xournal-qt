@@ -104,6 +104,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageOrderUndoAction.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/SequenceUndoAction.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/SequenceUndoAction.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/InlineMarkdown.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/InlineMarkdown.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HeadlessViews.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/SessionActions.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/SessionActions.cpp
