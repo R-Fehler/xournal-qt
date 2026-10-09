@@ -235,6 +235,15 @@ the core part done")
   Week start (Monday/Sunday), ISO week numbers, month and day names in the app's language; the calendar on a layer of
   its own below the writing (so it is not erased by accident), as new pages or on the current page. Later: holidays.
 
+### Built-in stickers (`qt/stickers-builtin`; the author, 2026-10-09; [stickers.md](qt/docs/features/stickers.md), "Built in")
+- [x] The collections, generated (`qt/resources/stickers/generate.py`) and bundled as resources: circuit symbols
+  (IEC, 26), logic gates (distinctive shapes and IEC, 7 each), 3D solids (8), lab glassware and benzene (12), names in
+  English and German, CC0. Left: the author's look at them, and a check on Android that they are copied.
+- [x] "Built in" in the sticker picker (read-only, Copy to my stickers, search in both languages), hiding and
+  restoring collections (chip menu, Settings → Documents), the pen's colour. Left: the scopes on a narrow phone sheet.
+- [ ] More collections later (the author: "with the option to add more later"), each a list in `generate.py`; names
+  in more languages when the app has translations.
+
 ### Handwriting
 - [ ] Library search for handwriting, what is left: the author's check with real notes; a document opened under
   another spelling of the library's path (a symlink) is still not matched to its index entry.
