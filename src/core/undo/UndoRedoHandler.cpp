@@ -159,6 +159,12 @@ void UndoRedoHandler::addUndoAction(UndoActionPtr action) {
     if (!action) {
         return;
     }
+#ifdef XOJ_NO_GTK
+    if (sink) {  // xournal-qt: see sink
+        sink(std::move(action));
+        return;
+    }
+#endif
 
     this->undoList.emplace_back(std::move(action));
     clearRedo();
