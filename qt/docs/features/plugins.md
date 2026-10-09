@@ -5,6 +5,28 @@ show a preview on the page. They are JavaScript, each in an engine of its own wi
 files, no network, no programs. Every change a plugin makes is checked against what the user allowed it and is one
 undo step; when a command fails, nothing of it stays. Why it is built this way: [ADR 0008](../decisions/0008-js-plugins.md).
 
+## Using plugins
+
+- **Commands**: ⋮ → Tools → **Plugins** lists the commands of the plugins that are on; a command that puts something on
+  the page (`"place": "insert"`, like "Plot a function…") is also in ⋮ → Tools beside Image and Sticker, and in the
+  toolbox's **+** catalog under Insert (the others under Plugins), to be placed on a bar like the app's own commands
+  ([toolbox.md](toolbox.md)). A command that needs a selection is offered only while something is selected.
+- **Keys**: a command's key from its manifest is used when it has Ctrl, Alt or Meta and no other action has it;
+  Settings → Shortcuts lists the commands in the group **Plugins** (change or add a key there; conflicts are shown as
+  for the app's actions).
+- **The first time** a command needs a permission, the window asks ("Allow Function plotter? … wants to change what is
+  on the pages"); the answer is kept. A command that changed the document shows a note with **Undo** (the whole
+  command is one step); one that failed shows why.
+- **Dialogs**: a plugin's modal dialog is the app's own dialog (a full-screen form on a phone). A **live dialog**
+  stays open beside the page (at the right; a bottom sheet on a phone, the page above it) while the page shows a
+  preview in a blue frame: drag the frame to move what will be inserted, its round corner to size it (unless the
+  plugin fixed the size). Every change of a field updates the preview; **Insert** puts it on the page as one undo
+  step, Cancel (or ×) leaves the page as it was. Another tab or the home screen closes it.
+- **Settings → Plugins**: every plugin found (bundled ones and your own), a switch for each, what it may do (each
+  permission: *Ask first*, *Allowed*, *Not allowed*), its log, its folder, and **Reload** (the folders read again and
+  every plugin's engine made anew: for writing plugins). A plugin that cannot run says why (a broken `plugin.json`, a
+  newer API, a module that imports outside its folder).
+
 ## How a command runs
 
 - The plugins are found in two folders: the bundled ones (`<share>/xournal-qt/plugins/<id>/`, beside the handwriting
@@ -171,5 +193,20 @@ Xournal++'s Lua plugins do not run here; porting one is mostly mechanical:
 ## Code and tests
 
 `qt/src/plugins` (the host, the engine, the bridge, `api.js`), `qt/src/ops` (the operations, shapes, transactions),
-`qt/src/session/SequenceUndoAction.h` (one undo step). Tests: `OperationsTest` (label `ops`), `PluginHostTest`
-(label `plugins`).
+`qt/src/session/SequenceUndoAction.h` (one undo step); in the window `qt/src/app/PluginControl.*` (`app.plugins`: the
+commands, the window's operations, the questions, dialogs and the live dialog), the preview in
+`CanvasView::setPluginPreview` and `DocumentCanvasItem` (a node above the pages), and the QML parts
+`PluginDialogs.qml`, `PluginLiveDialog.qml`, `PluginFrame.qml`, `PluginFields.qml`, `PluginCommandItem.qml`,
+`SettingsPlugins.qml`; the commands as shortcuts (`ShortcutsModel::setPluginActions`) and as toolbox items
+(`ToolboxModel::setPluginItems`). Tests: `OperationsTest` (label `ops`), `PluginHostTest` (label `plugins`),
+`PluginsUiTest` (label `ui`: the menu, the question, the note with Undo, the key, the live dialog with its preview
+and frame, Settings → Plugins).
+
+## On the device
+
+- Android: a live dialog is a bottom sheet over the lower part of the window; the page above it scrolls, the frame
+  can be dragged with a finger and the pen; the soft keyboard for a field pushes the sheet up and the page stays
+  visible above it.
+- A tablet in portrait and landscape: the live dialog at the right does not cover the frame where it starts (the
+  middle of what is in view); the frame's corner is big enough for a finger.
+- The permission question and a plugin's modal dialog close with Android's back key (as "Don't allow" / Cancel).

@@ -150,6 +150,9 @@ public:
     Result run(const QString& id, const QString& commandId, const Environment& env);
     /// A plugin's command runs now (no other may start: the window's undo waits too)
     bool busy() const { return running > 0; }
+    /// The window waits for the user (a file dialog of an operation): the watchdog's clock stops meanwhile
+    void pauseWatch();
+    void resumeWatch();
     /// How long JavaScript may run in one call (default 2 s)
     void setTimeLimit(std::chrono::milliseconds limit) { timeLimit = limit; }
 

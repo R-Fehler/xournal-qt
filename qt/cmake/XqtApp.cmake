@@ -199,6 +199,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AudioControl.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/TimelineControl.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/TimelineControl.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/PluginControl.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/PluginControl.cpp
 
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTemplates.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppPageFiles.cpp
@@ -212,7 +214,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/EngineSetup.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/EngineSetup.cpp)
 target_include_directories(xqt-shell PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src ${CMAKE_CURRENT_LIST_DIR}/../src/app)
-target_link_libraries(xqt-shell PUBLIC Qt6::Network Qt6::PrintSupport Qt6::Widgets Qt6::Quick xqt-canvas xqt-hwr)
+target_link_libraries(xqt-shell PUBLIC Qt6::Network Qt6::PrintSupport Qt6::Widgets Qt6::Quick xqt-canvas xqt-hwr
+    xqt-plugins)
 set_target_properties(xqt-shell PROPERTIES AUTOMOC ON)
 # The color palettes of the color chooser (qt/resources/palettes/README.md): :/xqt-palettes/palettes.json
 qt_add_resources(xqt-shell xqt_palettes PREFIX /xqt-palettes BASE "${CMAKE_CURRENT_LIST_DIR}/../resources/palettes"
@@ -300,6 +303,7 @@ set(XQT_QML_FILES
     src/app/qml/SettingsNewPages.qml
     src/app/qml/SettingsStorage.qml
     src/app/qml/SettingsShortcuts.qml
+    src/app/qml/SettingsPlugins.qml
     src/app/qml/SettingsHelp.qml
     src/app/qml/ModelLicenceDialog.qml
     src/app/qml/TabOverview.qml
@@ -411,7 +415,13 @@ set(XQT_QML_FILES
     src/app/qml/ToolEntryButton.qml
     src/app/qml/ToolEntryEditor.qml
     src/app/qml/TemplateSaveDialog.qml
-    src/app/qml/PageFiles.qml)
+    src/app/qml/PageFiles.qml
+    # (plugins: qt/docs/features/plugins.md)
+    src/app/qml/PluginFields.qml
+    src/app/qml/PluginDialogs.qml
+    src/app/qml/PluginLiveDialog.qml
+    src/app/qml/PluginFrame.qml
+    src/app/qml/PluginCommandItem.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})
@@ -517,6 +527,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/VersionHistoryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/PdfPasswordTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/CitationsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/PluginsUiTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.h
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AdaptiveAuditTest.cpp

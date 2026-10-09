@@ -148,7 +148,7 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
     settings.getCustomElement(CUSTOM).getString("shortcuts", stored);
     for (const QString& entry: QString::fromStdString(stored).split(';', Qt::SkipEmptyParts)) {
         const QString id = entry.section('=', 0, 0).trimmed();
-        if (find(id)) {
+        if (find(id) || id.startsWith(QLatin1String("plugin:"))) {  // (a plugin's: before its command is known)
             custom[id] = entry.section('=', 1).trimmed();
         }
     }
@@ -258,6 +258,35 @@ QHash<int, QByteArray> ShortcutsModel::roleNames() const {
     return {{IdRole, "actionId"},   {NameRole, "name"},          {GroupRole, "group"},
             {KeysRole, "keys"},     {DefaultKeysRole, "defaultKeys"}, {IsDefaultRole, "isDefault"},
             {ConflictRole, "conflict"}};
+}
+
+void ShortcutsModel::setPluginActions(const std::vector<PluginAction>& list) {
+    beginResetModel();
+    actions.erase(std::remove_if(actions.begin(), actions.end(),
+                                 [](const Action& a) { return a.id.startsWith(QLatin1String("plugin:")); }),
+                  actions.end());
+    QStringList taken;
+    for (const Action& a: actions) {
+        for (const QString& k: keys(a.id)) {
+            taken << QKeySequence(k, QKeySequence::PortableText).toString(QKeySequence::PortableText);
+        }
+    }
+    const QString group = tr("Plugins");
+    for (const PluginAction& p: list) {
+        QStringList defaults;
+        const QKeySequence seq(p.keys, QKeySequence::PortableText);
+        const QString text = seq.toString(QKeySequence::PortableText);
+        const bool modifier = seq.count() == 1 && (seq[0].keyboardModifiers() &
+                                                    (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier));
+        if (!text.isEmpty() && modifier && !taken.contains(text)) {
+            defaults << text;
+            taken << text;
+        }
+        actions.push_back({p.id, p.name, group, defaults});
+    }
+    endResetModel();
+    ++rev;
+    Q_EMIT changed();
 }
 
 QVariantList ShortcutsModel::sheet() const {

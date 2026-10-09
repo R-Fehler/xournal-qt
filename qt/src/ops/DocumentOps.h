@@ -22,10 +22,17 @@
  */
 #pragma once
 
+#include <QVariant>
+
+class Element;
+
 namespace xqt::ops {
 
 class Operations;
+struct Principal;
 
 void addDocumentOperations(Operations& ops);
+/// A principal's value in an element's data (invalid: none)
+QVariant dataOf(const Element& element, const Principal& principal);
 
 }  // namespace xqt::ops

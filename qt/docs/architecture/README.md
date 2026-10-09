@@ -227,6 +227,7 @@ One window's QML API, the context property `app`: its tabs, the current document
 | [`App*.cpp`](../../src/app/AppBookmarks.cpp) | one area each: bookmarks, tags, templates, stickers, snip, text files, … |
 | [`AudioControl`](../../src/app/AudioControl.h) | recording and playing (app.audio) |
 | [`TimelineControl`](../../src/app/TimelineControl.h) | the replay of how a page was written (app.timeline) |
+| [`PluginControl`](../../src/app/PluginControl.h) | plugins in the window (app.plugins): commands, the window's operations, dialogs, the live preview |
 | [`WindowContext`](../../src/app/WindowContext.h) | what a window's feature objects get from it (services, tabs, current document) |
 
 Depends on:
@@ -236,6 +237,7 @@ Depends on:
 - [Models and settings](#models-and-settings) (`calls`): the per-document lists and the settings models
 - [audio](#audio) (`calls`): AudioControl records and plays (app.audio)
 - [control](#control) (`calls`): upstream's Settings (the xournalQt part) and the ToolHandler
+- [plugins](#plugins) (`links`): xqt-shell links xqt-plugins: PluginControl runs a window's plugin commands, AppServices holds the host
 
 Used by:
 
@@ -610,6 +612,10 @@ The plugins of the process: one QJSEngine per plugin with the frozen API module 
 Depends on:
 
 - [ops](#ops) (`links`): xqt-plugins links xqt-ops: every API call is an operation checked for the plugin
+
+Used by:
+
+- [AppController](#appcontroller) (`links`): xqt-shell links xqt-plugins: PluginControl runs a window's plugin commands, AppServices holds the host
 
 #### ops
 

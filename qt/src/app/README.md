@@ -11,6 +11,7 @@ in `qml/` (the QML module `xqt-ui`, URI `XournalQt`; `qt/cmake/XqtApp.cmake` lis
 | `CurrentDocument` | the current tab's session and view and their signals, relayed in one place |
 | `WindowContext` | what a window's feature objects get from it: the services, its tabs, its current document (`AppController::windowContext`) |
 | `AudioControl`, `TimelineControl` | recording and playing (`app.audio`), the replay (`app.timeline`) |
+| `PluginControl` | plugins in the window (`app.plugins`, [plugins.md](../../docs/features/plugins.md)): their commands, the window's operations (selection, tool, view, files), the permission question, dialogs, the live dialog and its preview |
 | `AndroidSetup`, `AndroidActivity`, `WindowsSetup`, `WindowsFonts` | what the app needs on Android and Windows before the core starts |
 | `qml/Main.qml` | the window (`win`, about 1,100 lines): it holds the window's state objects and instantiates its parts, each a file of its own |
 | `qml/WindowInsets.qml`, `ViewModes.qml`, `ChromeLayout.qml` | the window's state: safe areas and the keyboard (`win.insets`), full screen, Zen, read only, presenting (`win.modes`), where the chrome goes (`win.layout`) |

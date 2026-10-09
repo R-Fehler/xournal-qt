@@ -62,6 +62,7 @@ namespace xqt {
 class AppServices;
 class AudioControl;
 class TimelineControl;
+class PluginControl;
 class AppContext;
 class Citations;
 class LibraryInkJob;
@@ -338,6 +339,9 @@ class AppController: public QObject {
     Q_PROPERTY(QObject* audio READ audioObject CONSTANT)
     /// The replay of the document's timeline (TimelineControl.h, qt/docs/features/timeline.md)
     Q_PROPERTY(QObject* timeline READ timelineObject CONSTANT)
+    /// The plugins in this window: their commands, questions, dialogs and the live dialog (PluginControl.h,
+    /// qt/docs/features/plugins.md)
+    Q_PROPERTY(QObject* plugins READ pluginsObject CONSTANT)
     /// Documents of a crashed previous run that can be recovered: [{ title, time }]. Empty when there are none.
     Q_PROPERTY(QVariantList recoveryItems READ recoveryItems NOTIFY recoveryChanged)
     /// How documents are kept (session/DocumentMode.h): "xopp" (Xournal++ files) or "pdf" (PDF files: every document
@@ -961,6 +965,8 @@ public:
     QObject* citationsObject() const;
     QObject* audioObject() const;
     QObject* timelineObject() const;
+    QObject* pluginsObject() const;
+    xqt::PluginControl* pluginControl() const { return pluginsControl.get(); }
     xqt::ReferenceMode& reference() const { return *referenceMode; }
     /// Ctrl+S: while the reference has the keys and is written in, it is saved (true). When it needs a file first,
     /// its tab becomes the current one and false is returned (the window then asks for the file as for any
@@ -1873,6 +1879,7 @@ private:
     std::unique_ptr<xqt::AudioControl> audioControl;  ///< (one recording per window; qt/docs/features/audio.md)
     void makeAudioControl();
     std::unique_ptr<xqt::TimelineControl> timelineControl;  ///< (qt/docs/features/timeline.md; made with the audio's)
+    std::unique_ptr<xqt::PluginControl> pluginsControl;      ///< (qt/docs/features/plugins.md; made with the audio's)
     bool replacePristine = true;  ///< opening a file replaces an untouched new document (not for a reference)
     std::unique_ptr<xqt::PagesModel> pages;
     std::unique_ptr<xqt::PageFilterModel> filteredPages;

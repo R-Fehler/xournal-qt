@@ -28,7 +28,8 @@ struct ClassInfo {
 const std::vector<ClassInfo>& classes() {
     static const std::vector<ClassInfo> all = {
             {"read",
-             {"document.read", "page.read", "layer.list", "element.list", "selection.read", "tool.read", "view.read"},
+             {"document.read", "page.read", "layer.list", "element.list", "selection.read", "selection.clear", "tool.read",
+              "view.read"},
              ""},
             {"view", {"view.*"}, ""},
             {"ui", {"ui.*"}, ""},

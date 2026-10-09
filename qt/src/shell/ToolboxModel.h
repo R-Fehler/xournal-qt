@@ -173,6 +173,9 @@ public:
     /// Places an app item that is not placed at `to` among the items of `bar` (-1: at the end); its id ("": unknown,
     /// or placed already)
     Q_INVOKABLE QString place(const QString& name, const QString& bar, int to = -1);
+    /// The plugins' commands that can be items too ("plugin:<id>/<command>", qt/docs/features/plugins.md): the
+    /// catalog offers those not placed. Placed ones stay in the arrangement when their plugin goes.
+    void setPluginItems(const QStringList& names);
 
     /// What "+" prefills for a type: the last entry of that type (a new id is given on add), else its defaults
     Q_INVOKABLE QVariantMap prefill(const QString& type) const;
@@ -225,6 +228,7 @@ private:
     QVariantList topList;
     QString activeId;
     QStringList recent;
+    QStringList pluginItems;
     int rev = 0;
     QTimer writeTimer;
     bool pending = false;  ///< a change not written yet

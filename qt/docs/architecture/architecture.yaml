@@ -290,6 +290,9 @@ blocks:
       - name: TimelineControl
         path: qt/src/app/TimelineControl.h
         what: the replay of how a page was written (app.timeline)
+      - name: PluginControl
+        path: qt/src/app/PluginControl.h
+        what: "plugins in the window (app.plugins): commands, the window's operations, dialogs, the live preview"
       - name: WindowContext
         path: qt/src/app/WindowContext.h
         what: what a window's feature objects get from it (services, tabs, current document)
@@ -1456,6 +1459,10 @@ edges:
     hide: true
 
   # --- Documents --------------------------------------------------------------------------------------------------
+  - from: app-controller
+    to: plugins
+    kind: links
+    what: "xqt-shell links xqt-plugins: PluginControl runs a window's plugin commands, AppServices holds the host"
   - from: plugins
     to: ops
     kind: links

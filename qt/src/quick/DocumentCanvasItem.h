@@ -199,6 +199,13 @@ public:
         double dpr = 0;
     };
     SelectionShown selectionShown() const { return selectionStats; }
+    /// A plugin's preview (CanvasView::setPluginPreview) in the last frame (tests): the same fields
+    SelectionShown pluginPreviewShown() const { return previewStats; }
+    /// Where a rectangle of page `page` (page points) is in the item (its bounding box: the canvas may be turned);
+    /// empty when the page is not laid out. For the preview's frame (qt/docs/features/plugins.md).
+    Q_INVOKABLE QRectF pageRectToItem(int page, const QRectF& rect) const;
+    /// A point of the item on page `page` (page points; outside the page too)
+    Q_INVOKABLE QPointF itemToPage(int page, const QPointF& point) const;
     /// The search's marks drawn in the last frame that drew them (tests), per page: their corners in page points
     /// (four each; a turned quad for handwriting written at an angle).
     std::map<size_t, std::vector<QPolygonF>> searchMarksShown() const;
@@ -252,6 +259,7 @@ private:
     void updateSearchHits(QSGNode* pageNode, size_t pageIndex, double scale);
     void takeKeyboardFocus();
     void updateSelectionNode(QSGNode* root, double zoom, double dpr);
+    void updatePreviewNode(QSGNode* root, double zoom, double dpr);
     void updateGeometryNode(QSGNode* root, double zoom, double dpr);
     void updateCurtainNode(QSGNode* root, double zoom, double dpr);
     bool claims(QPointF scenePos) const;
@@ -355,5 +363,6 @@ private:
     GeometryShown geometryStats;
     CurtainShown curtainStats;
     SelectionShown selectionStats;
+    SelectionShown previewStats;
     std::map<size_t, std::vector<QPolygonF>> searchMarks;  ///< (the scene graph's thread writes it while the UI waits)
 };

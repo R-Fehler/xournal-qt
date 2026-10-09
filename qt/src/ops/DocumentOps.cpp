@@ -39,7 +39,8 @@ constexpr int MAX_SHAPES = 20000;  ///< shapes of one insert
 
 QString dataKey(const Principal& p) { return p.id.isEmpty() ? QStringLiteral("user") : p.id; }
 
-/// The principal's value in an element's data (invalid: none)
+}  // namespace
+
 QVariant dataOf(const Element& e, const Principal& p) {
     if (e.getData().empty()) {
         return {};
@@ -49,6 +50,7 @@ QVariant dataOf(const Element& e, const Principal& p) {
     return v.isUndefined() ? QVariant() : v.toVariant();
 }
 
+namespace {
 /// The element's data with the principal's value set (null: removed)
 std::string withData(const std::string& data, const Principal& p, const QVariant& value) {
     QJsonObject all = QJsonDocument::fromJson(QByteArray::fromStdString(data)).object();

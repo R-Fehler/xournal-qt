@@ -3641,3 +3641,23 @@ void CanvasView::endMarkdownSelection() {
 }
 
 }  // namespace xqt
+
+namespace xqt {
+
+void CanvasView::setPluginPreview(size_t page, std::vector<ElementPtr> elements) {
+    preview.page = page;
+    preview.elements = std::move(elements);
+    ++preview.revision;
+    Q_EMIT updateRequested();
+}
+
+void CanvasView::clearPluginPreview() {
+    if (preview.elements.empty()) {
+        return;
+    }
+    preview.elements.clear();
+    ++preview.revision;
+    Q_EMIT updateRequested();
+}
+
+}  // namespace xqt

@@ -60,3 +60,6 @@ style, after Lucide's `replace`.
 
 `xqt-zen` (a page with a small dot in its lower left corner: Zen, only the page and the dot; qt/docs/features/zen.md) is drawn
 in the same style.
+
+`xqt-plugin` is Lucide's `puzzle`: a plugin's command without an icon of its own, Settings → Plugins
+(qt/docs/features/plugins.md); `xqt-function-plot` is Lucide's `chart-spline`: "Plot a function…".

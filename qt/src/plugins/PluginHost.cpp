@@ -239,6 +239,9 @@ void PluginHost::clearLog(const QString& id) {
     Q_EMIT logChanged(id);
 }
 
+void PluginHost::pauseWatch() { watchdog->pause(); }
+void PluginHost::resumeWatch() { watchdog->resume(); }
+
 PluginScript* PluginHost::scriptOf(const QString& id, QString& error) {
     const PluginInfo* info = plugin(id);
     if (!info) {

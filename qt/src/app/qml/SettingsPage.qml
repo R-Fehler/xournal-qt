@@ -57,6 +57,7 @@ Popup {
         {key: "newPages", title: qsTr("New pages")},
         {key: "storage", title: qsTr("Storage")},
         {key: "shortcuts", title: qsTr("Shortcuts")},
+        {key: "plugins", title: qsTr("Plugins")},
         {key: "help", title: qsTr("Help")}
     ]
     function sectionIndex(key) {
@@ -220,6 +221,9 @@ Popup {
 
             // --- Shortcuts ---
             SettingsShortcuts {}
+
+            // --- Plugins (qt/docs/features/plugins.md) ---
+            SettingsPlugins {}
 
             // --- Help: the introduction of the first start, the keyboard shortcuts (qt/docs/features/onboarding.md)
             SettingsHelp {}

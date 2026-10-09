@@ -38,6 +38,7 @@
 #include <QWheelEvent>
 
 #include "control/settings/Settings.h"
+#include "view/View.h"
 #include "control/tools/EditSelection.h"
 #include "CanvasInput.h"
 #include "InputLog.h"
@@ -432,6 +433,8 @@ public:
         appendChildNode(pagesRoot);
         geometry = new GeometryNode;
         appendChildNode(geometry);
+        previewRoot = new QSGTransformNode;
+        appendChildNode(previewRoot);
         selectionRoot = new QSGTransformNode;
         appendChildNode(selectionRoot);
         curtain = new CurtainNode;
@@ -439,6 +442,12 @@ public:
     }
     QSGTransformNode* pagesRoot;
     GeometryNode* geometry;  ///< the setsquare or compass, over the pages and under the selection
+    QSGTransformNode* previewRoot;    ///< a plugin's preview (CanvasView::pluginPreview), above the pages
+    TileNode* preview = nullptr;
+    quint64 previewRevision = ~quint64(0);
+    double previewZoom = 0;
+    double previewDpr = 0;
+    QRectF previewRegion;             ///< in the page's view pixels
     QSGTransformNode* selectionRoot;  ///< the selection (EditSelection::paint), above the pages
     CurtainNode* curtain;             ///< over everything of the document (only the pen's hover dot is above it)
     TileNode* selection = nullptr;
@@ -1649,6 +1658,88 @@ void DocumentCanvasItem::updateSelectionNode(QSGNode* rootNode, double zoom, dou
     selectionStats = {true, root->selection->rect(), root->selection->texture()->textureSize(), root->selectionDpr};
 }
 
+void DocumentCanvasItem::updatePreviewNode(QSGNode* rootNode, double zoom, double dpr) {
+    auto* root = static_cast<CanvasRootNode*>(rootNode);
+    const xqt::CanvasView::PluginPreview& p = canvasView->pluginPreview();
+    const bool shown = !p.elements.empty() && p.page < canvasView->pageCount();
+    if (!shown) {
+        if (root->preview) {
+            root->previewRoot->removeChildNode(root->preview);
+            delete root->preview;
+            root->preview = nullptr;
+        }
+        root->previewRevision = ~quint64(0);
+        previewStats = {};
+        return;
+    }
+    const QRectF pageRect = canvasView->pageViewRect(p.page);
+    const QPointF pageOrigin(snap(pageRect.x(), dpr), snap(pageRect.y(), dpr));
+    if (!root->preview || root->previewRevision != p.revision || root->previewZoom != zoom || root->previewDpr != dpr) {
+        // The elements as upstream's views draw them (what Insert will put there), into a texture of whole device
+        // pixels from the page's top left, as the selection's
+        QRectF bounds;
+        for (const auto& e: p.elements) {
+            const auto& b = e->getBoundingBox();
+            bounds |= QRectF(b.x, b.y, b.width, b.height);
+        }
+        bounds.adjust(-4, -4, 4, 4);
+        const int left = static_cast<int>(std::floor(bounds.left() * zoom * dpr));
+        const int top = static_cast<int>(std::floor(bounds.top() * zoom * dpr));
+        const QRect pixels(left, top,
+                           std::clamp(static_cast<int>(std::ceil(bounds.right() * zoom * dpr)) - left, 1, 8192),
+                           std::clamp(static_cast<int>(std::ceil(bounds.bottom() * zoom * dpr)) - top, 1, 8192));
+        QImage img(pixels.size(), QImage::Format_ARGB32_Premultiplied);
+        img.fill(Qt::transparent);
+        cairo_surface_t* surface = cairo_image_surface_create_for_data(
+                img.bits(), CAIRO_FORMAT_ARGB32, img.width(), img.height(), static_cast<int>(img.bytesPerLine()));
+        cairo_t* cr = cairo_create(surface);
+        cairo_translate(cr, -pixels.x(), -pixels.y());
+        cairo_scale(cr, zoom * dpr, zoom * dpr);
+        for (const auto& e: p.elements) {
+            if (auto view = xoj::view::ElementView::createFromElement(e.get())) {
+                view->draw(xoj::view::Context::createDefault(cr));
+            }
+        }
+        cairo_destroy(cr);
+        cairo_surface_destroy(surface);
+        const bool fresh = !root->preview;
+        if (fresh) {
+            root->preview = new TileNode;
+            root->preview->setFiltering(QSGTexture::Linear);
+        }
+        QSGTexture* previous = root->preview->texture();
+        root->preview->setTexture(window()->createTextureFromImage(img));
+        delete previous;
+        if (fresh) {
+            root->previewRoot->appendChildNode(root->preview);
+        }
+        root->previewRevision = p.revision;
+        root->previewZoom = zoom;
+        root->previewDpr = dpr;
+        root->previewRegion = QRectF(pixels.x() / dpr, pixels.y() / dpr, pixels.width() / dpr, pixels.height() / dpr);
+    }
+    root->preview->setRect(root->previewRegion.translated(pageOrigin));
+    previewStats = {true, root->preview->rect(), root->preview->texture()->textureSize(), root->previewDpr};
+}
+
+QRectF DocumentCanvasItem::pageRectToItem(int page, const QRectF& rect) const {
+    if (!canvasView || page < 0 || static_cast<size_t>(page) >= canvasView->pageCount()) {
+        return {};
+    }
+    const double zoom = canvasView->getViewController().zoom();
+    const QRectF r = canvasView->pageViewRect(static_cast<size_t>(page));
+    return toItem(QRectF(r.topLeft() + rect.topLeft() * zoom, rect.size() * zoom));
+}
+
+QPointF DocumentCanvasItem::itemToPage(int page, const QPointF& point) const {
+    if (!canvasView || page < 0 || static_cast<size_t>(page) >= canvasView->pageCount()) {
+        return {};
+    }
+    const double zoom = canvasView->getViewController().zoom();
+    const QRectF r = canvasView->pageViewRect(static_cast<size_t>(page));
+    return (canvasView->getViewController().screenToView(point) - r.topLeft()) / zoom;
+}
+
 void DocumentCanvasItem::updateGeometryNode(QSGNode* rootNode, double zoom, double dpr) {
     GeometryNode* g = static_cast<CanvasRootNode*>(rootNode)->geometry;
     const xqt::GeometryToolLayer& layer = canvasView->geometryTool();
@@ -2216,6 +2307,7 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
         QMetaObject::invokeMethod(this, "update", Qt::QueuedConnection);
     }
     updateGeometryNode(root, zoom, dpr);
+    updatePreviewNode(root, zoom, dpr);
     updateSelectionNode(root, zoom, dpr);
     updateCurtainNode(root, zoom, dpr);
     return root;

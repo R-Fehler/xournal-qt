@@ -134,6 +134,7 @@ std::unique_ptr<Text> makeText(const QVariantMap& shape, bool markdown) {
     text->setColor(colorOf(shape));
     double w = 0, h = 0;
     if (markdown) {
+        text->setMarkdown(true);  // (as its layer will make it: drawn formatted, also as a preview)
         md::Style style = md::styleOf(*text);
         const auto natural = naturalSize(content.toStdString(), style);
         w = natural.first;

@@ -1,5 +1,6 @@
 // xournal-qt: part of the main window (Main.qml): the buttons of the app's items, kept out of sight and lent to
 // the bars (Toolbox.qml) that hold them.
+import QtQml
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -16,7 +17,10 @@ Item {
     visible: false
     Material.foreground: "#303030"
     /// The buttons by their names (the app items' names of ToolboxModel, and the buttons of the moment)
-    readonly property var slots: ({
+    readonly property var slots: Object.assign({}, baseSlots, pluginSlots)
+    /// The buttons of the plugins' commands (qt/docs/features/plugins.md), by their keys ("plugin:<id>/<command>")
+    property var pluginSlots: ({})
+    readonly property var baseSlots: ({
         hand: handTool, touchDrawing: touchDrawingTool, select: selectTool, snip: snipTool, write: writeButton,
         geometry: geometryTool, pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, sticker: stickerTool,
         record: recordTool, addPage: addPageTool, search: searchTool,
@@ -37,6 +41,32 @@ Item {
     }
     // (the buttons on neither bar, and those not offered for this document)
     Item { id: toolBank; visible: false }
+    // The plugins' commands that may be items of the bars (made and gone with the plugins)
+    Instantiator {
+        model: app.plugins.commands.filter(function(c) { return c.toolbox })
+        delegate: IconButton {
+            required property var modelData
+            objectName: "pluginButton_" + modelData.key
+            parent: toolBank
+            property bool offered: modelData.when === "always" || (!app.homeVisible && (modelData.when !== "selection" || app.edit.hasSelection))
+            enabled: !app.plugins.busy
+            iconName: modelData.iconName
+            icon.source: modelData.icon
+            label: modelData.title
+            tip: modelData.title + win.keyNote(modelData.key)
+            onClicked: app.plugins.run(modelData.key)
+        }
+        onObjectAdded: function(index, object) {
+            const next = Object.assign({}, toolArea.pluginSlots)
+            next[object.modelData.key] = object
+            toolArea.pluginSlots = next
+        }
+        onObjectRemoved: function(index, object) {
+            const next = Object.assign({}, toolArea.pluginSlots)
+            delete next[object.modelData.key]
+            toolArea.pluginSlots = next
+        }
+    }
     Item {
         // --- the buttons of the app's items (lent to the bar that holds them; `offered`: there at all for this
         // document; undo and redo are the heads of the rail and the top bar) ---

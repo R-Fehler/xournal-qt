@@ -28,6 +28,11 @@
 #include "shell/ToolboxModel.h"
 #include "util/Util.h"
 
+#include <QDir>
+#include <QStandardPaths>
+
+#include "PluginHost.h"
+
 #include "MdImageDecoder.h"
 
 namespace xqt {
@@ -147,6 +152,43 @@ AppServices::AppServices() {
             recentFiles->pdfKindsChanged();
         }
     });
+
+    // The plugins (qt/docs/features/plugins.md): the bundled ones beside the handwriting models, the user's in the
+    // app's data folder; which are on and what each was allowed in our settings
+    const QString userPlugins =
+            QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)).filePath(QStringLiteral("plugins"));
+    pluginHost = std::make_unique<plugins::PluginHost>(
+            QStringList{QString::fromStdU16String((app->getResourceDir() / "plugins").u16string()), userPlugins},
+            [context] {
+                std::string json;
+                context->getSettings()->getCustomElement(CUSTOM).getString("plugins", json);
+                return QString::fromStdString(json);
+            },
+            [context](const QString& json) {
+                context->getSettings()->getCustomElement(CUSTOM).setString("plugins", json.toStdString());
+                context->getSettings()->customSettingsChanged();
+            });
+    // Their commands as shortcuts and as items of the toolbox's catalog
+    auto offerCommands = [this] {
+        std::vector<ShortcutsModel::PluginAction> actions;
+        QStringList items;
+        for (const plugins::PluginInfo& p: pluginHost->plugins()) {
+            if (!p.enabled || !p.error.isEmpty()) {
+                continue;
+            }
+            for (const plugins::PluginCommand& c: p.manifest.commands) {
+                const QString key = QStringLiteral("plugin:%1/%2").arg(p.manifest.id, c.id);
+                actions.push_back({key, c.title, c.shortcut});
+                if (c.toolbox) {
+                    items << key;
+                }
+            }
+        }
+        keys->setPluginActions(actions);
+        tools->setPluginItems(items);
+    };
+    offerCommands();
+    QObject::connect(pluginHost.get(), &plugins::PluginHost::pluginsChanged, pluginHost.get(), offerCommands);
 }
 
 AppServices::~AppServices() {
