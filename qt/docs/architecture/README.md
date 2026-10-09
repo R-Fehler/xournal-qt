@@ -489,6 +489,7 @@ One open document without a view (session), and what it builds on: the Markdown 
 | [audio](#audio) | Records and plays Ogg Vorbis, compatible with Xournal++'s audio (a stroke tied to a moment of a recording). | `xqt-audio` |
 | [markdown](#markdown) | Parses (md4c), lays out (Pango), paginates and draws (cairo) Markdown text, with the same text stack as upstream's text elements; registers the renderer upstream's TextView asks for Markdown texts. | `xqt-markdown` |
 | [session](#session) | One open document without a view: load, new, save in the background, autosave, undo, page revisions; the fork's formats (the PDF with notes, incremental saves, version history), search; process-wide AppContext. | `xqt-session` |
+| [ops](#ops) | Every change a plugin (later a remote peer or an agent) makes to a document: an operation of the collaboration vocabulary, checked against what its principal may do, applied with undo, one undo step per transaction or rolled back (ADR 0008). | `xqt-ops` |
 | [render](#render) | Turns a page of upstream's model into pixels with upstream's views and cairo, on worker threads; Qt-free, so the CLI and the tests use it too. | `xoj-render` |
 
 #### audio
@@ -538,6 +539,7 @@ Depends on:
 
 Used by:
 
+- [ops](#ops) (`calls`): Markdown boxes measured as drawn (labels placed by an anchor)
 - [session](#session) (`links`): xqt-session links xqt-markdown: text documents, Markdown boxes in exports
 
 #### session
@@ -560,11 +562,12 @@ One open document without a view: load, new, save in the background, autosave, u
 
 Depends on:
 
+- [undo](#undo) (`seam`): the undo stack's sink: UndoGathering gathers a command's steps into one SequenceUndoAction
 - [render](#render) (`links`): xqt-session links xoj-render: render workers in AppContext, drawing for exports
 - [markdown](#markdown) (`links`): xqt-session links xqt-markdown: text documents, Markdown boxes in exports
 - [audio](#audio) (`links`): xqt-session links xqt-audio: recordings tied to elements
 - [control/xojfile](#controlxojfile) (`calls`): loads with LoadHandler and saves with SaveHandler (in the background, on a page copy)
-- [control/xojfile](#controlxojfile) (`seam`): the fork's attributes (xqt-group, xqt-created, xqt-bookmark, xqt-audio, xqt-fill-color, notespace); a document loaded from memory (an encrypted PDF's .xopp)
+- [control/xojfile](#controlxojfile) (`seam`): the fork's attributes (xqt-group, xqt-created, xqt-data, xqt-bookmark, xqt-audio, xqt-fill-color, notespace); a document loaded from memory (an encrypted PDF's .xopp)
 - [undo](#undo) (`calls`): one UndoRedoHandler per session, plus one for page order
 - [model](#model) (`calls`): the Document it owns; listens to its changes
 - [model](#model) (`seam`): Document::setDocumentHandler, setPdfPassword, DocumentOutline; NoteSpace, page bookmarks, groups and times of elements
@@ -585,8 +588,29 @@ Used by:
 - [Models and settings](#models-and-settings) (`calls`): pages, outline, layers, annotations, versions of a session
 - [hwr](#hwr) (`links`): xqt-hwr links xqt-session: an indexer per open document reads its strokes
 - [canvas](#canvas) (`links`): xqt-canvas links xqt-session: a view shows a session; edits go through its undo
+- [ops](#ops) (`links`): xqt-ops links xqt-session: operations act on a DocumentSession, a transaction is an UndoGathering
 - [CLI](#cli) (`links`): xournal-qt-cli links xqt-session: the PDF with notes and the archive PDF
 - [Tests](#tests) (`calls`): one test binary per module, label per module
+
+#### ops
+
+Every change a plugin (later a remote peer or an agent) makes to a document: an operation of the collaboration vocabulary, checked against what its principal may do, applied with undo, one undo step per transaction or rolled back (ADR 0008).
+
+**Where**: [`qt/src/ops/`](../../src/ops/). **Target**: `xqt-ops`. **Kind**: xournal-qt module.
+
+**Docs**: [ops/README.md](../../src/ops/README.md), [0008-js-plugins.md](../decisions/0008-js-plugins.md).
+
+| Key class or file | What |
+| --- | --- |
+| [`Operations, Context`](../../src/ops/Operations.h) | the table of operations; a principal acting on a document, its references and its transaction |
+| [`DocumentOps`](../../src/ops/DocumentOps.h) | the document's operations: elements, layers, pages, backgrounds |
+| [`Shapes`](../../src/ops/Shapes.h) | elements described as data (strokes, texts, Markdown boxes), for inserting and previews |
+
+Depends on:
+
+- [session](#session) (`links`): xqt-ops links xqt-session: operations act on a DocumentSession, a transaction is an UndoGathering
+- [markdown](#markdown) (`calls`): Markdown boxes measured as drawn (labels placed by an anchor)
+- [undo](#undo) (`calls`): upstream's undo actions (InsertsUndoAction, DeleteUndoAction, InsertLayerUndoAction, …) for every change
 
 #### render
 
@@ -788,7 +812,7 @@ Depends on:
 Used by:
 
 - [session](#session) (`calls`): loads with LoadHandler and saves with SaveHandler (in the background, on a page copy)
-- [session](#session) (`seam`): the fork's attributes (xqt-group, xqt-created, xqt-bookmark, xqt-audio, xqt-fill-color, notespace); a document loaded from memory (an encrypted PDF's .xopp)
+- [session](#session) (`seam`): the fork's attributes (xqt-group, xqt-created, xqt-data, xqt-bookmark, xqt-audio, xqt-fill-color, notespace); a document loaded from memory (an encrypted PDF's .xopp)
 - [CLI](#cli) (`calls`): loads documents as upstream's CLI does
 
 #### view
@@ -876,6 +900,8 @@ Depends on:
 Used by:
 
 - [canvas](#canvas) (`calls`): upstream's undo actions for edits made outside the tools (groups, notes, page resize)
+- [ops](#ops) (`calls`): upstream's undo actions (InsertsUndoAction, DeleteUndoAction, InsertLayerUndoAction, …) for every change
+- [session](#session) (`seam`): the undo stack's sink: UndoGathering gathers a command's steps into one SequenceUndoAction
 - [session](#session) (`calls`): one UndoRedoHandler per session, plus one for page order
 - [Tools and handlers](#tools-and-handlers) (`calls`): every finished stroke or edit is an undo action
 
@@ -1272,6 +1298,7 @@ Upstream classes the fork's modules use as they are (`calls`), and the CMake lin
 | [canvas](#canvas) | [undo](#undo) | `calls` | upstream's undo actions for edits made outside the tools (groups, notes, page resize) |
 | [canvas](#canvas) | [model](#model) | `calls` | pages, layers and elements under the document lock |
 | [canvas](#canvas) | [control](#control) | `calls` | ToolHandler, LayerController, the shape recogniser, the settings |
+| [ops](#ops) | [undo](#undo) | `calls` | upstream's undo actions (InsertsUndoAction, DeleteUndoAction, InsertLayerUndoAction, …) for every change |
 | [session](#session) | [control/xojfile](#controlxojfile) | `calls` | loads with LoadHandler and saves with SaveHandler (in the background, on a page copy) |
 | [session](#session) | [undo](#undo) | `calls` | one UndoRedoHandler per session, plus one for page order |
 | [session](#session) | [model](#model) | `calls` | the Document it owns; listens to its changes |
@@ -1308,7 +1335,8 @@ Hooks a frontend may set and small edits, each marked `xournal-qt:` in the upstr
 
 | From | To | Kind | What |
 | --- | --- | --- | --- |
-| [session](#session) | [control/xojfile](#controlxojfile) | `seam` | the fork's attributes (xqt-group, xqt-created, xqt-bookmark, xqt-audio, xqt-fill-color, notespace); a document loaded from memory (an encrypted PDF's .xopp) |
+| [session](#session) | [undo](#undo) | `seam` | the undo stack's sink: UndoGathering gathers a command's steps into one SequenceUndoAction |
+| [session](#session) | [control/xojfile](#controlxojfile) | `seam` | the fork's attributes (xqt-group, xqt-created, xqt-data, xqt-bookmark, xqt-audio, xqt-fill-color, notespace); a document loaded from memory (an encrypted PDF's .xopp) |
 | [session](#session) | [model](#model) | `seam` | Document::setDocumentHandler, setPdfPassword, DocumentOutline; NoteSpace, page bookmarks, groups and times of elements |
 | [session](#session) | [view](#view) | `seam` | StickyNote draws a note's layer (xoj::view::layerDrawer); PageMargins scales ruled paper (xoj::view::ruledScale) |
 | [session](#session) | [util](#util) | `seam` | AppContext sets the UI-thread dispatcher (Util::setUiThreadDispatcher) |
@@ -1344,7 +1372,8 @@ Every edge from a frontend block into the core or `qt/compat`, by block.
 | [canvas](#canvas) | [Tools and handlers](#tools-and-handlers) (`links`); [Shadow headers](#shadow-headers) (`shadows`); [undo](#undo) (`calls`); [model](#model) (`calls`); [control](#control) (`calls`) |
 | [audio](#audio) | [model](#model) (`calls`) |
 | [markdown](#markdown) | [model](#model) (`seam`); [view](#view) (`seam`) |
-| [session](#session) | [control/xojfile](#controlxojfile) (`calls`); [control/xojfile](#controlxojfile) (`seam`); [undo](#undo) (`calls`); [model](#model) (`calls`); [model](#model) (`seam`); [view](#view) (`seam`); [util](#util) (`seam`); [pdf](#pdf) (`calls`); [control](#control) (`calls`); [Shadow headers](#shadow-headers) (`shadows`) |
+| [session](#session) | [undo](#undo) (`seam`); [control/xojfile](#controlxojfile) (`calls`); [control/xojfile](#controlxojfile) (`seam`); [undo](#undo) (`calls`); [model](#model) (`calls`); [model](#model) (`seam`); [view](#view) (`seam`); [util](#util) (`seam`); [pdf](#pdf) (`calls`); [control](#control) (`calls`); [Shadow headers](#shadow-headers) (`shadows`) |
+| [ops](#ops) | [undo](#undo) (`calls`) |
 | [render](#render) | [view](#view) (`calls`); [view](#view) (`seam`); [pdf](#pdf) (`calls`); [model](#model) (`calls`) |
 | [CLI](#cli) | [control/xojfile](#controlxojfile) (`calls`); [pdf](#pdf) (`calls`); [control](#control) (`calls`) |
 | [Upstream tests](#upstream-tests) | [model](#model) (`calls`) |

@@ -589,6 +589,28 @@ blocks:
         path: qt/src/session/StickyNote.h
         what: the fork's features in the document model (several through seams)
     docs: [qt/src/session/README.md, qt/docs/features/hybrid-pdf.md]
+  - id: ops
+    name: ops
+    layer: document
+    kind: qt
+    label: checked operations
+    target: xqt-ops
+    paths: [qt/src/ops/]
+    responsibility: >-
+      Every change a plugin (later a remote peer or an agent) makes to a document: an operation of the
+      collaboration vocabulary, checked against what its principal may do, applied with undo, one undo step per
+      transaction or rolled back (ADR 0008).
+    key:
+      - name: Operations, Context
+        path: qt/src/ops/Operations.h
+        what: the table of operations; a principal acting on a document, its references and its transaction
+      - name: DocumentOps
+        path: qt/src/ops/DocumentOps.h
+        what: "the document's operations: elements, layers, pages, backgrounds"
+      - name: Shapes
+        path: qt/src/ops/Shapes.h
+        what: elements described as data (strokes, texts, Markdown boxes), for inserting and previews
+    docs: [qt/src/ops/README.md, qt/docs/decisions/0008-js-plugins.md]
   - id: render
     name: render
     layer: document
@@ -1413,6 +1435,25 @@ edges:
     hide: true
 
   # --- Documents --------------------------------------------------------------------------------------------------
+  - from: ops
+    to: session
+    kind: links
+    what: "xqt-ops links xqt-session: operations act on a DocumentSession, a transaction is an UndoGathering"
+  - from: ops
+    to: markdown
+    kind: calls
+    what: Markdown boxes measured as drawn (labels placed by an anchor)
+    hide: true
+  - from: ops
+    to: core-undo
+    kind: calls
+    what: "upstream's undo actions (InsertsUndoAction, DeleteUndoAction, InsertLayerUndoAction, …) for every change"
+    hide: true
+  - from: session
+    to: core-undo
+    kind: seam
+    what: "the undo stack's sink: UndoGathering gathers a command's steps into one SequenceUndoAction"
+    hide: true
   - from: session
     to: render
     kind: links
@@ -1432,7 +1473,7 @@ edges:
   - from: session
     to: core-xojfile
     kind: seam
-    what: "the fork's attributes (xqt-group, xqt-created, xqt-bookmark, xqt-audio, xqt-fill-color, notespace); a document loaded from memory (an encrypted PDF's .xopp)"
+    what: "the fork's attributes (xqt-group, xqt-created, xqt-data, xqt-bookmark, xqt-audio, xqt-fill-color, notespace); a document loaded from memory (an encrypted PDF's .xopp)"
     hide: true
   - from: session
     to: core-undo

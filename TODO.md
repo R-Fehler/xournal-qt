@@ -78,12 +78,16 @@ The author's decisions of 2026-10-09: [ADR 0008](qt/docs/decisions/0008-js-plugi
 [js-plugins-research.md](qt/docs/review/2026-10/js-plugins-research.md).
 - [~] The undo sink seam and `SequenceUndoAction` (one command, one undo step; rollback) (`qt/js-plugins`)
 - [~] Plugin data on elements (`xqt-data`, a seam like `xqt-group`) (`qt/js-plugins`)
-- [~] The host: module `qt/src/plugins` (manifest, registry, engine per plugin, watchdog, log, permissions, the
-  operation layer and API v1), label `plugins` (`qt/js-plugins`)
+- [~] The operations layer: module `qt/src/ops` (principals, authority, transactions, the document's operations),
+  label `ops` (`qt/js-plugins`)
+- [~] The host: module `qt/src/plugins` (manifest, registry, engine per plugin, watchdog, log, permissions, API v1),
+  label `plugins` (`qt/js-plugins`)
 - [~] The UI: Plugins in ⋮, the "+" catalog, shortcuts, Settings → Plugins, the permission prompt, dialogs, the toast
   with Undo (`qt/js-plugins`)
-- [~] The side form with live preview (beside the page; below it on phones) (`qt/js-plugins`)
-- [~] The function plotter (bundled), and example ports of upstream's plugins (`qt/js-plugins`)
+- [~] The live dialog with the preview on the page (a bottom sheet on phones) (`qt/js-plugins`)
+- [~] The function plotter (bundled, "Plot a function…" with the insert commands; parametric curves; labels as
+  Markdown math), and example ports of upstream's plugins (`qt/js-plugins`)
+- [~] `xournal-qt-cli plugin run <id> <command> [files…] [--set k=v] [--allow class]` (`qt/js-plugins`)
 
 ## Decisions for the author
 - [ ] Reading library cache packs from the other cache location (shell review §4 #15) stays: it also serves read-only
