@@ -763,7 +763,7 @@ QString ToolboxModel::idOfApp(const QString& name) const {
 
 QStringList ToolboxModel::unplaced() const {
     QStringList out;
-    for (const QString& name: appItemNames()) {
+    for (const QString& name: appItemNames() + pluginItems) {
         if (idOfApp(name).isEmpty()) {
             out << name;
         }
@@ -771,8 +771,18 @@ QStringList ToolboxModel::unplaced() const {
     return out;
 }
 
+void ToolboxModel::setPluginItems(const QStringList& names) {
+    if (pluginItems == names) {
+        return;
+    }
+    pluginItems = names;
+    ++rev;
+    Q_EMIT changed();
+}
+
 QString ToolboxModel::place(const QString& name, const QString& bar, int to) {
-    if (!appItemNames().contains(name) || !idOfApp(name).isEmpty() || (bar != "rail" && bar != "top")) {
+    if ((!appItemNames().contains(name) && !pluginItems.contains(name)) || !idOfApp(name).isEmpty() ||
+        (bar != "rail" && bar != "top")) {
         return {};
     }
     QVariantList& l = listOf(bar);
@@ -893,7 +903,8 @@ void ToolboxModel::tidy() {
             return true;
         }
         const QString name = v.toMap().value("app").toString();
-        if (!known.contains(name) || apps.contains(name)) {
+        // (a plugin's command stays placed while its plugin is off or gone: the bars skip what has no button)
+        if ((!known.contains(name) && !name.startsWith(QLatin1String("plugin:"))) || apps.contains(name)) {
             return false;
         }
         apps << name;

@@ -12,6 +12,8 @@ install(DIRECTORY "${XQT_BUILD_RESOURCE_DIR}/palettes" "${XQT_BUILD_RESOURCE_DIR
 # share/xournal-qt into Contents/Resources/share/, Windows: the program folder's share/)
 # The built-in stickers (XqtSession.cmake; read-only, CC0: their LICENCE.md)
 install(DIRECTORY "${XQT_BUILD_RESOURCE_DIR}/stickers" DESTINATION share/xournal-qt)
+# The bundled plugins (XqtPlugins.cmake; qt/docs/features/plugins.md)
+install(DIRECTORY "${XQT_BUILD_RESOURCE_DIR}/plugins" DESTINATION share/xournal-qt)
 if(EXISTS "${XQT_BUILD_RESOURCE_DIR}/hwr-models")
     install(DIRECTORY "${XQT_BUILD_RESOURCE_DIR}/hwr-models" DESTINATION share/xournal-qt)
 endif()

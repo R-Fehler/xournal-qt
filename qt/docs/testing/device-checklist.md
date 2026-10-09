@@ -87,12 +87,14 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
 - [ ] Recording with the screen off ([audio.md](../features/audio.md#on-the-device)); the launcher's "Quick note"
       ([quick-note.md](../features/quick-note.md#on-the-device)); "Add to calendar"
       ([todos.md](../features/todos.md#on-the-device)).
+- [ ] Plugins: "Plot a function…" as a bottom sheet, the preview's frame dragged with a finger and the pen, Insert;
+      after an update of the app a changed bundled plugin is the new one ([plugins.md](../features/plugins.md#on-the-device)).
 - [ ] `adb logcat --pid=$(adb shell pidof org.xournalqt.app)` shows no crash.
 
 ## Other apps
 
 - [ ] A `.xopp` saved here opens in Xournal++ 1.2/1.3 and looks the same (with groups, creation times and
-      recordings); Xournal++'s files open here.
+      recordings; a plot of the function plotter as strokes and its labels' `$…$` source); Xournal++'s files open here.
 - [ ] PDFs with notes, archive PDFs, version history and encrypted PDFs in other viewers:
       [hybrid-pdf.md](../features/hybrid-pdf.md#on-the-device).
 - [ ] Other apps' annotations made editable: [adopt-annotations.md](../features/adopt-annotations.md#on-the-device);

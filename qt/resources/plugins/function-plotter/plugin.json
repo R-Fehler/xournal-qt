@@ -1,0 +1,17 @@
+{
+  "id": "org.xournalqt.function-plotter",
+  "name": "Function plotter",
+  "version": "1.0.0",
+  "api": "1.0",
+  "author": "xournal-qt",
+  "description": "Plots functions y = f(x) and curves x(t), y(t) as editable ink with formulas, axes, grid and numbers; with parameters on sliders, an exact scale for worksheets, zeros, extrema and intersections.",
+  "main": "main.mjs",
+  "enabled": true,
+  "permissions": ["edit"],
+  "commands": [
+    { "id": "plot", "title": "Plot a function…", "shortcut": "Ctrl+Alt+P", "icon": "xqt-function-plot",
+      "place": "insert", "when": "document" },
+    { "id": "editPlot", "title": "Edit plot…", "icon": "xqt-function-plot", "place": "insert", "when": "selection",
+      "toolbox": false }
+  ]
+}

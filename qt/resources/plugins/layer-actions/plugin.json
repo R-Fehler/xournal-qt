@@ -1,0 +1,15 @@
+{
+  "id": "org.xournalqt.example.layer-actions",
+  "name": "Layer actions (example)",
+  "version": "1.0.0",
+  "api": "1.0",
+  "author": "xournal-qt (a port of Xournal++'s LayerActions)",
+  "description": "A new layer on top of every page; only the first layer of this page shown, or all. An example of the plugin API: layers, several changes as one undo step.",
+  "main": "main.mjs",
+  "permissions": ["pages"],
+  "commands": [
+    { "id": "addTopLayer", "title": "A new top layer on every page", "toolbox": false },
+    { "id": "onlyFirstLayer", "title": "Show only the first layer of this page", "toolbox": false },
+    { "id": "allLayers", "title": "Show all layers of this page", "toolbox": false }
+  ]
+}

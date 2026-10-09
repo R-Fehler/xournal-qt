@@ -67,6 +67,8 @@ public:
     virtual void setElementGroup(uint32_t /*group*/) {}
     /// xournal-qt: when the element begun last was made, ms since 1970 UTC (the same five tags; qt/timeline)
     virtual void setElementCreated(int64_t /*ms*/) {}
+    /// xournal-qt: the data a plugin keeps on the element begun last (the same five tags; ADR 0008)
+    virtual void setElementData(std::string /*data*/) {}
     virtual void setStrokePoints(std::vector<Point> pointVector, bool hasPressure) = 0;
     virtual void finalizeStroke() = 0;
     virtual void addText(std::string font, double size, xoj::util::Matrix matrix, Color color,

@@ -1,0 +1,14 @@
+{
+  "id": "org.xournalqt.example.toggle-grid",
+  "name": "Toggle grid (example)",
+  "version": "1.0.0",
+  "api": "1.0",
+  "author": "xournal-qt (a port of Xournal++'s ToggleGrid)",
+  "description": "Switches the page between squared paper and the paper it had. An example of the plugin API: page backgrounds, one undo step.",
+  "main": "main.mjs",
+  "permissions": ["pages"],
+  "commands": [
+    { "id": "toggle", "title": "Squared paper on or off", "icon": "xqt-palette", "toolbox": false },
+    { "id": "toggleAll", "title": "Squared paper on or off (all pages)", "toolbox": false }
+  ]
+}

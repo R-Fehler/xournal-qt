@@ -168,8 +168,9 @@ top bar** / **Move to the rail** (at its end) and **Off the bars (into +)**.
 
 **The catalog** ("+", `toolTypeMenu`): a new tool of a kind (pen,
 highlighter, shape, eraser, text box, sticky note, laser pointer, snip: the editor, then **Add**), then every app tool
-and command on neither bar that is offered here, by section (Tools, Insert, View, Document: `catalogSection_<name>`,
-`catalog_<name>`). A tap puts it at the end of the bar it was opened from ("+" at the rail's end: the rail; at the top
+and command on neither bar that is offered here, by section (Tools, Insert, View, Document, Plugins:
+`catalogSection_<name>`, `catalog_<name>`; a plugin's command that inserts, like "Plot a function…", is under Insert,
+[plugins.md](plugins.md)). A tap puts it at the end of the bar it was opened from ("+" at the rail's end: the rail; at the top
 bar's end: the top bar; "Add a tool here…" in an item's menu: after that item). On a phone it is a sheet (the menus'
 sheet). Dragging out of it onto a bar is not built (a tap places, then carry it).
 
@@ -302,7 +303,8 @@ first layout. The last eraser cannot be removed (a group removed leaves it in it
   touchDrawing, and the commands record, open, save, milestone, share, print, image, sticker, addPage, search, read,
   replay, present, fullScreen, zen, tags, favourite, bookmark, settings, new (the names of `toolArea.slots`). Each has
   **one home**: the rail, the top bar, or nowhere ("not placed", `unplaced()`: what the catalog offers; a second place
-  in a file is dropped).
+  in a file is dropped). The plugins' commands are items too, named `plugin:<id>/<command>` (`setPluginItems`); one
+  placed stays in the arrangement while its plugin is off or gone (the bar shows nothing for it).
 - **The top bar's first layout** (`defaultTopLayout`): open, save, milestone, share, print | image, stickers, add
   page, write on the page | setsquare, the finger draws, record | search, read, replay, present, full screen, Zen |
   tags, favourite, bookmark | settings. The top bar shows it (above, "The top bar").

@@ -352,13 +352,19 @@ Item {
     }
     /// The catalog's rows of the app's items on neither bar (and offered here): [{section, title}, {name}, …]
     function catalogRows() {
-        const sections = [
+        let sections = [
             { section: "tools", title: qsTr("Tools"), names: ["hand", "select", "snip", "pdfText", "write", "geometry", "touchDrawing"] },
             { section: "insert", title: qsTr("Insert"), names: ["image", "sticker", "addPage", "record"] },
             { section: "view", title: qsTr("View"), names: ["search", "read", "replay", "present", "fullScreen", "zen"] },
             { section: "document", title: qsTr("Document"), names: ["new", "open", "save", "milestone", "share", "print",
                                                                     "tags", "favourite", "bookmark", "settings"] }
         ]
+        // (the plugins' commands: "insert" ones with the app's, the rest in a section of their own)
+        const plugins = app.plugins.commands.filter(function(c) { return c.toolbox })
+        sections[1].names = sections[1].names.concat(plugins.filter(function(c) { return c.place === "insert" })
+                                                            .map(function(c) { return c.key }))
+        sections.push({ section: "plugins", title: qsTr("Plugins"),
+                        names: plugins.filter(function(c) { return c.place !== "insert" }).map(function(c) { return c.key }) })
         const free = (app.toolbox.revision, app.toolbox.unplaced())
         const out = []
         sections.forEach(function(sec) {

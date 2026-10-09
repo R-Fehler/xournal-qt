@@ -290,6 +290,9 @@ blocks:
       - name: TimelineControl
         path: qt/src/app/TimelineControl.h
         what: the replay of how a page was written (app.timeline)
+      - name: PluginControl
+        path: qt/src/app/PluginControl.h
+        what: "plugins in the window (app.plugins): commands, the window's operations, dialogs, the live preview"
       - name: WindowContext
         path: qt/src/app/WindowContext.h
         what: what a window's feature objects get from it (services, tabs, current document)
@@ -589,6 +592,49 @@ blocks:
         path: qt/src/session/StickyNote.h
         what: the fork's features in the document model (several through seams)
     docs: [qt/src/session/README.md, qt/docs/features/hybrid-pdf.md]
+  - id: plugins
+    name: plugins
+    layer: document
+    kind: qt
+    label: JavaScript plugins
+    target: xqt-plugins
+    paths: [qt/src/plugins/]
+    responsibility: >-
+      The plugins of the process: one QJSEngine per plugin with the frozen API module "xournal", commands run for a
+      window as one transaction of the operations layer, permissions asked on first use, a watchdog (ADR 0008).
+    key:
+      - name: PluginHost
+        path: qt/src/plugins/PluginHost.h
+        what: finds and runs plugins; settings, logs; the window as PluginUi and its operations
+      - name: PluginScript, PluginBridge
+        path: qt/src/plugins/PluginScript.h
+        what: a plugin's engine and the bridge behind the API (api.js)
+      - name: Watchdog
+        path: qt/src/plugins/Watchdog.h
+        what: stops JavaScript that runs longer than 2 s
+    docs: [qt/src/plugins/README.md, qt/docs/features/plugins.md]
+  - id: ops
+    name: ops
+    layer: document
+    kind: qt
+    label: checked operations
+    target: xqt-ops
+    paths: [qt/src/ops/]
+    responsibility: >-
+      Every change a plugin (later a remote peer or an agent) makes to a document: an operation of the
+      collaboration vocabulary, checked against what its principal may do, applied with undo, one undo step per
+      transaction or rolled back (ADR 0008).
+    key:
+      - name: Operations, Context
+        path: qt/src/ops/Operations.h
+        what: the table of operations; a principal acting on a document, its references and its transaction
+      - name: DocumentOps
+        path: qt/src/ops/DocumentOps.h
+        what: "the document's operations: elements, layers, pages, backgrounds"
+      - name: Shapes
+        path: qt/src/ops/Shapes.h
+        what: elements described as data (strokes, texts, Markdown boxes), for inserting and previews
+    docs: [qt/src/ops/README.md, qt/docs/decisions/0008-js-plugins.md]
   - id: render
     name: render
     layer: document
@@ -1413,6 +1459,37 @@ edges:
     hide: true
 
   # --- Documents --------------------------------------------------------------------------------------------------
+  - from: app-controller
+    to: plugins
+    kind: links
+    what: "xqt-shell links xqt-plugins: PluginControl runs a window's plugin commands, AppServices holds the host"
+  - from: cli
+    to: plugins
+    kind: links
+    what: "xournal-qt-cli plugin run: a plugin's command on documents without a window (qt/cli/PluginRun.cpp)"
+  - from: plugins
+    to: ops
+    kind: links
+    what: "xqt-plugins links xqt-ops: every API call is an operation checked for the plugin"
+  - from: ops
+    to: session
+    kind: links
+    what: "xqt-ops links xqt-session: operations act on a DocumentSession, a transaction is an UndoGathering"
+  - from: ops
+    to: markdown
+    kind: calls
+    what: Markdown boxes measured as drawn (labels placed by an anchor)
+    hide: true
+  - from: ops
+    to: core-undo
+    kind: calls
+    what: "upstream's undo actions (InsertsUndoAction, DeleteUndoAction, InsertLayerUndoAction, …) for every change"
+    hide: true
+  - from: session
+    to: core-undo
+    kind: seam
+    what: "the undo stack's sink: UndoGathering gathers a command's steps into one SequenceUndoAction"
+    hide: true
   - from: session
     to: render
     kind: links
@@ -1432,7 +1509,7 @@ edges:
   - from: session
     to: core-xojfile
     kind: seam
-    what: "the fork's attributes (xqt-group, xqt-created, xqt-bookmark, xqt-audio, xqt-fill-color, notespace); a document loaded from memory (an encrypted PDF's .xopp)"
+    what: "the fork's attributes (xqt-group, xqt-created, xqt-data, xqt-bookmark, xqt-audio, xqt-fill-color, notespace); a document loaded from memory (an encrypted PDF's .xopp)"
     hide: true
   - from: session
     to: core-undo

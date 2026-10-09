@@ -54,6 +54,7 @@ constexpr auto FILL_STR = u8"fill";
 constexpr auto FILL_COLOR_STR = u8"xqt-fill-color";  // xournal-qt: the fill color of a stroke (qt/pen-styles)
 constexpr auto CAPSTYLE_STR = u8"capStyle";
 constexpr auto GROUP_STR = u8"xqt-group";  // xournal-qt: the group of an element (qt/groups)
+constexpr auto DATA_STR = u8"xqt-data";  // xournal-qt: data a plugin keeps on an element (ADR 0008)
 constexpr auto CREATED_STR = u8"xqt-created";  // xournal-qt: when an element was made, ms since 1970 UTC (qt/timeline)
 
 // text

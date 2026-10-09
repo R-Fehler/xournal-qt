@@ -100,3 +100,7 @@ non-view code out of canvas (B12), `DocumentSession` split (session 4), one PDF-
 `LibraryService` and the list-model base (shell 6, 7, 8), typed settings (shell 10, infra B13), module-qualified
 includes and the CMake module layout (infra B4, B5; shell 13), `DocumentCanvasItem` split (app-cpp O), shared small
 QML components (qml B11).
+
+**Research beside the review**: [js-plugins-research.md](js-plugins-research.md) (2026-10-09): JavaScript plugins in
+`QJSEngine` instead of upstream's Lua system (status quo, the engine's facts, a design, undo, risks); the author's
+decisions on it are [ADR 0008](../../decisions/0008-js-plugins.md), built in the block `qt/js-plugins`.

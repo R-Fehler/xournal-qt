@@ -1,0 +1,13 @@
+{
+  "id": "org.xournalqt.example.color-cycle",
+  "name": "Color cycle (example)",
+  "version": "1.0.0",
+  "api": "1.0",
+  "author": "xournal-qt (a port of Xournal++'s ColorCycle)",
+  "description": "Alt+C gives the tool in hand the next color of the palette. An example of the plugin API: the tool in hand.",
+  "main": "main.mjs",
+  "permissions": ["tools"],
+  "commands": [
+    { "id": "cycle", "title": "Next color", "shortcut": "Alt+C", "icon": "xqt-palette" }
+  ]
+}

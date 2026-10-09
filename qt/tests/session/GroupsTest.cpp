@@ -347,3 +347,32 @@ TEST_F(GroupsTest, whatASelectionCanDo) {
     EXPECT_TRUE(groups::fromClipboard("3 0 3", 2).empty());
     EXPECT_TRUE(groups::fromClipboard("3 x 3", 3).empty());
 }
+
+// Plugin data on elements (ADR 0008): the attribute xqt-data, written only where there is some (escaped: JSON has
+// quotes), read back as it was; copied with the element and with the eraser's pieces (applyStyleFrom)
+TEST_F(GroupsTest, pluginDataIsTheElementAttributeXqtData) {
+    auto doc = grouped();
+    const std::string json = R"({"org.example.plot":{"f":"x<2 && y>\"1\"","n":3}})";
+    auto elements = doc->getPage(0)->getSelectedLayer()->getElementsView();
+    const_cast<Element*>(elements.front())->setData(json);           // a stroke
+    const_cast<Element*>(*std::next(elements.begin()))->setData("t");  // a text
+    ASSERT_TRUE(DocumentSession::writeDocument(*doc, file("data.xopp")).ok);
+    const QString xml = xmlOf(tmp.filePath("data.xopp"));
+    EXPECT_EQ(xml.count("xqt-data="), 2) << xml.toStdString();
+
+    std::vector<std::string> warnings;
+    LoadHandler loader(&warnings);
+    auto loaded = loader.loadDocument(file("data.xopp"));
+    ASSERT_TRUE(loaded);
+    EXPECT_TRUE(warnings.empty());
+    const auto back = loaded->getPage(0)->getSelectedLayer()->getElementsView();
+    EXPECT_EQ(back.front()->getData(), json);
+    EXPECT_EQ((*std::next(back.begin()))->getData(), "t");
+    EXPECT_EQ((*std::next(back.begin(), 2))->getData(), "");
+
+    auto copy = back.front()->clone();
+    EXPECT_EQ(copy->getData(), json);
+    Stroke piece;
+    piece.applyStyleFrom(dynamic_cast<const Stroke*>(back.front()));
+    EXPECT_EQ(piece.getData(), json);
+}

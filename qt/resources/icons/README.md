@@ -63,3 +63,6 @@ in the same style.
 
 `xqt-volume` and `xqt-volume-off` are Lucide's `volume-2` and `volume-x`: the recordings on or off in the replay's play
 bar (qt/docs/features/timeline.md).
+
+`xqt-plugin` is Lucide's `puzzle`: a plugin's command without an icon of its own, Settings → Plugins
+(qt/docs/features/plugins.md); `xqt-function-plot` is Lucide's `chart-spline`: "Plot a function…".

@@ -12,6 +12,7 @@
 #pragma once
 
 #include <cstddef>  // for ptrdiff_t
+#include <string>   // for string (xournal-qt: plugin data)
 #include <cstdint>  // for uint32_t, int64_t (xournal-qt: group, creation time)
 #include <memory>   // for unique_ptr
 #include <vector>   // for vector
@@ -78,6 +79,11 @@ public:
     int64_t getCreated() const { return created; }
     void setCreated(int64_t ms) { created = ms; }
 
+    /// xournal-qt: data a plugin keeps on the element (qt/docs/decisions/0008-js-plugins.md; a JSON object by plugin
+    /// id, "": none). Copied with the element, saved as the attribute `xqt-data`; not in serialize().
+    const std::string& getData() const { return data; }
+    void setData(std::string d) { data = std::move(d); }
+
     const xoj::util::Rectangle<double>& getSnappedBounds() const;
 
     const xoj::util::Rectangle<double>& getBoundingBox() const;
@@ -120,6 +126,7 @@ private:
 
     uint32_t group = 0;    ///< xournal-qt: see getGroup()
     int64_t created = 0;   ///< xournal-qt: see getCreated()
+    std::string data;      ///< xournal-qt: see getData()
 };
 
 namespace xoj {

@@ -146,6 +146,9 @@ void XmlParser::parserStartElement(GMarkupParseContext* context, const gchar* el
                 t && *t > 0) {
                 self->builder.setElementCreated(*t);
             }
+            if (const auto d = XmlParserHelper::getAttrib<std::string_view>(xoj::xml_attrs::DATA_STR, attributes)) {
+                self->builder.setElementData(std::string(*d));  // xournal-qt: plugin data (ADR 0008)
+            }
         }
     }
 

@@ -58,6 +58,16 @@ public:
     /// The actions, for the cheat sheet: [{ group, name, keys }] in the order of the groups.
     Q_INVOKABLE QVariantList sheet() const;
 
+    /// The commands of the plugins (qt/docs/features/plugins.md), the group "Plugins" at the end; ids
+    /// "plugin:<id>/<command>". A default key is kept only when it has Ctrl, Alt or Meta and no other action uses it
+    /// (a plugin never takes a key of the app, nor Esc or Back): the user can give it one in Settings → Shortcuts.
+    struct PluginAction {
+        QString id;
+        QString name;
+        QString keys;
+    };
+    void setPluginActions(const std::vector<PluginAction>& list);
+
 Q_SIGNALS:
     void changed();
 

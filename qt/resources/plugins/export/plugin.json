@@ -1,0 +1,14 @@
+{
+  "id": "org.xournalqt.example.export",
+  "name": "Export (example)",
+  "version": "1.0.0",
+  "api": "1.0",
+  "author": "xournal-qt (a port of Xournal++'s Export)",
+  "description": "Exports the document as a PDF into a file you choose, and a list of its pages as Markdown. An example of the plugin API: files only through a dialog.",
+  "main": "main.mjs",
+  "permissions": ["files"],
+  "commands": [
+    { "id": "exportPdf", "title": "Export as PDF…", "icon": "xopp-document-export-pdf", "toolbox": false },
+    { "id": "exportOutline", "title": "Export a list of the pages as Markdown…", "toolbox": false }
+  ]
+}

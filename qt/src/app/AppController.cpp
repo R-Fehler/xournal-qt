@@ -4,6 +4,7 @@
 #include "AudioControl.h"
 #include "audio/AudioFiles.h"
 #include "TimelineControl.h"
+#include "PluginControl.h"
 
 #include "hwr/HandwritingSearch.h"
 #include "shell/HandwritingSettings.h"
@@ -382,6 +383,7 @@ AppController::~AppController() {
     disconnect(current.get(), nullptr, this, nullptr);
     disconnect(edits.get(), nullptr, this, nullptr);  // (the views go below: nothing relayed to a window on its way out)
     timelineControl.reset();  // (a replay ends: its view shows the whole document again)
+    pluginsControl.reset();   // (a plugin's live dialog closes)
     audioControl.reset();  // (a recording ends, and its document is told, before the sessions go)
     pages->setSession(nullptr);
     outline->setSession(nullptr);
@@ -753,6 +755,9 @@ void AppController::currentTabChanged() {
     }
     if (timelineControl) {
         timelineControl->currentChanged();  // (a replay of another document ends)
+    }
+    if (pluginsControl) {
+        pluginsControl->currentChanged();  // (a plugin's live dialog on another document closes)
     }
     updatePresentedView();  // (another tab: it presents now)
     if (session() && session()->textFile()) {
@@ -2758,10 +2763,12 @@ QObject* AppController::presenterObject() const { return presenter.get(); }
 QObject* AppController::citationsObject() const { return citations.get(); }
 QObject* AppController::audioObject() const { return audioControl.get(); }
 QObject* AppController::timelineObject() const { return timelineControl.get(); }
+QObject* AppController::pluginsObject() const { return pluginsControl.get(); }
 
 void AppController::makeAudioControl() {
     audioControl = std::make_unique<AudioControl>(windowContext());
     timelineControl = std::make_unique<TimelineControl>(windowContext(), audioControl.get());
+    pluginsControl = std::make_unique<PluginControl>(windowContext(), *this);
 }
 
 bool AppController::openAsReference(const QString& path) {
@@ -4204,6 +4211,9 @@ DocumentSession* AppController::undoneSession() const {
 }
 
 void AppController::undo() {
+    if (pluginsControl && pluginsControl->busy()) {
+        return;  // (a plugin's command gathers its steps now: qt/docs/features/plugins.md)
+    }
     if (MarkdownEditor* editor = undoneMarkdown(); editor && editor->canUndo()) {
         editor->undo();  // the text being written, step by step as Ctrl+Z (not the whole edit at once)
         return;
@@ -4223,6 +4233,9 @@ void AppController::undo() {
 }
 
 void AppController::redo() {
+    if (pluginsControl && pluginsControl->busy()) {
+        return;
+    }
     if (MarkdownEditor* editor = undoneMarkdown(); editor && editor->canRedo()) {
         editor->redo();
         return;

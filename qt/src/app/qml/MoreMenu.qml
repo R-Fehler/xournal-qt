@@ -1,5 +1,6 @@
 // xournal-qt: part of the main window (Main.qml): ⋮ and its menu. Main places it (its parent and y: the end of the
 // top bar, of a text document's format bar, or of the phone's app bar).
+import QtQml
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -230,6 +231,7 @@ Row {
             }
             // The app's tools and what is put on the page (the buttons of the bars, wherever they are)
             AdaptiveMenu {
+                id: moreToolsMenu
                 objectName: "moreToolsMenu"
                 title: qsTr("Tools")
                 iconName: "xqt-tools-more"
@@ -246,6 +248,45 @@ Row {
                 CommandItem { slot: "sticker" }
                 CommandItem { slot: "addPage" }
                 CommandItem { slot: "record" }
+                // Plugins' commands that put things on the page ("place": "insert"), as the app's own: "Plot a
+                // function…" (qt/docs/features/plugins.md)
+                Instantiator {
+                    model: app.plugins.commands.filter(function(c) { return c.menu && c.place === "insert" })
+                    delegate: PluginCommandItem {}
+                    // (before the separator above Plugins; while the menu is made, that comes after them)
+                    onObjectAdded: function(index, object) {
+                        for (let i = 0; i < moreToolsMenu.count; ++i) {
+                            const it = moreToolsMenu.itemAt(i)
+                            if (it && it.objectName === "pluginsSeparator") {
+                                moreToolsMenu.insertItem(i, object)
+                                return
+                            }
+                        }
+                        moreToolsMenu.addItem(object)
+                    }
+                    onObjectRemoved: function(index, object) { moreToolsMenu.removeItem(object) }
+                }
+                MenuSeparator { objectName: "pluginsSeparator" }
+                // Plugins (qt/docs/features/plugins.md): the commands of the plugins that are on, and their settings
+                AdaptiveMenu {
+                    id: morePluginsMenu
+                    objectName: "morePluginsMenu"
+                    title: qsTr("Plugins")
+                    iconName: "xqt-plugin"
+                    Instantiator {
+                        model: app.plugins.commands.filter(function(c) { return c.menu })
+                        delegate: PluginCommandItem {}
+                        onObjectAdded: function(index, object) { morePluginsMenu.insertItem(index, object) }
+                        onObjectRemoved: function(index, object) { morePluginsMenu.removeItem(object) }
+                    }
+                    MenuSeparator {}
+                    AdaptiveMenuItem {
+                        objectName: "pluginSettingsItem"
+                        text: qsTr("Manage plugins…")
+                        icon.source: app.iconUrl("xqt-sliders")
+                        onTriggered: toolboxMenus.afterMenus(function() { settingsPage.open(); settingsPage.showSection("plugins") })
+                    }
+                }
             }
             // How the document is shown (all pages are the view pill's; hiding the top bar is the tab on its
             // edge)

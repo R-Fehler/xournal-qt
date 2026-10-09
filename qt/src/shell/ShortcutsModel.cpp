@@ -148,7 +148,7 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
     settings.getCustomElement(CUSTOM).getString("shortcuts", stored);
     for (const QString& entry: QString::fromStdString(stored).split(';', Qt::SkipEmptyParts)) {
         const QString id = entry.section('=', 0, 0).trimmed();
-        if (find(id)) {
+        if (find(id) || id.startsWith(QLatin1String("plugin:"))) {  // (a plugin's: before its command is known)
             custom[id] = entry.section('=', 1).trimmed();
         }
     }
@@ -168,7 +168,31 @@ QStringList ShortcutsModel::keys(const QString& id) const {
         return it->second.isEmpty() ? QStringList{} : QStringList{it->second};
     }
     const Action* action = find(id);
-    return action ? action->defaults : QStringList{};
+    if (!action) {
+        return {};
+    }
+    if (!id.startsWith(QLatin1String("plugin:")) || action->defaults.isEmpty()) {
+        return action->defaults;
+    }
+    // A plugin's default key gives way to an action of the app that has it now (the user gave it one later): two
+    // shortcuts on one key would make Qt do neither
+    QStringList kept;
+    for (const QString& k: action->defaults) {
+        const QKeySequence wanted(k, QKeySequence::PortableText);
+        const bool taken = std::any_of(actions.begin(), actions.end(), [&](const Action& other) {
+            if (other.id.startsWith(QLatin1String("plugin:"))) {
+                return false;
+            }
+            const QStringList otherKeys = keys(other.id);
+            return std::any_of(otherKeys.begin(), otherKeys.end(), [&](const QString& o) {
+                return QKeySequence(o, QKeySequence::PortableText) == wanted;
+            });
+        });
+        if (!taken) {
+            kept << k;
+        }
+    }
+    return kept;
 }
 
 QString ShortcutsModel::conflict(const QString& id, const QString& keys) const {
@@ -258,6 +282,35 @@ QHash<int, QByteArray> ShortcutsModel::roleNames() const {
     return {{IdRole, "actionId"},   {NameRole, "name"},          {GroupRole, "group"},
             {KeysRole, "keys"},     {DefaultKeysRole, "defaultKeys"}, {IsDefaultRole, "isDefault"},
             {ConflictRole, "conflict"}};
+}
+
+void ShortcutsModel::setPluginActions(const std::vector<PluginAction>& list) {
+    beginResetModel();
+    actions.erase(std::remove_if(actions.begin(), actions.end(),
+                                 [](const Action& a) { return a.id.startsWith(QLatin1String("plugin:")); }),
+                  actions.end());
+    QStringList taken;
+    for (const Action& a: actions) {
+        for (const QString& k: keys(a.id)) {
+            taken << QKeySequence(k, QKeySequence::PortableText).toString(QKeySequence::PortableText);
+        }
+    }
+    const QString group = tr("Plugins");
+    for (const PluginAction& p: list) {
+        QStringList defaults;
+        const QKeySequence seq(p.keys, QKeySequence::PortableText);
+        const QString text = seq.toString(QKeySequence::PortableText);
+        const bool modifier = seq.count() == 1 && (seq[0].keyboardModifiers() &
+                                                    (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier));
+        if (!text.isEmpty() && modifier && !taken.contains(text)) {
+            defaults << text;
+            taken << text;
+        }
+        actions.push_back({p.id, p.name, group, defaults});
+    }
+    endResetModel();
+    ++rev;
+    Q_EMIT changed();
 }
 
 QVariantList ShortcutsModel::sheet() const {

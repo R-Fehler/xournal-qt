@@ -99,6 +99,7 @@ void Stroke::applyStyleFrom(const Stroke* other) {
     setFillColor(other->getFillColor());  // xournal-qt
     setGroup(other->getGroup());          // xournal-qt: qt/groups (erased pieces stay in the group)
     setCreated(other->getCreated());      // xournal-qt: qt/timeline (erased pieces and shapes keep their time)
+    setData(other->getData());            // xournal-qt: plugin data (ADR 0008)
     setStrokeCapStyle(other->getStrokeCapStyle());
     setLineStyle(other->getLineStyle());
 

@@ -43,6 +43,8 @@ Not a cache: deleting it resets the app.
 | File | What | Code |
 | --- | --- | --- |
 | `settings.xml` | upstream's settings (`Settings`), written in place by upstream's code. The fork's own keys are in its custom elements `xournalQt` and `touch`, among them the toolbox (`toolbox`, JSON), the shortcuts (`shortcuts`) and the hidden built-in sticker collections (`hiddenStickerCollections`) | `AppContext.cpp`, `AppServices.cpp`, `ShortcutsModel.cpp` |
+
+| `settings.xml` | upstream's settings (`Settings`), written in place by upstream's code. The fork's own keys are in its custom elements `xournalQt` and `touch`, among them the toolbox (`toolbox`, JSON), the shortcuts (`shortcuts`) and the plugins (`plugins`, JSON: which are on, what each was allowed) | `AppContext.cpp`, `AppServices.cpp`, `ShortcutsModel.cpp`, `PluginHost.cpp` |
 | `recent.json` | recent files and libraries | `RecentFiles.cpp` |
 | `session.json` | the session journal: the open tabs, for recovery and the next start | `SessionRecovery.cpp` |
 | `sessions/<library key>.json` | the journal of a window of another library than the default one (desktop, where each library has a window of its own); Android has one window and one `session.json` | `AppController::journalFileFor` |
@@ -90,6 +92,7 @@ The user's own things that are not in a library:
 | `stickers/`, `templates/` | the app-wide stickers and page templates (a library has its own `Stickers/` and `Templates/` folders) | `Stickers.cpp` |
 | `Tutorial/Tutorial.pdf` | the copy of the tutorial that Help → Tutorial opens to write on | `AppHelp.cpp` |
 | `Opened/` (translated) | files received from other apps when no library is open (else the library's `Opened/`) | `AppController::receivedFolder` |
+| `plugins/<folder>/` | the user's plugins (`plugin.json` and its modules; [plugins.md](../features/plugins.md)); a plugin there replaces a bundled one of the same id. The app only reads it | `AppServices.cpp`, `PluginHost.cpp` |
 
 The handwriting models downloaded or installed by the user are in `GenericDataLocation/xournal-qt/models/` (one
 folder per model with its `model.json`; a download is staged in `<model>.part`), `HandwritingSearch::modelsDir`
@@ -109,6 +112,10 @@ The **built-in stickers** ([stickers.md](../features/stickers.md), "Built in") a
 `<resource dir>/stickers/<collection>/` (`.xopp`, `names.json`; `collections.json`, `LICENCE.md`), from
 `qt/resources/stickers/` (XqtSession.cmake), in the same places as the models (`stickers/` instead of `hwr-models/`;
 on Android copied anew when `collections.json` changed). Hiding a collection changes only `settings.xml`.
+
+The plugins that **come with the app** are read-only resources too, `<resource dir>/plugins/<name>/` (the function
+plotter and the examples, from `qt/resources/plugins/`, XqtPlugins.cmake): beside `hwr-models/` in each place above
+(on Android copied at start to `files/share/xournal-qt/plugins/`, a changed file anew).
 
 On Android the app's data folder `files/` also holds the resources copied from the APK (`share/xournal-qt/`),
 `fonts.conf`, the user's fonts (`fonts/`) and GLib's state folder (`state/`).

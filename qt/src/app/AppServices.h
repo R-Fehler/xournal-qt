@@ -23,6 +23,9 @@ class Palette;
 namespace xqt::hwr {
 class HandwritingSearch;
 }
+namespace xqt::plugins {
+class PluginHost;
+}
 
 namespace xqt {
 
@@ -67,6 +70,8 @@ public:
     OpenDocuments& openDocuments() { return documents; }
     const OpenDocuments& openDocuments() const { return documents; }
     BackgroundJobs& jobs() { return background; }
+    /// The plugins (qt/docs/features/plugins.md): found in the bundled folder and the user's, run per window
+    plugins::PluginHost& plugins() const { return *pluginHost; }
 
     /// Makes the window of a controller of undocked documents (main(); nothing: no window, as in the tests)
     void setWindowFactory(std::function<void(AppController*)> factory) { windowFactory = std::move(factory); }
@@ -91,6 +96,7 @@ private:
     std::unique_ptr<LibraryInkJob> libraryInkJob;
     std::unique_ptr<HandwritingSettings> inkSettings;
     std::unique_ptr<RecentFiles> recentFiles;
+    std::unique_ptr<plugins::PluginHost> pluginHost;
     OpenDocuments documents;
     std::function<void(AppController*)> windowFactory;
     bool maximized = false;

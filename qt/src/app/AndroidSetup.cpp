@@ -77,7 +77,14 @@ void copyResources(const QString& from, const QString& to) {
         const QFileInfo existing(target);
         const QFileInfo resource(source);
         if (existing.exists() && existing.size() == resource.size()) {
-            continue;
+            // (a bundled plugin's script of the same size after an update: compared byte for byte, they are small)
+            if (!source.contains(QLatin1String("/plugins/")) || resource.size() > 512 * 1024) {
+                continue;
+            }
+            QFile a(source), b(target);
+            if (a.open(QIODevice::ReadOnly) && b.open(QIODevice::ReadOnly) && a.readAll() == b.readAll()) {
+                continue;
+            }
         }
         QDir().mkpath(existing.absolutePath());
         QFile::remove(target);

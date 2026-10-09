@@ -568,6 +568,18 @@ public:
     /// A check-box stamp for a handwritten to-do (TodoStamp.h): its check box at this point of page `pNr` (page
     /// coordinates). Undoable. False if there is no such page.
     bool addTodoStamp(size_t pNr, QPointF onPage);
+
+    // --- the preview of a plugin's live dialog (qt/docs/features/plugins.md, "Dialogs") ---------------------------
+    /// Elements drawn over a page as they would be inserted, not part of the document (the canvas item draws them
+    /// above the page, under the selection); replaces the preview before. `page` out of range: none.
+    struct PluginPreview {
+        size_t page = 0;
+        std::vector<ElementPtr> elements;
+        quint64 revision = 0;  ///< changes with every new preview
+    };
+    void setPluginPreview(size_t page, std::vector<ElementPtr> elements);
+    void clearPluginPreview();
+    const PluginPreview& pluginPreview() const { return preview; }
     /// A tap on the check box of a task in a Markdown text (page coordinates): it is switched, one undo step.
     bool toggleMarkdownCheckBox(CanvasPage& page, double x, double y);
     /// New texts of the text tool: Markdown text boxes of this size (an ordinary text already on the page is edited
@@ -798,6 +810,7 @@ private:
     void endMarkdownSelection();
     double markdownTextSize = 10;    ///< of this font size
     bool markdownInPanel = false;    ///< Markdown text boxes are edited beside the page (tests; normally on the page)
+    PluginPreview preview;
     GeometryToolLayer geometry{*this};
     CurtainLayer curtainLayer{*this};
     std::unique_ptr<StickyNotes> stickyNotes;

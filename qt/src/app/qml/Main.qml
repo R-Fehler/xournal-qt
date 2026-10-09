@@ -699,6 +699,11 @@ ApplicationWindow {
         height: atBottom ? win.layout.sourceBottomHeight : parent.height - win.layout.toolboxTop - win.layout.toolboxBottom
     }
     SourceDivider { id: sourceDivider }
+    // A plugin's live dialog beside the page, and the frame of its preview on the page (qt/docs/features/plugins.md)
+    PluginFrame { canvasItem: canvas; z: 5 }
+    PluginLiveDialog { id: pluginLiveDialog; canvasItem: canvas }
+    // What plugins ask while a command waits, and their notes
+    PluginDialogs { id: pluginDialogs }
     Connections {
         target: app
         // The text tool tapped a Markdown box

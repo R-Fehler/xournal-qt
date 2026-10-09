@@ -41,6 +41,7 @@ certain way is in [decisions/](../decisions/README.md); what changed in a releas
 | [handwriting-search.md](handwriting-search.md) | handwriting read for search, copy handwriting as text |
 | [audio.md](audio.md) | recordings tied to pages and strokes |
 | [timeline.md](timeline.md) | when each element was made, the replay |
+| [plugins.md](plugins.md) | JavaScript plugins: how a command runs, permissions, writing one, the API, from Lua |
 
 ## Markdown
 

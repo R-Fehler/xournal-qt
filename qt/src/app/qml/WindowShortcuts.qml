@@ -1,5 +1,6 @@
 // xournal-qt: the main window's keyboard shortcuts and touch gestures (part of Main.qml; the keys come from the
 // shortcut settings through win.keysOf). Shortcuts act in the window whatever item holds them.
+import QtQml
 import QtQuick
 import QtQuick.Controls
 import XournalQt.Canvas
@@ -102,6 +103,21 @@ Item {
     // Document shortcuts do nothing while the home screen is shown.
     readonly property bool docKeys: !app.homeVisible && !app.markdownActive && !win.modes.replaying
     Shortcut { sequences: win.keysOf("undo"); enabled: docKeys; onActivated: app.undo() }
+    // The plugins' commands on their keys (qt/docs/features/plugins.md; Settings → Shortcuts, group Plugins)
+    Repeater {
+        model: app.plugins.commands
+        // (in an item: a Shortcut finds its window through its parent item)
+        delegate: Item {
+            required property var modelData
+            objectName: "pluginShortcut_" + modelData.key
+            Shortcut {
+                sequences: win.keysOf(modelData.key)
+                enabled: !app.plugins.busy && (modelData.when === "always"
+                         || (windowShortcuts.docKeys && (modelData.when !== "selection" || app.edit.hasSelection)))
+                onActivated: app.plugins.run(modelData.key)
+            }
+        }
+    }
     // The tools on single keys: only while the page is at hand (typing into a text or a field takes its keys first;
     // the overviews and the settings search or edit what is typed)
     readonly property bool toolKeys: docKeys && !pageGrid.visible && !contentsOverview.visible && !tabOverview.visible

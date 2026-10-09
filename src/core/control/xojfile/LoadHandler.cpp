@@ -155,6 +155,17 @@ void LoadHandler::setElementCreated(int64_t ms) {
     }
 }
 
+// xournal-qt: the data a plugin keeps on the element begun last (ADR 0008)
+void LoadHandler::setElementData(std::string data) {
+    for (Element* e: {static_cast<Element*>(stroke.get()), static_cast<Element*>(text.get()),
+                      static_cast<Element*>(image.get()), static_cast<Element*>(teximage.get()),
+                      static_cast<Element*>(link.get())}) {
+        if (e) {
+            e->setData(data);
+        }
+    }
+}
+
 void LoadHandler::finalizePage() {
     xoj_assert(this->page);
 
