@@ -72,6 +72,19 @@ All four waves are merged (2026-10-07). The architecture overview:
   settings (shell 10, infra B13) · module-qualified includes and one CMake file per module (infra B4, B5; shell 13) ·
   `DocumentCanvasItem` split (app-cpp O) · shared small QML components (qml B11).
 
+## JavaScript plugins (`qt/js-plugins`)
+
+The author's decisions of 2026-10-09: [ADR 0008](qt/docs/decisions/0008-js-plugins.md); the research:
+[js-plugins-research.md](qt/docs/review/2026-10/js-plugins-research.md).
+- [~] The undo sink seam and `SequenceUndoAction` (one command, one undo step; rollback) (`qt/js-plugins`)
+- [~] Plugin data on elements (`xqt-data`, a seam like `xqt-group`) (`qt/js-plugins`)
+- [~] The host: module `qt/src/plugins` (manifest, registry, engine per plugin, watchdog, log, permissions, the
+  operation layer and API v1), label `plugins` (`qt/js-plugins`)
+- [~] The UI: Plugins in ⋮, the "+" catalog, shortcuts, Settings → Plugins, the permission prompt, dialogs, the toast
+  with Undo (`qt/js-plugins`)
+- [~] The side form with live preview (beside the page; below it on phones) (`qt/js-plugins`)
+- [~] The function plotter (bundled), and example ports of upstream's plugins (`qt/js-plugins`)
+
 ## Decisions for the author
 - [ ] Reading library cache packs from the other cache location (shell review §4 #15) stays: it also serves read-only
   folders with a cache of their own. Remove it?

@@ -13,6 +13,7 @@ is replaced keeps its file and says by which.
 | [0005](0005-memory-owners.md) | Memory and background threads have owners (`CanvasMemory`, `ImageMemory`, `ImageWorkers`, `BackgroundJobs`) |
 | [0006](0006-background-save.md) | A save writes a copy of the document on a worker; one atomic writer per file |
 | [0007](0007-canvas-tiles.md) | Pages reach the screen as texture tiles of the scene graph, with a budget per frame; looks change on the GPU |
+| [0008](0008-js-plugins.md) | Plugins are JavaScript in a `QJSEngine` of their own; every call is an operation checked against the plugin's permissions; one command, one undo step |
 
 Decisions recorded in the feature docs (each where it applies):
 
