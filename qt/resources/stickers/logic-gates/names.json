@@ -1,0 +1,12 @@
+{
+ "title": {"en": "Logic gates", "de": "Logikgatter"},
+ "stickers": [
+  {"file": "AND.xopp", "en": ["AND", "AND gate"], "de": ["UND", "UND-Gatter", "AND-Gatter"]},
+  {"file": "OR.xopp", "en": ["OR", "OR gate"], "de": ["ODER", "ODER-Gatter", "OR-Gatter"]},
+  {"file": "NOT.xopp", "en": ["NOT", "NOT gate", "Inverter"], "de": ["NICHT", "NICHT-Gatter", "NOT-Gatter", "Inverter"]},
+  {"file": "NAND.xopp", "en": ["NAND", "NAND gate"], "de": ["NAND", "NAND-Gatter", "NICHT-UND"]},
+  {"file": "NOR.xopp", "en": ["NOR", "NOR gate"], "de": ["NOR", "NOR-Gatter", "NICHT-ODER"]},
+  {"file": "XOR.xopp", "en": ["XOR", "XOR gate", "Exclusive OR"], "de": ["XOR", "XOR-Gatter", "Exklusiv-ODER", "Antivalenz"]},
+  {"file": "XNOR.xopp", "en": ["XNOR", "XNOR gate", "Exclusive NOR"], "de": ["XNOR", "XNOR-Gatter", "Äquivalenz"]}
+ ]
+}

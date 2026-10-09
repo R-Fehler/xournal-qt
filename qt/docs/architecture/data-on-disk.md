@@ -42,7 +42,7 @@ Not a cache: deleting it resets the app.
 
 | File | What | Code |
 | --- | --- | --- |
-| `settings.xml` | upstream's settings (`Settings`), written in place by upstream's code. The fork's own keys are in its custom elements `xournalQt` and `touch`, among them the toolbox (`toolbox`, JSON) and the shortcuts (`shortcuts`) | `AppContext.cpp`, `AppServices.cpp`, `ShortcutsModel.cpp` |
+| `settings.xml` | upstream's settings (`Settings`), written in place by upstream's code. The fork's own keys are in its custom elements `xournalQt` and `touch`, among them the toolbox (`toolbox`, JSON), the shortcuts (`shortcuts`) and the hidden built-in sticker collections (`hiddenStickerCollections`) | `AppContext.cpp`, `AppServices.cpp`, `ShortcutsModel.cpp` |
 | `recent.json` | recent files and libraries | `RecentFiles.cpp` |
 | `session.json` | the session journal: the open tabs, for recovery and the next start | `SessionRecovery.cpp` |
 | `sessions/<library key>.json` | the journal of a window of another library than the default one (desktop, where each library has a window of its own); Android has one window and one `session.json` | `AppController::journalFileFor` |
@@ -104,6 +104,11 @@ resources, `<resource dir>/hwr-models/<name>/` (`model.json`, its files, `LICENC
 | macOS | `xournal-qt.app/Contents/Resources/share/xournal-qt/hwr-models/` |
 | Android | in the APK's resources (`:/xqt-share/hwr-models/`), copied at start to `files/share/xournal-qt/hwr-models/` (a model whose `model.json` changed is copied anew) |
 | A build tree | `build-qt/share/xournal-qt/hwr-models/` |
+
+The **built-in stickers** ([stickers.md](../features/stickers.md), "Built in") are read-only resources too,
+`<resource dir>/stickers/<collection>/` (`.xopp`, `names.json`; `collections.json`, `LICENCE.md`), from
+`qt/resources/stickers/` (XqtSession.cmake), in the same places as the models (`stickers/` instead of `hwr-models/`;
+on Android copied anew when `collections.json` changed). Hiding a collection changes only `settings.xml`.
 
 On Android the app's data folder `files/` also holds the resources copied from the APK (`share/xournal-qt/`),
 `fonts.conf`, the user's fonts (`fonts/`) and GLib's state folder (`state/`).

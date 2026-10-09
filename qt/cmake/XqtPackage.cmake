@@ -10,6 +10,8 @@ install(DIRECTORY "${XQT_BUILD_RESOURCE_DIR}/palettes" "${XQT_BUILD_RESOURCE_DIR
     DESTINATION share/xournal-qt)
 # The handwriting models that come with the app, each with its LICENCE.md (XqtHwr.cmake; macOS: macos-deploy.sh copies
 # share/xournal-qt into Contents/Resources/share/, Windows: the program folder's share/)
+# The built-in stickers (XqtSession.cmake; read-only, CC0: their LICENCE.md)
+install(DIRECTORY "${XQT_BUILD_RESOURCE_DIR}/stickers" DESTINATION share/xournal-qt)
 if(EXISTS "${XQT_BUILD_RESOURCE_DIR}/hwr-models")
     install(DIRECTORY "${XQT_BUILD_RESOURCE_DIR}/hwr-models" DESTINATION share/xournal-qt)
 endif()

@@ -11,6 +11,18 @@ foreach(_xqt_font XqtEmoji.ttf LICENSE-NotoColorEmoji.txt)
         COPYONLY)
 endforeach()
 
+# The built-in stickers (qt/resources/stickers/<collection>/: .xopp, names.json; collections.json, LICENCE.md; made by
+# its generate.py, which is not copied): <resources>/stickers, read-only (qt/docs/features/stickers.md, "Built in").
+# Installed with the resources by XqtPackage.cmake; on Android in the APK's /xqt-share resources (XqtAndroid.cmake).
+file(GLOB_RECURSE _xqt_sticker_files LIST_DIRECTORIES false CONFIGURE_DEPENDS RELATIVE
+    "${CMAKE_CURRENT_LIST_DIR}/../resources/stickers" "${CMAKE_CURRENT_LIST_DIR}/../resources/stickers/*")
+foreach(_xqt_file ${_xqt_sticker_files})
+    if(NOT _xqt_file MATCHES "\\.py$")
+        configure_file("${CMAKE_CURRENT_LIST_DIR}/../resources/stickers/${_xqt_file}"
+            "${XQT_BUILD_RESOURCE_DIR}/stickers/${_xqt_file}" COPYONLY)
+    endif()
+endforeach()
+
 # The sRGB profile of archive PDFs (qt/resources/icc/README.md), compiled in as bytes
 set(XQT_SRGB_ICC "${CMAKE_CURRENT_LIST_DIR}/../resources/icc/sRGB.icc")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${XQT_SRGB_ICC}")

@@ -1,0 +1,31 @@
+{
+ "title": {"en": "Circuit symbols (IEC)", "de": "Schaltzeichen (IEC)"},
+ "stickers": [
+  {"file": "Resistor.xopp", "en": ["Resistor"], "de": ["Widerstand"]},
+  {"file": "Variable resistor.xopp", "en": ["Variable resistor", "Rheostat"], "de": ["Einstellbarer Widerstand", "Veränderbarer Widerstand"]},
+  {"file": "Potentiometer.xopp", "en": ["Potentiometer"], "de": ["Potentiometer", "Poti"]},
+  {"file": "Capacitor.xopp", "en": ["Capacitor", "Condenser"], "de": ["Kondensator"]},
+  {"file": "Polarised capacitor.xopp", "en": ["Polarised capacitor", "Electrolytic capacitor", "Polarized capacitor"], "de": ["Gepolter Kondensator", "Elektrolytkondensator", "Elko"]},
+  {"file": "Inductor.xopp", "en": ["Inductor", "Coil"], "de": ["Spule", "Induktivität"]},
+  {"file": "Diode.xopp", "en": ["Diode"], "de": ["Diode"]},
+  {"file": "Zener diode.xopp", "en": ["Zener diode"], "de": ["Z-Diode", "Zenerdiode"]},
+  {"file": "LED.xopp", "en": ["LED", "Light-emitting diode"], "de": ["Leuchtdiode", "LED"]},
+  {"file": "Photodiode.xopp", "en": ["Photodiode"], "de": ["Fotodiode", "Photodiode"]},
+  {"file": "NPN transistor.xopp", "en": ["NPN transistor"], "de": ["NPN-Transistor"]},
+  {"file": "PNP transistor.xopp", "en": ["PNP transistor"], "de": ["PNP-Transistor"]},
+  {"file": "Cell.xopp", "en": ["Cell"], "de": ["Zelle", "Galvanisches Element", "Batteriezelle"]},
+  {"file": "Battery.xopp", "en": ["Battery"], "de": ["Batterie"]},
+  {"file": "DC voltage source.xopp", "en": ["DC voltage source", "Voltage source"], "de": ["Gleichspannungsquelle", "Spannungsquelle"]},
+  {"file": "AC source.xopp", "en": ["AC source", "AC voltage source"], "de": ["Wechselspannungsquelle"]},
+  {"file": "Current source.xopp", "en": ["Current source"], "de": ["Stromquelle"]},
+  {"file": "Switch (open).xopp", "en": ["Switch (open)", "Switch"], "de": ["Schalter (offen)", "Schalter", "Schließer"]},
+  {"file": "Push button.xopp", "en": ["Push button"], "de": ["Taster"]},
+  {"file": "Lamp.xopp", "en": ["Lamp", "Bulb"], "de": ["Lampe", "Glühlampe"]},
+  {"file": "Ammeter.xopp", "en": ["Ammeter"], "de": ["Strommesser", "Amperemeter"]},
+  {"file": "Voltmeter.xopp", "en": ["Voltmeter"], "de": ["Spannungsmesser", "Voltmeter"]},
+  {"file": "Ground.xopp", "en": ["Ground", "Earth"], "de": ["Erde", "Masse", "Erdung"]},
+  {"file": "Op-amp.xopp", "en": ["Op-amp", "Operational amplifier"], "de": ["Operationsverstärker", "OPV", "OP-Amp"]},
+  {"file": "Op-amp (triangle).xopp", "en": ["Op-amp (triangle)", "Operational amplifier"], "de": ["Operationsverstärker (Dreieck)", "OPV"]},
+  {"file": "Fuse.xopp", "en": ["Fuse"], "de": ["Sicherung", "Schmelzsicherung"]}
+ ]
+}

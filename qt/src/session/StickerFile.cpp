@@ -209,6 +209,14 @@ std::optional<sticky::Group> read(const fs::path& file, std::string* error) {
     return group;
 }
 
+void recolour(sticky::Group& content, Color colour) {
+    for (auto& e: content.elements) {
+        if (e && (e->getType() == ELEMENT_STROKE || e->getType() == ELEMENT_TEXT)) {
+            e->setColor(colour);
+        }
+    }
+}
+
 std::string clipboardBytes(const sticky::Group& content) {
     std::vector<const Layer*> notes;
     for (const auto& n: content.notes) {

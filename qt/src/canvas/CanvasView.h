@@ -338,7 +338,9 @@ public:
     /// A sticker's file read off the UI thread, then `done` on this thread: the error ("": read), its content (a .xopp:
     /// in the clipboard's format of notes and elements; a picture: the file's bytes) and whether it is a picture. Not
     /// called when the view goes first (it waits for the work). False: a sticker is still being read or written.
-    bool loadSticker(fs::path file, std::function<void(const QString& error, const std::string& bytes, bool picture)> done);
+    /// `colour`: its ink and texts in that colour (a built-in sticker in the pen's colour).
+    bool loadSticker(fs::path file, std::function<void(const QString& error, const std::string& bytes, bool picture)> done,
+                     std::optional<Color> colour = std::nullopt);
     // --- groups (qt/docs/features/groups.md) ---
     /// What the selected elements can do with groups (nothing in a view for reading or a read-only document). Grouping
     /// takes elements of one layer.

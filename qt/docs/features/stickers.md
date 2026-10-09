@@ -22,6 +22,8 @@ clipboard when saved. A pasted sticker is a group ([groups.md](groups.md)): a ta
   The name is the same in every language, so a library synced between devices in other languages finds it.
 - **The app-wide set** ("In all libraries"): `<AppDataLocation>/stickers/` (on Linux
   `~/.local/share/xournal-qt/stickers/`), with subfolders the same way. It is there in every library.
+- **The built-in set** ("Built in"): the collections that come with the app, read-only, in the app's resources
+  (`<resources>/stickers/<collection>/`; see [Built in](#built-in)).
 - **A sticker** is one `.xopp` file (its name is the sticker's name), or a picture (`.png`, `.jpg`, `.jpeg`,
   `.webp`): a picture dropped into the folder is a sticker too, pasted as an image.
 - **Own order:** a hidden file `.sticker-order.json` in each sticker folder (`{"order": ["Arrow.xopp", …]}`): it
@@ -63,9 +65,9 @@ A normal `.xopp` that Xournal++ opens (upstream's LoadHandler reads it without a
 
 - **The sticker button** (an item of the top bar, next to the image button, or wherever the user put it; in the
   phone's "All tools" sheet under "Insert") opens the **picker**: a popup beside the button, a bottom sheet on a phone.
-- **The picker:** "This library" / "All libraries" (the app-wide set), the folders of that set as chips ("All", then
-  each folder), a search (the name and the folder), the order ("Last used", "Own order", "Name", "Date added"), and the
-  grid of previews (three columns on a phone) with the names under them. "+ Save selection" while something is
+- **The picker:** "This library" / "All libraries" (the app-wide set) / "Built in", the folders of that set as chips
+  ("All", then each folder), a search (the name and the folder), the order ("Last used", "Own order", "Name", "Date
+  added"), and the grid of previews (three columns on a phone) with the names under them. "+ Save selection" while something is
   selected. An empty set says how to make a sticker.
 - **A tap on a sticker** loads it off the UI thread, puts it on the clipboard and pastes it on the current page: at
   its original size, in the middle of the visible part of the page, made smaller only when it is larger than the page;
@@ -76,6 +78,44 @@ A normal `.xopp` that Xournal++ opens (upstream's LoadHandler reads it without a
   fit the visible part of the page as pasted pictures are.
 - **A Markdown or text document** has no sticker button. A sticker used elsewhere is on the clipboard, and Ctrl+V
   in Markdown pastes its picture the Markdown way ([md-images.md](md-images.md)).
+
+## Built in
+
+The author: "allow the user to remove these groups if they are not using IEC for example anywhere in their life, with
+a restore feature". Only standardized drawings that are slow or hard to draw well by hand come with the app (no
+arrows, callouts, boxes, Venn diagrams: the pen, the shape tool and the user's own stickers cover those):
+
+| Collection (id) | What |
+| --- | --- |
+| Circuit symbols (IEC) (`circuits-iec`) | 26 symbols in IEC 60617 style: resistor, variable resistor, potentiometer, capacitor, polarised capacitor, inductor, diode, Zener diode, LED, photodiode, NPN and PNP transistor, cell, battery, DC voltage, AC and current source, switch (open), push button, lamp, ammeter, voltmeter, ground, op-amp (IEC box and triangle), fuse. Leads are short straight wire ends, so they meet drawn wires |
+| Logic gates (`logic-gates`) | AND, OR, NOT, NAND, NOR, XOR, XNOR in the distinctive (ANSI/IEEE) shapes |
+| Logic gates (IEC) (`logic-gates-iec`) | the same seven as IEC rectangles (&, ≥1, 1, =1, with negation circles) |
+| 3D solids (`solids`) | cube, cuboid, cylinder, cone, sphere, square pyramid, triangular prism, tetrahedron in cabinet projection (depth at 45°, halved), hidden edges dashed |
+| Lab glassware (`lab`) | beaker, Erlenmeyer flask, round-bottom flask, test tube, burette, pipette, measuring cylinder, Bunsen burner, condenser, funnel, benzene (Kekulé and circle) |
+
+- **The files** are made by `qt/resources/stickers/generate.py` (Python's standard library, reproducible; run it
+  after changing a drawing and commit what it writes) as the app writes a sticker file (above), black lines of 1.2 pt
+  (labels 1.0 pt, as strokes: a sticker is one group that scales cleanly), a circuit symbol about 15–20 mm long, a
+  solid 25–35 mm. Each collection's `names.json` names it and every sticker in English and German (the first name of
+  each language is shown, the others are searched too); `collections.json` gives the collections' order and a hash.
+  Our own work, CC0 (`LICENCE.md` beside them). More collections can be added the same way.
+- **Installed** read-only with the app's resources: `<prefix>/share/xournal-qt/stickers/` (Windows: `share\` next to
+  `bin\`; macOS: the bundle's `Contents/Resources/share/`; Android: copied from the APK at start, anew when
+  `collections.json` changed; a build tree: `build-qt/share/xournal-qt/stickers/`).
+- **In the picker:** "Built in" lists the collections as chips (their titles), the stickers by their names in the
+  app's language (`QLocale`: German shows "Widerstand", else "Resistor"); the search finds every name in both
+  languages and the collection's title. While none was used they come in their own order (the collections', then
+  `names.json`'s); "Date added" and "Own order" keep that order too.
+- **Read-only:** the card's menu has only **Copy to my stickers** (a copy in the library's set, or the app-wide set
+  without a library, at its root, named as shown; then it can be opened and changed). Nothing renames, moves,
+  reorders or deletes a built-in sticker, and no order file is written beside them.
+- **Hide a collection:** press and hold (or right-click) its chip → **Hide this collection**, or its switch in
+  **Settings → Documents → Built-in stickers**. A hidden collection is not listed and not searched; nothing on disk
+  changes. The picker says "2 collections hidden · **Show**"; Settings has **Restore hidden collections**. Kept in
+  `settings.xml` (`xournalQt`: `hiddenStickerCollections`, the ids joined by `+`).
+- **In the pen's colour** (a check box in "Built in", and in Settings): a built-in sticker is pasted in the current
+  pen's colour (its ink; off: black, as drawn). Kept as `builtinStickersInPenColour`. The user's own stickers are
+  pasted as they are.
 
 ## Managing stickers
 
@@ -97,15 +137,29 @@ card says "Stickers" and has a sticker badge. Pictures dropped into it in a file
 
 | Where | What |
 | --- | --- |
-| `qt/src/session/StickerFile.*` | A sticker's document from content (`makeDocument`), writing it, reading one back as content (`read`), the clipboard bytes. Qt-light, any thread. |
-| `qt/src/shell/Stickers.*` | The sets on disk: where they are, listing (folders, stickers), unique names, own order (`.sticker-order.json`), last used, rename, move, copy, trash. `StickersModel`: the picker's list (scope, folder, search, sort). |
+| `qt/src/session/StickerFile.*` | A sticker's document from content (`makeDocument`), writing it, reading one back as content (`read`), `recolour` (the pen's colour), the clipboard bytes. Qt-light, any thread. |
+| `qt/src/shell/Stickers.*` | The sets on disk: where they are, listing (folders, stickers), unique names, own order (`.sticker-order.json`), last used, rename, move, copy, trash; the built-in set (`builtinSet`, `collections`: `names.json`, `collections.json`) and its settings (hidden collections, the pen's colour). `StickersModel`: the picker's list (scope, folder, search, sort; "builtin": titles, names in both languages, read-only, `copyToMine`, hiding). |
+| `qt/resources/stickers/` | The built-in collections and their generator `generate.py`; copied into the resources by `XqtSession.cmake`, installed by `XqtPackage.cmake`. |
 | `qt/src/canvas/CanvasStickers.cpp` (`CanvasView::stickerSource`, `saveSticker`, `loadSticker`, `pasteSticker`) | The selection as a sticker's content (copies; the lasso it was made with, `selectedWith` from `CanvasPage`), the picture and the file written or read off the UI thread (the view waits for it when it goes), the paste. |
 | `MixedSelection::pasteAt`, `setClipboard` | Notes and elements pasted together at a point, made smaller only to fit the page, selected, one step; the clipboard entry with its picture for other apps. |
 | `qt/src/app/AppStickers.cpp` | `app.stickers` (the model), `saveSticker`, `pasteSticker`, the card actions. |
-| `StickerButton.qml`, `StickerPicker.qml`, `StickerSaveDialog.qml` | The button (self-contained, for the toolbox), the picker, the dialog. `SelectionPill.qml` and `NotePill.qml`: "Save as sticker…". |
+| `StickerButton.qml`, `StickerPicker.qml`, `StickerSaveDialog.qml` | The button (self-contained, for the toolbox), the picker (with "Built in", the chips' menu, "Show", "In the pen's colour"), the dialog. `SelectionPill.qml` and `NotePill.qml`: "Save as sticker…". `SettingsDocuments.qml`: "Built-in stickers". |
+
+Tests: `StickersTest`, `BuiltinStickersTest` (shell: every built-in sticker in the app's and upstream's loader, one
+group, names, sizes; the scope, search, read-only, copy, hidden collections in the settings), `StickerFileTest`
+(session), `StickerToolTest` and `BuiltinStickerToolTest` (ui).
+
+## On the device
+
+- The picker's three scopes beside "+ Save selection" on a phone's sheet (narrow: the tab titles may be cut short).
+- Built-in stickers on Android: listed after the first start (copied from the APK), and anew after an update that
+  changed them.
+- A built-in sticker pasted with a pen, moved and scaled: its lines meet hand-drawn wires.
 
 ## Not built
 
+- More built-in collections (the author: "with the option to add more later"); names in languages other than English
+  and German.
 - The picker's search does not look into the stickers' text (the library's search does, for the library's set).
 - Markdown pictures of a sticker pasted into a `.xopp`: the boxes are pasted, their pictures are found only while the
   document they came from is open (as for a copied Markdown box).

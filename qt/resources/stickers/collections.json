@@ -1,0 +1,4 @@
+{
+ "order": ["circuits-iec", "logic-gates", "logic-gates-iec", "solids", "lab"],
+ "sha256": "15aa16a64a9e284e7a8557b4d84c04d02ec58df028470e70f9d9597248976d2b"
+}

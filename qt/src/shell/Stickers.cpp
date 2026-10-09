@@ -9,9 +9,13 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLocale>
 #include <QStandardPaths>
 
+#include "control/settings/Settings.h"
+
 #include "DocumentFiles.h"
+#include "session/AppContext.h"
 #include "session/FileIo.h"
 
 #include "JsonFile.h"
@@ -23,6 +27,7 @@ namespace xqt::stickers {
 namespace {
 std::mutex appSetMutex;
 std::map<Kind, fs::path> appSetOverride;
+fs::path builtinOverride;
 
 std::string lower(std::string s) {
     std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -103,6 +108,111 @@ fs::path appSet(Kind kind) {
 void setAppSet(const fs::path& folder, Kind kind) {
     std::lock_guard lock(appSetMutex);
     appSetOverride[kind] = folder;
+}
+
+// --- the built-in set -----------------------------------------------------------------------------------------------
+
+fs::path builtinSet() {
+    {
+        std::lock_guard lock(appSetMutex);
+        if (!builtinOverride.empty()) {
+            return builtinOverride;
+        }
+    }
+    return AppContext::defaultResourceDir() / "stickers";
+}
+
+void setBuiltinSet(const fs::path& folder) {
+    std::lock_guard lock(appSetMutex);
+    builtinOverride = folder;
+}
+
+std::vector<Collection> collections(const fs::path& set) {
+    std::vector<Collection> out;
+    std::error_code ec;
+    if (set.empty() || !fs::is_directory(set, ec)) {
+        return out;
+    }
+    const auto strings = [](const QJsonValue& v) {
+        std::vector<std::string> list;
+        for (const QJsonValue& s: v.toArray()) {
+            if (s.isString() && !s.toString().isEmpty()) {
+                list.push_back(s.toString().toStdString());
+            }
+        }
+        return list;
+    };
+    for (const auto& entry: fs::directory_iterator(set, ec)) {
+        if (!entry.is_directory(ec) || hidden(entry.path())) {
+            continue;
+        }
+        const QJsonObject names = readJsonObject(entry.path() / "names.json");
+        if (names.isEmpty()) {
+            continue;
+        }
+        Collection c;
+        c.id = entry.path().filename().string();
+        const QJsonObject title = names.value(QStringLiteral("title")).toObject();
+        c.titleEn = title.value(QStringLiteral("en")).toString(QString::fromStdString(c.id)).toStdString();
+        c.titleDe = title.value(QStringLiteral("de")).toString(QString::fromStdString(c.titleEn)).toStdString();
+        for (const QJsonValue& v: names.value(QStringLiteral("stickers")).toArray()) {
+            const QJsonObject o = v.toObject();
+            BuiltinSticker b;
+            b.file = o.value(QStringLiteral("file")).toString().toStdString();
+            b.en = strings(o.value(QStringLiteral("en")));
+            b.de = strings(o.value(QStringLiteral("de")));
+            // (a file of the list that is not there, or not a sticker's, is left out)
+            if (b.file.empty() || !isStickerFile(entry.path() / b.file) || !fs::is_regular_file(entry.path() / b.file, ec)) {
+                continue;
+            }
+            if (b.en.empty()) {
+                b.en.push_back(fs::path(b.file).stem().string());
+            }
+            if (b.de.empty()) {
+                b.de.push_back(b.en.front());
+            }
+            c.stickers.push_back(std::move(b));
+        }
+        out.push_back(std::move(c));
+    }
+    // In the order of collections.json, the others after them by id
+    std::vector<std::string> order;
+    for (const QJsonValue& v: readJsonObject(set / "collections.json").value(QStringLiteral("order")).toArray()) {
+        order.push_back(v.toString().toStdString());
+    }
+    const auto place = [&](const Collection& c) {
+        const auto at = std::find(order.begin(), order.end(), c.id);
+        return static_cast<size_t>(at - order.begin());
+    };
+    std::sort(out.begin(), out.end(), [&](const Collection& a, const Collection& b) {
+        const size_t pa = place(a), pb = place(b);
+        return pa != pb ? pa < pb : a.id < b.id;
+    });
+    return out;
+}
+
+std::string nameLanguage() { return QLocale().language() == QLocale::German ? "de" : "en"; }
+
+QStringList hiddenCollections(Settings& settings) {
+    std::string ids;
+    settings.getCustomElement("xournalQt").getString("hiddenStickerCollections", ids);
+    return QString::fromStdString(ids).split(u'+', Qt::SkipEmptyParts);
+}
+
+void setHiddenCollections(Settings& settings, const QStringList& ids) {
+    settings.getCustomElement("xournalQt").setString("hiddenStickerCollections", ids.join(u'+').toStdString());
+    settings.customSettingsChanged();
+}
+
+bool penColour(Settings& settings) {
+    bool on = false;
+    settings.getCustomElement("xournalQt").getBool("builtinStickersInPenColour", on);
+    return on;
+}
+
+void setPenColour(Settings& settings, bool on) {
+    settings.getCustomElement("xournalQt").setBool("builtinStickersInPenColour", on);
+    settings.customSettingsChanged();
 }
 
 std::vector<std::pair<fs::path, std::string>> companionsOf(const fs::path& file) {
@@ -457,9 +567,22 @@ void StickersModel::setLibrary(const fs::path& root, const fs::path& configDir) 
     refresh();
 }
 
+void StickersModel::setSettings(Settings* s) {
+    settings = s;
+    if (settings) {
+        hidden = hiddenCollections(*settings);
+        inPenColour = stickers::penColour(*settings);
+    }
+    Q_EMIT penColourChanged();
+    refresh();
+}
+
 fs::path StickersModel::rootOf(const QString& scope) const {
     if (scope == QLatin1String("app")) {
         return appSet(setKind);
+    }
+    if (scope == QLatin1String("builtin")) {
+        return setKind == Kind::Stickers ? builtinSet() : fs::path();
     }
     return libraryRoot.empty() ? fs::path() : librarySet(libraryRoot, setKind);
 }
@@ -499,8 +622,9 @@ QHash<int, QByteArray> StickersModel::roleNames() const {
 }
 
 void StickersModel::setScope(const QString& scope) {
-    const QString s = scope == QLatin1String("app") || libraryRoot.empty() ? QStringLiteral("app")
-                                                                            : QStringLiteral("library");
+    const QString s = scope == QLatin1String("builtin") && setKind == Kind::Stickers ? QStringLiteral("builtin")
+                      : scope == QLatin1String("app") || libraryRoot.empty()          ? QStringLiteral("app")
+                                                                                       : QStringLiteral("library");
     if (s == scopeName) {
         return;
     }
@@ -538,11 +662,46 @@ void StickersModel::setSort(const QString& sort) {
     apply();
 }
 
+void StickersModel::listBuiltin() {
+    builtins = setKind == Kind::Stickers ? collections(builtinSet()) : std::vector<Collection>();
+    language = QString::fromStdString(nameLanguage());
+    if (scopeName != QLatin1String("builtin")) {
+        return;
+    }
+    all.clear();
+    folderNames.clear();
+    const fs::path set = builtinSet();
+    int rank = 0;
+    for (const Collection& c: builtins) {
+        if (hidden.contains(QString::fromStdString(c.id))) {
+            continue;
+        }
+        folderNames << QString::fromStdString(c.id);
+        for (const BuiltinSticker& b: c.stickers) {
+            Entry e;
+            e.path = set / c.id / b.file;
+            e.folder = c.id;
+            e.name = language == QLatin1String("de") ? b.de.front() : b.en.front();
+            e.builtin = true;
+            e.rank = rank++;
+            e.aliases = b.en;
+            e.aliases.insert(e.aliases.end(), b.de.begin(), b.de.end());
+            e.aliases.push_back(c.titleEn);
+            e.aliases.push_back(c.titleDe);
+            all.push_back(std::move(e));
+        }
+    }
+}
+
 void StickersModel::refresh() {
     const fs::path set = currentSet();
-    all = set.empty() ? std::vector<Entry>() : list(set, setKind);
+    listBuiltin();
+    if (scopeName != QLatin1String("builtin")) {
+        all = set.empty() ? std::vector<Entry>() : list(set, setKind);
+        folderNames = set.empty() ? QStringList() : folders(set);
+    }
     allCount = all.size();
-    folderNames = set.empty() ? QStringList() : folders(set);
+    Q_EMIT collectionsChanged();
     if (!folderName.isEmpty() && !folderNames.contains(folderName)) {
         folderName.clear();
         Q_EMIT folderChanged();
@@ -560,7 +719,10 @@ void StickersModel::apply() {
             continue;
         }
         if (!needle.isEmpty() && !QString::fromStdString(e.name).contains(needle, Qt::CaseInsensitive) &&
-            !QString::fromStdString(e.folder).contains(needle, Qt::CaseInsensitive)) {
+            !QString::fromStdString(e.folder).contains(needle, Qt::CaseInsensitive) &&
+            std::none_of(e.aliases.begin(), e.aliases.end(), [&](const std::string& alias) {
+                return QString::fromStdString(alias).contains(needle, Qt::CaseInsensitive);
+            })) {
             continue;
         }
         shown.push_back(e);
@@ -568,10 +730,15 @@ void StickersModel::apply() {
     const auto byName = [](const Entry& a, const Entry& b) {
         return DocumentFiles::compareNames(QString::fromStdString(a.name), QString::fromStdString(b.name)) < 0;
     };
+    const bool builtin = scopeName == QLatin1String("builtin");
     if (sortName == QLatin1String("own")) {
-        shown = ordered(std::move(shown), setKind);
+        if (!builtin) {  // (the built-in set's own order: its lists, as read)
+            shown = ordered(std::move(shown), setKind);
+        }
     } else if (sortName == QLatin1String("name")) {
         std::stable_sort(shown.begin(), shown.end(), byName);
+    } else if (sortName == QLatin1String("added") && builtin) {
+        // (all came with the app: their own order)
     } else if (sortName == QLatin1String("added")) {
         std::stable_sort(shown.begin(), shown.end(), [](const Entry& a, const Entry& b) { return a.added > b.added; });
     } else {
@@ -582,7 +749,7 @@ void StickersModel::apply() {
             if (ua != ub) {
                 return ua > ub;
             }
-            return a.added > b.added;
+            return builtin ? a.rank < b.rank : a.added > b.added;
         });
     }
     endResetModel();
@@ -627,6 +794,9 @@ QVariantList StickersModel::recent(int count) const {
 }
 
 bool StickersModel::moveBy(const QString& path, int delta) {
+    if (isBuiltin(path)) {
+        return false;
+    }
     if (!moveInOrder(fs::path(path.toStdString()), delta, setKind)) {
         return false;
     }
@@ -639,6 +809,9 @@ bool StickersModel::moveBy(const QString& path, int delta) {
 }
 
 bool StickersModel::rename(const QString& path, const QString& name) {
+    if (isBuiltin(path)) {
+        return false;
+    }
     const fs::path from(path.toStdString());
     // (a name a file cannot have is refused, not changed: the user sees what it is called)
     const std::string wanted = name.trimmed().toStdString();
@@ -657,6 +830,9 @@ bool StickersModel::rename(const QString& path, const QString& name) {
 bool StickersModel::moveToFolder(const QString& path, const QString& folder) {
     const fs::path from(path.toStdString());
     const QString scope = scopeOf(path);
+    if (scope == QLatin1String("builtin")) {
+        return false;
+    }
     const fs::path set = rootOf(scope.isEmpty() ? scopeName : scope);
     if (set.empty() || folder.contains(QLatin1String(".."))) {
         return false;
@@ -680,7 +856,7 @@ bool StickersModel::moveToFolder(const QString& path, const QString& folder) {
 
 bool StickersModel::copyToOtherSet(const QString& path) {
     const QString scope = scopeOf(path);
-    if (scope.isEmpty() || libraryRoot.empty()) {
+    if (scope.isEmpty() || scope == QLatin1String("builtin") || libraryRoot.empty()) {
         return false;
     }
     const fs::path from(path.toStdString());
@@ -699,6 +875,9 @@ bool StickersModel::copyToLibrary(const QString& path, const QString& library) {
 }
 
 bool StickersModel::remove(const QString& path) {
+    if (isBuiltin(path)) {
+        return false;
+    }
     const fs::path file(path.toStdString());
     if (!stickers::trash(file, setKind)) {
         return false;
@@ -710,7 +889,7 @@ bool StickersModel::remove(const QString& path) {
 
 QString StickersModel::scopeOf(const QString& path) const {
     const fs::path file = fs::path(path.toStdString()).lexically_normal();
-    for (const QString scope: {QStringLiteral("library"), QStringLiteral("app")}) {
+    for (const QString scope: {QStringLiteral("library"), QStringLiteral("app"), QStringLiteral("builtin")}) {
         const fs::path set = rootOf(scope);
         if (set.empty()) {
             continue;
@@ -721,6 +900,110 @@ QString StickersModel::scopeOf(const QString& path) const {
         }
     }
     return {};
+}
+
+QString StickersModel::folderTitle(const QString& folder) const {
+    if (scopeName == QLatin1String("builtin")) {
+        for (const Collection& c: builtins) {
+            if (QString::fromStdString(c.id) == folder) {
+                return QString::fromStdString(language == QLatin1String("de") ? c.titleDe : c.titleEn);
+            }
+        }
+    }
+    return folder;
+}
+
+QString StickersModel::copyToMine(const QString& path) {
+    const fs::path from(path.toStdString());
+    const fs::path into = rootOf(hasLibrary() ? QStringLiteral("library") : QStringLiteral("app"));
+    std::error_code ec;
+    if (into.empty() || !fs::is_regular_file(from, ec)) {
+        return {};
+    }
+    // Named as it is shown (a built-in one in the app's language)
+    std::string name = from.stem().string();
+    for (const Entry& e: all) {
+        if (e.path == from) {
+            name = e.name;
+        }
+    }
+    name = stickers::fileNameOf(name);
+    fs::create_directories(into, ec);
+    const fs::path target = uniqueTarget(into, name, from.extension().string());
+    if (!fs::copy_file(from, target, ec) || ec) {
+        return {};
+    }
+    // (a copy of a read-only file is the user's: writable)
+    fs::permissions(target, fs::perms::owner_write, fs::perm_options::add, ec);
+    carryCompanions(from, target, true);
+    refresh();
+    return QString::fromStdString(target.string());
+}
+
+QVariantList StickersModel::collectionList() const {
+    QVariantList out;
+    for (const Collection& c: builtins) {
+        const QString id = QString::fromStdString(c.id);
+        out.append(QVariantMap{
+                {QStringLiteral("id"), id},
+                {QStringLiteral("title"),
+                 QString::fromStdString(language == QLatin1String("de") ? c.titleDe : c.titleEn)},
+                {QStringLiteral("hidden"), hidden.contains(id)},
+                {QStringLiteral("count"), static_cast<int>(c.stickers.size())}});
+    }
+    return out;
+}
+
+int StickersModel::hiddenCount() const {
+    int n = 0;
+    for (const Collection& c: builtins) {
+        n += hidden.contains(QString::fromStdString(c.id)) ? 1 : 0;
+    }
+    return n;
+}
+
+void StickersModel::setCollectionHidden(const QString& id, bool hide) {
+    if (id.isEmpty() || hide == hidden.contains(id)) {
+        return;
+    }
+    if (hide) {
+        hidden << id;
+    } else {
+        hidden.removeAll(id);
+    }
+    storeHidden();
+}
+
+void StickersModel::restoreCollections() {
+    if (hidden.isEmpty()) {
+        return;
+    }
+    hidden.clear();
+    storeHidden();
+}
+
+void StickersModel::storeHidden() {
+    if (settings) {
+        setHiddenCollections(*settings, hidden);
+    }
+    if (folderName == QLatin1String("") || !hidden.contains(folderName)) {
+        refresh();
+        return;
+    }
+    folderName.clear();  // (its collection is hidden: all of the set)
+    Q_EMIT folderChanged();
+    refresh();
+}
+
+void StickersModel::setPenColour(bool on) {
+    if (on == inPenColour) {
+        return;
+    }
+    inPenColour = on;
+    if (settings) {
+        stickers::setPenColour(*settings, on);
+    }
+    Q_EMIT penColourChanged();
 }
 
 }  // namespace xqt
