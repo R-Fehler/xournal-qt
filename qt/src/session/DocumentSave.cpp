@@ -408,18 +408,10 @@ void DocumentSession::beginSave() {
             break;
         case SaveKind::SaveAs: {
             t.target = t.request.target;
-            // The recordings a PDF with notes brought (in the cache): into the app's audio folder, where the .xopp's
-            // bare names find them, as upstream (qt/docs/features/audio.md)
-            std::vector<std::string> names;
-            fs::path before;
-            {
-                std::shared_lock lock(*doc);
-                for (const auto& r: audio::recordingsOf(*doc)) {
-                    names.push_back(r.name);
-                }
-                before = doc->getFilepath();
+            // Its recordings go into the new file's sidecar once it is written (the worker, below)
+            if (!t.request.audioFrom) {  // (the first time: a save that waits for merges begins again)
+                t.request.audioFrom = getFilePath();
             }
-            audio::adoptExtracted(names, before);
             // Like Control::saveImpl(saveAs=true): the document takes the new path before saving (the location of an
             // attached background PDF is derived from it).
             {
@@ -759,6 +751,18 @@ void DocumentSession::takeSnapshot() {
                 // name, then the .xopp is written again (a crash at any point leaves a matching pair).
                 t.result = writeXoppFile(*t.snapshot, t.target, t.createBackup, t.handler);
                 t.xoppWritten = t.result.ok;
+                if (t.result.ok && t.request.audioFrom && *t.request.audioFrom != t.target) {
+                    // The recordings into "name.audio" next to it: moved from the app's folder (not saved before),
+                    // copied from another document's place (qt/docs/features/audio.md, "Storage")
+                    std::vector<std::string> names;
+                    {
+                        std::shared_lock lock(*t.snapshot);
+                        for (const auto& r: audio::recordingsOf(*t.snapshot)) {
+                            names.push_back(r.name);
+                        }
+                    }
+                    audio::gather(names, *t.request.audioFrom, t.target);
+                }
                 if (t.result.ok && !t.stagedAs.empty()) {
                     if (stopAt(2)) {
                         t.result = {false, "stopped (test)", {}};

@@ -1,6 +1,7 @@
 /*
- * xournal-qt: where recordings are kept (qt/docs/features/audio.md, "Storage"): found in the app's audio folder and
- * next to the document; carried by a PDF with notes as attachments named with their pages ("audio-p001-p003-….ogg",
+ * xournal-qt: where recordings are kept (qt/docs/features/audio.md, "Storage"): in a .xopp's sidecar "name.audio"
+ * (the app's audio folder only while it is not saved, and for a PDF with notes); the first save and Save as put them
+ * there; carried by a PDF with notes as attachments named with their pages ("audio-p001-p003-….ogg",
  * renamed by an incremental save when pages move), left out of the clean copy, taken out again when the PDF is opened;
  * an archive PDF's associated files; "Export for Xournal++" with the recordings copied beside it under absolute names.
  *
@@ -148,8 +149,17 @@ TEST_F(AudioStorageTest, recordingsAreFoundWhereUpstreamAndTheAppKeepThem) {
     std::ofstream(doc.parent_path() / "beside.ogg") << "x";
     std::ofstream(doc.parent_path() / "lecture.audio" / "exported.ogg") << "x";
     std::ofstream(path("xournalpp-audio/upstream.ogg")) << "x";
-    EXPECT_EQ(audio::find(NAME, doc), recording);
+    // The app's folder: for a document not saved yet and a PDF with notes, not for a .xopp (its sidecar)
+    EXPECT_TRUE(audio::find(NAME, doc).empty());
     EXPECT_EQ(audio::find(NAME), recording);
+    EXPECT_EQ(audio::find(NAME, path("notes/lecture.pdf")), recording);
+    EXPECT_TRUE(audio::keepsSidecar(doc));
+    EXPECT_TRUE(audio::keepsSidecar(path("old.XOJ")));
+    EXPECT_FALSE(audio::keepsSidecar(path("notes.pdf")));
+    EXPECT_FALSE(audio::keepsSidecar({}));
+    EXPECT_EQ(audio::recordingFolderFor({}), audio::appFolder());
+    EXPECT_EQ(audio::recordingFolderFor(path("notes.pdf")), audio::appFolder());
+    EXPECT_EQ(audio::recordingFolderFor(doc), doc.parent_path() / "lecture.audio");
     EXPECT_EQ(audio::find("beside.ogg", doc), doc.parent_path() / "beside.ogg");
     EXPECT_EQ(audio::find("exported.ogg", doc), doc.parent_path() / "lecture.audio" / "exported.ogg");
     EXPECT_TRUE(audio::find("upstream.ogg", doc).empty());
@@ -157,7 +167,7 @@ TEST_F(AudioStorageTest, recordingsAreFoundWhereUpstreamAndTheAppKeepThem) {
     EXPECT_EQ(audio::find("upstream.ogg", doc), path("xournalpp-audio/upstream.ogg"));
     // An absolute name (Export for Xournal++): as it is, else by its file name
     const std::u8string abs = recording.u8string();
-    EXPECT_EQ(audio::find(std::string(abs.begin(), abs.end())), recording);
+    EXPECT_EQ(audio::find(std::string(abs.begin(), abs.end()), doc), recording);
     const std::u8string gone = path("elsewhere/lecture.audio/beside.ogg").u8string();
     EXPECT_EQ(audio::find(std::string(gone.begin(), gone.end()), doc), doc.parent_path() / "beside.ogg");
     EXPECT_TRUE(audio::find("missing.ogg", doc).empty());
@@ -274,8 +284,9 @@ TEST_F(AudioStorageTest, exportForXournalppCopiesTheRecordings) {
     EXPECT_EQ(audio::recordingsOf(*s->getDocument()).front().name, NAME);
 }
 
-// A PDF with notes saved as a .xopp: its recordings go into the app's audio folder, where the .xopp finds them
-TEST_F(AudioStorageTest, savedAsXoppTheRecordingsGoToTheAppFolder) {
+// A PDF with notes saved as a .xopp: its recordings (taken out of the PDF) are copied into the .xopp's sidecar, where
+// its bare names find them
+TEST_F(AudioStorageTest, savedAsXoppTheRecordingsGoIntoItsSidecar) {
     {
         auto s = recorded();
         ASSERT_TRUE(s->saveAsHybrid(path("notes.pdf")).ok);
@@ -287,6 +298,67 @@ TEST_F(AudioStorageTest, savedAsXoppTheRecordingsGoToTheAppFolder) {
     fs::create_directories(path("other"));
     const auto r = s.saveAs(path("other/notes.xopp"));
     ASSERT_TRUE(r.ok) << r.error;
-    ASSERT_TRUE(fs::exists(recording));
-    EXPECT_EQ(audio::durationMsOf(recording), 1000);
+    const fs::path inSidecar = path("other/notes.audio") / NAME;
+    ASSERT_TRUE(fs::exists(inSidecar));
+    EXPECT_EQ(audio::durationMsOf(inSidecar), 1000);
+    EXPECT_FALSE(fs::exists(recording)) << "not into the app's folder";
+    EXPECT_EQ(audio::find(NAME, path("other/notes.xopp")), inSidecar);
+}
+
+// The author: "keep audio files in the sidecar dir for xopp files". A document not saved yet records into the app's
+// folder; its first save moves them into "name.audio" next to it (the .xopp names them bare, as Xournal++ does);
+// Save as to another place copies them into the new sidecar (the first file keeps its own); a recording still being
+// written stays until it is done
+TEST_F(AudioStorageTest, theFirstSaveMovesTheRecordingsIntoTheSidecarAndSaveAsCopiesThem) {
+    auto s = recorded();
+    const fs::path xopp = path("lectures/physics.xopp");
+    fs::create_directories(xopp.parent_path());
+    const std::string bytesBefore = bytes(recording);
+    // A second recording of it, being written: left where it is
+    const fs::path busy = audio::appFolder() / "2026-10-04_11-00-00.ogg";
+    std::ofstream(busy) << "being recorded";
+    EXPECT_TRUE(s->addVoiceMemo(1, "2026-10-04_11-00-00.ogg"));
+    audio::setBusy(busy, true);
+
+    auto r = s->saveAs(xopp);
+    ASSERT_TRUE(r.ok) << r.error;
+    const fs::path inSidecar = path("lectures/physics.audio") / NAME;
+    ASSERT_TRUE(fs::exists(inSidecar));
+    EXPECT_EQ(bytes(inSidecar), bytesBefore);
+    EXPECT_FALSE(fs::exists(recording)) << "moved, not copied";
+    EXPECT_TRUE(fs::exists(busy)) << "being recorded: not moved";
+    EXPECT_FALSE(fs::exists(path("lectures/physics.audio") / "2026-10-04_11-00-00.ogg"));
+    audio::setBusy(busy, false);
+    // It ends: moved then (AudioControl::endRecording)
+    EXPECT_TRUE(audio::moveInto(busy, audio::sidecarOf(xopp)));
+    EXPECT_FALSE(fs::exists(busy));
+    EXPECT_TRUE(fs::exists(path("lectures/physics.audio") / "2026-10-04_11-00-00.ogg"));
+    EXPECT_EQ(audio::find(NAME, xopp), inSidecar);
+
+    // The file names it bare (Xournal++ resolves a bare name against its own audio folder)
+    QProcess gz;
+    gz.start("gzip", {"-dc", QString::fromStdString(xopp.string())});
+    ASSERT_TRUE(gz.waitForFinished());
+    const QString xml = QString::fromUtf8(gz.readAllStandardOutput());
+    EXPECT_TRUE(xml.contains(QString("fn=\"%1\"").arg(NAME))) << xml.toStdString();
+
+    // Save as elsewhere: copied, the first keeps its own
+    fs::create_directories(path("copy"));
+    r = s->saveAs(path("copy/physics 2.xopp"));
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_EQ(bytes(path("copy/physics 2.audio") / NAME), bytesBefore);
+    EXPECT_TRUE(fs::exists(inSidecar));
+    // Ctrl+S: nothing moves
+    r = s->save();
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(fs::exists(inSidecar));
+
+    // Opened again from its new place, the recording is found; a document saved without recordings has no sidecar
+    auto loaded = DocumentSession::loadFile(path("copy/physics 2.xopp"));
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    EXPECT_EQ(audio::find(audio::recordingsOf(*loaded.document).front().name, path("copy/physics 2.xopp")),
+              path("copy/physics 2.audio") / NAME);
+    DocumentSession plain(*app);
+    ASSERT_TRUE(plain.saveAs(path("copy/plain.xopp")).ok);
+    EXPECT_FALSE(fs::exists(path("copy/plain.audio"))) << "no empty folder in the user's library";
 }

@@ -11,7 +11,7 @@ Xournal++'s audio (a stroke or text tied to a moment of a recording). The window
 | `OggVorbis` | reading and writing Ogg Vorbis with the vendored libogg/libvorbis |
 | `AudioDevice`, `QtAudioDevice` | the microphone and the speaker behind small interfaces; Qt Multimedia's `QAudioSource`/`QAudioSink` |
 | `FakeAudio` | fake devices for the tests and for `XQT_FAKE_AUDIO=1` |
-| `AudioFiles` | where recordings are kept and found (as Xournal++ does) |
+| `AudioFiles` | where recordings are kept and found: a `.xopp`'s `name.audio/` next to it, the app's folder while not saved; gathered into the sidecar on the first save and Save as |
 | `DocumentAudio` | the recordings of a document and the elements tied to them |
 
 **May depend on**: `xoj-core` (upstream's model: the `ts`/`fn` of strokes and texts, `XojPage`'s voice memos; an undo

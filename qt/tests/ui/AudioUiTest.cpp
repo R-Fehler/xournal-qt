@@ -11,6 +11,8 @@
 #include <shared_mutex>
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
 #include <QElapsedTimer>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -35,6 +37,7 @@
 #include "shell/PageSketches.h"
 #include "shell/DocumentCovers.h"
 #include "shell/RecentFiles.h"
+#include "shell/SystemApps.h"
 #include "shell/TabManager.h"
 #include "shell/Thumbnails.h"
 
@@ -117,6 +120,14 @@ protected:
 
     QTemporaryDir tmp;
 };
+/// The system's trash, faked: removes (never the user's trash)
+struct FakeTrash: xqt::SystemApps {
+    QStringList trashed;
+    bool moveToTrash(const QString& path) override {
+        trashed << path;
+        return QFileInfo(path).isDir() ? QDir(path).removeRecursively() : QFile::remove(path);
+    }
+};
 class NoAudioUiTest: public AudioUiTest {
 protected:
     bool withAudio() const override { return false; }
@@ -182,6 +193,84 @@ TEST_F(AudioUiTest, recordWriteAndPlayTheMoment) {
     click(find<QObject>("playbackClose"));
     EXPECT_TRUE(until([&] { return !audio()->property("playing").toBool(); }));
     EXPECT_TRUE(until([&] { return !playback->isVisible(); }));
+}
+
+// qt/docs/features/audio.md, "Storage": a document not saved yet records into the app's folder; saved as a .xopp
+// while it records, the recording stays there until it ends and then goes into "name.audio" next to it; the next one
+// is recorded there directly, and both play
+TEST_F(AudioUiTest, aSavedDocumentKeepsItsRecordingsNextToIt) {
+    controller->newDocument();
+    view()->getViewController().scrollToPageRect(0, QRectF(0, 0, 400, 400));
+    wait(200);
+    ASSERT_TRUE(QMetaObject::invokeMethod(audio(), "startRecording"));
+    ASSERT_TRUE(until([&] { return audio()->property("recordedMs").toLongLong() >= 300; }));
+    QVariantList recs;
+    QMetaObject::invokeMethod(audio(), "recordings", Q_RETURN_ARG(QVariantList, recs));
+    ASSERT_EQ(recs.size(), 1);
+    const QString name1 = recs[0].toMap()["name"].toString();
+    const fs::path app = fs::path(tmp.filePath("audio").toStdString());
+    EXPECT_TRUE(fs::exists(app / name1.toStdString())) << "not saved yet: the app's folder";
+
+    const fs::path xopp = fs::path(tmp.filePath("docs/lecture.xopp").toStdString());
+    fs::create_directories(xopp.parent_path());
+    ASSERT_TRUE(controller->saveAs(QUrl::fromLocalFile(QString::fromStdString(xopp.string()))));
+    EXPECT_TRUE(fs::exists(app / name1.toStdString())) << "still being recorded: where it is";
+    QMetaObject::invokeMethod(audio(), "stopRecording");
+    const fs::path sidecar = xopp.parent_path() / "lecture.audio";
+    EXPECT_TRUE(fs::exists(sidecar / name1.toStdString())) << "ended: next to the document";
+    EXPECT_FALSE(fs::exists(app / name1.toStdString()));
+
+    wait(1100);  // (the next recording's name: another second)
+    ASSERT_TRUE(QMetaObject::invokeMethod(audio(), "startRecording"));
+    ASSERT_TRUE(until([&] { return audio()->property("recordedMs").toLongLong() >= 300; }));
+    QMetaObject::invokeMethod(audio(), "stopRecording");
+    QMetaObject::invokeMethod(audio(), "recordings", Q_RETURN_ARG(QVariantList, recs));
+    ASSERT_EQ(recs.size(), 2);
+    for (const QVariant& r: recs) {
+        const QString n = r.toMap()["name"].toString();
+        EXPECT_TRUE(fs::exists(sidecar / n.toStdString())) << n.toStdString();
+        EXPECT_TRUE(r.toMap()["found"].toBool());
+        bool played = false;
+        QMetaObject::invokeMethod(audio(), "play", Q_RETURN_ARG(bool, played), Q_ARG(QString, n), Q_ARG(qint64, 0));
+        EXPECT_TRUE(played) << n.toStdString();
+        QMetaObject::invokeMethod(audio(), "stopPlayback");
+    }
+}
+
+// A .xopp with recordings saved as a PDF with notes, the .xopp to the trash with its "name.audio": the PDF carries the
+// recordings, and they still play in the open document (a copy went into the app's folder, where a PDF with notes
+// finds them)
+TEST_F(AudioUiTest, aXoppSavedAsAPdfWithNotesKeepsPlayingItsRecordings) {
+    FakeTrash trash;
+    xqt::SystemApps::setInstance(&trash);
+    controller->newDocument();
+    ASSERT_TRUE(QMetaObject::invokeMethod(audio(), "startRecording"));
+    ASSERT_TRUE(until([&] { return audio()->property("recordedMs").toLongLong() >= 300; }));
+    QMetaObject::invokeMethod(audio(), "stopRecording");
+    const fs::path xopp = fs::path(tmp.filePath("docs/talk.xopp").toStdString());
+    fs::create_directories(xopp.parent_path());
+    ASSERT_TRUE(controller->saveAs(QUrl::fromLocalFile(QString::fromStdString(xopp.string()))));
+    QVariantList recs;
+    QMetaObject::invokeMethod(audio(), "recordings", Q_RETURN_ARG(QVariantList, recs));
+    ASSERT_EQ(recs.size(), 1);
+    const QString name = recs[0].toMap()["name"].toString();
+    ASSERT_TRUE(fs::exists(xopp.parent_path() / "talk.audio" / name.toStdString()));
+
+    const fs::path pdf = xopp.parent_path() / "talk.pdf";
+    ASSERT_TRUE(controller->saveAsHybridInBackground(QUrl::fromLocalFile(QString::fromStdString(pdf.string())),
+                                                     QJSValue(), "trash"));
+    ASSERT_TRUE(until([&] { return !controller->anySaving() && !fs::exists(xopp); }, 20000));
+    EXPECT_TRUE(trash.trashed.contains(QString::fromStdString((xopp.parent_path() / "talk.audio").string())))
+            << "its recordings' folder went with it";
+    EXPECT_FALSE(fs::exists(xopp.parent_path() / "talk.audio"));
+    QMetaObject::invokeMethod(audio(), "recordings", Q_RETURN_ARG(QVariantList, recs));
+    ASSERT_EQ(recs.size(), 1);
+    EXPECT_TRUE(recs[0].toMap()["found"].toBool());
+    bool played = false;
+    QMetaObject::invokeMethod(audio(), "play", Q_RETURN_ARG(bool, played), Q_ARG(QString, name), Q_ARG(qint64, 0));
+    EXPECT_TRUE(played);
+    QMetaObject::invokeMethod(audio(), "stopPlayback");
+    xqt::SystemApps::setInstance(nullptr);
 }
 
 // Held, the button offers the play tool and the list of recordings; removing one there unties the ink (undoable)

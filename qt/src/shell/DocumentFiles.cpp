@@ -20,6 +20,7 @@
 #include <QLocale>
 #include <QString>
 
+#include "audio/AudioFiles.h"
 #include "model/Document.h"
 #include "model/XojPage.h"
 #include "session/DocumentImages.h"
@@ -486,6 +487,19 @@ DocumentFiles::Result relocate(const DocumentItem& item, const fs::path& folder,
                 r.moved.emplace_back(pages, newPages);  // (an open document follows)
             }
         }
+        // Its recordings ("name.audio" next to it) go along: its strokes name them bare (qt/docs/features/audio.md)
+        if (const fs::path rec = audio::sidecarOf(item.xopp); isDir(rec)) {
+            const fs::path newRec = audio::sidecarOf(newXopp);
+            if (rec != newRec) {
+                if (!transferFolder(rec, newRec, copy, error)) {
+                    return failure(error);
+                }
+                rollback.transferredFolder(rec, newRec, copy);
+                if (!copy) {
+                    r.moved.emplace_back(rec, newRec);
+                }
+            }
+        }
     }
     if (!pdfSource.empty()) {
         if (!transfer(pdfSource, newPdf, copy, error)) {
@@ -659,6 +673,14 @@ std::vector<fs::path> imageAttachmentsOf(const fs::path& xopp) {
     return images;
 }
 
+fs::path recordingsOf(const DocumentItem& item) {
+    if (item.xopp.empty()) {
+        return {};
+    }
+    const fs::path rec = audio::sidecarOf(item.xopp);
+    return isDir(rec) ? rec : fs::path();
+}
+
 std::vector<fs::path> filesOf(const DocumentItem& item) {
     std::vector<fs::path> files;
     const fs::path none;
@@ -678,6 +700,9 @@ std::vector<fs::path> filesOf(const DocumentItem& item) {
         if (const fs::path assets = DocumentImages::assetsFolder(item.md); isDir(assets)) {
             files.push_back(assets);  // (its pictures: one document with the .md)
         }
+    }
+    if (const fs::path rec = recordingsOf(item); !rec.empty()) {
+        files.push_back(rec);  // (its recordings: one document with the .xopp)
     }
     return files;
 }
@@ -799,11 +824,14 @@ Listing scan(const fs::path& dir, unsigned include) {
     }
     foldConflicts(l.items);
     // A .md's pictures ("name.assets" next to it) are part of it, not a folder of the library
-    // (qt/docs/features/md-images.md)
-    if (!mds.empty()) {
+    // (qt/docs/features/md-images.md); a .xopp's recordings ("name.audio") the same (qt/docs/features/audio.md)
+    if (!mds.empty() || !xopps.empty()) {
         std::set<std::string> assets;
         for (const auto& md: mds) {
             assets.insert(DocumentImages::assetsName(md));
+        }
+        for (const auto& [stem, xopp]: xopps) {
+            assets.insert(audio::sidecarOf(xopp).filename().string());
         }
         l.folders.erase(std::remove_if(l.folders.begin(), l.folders.end(),
                                        [&](const fs::path& f) { return assets.count(f.filename().string()) > 0; }),
@@ -914,8 +942,8 @@ bool nameTaken(const fs::path& folder, const std::string& name) {
             return true;
         }
     }
-    if (isDir(folder / (name + ".assets"))) {
-        return true;  // (the pictures of a .md of that name, or left behind by one)
+    if (isDir(folder / (name + ".assets")) || isDir(folder / (name + ".audio"))) {
+        return true;  // (the pictures of a .md of that name, the recordings of a .xopp, or left behind by one)
     }
     return !imageNamed(folder, name).empty();
 }

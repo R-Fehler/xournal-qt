@@ -163,6 +163,9 @@ public:
         /// A PDF with notes: how it is encrypted (protecting it, changing or removing its password: needs `compact`).
         /// None given: a protected document's files stay encrypted with its password (encryptionForSave()).
         std::optional<PdfEncryption::Encryption> encryption;
+        /// SaveAs (also the first save): the document's file before it (empty: not saved), set when the save begins;
+        /// its recordings go into the new .xopp's sidecar once it is written (qt/docs/features/audio.md, "Storage")
+        std::optional<fs::path> audioFrom;
     };
     /// Save without blocking the window. What the writers need is taken from the document at once on this thread (a
     /// copy of its pages, under its read lock); the heavy file work (the gzip XML, qpdf) runs on a worker, and the

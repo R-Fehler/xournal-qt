@@ -274,7 +274,9 @@ bool AudioControl::startRecording() {
     }
     setDenied(false);
     stopPlayback();  // (the speaker would be recorded)
-    const fs::path folder = audio::appFolder();
+    // Into the document's sidecar ("name.audio" next to its .xopp), else (not saved yet, a PDF with notes) the app's
+    // audio folder: the first save takes it into the sidecar (qt/docs/features/audio.md, "Storage")
+    const fs::path folder = audio::recordingFolderFor(s->getFilePath());
     const std::string name = audio::newRecordingName(QDateTime::currentDateTime(), [&](const std::string& n) {
         std::error_code ec;
         return fs::exists(folder / n, ec);
@@ -284,6 +286,8 @@ bool AudioControl::startRecording() {
         return false;
     }
     recordingFor = s;
+    recordingFile = folder / name;
+    audio::setBusy(recordingFile, true);  // (a save leaves it where it is until it is done: endRecording)
     audio::Recorder* r = recorder.get();
     s->setRecording(name, [r] { return static_cast<size_t>(r->positionMs()); });
     s->addVoiceMemo(s->getCurrentPageNo(), name);
@@ -294,6 +298,8 @@ bool AudioControl::startRecording() {
             recorder->stop();
             Q_EMIT message(tr("The recording ended with its document."));
         }
+        audio::setBusy(recordingFile, false);
+        recordingFile.clear();
         Q_EMIT recordingChanged();
     });
     Q_EMIT recordingChanged();
@@ -301,10 +307,19 @@ bool AudioControl::startRecording() {
 }
 
 void AudioControl::endRecording() {
+    audio::setBusy(recordingFile, false);
     if (recordingFor) {
         recordingFor->setRecording({}, {});
         disconnect(recordingFor, &QObject::destroyed, this, nullptr);
+        // Saved as a .xopp while it recorded (the save left it): into the sidecar now
+        const fs::path doc = recordingFor->getFilePath();
+        std::error_code ec;
+        if (audio::keepsSidecar(doc) && fs::is_regular_file(recordingFile, ec) &&
+            !fs::equivalent(recordingFile.parent_path(), audio::sidecarOf(doc), ec)) {
+            audio::moveInto(recordingFile, audio::sidecarOf(doc));
+        }
     }
+    recordingFile.clear();
     recordingFor = nullptr;
     Q_EMIT recordingChanged();
 }

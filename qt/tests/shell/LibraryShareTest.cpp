@@ -517,7 +517,8 @@ TEST_F(LibraryShareTest, entriesSurviveACopyWithOtherTimesButNotOtherContent) {
 TEST_F(LibraryShareTest, recordingsGoAlongOrStayBehind) {
     audio::setAppFolder(fs::path(tmp.filePath("app-audio").toStdString()));
     const std::string name = "2026-10-05_10-00-00.ogg";
-    writeFile(audio::appFolder() / name, std::string(4096, 'o'));  // (its bytes are not looked at)
+    // (in its sidecar, next to it; its bytes are not looked at)
+    writeFile(shared / "talk.audio" / name, std::string(4096, 'o'));
     {
         Document doc(nullptr);
         doc.addPage(std::make_shared<XojPage>(595, 842));
@@ -535,7 +536,7 @@ TEST_F(LibraryShareTest, recordingsGoAlongOrStayBehind) {
     }
     ASSERT_GT(HybridPdf::recordingBytes(shared / "talk-notes.pdf"), 4000u) << "the PDF with notes carries it";
     const auto survey = LibraryShare::survey(shared);
-    EXPECT_EQ(survey.recordings, 2) << "the .xopp's (in the app's audio folder) and the PDF's";
+    EXPECT_EQ(survey.recordings, 2) << "the .xopp's (in its sidecar) and the PDF's";
     EXPECT_GE(survey.recordingBytes, 8192u);
 
     LibraryShare::Options o;
