@@ -80,6 +80,15 @@ TEST_F(PluginFixture, importsOutsideThePluginsFolderAreRefused) {
     EXPECT_TRUE(checkImports(tmp.filePath("user/dyn"), "main.mjs").contains("import()"));
     writePlugin("user", "bare", {{"main.mjs", "import x from 'somewhere'; export function run() {}"}});
     EXPECT_FALSE(checkImports(tmp.filePath("user/bare"), "main.mjs").isEmpty());
+    // `import * as api from "xournal"` gives undefined on Qt 6.7 (the CI's KDE neon): refused everywhere, with the forms
+    // that work on every Qt; in a comment or a string, and `import *` of the plugin's own files, are fine
+    writePlugin("user", "star", {{"main.mjs", "import * as api from \"xournal\"; export function run() {}"}});
+    const QString star = checkImports(tmp.filePath("user/star"), "main.mjs");
+    EXPECT_TRUE(star.contains("import xournal from")) << star.toStdString();
+    writePlugin("user", "starok", {{"main.mjs", "// import * as api from 'xournal'\nimport * as l from './l.mjs';\n"
+                                                "import xournal, { doc } from 'xournal'; export function run() {}"},
+                                   {"l.mjs", "export const a = 1;"}});
+    EXPECT_EQ(checkImports(tmp.filePath("user/starok"), "main.mjs"), "");
 
     // A plugin that imports outside does not load, and says why
     writePlugin("user", "outside", {{"plugin.json", manifest("org.example.outside")}});
@@ -213,7 +222,7 @@ export function run() {
 
 TEST_F(PluginFixture, thePluginSeesOnlyTheApi) {
     writePlugin("user", "probe", {{"plugin.json", manifest("org.example.probe", "[]")},
-                                  {"main.mjs", R"(import * as api from "xournal";
+                                  {"main.mjs", R"(import api from "xournal";
 const G = (function () { return this; })() || {};
 export function run() {
     const found = [];

@@ -182,6 +182,10 @@ export function cycle(ctx) {
 
 ## The API (`import { … } from "xournal"`)
 
+Import the parts you use (`import { doc, elements } from "xournal"`) or the whole API as one object
+(`import xournal from "xournal"`). `import * as xournal from "xournal"` is refused when the plugin loads: Qt 6.7's
+engine (KDE neon) gives `undefined` for it, so a plugin written on a newer Qt would fail there.
+
 Pages and layers are 0-based indices; `page` left out (or `undefined`) is the current page, `layer` the selected one.
 Coordinates are points (1/72 inch) on the page. Errors are thrown as JavaScript errors with a `name`
 (`PermissionError`, `TypeError` for bad arguments, `StaleReferenceError`, `ReadOnlyError`).
