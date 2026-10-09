@@ -1,0 +1,12 @@
+{
+ "title": {"en": "Logic gates (IEC)", "de": "Logikgatter (IEC)"},
+ "stickers": [
+  {"file": "AND (IEC).xopp", "en": ["AND (IEC)", "AND", "AND gate"], "de": ["UND (IEC)", "UND", "UND-Gatter", "AND-Gatter"]},
+  {"file": "OR (IEC).xopp", "en": ["OR (IEC)", "OR", "OR gate"], "de": ["ODER (IEC)", "ODER", "ODER-Gatter", "OR-Gatter"]},
+  {"file": "NOT (IEC).xopp", "en": ["NOT (IEC)", "NOT", "NOT gate", "Inverter"], "de": ["NICHT (IEC)", "NICHT", "NICHT-Gatter", "NOT-Gatter", "Inverter"]},
+  {"file": "NAND (IEC).xopp", "en": ["NAND (IEC)", "NAND", "NAND gate"], "de": ["NAND (IEC)", "NAND", "NAND-Gatter", "NICHT-UND"]},
+  {"file": "NOR (IEC).xopp", "en": ["NOR (IEC)", "NOR", "NOR gate"], "de": ["NOR (IEC)", "NOR", "NOR-Gatter", "NICHT-ODER"]},
+  {"file": "XOR (IEC).xopp", "en": ["XOR (IEC)", "XOR", "XOR gate", "Exclusive OR"], "de": ["XOR (IEC)", "XOR", "XOR-Gatter", "Exklusiv-ODER", "Antivalenz"]},
+  {"file": "XNOR (IEC).xopp", "en": ["XNOR (IEC)", "XNOR", "XNOR gate", "Exclusive NOR"], "de": ["XNOR (IEC)", "XNOR", "XNOR-Gatter", "Äquivalenz"]}
+ ]
+}

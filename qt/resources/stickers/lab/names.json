@@ -1,0 +1,17 @@
+{
+ "title": {"en": "Lab glassware", "de": "Laborgeräte"},
+ "stickers": [
+  {"file": "Beaker.xopp", "en": ["Beaker"], "de": ["Becherglas"]},
+  {"file": "Erlenmeyer flask.xopp", "en": ["Erlenmeyer flask", "Conical flask"], "de": ["Erlenmeyerkolben"]},
+  {"file": "Round-bottom flask.xopp", "en": ["Round-bottom flask", "Florence flask"], "de": ["Rundkolben"]},
+  {"file": "Test tube.xopp", "en": ["Test tube"], "de": ["Reagenzglas"]},
+  {"file": "Burette.xopp", "en": ["Burette", "Buret"], "de": ["Bürette"]},
+  {"file": "Pipette.xopp", "en": ["Pipette", "Volumetric pipette", "Pipet"], "de": ["Pipette", "Vollpipette"]},
+  {"file": "Measuring cylinder.xopp", "en": ["Measuring cylinder", "Graduated cylinder"], "de": ["Messzylinder"]},
+  {"file": "Bunsen burner.xopp", "en": ["Bunsen burner", "Burner"], "de": ["Bunsenbrenner", "Brenner"]},
+  {"file": "Condenser.xopp", "en": ["Condenser", "Liebig condenser"], "de": ["Kühler", "Liebigkühler"]},
+  {"file": "Funnel.xopp", "en": ["Funnel"], "de": ["Trichter"]},
+  {"file": "Benzene (Kekule).xopp", "en": ["Benzene (Kekulé)", "Benzene", "Benzene ring", "Kekule"], "de": ["Benzol (Kekulé)", "Benzol", "Benzolring"]},
+  {"file": "Benzene (circle).xopp", "en": ["Benzene (circle)", "Benzene", "Benzene ring", "Aromatic ring"], "de": ["Benzol (Kreis)", "Benzol", "Benzolring", "Aromat"]}
+ ]
+}

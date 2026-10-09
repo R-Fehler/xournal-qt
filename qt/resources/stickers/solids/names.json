@@ -1,0 +1,13 @@
+{
+ "title": {"en": "3D solids", "de": "Körper (3D)"},
+ "stickers": [
+  {"file": "Cube.xopp", "en": ["Cube"], "de": ["Würfel"]},
+  {"file": "Cuboid.xopp", "en": ["Cuboid", "Rectangular box", "Rectangular prism"], "de": ["Quader"]},
+  {"file": "Cylinder.xopp", "en": ["Cylinder"], "de": ["Zylinder"]},
+  {"file": "Cone.xopp", "en": ["Cone"], "de": ["Kegel"]},
+  {"file": "Sphere.xopp", "en": ["Sphere", "Ball"], "de": ["Kugel"]},
+  {"file": "Square pyramid.xopp", "en": ["Square pyramid", "Pyramid"], "de": ["Quadratische Pyramide", "Pyramide"]},
+  {"file": "Triangular prism.xopp", "en": ["Triangular prism", "Prism"], "de": ["Dreiecksprisma", "Prisma"]},
+  {"file": "Tetrahedron.xopp", "en": ["Tetrahedron", "Triangular pyramid"], "de": ["Tetraeder", "Dreieckspyramide"]}
+ ]
+}

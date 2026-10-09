@@ -51,10 +51,25 @@ void dropChangedModels(const QString& from, const QString& to) {
     }
 }
 
+/// The built-in stickers (stickers/, qt/docs/features/stickers.md): a sticker drawn again may keep its size, so the set
+/// copied before goes when its collections.json (with the hash of all of them) differs from the app's.
+void dropChangedStickers(const QString& from, const QString& to) {
+    QFile ours(from + QStringLiteral("/stickers/collections.json"));
+    QFile copied(to + QStringLiteral("/stickers/collections.json"));
+    if (!copied.exists()) {
+        return;
+    }
+    if (!ours.open(QIODevice::ReadOnly) || !copied.open(QIODevice::ReadOnly) || ours.readAll() != copied.readAll()) {
+        copied.close();
+        QDir(to + QStringLiteral("/stickers")).removeRecursively();
+    }
+}
+
 /// Copies the resource tree below `from` (":/...") to the folder `to`, file by file where missing or changed in size
 /// (an update of the app replaces them; a start without changes only compares sizes).
 void copyResources(const QString& from, const QString& to) {
     dropChangedModels(from, to);
+    dropChangedStickers(from, to);
     QDirIterator it(from, QDir::Files, QDirIterator::Subdirectories);
     while (it.hasNext()) {
         const QString source = it.next();
