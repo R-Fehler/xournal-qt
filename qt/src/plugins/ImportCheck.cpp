@@ -119,6 +119,21 @@ std::vector<Token> tokenize(const QString& s) {
 }
 }  // namespace
 
+/// `import * as name from "xournal"`: on Qt 6.7 the name is undefined (a namespace import of a module registered from
+/// C++; named and default imports work, and so does `import *` of the plugin's own files). Refused on every Qt, so a
+/// plugin written on a newer one also runs on KDE neon's 6.7.
+bool importsTheApiAsNamespace(const QString& source) {
+    const std::vector<Token> t = tokenize(source);
+    for (size_t i = 0; i + 5 < t.size(); ++i) {
+        if (t[i].kind == Token::Kind::Word && t[i].text == "import" && t[i + 1].kind == Token::Kind::Punct &&
+            t[i + 1].text == "*" && t[i + 2].text == "as" && t[i + 4].text == "from" &&
+            t[i + 5].kind == Token::Kind::String && t[i + 5].text == "xournal") {
+            return true;
+        }
+    }
+    return false;
+}
+
 QStringList importsOf(const QString& source, bool* dynamic) {
     const std::vector<Token> t = tokenize(source);
     QStringList out;
@@ -174,7 +189,13 @@ QString checkImports(const QString& folder, const QString& main) {
             return QStringLiteral("%1 cannot be read").arg(name);
         }
         bool dynamic = false;
-        const QStringList imports = importsOf(QString::fromUtf8(f.readAll()), &dynamic);
+        const QString source = QString::fromUtf8(f.readAll());
+        if (importsTheApiAsNamespace(source)) {
+            return QStringLiteral("%1: write `import xournal from \"xournal\"` or `import { doc, elements } from \"xournal\"` "
+                                  "instead of `import * as … from \"xournal\"` (it does not work on Qt 6.7)")
+                    .arg(name);
+        }
+        const QStringList imports = importsOf(source, &dynamic);
         if (dynamic) {
             return QStringLiteral("%1: import() is not allowed (only static imports of the plugin's files)").arg(name);
         }
