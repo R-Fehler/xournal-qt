@@ -447,9 +447,11 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
     // Presenting with two screens: the slide on the audience's screen, the presenter's console on the other
     // (qt/docs/features/presenter-view.md; PresenterConsole reads these); swapped: the audience's screen is the primary
     // one; the space for notes shown to the audience too (off by default); the audience following the presenter's zoom
-    // (on by default)
-    for (const char* key: {"presenterView", "presenterSwapScreens", "presenterShowNotes", "presenterFollowView"}) {
-        const bool fallback = std::string_view(key) == "presenterView" || std::string_view(key) == "presenterFollowView";
+    // (off by default: the audience keeps the whole slide while the presenter zooms in to write); while presenting the
+    // laser pointer leads the rail when the rail holds none (on by default)
+    for (const char* key:
+         {"presenterView", "presenterSwapScreens", "presenterShowNotes", "presenterFollowView", "presenterLaser"}) {
+        const bool fallback = std::string_view(key) == "presenterView" || std::string_view(key) == "presenterLaser";
         add(key,
             [&s, key, fallback] {
                 bool on = fallback;

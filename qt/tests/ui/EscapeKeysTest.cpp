@@ -137,6 +137,37 @@ TEST_P(EscapeOrBackTest, presentingWithASelectionASnipOrTheStamp) {
     EXPECT_FALSE(controller->presenting()) << "then presenting ends";
 }
 
+// Presenting with the page grid open (all pages, G): the grid closes first (its selected pages unselected before
+// that), the presentation goes on; the next press ends it. In full screen likewise: the grid before full screen.
+TEST_P(EscapeOrBackTest, thePageGridBeforePresentingAndFullScreen) {
+    QMetaObject::invokeMethod(window, "startPresenting", Q_ARG(QVariant, false));
+    ASSERT_TRUE(until([&] { return controller->presenting(); }));
+    auto* grid = findItem("pageGrid");
+    ASSERT_NE(grid, nullptr);
+    key(Qt::Key_G);
+    ASSERT_TRUE(until([&] { return grid->isVisible(); }));
+    QObject* pages = controller->property("pages").value<QObject*>();
+    QMetaObject::invokeMethod(pages, "toggleSelected", Q_ARG(int, 0));
+    ASSERT_EQ(pages->property("selectionCount").toInt(), 1);
+    press();
+    EXPECT_EQ(pages->property("selectionCount").toInt(), 0) << "the selected pages first";
+    EXPECT_TRUE(grid->isVisible());
+    press();
+    EXPECT_FALSE(grid->isVisible()) << "then the grid";
+    EXPECT_TRUE(controller->presenting());
+    press();
+    EXPECT_FALSE(controller->presenting()) << "then presenting ends";
+    EXPECT_TRUE(flag("fullScreenMode"));
+
+    QMetaObject::invokeMethod(grid, "open");
+    ASSERT_TRUE(until([&] { return grid->isVisible(); }));
+    press();
+    EXPECT_FALSE(grid->isVisible());
+    EXPECT_TRUE(flag("fullScreenMode")) << "the grid before full screen";
+    press();
+    EXPECT_FALSE(flag("fullScreenMode"));
+}
+
 // Zen in full screen: Esc leaves Zen, the next one full screen (the order: Zen before full screen)
 TEST_P(EscapeOrBackTest, zenThenFullScreen) {
     ASSERT_NO_FATAL_FAILURE(fullScreen());

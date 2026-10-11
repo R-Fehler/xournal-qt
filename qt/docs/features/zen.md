@@ -65,17 +65,19 @@ two enabled shortcuts of the same key are "ambiguous" to Qt, and then neither ac
 
 0. What is in front takes the key itself: a popup (a modal one, or one that closes on Esc, gets the key before the
    window's shortcuts; Back also waits while a sheet, a dialog, the tool editor, the stickers or the emoji count
-   themselves open, `win.takeBack`), and an item that claims it while it has the focus (the page jump, the page grid,
-   a search field, a text being typed).
-1. The page sidebar's drawer closes.
-2. The curtain's handles hide.
-3. The selection: selected elements, a sticky note or PDF text are unselected.
-4. An armed snip is put away.
-5. The armed to-do stamp is put away.
-6. The replay ends.
-7. Presenting ends; full screen stays.
-8. Zen: the pill closes first, then Zen ends. Read ends with it (read only, and the full screen it entered).
-9. Full screen ends.
+   themselves open, `win.takeBack`), and an item that claims it while it has the focus (the page jump, a search
+   field, a text being typed).
+1. The presenter's pill folds (presenting with two screens, [presenter-view.md](presenter-view.md)).
+2. The page sidebar's drawer closes.
+3. The page grid: its selected pages are unselected, else it closes (presenting goes on, full screen stays).
+4. The curtain's handles hide.
+5. The selection: selected elements, a sticky note or PDF text are unselected.
+6. An armed snip is put away.
+7. The armed to-do stamp is put away.
+8. The replay ends.
+9. Presenting ends; full screen stays.
+10. Zen: the pill closes first, then Zen ends. Read ends with it (read only, and the full screen it entered).
+11. Full screen ends.
 
 Esc and Android's back key (and gesture) take the same steps (the author: "I want a consistent android back
 behavior"). When no step is left, Back on Android asks first: "Leave Xournal Qt?" (`LeaveAppDialog`; Stay, Back
@@ -90,7 +92,7 @@ Elsewhere Back with no step left is the system's.
 Tests (label `ui`): `ReadingTest` (in ToolboxTest.cpp: Read, read only on its own, Zen hides all but the page and the
 dot, the pill and its entries, Zen writes, the note once), `ReadingPhoneTest` (`ReadingPhone.ui@phone`),
 `ToolboxTest.zenIsOnTheTopBarAtEverySize`, `ToolboxTest.backLeavesZen`, `EscapeOrBackTest` (each order with Esc and
-with Back), `EscapeKeysTest.backWithNothingLeftAsksBeforeLeaving`, `PhoneChromeTest.zenIsAutomaticOnlyInATinyWindow`,
+with Back; the page grid before presenting and full screen), `EscapeKeysTest.backWithNothingLeftAsksBeforeLeaving`, `PhoneChromeTest.zenIsAutomaticOnlyInATinyWindow`,
 `PhoneChromeTest.presentingWithoutControlsHasTheZenDot`, `MainWindowTest.presentingWithoutControls`. The back gesture
 itself is on the device checklist.
 

@@ -303,6 +303,78 @@ TEST(ViewSnapping, upAndDownWhileReadingARowOfPagesComesToRest) {
     EXPECT_NEAR(vc.scrollPosition().y(), small.center().y() - 300, 1);
 }
 
+// Presenting (qt/docs/features/presenter-view.md: "zoom in for making detailed annotations"): zoomed in on a slide, a
+// drag, a fling and a jump to the slide itself stay on it; the next slide (a key, a page chosen) comes whole
+TEST(ViewSnapping, presentingZoomedInStaysOnTheSlide) {
+    const QSizeF slide(960, 540);
+    Pages pages({slide, slide, slide, slide});
+    DocumentLayout::Config presenting;
+    presenting.horizontal = true;
+    presenting.noMargins = true;
+    DocumentLayout layout = pages.layout(presenting);
+    ViewController vc(&layout);
+    ManualClock clock;
+    vc.setClock(clock);
+    vc.setViewSize(QSizeF(1920, 1080));
+    vc.setSnapping(true, 1);
+    vc.setPresenting(true);
+    auto settle = [&] {
+        for (int ms = 0; vc.isAnimating() && ms < 3000; ms += 8) {
+            clock.advance(8);
+        }
+    };
+    vc.fitPresentedPage(1);
+    const double fit = vc.zoom();
+    EXPECT_FALSE(vc.stayingOn().has_value()) << "at the fit a swipe goes from slide to slide";
+    // At the fit a fling goes on to the next slide
+    vc.endScroll(QPointF(-3.0, 0));
+    settle();
+    EXPECT_EQ(vc.currentGroup(), 2u);
+    vc.fitPresentedPage(1);
+
+    // Zoomed in (to write a detail): dragged far to the right, the view ends at the slide's edge
+    vc.setZoom(fit * 3, QPointF(960, 540));
+    ASSERT_EQ(vc.stayingOn(), std::optional<size_t>(1));
+    const auto [lo, hi] = vc.restRange(1);
+    ASSERT_GT(hi - lo, 1000) << "the slide is wider than the view";
+    vc.panBy(QPointF(-100000, 0));
+    EXPECT_NEAR(vc.scrollPosition().x(), hi, 0.5) << "at the slide's right edge, not on the next slide";
+    EXPECT_EQ(vc.currentGroup(), 1u);
+    // A fling at the edge: still on the slide, still zoomed in
+    vc.endScroll(QPointF(-5.0, 0));
+    settle();
+    EXPECT_EQ(vc.currentGroup(), 1u);
+    EXPECT_NEAR(vc.zoom(), fit * 3, 1e-9);
+    EXPECT_LE(vc.scrollPosition().x(), hi + 0.5);
+    // To the left edge: the same
+    vc.panBy(QPointF(100000, 0));
+    EXPECT_NEAR(vc.scrollPosition().x(), lo, 0.5);
+    vc.endScroll(QPointF(5.0, 0));
+    settle();
+    EXPECT_EQ(vc.currentGroup(), 1u);
+    // A jump to the slide itself keeps the zoom
+    vc.scrollToPage(1);
+    EXPECT_NEAR(vc.zoom(), fit * 3, 1e-9);
+
+    // The next slide (Space, →): whole, the zoom of presenting again
+    EXPECT_TRUE(vc.stepPages(1));
+    settle();
+    EXPECT_EQ(vc.currentGroup(), 2u);
+    EXPECT_NEAR(vc.zoom(), fit, 1e-9);
+    EXPECT_EQ(vc.keptFit(), ViewController::Fit::Page);
+    // Zoomed in again, then a page chosen (the page grid): whole too
+    vc.setZoom(fit * 2, QPointF(960, 540));
+    vc.scrollToPage(0);
+    settle();
+    EXPECT_EQ(vc.currentGroup(), 0u);
+    EXPECT_NEAR(vc.zoom(), fit, 1e-9);
+    // Not presenting: a drag goes on to the next pages as before
+    vc.setPresenting(false);
+    vc.setZoom(fit * 3, QPointF(960, 540));
+    vc.panBy(QPointF(-100000, 0));
+    EXPECT_GT(vc.currentGroup(), 0u);
+}
+
 TEST(PdfLinks, linksAreFoundAtTheirPlace) {
     QTemporaryDir tmp;
     // A small PDF with an external link and a link to page 2 (written by hand: cairo 1.16 cannot write page links).

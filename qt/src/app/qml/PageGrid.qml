@@ -27,6 +27,8 @@ Rectangle {
     property real bottomInset: 0
     /// Room at the right for a cut-out or the navigation bar at the side
     property real rightInset: 0
+    /// Room above the first row (the presenter's pill at the top left while presenting with two screens)
+    property real topInset: 0
     signal contentsRequested()
     signal zoomRequested()
     readonly property int columns: Math.max(1, Math.min(12, Math.round(grid.width / cellTarget)))
@@ -91,7 +93,7 @@ Rectangle {
         // Room for a page of the document's usual format (A4, slides, ...) and its number; others are fitted in.
         cellHeight: Math.round((cellWidth - pageGrid.spacing) * app.pages.typicalAspect) + pageGrid.labelHeight
                     + pageGrid.spacing
-        header: Item { height: pageGrid.spacing }
+        header: Item { height: pageGrid.spacing + pageGrid.topInset }
         // Add pages at the end, and room so the last row is not under the zoom controls
         footer: Column {
             width: grid.width

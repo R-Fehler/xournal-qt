@@ -93,6 +93,20 @@ The author's decisions of 2026-10-09: [ADR 0008](qt/docs/decisions/0008-js-plugi
 - [ ] Plugins on Android and iOS: "Install from file…" (a zip) in Settings → Plugins (the user's plugin folder is in
   the app's private storage there); the device checks of plugins.md "On the device".
 
+## The presenter's console (`qt/presenter`)
+
+The author, 2026-10-11 (the console on a second screen as presenting on one screen, the tools and the laser pointer,
+a pill for the time, a grid to jump; zooming in on the console to write details): [presenter-view.md](qt/docs/features/presenter-view.md).
+- [x] Zoomed in while presenting, the view stays on the slide; the next slide comes whole. Left: nothing.
+- [x] The console is presenting as on one screen; the panel's content in a pill (folded: the minutes); following the
+  zoom off by default. Left: the device checks of presenter-view.md (projector, clicker, tablet).
+- [x] All pages while presenting (the pill's button, G in both windows, ⋯ → All pages); Esc/Back close the grid first.
+  Left: nothing.
+- [x] The laser pointer at the rail's head while presenting when the rail holds none. Left: nothing.
+- [ ] A page narrower than the window (A4 upright, a slide with its space for notes beside it) shows the neighbouring
+  pages beside it while presenting, on one screen as on the console (presenting's layout is a row of pages). Black
+  there needs the canvas to draw only the presented page while presenting.
+
 ## Decisions for the author
 - [ ] Reading library cache packs from the other cache location (shell review §4 #15) stays: it also serves read-only
   folders with a cache of their own. Remove it?

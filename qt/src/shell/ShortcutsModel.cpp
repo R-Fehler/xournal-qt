@@ -89,6 +89,9 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"present", tr("Present (full screen, page by page)"), view, {"F5"}},
             // (only the page: no floating toolbox; again while presenting: the controls back)
             {"presentClean", tr("Present without controls"), view, {"Ctrl+F5"}},
+            // (while presenting only: the page grid over the slide, a page tapped is presented;
+            // qt/docs/features/presenter-view.md)
+            {"presentPages", tr("All pages while presenting"), view, {"G"}},
             // (qt/docs/features/zen.md: Read is Zen and read only, in full screen; again: back)
             {"read", tr("Read (Zen, read only, full screen)"), view, {"Ctrl+Alt+R"}},
             // (qt/docs/features/zen.md: only the page and a faint dot; again, or Esc: the controls back)

@@ -13,6 +13,8 @@ Window {
     property QtObject presenter: app.presenter
     /// A digit typed here: the page number is typed on in the console's window (the audience does not see it)
     signal digitTyped(string digit)
+    /// All pages (G): the page grid opens in the console (the audience keeps the slide)
+    signal pagesRequested()
     title: qsTr("Presentation") + " — " + app.title
     color: "#000000"
     visible: false
@@ -46,6 +48,12 @@ Window {
         when: audience.visible && audience.width > 0 && audience.height > 0
     }
 
+    // (a clicker or the keyboard with the focus here: as in the console)
+    Shortcut {
+        sequences: win.keysOf("presentPages")
+        enabled: audience.visible
+        onActivated: audience.pagesRequested()
+    }
     Item {
         id: keys
         objectName: "audienceKeys"
