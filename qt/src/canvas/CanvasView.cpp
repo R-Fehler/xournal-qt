@@ -387,6 +387,7 @@ bool CanvasView::rotationGestureAllowed() const {
 void CanvasView::applyScrolling() {
     viewController.setSnapping(presenting || snapSetting(*session.getSettings()), presenting ? 1 : 0);
     viewController.setSnappingVertically(snapVertically && !presenting);
+    viewController.setPresenting(presenting);  // (zoomed in on a slide: the view stays on it)
 }
 
 void CanvasView::setSnapVertically(bool on) {

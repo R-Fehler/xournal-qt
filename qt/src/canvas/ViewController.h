@@ -220,6 +220,12 @@ public:
     /// Up and down too (reading, qt/docs/features/toolbox.md): a drag or a fling comes to rest on a row of pages: its
     /// top at the view's top, or within it when it is taller than the view; a row that fits rests in the middle
     void setSnappingVertically(bool on) { snapVertical = on; }
+    /// Presenting (qt/docs/features/presenter-view.md): zoomed in by hand further than the page filling the view, the
+    /// view stays on that page (a drag, a fling, the wheel move within it, never on to the next slide); going to
+    /// another page (the keys, a page chosen) shows it whole, fitted again.
+    void setPresenting(bool on) { presenting = on; }
+    /// Presenting and zoomed in by hand: the group of pages the view stays on (none: it may go from page to page)
+    std::optional<size_t> stayingOn() const;
     bool snapping() const { return snap && (layout->horizontal() || snapVertical); }
     /// A scroll delta (wheel, touchpad): sideways, what cannot scroll up or down scrolls left or right.
     QPointF scrollDelta(QPointF delta) const;
@@ -290,6 +296,9 @@ private:
     bool snap = false;
     bool snapVertical = false;
     int snapMaxStep = 0;
+    bool presenting = false;
+    /// Presenting: the group shown by the last fit of presenting (the one a zoom by hand stays on)
+    size_t presentedGroup = 0;
     bool animating = false;
     QPointF animFrom, animTo, animVelocity;
     double animDuration = 0;

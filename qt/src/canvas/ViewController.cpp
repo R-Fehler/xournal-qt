@@ -145,6 +145,26 @@ void ViewController::clamp() {
     const auto [minX, maxX] = scrollRangeX();
     scrollPos.setX(std::clamp(scrollPos.x(), minX, maxX));
     scrollPos.setY(std::clamp(scrollPos.y(), 0.0, std::max(0.0, content.height() - view.height())));
+    if (presenting && layout->horizontal() && layout->groupCount() > 0) {
+        if (kept == Fit::Page) {
+            presentedGroup = currentGroup();  // (the slide shown, or the one on its way)
+        } else if (const auto on = stayingOn()) {
+            // Zoomed in on the slide: within it (its edges may rest in the view's middle, as the slides' do)
+            const auto [lo, hi] = restRange(*on);
+            scrollPos.setX(std::clamp(scrollPos.x(), lo, hi));
+        }
+    }
+}
+
+std::optional<size_t> ViewController::stayingOn() const {
+    if (!presenting || kept == Fit::Page || !layout->horizontal() || layout->groupCount() == 0) {
+        return std::nullopt;
+    }
+    const size_t group = std::min(presentedGroup, layout->groupCount() - 1);
+    if (z <= presentedZoom(layout->groupPages(group).first) * 1.01) {
+        return std::nullopt;  // (at the fit or smaller: a swipe goes from slide to slide)
+    }
+    return group;
 }
 
 std::pair<double, double> ViewController::scrollRangeX() const {
@@ -315,6 +335,10 @@ void ViewController::scrollToPageRect(size_t page, QRectF rectPt) {
         return;
     }
     stopMomentum();
+    if (const auto on = stayingOn(); on && layout->groupOf(page) != *on) {
+        fitPresentedPage(page);  // (presenting zoomed in: another slide is shown whole)
+        return;
+    }
     const QRectF p = layout->pageRect(page, z);
     const QRectF r(p.x() + rectPt.x() * z, p.y() + rectPt.y() * z, rectPt.width() * z, rectPt.height() * z);
     const QRectF visible = visibleContentRect().adjusted(0, 40, 0, -40);  // not under floating bars
@@ -345,8 +369,13 @@ void ViewController::scrollToPage(size_t page) {
     const QRectF r = layout->pageRect(page, z);
     const QRectF visible = visibleContentRect();
     if (layout->horizontal()) {
-        if (kept == Fit::Page) {
+        if (kept == Fit::Page || (presenting && layout->groupOf(page) != currentGroup())) {
             fitPresentedPage(page);  // presenting: the page fills the screen, whatever its shape
+            return;
+        }
+        if (presenting) {
+            pageJump = page;  // (zoomed in on that slide already: the zoom stays)
+            Q_EMIT changed();
             return;
         }
         // Sideways: to the resting place of its group (always when snapping, so that it comes to rest there)
@@ -830,8 +859,8 @@ void ViewController::placeGroup(size_t group) {
 }
 
 void ViewController::endScroll(QPointF v) {
-    if (!snapping() || layout->groupCount() == 0) {
-        fling(v);
+    if (!snapping() || layout->groupCount() == 0 || stayingOn()) {
+        fling(v);  // (presenting zoomed in: on within the slide, clamp() keeps it there)
         return;
     }
     if (!layout->horizontal()) {
@@ -959,6 +988,13 @@ bool ViewController::stepPages(int delta) {
     const size_t from = currentGroup();
     const auto to = static_cast<size_t>(
             std::clamp<std::ptrdiff_t>(static_cast<std::ptrdiff_t>(from) + delta, 0, static_cast<std::ptrdiff_t>(count) - 1));
+    if (presenting && kept != Fit::Page) {
+        // Presenting, zoomed by hand: the next slide shown whole (at the last one, the zoom stays)
+        if (to != from) {
+            fitPresentedPage(layout->groupPages(to).first);
+        }
+        return true;
+    }
     if (kept == Fit::Page) {
         // Presenting a page of another size: fitted to it, there at once
         const size_t page = layout->groupPages(to).first;
