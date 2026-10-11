@@ -2,7 +2,8 @@
 // default; left, top or bottom by choice, per window size), like pens lying sorted in a box on the table. One element
 // in the window, in full screen and on phones (the dock: the same rail at the bottom edge). The same element is the top
 // bar (`bar: "top"`, qt/top-bar): the other list of the one arrangement, sideways, without a grip.
-//   head   undo, redo (pinned; the top bar: only where no rail is shown)
+//   head   undo, redo (pinned; the top bar: only where no rail is shown); presenting, the laser pointer when the rail
+//          holds none (qt/docs/features/presenter-view.md)
 //   middle the bar's items as the arrangement has them (ToolboxModel): the user's tools, dividers, groups, and the app's
 //          own tools and commands (hand, select, …; open, save, …: the window's buttons, lent to the bar); it scrolls
 //   tail   "+" (the catalog: a new tool, or an item not placed), ⋯ (full screen: what the top bar holds there); a
@@ -99,6 +100,32 @@ Rectangle {
         y: box.edge === "top" ? parent.height - box.hair : 0
         width: box.vertical ? box.hair : parent.width
         height: box.vertical ? parent.height : box.hair
+    }
+
+    // --- presenting: the laser pointer at hand (qt/docs/features/presenter-view.md) -------------------------------------
+    /// The rail holds a laser pointer (also in a group): presenting adds none then
+    readonly property bool railHasLaser: {
+        if (isTop) return false
+        const list = barList
+        for (let i = 0; i < list.length; ++i) {
+            const e = list[i]
+            if (e.type === "laser") return true
+            if (e.group === true) {
+                const m = store.members(e.id)
+                for (let j = 0; j < m.length; ++j) if (m[j].type === "laser") return true
+            }
+        }
+        return false
+    }
+    /// While presenting, the laser pointer leads the rail (after undo and redo, pinned) when the rail holds none of
+    /// its own; "Not while presenting" (its menu, Settings → Pen → Presenting) leaves it out
+    readonly property bool presentLaserShown: !isTop && !compact && app.presenting && !railHasLaser
+                                              && (app.settings.revision, app.settings.get("presenterLaser") !== false)
+    readonly property bool laserInHand: app.tool === "laserPointerPen" || app.tool === "laserPointerHighlighter"
+    /// The laser pointer used last (an entry on the top bar, …), else the laser pen
+    function takeLaser() {
+        const id = store.recentOfType("laser")
+        if (id === "" || !app.applyToolEntry(id)) app.selectTool("laserPointerPen")
     }
 
     // --- what is shown ----------------------------------------------------------------------------------------------
@@ -701,6 +728,44 @@ Rectangle {
             tip: win.withKeys(qsTr("Redo"), "redo")
             enabled: app.canRedo
             onClicked: app.redo()
+        }
+        // Presenting: the laser pointer (the rail holds none of its own)
+        IconButton {
+            id: presentLaser
+            objectName: box.named("toolboxPresentLaser")
+            visible: box.presentLaserShown
+            width: box.cell; height: box.cell
+            icon.width: 24; icon.height: 24
+            iconName: "xopp-laser-pointer"
+            checked: box.laserInHand
+            label: qsTr("Laser pointer")
+            tip: qsTr("Laser pointer (while presenting; hold for its menu)")
+            ownHold: true
+            onClicked: box.takeLaser()
+            onPressAndHold: presentLaserMenu.openMenu(undefined, presentLaser)
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                onTapped: presentLaserMenu.openMenu(undefined, presentLaser)
+            }
+            AdaptiveMenu {
+                id: presentLaserMenu
+                objectName: box.named("toolboxPresentLaserMenu")
+                title: qsTr("Laser pointer")
+                // (a laser pointer of its own on the rail, kept also when not presenting: this one goes then)
+                AdaptiveMenuItem {
+                    objectName: "presentLaserKeep"
+                    text: qsTr("Keep it on the rail")
+                    onTriggered: {
+                        const id = box.store.add(box.store.prefill("laser"))
+                        if (id !== "") app.applyToolEntry(id)
+                    }
+                }
+                AdaptiveMenuItem {
+                    objectName: "presentLaserOff"
+                    text: qsTr("Not while presenting")
+                    onTriggered: app.settings.set("presenterLaser", false)
+                }
+            }
         }
     }
     Rectangle {  // (between the head and the tools)

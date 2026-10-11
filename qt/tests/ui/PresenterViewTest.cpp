@@ -44,6 +44,7 @@
 #include "shell/SettingsModel.h"
 #include "shell/TabManager.h"
 #include "shell/Thumbnails.h"
+#include "shell/ToolboxModel.h"
 
 #include "AppController.h"
 #include "UiFixture.h"
@@ -75,6 +76,7 @@ protected:
         settings()->set("presenterSwapScreens", false);
         settings()->set("presenterShowNotes", false);
         settings()->set("presenterFollowView", false);
+        settings()->set("presenterLaser", true);
         closeApp();
     }
 
@@ -862,8 +864,55 @@ TEST_F(PresenterView, thePageGridOnTheConsole) {
     EXPECT_TRUE(controller->presenting());
 }
 
-// XQT_SHOTS=<folder>: the console at 1920 x 1080 with the pill folded and unfolded, zoomed in (the grid:
-// thePageGridOnTheConsole)
+// While presenting the laser pointer is at hand on the rail: the first tools have one (no other is added); a rail
+// without one gets it at its head while presenting (one screen or two), taken with a tap; its menu keeps one on the rail
+// or leaves it out ("Not while presenting", also Settings → Pen → Presenting)
+TEST_F(PresenterView, theLaserPointerIsOnTheRailWhilePresenting) {
+    xqt::ToolboxModel* tools = controller->toolboxModel();
+    ASSERT_NE(tools, nullptr);
+    auto* slot = find("toolboxPresentLaser");
+    ASSERT_NE(slot, nullptr);
+    const QString laser = tools->recentOfType("laser");
+    ASSERT_FALSE(laser.isEmpty()) << "a laser pointer among the first tools";
+    present();
+    auto* box = find("toolbox");
+    until([&] { return box->isVisible(); });
+    EXPECT_FALSE(slot->isVisible()) << "the rail has its own";
+    controller->setPresenting(false);
+
+    // Removed from the rail by the user: while presenting the rail leads with one
+    ASSERT_TRUE(tools->remove(laser));
+    wait(50);
+    EXPECT_FALSE(slot->isVisible()) << "not when not presenting";
+    present();
+    until([&] { return box->isVisible() && slot->isVisible(); });
+    ASSERT_TRUE(slot->isVisible());
+    EXPECT_TRUE(QRectF(0, 0, window->width(), window->height()).contains(sceneRect(slot))) << "in sight";
+    controller->selectTool("pen");
+    click(slot);
+    EXPECT_EQ(controller->tool(), QStringLiteral("laserPointerPen")) << "one tap";
+    EXPECT_TRUE(slot->property("checked").toBool());
+    shot("laser");
+
+    // "Not while presenting": gone, remembered; the setting brings it back
+    QObject* menu = window->findChild<QObject*>("toolboxPresentLaserMenu");
+    ASSERT_NE(menu, nullptr);
+    QMetaObject::invokeMethod(entryOf(menu, "presentLaserOff"), "triggered");
+    until([&] { return !slot->isVisible(); });
+    EXPECT_FALSE(settings()->get("presenterLaser").toBool());
+    settings()->set("presenterLaser", true);
+    until([&] { return slot->isVisible(); });
+    // "Keep it on the rail": a laser pointer of the user's own again, this one goes
+    QMetaObject::invokeMethod(entryOf(menu, "presentLaserKeep"), "triggered");
+    until([&] { return !slot->isVisible(); });
+    EXPECT_FALSE(tools->recentOfType("laser").isEmpty());
+    EXPECT_EQ(controller->tool(), QStringLiteral("laserPointerPen"));
+    controller->setPresenting(false);
+    controller->selectTool("pen");
+    tools->reset();
+}
+
+// XQT_SHOTS=<folder>: the console at 1920 x 1080 with the pill folded and unfolded (the grid: thePageGridOnTheConsole)
 TEST_F(PresenterView, shotsOfTheConsole) {
     if (!twoScreens || !qEnvironmentVariableIsSet("XQT_SHOTS")) {
         GTEST_SKIP() << "set XQT_SHOTS, with two screens (PresenterView.ui@2screens)";
