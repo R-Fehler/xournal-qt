@@ -134,6 +134,10 @@ ApplicationWindow {
             pageJump.forReference = false
             pageJump.start(digit)
         }
+        onPagesRequested: {
+            win.requestActivate()
+            pageGrid.visible ? pageGrid.close() : pageGrid.open()
+        }
     }
     Connections {
         target: app.presenter
@@ -663,6 +667,8 @@ ApplicationWindow {
         // (its pill above the navigation bar and the keyboard)
         bottomInset: canvas.y + canvas.height - win.layout.canvasControlsBottom
         rightInset: canvas.x + canvas.width - win.layout.canvasControlsRight
+        // (the first row below the presenter's pill)
+        topInset: presenterPill.visible ? Math.max(0, presenterPill.y + presenterPill.height + 4 - canvas.y) : 0
         // The phone chrome: the contents and the zoom are here (its page number opens the grid)
         phoneTools: win.layout.phoneChrome
         onContentsRequested: contentsOverview.open()
@@ -823,10 +829,14 @@ ApplicationWindow {
 
     PresentPageIndicator { id: presentIndicator }
     // Presenting with two screens, the console (qt/docs/features/presenter-view.md): presenting as on one screen, and
-    // the pill with the time, the next page and the console's settings
+    // the pill with the time, the next page, all pages and the console's settings
     PresenterPill {
         id: presenterPill
         onStopRequested: app.presenting = false
+        onPagesRequested: {
+            presenterPill.expanded = false
+            pageGrid.visible ? pageGrid.close() : pageGrid.open()
+        }
     }
     // While it is unfolded: a tap beside it (on the page, the toolbox) folds it and does nothing else
     MouseArea {

@@ -135,6 +135,20 @@ protected:
         return std::abs(a.left() - b.left()) < d && std::abs(a.top() - b.top()) < d &&
                std::abs(a.right() - b.right()) < d && std::abs(a.bottom() - b.bottom()) < d;
     }
+    /// A cell of the page grid (its delegate) by the page's index
+    QQuickItem* gridCell(int page) const {
+        auto* view = find("pageGridView");
+        if (!view) {
+            return nullptr;
+        }
+        auto* content = view->property("contentItem").value<QQuickItem*>();
+        for (QQuickItem* c: content ? content->childItems() : QList<QQuickItem*>{}) {
+            if (c->property("pageIndex").isValid() && c->property("pageIndex").toInt() == page && c->isVisible()) {
+                return c;
+            }
+        }
+        return nullptr;
+    }
     /// XQT_SHOTS=<folder>: the console as it looks (the pictures of qt/docs/features/presenter-view.md)
     void shot(const QString& name) {
         if (!qEnvironmentVariableIsSet("XQT_SHOTS")) {
@@ -174,6 +188,25 @@ TEST_F(PresenterView, withOneScreenPresentingIsAsBefore) {
     EXPECT_FALSE(find("presenterPill")->isVisible()) << "no console: nothing the audience should not see";
     const QRectF canvas = sceneRect(find("canvas"));
     EXPECT_NEAR(canvas.right(), window->width(), 1) << "the page has the whole window";
+    // All pages (G): the window's own page grid; Esc: back to the slide, still presenting
+    key(Qt::Key_G);
+    auto* grid = find("pageGrid");
+    until([&] { return grid->isVisible(); });
+    EXPECT_TRUE(grid->isVisible());
+    key(Qt::Key_Escape);
+    until([&] { return !grid->isVisible(); });
+    EXPECT_TRUE(controller->presenting()) << "Esc closed the grid first";
+    // (also in the floating toolbox's ⋯: on one screen there is no presenter's pill)
+    QObject* more = window->findChild<QObject*>("toolboxMoreMenu");
+    ASSERT_NE(more, nullptr);
+    QObject* pages = entryOf(more, "toolboxPresentPagesItem");
+    ASSERT_NE(pages, nullptr);
+    EXPECT_TRUE(pages->property("offered").toBool());
+    QMetaObject::invokeMethod(pages, "triggered");
+    until([&] { return grid->isVisible(); });
+    key(Qt::Key_G);
+    until([&] { return !grid->isVisible(); });
+    EXPECT_TRUE(controller->presenting());
     key(Qt::Key_Escape);
     EXPECT_FALSE(controller->presenting());
 }
@@ -773,7 +806,64 @@ TEST_F(PresenterView, thePillFoldsOnATapBesideItAndOnEscape) {
     EXPECT_FALSE(controller->presenting());
 }
 
-// XQT_SHOTS=<folder>: the console at 1920 x 1080 with the pill folded and unfolded, zoomed in
+// All pages while presenting with two screens: the page grid over the console's page (the pill's button, G in either
+// window); the audience keeps the slide while it is open; a page tapped is presented on both; Esc closes it first
+TEST_F(PresenterView, thePageGridOnTheConsole) {
+    if (!twoScreens) {
+        GTEST_SKIP() << "needs two screens (PresenterView.ui@2screens)";
+    }
+    present();
+    ASSERT_TRUE(console->active());
+    auto* grid = find("pageGrid");
+    ASSERT_NE(grid, nullptr);
+
+    // The pill's button
+    click(find("presenterGridButton"));
+    until([&] { return grid->isVisible(); });
+    EXPECT_TRUE(grid->isVisible());
+    EXPECT_TRUE(sceneRect(grid).contains(sceneRect(find("canvas")).center())) << "over the console's page";
+    EXPECT_TRUE(audienceWindow->isVisible());
+    EXPECT_EQ(audience()->currentPageNo(), 0u) << "the audience keeps the slide";
+    EXPECT_EQ(console->page(), 0);
+    shot("grid");
+    // A page tapped: presented on both screens
+    QQuickItem* cell = nullptr;
+    until([&] { return (cell = gridCell(2)) != nullptr; });
+    ASSERT_NE(cell, nullptr);
+    click(cell);
+    until([&] { return !grid->isVisible(); });
+    settle();
+    EXPECT_EQ(controller->pageNumber(), 3);
+    until([&] { return audience()->currentPageNo() == 2; });
+    EXPECT_EQ(audience()->currentPageNo(), 2u);
+    EXPECT_TRUE(controller->presenting());
+
+    // G: open, Esc: closed, still presenting, the slide unchanged
+    key(Qt::Key_G);
+    until([&] { return grid->isVisible(); });
+    key(Qt::Key_Right);  // (the grid's own keys: its cursor moves, nothing is presented)
+    wait(50);
+    EXPECT_EQ(controller->pageNumber(), 3);
+    EXPECT_EQ(audience()->currentPageNo(), 2u);
+    key(Qt::Key_Escape);
+    until([&] { return !grid->isVisible(); });
+    EXPECT_TRUE(controller->presenting()) << "Esc closed the grid first";
+    EXPECT_EQ(controller->pageNumber(), 3);
+
+    // G in the audience's window (a keyboard there): the grid opens in the console
+    audienceWindow->requestActivate();
+    until([&] { return audienceWindow->isActive(); });
+    QTest::keyClick(audienceWindow, Qt::Key_G);
+    until([&] { return grid->isVisible() && window->isActive(); });
+    EXPECT_TRUE(grid->isVisible());
+    EXPECT_EQ(audience()->currentPageNo(), 2u);
+    key(Qt::Key_G);
+    until([&] { return !grid->isVisible(); });
+    EXPECT_TRUE(controller->presenting());
+}
+
+// XQT_SHOTS=<folder>: the console at 1920 x 1080 with the pill folded and unfolded, zoomed in (the grid:
+// thePageGridOnTheConsole)
 TEST_F(PresenterView, shotsOfTheConsole) {
     if (!twoScreens || !qEnvironmentVariableIsSet("XQT_SHOTS")) {
         GTEST_SKIP() << "set XQT_SHOTS, with two screens (PresenterView.ui@2screens)";

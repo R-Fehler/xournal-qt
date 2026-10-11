@@ -1,8 +1,8 @@
 // xournal-qt: part of the main window (Main.qml), a direct child of it there: its z and parent are the window's.
 //
 // The presenter's console on the laptop's screen (qt/docs/features/presenter-view.md): presenting as on one screen,
-// with this small pill at the top left corner of the page. Folded it shows only the minutes since the start ("12 min");
-// a tap on the minutes unfolds it: the time of day, the time since the
+// with this small pill at the top left corner of the page. Folded it shows only the minutes since the start ("12 min")
+// and the button of all pages (the page grid, G); a tap on the minutes unfolds it: the time of day, the time since the
 // start with pause / go on and back to 0:00, "Page 3 of 20" and the next page smaller, the notes for the audience,
 // the audience following the zoom and Fit, which screen is the audience's, swap screens, End. A tap beside it (on the
 // page: it writes nothing then), Esc or Back folds it again (WindowShortcuts: the first step). Only the console has
@@ -19,6 +19,7 @@ Pane {
     /// Unfolded: the time, the page, the next page and the console's settings
     property bool expanded: false
     signal stopRequested()
+    signal pagesRequested()
     visible: win.modes.presenterConsole && !app.homeVisible
     onVisibleChanged: if (!visible) expanded = false
     z: 93
@@ -65,7 +66,7 @@ Pane {
 
     ColumnLayout {
         spacing: 0
-        // Folded: the minutes (a tap unfolds it)
+        // Folded: the minutes (a tap unfolds it) and all pages
         RowLayout {
             spacing: 0
             ToolButton {
@@ -91,6 +92,19 @@ Pane {
                 ToolTip.delay: 600
                 ToolTip.text: pill.expanded ? qsTr("Fold (Esc)")
                                             : qsTr("The time since the start, the next page and the presenter's settings")
+            }
+            Rectangle { implicitWidth: 1; implicitHeight: 24; color: "#d5d8dc" }
+            IconButton {
+                objectName: "presenterGridButton"
+                implicitWidth: pill.target
+                implicitHeight: pill.target
+                icon.width: 22
+                icon.height: 22
+                iconName: "xqt-pages-grid"
+                checked: pageGrid.visible
+                label: qsTr("All pages")
+                tip: qsTr("All pages: tap one to go there (G)")
+                onClicked: pill.pagesRequested()
             }
         }
 

@@ -43,6 +43,14 @@ Item {
             icon.source: app.iconUrl("xqt-eye-off")
             onTriggered: app.presenting ? (win.modes.presentClean = true) : win.modes.startPresenting(true)
         }
+        // Presenting: all pages, to go to one (the page grid; on one screen there is no presenter's pill)
+        AdaptiveMenuItem {
+            objectName: "toolboxPresentPagesItem"
+            offered: app.presenting
+            text: qsTr("All pages") + win.keyNote("presentPages")
+            icon.source: app.iconUrl("xqt-pages-grid")
+            onTriggered: pageGrid.open()
+        }
         // Read only: the pen does not write, the edges turn the pages (qt/docs/features/zen.md)
         AdaptiveMenuItem {
             objectName: "toolboxReadOnlyItem"

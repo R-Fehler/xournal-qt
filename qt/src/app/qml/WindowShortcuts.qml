@@ -15,16 +15,18 @@ Item {
     //      claims it while it has the focus (the page jump, the page grid, a search field, a text being typed)
     //   1. presenterPill  the presenter's pill (the console, qt/docs/features/presenter-view.md) folds
     //   2. drawer       the page sidebar's drawer closes
-    //   3. curtain      the curtain's handles hide
-    //   4. selection    the selected elements, sticky note or PDF text are unselected
-    //   5. snip         an armed snip is put away
-    //   6. stamp        the armed to-do stamp is put away
-    //   7. replay       the replay ends
-    //   8. presenting   presenting ends (full screen stays: the next press leaves it)
-    //   9. zen          the Zen pill closes, else Zen ends; Read ends with it (read only, and the full screen it
+    //   3. pages        the page grid: its selected pages are unselected, else it closes (presenting: back to the
+    //                   slide, the presentation goes on)
+    //   4. curtain      the curtain's handles hide
+    //   5. selection    the selected elements, sticky note or PDF text are unselected
+    //   6. snip         an armed snip is put away
+    //   7. stamp        the armed to-do stamp is put away
+    //   8. replay       the replay ends
+    //   9. presenting   presenting ends (full screen stays: the next press leaves it)
+    //  10. zen          the Zen pill closes, else Zen ends; Read ends with it (read only, and the full screen it
     //                   entered). Presenting without controls is Zen: the controls come back.
-    //  10. fullScreen   full screen ends
-    //  11. leave        Back only, where leaving is asked (Android): "Leave Xournal Qt?" (LeaveAppDialog)
+    //  11. fullScreen   full screen ends
+    //  12. leave        Back only, where leaving is asked (Android): "Leave Xournal Qt?" (LeaveAppDialog)
     // Esc and Android's back key (and gesture) take the same steps (the author, 2026-10-07: "I want a consistent
     // android back behavior"); when none is left, Back on Android asks before the app is left ("leaving the app
     // should only happen after confirming it in a small dialog"); elsewhere it is the system's.
@@ -42,6 +44,7 @@ Item {
         if (back && backTakers > 0) return ""
         if (presenterPill.visible && presenterPill.expanded) return "presenterPill"
         if (win.layout.sidebarDrawerOpen && sidebar.visible) return "drawer"
+        if (pageGrid.visible) return "pages"
         if (docKeys && app.curtainHandles) return "curtain"
         if (docKeys && (app.edit.hasSelection || app.edit.noteSelected || app.edit.pdfTextIsSelected)) return "selection"
         if (app.snip !== "") return "snip"
@@ -57,6 +60,10 @@ Item {
         switch (step) {
         case "presenterPill": presenterPill.expanded = false; break
         case "drawer": win.layout.showSidebar(false); break
+        case "pages":
+            if (app.pages.selectionCount > 0) app.pages.clearSelection()
+            else pageGrid.close()
+            break
         case "curtain": app.curtainHandles = false; break
         case "selection":
             if (app.edit.hasSelection || app.edit.noteSelected) app.clearSelection()
@@ -162,6 +169,14 @@ Item {
     Shortcut { sequence: "Backspace"; enabled: windowShortcuts.presentKeys && !app.edit.hasSelection; onActivated: app.previousPage() }
     Shortcut { sequence: "Home"; enabled: windowShortcuts.presentKeys; onActivated: app.firstPage() }
     Shortcut { sequence: "End"; enabled: windowShortcuts.presentKeys; onActivated: app.lastPage() }
+    // All pages while presenting (G, changeable): the page grid over the slide; a page tapped there is presented (the
+    // audience's screen keeps the slide until then); again, or Esc: back to the slide
+    Shortcut {
+        objectName: "presentPagesShortcut"
+        sequences: win.keysOf("presentPages")
+        enabled: app.presenting && windowShortcuts.docKeys && !tabOverview.visible && !settingsPage.visible
+        onActivated: pageGrid.visible ? pageGrid.close() : pageGrid.open()
+    }
 
     Shortcut { sequences: win.keysOf("toolEraser"); enabled: toolKeys; onActivated: app.takeToolOfType("eraser") }
     Shortcut { sequences: win.keysOf("toolHighlighter"); enabled: toolKeys; onActivated: app.takeToolOfType("highlighter") }
