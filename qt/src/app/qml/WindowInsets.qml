@@ -10,8 +10,6 @@ QtObject {
     objectName: "safeInsets"
     /// The window whose insets these are
     required property Window window
-    /// Room at the right side of the content that the controls keep clear of (the presenter's panel)
-    property real rightReserve: 0
 
     /// The parts of the window under the system's bars and a camera cut-out (edge to edge on Android and iOS; set by
     /// main.cpp from the window's safe area margins on Qt 6.9+, 0 elsewhere; the tests set them by hand): the status
@@ -25,7 +23,7 @@ QtObject {
     /// Where the controls over the pages may go, in the content item's coordinates (the pages under the header and
     /// above the footer): clear of the safe area's insets, and above the soft keyboard
     readonly property real controlsLeft: left
-    readonly property real controlsRight: window.contentItem.width - right - rightReserve
+    readonly property real controlsRight: window.contentItem.width - right
     readonly property real controlsTop: Math.max(0, top - window.contentItem.y)
     readonly property real controlsBottom: Math.min(window.contentItem.height, window.height - bottom - window.contentItem.y,
                                                     keyboardTop - window.contentItem.y)

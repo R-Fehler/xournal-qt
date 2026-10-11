@@ -13,17 +13,18 @@ Item {
     //   0. what is in front takes the key itself: a popup (Qt gives a modal popup, or one that closes on Esc, the key
     //      before the window's shortcuts; Back also waits while backTakers counts an open one), and an item that
     //      claims it while it has the focus (the page jump, the page grid, a search field, a text being typed)
-    //   1. drawer       the page sidebar's drawer closes
-    //   2. curtain      the curtain's handles hide
-    //   3. selection    the selected elements, sticky note or PDF text are unselected
-    //   4. snip         an armed snip is put away
-    //   5. stamp        the armed to-do stamp is put away
-    //   6. replay       the replay ends
-    //   7. presenting   presenting ends (full screen stays: the next press leaves it)
-    //   8. zen          the Zen pill closes, else Zen ends; Read ends with it (read only, and the full screen it
+    //   1. presenterPill  the presenter's pill (the console, qt/docs/features/presenter-view.md) folds
+    //   2. drawer       the page sidebar's drawer closes
+    //   3. curtain      the curtain's handles hide
+    //   4. selection    the selected elements, sticky note or PDF text are unselected
+    //   5. snip         an armed snip is put away
+    //   6. stamp        the armed to-do stamp is put away
+    //   7. replay       the replay ends
+    //   8. presenting   presenting ends (full screen stays: the next press leaves it)
+    //   9. zen          the Zen pill closes, else Zen ends; Read ends with it (read only, and the full screen it
     //                   entered). Presenting without controls is Zen: the controls come back.
-    //   9. fullScreen   full screen ends
-    //  10. leave        Back only, where leaving is asked (Android): "Leave Xournal Qt?" (LeaveAppDialog)
+    //  10. fullScreen   full screen ends
+    //  11. leave        Back only, where leaving is asked (Android): "Leave Xournal Qt?" (LeaveAppDialog)
     // Esc and Android's back key (and gesture) take the same steps (the author, 2026-10-07: "I want a consistent
     // android back behavior"); when none is left, Back on Android asks before the app is left ("leaving the app
     // should only happen after confirming it in a small dialog"); elsewhere it is the system's.
@@ -39,6 +40,7 @@ Item {
     readonly property string backStep: stepFor(true)
     function stepFor(back) {
         if (back && backTakers > 0) return ""
+        if (presenterPill.visible && presenterPill.expanded) return "presenterPill"
         if (win.layout.sidebarDrawerOpen && sidebar.visible) return "drawer"
         if (docKeys && app.curtainHandles) return "curtain"
         if (docKeys && (app.edit.hasSelection || app.edit.noteSelected || app.edit.pdfTextIsSelected)) return "selection"
@@ -53,6 +55,7 @@ Item {
     }
     function takeStep(step, back) {
         switch (step) {
+        case "presenterPill": presenterPill.expanded = false; break
         case "drawer": win.layout.showSidebar(false); break
         case "curtain": app.curtainHandles = false; break
         case "selection":

@@ -102,7 +102,7 @@ void PresenterConsole::setShowNotes(bool on) {
     }
 }
 
-bool PresenterConsole::followView() const { return setting(*app.getSettings(), FOLLOW_KEY, true); }
+bool PresenterConsole::followView() const { return setting(*app.getSettings(), FOLLOW_KEY, false); }
 
 void PresenterConsole::setFollowView(bool on) {
     if (on != followView()) {
@@ -272,8 +272,9 @@ void PresenterConsole::place(bool force) {
     const bool moved = static_cast<int>(page) != shownPage;
     ViewController& presenterView = presented->getViewController();
     const bool follows = followView();
-    if (moved && follows && presenterZoomedIn(page)) {
-        // Another page: both screens show it whole (the audience is never left on a part of the page before)
+    if (moved && presenterZoomedIn(page)) {
+        // Another page: both screens show it whole (the console zoomed in to write: the next slide comes whole; the
+        // audience is never left on a part of the page before)
         presenterView.fitPresentedPage(page);
     }
     const QRectF frame = frameOf(page);

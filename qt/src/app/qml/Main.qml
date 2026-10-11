@@ -43,7 +43,6 @@ ApplicationWindow {
     readonly property WindowInsets insets: WindowInsets {
         id: windowInsets
         window: win
-        rightReserve: viewModes.presenterPanelWidth
     }
     /// The chrome (full or compact), full screen and the window's state, presenting, Zen, read only and Read, the replay
     readonly property ViewModes modes: ViewModes { id: viewModes }
@@ -638,18 +637,6 @@ ApplicationWindow {
                         canvas.emojiCompletionRect.width, canvas.emojiCompletionRect.height)
         onChosen: function(index) { canvas.chooseEmojiCompletion(index) }
     }
-    // Presenting with two screens: the console's panel beside the page (qt/docs/features/presenter-view.md)
-    PresenterPanel {
-        id: presenterPanel
-        visible: win.modes.presenterConsole
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.right: parent.right
-        anchors.rightMargin: win.insets.right
-        width: win.modes.presenterPanelWidth
-        z: 4
-        onStopRequested: app.presenting = false
-    }
     // Reference mode: another document beside this one (the canvas area is split)
     ReferenceSplit {
         id: referenceSplit
@@ -658,8 +645,7 @@ ApplicationWindow {
         anchors.topMargin: win.layout.toolboxTop
         anchors.bottom: win.layout.sourcePanel && win.layout.sourceAtBottom ? win.layout.sourcePanel.top : parent.bottom
         anchors.bottomMargin: win.layout.sourcePanel && win.layout.sourceAtBottom ? 0 : win.layout.toolboxBottom
-        anchors.right: win.modes.presenterConsole ? presenterPanel.left
-                       : win.layout.sourcePanel && !win.layout.sourceAtBottom ? win.layout.sourcePanel.left
+        anchors.right: win.layout.sourcePanel && !win.layout.sourceAtBottom ? win.layout.sourcePanel.left
                        : win.layout.dockRail ? phoneDock.left
                        : (win.layout.sideEdge === "right" ? sideTools.left : parent.right)
         anchors.left: sidebar.visible && win.layout.sidebarDocked ? sidebar.right
@@ -836,6 +822,20 @@ ApplicationWindow {
     TabToast { id: tabToast }
 
     PresentPageIndicator { id: presentIndicator }
+    // Presenting with two screens, the console (qt/docs/features/presenter-view.md): presenting as on one screen, and
+    // the pill with the time, the next page and the console's settings
+    PresenterPill {
+        id: presenterPill
+        onStopRequested: app.presenting = false
+    }
+    // While it is unfolded: a tap beside it (on the page, the toolbox) folds it and does nothing else
+    MouseArea {
+        objectName: "presenterPillCatcher"
+        visible: presenterPill.visible && presenterPill.expanded
+        z: 92
+        anchors.fill: parent
+        onPressed: presenterPill.expanded = false
+    }
     // --- Zen (qt/docs/features/zen.md) -------------------------------------------------------------------------------
     ZenDot { id: zenDot }
     // Where the mouse or the pen counts as near the dot (looked through by the page: it writes there as anywhere)

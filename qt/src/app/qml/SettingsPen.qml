@@ -148,13 +148,15 @@ ScrollView {
         SettingsSwitchRow { objectName: "presenterFollowSwitch"; key: "presenterFollowView"; text: qsTr("The audience follows the zoom of the console") }
         SettingsHint {
             text: qsTr("With a second screen (a projector), presenting%1 shows only the slide there, "
-                       + "and on this screen the page with its space for notes, the next page, the clock "
-                       + "and the time since the start. Write on the page here: the audience sees it at "
-                       + "once. The audience's screen is the one that is not the main screen; swap them "
-                       + "when it is the other way round. With the space for notes shown too, the audience "
-                       + "sees the whole page and what is written beside the slide. Zooming in on the console "
-                       + "shows the audience the same part of the page, as large as their screen allows; "
-                       + "a frame on the console shows what they see.").arg(sheet.win.keyNote("present"))
+                       + "and on this screen the page with its space for notes and the tools, as when "
+                       + "presenting on one screen, and a small pill with the minutes since the start (a tap: "
+                       + "the clock, the next page and these switches). Write on the page "
+                       + "here: the audience sees it at once. Zoom in here to write a detail: the audience "
+                       + "keeps the whole slide, unless it follows the zoom of the console (a frame then shows "
+                       + "what they see). The audience's screen is the one that is not the main screen; swap "
+                       + "them when it is the other way round. With the space for notes shown too, the "
+                       + "audience sees the whole page and what is written beside the slide.")
+                      .arg(sheet.win.keyNote("present"))
         }
         SettingsSectionTitle { text: qsTr("Grid") }
         SettingsSwitchRow { objectName: "snapGridSwitch"; key: "snapGrid"; text: qsTr("Snap to the grid") }

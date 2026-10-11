@@ -157,11 +157,10 @@ Item {
     /// Ctrl+F5 brings them back, Ctrl+F5 hides them again. Every presentation starts as it is asked for: F5 with the
     /// controls (and no dot).
     property bool presentClean: false
-    /// Presenting with two screens: this window is the console (the page with its space for notes, the panel with
-    /// the clock, the time, the next page), the audience's window shows the slide
+    /// Presenting with two screens: this window is the console (presenting as on one screen: the page with its space
+    /// for notes, the toolbox; the pill with the time, the next page and all pages), the audience's window shows the
+    /// slide
     readonly property bool presenterConsole: app.presenting && app.presenter.active
-    /// The console's panel at the right (the controls over the page stay left of it)
-    readonly property real presenterPanelWidth: presenterConsole ? Math.round(Math.min(480, Math.max(280, win.width * 0.3))) : 0
 
     Connections {
         target: app

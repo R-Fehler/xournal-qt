@@ -3,9 +3,9 @@
  *
  * While presenting with two screens, the audience's screen shows only the slide (full screen, without its space for
  * notes, qt/docs/features/note-space.md) and the window being presented from becomes the presenter's console on the
- * other screen: the current page large with its space for notes (the tab's own view, written on with the toolbox as
- * when presenting on one screen), the next page smaller, a clock, the time since the start (paused, resumed, reset),
- * the page number. With one screen, presenting is as before.
+ * other screen: presenting as on one screen (the tab's own view, the page with its space for notes, written on with
+ * the toolbox), with a pill (PresenterPill.qml) holding the time since the start (paused, resumed, reset), a clock, the
+ * page number, the next page smaller and the console's settings. With one screen, presenting is as before.
  *
  * The audience's screen is a second CanvasView of the presented document (as the same document beside itself,
  * qt/docs/features/reference-view.md: one session, one undo history, the rendered pages of both under CanvasMemory's
@@ -70,8 +70,9 @@ class PresenterConsole final: public QObject {
     /// What the audience's window shows of the current page, in points (the slide, or the whole page with showNotes):
     /// its canvas has this shape, as large as the screen allows
     Q_PROPERTY(QSizeF shownSize READ shownSize NOTIFY shownChanged)
-    /// The setting "presenterFollowView" (on by default): zoomed in on the console, the audience sees the same part of
-    /// the page (fitted to its screen's shape, never less than the presenter sees); off, it always sees the whole slide
+    /// The setting "presenterFollowView" (off by default: the presenter zooms in to write a detail, the audience keeps
+    /// the whole slide): on, zoomed in on the console, the audience sees the same part of the page (fitted to its
+    /// screen's shape, never less than the presenter sees); off, it always sees the whole slide
     Q_PROPERTY(bool followView READ followView WRITE setFollowView NOTIFY optionsChanged)
     /// The audience's window's size (AudienceWindow tells it; the audience's screen's until then): the shape the
     /// part the audience sees is widened to
@@ -173,7 +174,7 @@ private:
     int shownPage = 0;
     QRectF shown;  ///< the part of the page the audience's view shows (points)
     bool notesShown = false;  ///< showNotes as the audience's view was last fitted
-    bool followed = true;     ///< followView as last seen
+    bool followed = false;    ///< followView as last seen
     bool placing = false;     ///< in place() (fitting the presenter's view there calls it again)
     QSizeF windowSize;        ///< the audience's window's (audienceSize)
     QRectF frameOnConsole;    ///< audienceFrame

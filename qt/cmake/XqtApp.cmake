@@ -376,7 +376,7 @@ set(XQT_QML_FILES
     src/app/qml/LayerList.qml
     src/app/qml/PagePicture.qml
     src/app/qml/AudienceWindow.qml
-    src/app/qml/PresenterPanel.qml
+    src/app/qml/PresenterPill.qml
     src/app/qml/Hairline.qml
     src/app/qml/RaceWatch.qml
     src/app/qml/FuzzyToggle.qml
