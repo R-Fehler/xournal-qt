@@ -108,10 +108,8 @@ a pill for the time, a grid to jump; zooming in on the console to write details)
 The author, 2026-10-13: "The model is small and fast, I would like to have it on always per default on all platforms.
 Remove the different cases to handle, just always on. If power consumption really becomes a problem we fix it later."
 [handwriting-search.md](qt/docs/features/handwriting-search.md), "Work and power" and "Decisions".
-- [x] The library's handwriting is read whatever the power source (the mains check, its timer and the "on mains
-  power" status gone). Left: nothing.
-- [x] "Search handwriting" on by default (the UI and shell tests run with it off). Left: the device check of a laptop
-  and a phone on battery (handwriting-search.md, "On the device").
+- [ ] "Search handwriting" on by default, what is left: the device check of a laptop and a phone on battery
+  (handwriting-search.md, "On the device").
 
 ## Decisions for the author
 - [ ] Reading library cache packs from the other cache location (shell review §4 #15) stays: it also serves read-only
@@ -269,6 +267,10 @@ Rerun a failure alone before calling it a flake; harden a test by waiting for th
 - [ ] The format bar scrolls below ~680 px on a desktop; the Markdown panel's rows are not smaller on a phone.
 - [ ] A list view of the library for phones; the tab menu (rename, reference, share) from the phone's app bar.
 - [ ] The emoji button is out of reach while the soft keyboard is open on a phone.
+
+- [ ] A library document whose background reading was stopped partway (the search switched off, the library changed)
+  stays marked as tried for the rest of the run, so switching the search off and on again skips it until the next
+  start (`LibraryInkJob`; seen by `qt/hwr-always`, not reproduced in a test yet).
 
 ### Plotting (after the core plugin block `qt/js-plugins` is merged; the author, 2026-10-09: "do them once we have
 the core part done")
