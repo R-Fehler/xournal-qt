@@ -237,10 +237,10 @@ Reading a line costs about 0.2 s per model, and most documents are in one langua
 
 - Reading runs on one thread at the lowest priority (Linux: `SCHED_IDLE`): it only uses a core nothing else wants.
   It waits while pages in view are drawn and while you write.
-- The open documents are always read (the one in front first). The rest of the library is read only on **mains
-  power**, one document at a time; unplug and it stops within a minute.
-  A computer without a battery counts as on mains; the battery of a device (a wireless mouse, keyboard or pen) does
-  not count as the computer's (Linux: `LibraryInkJob::onMainsIn`, `InkLibraryTest.aDevicesBatteryDoesNotMeanTheComputerIsOnBattery`).
+- The open documents are read first (the one in front first), then the rest of the library, one document at a time
+  (`LibraryInkJob`), after every page of an open document.
+- **Power is not considered**, by the author's choice (2026-10-13: "The model is small and fast"): on battery the
+  library is read as on mains power, on every platform. The reading stays at the lowest priority and waits as above.
 - About 0.2 s per line and model, 4–5 s per page of dense handwriting on a laptop; a page is read once. With two
   models a document's first lines cost twice that, then mostly one model reads (see above).
 - A model takes about 250 MB (TrOCR) of memory while it reads and is unloaded after a minute without work.
@@ -342,7 +342,9 @@ xournal-qt-cli hwr-bench filled.xopp [--model <folder>]... [--out reports/w07]
 
 - Off until switched on in Settings; no learning from the user's handwriting; English and German (below).
 - Typo tolerance applies to handwriting even with Fuzzy off.
-- The library is read in the background only on mains power; open documents always.
+- **Power is not considered** (the author, 2026-10-13; before: the library was read only on mains power): the
+  library is read in the background on battery too, on every platform, at the lowest priority and one document at a
+  time. If the power it takes becomes a problem, this is revisited (TODO.md).
 - Nothing is stored in the `.xopp`; the PDF text layer has the best reading only (no file of all readings in PDFs).
 - **The model is bundled** (the author, 2026-10-08; before: downloaded on demand): the shared German and English
   model ships inside the app with its own licence note (non-commercial), found by its manifest, not by name ("The

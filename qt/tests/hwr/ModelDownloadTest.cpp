@@ -21,7 +21,6 @@
 #include "hwr/ModelInfo.h"
 #include "session/AppContext.h"
 #include "shell/HandwritingSettings.h"
-#include "shell/LibraryInkJob.h"
 #include "shell/ModelDownload.h"
 #include "support/TestSupport.h"
 
@@ -224,7 +223,6 @@ TEST_F(ModelDownloadTest, settingsOfferTheDownloadsAndUseTheModels) {
         fake->setReady(info.valid(), QStringLiteral("The model is not installed"));
         return fake;
     });
-    LibraryInkJob::setPowerSource([] { return true; });
     hwr::HandwritingSearch search(app);
     HandwritingSettings settings(app, search, nullptr);
     EXPECT_FALSE(settings.enabled());
@@ -293,7 +291,6 @@ TEST_F(ModelDownloadTest, settingsOfferTheDownloadsAndUseTheModels) {
     EXPECT_FALSE(settings.modelOf(QStringLiteral("en")).value(QStringLiteral("installed")).toBool());
     EXPECT_FALSE(settings.ready());
     hwr::HandwritingSearch::setFactory({});
-    LibraryInkJob::setPowerSource({});
 }
 
 // Which models the languages need: the folder chosen for a language, else the app's own, else any model in the models
@@ -430,7 +427,6 @@ TEST_F(ModelDownloadTest, theBuiltInModelReadsWhatHasNoModelOfItsOwn) {
         fake->setReady(info.valid(), QStringLiteral("The model is not installed"));
         return fake;
     });
-    LibraryInkJob::setPowerSource([] { return true; });
     hwr::HandwritingSearch search(app);
     HandwritingSettings settings(app, search, nullptr);
     EXPECT_FALSE(settings.enabled());  // (still off until switched on)
@@ -475,5 +471,4 @@ TEST_F(ModelDownloadTest, theBuiltInModelReadsWhatHasNoModelOfItsOwn) {
     EXPECT_EQ(search.modelFoldersInUse().size(), 1);  // (the same model, for German)
     settings.setEnabled(false);
     hwr::HandwritingSearch::setFactory({});
-    LibraryInkJob::setPowerSource({});
 }

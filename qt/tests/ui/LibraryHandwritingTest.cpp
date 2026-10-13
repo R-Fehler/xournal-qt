@@ -78,18 +78,18 @@ protected:
         });
         hwr::HandwritingSearch::setFactory([f = fake](const QString&) { return f; });
         hwr::InkTextIndexer::setDelay(50);
-        LibraryInkJob::setPowerSource([this] { return mains; });
     }
     void TearDown() override {
         handwriting(false);
         closeApp();
         hwr::HandwritingSearch::setFactory({});
         hwr::InkTextIndexer::setDelay(hwr::InkTextIndexer::DELAY_MS);
-        LibraryInkJob::setPowerSource({});
     }
 
-    /// The app (again: a restart), on the library, with the handwriting search on
-    void start() {
+    /// The app (again: a restart), on the library, with the handwriting search on. `background`: the library's
+    /// documents are read in the background as in the app; else that job is held back, so that what is found was read
+    /// by the open document's indexer.
+    void start(bool background = false) {
         makeController();
         controller->setLibraryRoot(root);
         qobject_cast<RecentFiles*>(controller->recentModel())->clear();
@@ -97,6 +97,11 @@ protected:
         library = qobject_cast<LibraryModel*>(controller->libraryModel());
         ASSERT_NE(library, nullptr);
         until([&] { return !library->indexing() && library->searchIndex(); });
+        if (!background) {
+            // (the job no longer follows the switch: it stays off until a test switches it on)
+            QObject::disconnect(&controller->services().handwriting(), &hwr::HandwritingSearch::enabledChanged,
+                                &controller->services().libraryInk(), nullptr);
+        }
         handwriting(true);
     }
     void handwriting(bool on) {
@@ -143,15 +148,13 @@ protected:
 
     QTemporaryDir tmp;
     fs::path root;
-    bool mains = false;
     std::shared_ptr<hwr::FakeRecognizer> fake;
     LibraryModel* library = nullptr;
 };
 }  // namespace
 
-// What the author did (on battery: the library is not read in the background): open a document of the library and let
-// its handwriting be read (Ctrl+F finds it). The library's search finds it too, without saving, and after a restart
-// (read back from the library's cache, nothing read again)
+// What the author did: open a document of the library and let its handwriting be read (Ctrl+F finds it). The library's
+// search finds it too, without saving, and after a restart (read back from the library's cache, nothing read again)
 TEST_F(LibraryHandwritingTest, aDocumentReadWhileOpenIsFoundInTheLibrary) {
     const fs::path file = root / "Sub" / "notes.xopp";
     writeNotes(file);
@@ -190,21 +193,19 @@ TEST_F(LibraryHandwritingTest, theLibrarysSearchFollowsTheHandwritingRead) {
     library->setSearchQuery("turbine");
     wait(100);
     EXPECT_FALSE(isShown(file));
-    mains = true;
-    controller->services().libraryInk().check();
+    controller->services().libraryInk().setEnabled(true);
     EXPECT_TRUE(until([&] { return isShown(file); }, 10000)) << "listed when the background job read it";
 }
 
-// A document never opened: read by the library's background job (on mains power)
+// A document never opened: read by the library's background job (whatever the power source)
 TEST_F(LibraryHandwritingTest, aDocumentNeverOpenedIsReadInTheBackground) {
     const fs::path file = root / "notes.xopp";
     writeNotes(file);
-    mains = true;
-    ASSERT_NO_FATAL_FAILURE(start());
+    ASSERT_NO_FATAL_FAILURE(start(true));
     ASSERT_TRUE(until([&] { return listed("turbine", file); }, 10000)) << "found after the background reading";
     closeApp();
     const int calls = fake->calls();
-    ASSERT_NO_FATAL_FAILURE(start());
+    ASSERT_NO_FATAL_FAILURE(start(true));
     EXPECT_TRUE(until([&] { return listed("turbine", file); }, 10000)) << "found after a restart";
     EXPECT_EQ(fake->calls(), calls) << "nothing read again";
 }

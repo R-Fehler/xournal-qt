@@ -76,8 +76,6 @@ public:
     QVariantMap modelOf(const QString& language) const;
     int pagesWaiting() const;
     int libraryLeft() const;
-    /// The computer is on battery
-    bool onBattery() const;
 
     /// Download a language's model into the app's data folder (the user agreed: the address and size were shown).
     Q_INVOKABLE void download(const QString& language);

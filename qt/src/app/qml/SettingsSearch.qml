@@ -96,7 +96,7 @@ ScrollView {
             text: qsTr("Handwritten words become searchable: in open documents, in the library, and (as "
                        + "invisible text) in PDFs with notes and archive PDFs that other PDF apps open. "
                        + "The handwriting is never turned into text. The recogniser runs on this computer "
-                       + "at low priority; the library's other documents are read only on mains power.")
+                       + "at the lowest priority, one document of the library at a time.")
         }
         Label {
             objectName: "handwritingStatus"
