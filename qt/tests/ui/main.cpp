@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 
 #include "DocumentCanvasItem.h"
+#include "hwr/HandwritingSearch.h"
 #include "session/AppContext.h"
 
 Q_IMPORT_QML_PLUGIN(XournalQtPlugin)
@@ -37,6 +38,9 @@ int main(int argc, char* argv[]) {
     // The first start asks how to keep documents (DocumentMode.h): the tests work with Xournal++ files unless they set
     // another mode, and the question stays away (the tests of the question unset this)
     qputenv("XQT_DOCUMENT_MODE", "xopp");
+    // The handwriting search is on by default in the app; here it is off unless a test switches it on (the documents
+    // of unrelated tests are not read in the background, which would only slow them down)
+    xqt::hwr::HandwritingSearch::setDefaultEnabled(false);
     // No hover on the controls: the pointer rests where a test last clicked, and a button that appears under it
     // opened its tool tip 600 ms later, over whatever the test clicked next (a test slowed down by load missed it).
     qputenv("QT_QUICK_CONTROLS_HOVER_ENABLED", "0");

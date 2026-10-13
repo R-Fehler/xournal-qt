@@ -7,7 +7,8 @@ clipboard (below).
 
 ## Using it
 
-1. **Settings → Search → "Search handwriting"** (off until you switch it on).
+1. **Settings → Search → "Search handwriting"**: on by default (the model comes with the app, nothing is
+   downloaded); switch it off there.
 2. **Handwriting languages**: English, German, or English and German (the default). The app **comes with a model
    that reads both** (see "The built-in model"): Settings says "Built in, in use (<name>, <size>)" per language,
    with its **Licence** note one click away, and nothing needs to be downloaded. **Choose a folder…** uses a model of
@@ -324,7 +325,7 @@ xournal-qt-cli hwr-bench filled.xopp [--model <folder>]... [--out reports/w07]
   training block brings its own. The recogniser's id is derived from the manifests (results of other models are read
   again); several models' ids are joined with `+`.
 - **ONNX Runtime** is not linked: only its C API's headers are vendored (`qt/3rdparty/onnxruntime`), and the library
-  is opened when the search is switched on (where: "The built-in model"). Without it, Settings says so and nothing
+  is opened when the search is on (where: "The built-in model"). Without it, Settings says so and nothing
   else changes. The packages bring it (the packaging's job: `qt/packaging`, the CI).
 - Tests that need the runtime or the model are skipped unless `XQT_ONNXRUNTIME` (tiny models in
   `qt/tests/hwr/data`: a TrOCR stand-in and a CTC model, made by `tinytrocr.py` and `tinyctc.py`) or
@@ -340,7 +341,10 @@ xournal-qt-cli hwr-bench filled.xopp [--model <folder>]... [--out reports/w07]
 
 ## Decisions
 
-- Off until switched on in Settings; no learning from the user's handwriting; English and German (below).
+- **On by default** (the author, 2026-10-13: "The model is small and fast, I would like to have it on always per
+  default on all platforms"; before: off until switched on): the model comes with the app, so nothing is downloaded
+  for it. It can be switched off in Settings → Search. No learning from the user's handwriting; English and German
+  (below).
 - Typo tolerance applies to handwriting even with Fuzzy off.
 - **Power is not considered** (the author, 2026-10-13; before: the library was read only on mains power): the
   library is read in the background on battery too, on every platform, at the lowest priority and one document at a
@@ -380,5 +384,7 @@ What only a real device, screen or another app can show; walked before a release
 - [ ] The models download once with consent; the author's own notes in English and German are found by words
       written in them, also in the library search and in other PDF viewers (the invisible text layer).
 - [ ] Each package (`.deb`, AppImage, Windows zip, macOS bundle, APK): `--hwr-info` says "hwr: ready" (on Android:
-      Settings → Search says "Built in, in use" after switching the search on), and a German and an English note are
+      Settings → Search says "Built in, in use" at a first start, the search being on by default), and a German and an English note are
       found without downloading anything; Settings → Help → About shows the model's licence note.
+- [ ] A laptop and a phone on battery: the library's documents are read in the background too (Settings → Search
+      counts them down), and writing and scrolling stay smooth meanwhile.

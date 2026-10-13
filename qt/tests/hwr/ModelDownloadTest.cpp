@@ -225,7 +225,9 @@ TEST_F(ModelDownloadTest, settingsOfferTheDownloadsAndUseTheModels) {
     });
     hwr::HandwritingSearch search(app);
     HandwritingSettings settings(app, search, nullptr);
-    EXPECT_FALSE(settings.enabled());
+    EXPECT_TRUE(settings.enabled());  // (on by default: a model comes with the app)
+    settings.setEnabled(false);
+    EXPECT_FALSE(hwr::HandwritingSearch::enabledIn(*app.getSettings()));
     EXPECT_EQ(settings.status(), QStringLiteral("Off"));
     EXPECT_EQ(settings.languages(), QStringLiteral("en+de"));  // (English and German by default)
     settings.setEnabled(true);
@@ -429,7 +431,7 @@ TEST_F(ModelDownloadTest, theBuiltInModelReadsWhatHasNoModelOfItsOwn) {
     });
     hwr::HandwritingSearch search(app);
     HandwritingSettings settings(app, search, nullptr);
-    EXPECT_FALSE(settings.enabled());  // (still off until switched on)
+    EXPECT_TRUE(settings.enabled());  // (on by default)
     // The models that come with the app (About, Settings)
     const QVariantList builtIn = settings.builtInModels();
     ASSERT_EQ(builtIn.size(), 1);

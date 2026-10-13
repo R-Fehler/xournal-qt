@@ -241,7 +241,7 @@ int main(int argc, char* argv[]) {
     xqt::registerQuickTypes();
 #ifdef XQT_HWR_ONNX
     // The handwriting search's recognisers, by their manifests' kind: TrOCR or a CTC model in ONNX Runtime (loaded
-    // only when the search is switched on); a folder without a model gets TrOCR's, which says what is missing
+    // only while the search is on); a folder without a model gets TrOCR's, which says what is missing
     xqt::hwr::HandwritingSearch::setFactory(&xqt::hwr::onnxRecognizerFor);
 #endif
     // What the windows share (settings, tools, library, the background jobs): made before the first window, gone

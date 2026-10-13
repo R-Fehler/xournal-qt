@@ -7339,12 +7339,12 @@ TEST_F(MainWindowTest, settingsSearchTabSetsTheFuzzySearch) {
     ASSERT_TRUE(waitOpened(sheet, false));
 }
 
-// Settings → Search: the handwriting search's switch (off until switched on), its status, and the model's download
-// offered with its address and size shown (nothing is downloaded until the button is pressed).
+// Settings → Search: the handwriting search's switch (on by default in the app; switched off here first), its status,
+// and the model's download offered with its address and size shown (nothing is downloaded until the button is pressed).
 TEST_F(MainWindowTest, settingsSearchTabSwitchesTheHandwritingSearch) {
     QObject* hw = controller->property("handwriting").value<QObject*>();
     ASSERT_NE(hw, nullptr);
-    hw->setProperty("enabled", false);  // (the tests share the config folder)
+    hw->setProperty("enabled", false);  // (the tests share the config folder; and the UI tests' default is off)
     QObject* sheet = find("settingsPage");
     key(Qt::Key_Comma, Qt::ControlModifier);
     ASSERT_TRUE(waitOpened(sheet, true));
@@ -7352,7 +7352,7 @@ TEST_F(MainWindowTest, settingsSearchTabSwitchesTheHandwritingSearch) {
     auto* toggle = findItem("handwritingSearchSwitch");
     ASSERT_NE(toggle, nullptr);
     until([&] { return toggle->isVisible(); });
-    EXPECT_FALSE(toggle->property("checked").toBool()) << "off until switched on";
+    EXPECT_FALSE(toggle->property("checked").toBool()) << "switched off";
     EXPECT_FALSE(findItem("handwritingStatus")->isVisible());
     click(toggle);
     until([&] { return hw->property("enabled").toBool(); });

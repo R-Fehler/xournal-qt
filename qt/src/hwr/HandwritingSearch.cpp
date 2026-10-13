@@ -32,8 +32,17 @@ HandwritingSearch::Seeder& seeder() {
 
 void HandwritingSearch::setSeeder(Seeder s) { seeder() = std::move(s); }
 
+namespace {
+bool& defaultEnabled() {
+    static bool on = true;  // (the model comes with the app: the author, 2026-10-13)
+    return on;
+}
+}  // namespace
+
+void HandwritingSearch::setDefaultEnabled(bool on) { defaultEnabled() = on; }
+
 bool HandwritingSearch::enabledIn(Settings& s) {
-    bool on = false;
+    bool on = defaultEnabled();
     s.getCustomElement("xournalQt").getBool("handwritingSearch", on);
     return on;
 }

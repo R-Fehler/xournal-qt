@@ -219,13 +219,14 @@ TEST_F(InkIndexerTest, theSettingSwitchesItOnAndOff) {
         return fake;
     });
     Settings& settings = *app->getSettings();
-    EXPECT_FALSE(hwr::HandwritingSearch::enabledIn(settings));  // (off until switched on)
+    EXPECT_TRUE(hwr::HandwritingSearch::enabledIn(settings));  // (on by default: a model comes with the app)
     EXPECT_EQ(hwr::HandwritingSearch::modelDir(settings), hwr::HandwritingSearch::defaultModelDir());
     EXPECT_TRUE(hwr::HandwritingSearch::defaultModelDir().endsWith(QStringLiteral("/xournal-qt/models/trocr-small-hw-int8")));
     qputenv("XQT_HWR_MODEL", "/elsewhere/model");
     EXPECT_EQ(hwr::HandwritingSearch::modelDir(settings), QStringLiteral("/elsewhere/model"));
     qunsetenv("XQT_HWR_MODEL");
 
+    hwr::HandwritingSearch::setEnabledIn(settings, false);  // (switched off)
     hwr::HandwritingSearch search(*app);
     auto a = open(1, 1);
     auto b = open(1, 2);

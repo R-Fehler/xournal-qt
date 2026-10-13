@@ -9,6 +9,7 @@
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
 
+#include "hwr/HandwritingSearch.h"
 #include "session/AppContext.h"
 #include "shell/ImageWorkers.h"
 
@@ -29,6 +30,8 @@ int main(int argc, char* argv[]) {
     // (the app-wide stickers, qt/docs/features/stickers.md)
     qputenv("XDG_DATA_HOME", (home.path() + "/data").toUtf8());
     qputenv("XQT_RESOURCE_DIR", XQT_BUILD_RESOURCE_DIR);
+    // The handwriting search is on by default in the app; here it is off unless a test switches it on
+    xqt::hwr::HandwritingSearch::setDefaultEnabled(false);
     QGuiApplication app(argc, argv);
     setlocale(LC_NUMERIC, "C");
     xqt::AppContext::installQtUiThreadDispatcher();
