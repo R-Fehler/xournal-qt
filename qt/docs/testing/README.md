@@ -70,6 +70,10 @@ with `XQT_FAST_DEV` that halved the time of a short test.
   delegates), `findInScene` (also the popups), `entryOf(menu, name)`, `click`, `key`, `type`, `nextFrame`,
   `scrollIntoView`, `waitOpened(popup, open)`, `until(condition)` (fails on a timeout, `untilMs` by default) and
   `upTo` (does not), `wait(ms)` (fixed).
+- **The handwriting search is off in the UI and shell tests** (their `main.cpp`: `HandwritingSearch::setDefaultEnabled(false)`),
+  although the app has it on by default: the documents of unrelated tests are not read in the background. A test of
+  the search switches it on (`app.handwriting.enabled`, or `HandwritingSearch::setEnabledIn`) and gives it a
+  recogniser (`HandwritingSearch::setFactory` with a `FakeRecognizer`); the `hwr` tests see the app's default.
 - **QML items a test needs carry an `objectName`.** Find them by it, never by position or text.
 - **Wait for a state, not for time.** Prefer `QTest::qWaitFor(condition)` (inside `ASSERT_TRUE`) over a fixed
   `wait(N)`; a fixed wait is either too long or flaky under load.

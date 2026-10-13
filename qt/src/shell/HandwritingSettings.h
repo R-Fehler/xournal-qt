@@ -32,7 +32,7 @@ class HandwritingSearch;
 
 class HandwritingSettings final: public QObject {
     Q_OBJECT
-    /// The setting (off until switched on)
+    /// The setting (on unless switched off)
     Q_PROPERTY(bool enabled READ enabled WRITE setEnabled NOTIFY changed)
     /// The languages read: "en", "de" or "en+de" (English and German, the default)
     Q_PROPERTY(QString languages READ languages WRITE setLanguages NOTIFY changed)
@@ -76,8 +76,6 @@ public:
     QVariantMap modelOf(const QString& language) const;
     int pagesWaiting() const;
     int libraryLeft() const;
-    /// The computer is on battery
-    bool onBattery() const;
 
     /// Download a language's model into the app's data folder (the user agreed: the address and size were shown).
     Q_INVOKABLE void download(const QString& language);

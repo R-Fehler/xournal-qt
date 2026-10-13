@@ -91,8 +91,6 @@ QString HandwritingSettings::status() const {
         now = tr("Reading handwriting: %n page(s) of open documents left", nullptr, pagesWaiting());
     } else if (libraryLeft() > 0) {
         now = tr("Reading the library's handwriting: %n document(s) left", nullptr, libraryLeft());
-    } else if (onBattery()) {
-        now = tr("Ready. The library's other documents are read on mains power.");
     } else {
         now = tr("Ready");
     }
@@ -251,8 +249,6 @@ QVariantList HandwritingSettings::models() const {
 int HandwritingSettings::pagesWaiting() const { return search.pagesWaiting(); }
 
 int HandwritingSettings::libraryLeft() const { return library ? library->documentsLeft() : 0; }
-
-bool HandwritingSettings::onBattery() const { return !LibraryInkJob::onMains(); }
 
 void HandwritingSettings::download(const QString& language) {
     const ModelDownload::Model* model = ModelDownload::modelFor(language);

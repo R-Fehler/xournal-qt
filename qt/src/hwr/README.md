@@ -23,7 +23,8 @@ never converted: the readings go into the search index (and an invisible text la
 **May depend on**: `xqt-session` and below (upstream's model: strokes and pages; `control/settings`), Qt Gui (PNGs of
 the dataset). Not on canvas, quick, shell or app (the library's job is `shell/LibraryInkJob`).
 
-**Threads**: one worker at idle priority (`InkRecognitionService`); the library is read only on mains power.
+**Threads**: one worker at idle priority (`InkRecognitionService`); the library's documents after the open ones, one at a time
+(`shell/LibraryInkJob`), whatever the power source.
 
 **Tests**: `qt/tests/hwr` (label `hwr`; tiny stand-in models in `qt/tests/hwr/data`). **Docs**:
 [handwriting search](../../docs/features/handwriting-search.md), the research and the training in

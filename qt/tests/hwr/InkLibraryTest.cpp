@@ -3,8 +3,6 @@
  *
  * @license GNU GPLv2 or later
  */
-#include <fstream>
-#include <map>
 #include <memory>
 
 #include <QCborArray>
@@ -263,7 +261,7 @@ fs::path writeNotes(const QTemporaryDir& dir, const char* name, size_t pages, in
 
 }  // namespace
 
-TEST_F(InkLibraryTest, theLibrarysHandwritingIsReadOnMainsPower) {
+TEST_F(InkLibraryTest, theLibrarysHandwritingIsReadInTheBackground) {
     const fs::path a = writeNotes(tmp, "a.xopp", 2, 2, 1);
     const fs::path b = writeNotes(tmp, "b.xopp", 1, 1, 7);
     const fs::path c = writeXopp(tmp, "c.xopp", 1);  // (one stroke: a line of one word)
@@ -276,16 +274,9 @@ TEST_F(InkLibraryTest, theLibrarysHandwritingIsReadOnMainsPower) {
     });
     hwr::InkRecognitionService service;
     service.setRecognizer(fake);
-    bool mains = false;
-    LibraryInkJob::setPowerSource([&] { return mains; });
     LibraryInkJob job(service);
     job.setIndex(&index);
     job.setEnabled(true);
-    QCoreApplication::processEvents();
-    EXPECT_FALSE(job.running());  // on battery: nothing
-    EXPECT_EQ(fake->calls(), 0);
-    mains = true;
-    job.check();
     ASSERT_TRUE(waitFor([&] { return !job.running() && index.inkOf(a) && index.inkOf(b) && index.inkOf(c); }, 10000));
     EXPECT_EQ(fake->calls(), 6);  // (2 x 2 lines, 1, 1)
     EXPECT_TRUE(index.inkOf(a)->complete);
@@ -299,28 +290,6 @@ TEST_F(InkLibraryTest, theLibrarysHandwritingIsReadOnMainsPower) {
     QCoreApplication::processEvents();
     EXPECT_FALSE(job.running());
     EXPECT_EQ(fake->calls(), 6);
-    LibraryInkJob::setPowerSource({});
-}
-
-// Mains power (Linux, /sys/class/power_supply): the computer's own battery counts; a device's battery (a wireless
-// mouse, keyboard or pen: scope "Device") does not, so a desktop with a wireless mouse is on mains
-TEST_F(InkLibraryTest, aDevicesBatteryDoesNotMeanTheComputerIsOnBattery) {
-    auto supply = [&](const char* name, std::map<const char*, const char*> values) {
-        const fs::path dir = root / "power" / name;
-        fs::create_directories(dir);
-        for (const auto& [key, value]: values) {
-            std::ofstream(dir / key) << value << "\n";
-        }
-    };
-    const QString power = QString::fromStdString((root / "power").string());
-    EXPECT_TRUE(LibraryInkJob::onMainsIn(power)) << "nothing there: a desktop";
-    supply("hidpp_battery_0", {{"type", "Battery"}, {"scope", "Device"}, {"status", "Discharging"}});
-    EXPECT_TRUE(LibraryInkJob::onMainsIn(power)) << "a desktop with a wireless mouse";
-    supply("BAT0", {{"type", "Battery"}, {"status", "Discharging"}});
-    supply("AC", {{"type", "Mains"}, {"online", "0"}});
-    EXPECT_FALSE(LibraryInkJob::onMainsIn(power)) << "a laptop unplugged";
-    supply("AC", {{"type", "Mains"}, {"online", "1"}});
-    EXPECT_TRUE(LibraryInkJob::onMainsIn(power)) << "a laptop plugged in";
 }
 
 TEST_F(InkLibraryTest, aSharedZipUnpackedWithOtherTimesIsNotReadAgain) {
@@ -334,7 +303,6 @@ TEST_F(InkLibraryTest, aSharedZipUnpackedWithOtherTimesIsNotReadAgain) {
     });
     hwr::InkRecognitionService service;
     service.setRecognizer(fake);
-    LibraryInkJob::setPowerSource([] { return true; });
     fs::path zip;
     {
         LibraryIndex index(root / "Lib");
@@ -395,5 +363,4 @@ TEST_F(InkLibraryTest, aSharedZipUnpackedWithOtherTimesIsNotReadAgain) {
     job.check();
     ASSERT_TRUE(waitFor([&] { return !job.running() && received.inkOf(r.folder / "a.xopp"); }, 10000));
     EXPECT_GT(fake->calls(), before) << "its new handwriting is read";
-    LibraryInkJob::setPowerSource({});
 }

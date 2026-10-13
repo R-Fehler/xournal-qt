@@ -4,9 +4,8 @@
 #include <optional>
 #include <shared_mutex>
 
-#include <QDir>
-#include <QFile>
 #include <QThreadPool>
+#include <QTimer>
 
 #include "model/Document.h"
 #include "model/XojPage.h"
@@ -16,60 +15,12 @@
 #include "FileStamps.h"
 #include "LibraryIndex.h"
 
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#endif
-
 namespace xqt {
 
 namespace {
-std::function<bool()>& powerSource() {
-    static std::function<bool()> f;
-    return f;
-}
 constexpr size_t AT_ONCE = 2;
 constexpr double LIBRARY_PRIORITY = 2e6;  ///< after every open document (InkTextIndexer: 0 and 1e6 + distance)
-
-bool systemOnMains() {
-#ifdef _WIN32
-    SYSTEM_POWER_STATUS status;
-    return !GetSystemPowerStatus(&status) || status.ACLineStatus != 0;
-#elif defined(__linux__) && !defined(__ANDROID__)
-    return LibraryInkJob::onMainsIn(QStringLiteral("/sys/class/power_supply"));
-#else
-    return false;  // (phones: not yet)
-#endif
-}
 }  // namespace
-
-bool LibraryInkJob::onMains() { return powerSource() ? powerSource()() : systemOnMains(); }
-
-void LibraryInkJob::setPowerSource(std::function<bool()> source) { powerSource() = std::move(source); }
-
-bool LibraryInkJob::onMainsIn(const QString& folder) {
-    const QDir dir(folder);
-    bool battery = false;
-    for (const QString& name: dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
-        auto read = [&](const char* what) {
-            QFile f(dir.filePath(name) + u'/' + QLatin1String(what));
-            return f.open(QIODevice::ReadOnly) ? QString::fromLatin1(f.readAll()).trimmed() : QString();
-        };
-        if (read("scope") == QLatin1String("Device")) {
-            continue;  // (the battery of a device: a wireless mouse, keyboard or pen, not the computer's)
-        }
-        const QString type = read("type");
-        if (type == QLatin1String("Battery")) {
-            battery = true;
-        } else if ((type == QLatin1String("Mains") || type.startsWith(QLatin1String("USB"))) &&
-                   read("online") == QLatin1String("1")) {
-            return true;
-        }
-    }
-    return !battery;  // (a computer without a battery is on mains)
-}
 
 struct LibraryInkJob::Current {
     fs::path file;
@@ -87,8 +38,6 @@ LibraryInkJob::LibraryInkJob(hwr::InkRecognitionService& service, QObject* paren
         QObject(parent), service(service), loader(std::make_unique<QThreadPool>()) {
     loader->setMaxThreadCount(1);
     loader->setThreadPriority(QThread::LowestPriority);
-    power.setInterval(60000);
-    connect(&power, &QTimer::timeout, this, &LibraryInkJob::check);
     connect(&service, &hwr::InkRecognitionService::recognizerChanged, this, &LibraryInkJob::check);
 }
 
@@ -108,15 +57,10 @@ void LibraryInkJob::setIndex(LibraryIndex* i) {
 
 void LibraryInkJob::setEnabled(bool on) {
     enabled = on;
-    if (on) {
-        power.start();
-    } else {
-        power.stop();
-    }
     check();
 }
 
-bool LibraryInkJob::allowed() const { return enabled && index && service.ready() && onMains(); }
+bool LibraryInkJob::allowed() const { return enabled && index && service.ready(); }
 
 void LibraryInkJob::check() {
     if (!allowed()) {

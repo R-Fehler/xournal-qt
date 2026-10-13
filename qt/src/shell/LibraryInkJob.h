@@ -2,11 +2,9 @@
  * xournal-qt: reads the handwriting of the library's documents in the background
  * (qt/docs/features/handwriting-search.md).
  *
- * Open documents are read by their indexers (InkTextIndexer) whatever the power source. The rest of the library is
- * read only while
- *  - the handwriting search is on and its recogniser is ready (the model is there),
- *  - and the computer runs on mains power (Linux: /sys/class/power_supply; a computer without a battery counts as on
- *    mains, and the batteries of devices, a wireless mouse or pen, do not count). Checked again every minute: unplugged, the job stops after the page it is reading.
+ * Open documents are read by their indexers (InkTextIndexer). The rest of the library is read while the handwriting
+ * search is on and its recogniser is ready (the model is there), whatever the power source (the author's choice: the
+ * model is small and fast; the work stays at the lowest priority).
  * One document at a time: it is loaded on a worker at low priority, its pages go to the recognition worker
  * (InkRecognitionService) with the lowest priority (after every open document), two at a time, each a copy of its
  * strokes; lines read before (its entry in the library's cache, also of an older version of the file) are not read
@@ -23,13 +21,11 @@
 
 #include <deque>
 #include <map>
-#include <functional>
 #include <memory>
 #include <vector>
 
 #include <QObject>
 #include <QPointer>
-#include <QTimer>
 
 #include "filesystem.h"
 #include "hwr/InkRecognitionService.h"
@@ -51,14 +47,8 @@ public:
     void setIndex(LibraryIndex* index);
     /// The handwriting search is on.
     void setEnabled(bool on);
-    /// Look for documents to read now (the index was updated, a document saved, the power plugged in).
+    /// Look for documents to read now (the index was updated, a document saved).
     void check();
-
-    /// Whether the computer runs on mains power; tests set their own (nullptr: the system's again).
-    static bool onMains();
-    static void setPowerSource(std::function<bool()> source);
-    /// Linux: whether the power supplies in this folder (as /sys/class/power_supply) say mains power.
-    static bool onMainsIn(const QString& folder);
 
     bool running() const { return current != nullptr || !waiting.empty(); }
     int documentsLeft() const { return static_cast<int>(waiting.size()) + (current ? 1 : 0); }
@@ -83,7 +73,6 @@ private:
     std::map<fs::path, QString> tried;  ///< read in this run of the app, with their stamps (not read again)
     std::shared_ptr<Current> current;
     std::unique_ptr<QThreadPool> loader;
-    QTimer power;
     int pagesDone = 0;
     quint64 generation = 0;
 };

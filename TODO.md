@@ -103,6 +103,16 @@ a pill for the time, a grid to jump; zooming in on the console to write details)
   pages beside it while presenting, on one screen as on the console (presenting's layout is a row of pages). Black
   there needs the canvas to draw only the presented page while presenting.
 
+## The handwriting search always on (`qt/hwr-always`)
+
+The author, 2026-10-13: "The model is small and fast, I would like to have it on always per default on all platforms.
+Remove the different cases to handle, just always on. If power consumption really becomes a problem we fix it later."
+[handwriting-search.md](qt/docs/features/handwriting-search.md), "Work and power" and "Decisions".
+- [x] The library's handwriting is read whatever the power source (the mains check, its timer and the "on mains
+  power" status gone). Left: nothing.
+- [x] "Search handwriting" on by default (the UI and shell tests run with it off). Left: the device check of a laptop
+  and a phone on battery (handwriting-search.md, "On the device").
+
 ## Decisions for the author
 - [ ] Reading library cache packs from the other cache location (shell review §4 #15) stays: it also serves read-only
   folders with a cache of their own. Remove it?
@@ -303,6 +313,10 @@ the core part done")
   Android library is 33 MB; a reduced build is often a few MB), built in the CI per platform and redone when the
   model's operators change. Microsoft's ORT builds are 16 KB page aligned (checked for the Android AAR).
 - [ ] The text layer in plain "Export as PDF".
+- [ ] If the power the handwriting search takes becomes a problem (the author, 2026-10-13: then it is fixed), revisit
+  reading the library on battery: the power source per platform (Linux `/sys/class/power_supply`, Windows
+  `GetSystemPowerStatus`, Android `BatteryManager`, macOS IOKit; the Linux and Windows checks are in git before
+  `qt/hwr-always`).
 - [?] **Text or drawing, and writing of any size** (the author is unsure how stable a size-aware layout would be;
   nothing changed yet). Today `InkLayout` calls a stroke a drawing when it is filled, taller than 2.5 times the
   page's letter height, or long and straight: big writing (headlines) is dropped, and curvy letter-sized drawings

@@ -110,7 +110,7 @@ AppServices::AppServices() {
         }
         return out;
     });
-    // The library's handwriting: read in the background while the search is on (and on mains power)
+    // The library's handwriting: read in the background while the search is on
     libraryInkJob = std::make_unique<LibraryInkJob>(ink->service());
     libraryInkJob->setIndex(lib->searchIndex());
     libraryInkJob->setEnabled(ink->enabled());

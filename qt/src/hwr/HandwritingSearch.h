@@ -2,7 +2,8 @@
  * xournal-qt: the handwriting search of the app (qt/docs/features/handwriting-search.md): the setting, the recogniser
  * and its model, the worker, and an indexer per open document.
  *
- * Off until switched on in Settings ("handwritingSearch" in the xournalQt part of the settings). While on, every open
+ * On unless switched off in Settings ("handwritingSearch" in the xournalQt part of the settings; the model comes with
+ * the app, nothing is downloaded). While on, every open
  * document gets an InkTextIndexer (the one in front first), all sharing one InkRecognitionService. Off again: the
  * indexers go and the open documents forget their recognised words (the library's results stay on disk).
  *
@@ -64,9 +65,12 @@ public:
     explicit HandwritingSearch(AppContext& app, QObject* parent = nullptr);
     ~HandwritingSearch() override;
 
-    /// The setting (off by default).
+    /// The setting (on by default).
     static bool enabledIn(Settings& settings);
     static void setEnabledIn(Settings& settings, bool on);
+    /// What the setting is where the user never switched it: on. The UI and shell tests set it off for their runs (the
+    /// documents of unrelated tests are not read; a test of the search switches it on).
+    static void setDefaultEnabled(bool on);
     /// The languages read ("en", "de"; English and German by default).
     static QStringList languagesIn(Settings& settings);
     static void setLanguagesIn(Settings& settings, const QStringList& languages);
