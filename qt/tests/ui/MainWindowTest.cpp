@@ -6873,6 +6873,29 @@ TEST_F(MainWindowTest, notesGoIntoThePdfItselfIfWanted) {
     EXPECT_TRUE(QFile::exists(dir.filePath("lecture.original.pdf")));
 }
 
+// The Save button held (or right-clicked): Save and Save as… (testers looked for Save as there,
+// xournalpp/xournalpp#7770); a tap still saves
+TEST_F(MainWindowTest, theSaveButtonHeldOffersSaveAs) {
+    QObject* button = find("saveButton");
+    ASSERT_NE(button, nullptr);
+    EXPECT_TRUE(button->property("ownHold").toBool()) << "a hold of its own: no label above the finger";
+    QObject* menu = find("saveMenu");
+    ASSERT_NE(menu, nullptr);
+    QMetaObject::invokeMethod(button, "pressAndHold");
+    until([&] { return menu->property("visible").toBool(); });
+    ASSERT_TRUE(menu->property("visible").toBool());
+    QObject* saveAs = find("saveMenuSaveAsItem");
+    ASSERT_NE(saveAs, nullptr);
+    EXPECT_TRUE(saveAs->property("text").toString().startsWith(QString::fromUtf8("Save as…")));
+    QMetaObject::invokeMethod(saveAs, "triggered");
+    QObject* dialog = find("saveDialog");
+    until([&] { return dialog->property("visible").toBool(); });
+    EXPECT_TRUE(dialog->property("visible").toBool()) << "Save as… opens the dialog";
+    QMetaObject::invokeMethod(dialog, "reject");
+    until([&] { return !dialog->property("visible").toBool(); });
+    EXPECT_FALSE(controller->anySaving());
+}
+
 // Save as offers both formats in one dialog: "Xournal notes (.xopp)", the default for new documents, and "PDF with
 // notes, editable (.pdf)", the default for a document that is a hybrid PDF already. The extension typed wins over the
 // chosen type; the file name follows the type. There is no separate "Save as hybrid PDF…" any more, and "Export as

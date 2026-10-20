@@ -458,8 +458,35 @@ Item {
             parent: toolBank
             iconName: "xopp-document-save"
             label: qsTr("Save")
-            tip: qsTr("Save") + win.keyNote("save")
+            tip: qsTr("Save (hold: Save as…)") + win.keyNote("save")
+            // Held or right-clicked: Save as… (testers looked for it here, xournalpp#7770; ⋮ has it too)
+            ownHold: !win.textDoc
+            readonly property string holdText: qsTr("Save as…")
             onClicked: saveOrAsk(null)
+            onPressAndHold: if (!win.textDoc) Popups.openAt(saveMenu)
+            TapHandler {
+                enabled: !win.textDoc
+                acceptedButtons: Qt.RightButton
+                acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
+                onTapped: function(point) { Popups.openAt(saveMenu, point.position) }
+            }
+            AdaptiveMenu {
+                id: saveMenu
+                objectName: "saveMenu"
+                title: qsTr("Save")
+                AdaptiveMenuItem {
+                    objectName: "saveMenuSaveItem"
+                    text: qsTr("Save") + win.keyNote("save")
+                    icon.source: app.iconUrl("xopp-document-save")
+                    onTriggered: saveOrAsk(null)
+                }
+                AdaptiveMenuItem {
+                    objectName: "saveMenuSaveAsItem"
+                    text: qsTr("Save as…") + win.keyNote("saveAs")
+                    icon.source: app.iconUrl("xopp-document-save")
+                    onTriggered: openSaveDialog(null)
+                }
+            }
         }
         // A .md: a copy as notes (a .xopp) to write on with the pen; the .md stays as it is
         IconButton {
