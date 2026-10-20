@@ -1959,6 +1959,16 @@ TEST_F(AdaptiveLayoutTest, sidebarArrowOpensAndCloses) {
     wait(50);
     EXPECT_FALSE(arrow->isVisible());
     QMetaObject::invokeMethod(window, "setZen", Q_ARG(QVariant, false));
+    // With the top bar put away it stays: nothing else opens the sidebar then (testers, xournalpp/xournalpp#7770)
+    controller->setToolbarHidden(true);
+    wait(50);
+    EXPECT_TRUE(shownInWindow(arrow)) << "the top bar put away: the arrow stays";
+    click(arrow);
+    EXPECT_TRUE(sidebar->isVisible()) << "and opens the sidebar";
+    click(arrow);
+    until([&] { return !sidebar->isVisible(); });
+    EXPECT_FALSE(sidebar->isVisible());
+    controller->setToolbarHidden(false);
 }
 
 // The view pill: the contents button beside the page grid, no − / +, inside the window at the five sizes and clear of
