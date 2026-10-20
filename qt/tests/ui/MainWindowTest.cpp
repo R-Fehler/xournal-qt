@@ -649,6 +649,31 @@ TEST_F(MainWindowTest, twoA4PagesSideBySideOnTheUnfoldedFold) {
     ASSERT_TRUE(waitOpened(sheet, false));
 }
 
+// Settings → Stabilizer: with the arithmetic mean the buffer size slider ends at 20, the sizes that help, over its
+// whole length (testers, xournalpp/xournalpp#7770); with the Gaussian weights it goes to 100 as in Xournal++
+TEST_F(MainWindowTest, theStabilizersArithmeticMeanEndsAt20) {
+    QObject* model = controller->settingsModel();
+    ASSERT_NE(model, nullptr);
+    const auto set = [&](const char* key, const QVariant& v) {
+        QMetaObject::invokeMethod(model, "set", Q_ARG(QString, key), Q_ARG(QVariant, v));
+    };
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("stabilizerTab"));
+    set("stabilizerAveraging", 1);
+    QQuickItem* row = findItem("stabilizerBuffersizeRow");
+    ASSERT_NE(row, nullptr);
+    until([&] { return row->isVisible(); });
+    EXPECT_DOUBLE_EQ(row->property("to").toDouble(), 20);
+    EXPECT_DOUBLE_EQ(row->property("from").toDouble(), 2);
+    set("stabilizerAveraging", 2);
+    EXPECT_DOUBLE_EQ(row->property("to").toDouble(), 100);
+    set("stabilizerAveraging", 0);
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+}
+
 namespace {
 /// An ordinary text (as Xournal++ writes them, not Markdown) on a page of the current document, in its selected layer
 void addXournalText(AppController& c, size_t pageNo, double x, double y, const std::string& text) {
