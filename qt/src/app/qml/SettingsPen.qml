@@ -59,7 +59,14 @@ ScrollView {
                 { text: qsTr("No change (keep the tool)"), value: "none" }
             ]
         }
+        // The size of the eraser that button gives (qt/docs/features/pen-buttons.md), under what the button does
+        SettingsButtonWidthRow {
+            objectName: "eraserButtonWidthRow"
+            key: "eraserButtonWidth"; text: qsTr("Eraser size (own width)")
+            enabled: (sheet.s.revision, sheet.s.get("eraserButtonTool") === "eraser")
+        }
         SettingsComboRow {
+            objectName: "stylusButtonToolRow"
             key: "stylusButtonTool"; text: qsTr("Lower side button")
             options: [
                 { text: qsTr("Eraser"), value: "eraser" },
@@ -70,7 +77,13 @@ ScrollView {
                 { text: qsTr("Lasso selection"), value: "selectRegion" }
             ]
         }
+        SettingsButtonWidthRow {
+            objectName: "stylusButtonWidthRow"
+            key: "stylusButtonWidth"; text: qsTr("Eraser size (own width)")
+            enabled: (sheet.s.revision, sheet.s.get("stylusButtonTool") === "eraser")
+        }
         SettingsComboRow {
+            objectName: "stylusButton2ToolRow"
             key: "stylusButton2Tool"; text: qsTr("Upper side button")
             options: [
                 { text: qsTr("Eraser"), value: "eraser" },
@@ -80,6 +93,16 @@ ScrollView {
                 { text: qsTr("Rectangle selection"), value: "selectRect" },
                 { text: qsTr("Lasso selection"), value: "selectRegion" }
             ]
+        }
+        SettingsButtonWidthRow {
+            objectName: "stylusButton2WidthRow"
+            key: "stylusButton2Width"; text: qsTr("Eraser size (own width)")
+            enabled: (sheet.s.revision, sheet.s.get("stylusButton2Tool") === "eraser")
+        }
+        SettingsHint {
+            text: qsTr("How wide the eraser each of these buttons gives is: its own width, or the tool bar "
+                       + "eraser's as before. The kind (standard, whole strokes, whiteout) is that of the eraser "
+                       + "itself, below.")
         }
         SettingsComboRow {
             key: "eraserMode"; text: qsTr("Eraser")

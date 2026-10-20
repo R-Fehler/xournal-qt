@@ -111,6 +111,8 @@
 #include "util/PathUtil.h"
 
 #include "AppController.h"
+#include "gui/inputdevices/InputUtils.h"
+
 #include "AppServices.h"
 #include "UiFixture.h"
 #include "MarkdownFile.h"
@@ -369,6 +371,62 @@ TEST_F(MainWindowTest, thePointerOverThePageIsADotOrTheCrosshair) {
     EXPECT_GT(eraser, dot) << "the eraser's outline";
     controller->selectTool("pen");
     EXPECT_EQ(canvas->cursor().pixmap().deviceIndependentSize().toSize().width(), dot) << "the pen: the dot again";
+}
+
+// The eraser a side button of the pen gives has a size of its own, chosen in Settings → Pen under what the button does
+// (qt/docs/features/pen-buttons.md): "Own width" and its width; the button's eraser follows at once.
+TEST_F(MainWindowTest, theEraserOfASideButtonTakesItsOwnSizeInTheSettings) {
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    ASSERT_NE(settings, nullptr);
+    EXPECT_DOUBLE_EQ(settings->get("stylusButtonWidth").toDouble(), 0.0) << "the tool bar eraser's, by default";
+    controller->newDocument();
+    ToolHandler* tools = controller->context().getToolHandler();
+    ASSERT_TRUE(tools);
+
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    auto* row = findItem("stylusButtonWidthRow");
+    ASSERT_NE(row, nullptr);
+    until([&] { return row->isVisible(); });
+    EXPECT_TRUE(row->isVisible()) << "under the lower side button, on the Pen tab";
+    auto* own = findItem("stylusButtonWidthSwitch");
+    ASSERT_NE(own, nullptr);
+    EXPECT_FALSE(own->property("checked").toBool()) << "the tool bar eraser's, by default";
+    auto* slider = findItem("stylusButtonWidthSlider");
+    ASSERT_NE(slider, nullptr);
+    EXPECT_FALSE(slider->isVisible()) << "no width to show, off";
+
+    // "Own width": the width it starts with (8.5 pt), and the slider
+    scrollIntoView(own);
+    click(own);
+    EXPECT_TRUE(own->property("checked").toBool());
+    EXPECT_DOUBLE_EQ(settings->get("stylusButtonWidth").toDouble(), 8.5);
+    until([&] { return slider->isVisible(); });
+    ASSERT_TRUE(slider->isVisible());
+    ASSERT_TRUE(tools->pointActiveToolToButtonTool(BUTTON_STYLUS_ONE));
+    EXPECT_DOUBLE_EQ(tools->getThickness(), 8.5) << "the lower side button's eraser, at once";
+
+    // The slider (a drag moves the width: 0.1 to 150 pt on a log scale) and the value its right shows, in mm
+    const double sliderAt85 = slider->property("value").toDouble();
+    ASSERT_TRUE(settings->set("stylusButtonWidth", 30.0));
+    until([&] { return slider->property("value").toDouble() > sliderAt85; });
+    EXPECT_GT(slider->property("value").toDouble(), sliderAt85) << "a wider eraser moves the slider";
+    tools->pointActiveToolToToolbarTool();
+    InputUtils::applyButton(tools, controller->context().getSettings(), BUTTON_STYLUS_ONE);
+    EXPECT_DOUBLE_EQ(tools->getThickness(), 30.0) << "the eraser follows the width";
+    auto* value = findItem("stylusButtonWidthValue");
+    ASSERT_NE(value, nullptr);
+    EXPECT_EQ(value->property("text").toString(), QString::fromUtf8("11 mm")) << "30 pt, as the eraser's editor shows it";
+
+    // Off again: the tool bar eraser's
+    scrollIntoView(own);
+    click(own);
+    EXPECT_DOUBLE_EQ(settings->get("stylusButtonWidth").toDouble(), 0.0);
+    EXPECT_FALSE(slider->isVisible());
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+    tools->selectTool(TOOL_PEN);
 }
 
 // Drawing with the finger: a toggle in the tool bar and the same setting in Settings -> Touch (off on the desktop).

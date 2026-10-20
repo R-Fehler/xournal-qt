@@ -192,6 +192,11 @@ public:
      */
     void setButtonSize(ToolSize size, Button button);
 
+    /// xournal-qt: the width of the button's tool besides its five sizes (as setCustomThickness does for the tool bar
+    /// tool), so that a button of the pen erases with a width of its own whatever size the tool bar eraser has
+    /// (qt/src/session/ButtonWidths.h). `active` false, or a width of 0: the five sizes again.
+    void setButtonCustomThickness(Button button, double thickness, bool active);
+
     /**
      * @brief Get the Thickness of the active tool
      *
@@ -379,6 +384,10 @@ public:
 
     const double* getToolThickness(ToolType type) const;
 
+    /// xournal-qt: the tool a button of the pen, the mouse or a finger is set to (nullptr: none). Upstream keeps it
+    /// private; the size of the eraser a side button gives is set on it (qt/src/session/ButtonWidths.h).
+    Tool* getButtonTool(Button button) const;
+
     /**
      * Returns whether the current tool will create an element that may only reside on a single page even when the
      * pointer moves to another
@@ -403,14 +412,6 @@ protected:
 
 private:
     std::array<std::unique_ptr<Tool>, TOOL_COUNT> tools;
-
-    /**
-     * @brief Get the Button Tool pointer based on enum
-     *
-     * @param button
-     * @return Tool*
-     */
-    Tool* getButtonTool(Button button) const;
 
     /**
      * @brief Get the Selected Tool pointer based on enum

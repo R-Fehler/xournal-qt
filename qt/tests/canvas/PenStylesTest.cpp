@@ -4,6 +4,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <chrono>
 #include <cmath>
 #include <fstream>
 #include <memory>
@@ -13,6 +14,8 @@
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QImage>
+#include <QMouseEvent>
+#include <QSignalSpy>
 #include <QPointingDevice>
 #include <QTabletEvent>
 #include <QTemporaryDir>
@@ -90,6 +93,29 @@ protected:
         timestamp += 5;
         input->tabletEvent(&e, pos);
     }
+
+    /// The lower side button pressed (as the pen reports it: a press of its own, `Qt::MiddleButton`), the pen still
+    /// off the screen: the tool becomes the eraser, and nothing is erased yet
+    void sideButtonPress(QPointF pos) {
+        tablet(QEvent::TabletPress, viewPos(pos), 0.0, Qt::MiddleButton, Qt::MiddleButton);
+        sideHeld = true;
+    }
+    /// The pen's tip touching the screen, the side button still held: the eraser begins
+    void tipDown(QPointF pos) { tablet(QEvent::TabletPress, viewPos(pos), 0.6, Qt::LeftButton, Qt::LeftButton); }
+    /// The pen's tip moving on the screen, the side button held
+    void tipMove(QPointF pos) {
+        tablet(QEvent::TabletMove, viewPos(pos), 0.6, Qt::NoButton, Qt::LeftButton);
+    }
+    /// The tip lifted (the side button still held)
+    void tipUp(QPointF pos) {
+        tablet(QEvent::TabletRelease, viewPos(pos), 0.0, Qt::LeftButton, Qt::NoButton);
+    }
+    /// The side button let go without the tip having touched
+    void sideButtonRelease(QPointF pos) {
+        tablet(QEvent::TabletRelease, viewPos(pos), 0.0, Qt::MiddleButton, Qt::NoButton);
+        sideHeld = false;
+    }
+    bool sideHeld = false;
 
     /// A stroke along a line (page points), at an even pressure
     void drawLine(QPointF from, QPointF to, int steps = 40) {
@@ -434,6 +460,210 @@ TEST_F(PenStylesTest, theFillingIsSavedCopiedAndExported) {
 // The laser pointer (upstream's laser pen and highlighter): ink over the page that fades out a while after the pen is
 // lifted (upstream's setting, laserPointerFadeOutTime); never in the document, the undo stack, the file or the
 // pictures of the page (thumbnails, previews, exports draw the document).
+// A side button of the pen that erases (the lower one by default) turns the pen into the eraser while it is held, and
+// the pen's tip touching the screen erases (qt/docs/features/pen-buttons.md).
+TEST_F(PenStylesTest, theSideButtonErasesWhenTheTipTouches) {
+    tools()->selectTool(TOOL_ERASER);
+    tools()->setEraserType(ERASER_TYPE_DEFAULT);
+    tools()->setEraserSize(TOOL_SIZE_FINE);
+    tools()->selectTool(TOOL_PEN);
+    drawLine(QPointF(100, 200), QPointF(400, 200));
+    ASSERT_EQ(strokes().size(), 1u);
+
+    // The side button: the eraser in hand; the tip on the screen: it erases along the wipe
+    sideButtonPress(QPointF(200, 200));
+    ASSERT_EQ(tools()->getToolType(), TOOL_ERASER) << "the side button takes the eraser";
+    tipDown(QPointF(200, 200));
+    for (int i = 1; i <= 20; ++i) {
+        tipMove(QPointF(200 + 5.0 * i, 200));
+    }
+    tipUp(QPointF(300, 200));
+    sideButtonRelease(QPointF(300, 200));
+    processEvents();
+
+    EXPECT_NE(tools()->getToolType(), TOOL_ERASER) << "let go: the pen again";
+    // What the eraser passed over is gone, all along the wipe: not only where the tip went down. The stroke is left in
+    // two pieces, before and after the wipe
+    ASSERT_EQ(strokes().size(), 2u) << "the eraser cut the stroke where it passed";
+    const auto& first = strokes()[0]->getPointVector();
+    const auto& second = strokes()[1]->getPointVector();
+    ASSERT_FALSE(first.empty());
+    ASSERT_FALSE(second.empty());
+    EXPECT_EQ(first.front().x, 100);
+    EXPECT_GT(first.back().x, 190) << "the first piece reaches the wipe's start";
+    EXPECT_LT(first.back().x, 200);
+    EXPECT_GT(second.front().x, 300) << "the second starts after the wipe";
+    EXPECT_LT(second.front().x, 310);
+    EXPECT_EQ(second.back().x, 400);
+}
+
+// The side button keeps the eraser in hand from one touch to the next: lifting the tip (the button still held) leaves
+// the eraser as the tool, so the pointer and the rail keep showing what a touch would do, and the next touch erases
+// straight away (qt/docs/features/pen-buttons.md).
+TEST_F(PenStylesTest, theEraserStaysInHandBetweenTwoTouchesOfTheSideButton) {
+    tools()->selectTool(TOOL_ERASER);
+    tools()->setEraserType(ERASER_TYPE_DEFAULT);
+    tools()->setEraserSize(TOOL_SIZE_FINE);
+    tools()->selectTool(TOOL_PEN);
+    drawLine(QPointF(100, 200), QPointF(400, 200));
+    drawLine(QPointF(100, 260), QPointF(400, 260));
+    ASSERT_EQ(strokes().size(), 2u);
+    QSignalSpy changed(app.get(), &AppContext::activeToolChanged);
+
+    sideButtonPress(QPointF(200, 200));
+    ASSERT_EQ(tools()->getToolType(), TOOL_ERASER);
+    tipDown(QPointF(200, 200));
+    tipMove(QPointF(300, 200));
+    tipUp(QPointF(300, 200));
+    processEvents();
+
+    // The tip is up, the button still held: the eraser is still the tool (not the pen it was before)
+    EXPECT_EQ(tools()->getToolType(), TOOL_ERASER) << "the button still held: the eraser stays in hand";
+    EXPECT_GE(changed.count(), 1);
+
+    // The next touch erases at once, without the tool having to change first
+    tipDown(QPointF(200, 260));
+    EXPECT_EQ(tools()->getToolType(), TOOL_ERASER);
+    tipMove(QPointF(300, 260));
+    tipUp(QPointF(300, 260));
+    sideButtonRelease(QPointF(300, 260));
+    processEvents();
+
+    EXPECT_EQ(tools()->getToolType(), TOOL_PEN) << "the button let go: the pen again";
+}
+
+// The side button alone erases nothing: with the tip off the screen the pen only hovers, and a pen over a page writes
+// and erases nothing (qt/docs/features/pen-buttons.md). Otherwise crossing a page with the button held would wipe it.
+TEST_F(PenStylesTest, theSideButtonAloneErasesNothingWhileThePenHovers) {
+    tools()->selectTool(TOOL_ERASER);
+    tools()->setEraserType(ERASER_TYPE_DEFAULT);
+    tools()->setEraserSize(TOOL_SIZE_VERY_THICK);  // (18 pt: a hover over the stroke would surely catch it)
+    tools()->selectTool(TOOL_PEN);
+    drawLine(QPointF(100, 200), QPointF(400, 200));
+    ASSERT_EQ(strokes().size(), 1u);
+
+    const double width = strokes()[0]->getWidth();
+    sideButtonPress(QPointF(120, 200));
+    ASSERT_EQ(tools()->getToolType(), TOOL_ERASER) << "the eraser is in hand";
+    for (const double x: {180.0, 240.0, 300.0, 360.0}) {  // a pass right over the stroke, the tip off the screen
+        tablet(QEvent::TabletMove, viewPos(QPointF(x, 200)), 0.0, Qt::NoButton, Qt::MiddleButton);
+    }
+    sideButtonRelease(QPointF(360, 200));
+    processEvents();
+
+    ASSERT_EQ(strokes().size(), 1u) << "nothing was erased: the pen never touched the page";
+    EXPECT_EQ(strokes()[0]->getWidth(), width);
+    EXPECT_EQ(tools()->getToolType(), TOOL_PEN) << "the pen again";
+
+    // And the tip touching afterwards does erase, so the check above is not vacuous
+    sideButtonPress(QPointF(120, 200));
+    tipDown(QPointF(120, 200));
+    tipMove(QPointF(380, 200));
+    tipUp(QPointF(380, 200));
+    sideButtonRelease(QPointF(380, 200));
+    processEvents();
+    EXPECT_NE(strokes().size(), 1u) << "with the tip on the screen it does erase";
+}
+
+// A quick wipe: the pen moves fast, so few (far apart) samples arrive. The eraser still erases all the way between
+// them, as if it were there at every point in between (qt/docs/features/pen-buttons.md): a fast swipe leaves no ink.
+TEST_F(PenStylesTest, aFastWipeErasesBetweenTheSamples) {
+    tools()->selectTool(TOOL_ERASER);
+    tools()->setEraserType(ERASER_TYPE_DEFAULT);
+    tools()->setEraserSize(TOOL_SIZE_FINE);  // (2.83 pt: its box reaches 2.83 pt from the pointer)
+    tools()->selectTool(TOOL_PEN);
+    drawLine(QPointF(100, 200), QPointF(500, 200));
+    ASSERT_EQ(strokes().size(), 1u);
+
+    // Four samples, 100 pt apart, far more than the eraser is wide (a fast swipe)
+    sideButtonPress(QPointF(150, 200));
+    ASSERT_EQ(tools()->getToolType(), TOOL_ERASER) << "the side button takes the eraser";
+    tipDown(QPointF(150, 200));
+    for (const double x: {250.0, 350.0, 450.0}) {
+        tipMove(QPointF(x, 200));
+    }
+    tipUp(QPointF(450, 200));
+    sideButtonRelease(QPointF(450, 200));
+    processEvents();
+
+    // Nothing is left between where the wipe began and where it ended: no ink was skipped over
+    for (const Stroke* s: strokes()) {
+        for (const Point& p: s->getPointVector()) {
+            if (std::abs(p.y - 200) < 10) {
+                EXPECT_TRUE(p.x < 155 || p.x > 445) << "ink left where the wipe passed (" << p.x << ")";
+            }
+        }
+    }
+
+    // The pen again: an ordinary stroke, and the eraser did not eat it (the wipe left the line's two ends)
+    tools()->selectTool(TOOL_PEN);
+    const size_t left = strokes().size();
+    drawLine(QPointF(100, 300), QPointF(500, 300));
+    EXPECT_EQ(strokes().size(), left + 1) << "only the new stroke was added";
+
+    // The tool bar's eraser with the mouse, as quickly: the same, since it is the same eraser
+    tools()->selectTool(TOOL_ERASER);
+    const QPointF from = viewPos(QPointF(150, 300));
+    const QPointF to = viewPos(QPointF(450, 300));
+    QMouseEvent press(QEvent::MouseButtonPress, from, from, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+    input->mouseEvent(&press, from);
+    for (const double t: {0.33, 0.66}) {  // (three samples across the whole stroke)
+        const QPointF p = from + (to - from) * t;
+        QMouseEvent move(QEvent::MouseMove, p, p, Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+        input->mouseEvent(&move, p);
+    }
+    QMouseEvent release(QEvent::MouseButtonRelease, to, to, Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+    input->mouseEvent(&release, to);
+    processEvents();
+    for (const Stroke* st: strokes()) {
+        for (const Point& p: st->getPointVector()) {
+            if (std::abs(p.y - 300) < 10) {
+                EXPECT_TRUE(p.x < 155 || p.x > 445) << "the mouse's wipe skipped ink too (" << p.x << ")";
+            }
+        }
+    }
+}
+
+// The wipe between two samples costs in proportion to how far the pen moved over the eraser's size, not to the
+// document: a long wipe on a page full of ink stays quick, and a jump that is no wipe at all (a whole page in one
+// event) does not stall (qt/docs/features/pen-buttons.md).
+TEST_F(PenStylesTest, aFastWipeStaysCheap) {
+    tools()->selectTool(TOOL_ERASER);
+    tools()->setEraserType(ERASER_TYPE_DEFAULT);
+    tools()->setEraserSize(TOOL_SIZE_FINE);
+    tools()->selectTool(TOOL_PEN);
+    for (int i = 0; i < 40; ++i) {  // a page of handwriting to look at
+        drawLine(QPointF(20, 100 + 12 * i), QPointF(560, 100 + 12 * i), 20);
+    }
+    ASSERT_EQ(strokes().size(), 40u);
+
+    // One wipe across the whole page in 8 samples (70 pt apart, 25× the eraser's reach)
+    sideButtonPress(QPointF(20, 150));
+    const auto started = std::chrono::steady_clock::now();
+    tipDown(QPointF(20, 150));
+    for (int i = 1; i <= 8; ++i) {
+        tipMove(QPointF(20 + 67.5 * i, 150));
+    }
+    tipUp(QPointF(560, 150));
+    sideButtonRelease(QPointF(560, 150));
+    processEvents();
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started);
+    EXPECT_LT(ms.count(), 2000) << "a wipe over a full page of ink is quick";
+    // (it did erase: the strokes it crossed are gone from all the way across)
+    EXPECT_GT(strokes().size(), 0u) << "the strokes above and below the wipe stay";
+
+    // A jump of a whole page in one move (no wipe: nothing in between was under the eraser)
+    tools()->selectTool(TOOL_ERASER);
+    sideButtonPress(QPointF(20, 500));
+    tipDown(QPointF(20, 500));
+    const auto before = std::chrono::steady_clock::now();
+    tipMove(QPointF(560, 1300));
+    tipUp(QPointF(560, 1300));
+    processEvents();
+    const auto jump = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - before);
+    EXPECT_LT(jump.count(), 500) << "capped: a jump is not wiped along";
+}
+
 TEST_F(PenStylesTest, theLaserPointersInkFadesAndIsNeverInTheDocument) {
     app->getSettings()->setLaserPointerFadeOutTime(400);
     drawLine(QPointF(100, 200), QPointF(400, 200));  // a stroke of the pen, to compare

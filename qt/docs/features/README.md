@@ -30,6 +30,7 @@ certain way is in [decisions/](../decisions/README.md); what changed in a releas
 | [toolbox.md](toolbox.md) | the user's tools on the rail, the top bar, groups, the catalog, Zen and read only from the tools' side |
 | [color-palettes.md](color-palettes.md) | colors by role |
 | [pen-gestures.md](pen-gestures.md) | hold to straighten, scratch out |
+| [pen-buttons.md](pen-buttons.md) | the eraser the pen's side buttons and its eraser end give, and its size |
 | [hover-cursors.md](hover-cursors.md) | the pointer over the page, the eraser's outline |
 | [groups.md](groups.md) | groups of elements |
 | [sticky-notes.md](sticky-notes.md) | sticky notes as containers, cover mode, several notes at once |

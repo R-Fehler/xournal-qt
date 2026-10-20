@@ -242,12 +242,16 @@ bool CanvasInput::tabletEvent(QTabletEvent* e, QPointF viewPos) {
                 // Port of StylusInputHandler: a barrel button press changes the tool; during a stroke, the stroke
                 // ends and a new one starts with the button's tool.
                 (e->button() == Qt::MiddleButton ? modifier2 : modifier3) = true;
+                (e->button() == Qt::MiddleButton ? penSideButton1 : penSideButton2) = true;
                 penHoldTimer.stop();
                 stopStraighten();
                 if (inputRunning) {
                     actionEnd(ev);
                     actionStart(ev);
                 } else {
+                    // The button only takes its tool while it is held (the eraser of the side buttons by default); it
+                    // erases nothing yet: the pen is off the screen. Its tip touching starts the eraser
+                    // (qt/docs/features/pen-buttons.md, "The button changes the tool: the tip does the erasing").
                     changeTool(ev);
                 }
             }
@@ -288,6 +292,7 @@ bool CanvasInput::tabletEvent(QTabletEvent* e, QPointF viewPos) {
                 runningDeviceClass.reset();
             } else if (e->button() == Qt::MiddleButton || e->button() == Qt::RightButton) {
                 (e->button() == Qt::MiddleButton ? modifier2 : modifier3) = false;
+                (e->button() == Qt::MiddleButton ? penSideButton1 : penSideButton2) = false;
                 penHoldTimer.stop();
                 stopStraighten();
                 if (inputRunning) {
@@ -318,6 +323,7 @@ void CanvasInput::proximityEvent(bool entered) {
     if (!entered) {
         // Upstream: leaving resets the barrel buttons. A stroke still running (lost release) ends here.
         modifier2 = modifier3 = false;
+        penSideButton1 = penSideButton2 = false;
         penHoldTimer.stop();
         penHoldFired = false;
         stopStraighten();
@@ -520,6 +526,19 @@ bool CanvasInput::changeTool(const Event& event) {
         toolHandler->fireToolChanged();
     }
     return true;
+}
+
+void CanvasInput::backToToolbarTool() {
+    // A sequence ended: the tool in hand goes back to the tool bar's, which the marker / the rail shows. Not while a
+    // side button of the pen is held: that button lends its tool (the eraser) until it is let go, also between two
+    // touches, so the pointer and the rail keep showing what the next touch would do (qt/docs/features/pen-buttons.md)
+    if (penSideButton1 || penSideButton2) {
+        return;
+    }
+    ToolHandler* h = view.getSession().getToolHandler();
+    if (h->pointActiveToolToToolbarTool()) {
+        h->fireToolChanged();
+    }
 }
 
 void CanvasInput::updateLastEvent(const Event& event) {
@@ -1000,9 +1019,7 @@ bool CanvasInput::actionEnd(const Event& event) {
         }
         curtainScrolls = false;
         this->sequenceStartPage = nullptr;
-        if (toolHandler->pointActiveToolToToolbarTool()) {
-            toolHandler->fireToolChanged();
-        }
+        backToToolbarTool();
         this->inputRunning = false;
         return false;
     }
@@ -1030,9 +1047,7 @@ bool CanvasInput::actionEnd(const Event& event) {
         // The width of a Markdown text box: one undo step (nothing else: no tap, no release on a page)
         view.boxResize().endDrag();
         this->sequenceStartPage = nullptr;
-        if (toolHandler->pointActiveToolToToolbarTool()) {
-            toolHandler->fireToolChanged();
-        }
+        backToToolbarTool();
         this->inputRunning = false;
         return false;
     }
@@ -1088,9 +1103,7 @@ bool CanvasInput::actionEnd(const Event& event) {
 
     draggingGeometryTool = false;
     this->sequenceStartPage = nullptr;
-    if (toolHandler->pointActiveToolToToolbarTool()) {
-        toolHandler->fireToolChanged();
-    }
+    backToToolbarTool();
     this->inputRunning = false;
     return false;
 }
@@ -1281,9 +1294,7 @@ void CanvasInput::cancelFingerStroke() {
     inputRunning = false;
     deviceClassPressed = false;
     runningDeviceClass.reset();
-    if (ToolHandler* h = view.getSession().getToolHandler(); h->pointActiveToolToToolbarTool()) {
-        h->fireToolChanged();
-    }
+    backToToolbarTool();
 }
 
 void CanvasInput::cancelTouchGesture() {

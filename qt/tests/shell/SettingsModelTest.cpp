@@ -16,6 +16,7 @@
 #include "control/settings/ButtonConfig.h"
 #include "control/settings/PageTemplateSettings.h"
 #include "control/settings/Settings.h"
+#include "gui/inputdevices/InputUtils.h"
 #include "model/Document.h"
 #include "model/XojPage.h"
 #include "session/AppContext.h"
@@ -25,6 +26,8 @@
 #include "session/TextMatch.h"
 #include "shell/ImageMemory.h"
 #include "shell/SettingsModel.h"
+
+#include "HoverPointer.h"
 
 using namespace xqt;
 
@@ -162,6 +165,124 @@ TEST_F(SettingsModelTest, penButtonsAndEraser) {
     EXPECT_EQ(app->getSettings()->getButtonConfig(BUTTON_STYLUS_ONE)->getAction(), TOOL_ERASER);
     model->set("eraserMode", "deleteStroke");
     EXPECT_EQ(app->getToolHandler()->getEraserType(), ERASER_TYPE_DELETE_STROKE);
+}
+
+// The side buttons and the pen's eraser end erase with a size of their own (next to what they do, in Settings → Pen):
+// the eraser's width in points; 0 (the default): the tool bar eraser's width and kind, as before. The button's eraser
+// follows at once, not only from the next start.
+TEST_F(SettingsModelTest, theEraserOfThePenButtonsHasASizeOfItsOwn) {
+    ToolHandler* tools = app->getToolHandler();
+    Settings* s = app->getSettings();
+    // As a press of the button does (CanvasInput::changeTool), and letting it go (the pen's tool again)
+    const auto press = [&](Button button) {
+        InputUtils::applyButton(tools, s, button);
+        return tools->getThickness();
+    };
+    const auto release = [&] { tools->pointActiveToolToToolbarTool(); };
+    for (const char* key: {"eraserButtonWidth", "stylusButtonWidth", "stylusButton2Width"}) {
+        EXPECT_DOUBLE_EQ(model->get(key).toDouble(), 0.0) << key << ": the tool bar eraser's, by default";
+    }
+    tools->selectTool(TOOL_ERASER);
+    const double barWidth = tools->getThickness();
+    tools->selectTool(TOOL_PEN);
+
+    // A width of its own is the button's tool's while the button is held
+    ASSERT_TRUE(model->set("eraserButtonWidth", 20.0));
+    EXPECT_DOUBLE_EQ(model->get("eraserButtonWidth").toDouble(), 20.0);
+    EXPECT_DOUBLE_EQ(press(BUTTON_ERASER), 20.0) << "the eraser end's own width";
+    release();
+
+    // Each button its own; the tool bar eraser's own width stays
+    ASSERT_TRUE(model->set("stylusButtonWidth", 30.0));
+    EXPECT_DOUBLE_EQ(model->get("eraserButtonWidth").toDouble(), 20.0);
+    EXPECT_DOUBLE_EQ(model->get("stylusButton2Width").toDouble(), 0.0) << "still the tool bar's";
+    EXPECT_DOUBLE_EQ(press(BUTTON_STYLUS_ONE), 30.0) << "the lower side button's own width";
+    release();
+    EXPECT_DOUBLE_EQ(press(BUTTON_STYLUS_TWO), barWidth) << "the upper side button: the tool bar eraser's";
+    release();
+
+    // The tool bar eraser picks another size: a button with a width of its own keeps it, one without follows
+    tools->selectTool(TOOL_ERASER);
+    tools->setEraserSize(TOOL_SIZE_FINE);
+    const double barFine = tools->getThickness();
+    tools->selectTool(TOOL_PEN);
+    EXPECT_DOUBLE_EQ(press(BUTTON_STYLUS_ONE), 30.0) << "its own width, whatever size the tool bar's eraser takes";
+    release();
+    EXPECT_DOUBLE_EQ(press(BUTTON_STYLUS_TWO), barFine) << "the tool bar eraser's fine size";
+    release();
+
+    // Back to the tool bar eraser's: the button takes the tool bar eraser's width again
+    ASSERT_TRUE(model->set("eraserButtonWidth", 0));
+    EXPECT_DOUBLE_EQ(model->get("eraserButtonWidth").toDouble(), 0.0);
+    EXPECT_DOUBLE_EQ(press(BUTTON_ERASER), barFine) << "as before: the tool bar eraser's";
+    release();
+
+    // ... also with that very button's eraser in hand: its tool is made anew, so the tool in hand is the pen's again
+    // (never a pointer to the old copy, which goes away there)
+    InputUtils::applyButton(tools, s, BUTTON_STYLUS_ONE);
+    ASSERT_EQ(tools->getToolType(), TOOL_ERASER) << "that button's eraser in hand";
+    ASSERT_TRUE(model->set("stylusButtonWidth", 0));
+    EXPECT_EQ(tools->getToolType(), TOOL_PEN) << "no dangling tool: the pen again";
+    EXPECT_DOUBLE_EQ(press(BUTTON_STYLUS_ONE), barFine) << "the tool bar eraser's again";
+    release();
+
+    // A width out of range is kept within it (the row offers 0.1 to 150 pt)
+    ASSERT_TRUE(model->set("eraserButtonWidth", 0.01));
+    EXPECT_DOUBLE_EQ(model->get("eraserButtonWidth").toDouble(), 0.1);
+    ASSERT_TRUE(model->set("eraserButtonWidth", 1000.0));
+    EXPECT_DOUBLE_EQ(model->get("eraserButtonWidth").toDouble(), 150.0);
+
+    // Kept in the settings file: the next start has it from the first press
+    model.reset();
+    app.reset();
+    app = std::make_unique<AppContext>(fs::path(XQT_BUILD_RESOURCE_DIR),
+                                       fs::path(tmp.filePath("settings.xml").toStdString()), 1);
+    model = std::make_unique<SettingsModel>(*app);
+    EXPECT_DOUBLE_EQ(model->get("eraserButtonWidth").toDouble(), 150.0);
+    EXPECT_DOUBLE_EQ(model->get("stylusButtonWidth").toDouble(), 0.0);
+    ToolHandler* again = app->getToolHandler();
+    InputUtils::applyButton(again, app->getSettings(), BUTTON_ERASER);
+    EXPECT_DOUBLE_EQ(again->getThickness(), 150.0) << "from the first press, before any eraser was taken";
+}
+
+// The eraser the pointer shows while a side button erases, or at the pen's eraser end before it touches, is the width
+// set for that button; the tool bar eraser keeps its own.
+TEST_F(SettingsModelTest, thePenButtonsPointerShowsTheirOwnEraserSize) {
+    ASSERT_TRUE(model->set("eraserButtonWidth", 40.0));
+    ASSERT_TRUE(model->set("stylusButtonWidth", 4.0));
+    Settings& s = *app->getSettings();
+    ToolHandler& tools = *app->getToolHandler();
+    const auto barEraser = [&] { return 2 * tools.getTool(TOOL_ERASER).getThickness(tools.getEraserSize()); };
+
+    // The tool bar eraser in hand: its own width (upstream's square is 2 × the width a side)
+    tools.selectTool(TOOL_ERASER);
+    const auto bar = hover::eraserMark(tools, s, false, 1.0);
+    ASSERT_TRUE(bar);
+    EXPECT_DOUBLE_EQ(bar->size, barEraser());
+
+    // The lower side button held: its own width
+    InputUtils::applyButton(&tools, &s, BUTTON_STYLUS_ONE);
+    const auto button = hover::eraserMark(tools, s, false, 1.0);
+    ASSERT_TRUE(button);
+    EXPECT_DOUBLE_EQ(button->size, 8.0) << "2 × 4 pt";
+
+    // The pen's eraser end, hovering: the eraser button's own width, before it touches
+    tools.selectTool(TOOL_PEN);
+    EXPECT_FALSE(hover::eraserMark(tools, s, false, 1.0)) << "the pen: no eraser";
+    const auto end = hover::eraserMark(tools, s, true, 1.0);
+    ASSERT_TRUE(end);
+    EXPECT_DOUBLE_EQ(end->size, 80.0) << "2 × 40 pt";
+
+    // Not an eraser button any more: no eraser shown at the end
+    ASSERT_TRUE(model->set("eraserButtonTool", "hand"));
+    EXPECT_FALSE(hover::eraserMark(tools, s, true, 1.0));
+
+    // The tool bar's again: as it was
+    ASSERT_TRUE(model->set("eraserButtonTool", "eraser"));
+    ASSERT_TRUE(model->set("eraserButtonWidth", 0));
+    const auto back = hover::eraserMark(tools, s, true, 1.0);
+    ASSERT_TRUE(back);
+    EXPECT_DOUBLE_EQ(back->size, barEraser());
 }
 
 TEST_F(SettingsModelTest, newPageTemplate) {
