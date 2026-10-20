@@ -1465,15 +1465,18 @@ TEST_F(AdaptiveLayoutTest, theHomeScreensPlusAndViewMenusWork) {
         choose("addOpenFileItem");
         EXPECT_EQ(openFile.count(), 1) << at << ": Open a file…";
         wait(100);
-        click(star);  // (on Recent: the library's favourites)
-        EXPECT_EQ(home->property("page").toInt(), 0) << at;
-        EXPECT_TRUE(library->property("favouritesOnly").toBool()) << at;
-        library->setProperty("favouritesOnly", false);
-        for (QObject* o: window->findChildren<QObject*>()) {  // (the window's file dialog)
+        // (the window's file dialog, if it opened, closed first: it is modal, and from Qt 6.10 on it does open
+        // off-screen too, so the tap on the star never arrived)
+        for (QObject* o: window->findChildren<QObject*>()) {
             if (o->inherits("QQuickFileDialog") && o->property("visible").toBool()) {
                 QMetaObject::invokeMethod(o, "close");
             }
         }
+        wait(100);
+        click(star);  // (on Recent: the library's favourites)
+        EXPECT_EQ(home->property("page").toInt(), 0) << at;
+        EXPECT_TRUE(library->property("favouritesOnly").toBool()) << at;
+        library->setProperty("favouritesOnly", false);
         wait(100);
         home->setProperty("page", 0);
         wait(100);
