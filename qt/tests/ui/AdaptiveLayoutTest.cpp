@@ -675,6 +675,13 @@ protected:
                                     "homeSettingsButton"}) {
                 EXPECT_TRUE(shownInWindow(findItem(name))) << at << ": " << name << " (the expanded header)";
             }
+            // Import says its name beside the icon where there is room for the words (testers, xournalpp#7770)
+            QQuickItem* import = findItem("importButton");
+            const bool roomy = home->property("roomy").toBool();
+            EXPECT_EQ(import->property("text").toString(), roomy ? "Import" : "") << at;
+            if (roomy) {
+                EXPECT_GT(import->width(), 48 + 20) << at << ": wide enough for its word";
+            }
         }
     }
     /// The home screen (qt/adaptive-home): each of its pages, a deep folder with its breadcrumbs (and nothing in it),
@@ -1254,6 +1261,39 @@ TEST_F(AdaptiveLayoutTest, menusAreSheetsOnPhones) {
     checkMenuGeometry("1280x800", layoutMenu, layoutButton, true);
     QMetaObject::invokeMethod(layoutMenu, "close");
     EXPECT_TRUE(opened(layoutMenu, false));
+}
+
+// The library's Import says its name beside the icon where the header has room for the words (home.roomy), as the
+// switch's Favourites and Bookmarks do: the tray with an arrow alone did not say what it does (testers,
+// xournalpp/xournalpp#7770); with less room only the icon, and the row fits
+TEST_F(AdaptiveLayoutTest, theLibrarysImportSaysItsNameWhereThereIsRoom) {
+    QQuickItem* home = findItem("homeView");
+    ASSERT_NE(home, nullptr);
+    home->setProperty("page", 0);
+    QQuickItem* import = findItem("importButton");
+    ASSERT_NE(import, nullptr);
+    bool sawRoomy = false;
+    bool sawTight = false;
+    for (const WindowSize& s: {WindowSize{2560, 1200, "wide"}, WindowSize{1920, 1080, "desktop-fhd"},
+                               WindowSize{1366, 768, "laptop"}}) {
+        resize(s.w, s.h);
+        wait(150);
+        const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
+        if (!home->property("expanded").toBool()) {
+            continue;
+        }
+        const bool roomy = home->property("roomy").toBool();
+        (roomy ? sawRoomy : sawTight) = true;
+        EXPECT_TRUE(shownInWindow(import)) << at;
+        EXPECT_EQ(import->property("text").toString(), roomy ? "Import" : "") << at;
+        if (roomy) {
+            EXPECT_GT(import->width(), 48 + 20) << at << ": wide enough for its word";
+        } else {
+            EXPECT_EQ(import->width(), 48) << at << ": the icon alone";
+        }
+        expectNoRowWider(at);
+    }
+    EXPECT_TRUE(sawRoomy) << "a window with room for the words";
 }
 
 // The library's "+" and View (qt/adaptive-home) on a phone (sheets; "+" floats at the bottom) and in a desktop window
