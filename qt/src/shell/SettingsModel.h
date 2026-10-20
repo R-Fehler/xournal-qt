@@ -56,6 +56,8 @@ public:
     /// letters, 2 two in words of 8+; WordMatch.h), and applying it to the queries parsed from then on.
     static int fuzzyTypos(Settings& settings);
     static void applyFuzzyTypos(Settings& settings);
+    /// The width the eraser of a button of the pen gets when it is given one ("Own width", ButtonWidths.h)
+    Q_INVOKABLE double defaultButtonWidth() const;
     /// Documents open with the hand tool, so that one finger scrolls and the pen is chosen when wanted
     /// ("handWhenOpening" in the touch part). On by default on Android, where one finger is expected to scroll; off
     /// on the desktop, where the tool stays as it was.

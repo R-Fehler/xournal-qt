@@ -42,8 +42,9 @@ A pointer drawn by the app comes late; a cursor of the platform does not:
 ## The eraser shows what it will erase
 
 While a press would erase, the pointer is the eraser itself (`hover::eraserMark`): the tool bar's eraser, a side
-button set to erase while it is held, and the pen's eraser end while it hovers. The tool changes only when the eraser
-end touches, so its preview comes from the eraser button's setting and the tool bar eraser's size and kind. The
+button set to erase while it is held, and the pen's eraser end while it hovers. The eraser end's tool changes only when
+it touches, so its preview comes from the eraser button's setting (its own width when one is set for it,
+[pen-buttons.md](pen-buttons.md); else the tool bar eraser's width and kind). The
 outline is gray, with a faint gray fill and a light halo so that it shows on dark paper. Its size is the eraser's real
 size at the current zoom, and it changes with the zoom and the eraser's size:
 
@@ -65,9 +66,10 @@ visible. No preview is shown where nothing is erased: a document open only for r
 Known limits:
 
 - With Qt's software renderer (no GPU), the drawn outline of an oversized eraser is not shown. The cursors are.
-- A size or kind of its own for the eraser button, set in Xournal++'s settings, shows once the eraser end has
-  touched. Before that, the tool bar eraser's size and kind are shown. This app's settings always use the tool bar
-  eraser's.
+
+The eraser a side button gives is its own width when one is set for it (Settings → Pen → Buttons and eraser,
+[pen-buttons.md](pen-buttons.md)); with "Own width" off, the tool bar eraser's, for the hovering pen's eraser end as
+for the button held.
 
 ## On the device
 

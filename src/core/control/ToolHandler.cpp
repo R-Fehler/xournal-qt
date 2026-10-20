@@ -385,6 +385,16 @@ void ToolHandler::setButtonSize(ToolSize size, Button button) {
     tool->setSize(clippedSize);
 }
 
+// xournal-qt
+void ToolHandler::setButtonCustomThickness(Button button, double thickness, bool active) {
+    Tool* tool = getButtonTool(button);
+    if (!tool || !tool->thickness) {
+        return;  // (no such button's tool, or a tool without sizes)
+    }
+    tool->customThickness = thickness > 0 ? thickness : 0;
+    tool->customThicknessActive = active && thickness > 0;
+}
+
 void ToolHandler::setLineStyle(const LineStyle& style) {
     Tool* tool = this->toolbarSelectedTool;
     tool->setLineStyle(style);
@@ -725,6 +735,7 @@ auto ToolHandler::getSelectedTool(SelectedTool selectedTool) const -> Tool* {
     }
 }
 
+// xournal-qt: public (the width of a button's eraser, qt/src/session/ButtonWidths.h)
 auto ToolHandler::getButtonTool(Button button) const -> Tool* {
     switch (button) {
         case Button::BUTTON_ERASER:
