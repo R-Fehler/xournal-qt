@@ -241,11 +241,11 @@ TEST_F(FractionalScaleCanvas, theCurtainsHandlesAndKnobLieOnWholeDevicePixels) {
     settle(200);
     const auto shown = canvas->curtainShown();
     ASSERT_TRUE(shown.shown);
-    ASSERT_FALSE(shown.handleFrames.empty());
-    for (size_t i = 0; i < shown.handleFrames.size(); ++i) {
-        EXPECT_TRUE(onDevicePixels(shown.handleFrames[i], dpr))
-                << "handle " << i << " at " << shown.handleFrames[i].x() * dpr;
-        EXPECT_TRUE(onDevicePixels(shown.handleFills[i], dpr)) << "its inside";
+    ASSERT_FALSE(shown.handleRects.empty());
+    for (size_t i = 0; i < shown.handleRects.size(); ++i) {
+        EXPECT_TRUE(onDevicePixels(shown.handleRects[i], dpr))
+                << "handle " << i << " at " << shown.handleRects[i].x() * dpr;
+        EXPECT_NEAR(shown.handlePixels.width(), shown.handleRects[i].width() * dpr, 1e-6) << "one pixel each";
     }
     ASSERT_FALSE(shown.knob.isEmpty());
     EXPECT_TRUE(onDevicePixels(shown.knob, dpr)) << "the knob at " << shown.knob.x() * dpr;

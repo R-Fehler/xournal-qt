@@ -661,6 +661,61 @@ TEST_F(CanvasItemInputTest, theEraserCursorHasTheErasersSizeAtTheZoom) {
 
 // An eraser bigger than a cursor may be (MAX_CURSOR_PX): the cursor is the dot, the canvas draws the eraser around
 // it and moves it with the mouse.
+// Reported on a Wacom CTL-672 (xournalpp/xournalpp#7770): the eraser end erased with the width the tool bar's eraser
+// had when the app started. Its button ("no change" in the settings) took the size step but not the width of the tool
+// bar (the tool bar sets a width of its own, ToolHandler::setCustomThickness).
+TEST_F(CanvasItemInputTest, thePensEraserEndAndSideButtonEraseWithTheToolBarsEraserWidth) {
+    QPointingDevice eraserEnd{"test pen eraser", 2003, QInputDevice::DeviceType::Stylus,
+                              QPointingDevice::PointerType::Eraser,
+                              QInputDevice::Capability::Position | QInputDevice::Capability::Pressure, 1, 3};
+    QWindowSystemInterface::registerInputDevice(&eraserEnd);
+    ToolHandler* tools = app->getToolHandler();
+    const auto touchWith = [&](QPointingDevice* device, QPointF pos, Qt::MouseButtons buttons, double pressure) {
+        QWindowSystemInterface::handleTabletEvent(window, timestamp, device, xqt::test::nativeLocal(window, pos),
+                                                  xqt::test::nativeGlobal(window, pos), buttons, pressure, 0, 0, 0, 0,
+                                                  0, Qt::NoModifier);
+        timestamp += 5;
+        QWindowSystemInterface::flushWindowSystemEvents();
+    };
+    const QPointF at(300, 250);
+    const auto widthOfTheEraserEnd = [&] {
+        touchWith(&eraserEnd, at, Qt::LeftButton, 0.5);
+        wait(20);
+        EXPECT_EQ(tools->getToolType(), TOOL_ERASER);
+        const double width = tools->getThickness();
+        touchWith(&eraserEnd, at, Qt::NoButton, 0.0);
+        wait(20);
+        return width;
+    };
+    const auto widthOfTheSideButton = [&] {
+        touchWith(&pen, at, Qt::MiddleButton, 0.0);
+        wait(20);
+        EXPECT_EQ(tools->getToolType(), TOOL_ERASER);
+        const double width = tools->getThickness();
+        touchWith(&pen, at, Qt::NoButton, 0.0);
+        wait(20);
+        return width;
+    };
+
+    // The tool bar's eraser gets a width of its own (the slider, a toolbox entry), the pen stays the tool
+    tools->setCustomThickness(TOOL_ERASER, 23, true);
+    EXPECT_DOUBLE_EQ(widthOfTheEraserEnd(), 23);
+    EXPECT_DOUBLE_EQ(widthOfTheSideButton(), 23);
+    tools->setCustomThickness(TOOL_ERASER, 7, true);
+    EXPECT_DOUBLE_EQ(widthOfTheEraserEnd(), 7) << "a second change reaches it too";
+
+    // One of the five sizes again: the width of the size, not the last width of its own
+    tools->selectTool(TOOL_ERASER);
+    tools->setSize(TOOL_SIZE_VERY_THICK);
+    const double veryThick = tools->getThickness();
+    tools->selectTool(TOOL_PEN);
+    EXPECT_DOUBLE_EQ(widthOfTheEraserEnd(), veryThick);
+    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(
+            window, timestamp++, &eraserEnd, false, xqt::test::nativeLocal(window, at),
+            xqt::test::nativeGlobal(window, at));
+    QWindowSystemInterface::flushWindowSystemEvents();
+}
+
 TEST_F(CanvasItemInputTest, anEraserTooBigForACursorIsDrawnByTheCanvas) {
     ToolHandler* tools = app->getToolHandler();
     tools->selectTool(TOOL_ERASER);

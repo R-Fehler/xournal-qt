@@ -154,7 +154,7 @@ run_case() {
     mkdir -p "$rt"
     if "$QT_CLI" "$f" --dump >"$rt/original.dump" 2>/dev/null; then
         if "$QT_CLI" "$f" --resave="$rt/resaved.xopp" >"$rt/resave.log" 2>&1 &&
-            "$QT_CLI" "$rt/resaved.xopp" --dump >"$rt/resaved.dump" 2>&1; then
+            "$QT_CLI" "$rt/resaved.xopp" --dump >"$rt/resaved.dump" 2>>"$rt/resave.log"; then
             if diff -q "$rt/original.dump" "$rt/resaved.dump" >/dev/null; then
                 mkdir -p "$rt/a" "$rt/b"
                 "$QT_CLI" "$f" --create-img="$rt/a/page.png" --export-png-dpi=72 >/dev/null 2>&1

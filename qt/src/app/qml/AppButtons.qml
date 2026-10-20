@@ -25,7 +25,7 @@ Item {
         geometry: geometryTool, pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, sticker: stickerTool,
         record: recordTool, addPage: addPageTool, search: searchTool,
         fullScreen: fullScreenTool, present: presentTool, read: readTool, zen: zenTool, replay: replayTool,
-        settings: settingsTool,
+        curtain: curtainTool, spotlight: spotlightTool, settings: settingsTool,
         new: newTool, open: openTool, save: saveTool, milestone: milestoneTool, editAsNotes: editAsNotesTool,
         openExternally: openExternallyTool,
         share: shareTool, print: printTool, bookmark: bookmarkTool, favourite: favouriteTool, tags: tagsTool
@@ -458,8 +458,35 @@ Item {
             parent: toolBank
             iconName: "xopp-document-save"
             label: qsTr("Save")
-            tip: qsTr("Save") + win.keyNote("save")
+            tip: qsTr("Save (hold: Save as…)") + win.keyNote("save")
+            // Held or right-clicked: Save as… (testers looked for it here, xournalpp#7770; ⋮ has it too)
+            ownHold: !win.textDoc
+            readonly property string holdText: qsTr("Save as…")
             onClicked: saveOrAsk(null)
+            onPressAndHold: if (!win.textDoc) Popups.openAt(saveMenu)
+            TapHandler {
+                enabled: !win.textDoc
+                acceptedButtons: Qt.RightButton
+                acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
+                onTapped: function(point) { Popups.openAt(saveMenu, point.position) }
+            }
+            AdaptiveMenu {
+                id: saveMenu
+                objectName: "saveMenu"
+                title: qsTr("Save")
+                AdaptiveMenuItem {
+                    objectName: "saveMenuSaveItem"
+                    text: qsTr("Save") + win.keyNote("save")
+                    icon.source: app.iconUrl("xopp-document-save")
+                    onTriggered: saveOrAsk(null)
+                }
+                AdaptiveMenuItem {
+                    objectName: "saveMenuSaveAsItem"
+                    text: qsTr("Save as…") + win.keyNote("saveAs")
+                    icon.source: app.iconUrl("xopp-document-save")
+                    onTriggered: openSaveDialog(null)
+                }
+            }
         }
         // A .md: a copy as notes (a .xopp) to write on with the pen; the .md stays as it is
         IconButton {
@@ -547,6 +574,30 @@ Item {
             label: qsTr("Zen")
             tip: win.withKeys(qsTr("Zen: only the page (the dot in the lower left corner brings the controls back)"), "zen")
             onClicked: win.modes.setZen(true)
+        }
+        // The curtain and the spotlight (qt/docs/features/curtain.md): on no bar at a first start, the catalog
+        // offers them (testers found no button for them, xournalpp#7770); checked while out
+        IconButton {
+            id: curtainTool
+            objectName: "curtainButton"
+            parent: toolBank
+            property bool offered: !win.textDoc
+            iconName: "xqt-curtain"
+            checked: app.curtain === "curtain"
+            label: qsTr("Curtain")
+            tip: qsTr("Curtain: hide part of the page") + win.keyNote("curtain")
+            onClicked: app.toggleCurtain("curtain")
+        }
+        IconButton {
+            id: spotlightTool
+            objectName: "spotlightButton"
+            parent: toolBank
+            property bool offered: !win.textDoc
+            iconName: "xqt-spotlight"
+            checked: app.curtain === "spotlight"
+            label: qsTr("Spotlight")
+            tip: qsTr("Spotlight: only a part of the page shown") + win.keyNote("spotlight")
+            onClicked: app.toggleCurtain("spotlight")
         }
         IconButton {
             id: replayTool

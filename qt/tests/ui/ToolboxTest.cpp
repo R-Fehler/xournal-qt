@@ -1585,6 +1585,40 @@ TEST_F(ToolboxTest, theCatalogAddsToEitherBar) {
     EXPECT_TRUE(inside(entry(added), find("topBar")));
 }
 
+// The curtain and the spotlight: on no bar at a first start, the catalog's View offers them; a button of each puts it
+// out and takes it away, checked while it is out (testers found no button for them, xournalpp/xournalpp#7770)
+TEST_F(ToolboxTest, theCatalogOffersTheCurtainAndTheSpotlight) {
+    auto* catalog = find<QObject>("toolTypeMenu");
+    EXPECT_TRUE(tools()->unplaced().contains("curtain"));
+    EXPECT_TRUE(tools()->unplaced().contains("spotlight"));
+    click(find("topBarAddButton"));
+    until([&] { return catalog->property("visible").toBool(); });
+    for (const char* name: {"catalog_curtain", "catalog_spotlight"}) {
+        ASSERT_NE(entryOf(catalog, name), nullptr) << name;
+        EXPECT_TRUE(entryOf(catalog, name)->property("offered").toBool()) << name;
+    }
+    trigger(catalog, "catalog_curtain");
+    click(find("topBarAddButton"));
+    until([&] { return catalog->property("visible").toBool(); });
+    trigger(catalog, "catalog_spotlight");
+    for (const char* name: {"curtainButton", "spotlightButton"}) {
+        until([&] { return inside(find(name), find("topBar")); });
+        EXPECT_TRUE(inside(find(name), find("topBar"))) << name;
+    }
+    click(find("curtainButton"));
+    until([&] { return controller->curtain() == "curtain"; });
+    EXPECT_EQ(controller->curtain(), "curtain");
+    EXPECT_TRUE(find("curtainButton")->property("checked").toBool());
+    click(find("spotlightButton"));
+    until([&] { return controller->curtain() == "spotlight"; });
+    EXPECT_EQ(controller->curtain(), "spotlight") << "one of the two at a time";
+    EXPECT_FALSE(find("curtainButton")->property("checked").toBool());
+    EXPECT_TRUE(find("spotlightButton")->property("checked").toBool());
+    click(find("spotlightButton"));
+    until([&] { return controller->curtain().isEmpty(); });
+    EXPECT_TRUE(controller->curtain().isEmpty()) << "again: away";
+}
+
 // Settings → "Back to the first layout": both bars as at a first start, asked first; the tools stay
 TEST_F(ToolboxTest, backToTheFirstLayout) {
     const QString pen = nth("pen", 2);
@@ -1743,7 +1777,8 @@ TEST_F(ToolboxTest, nothingIsUnreachable) {
     const std::map<QString, QString> inMore{
             {"share", "shareItem"}, {"print", "printItem"}, {"milestone", "saveWithMessageItem"},
             {"tags", "documentTagsMenuItem"}, {"zen", "zenItem"}, {"read", "readItem"}, {"replay", "replayItem"},
-            {"bookmark", "bookmarkPageItem"}, {"favourite", "favouriteDocumentItem"}};
+            {"bookmark", "bookmarkPageItem"}, {"favourite", "favouriteDocumentItem"},
+            {"curtain", "curtainItem"}, {"spotlight", "spotlightItem"}};
     // Some off the bars: ⋮ has them
     tools()->remove(tools()->idOfApp("share"));
     tools()->remove(tools()->idOfApp("select"));

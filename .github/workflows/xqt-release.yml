@@ -5,7 +5,10 @@
 #
 # Qt 6.5 or newer is needed, which the runners' own Ubuntu 24.04 does not have (6.4), so every job builds in a
 # container: one on Ubuntu 22.04 with KDE neon's packages (Qt 6.7, as on the author's machine), one on Debian 13
-# (Qt 6.8, also for Ubuntu 25.04 and newer).
+# (Qt 6.8), one on Ubuntu 26.04 (Qt 6.10). A .deb installs only on the system it was built on: it depends on that
+# system's exact Qt version (the QML compiled ahead of time uses Qt's private API, so dpkg-shlibdeps adds
+# qt6-*-private-abi (= <version>)) and on its library package names (Debian's libjpeg62-turbo and libxml2 are
+# Ubuntu 26.04's libjpeg-turbo8 and libxml2-16).
 name: xournal-qt release
 
 on:
@@ -29,9 +32,13 @@ jobs:
             container: ubuntu:22.04
             suffix: neon-jammy
             neon: '1'
-          - name: Debian 13 / Ubuntu 25.04
+          - name: Debian 13
             container: debian:trixie
             suffix: debian13
+            neon: '0'
+          - name: Ubuntu 26.04
+            container: ubuntu:26.04
+            suffix: ubuntu26.04
             neon: '0'
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache

@@ -184,10 +184,11 @@ public:
         QRectF sheet;  ///< (the spotlight: its hole)
         bool spotlight = false;
         int handles = 0;
-        std::vector<QRectF> handleFrames;  ///< the square handles (item coordinates)
-        std::vector<QRectF> handleFills;   ///< ... their white inside
+        std::vector<QRectF> handleRects;   ///< the round handles' pictures (item coordinates)
+        QSize handlePixels;                ///< ... their pixels
         QRectF knob;                       ///< the knob that turns it (item coordinates; empty: none)
         QSize knobPixels;                  ///< its picture's pixels
+        double opacity = 1;                ///< how dark its black is (the setting "curtainOpacity", 0 to 1)
     };
     CurtainShown curtainShown() const { return curtainStats; }
     /// The selection's picture in the last frame (tests): shown or not, where (item coordinates), its pixels and the

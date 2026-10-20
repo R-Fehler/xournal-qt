@@ -301,7 +301,8 @@ first layout. The last eraser cannot be removed (a group removed leaves it in it
 
 - **The app's items** (`ToolboxModel::appItemNames`): the tools hand, select, snip, pdfText, write, geometry,
   touchDrawing, and the commands record, open, save, milestone, share, print, image, sticker, addPage, search, read,
-  replay, present, fullScreen, zen, tags, favourite, bookmark, settings, new (the names of `toolArea.slots`). Each has
+  replay, present, fullScreen, zen, tags, favourite, bookmark, settings, new, curtain, spotlight (the names of
+  `toolArea.slots`; curtain and spotlight on no bar at a first start). Each has
   **one home**: the rail, the top bar, or nowhere ("not placed", `unplaced()`: what the catalog offers; a second place
   in a file is dropped). The plugins' commands are items too, named `plugin:<id>/<command>` (`setPluginItems`); one
   placed stays in the arrangement while its plugin is off or gone (the bar shows nothing for it).

@@ -631,7 +631,8 @@ On a generated library of 3,000 Markdown files (~12 MB of text) a search takes t
     line in today's `Inbox/<date>.md` (a setting). Also Ctrl+Alt+N, ⋮ → Document in a document and `xournal-qt --quick-note`
     ([quick-note.md](quick-note.md)).
   - Import: files, or a folder with all its subfolders (the Import button's menu); also dropping files or folders
-    from the file manager. They are copied.
+    from the file manager. They are copied. Its word "Import" stands beside the icon where the header has room for
+    the words (`home.roomy`): testers did not read the tray with an arrow alone (xournalpp/xournalpp#7770).
   - New folder
   - In a window too narrow for all these buttons (and on a phone, where it floats at the bottom right) they are one
     button, **"+"**: Quick note, New document…, New Markdown file…, New text file…, Import files…, Import a folder…, New folder…

@@ -24,9 +24,15 @@ ScrollView {
             ]
         }
         SettingsSliderRow {
+            objectName: "stabilizerBuffersizeRow"
             visible: (sheet.s.revision, sheet.s.get("stabilizerAveraging")) !== 0
             key: "stabilizerBuffersize"; text: qsTr("Buffer size")
-            from: 2; to: 100; stepSize: 1; decimals: 0
+            // The arithmetic mean lags behind the pen by the whole buffer: the useful sizes are the small ones, so its
+            // slider ends at 20 (upstream's default) and gives them its whole length (testers, xournalpp#7770).
+            // Gaussian weights fade the older points out, larger buffers stay useful there (upstream: 2 to 100).
+            // A larger stored value is kept until the slider is moved.
+            from: 2; stepSize: 1; decimals: 0
+            to: (sheet.s.revision, sheet.s.get("stabilizerAveraging")) === 1 ? 20 : 100
         }
         SettingsSliderRow {
             visible: (sheet.s.revision, sheet.s.get("stabilizerAveraging")) === 2

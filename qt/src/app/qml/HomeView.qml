@@ -69,7 +69,9 @@ Rectangle {
     /// Room for the words beside the icons of the switch (Recent, Favourites, Bookmarks), and a search at its full
     /// width. One rule: words only where the header has room for every button and them; everywhere else icons (a tip
     /// on hover, and while a finger is held on them)
-    readonly property bool roomy: expanded && headerRoom >= expandedNeed + 230 + switchWords
+    readonly property bool roomy: expanded && headerRoom >= expandedNeed + 230 + switchWords + importWord.advanceWidth + 8
+    /// (Import's word: its icon alone did not say what it does, testers in xournalpp#7770)
+    TextMetrics { id: importWord; text: qsTr("Import") }
     /// The grouped row: the switch, the search at its smallest, "+", View and Settings
     readonly property real groupedNeed: switchNeed + searchMinimum + 3 * 48 + 6 * 6
     /// The search in a row of its own: on a phone upright, and in a window too narrow for it in the header

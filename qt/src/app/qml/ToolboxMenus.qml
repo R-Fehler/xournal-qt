@@ -363,7 +363,8 @@ Item {
         let sections = [
             { section: "tools", title: qsTr("Tools"), names: ["hand", "select", "snip", "pdfText", "write", "geometry", "touchDrawing"] },
             { section: "insert", title: qsTr("Insert"), names: ["image", "sticker", "addPage", "record"] },
-            { section: "view", title: qsTr("View"), names: ["search", "read", "replay", "present", "fullScreen", "zen"] },
+            { section: "view", title: qsTr("View"), names: ["search", "read", "replay", "present", "fullScreen", "zen",
+                                                            "curtain", "spotlight"] },
             { section: "document", title: qsTr("Document"), names: ["new", "open", "save", "milestone", "share", "print",
                                                                     "tags", "favourite", "bookmark", "settings"] }
         ]

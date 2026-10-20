@@ -6,7 +6,8 @@
 #   XQT_NEON=1 qt/scripts/linux-deps.sh          # add KDE neon's repository first: Qt 6.7 and KF6 on Ubuntu 22.04
 #   XQT_SYSTEM_QPDF=1 qt/scripts/linux-deps.sh   # also the system's qpdf, for -DXQT_SYSTEM_QPDF=ON (12 or newer)
 #
-# Qt 6.5 or newer is needed. Ubuntu 24.04 has 6.4, so use Debian 13 (Qt 6.8), Ubuntu 25.04, or KDE neon (XQT_NEON=1).
+# Qt 6.5 or newer is needed. Ubuntu 24.04 has 6.4, so use Debian 13 (Qt 6.8), Ubuntu 25.04 or newer (26.04: Qt 6.10),
+# or KDE neon (XQT_NEON=1).
 # qpdf is built with the app (qt/cmake/XqtQpdf.cmake: its source is downloaded when the build is configured); it
 # needs zlib and libjpeg.
 set -euo pipefail
