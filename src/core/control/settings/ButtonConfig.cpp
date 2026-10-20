@@ -87,6 +87,7 @@ auto ButtonConfig::applyNoChangeSettings(ToolHandler* toolHandler, Button button
 
     if (t.hasCapability(TOOL_CAP_SIZE) && this->size == TOOL_SIZE_NONE) {
         toolHandler->setButtonSize(t.getSize(), button);
+        toolHandler->setButtonCustomThickness(this->action, button);  // xournal-qt: and its width of its own
     }
     if (t.hasCapability(TOOL_CAP_COLOR) && !this->color) {
         toolHandler->setButtonColor(t.getColor(), button);

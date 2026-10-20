@@ -67,11 +67,14 @@ Known limits:
 - With Qt's software renderer (no GPU), the drawn outline of an oversized eraser is not shown. The cursors are.
 - A size or kind of its own for the eraser button, set in Xournal++'s settings, shows once the eraser end has
   touched. Before that, the tool bar eraser's size and kind are shown. This app's settings always use the tool bar
-  eraser's.
+  eraser's, and the eraser end erases with them: its width too (`ToolHandler::setButtonCustomThickness`; until
+  0.12.0 it kept the width the tool bar's eraser had when the app started, while the preview showed the new one).
 
 ## On the device
 
 What only a real device, screen or another app can show; walked before a release from the [device checklist](../testing/device-checklist.md).
 
+- [ ] A pen with an eraser end (Wacom): a new eraser width on the tool bar, then the eraser end erases as wide as
+      its outline shows (testers, xournalpp/xournalpp#7770).
 - [ ] The pointer (dot or crosshair, Settings → Pen) follows the hovering pen as fast as the mouse arrow; over the
       bars the arrow; Android's S Pen shows the drawn dot under the tip. If no pointer shows: `XQT_PEN_CURSOR=0`.

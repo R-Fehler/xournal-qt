@@ -383,6 +383,15 @@ void ToolHandler::setButtonSize(ToolSize size, Button button) {
     Tool* tool = getButtonTool(button);
     xoj_assert(tool);
     tool->setSize(clippedSize);
+    tool->customThicknessActive = false;  // xournal-qt: a size again, as setSize()
+}
+
+void ToolHandler::setButtonCustomThickness(ToolType type, Button button) {
+    Tool* tool = getButtonTool(button);
+    xoj_assert(tool);
+    const Tool& from = getTool(type);
+    tool->customThickness = from.customThickness;
+    tool->customThicknessActive = from.customThicknessActive;
 }
 
 void ToolHandler::setLineStyle(const LineStyle& style) {
