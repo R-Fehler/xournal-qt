@@ -28,6 +28,7 @@
 
 #include "CanvasMemory.h"
 #include "CanvasView.h"
+#include "CurtainLayer.h"
 #include "HoverPointer.h"
 #include "PenGestures.h"
 #include "ScreenCalibration.h"
@@ -463,6 +464,14 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                 s.customSettingsChanged();
             });
     }
+
+    // How dark the curtain and the spotlight are, in percent (qt/docs/features/curtain.md; 100: black)
+    add("curtainOpacity", [&s] { return QVariant(CurtainLayer::opacitySetting(s)); },
+        [&s](const QVariant& v) {
+            s.getCustomElement("xournalQt").setInt("curtainOpacity",
+                                                   std::clamp(v.toInt(), CurtainLayer::OPACITY_MIN, 100));
+            s.customSettingsChanged();
+        });
 
     // The replay's hint was shown once (qt/docs/features/timeline.md, "The play bar"): not again
     add("replayHintSeen",

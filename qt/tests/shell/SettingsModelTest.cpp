@@ -26,6 +26,8 @@
 #include "shell/ImageMemory.h"
 #include "shell/SettingsModel.h"
 
+#include "CurtainLayer.h"
+
 using namespace xqt;
 
 namespace {
@@ -89,6 +91,12 @@ TEST_F(SettingsModelTest, valuesReachUpstreamSettingsAndAreClamped) {
     EXPECT_EQ(timeout, 600);
     model->set("autosaveMinutes", 500);
     EXPECT_EQ(s->getAutosaveTimeout(), 60);
+    // The curtain's darkness (ours): black by default, 20 to 100 %
+    EXPECT_EQ(model->get("curtainOpacity").toInt(), 100);
+    model->set("curtainOpacity", 60);
+    EXPECT_EQ(CurtainLayer::opacitySetting(*s), 60);
+    model->set("curtainOpacity", 5);
+    EXPECT_EQ(model->get("curtainOpacity").toInt(), CurtainLayer::OPACITY_MIN);
     EXPECT_GE(changed.count(), 5);
     EXPECT_EQ(appChanged.count(), changed.count());
 }

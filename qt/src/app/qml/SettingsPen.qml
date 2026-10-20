@@ -160,6 +160,16 @@ ScrollView {
                        + "the rail leads with the laser pointer when it holds none of its own.")
                       .arg(sheet.win.keyNote("present"))
         }
+        // The curtain and the spotlight (qt/docs/features/curtain.md): how dark their black is
+        SettingsSliderRow {
+            objectName: "curtainOpacityRow"
+            key: "curtainOpacity"; text: qsTr("Darkness of the curtain and the spotlight")
+            from: 20; to: 100; stepSize: 5; decimals: 0; suffix: " %"
+        }
+        SettingsHint {
+            text: qsTr("Black at 100 %. Below that the page shows through, dimmed. Either way nothing is "
+                       + "written on it.")
+        }
         SettingsSectionTitle { text: qsTr("Grid") }
         SettingsSwitchRow { objectName: "snapGridSwitch"; key: "snapGrid"; text: qsTr("Snap to the grid") }
         SettingsHint {

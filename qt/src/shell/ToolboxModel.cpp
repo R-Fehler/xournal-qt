@@ -231,7 +231,9 @@ QStringList ToolboxModel::appItemNames() {
             "hand", "select", "snip", "pdfText", "write", "geometry", "touchDrawing",
             // its commands
             "record", "open", "save", "milestone", "share", "print", "image", "sticker", "addPage", "search", "read",
-            "replay", "present", "fullScreen", "zen", "tags", "favourite", "bookmark", "settings", "new"};
+            "replay", "present", "fullScreen", "zen", "tags", "favourite", "bookmark", "settings", "new",
+            // (on no bar at a first start: the catalog offers them)
+            "curtain", "spotlight"};
 }
 
 bool ToolboxModel::isAppTool(const QString& name) {

@@ -17,6 +17,7 @@
 #include <QTest>
 #include <gtest/gtest.h>
 
+#include "control/settings/Settings.h"
 #include "render/RenderService.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
@@ -177,6 +178,50 @@ TEST_F(CurtainCanvasTest, thePagesOwnPictureHasNothingOfIt) {
 }
 
 // The spotlight: the whole canvas is black (around the page as well) but its hole, whose corners are rounded.
+// Its darkness is a setting (testers, xournalpp/xournalpp#7770: "set the opacity of the black cover"): black by
+// default, else the page shows through it, the curtain and the spotlight alike; the handles stay as they are
+TEST_F(CurtainCanvasTest, theCoverIsAsDarkAsTheSettingSays) {
+    const auto grey = [](QRgb c) { return qRed(c) > 70 && qRed(c) < 135 && qGreen(c) > 70 && qGreen(c) < 135; };
+    CurtainLayer& curtain = view->curtain();
+    curtain.show(CurtainLayer::Shape::Curtain);
+    curtain.place(QPointF(300, 300), QSizeF(200, 120), 0);
+    curtain.setHandlesShown(false);
+    ASSERT_TRUE(nextFrame());
+    settle(100);
+    EXPECT_TRUE(black(shot().pixel(inShot(QPointF(300, 300))))) << "black at first";
+
+    app->getSettings()->getCustomElement("xournalQt").setInt("curtainOpacity", 60);
+    Q_EMIT app->settingsChanged();
+    settle(100);
+    QImage image = shot();
+    EXPECT_TRUE(grey(image.pixel(inShot(QPointF(300, 300))))) << "60 %: the white page shows through, grey";
+    // (the page as it is: white, or one of its pale blue lines)
+    EXPECT_GT(qBlue(image.pixel(inShot(QPointF(300, 200)))), 220) << "the page above it as it is";
+    EXPECT_NEAR(canvas->curtainShown().opacity, 0.6, 1e-9);
+
+    curtain.show(CurtainLayer::Shape::Spotlight);
+    curtain.place(QPointF(300, 300), QSizeF(200, 120), 0);
+    ASSERT_TRUE(nextFrame());
+    image = shot();
+    EXPECT_TRUE(grey(image.pixel(inShot(QPointF(50, 50))))) << "the spotlight: the page outside the hole grey";
+    EXPECT_GT(qBlue(image.pixel(inShot(QPointF(300, 300)))), 220) << "its hole as it is";
+    // Its handles are not dimmed: white in the middle as a selection's
+    curtain.setHandlesShown(true);
+    ASSERT_TRUE(nextFrame());
+    image = shot();
+    const auto shown = canvas->curtainShown();
+    ASSERT_FALSE(shown.handleRects.empty());
+    const QRgb middle =
+            image.pixel((shown.handleRects.front().center() * window->effectiveDevicePixelRatio()).toPoint());
+    EXPECT_GT(qRed(middle), 240) << "a handle's middle is white";
+    curtain.setHandlesShown(false);
+
+    app->getSettings()->getCustomElement("xournalQt").setInt("curtainOpacity", 100);
+    Q_EMIT app->settingsChanged();
+    settle(100);
+    EXPECT_TRUE(black(shot().pixel(inShot(QPointF(50, 50))))) << "100 %: black again";
+}
+
 TEST_F(CurtainCanvasTest, theSpotlightIsBlackAllAroundItsHole) {
     CurtainLayer& curtain = view->curtain();
     curtain.show(CurtainLayer::Shape::Spotlight);

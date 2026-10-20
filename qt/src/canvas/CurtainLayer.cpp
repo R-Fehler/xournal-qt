@@ -6,6 +6,7 @@
 
 #include <QRectF>
 
+#include "control/settings/Settings.h"
 #include "model/XojPage.h"
 
 #include "CanvasPage.h"
@@ -28,6 +29,12 @@ constexpr double MAX_SIDE = 20000;
 }  // namespace
 
 CurtainLayer::CurtainLayer(CanvasView& view): view(view) {}
+
+int CurtainLayer::opacitySetting(Settings& settings) {
+    int percent = 100;
+    settings.getCustomElement("xournalQt").getInt("curtainOpacity", percent);
+    return std::clamp(percent, OPACITY_MIN, 100);
+}
 
 CurtainLayer::~CurtainLayer() = default;
 
