@@ -20,6 +20,7 @@
 #include "control/settings/SettingsEnums.h"
 #include "control/tools/StrokeStabilizerEnum.h"
 #include "render/PaperTexture.h"
+#include "session/ButtonWidths.h"
 #include "session/AppContext.h"
 #include "session/DocumentMode.h"
 #include "session/FuzzyQuery.h"
@@ -178,6 +179,23 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
     add("stylusButtonTool", stylusGet, stylusSet);
     auto [stylus2Get, stylus2Set] = buttonTool(BUTTON_STYLUS_TWO);
     add("stylusButton2Tool", stylus2Get, stylus2Set);
+    // The width of the eraser these three buttons give (qt/src/session/ButtonWidths.h): points while the eraser is in
+    // hand, else 0 ("the tool bar eraser's", what a button without a size of its own has always had). Setting it gives
+    // the button's tool the width at once.
+    auto buttonWidth = [this](Button button) {
+        return std::pair{[this, button] { return QVariant(buttonwidths::width(settings, button)); },
+                         [this, button](const QVariant& v) {
+                             ToolHandler* tools = this->app.getToolHandler();
+                             buttonwidths::setWidth(settings, *tools, button, v.toDouble());
+                             tools->fireToolChanged();  // (the pointer over the page follows)
+                         }};
+    };
+    auto [eraserWidthGet, eraserWidthSet] = buttonWidth(BUTTON_ERASER);
+    add("eraserButtonWidth", eraserWidthGet, eraserWidthSet);
+    auto [stylusWidthGet, stylusWidthSet] = buttonWidth(BUTTON_STYLUS_ONE);
+    add("stylusButtonWidth", stylusWidthGet, stylusWidthSet);
+    auto [stylus2WidthGet, stylus2WidthSet] = buttonWidth(BUTTON_STYLUS_TWO);
+    add("stylusButton2Width", stylus2WidthGet, stylus2WidthSet);
     add("eraserMode",
         [&app] { return QVariant(QString::fromUtf8(eraserTypeToString(app.getToolHandler()->getEraserType()).data())); },
         [&app](const QVariant& v) {
@@ -709,6 +727,8 @@ QStringList SettingsModel::keys() const {
     }
     return k;
 }
+
+double SettingsModel::defaultButtonWidth() const { return buttonwidths::DEFAULT_WIDTH; }
 
 QVariant SettingsModel::get(const QString& key) const {
     auto it = entries.find(key);

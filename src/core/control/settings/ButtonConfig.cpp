@@ -23,6 +23,9 @@ auto ButtonConfig::getAction() const -> ToolType { return this->action; }
 
 void ButtonConfig::setAction(ToolType action) { this->action = action; }
 
+// xournal-qt
+void ButtonConfig::setSize(ToolSize size) { this->size = size; }
+
 void ButtonConfig::initButton(ToolHandler* toolHandler, Button button) const {
     toolHandler->resetButtonTool(this->action, button);
 

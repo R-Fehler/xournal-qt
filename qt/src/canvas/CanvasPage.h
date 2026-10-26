@@ -183,6 +183,9 @@ private:
     std::unique_ptr<LegacyRedrawable> eraserRedraw;  ///< the eraser's redraws, told to every view of the page
     std::unique_ptr<EraseHandler> eraser;
     bool inEraser = false;
+    /// xournal-qt: where the eraser was last told to erase (page coordinates): a quick pen reports few, far apart
+    /// samples, and the eraser erases along the way between them (eraseAlong, qt/docs/features/pen-buttons.md)
+    std::optional<xoj::util::Point<double>> eraserAt;
     std::unique_ptr<Selector> selector;  ///< rectangle / lasso being drawn (select tools)
     bool snipping = false;               ///< ... for a snip (Snip.h)
     /// Select the element under a tap (port of upstream's SelectObject). `aggregate`: add to the selection.
@@ -197,6 +200,14 @@ private:
     void leaveNote();
     /// The eraser stays inside the note it erases on (never on the paper's edge). False: the note is too small.
     bool eraserInNote(double& x, double& y) const;
+    /// xournal-qt: the eraser at (x, y), and along the line from where it was last (a quick pen reports few, far apart
+    /// samples: without the line between them, ink under the eraser is skipped over). It erases in steps no wider than
+    /// the eraser, through the same upstream EraseHandler as any eraser, so up to `MAX_ERASE_STEPS` of them (a jump
+    /// further than that, e.g. onto another page, erases at its ends only).
+    void eraseAlong(double x, double y);
+    /// The most `erase` calls one move adds (a fast wipe stays well under it: about the distance over the eraser's
+    /// half-width; a jump across the page is capped instead of stalling here)
+    static constexpr int MAX_ERASE_STEPS = 400;
     std::optional<Layer::Index> layerBeforeNote;  ///< the page's selected layer while writing on a note
     std::optional<xoj::util::Rectangle<double>> noteClip;  ///< the note written on: the stroke is drawn clipped to it
     std::optional<std::pair<double, double>> coverPress;  ///< a press on a covering note (a tap: it peeks)

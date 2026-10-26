@@ -294,6 +294,7 @@ set(XQT_QML_FILES
     src/app/qml/SettingsSwitchRow.qml
     src/app/qml/SettingsSliderRow.qml
     src/app/qml/SettingsComboRow.qml
+    src/app/qml/SettingsButtonWidthRow.qml
     src/app/qml/SettingsPen.qml
     src/app/qml/SettingsTouch.qml
     src/app/qml/SettingsStabilizer.qml

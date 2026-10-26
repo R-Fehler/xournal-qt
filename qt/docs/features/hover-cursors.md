@@ -42,8 +42,9 @@ A pointer drawn by the app comes late; a cursor of the platform does not:
 ## The eraser shows what it will erase
 
 While a press would erase, the pointer is the eraser itself (`hover::eraserMark`): the tool bar's eraser, a side
-button set to erase while it is held, and the pen's eraser end while it hovers. The tool changes only when the eraser
-end touches, so its preview comes from the eraser button's setting and the tool bar eraser's size and kind. The
+button set to erase while it is held, and the pen's eraser end while it hovers. The eraser end's tool changes only when
+it touches, so its preview comes from the eraser button's setting (its own width when one is set for it,
+[pen-buttons.md](pen-buttons.md); else the tool bar eraser's width and kind). The
 outline is gray, with a faint gray fill and a light halo so that it shows on dark paper. Its size is the eraser's real
 size at the current zoom, and it changes with the zoom and the eraser's size:
 
@@ -69,6 +70,10 @@ Known limits:
   touched. Before that, the tool bar eraser's size and kind are shown. This app's settings always use the tool bar
   eraser's, and the eraser end erases with them: its width too (`ToolHandler::setButtonCustomThickness`; until
   0.12.0 it kept the width the tool bar's eraser had when the app started, while the preview showed the new one).
+
+A width of its own for the eraser that a button of the pen gives (Settings → Pen → Buttons and eraser,
+[pen-buttons.md](pen-buttons.md)) is what the pointer shows for that button: with "Own width" off, the tool bar
+eraser's width and kind, for the hovering pen's eraser end as for the button held; on, the width set for the button.
 
 ## On the device
 

@@ -25,6 +25,9 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
 - [ ] A stroke from one page into the next continues on the next page.
 - [ ] The pointer over the page, pen gestures, the setsquare and the compass: [hover-cursors.md](../features/hover-cursors.md#on-the-device),
       [pen-gestures.md](../features/pen-gestures.md#on-the-device), [toolbox.md](../features/toolbox.md#on-the-device).
+- [ ] The side buttons' and the eraser end's eraser size ("Own width", Settings → Pen): [pen-buttons.md](../features/pen-buttons.md#on-the-device).
+- [ ] A **quick** wipe with the side button held (and with the tool bar's eraser) leaves no ink behind, also with a
+      small eraser and at a low zoom.
 
 ## Touch and palm rejection
 

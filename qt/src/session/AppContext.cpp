@@ -12,6 +12,7 @@
 #include "util/PathUtil.h"
 #include "util/Util.h"
 
+#include "ButtonWidths.h"
 #include "DocumentSession.h"
 #include "EmojiFont.h"
 #include "MdBox.h"
@@ -72,6 +73,8 @@ void AppContext::initButtonTools() {
                           Button::BUTTON_MOUSE_4, Button::BUTTON_MOUSE_5, Button::BUTTON_TOUCH}) {
         settings->getButtonConfig(static_cast<unsigned int>(b))->initButton(toolHandler.get(), b);
     }
+    // The eraser a side button of the pen gives with the width chosen for it (Settings → Pen, ButtonWidths.h)
+    buttonwidths::apply(*settings, *toolHandler);
 }
 
 AppContext::~AppContext() {

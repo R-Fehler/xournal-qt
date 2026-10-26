@@ -92,6 +92,9 @@ private:
     /// The release of a press that did not move (a tap, a click): it may follow a link
     bool isClick(const Event& release) const;
     bool changeTool(const Event& event);
+    /// A sequence ended: the tool in hand is the tool bar's again, unless a side button of the pen is still held (it
+    /// lends its tool until it is let go; qt/docs/features/pen-buttons.md)
+    void backToToolbarTool();
     void updateLastEvent(const Event& event);
     PositionInputData getInputDataRelativeToCurrentPage(CanvasPage* page, const Event& event) const;
     /// A place on the canvas in the coordinates of a page (points).
@@ -122,6 +125,10 @@ private:
     bool readOnlyPress = false;  ///< a press on a read-only document: it only scrolls (and a tap follows a link)
     bool refusedPress = false;   ///< ... a press of a writing tool on a view for reading only (CanvasView::writingRefused)
     bool textPress = false;      ///< a press on a text file edited (CanvasView::textMode): cursor, drag selects
+    /// xournal-qt: a side button of the pen is held (the mouse's own middle button is `modifier2` too, and it goes
+    /// back to the tool bar's tool on release): its tool stays in hand until it is let go
+    bool penSideButton1 = false;
+    bool penSideButton2 = false;
     bool modifier2 = false;  ///< first barrel button (upstream: button 2)
     bool modifier3 = false;  ///< second barrel button (upstream: button 3)
     bool inputRunning = false;
