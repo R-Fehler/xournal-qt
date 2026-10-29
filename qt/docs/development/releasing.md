@@ -92,7 +92,8 @@ newer, arm64) into the draft, and (also since 0.4.0) the unsigned **macOS** `.dm
   that `xournal-qt --audio-info` says "recording: available". A release whose notes mention recording on these
   systems wants the device checklist's recording items walked through first.
 - Open questions on both: the pen and touch input (Qt's tablet events on Windows Ink and on macOS), the file
-  associations (declared in the macOS bundle, untested; none on Windows yet), and the places where the fork writes
+  associations (declared in the macOS bundle, untested; on Windows the installer's, tried on the CI runner only), and
+  the places where the fork writes
   its settings and cache (`Util::getCacheSubfolder`: GLib's XDG folders, `~/.config` and `~/.cache` on macOS).
 
 ## Handwriting: ONNX Runtime and the model
