@@ -16,7 +16,9 @@ What the CI does on every push, the block tests and how to reproduce a CI failur
 5. Watch the run. It produces:
    - `xournal-qt_x.y.z_amd64_neon-jammy.deb` — built on Ubuntu 22.04 with KDE neon's packages (Qt 6.7). For KDE
      neon and other Ubuntu 22.04 systems that have Qt 6.5 or newer.
-   - `xournal-qt_x.y.z_amd64_debian13.deb` — built on Debian 13. Also for Ubuntu 25.04 and newer.
+   - `xournal-qt_x.y.z_amd64_debian13.deb` — built on Debian 13 (Qt 6.8). For Debian 13 only.
+   - `xournal-qt_x.y.z_amd64_ubuntu26.04.deb` — built on Ubuntu 26.04 (Qt 6.10). For Ubuntu 26.04 and its flavours
+     (Kubuntu, …).
    - `xournal-qt-x.y.z-x86_64.AppImage` — runs from Ubuntu 22.04 on, whatever Qt the system has; it carries Qt and
      the QML modules with it (about 80 MB), which linuxdeploy and its Qt plugin put there. Those two are tools, they
      are AppImages themselves, and they do not belong in the release.
@@ -41,11 +43,19 @@ their own qpdf 12 or newer with `-DXQT_SYSTEM_QPDF=ON` (`XQT_SYSTEM_QPDF=1 qt/sc
 offline builds point `-DXQT_QPDF_SOURCE_DIR=<unpacked qpdf-12.4.1>` at the source. Windows (MSYS2, qpdf 12.3) and
 Android (vcpkg, qpdf 12.4) use their package manager's qpdf, which is new enough.
 
+A `.deb` installs only on the system it was built on. It depends on that system's exact Qt version: the QML compiled
+ahead of time uses Qt's private API, so `dpkg-shlibdeps` adds `qt6-base-private-abi (= 6.8.2)` and
+`qt6-declarative-private-abi (= 6.8.2)` to the Debian 13 package, and Ubuntu 26.04 has Qt 6.10.2. The library
+packages are named differently, too: Debian's `libjpeg62-turbo` and `libxml2` are `libjpeg-turbo8` and `libxml2-16` on
+Ubuntu 26.04. Until 0.12.0 the releases said the Debian 13 package was also for Ubuntu 25.04 and newer; on Ubuntu
+26.04 `apt` refuses it for those four dependencies (discussion xournalpp/xournalpp#7770).
+
 | System | What to use |
 | --- | --- |
-| KDE neon (Ubuntu 22.04 base), Kubuntu with Qt 6.5+ | the `neon-jammy` package |
-| Debian 13, Ubuntu 25.04 and newer | the `debian13` package |
-| Ubuntu 24.04 (Qt 6.4 only) | the AppImage, or build with Qt from KDE neon |
+| KDE neon (Ubuntu 22.04 base) | the `neon-jammy` package |
+| Debian 13 | the `debian13` package |
+| Ubuntu 26.04, Kubuntu 26.04 | the `ubuntu26.04` package |
+| Ubuntu 24.04 (Qt 6.4 only), 25.04, 25.10 | the AppImage, or build from source |
 | anything else | the AppImage, or build from source (`qt/scripts/linux-deps.sh`, then the two cmake lines in `FORK.md`) |
 
 ## Windows and macOS

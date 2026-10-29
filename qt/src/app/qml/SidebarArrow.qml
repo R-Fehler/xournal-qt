@@ -7,14 +7,13 @@ import QtQuick.Layouts
 
 // The page sidebar's tab (qt/docs/features/adaptive-layout.md, "The page sidebar"): an arrow at the left edge of the
 // canvas area opens it (beside the page where there is room, else as the drawer); at the sidebar's edge, "‹" closes it.
-// A finger's size in the touch profile; not in the compact chrome or Zen, nor while presenting, nor while the
-// tool bar is put away (unless the sidebar is open: then it closes it).
+// A finger's size in the touch profile; not in the compact chrome or Zen, nor while presenting. With the top bar put
+// away it stays: nothing else opens the sidebar then.
 AbstractButton {
     id: sidebarArrow
     objectName: "sidebarArrow"
     readonly property bool open: win.layout.sidebarShown && sidebar.visible
     visible: win.modes.fullChrome && !app.homeVisible && !win.modes.hudHidden && !app.presenting
-             && (open || !app.toolbarHidden || win.layout.phoneChrome)
     z: 50  // (over the drawer and its dimmed page)
     width: win.adaptive.touchProfile ? win.adaptive.minTarget : 24
     height: win.adaptive.touchProfile ? 64 : 56

@@ -103,8 +103,9 @@ size, and "Reset the layout choices".
 - The same arrow sits at the sidebar's edge while it is open ("‹") and closes it: a docked sidebar is then `hidden`
   for this class where it would be shown automatically. Showing it again where there is room clears the choice.
 - The arrow: a slim tab at 40 % of the canvas's height (clear of the search bar at the top and the pills at the
-  bottom), `minTarget` wide in the touch profile (24 px otherwise). Not in the compact chrome or Zen, not while
-  presenting, and not while the top bar is put away (unless the sidebar is open: then it closes it).
+  bottom), `minTarget` wide in the touch profile (24 px otherwise). Not in the compact chrome or Zen, and not while
+  presenting. With the top bar put away it stays: nothing else opens the sidebar then (until 0.12.0 it went with the
+  bar, testers in xournalpp/xournalpp#7770).
 
 `win.layout.showSidebar(shown)` and `win.layout.dockSidebar()` are the functions; `sidebarDocked`, `sidebarDrawerOpen`
 and `sidebarShown` the state.

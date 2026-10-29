@@ -37,6 +37,7 @@
 #include <QPointF>
 #include <QSizeF>
 
+class Settings;
 class XojPage;
 
 namespace xqt {
@@ -125,6 +126,11 @@ public:
     static constexpr double SIZE_SLOP = 0.06;
     /// Turning it with the knob, it stays straight (a multiple of 90 degrees) within this much
     static constexpr double STRAIGHT_SNAP = 4 * M_PI / 180;
+
+    /// How dark its black is, in percent: the setting "curtainOpacity" of ours (Settings → Pen → Presenting), 100
+    /// (black, the default) down to OPACITY_MIN: the page shows through it, for the one writing; it still takes no ink
+    static constexpr int OPACITY_MIN = 20;
+    static int opacitySetting(Settings& settings);
 
 private:
     void put(CanvasPage& page);

@@ -138,8 +138,9 @@ again about 0.5 s. Most of a full write is qpdf resolving and writing every page
 
 ## Save as, the old `.xopp`, Share
 
-1. **Save as with a type.** One Save as dialog (⋮ → Save as…, Ctrl+Shift+S, and Ctrl+S of a document without a
-   file) with two file types: "Xournal notes (.xopp)" and "PDF with notes, editable (.pdf)". New documents start on
+1. **Save as with a type.** One Save as dialog (⋮ → Save as…, Ctrl+Shift+S, the Save button held or right-clicked
+   (`saveMenu`: Save, Save as…; testers looked for it there, xournalpp/xournalpp#7770), and Ctrl+S of a document
+   without a file) with two file types: "Xournal notes (.xopp)" and "PDF with notes, editable (.pdf)". New documents start on
    `.xopp` (decided with the author), a document that is a hybrid PDF already starts on the PDF with its own name. The name
    follows the type (`AppController::fileForFormat`: the suggestion of one type becomes the other's; else the
    extension is swapped, and a `.pdf` taken by another PDF becomes `name.notes.pdf`). The extension typed wins over

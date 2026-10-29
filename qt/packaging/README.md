@@ -30,4 +30,6 @@ Every installed file has a name of its own (`xournal-qt…`), so the package can
 package (Xournal++ GTK). `packaging/check-conflicts.sh <deb>` compares the files with those of installed packages.
 
 The dependencies come from the libraries the program uses (`dpkg-shlibdeps`), plus the QML modules and the SVG
-image plugin (package names of KDE neon / Ubuntu).
+image plugin (package names of KDE neon / Ubuntu). So a package fits only the system it was built on: the exact Qt
+version (`qt6-*-private-abi`) and that system's library package names. The releases build one for KDE neon, Debian 13
+and Ubuntu 26.04 ([releasing.md](../docs/development/releasing.md#which-package-for-which-system)).

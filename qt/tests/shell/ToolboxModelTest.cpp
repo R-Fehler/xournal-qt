@@ -278,7 +278,8 @@ TEST(ToolboxModel, theTopBarHasItsFirstLayout) {
                            "@settings"}));
     EXPECT_EQ(m.items("top"), m.topItems());
     EXPECT_EQ(m.items("rail"), m.entries());
-    EXPECT_EQ(m.unplaced(), QStringList({"new"})) << "every other app item has its place";
+    EXPECT_EQ(m.unplaced(), QStringList({"new", "curtain", "spotlight"}))
+            << "every other app item has its place (the catalog offers these)";
     EXPECT_EQ(m.barOf(m.idOfApp("hand")), "rail");
     EXPECT_EQ(m.barOf(m.idOfApp("record")), "top");
     EXPECT_EQ(m.kindOf(m.idOfApp("hand")), "app");
@@ -437,7 +438,7 @@ TEST(ToolboxModel, backToTheFirstLayoutKeepsTheUsersTools) {
     EXPECT_EQ(typesOf(m.entries()).mid(typesOf(m.entries()).size() - 5),
               QStringList({"|", "@hand", "@select", "@snip", "@pdfText"}));
     EXPECT_EQ(typesOf(m.topItems()), typesOf(ToolboxModel(nullptr, nullptr).topItems()));
-    EXPECT_EQ(m.unplaced(), QStringList({"new"}));
+    EXPECT_EQ(m.unplaced(), QStringList({"new", "curtain", "spotlight"}));
     const QStringList ids = idsOf(m.entries()) + idsOf(m.topItems());
     EXPECT_EQ(QSet<QString>(ids.begin(), ids.end()).size(), ids.size());
 }

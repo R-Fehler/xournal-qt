@@ -210,6 +210,9 @@ public:
     /// Whether the tool draws with its custom width.
     bool isCustomThicknessActive(SelectedTool selectedTool = SelectedTool::active) const;
     bool isCustomThicknessActive(ToolType type) const;
+    /// xournal-qt: the button's tool takes the custom width of the tool `type` (and whether it is active), as
+    /// ButtonConfig::applyNoChangeSettings gives it the size: the size alone is not the width of a tool here.
+    void setButtonCustomThickness(ToolType type, Button button);
 
     void setLineStyle(const LineStyle& style);
 

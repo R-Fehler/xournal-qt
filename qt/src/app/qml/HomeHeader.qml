@@ -201,6 +201,11 @@ Flickable {
             label: qsTr("Import")
             visible: home.expanded && home.page === 0 && app.library.available
             iconName: "xqt-import"
+            // Its word beside the icon where the header has room for every word (home.roomy): the tray with an
+            // arrow alone did not say what it does
+            display: home.roomy ? AbstractButton.TextBesideIcon : AbstractButton.IconOnly
+            text: home.roomy ? label : ""
+            implicitWidth: home.roomy ? implicitContentWidth + leftPadding + rightPadding : 48
             tip: qsTr("Import PDFs and Xournal files, or a whole folder (copies them into this folder)")
             onClicked: Popups.openAt(importMenu)
             AdaptiveMenu {

@@ -29,6 +29,7 @@
 #include <QSGClipNode>
 #include <QSGRendererInterface>
 #include <QSGFlatColorMaterial>
+#include <QSGOpacityNode>
 #include <QSGGeometry>
 #include <QSGSimpleRectNode>
 #include <QSGSimpleTextureNode>
@@ -294,18 +295,15 @@ public:
         clip = new PageClipNode;
         appendChildNode(clip);
         body = new QSGTransformNode;
-        clip->appendChildNode(body);
+        // (its black as dark as the setting says: the handles are not under it)
+        cover = new QSGOpacityNode;
+        clip->appendChildNode(cover);
+        cover->appendChildNode(body);
         sheet = new QSGSimpleRectNode(QRectF(), Qt::black);
         body->appendChildNode(sheet);
         for (auto*& f: around) {
             f = new QSGSimpleRectNode(QRectF(), Qt::black);
             body->appendChildNode(f);
-        }
-        for (int i = 0; i < HANDLES; ++i) {
-            frames[i] = new QSGSimpleRectNode(QRectF(), HANDLE_COLOR);
-            clip->appendChildNode(frames[i]);
-            fills[i] = new QSGSimpleRectNode(QRectF(), Qt::white);
-            clip->appendChildNode(fills[i]);
         }
     }
     void clear() {
@@ -359,49 +357,104 @@ public:
     }
     void hideHandles() {
         for (int i = 0; i < HANDLES; ++i) {
-            frames[i]->setRect(QRectF());
-            fills[i]->setRect(QRectF());
+            showHandle(i, false);
         }
         if (knob && knob->parent()) {
             clip->removeChildNode(knob);
         }
     }
-    /// The knob that turns it: a white disc in a ring (a picture of its own, made once for each pixel ratio), on
-    /// whole device pixels
-    void showKnob(QQuickWindow* window, QPointF at, double dpr) {
-        const int size = static_cast<int>(std::ceil(KNOB * dpr));
-        if (knob && knobDpr != dpr) {
-            if (knob->parent()) {
-                clip->removeChildNode(knob);
-            }
-            delete knob;
-            knob = nullptr;
+    /// The handles' and the knob's pictures for this pixel ratio and selection color (again only when one changed)
+    void preparePictures(QQuickWindow* window, double dpr, QColor color) {
+        if (picturesDpr == dpr && picturesColor == color && knob) {
+            return;
         }
-        if (!knob) {
-            QImage image(size, size, QImage::Format_ARGB32_Premultiplied);
-            image.fill(Qt::transparent);
-            QPainter painter(&image);
-            painter.setRenderHint(QPainter::Antialiasing);
-            const double ring = size / 7.0;
-            painter.setPen(QPen(HANDLE_COLOR, ring));
-            painter.setBrush(Qt::white);
-            painter.drawEllipse(QRectF(ring / 2, ring / 2, size - ring, size - ring));
-            painter.end();
-            knob = new TileNode;
-            knob->setFiltering(QSGTexture::Linear);
-            knob->setTexture(window->createTextureFromImage(image));
-            knobDpr = dpr;
+        const QImage disc = handlePicture(dpr, color, false);
+        for (int i = 0; i < HANDLES; ++i) {
+            const bool shown = handles[i] && handles[i]->parent();
+            showHandle(i, false);
+            delete handles[i];
+            handles[i] = new TileNode;
+            handles[i]->setFiltering(QSGTexture::Linear);
+            handles[i]->setTexture(window->createTextureFromImage(disc));
+            showHandle(i, shown);
         }
-        const double side = size / dpr;
-        knob->setRect(QRectF(snapPoint(at - QPointF(side / 2, side / 2), dpr), QSizeF(side, side)));
-        if (!knob->parent()) {
+        const bool knobShown = knob && knob->parent();
+        if (knobShown) {
+            clip->removeChildNode(knob);
+        }
+        delete knob;
+        knob = new TileNode;
+        knob->setFiltering(QSGTexture::Linear);
+        knob->setTexture(window->createTextureFromImage(handlePicture(dpr, color, true)));
+        if (knobShown) {
             clip->appendChildNode(knob);
         }
+        picturesDpr = dpr;
+        picturesColor = color;
+    }
+    /// Handle `i` (or the knob: `i` < 0) with its middle at `at`, on whole device pixels
+    void placeHandle(int i, QPointF at, double dpr) {
+        TileNode* node = i < 0 ? knob : handles[i];
+        const double side = node->texture()->textureSize().width() / dpr;
+        node->setRect(QRectF(snapPoint(at - QPointF(side / 2, side / 2), dpr), QSizeF(side, side)));
+        if (i < 0) {
+            if (!knob->parent()) {
+                clip->appendChildNode(knob);
+            }
+        } else {
+            showHandle(i, true);
+        }
+    }
+    void showHandle(int i, bool shown) {
+        if (!handles[i] || (handles[i]->parent() != nullptr) == shown) {
+            return;
+        }
+        if (shown) {
+            clip->appendChildNode(handles[i]);
+        } else {
+            clip->removeChildNode(handles[i]);
+        }
+    }
+    /// As the selection's handles (EditSelection::drawAnchorRect, drawAnchorRotation): a white disc in a ring of the
+    /// selection color with a soft edge; the knob that turns it red with a white ring and a turning arrow
+    static QImage handlePicture(double dpr, const QColor& color, bool turning) {
+        const int size = static_cast<int>(std::ceil((2 * RADIUS + 6) * dpr));
+        QImage image(size, size, QImage::Format_ARGB32_Premultiplied);
+        image.fill(Qt::transparent);
+        QPainter painter(&image);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.scale(dpr, dpr);
+        const QPointF c(size / dpr / 2, size / dpr / 2);
+        const auto circle = [&](double r) { return QRectF(c - QPointF(r, r), QSizeF(2 * r, 2 * r)); };
+        if (turning) {
+            painter.setPen(QPen(Qt::white, 2));
+            painter.setBrush(QColor::fromRgbF(0.85F, 0.11F, 0.11F));
+            painter.drawEllipse(circle(RADIUS));
+            // (cairo's angles turn clockwise on the screen, Qt's the other way: cairo's -2.4 to 1.6 radians)
+            constexpr double DEGREES = 180 / M_PI;
+            painter.setBrush(Qt::NoBrush);
+            painter.drawArc(circle(RADIUS * 0.45), static_cast<int>(2.4 * DEGREES * 16),
+                            static_cast<int>(-4.0 * DEGREES * 16));
+        } else {
+            painter.setPen(QPen(QColor(0, 0, 0, 64), 2));  // a soft edge, also on white pages
+            painter.setBrush(Qt::NoBrush);
+            painter.drawEllipse(circle(RADIUS + 1));
+            painter.setPen(QPen(color, 2.5));
+            painter.setBrush(Qt::white);
+            painter.drawEllipse(circle(RADIUS));
+        }
+        painter.end();
+        return image;
     }
     ~CurtainNode() override {
         // (in the tree they go with it)
         if (knob && !knob->parent()) {
             delete knob;
+        }
+        for (TileNode* h: handles) {
+            if (h && !h->parent()) {
+                delete h;
+            }
         }
         for (TileNode* c: corners) {
             if (c && !c->parent()) {
@@ -409,18 +462,17 @@ public:
             }
         }
     }
-    static inline const QColor HANDLE_COLOR{0x3f, 0x51, 0xb5};  // (the window's accent, Material Indigo)
-    static constexpr double HANDLE = 12;  ///< a handle's size (item pixels)
-    static constexpr double KNOB = 20;
+    static constexpr double RADIUS = 12;  ///< a handle's radius (item pixels), as the selection's (handleRadius)
     PageClipNode* clip;
+    QSGOpacityNode* cover;   ///< how dark the black is (the setting "curtainOpacity")
     QSGTransformNode* body;  ///< its own coordinates (points from its middle, unturned)
     QSGSimpleRectNode* sheet;                    ///< the curtain
     std::array<QSGSimpleRectNode*, 4> around{};  ///< the spotlight: black above, below, left and right of its hole
     std::array<TileNode*, 4> corners{};          ///< ... and in its corners (top left, top right, bottom left, right)
-    std::array<QSGSimpleRectNode*, HANDLES> frames{};
-    std::array<QSGSimpleRectNode*, HANDLES> fills{};
-    TileNode* knob = nullptr;
-    double knobDpr = 0;  ///< the pixel ratio its picture was made for
+    std::array<TileNode*, HANDLES> handles{};    ///< at the corners and the middles of the edges
+    TileNode* knob = nullptr;                    ///< the knob that turns it
+    double picturesDpr = 0;                      ///< the pixel ratio and color their pictures were made for
+    QColor picturesColor;
 };
 
 // Containers are (identity) transform nodes, not plain QSGNodes: Qt Quick's software backend re-resolves a changed
@@ -980,6 +1032,12 @@ void DocumentCanvasItem::setView(QObject* object) {
         // The pointer follows the settings (dot or crosshair)
         pointerApp = &canvasView->getSession().getApp();
         connect(pointerApp, &xqt::AppContext::settingsChanged, this, &DocumentCanvasItem::refreshPointer);
+        // (the curtain's darkness and the selection's color are settings too: drawn again while it is out)
+        connect(pointerApp, &xqt::AppContext::settingsChanged, this, [this] {
+            if (canvasView && canvasView->curtain().visible()) {
+                update();
+            }
+        });
         // ... the tool (the eraser's size and kind; a side button that erases while it is held), and the zoom
         connect(pointerApp, &xqt::AppContext::activeToolChanged, this, &DocumentCanvasItem::refreshPointer);
         connect(pointerApp, &xqt::AppContext::toolPropertiesChanged, this, &DocumentCanvasItem::refreshPointer);
@@ -1900,27 +1958,30 @@ void DocumentCanvasItem::updateCurtainNode(QSGNode* rootNode, double zoom, doubl
         c->sheet->setRect(QRectF(QPointF(-size.width() / 2, -size.height() / 2), size));
     }
 
-    // The handles: squares at the corners and edges, the knob above (item pixels, not turned)
+    // How dark the black is (a setting; the handles are not under it)
+    Settings& settings = *canvasView->getSession().getSettings();
+    const double opacity = xqt::CurtainLayer::opacitySetting(settings) / 100.0;
+    if (c->cover->opacity() != opacity) {
+        c->cover->setOpacity(opacity);
+    }
+
+    // The handles: round at the corners and edges, the knob above, as the selection's (item pixels, not turned, on
+    // whole device pixels)
+    const Color selection = settings.getSelectionColor();
+    c->preparePictures(window(), dpr, QColor(selection.red, selection.green, selection.blue));
     const auto handles = curtain.handles();
-    int square = 0;
+    int round = 0;
     bool knob = false;
     for (const auto& [handle, at]: handles) {
         if (handle == xqt::CurtainLayer::Handle::Rotate) {
-            c->showKnob(window(), at, dpr);
+            c->placeHandle(-1, at, dpr);
             knob = true;
-        } else if (square < CurtainNode::HANDLES) {
-            // Whole device pixels (at 125 % or 150 % a frame of 2 logical pixels was 2 or 3 pixels thick by side)
-            const double h = std::round(CurtainNode::HANDLE * dpr) / dpr;
-            const double frame = std::max(1.0, std::round(2 * dpr)) / dpr;
-            const QPointF corner = snapPoint(at - QPointF(h / 2, h / 2), dpr);
-            c->frames[square]->setRect(QRectF(corner, QSizeF(h, h)));
-            c->fills[square]->setRect(QRectF(corner + QPointF(frame, frame), QSizeF(h - 2 * frame, h - 2 * frame)));
-            ++square;
+        } else if (round < CurtainNode::HANDLES) {
+            c->placeHandle(round++, at, dpr);
         }
     }
-    for (int i = square; i < CurtainNode::HANDLES; ++i) {
-        c->frames[i]->setRect(QRectF());
-        c->fills[i]->setRect(QRectF());
+    for (int i = round; i < CurtainNode::HANDLES; ++i) {
+        c->showHandle(i, false);
     }
     if (!knob && c->knob && c->knob->parent()) {
         c->clip->removeChildNode(c->knob);
@@ -1930,12 +1991,12 @@ void DocumentCanvasItem::updateCurtainNode(QSGNode* rootNode, double zoom, doubl
     curtainStats.sheet = QRectF(QPointF(-size.width() / 2, -size.height() / 2), size);
     curtainStats.spotlight = spotlight;
     curtainStats.handles = static_cast<int>(handles.size());
-    curtainStats.handleFrames.clear();
-    curtainStats.handleFills.clear();
-    for (int i = 0; i < square; ++i) {
-        curtainStats.handleFrames.push_back(c->frames[i]->rect());
-        curtainStats.handleFills.push_back(c->fills[i]->rect());
+    curtainStats.opacity = opacity;
+    curtainStats.handleRects.clear();
+    for (int i = 0; i < round; ++i) {
+        curtainStats.handleRects.push_back(c->handles[i]->rect());
     }
+    curtainStats.handlePixels = round > 0 ? c->handles[0]->texture()->textureSize() : QSize();
     curtainStats.knob = knob ? c->knob->rect() : QRectF();
     curtainStats.knobPixels = knob ? c->knob->texture()->textureSize() : QSize();
 }

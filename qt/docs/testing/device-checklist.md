@@ -107,7 +107,7 @@ Each link is that doc's section "On the device".
 
 | Area | Docs |
 | --- | --- |
-| Pen and tools | [hover-cursors](../features/hover-cursors.md#on-the-device), [pen-gestures](../features/pen-gestures.md#on-the-device), [toolbox](../features/toolbox.md#on-the-device) |
+| Pen and tools | [hover-cursors](../features/hover-cursors.md#on-the-device), [pen-gestures](../features/pen-gestures.md#on-the-device), [toolbox](../features/toolbox.md#on-the-device), [curtain](../features/curtain.md#on-the-device) |
 | Screens and the window | [hidpi](../features/hidpi.md#on-the-device), [adaptive-layout](../features/adaptive-layout.md#on-the-device), [zen](../features/zen.md#on-the-device), [presenter-view](../features/presenter-view.md#on-the-device), [reference-view](../features/reference-view.md#on-the-device) |
 | Documents and files | [hybrid-pdf](../features/hybrid-pdf.md#on-the-device), [library](../features/library.md#on-the-device), [adopt-annotations](../features/adopt-annotations.md#on-the-device), [tags](../features/tags.md#on-the-device), [todos](../features/todos.md#on-the-device), [quick-note](../features/quick-note.md#on-the-device) |
 | Markdown | [markdown-boxes](../features/markdown-boxes.md#on-the-device), [md-pdf](../features/md-pdf.md#on-the-device) |
