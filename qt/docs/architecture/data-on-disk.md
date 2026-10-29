@@ -103,7 +103,7 @@ resources, `<resource dir>/hwr-models/<name>/` (`model.json`, its files, `LICENC
 | Where | Built-in models |
 | --- | --- |
 | Linux (`.deb`, AppImage, an install) | `<prefix>/share/xournal-qt/hwr-models/` |
-| Windows (the zip) | `share\xournal-qt\hwr-models\` next to `bin\` |
+| Windows (the zip, the installer) | `share\xournal-qt\hwr-models\` next to `bin\` |
 | macOS | `xournal-qt.app/Contents/Resources/share/xournal-qt/hwr-models/` |
 | Android | in the APK's resources (`:/xqt-share/hwr-models/`), copied at start to `files/share/xournal-qt/hwr-models/` (a model whose `model.json` changed is copied anew) |
 | A build tree | `build-qt/share/xournal-qt/hwr-models/` |

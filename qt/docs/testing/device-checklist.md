@@ -61,7 +61,19 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
 - [ ] Printing on a real printer: page range, copies, landscape pages turned onto the sheet.
 - [ ] Recording and playing ([audio.md](../features/audio.md#on-the-device)).
 
-## Windows (the portable zip, Surface)
+## Windows (the installer and the portable zip, Surface)
+
+- [ ] The installer ([windows.md](../development/windows.md#the-installer)): SmartScreen, then no admin prompt; the
+      pages read well at 150 % and 200 %; "Start Xournal Qt" at the end starts it; the Start menu entry and Apps →
+      Installed apps show the icon and the version.
+- [ ] A `.xopp` and a `.xoj` show the document icon in Explorer and open on a double-click; right-click a PDF →
+      "Open with" lists Xournal Qt.
+- [ ] "Make Xournal Qt the default PDF app": Settings opens on Xournal Qt's page (Windows 11; Windows 10: Default
+      apps); after choosing it for `.pdf`, a double-click opens PDFs in it, and the choice survives an update.
+- [ ] The next version's installer over this one while the app runs: it asks to close it; then it updates in place
+      without the licence and folder pages, and the settings, libraries and taskbar pin stay.
+- [ ] Uninstall from Apps → Installed apps: the folder, the Start menu entry and the file types are gone; the
+      settings in `%LOCALAPPDATA%\xournal-qt` and the libraries stay.
 
 - [ ] `bin\xournal-qt.exe` starts without a console window (SmartScreen: "More info" → "Run anyway").
 - [ ] Pen pressure; if not: `xournal-qt-debug.bat` writes `input-log.txt`.

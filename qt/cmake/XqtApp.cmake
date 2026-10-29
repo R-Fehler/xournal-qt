@@ -457,6 +457,12 @@ if(WIN32)
         ${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowsSetup.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowsFonts.h
         ${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowsFonts.cpp)
+    # The program and document icons and the version Explorer shows (qt/packaging/windows/xournal-qt.rc.in; the
+    # installer's file types use the icons by position)
+    enable_language(RC)
+    get_filename_component(XQT_WINDOWS_PACKAGING_DIR "${CMAKE_CURRENT_LIST_DIR}/../packaging/windows" ABSOLUTE)
+    configure_file("${XQT_WINDOWS_PACKAGING_DIR}/xournal-qt.rc.in" "${CMAKE_BINARY_DIR}/xournal-qt.rc" @ONLY)
+    target_sources(xournal-qt PRIVATE "${CMAKE_BINARY_DIR}/xournal-qt.rc")
 endif()
 
 if(XQT_BUILD_TESTS)

@@ -1,7 +1,7 @@
 # xournal-qt: the artifacts of a release. Push a tag "v1.2.3" (or start this by hand) and a draft release with the
 # packages appears; look at it, write the notes and publish it. Linux (.deb, AppImage) is built here; Windows (a
-# portable zip), Android (the APK, signed with the release key from the repository secrets) and macOS (an unsigned
-# .dmg for Apple Silicon) by their own workflows, called from here.
+# portable zip and the installer), Android (the APK, signed with the release key from the repository secrets) and
+# macOS (an unsigned .dmg for Apple Silicon) by their own workflows, called from here.
 #
 # Qt 6.5 or newer is needed, which the runners' own Ubuntu 24.04 does not have (6.4), so every job builds in a
 # container: one on Ubuntu 22.04 with KDE neon's packages (Qt 6.7, as on the author's machine), one on Debian 13
@@ -211,6 +211,11 @@ jobs:
       - uses: actions/download-artifact@v4
         continue-on-error: true
         with:
+          name: xournal-qt-windows-setup-x64
+          path: windows-setup
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
           name: xournal-qt-android-arm64
           path: android
       - uses: actions/download-artifact@v4
@@ -230,6 +235,8 @@ jobs:
           if [ -n "$(ls -A windows 2>/dev/null)" ]; then
               (cd windows && zip -qr "../artifacts/xournal-qt-${version}-windows-x64.zip" .)
           fi
+          # Windows: the installer, named with the version already
+          cp windows-setup/xournal-qt-*-windows-setup-x64.exe artifacts/ 2>/dev/null || true
           if [ -f android/xournal-qt-arm64.apk ]; then
               cp android/xournal-qt-arm64.apk "artifacts/xournal-qt-${version}-android-arm64.apk"
           fi

@@ -1,19 +1,24 @@
 # Windows
 
-The desktop app, built for Windows x64 on GitHub Actions and published as a portable folder in a zip: unpack it and
-start `bin\xournal-qt.exe`. No installer yet. What is left for later is in [windows-roadmap.md](windows-roadmap.md).
+The desktop app, built for Windows x64 on GitHub Actions and published two ways: an installer
+(`xournal-qt-<version>-windows-setup-x64.exe`, for the user who runs it, no admin rights, updates an installed
+version: [The installer](#the-installer)) and a portable folder in a zip (unpack it and start `bin\xournal-qt.exe`).
+What is left for later is in [windows-roadmap.md](windows-roadmap.md).
 
-## Getting the zip
+## Getting the zip and the installer
 
 The workflow **xournal-qt Windows** ([.github/workflows/xqt-windows.yml](../../../.github/workflows/xqt-windows.yml))
 runs when it is started by hand (Actions → "xournal-qt Windows" → "Run workflow", any branch), for every push to
-the branches `qt/windows-build` and `qt/windows-feel`, and from the release workflow, which puts the zip into every
-release as `xournal-qt-<version>-windows-x64.zip` ([releasing.md](releasing.md)). Its run page has the artifacts:
+the branches `qt/windows-build`, `qt/windows-feel` and `qt/windows-installer`, and from the release workflow, which
+puts the zip and the installer into every release as `xournal-qt-<version>-windows-x64.zip` and
+`xournal-qt-<version>-windows-setup-x64.exe` ([releasing.md](releasing.md)). Its run page has the artifacts:
 
 | Artifact | What |
 |---|---|
 | `xournal-qt-windows-x64` (downloads as `xournal-qt-windows-x64.zip`) | the program folder `xournal-qt/` |
+| `xournal-qt-windows-setup-x64` | the installer, `xournal-qt-<version>-windows-setup-x64.exe` |
 | `smoke-test` | what the smoke test wrote: `app.png` (the app's window, off-screen), the exports, a log per step |
+| `installer-test` | what the installer test wrote: a log per step, `opened-by-type.png` (the app started by a `.xopp`) |
 | `build-logs` (only when the run failed) | configure, build and deploy logs, `CMakeCache.txt`, CMake's configure log |
 
 Artifacts are kept for 90 days (GitHub's default).
@@ -48,6 +53,72 @@ Where the program keeps things:
 | The default library | `Documents\Xournal_Libraries\Default` |
 
 Every file, and why the folders are these: [data-on-disk.md](../architecture/data-on-disk.md).
+
+## The installer
+
+`xournal-qt-<version>-windows-setup-x64.exe` installs the same program folder as the zip. It is an NSIS installer,
+adapted from upstream's (`windows-setup/xournalpp.nsi`, which stays as it is): the script is
+[qt/packaging/windows/xournal-qt.nsi](../../packaging/windows/xournal-qt.nsi), built by
+[qt/scripts/windows-installer.sh](../../scripts/windows-installer.sh) and tried by
+[qt/scripts/windows-installer-test.sh](../../scripts/windows-installer-test.sh).
+
+- **For the user who runs it**, without admin rights: into `%LOCALAPPDATA%\Programs\xournal-qt` (the folder can be
+  chosen; `xournal-qt` is added to a folder chosen without it), every registry entry under `HKCU`. So an update never
+  asks for admin rights, and there is one install per user, never two to choose between.
+- **Every name is xournal-qt's own** (`Software\xournal-qt`, the uninstall entry `xournal-qt`, the file types
+  `xournal-qt.xopp`, `xournal-qt.xoj`, `xournal-qt.pdf`), so it installs next to Xournal++. Upstream's script uses
+  `Xournal++` for all of them and, unchanged, would have run Xournal++'s uninstaller as its "previous version".
+- **What it adds**: the Start menu entry "Xournal Qt" (and a desktop shortcut, a component that is off by default);
+  `xournal-qt` for Win+R (App Paths); Apps → Installed apps (version, size, uninstall); "Open with" for `.xopp`,
+  `.xoj` and `.pdf`; Settings → Default apps lists the app with those three types (`RegisteredApplications`,
+  `Software\xournal-qt\Capabilities`). The icons are in `xournal-qt.exe` (below).
+- **Components**: "Open .xopp and .xoj files with Xournal Qt" (on; it sets the two types' default under
+  `HKCU\Software\Classes`, which a choice the user made in Windows' "Open with → Always" still overrides), "Desktop
+  shortcut" (off), "Make Xournal Qt the default PDF app" (off). An update offers the choices of the last install.
+- **The default PDF app**: Windows lets only the user choose it. Since Windows 8 a default that a program writes is
+  ignored and reset (the choice is kept in `UserChoice` with a hash only Windows' own dialogs write). So the
+  component does what a program can: the app is registered for `.pdf`, and at the end the installer says so and opens
+  `ms-settings:defaultapps?registeredAppUser=xournal-qt`, Xournal Qt's page in Settings → Default apps (Windows 11;
+  Windows 10 opens the Default apps page), where one click on `.pdf` chooses it. A silent install (`/S`) does not
+  open Settings.
+- **Updates**: the installer finds the installed version (`HKCU\Software\xournal-qt`: `InstallDir`, `Version`) and
+  installs into its folder, skipping the licence and folder pages. It first removes the old version's program files
+  (`bin\`, `share\`, `lib\`, `etc\`, the README and the .bat): the DLLs and Qt plugins differ between versions, and a
+  stale one left in `bin\` can break the start. It does not run the old uninstaller, which would delete the file
+  types, after which Windows forgets the user's choice of default PDF app. `windows-installer.sh` refuses a program
+  folder whose top-level entries the script does not remove (a new folder must be added to `RemoveProgramFiles`).
+- **An older version over a newer one** asks first; silently it is refused (exit code 3). Reinstalling the same
+  version works.
+- **While Xournal Qt runs** (its `.exe` or the CLI's in the install folder are open: Windows refuses to open a
+  running program for writing), the installer and the uninstaller ask to close it and retry. Silently, the
+  installer waits 10 s, then gives up without changing anything (exit code 4).
+- **The uninstaller** removes the program folder, the shortcuts and its registry entries, and of the file types'
+  defaults only those that still name Xournal Qt.
+- **Never touched**, by an update or the uninstaller: the settings (`%LOCALAPPDATA%\xournal-qt`), the caches, the
+  recordings and the libraries.
+- **Silent** (for scripts, and a later update check in the app): `setup.exe /S` installs or updates with the
+  defaults (or the last install's choices), `/D=<folder>` (last, unquoted) chooses the folder of a first install,
+  `"%LOCALAPPDATA%\Programs\xournal-qt\Uninstall.exe" /S` uninstalls.
+- **Not signed** yet: SmartScreen asks before the installer runs ("More info" → "Run anyway"), as for the zip.
+
+**The icons and the version of `xournal-qt.exe`**: [qt/packaging/windows/xournal-qt.rc.in](../../packaging/windows/xournal-qt.rc.in)
+(configured and compiled with `windres` by `XqtApp.cmake` on Windows) puts two icons into the program: the program's
+(0, from `qt/packaging/xournal-qt.svg`), which Explorer, the taskbar and Alt+Tab show before the window sets its own,
+and the `.xopp` / `.xoj` document icon (1, upstream's `ui/pixmaps/application-x-xopp.svg`), which the file types
+name. Explorer's Properties → Details show the version. The `.ico` files are committed;
+`python3 qt/packaging/windows/make-icons.py` makes them again after an SVG changed (librsvg through PyGObject).
+
+**The CI** (`xqt-windows.yml`) builds the installer after the deploy step with the runner's NSIS and publishes it,
+then `windows-installer-test.sh` runs it silently on the runner: an install (files, registry entries, Start menu,
+the installed CLI), a `.xopp` opened through its file type (`cmd /c start`, as a double-click: the installed app
+starts and saves a screenshot), an update refused while the app runs, an update over an "older" version (its stale
+files are gone, a `.xopp` default of another program and the choice to leave it stay, the settings stay), a
+downgrade refused, and the uninstall (everything of its own gone, the other program's default and the settings
+kept). What only a person at a Windows machine sees (the pages, Settings → Default apps, SmartScreen) is in the
+[device checklist](../testing/device-checklist.md).
+
+**Building it elsewhere**: `windows-installer.sh` also runs on Linux with Debian's or Ubuntu's `nsis` package (or
+`MAKENSIS=<makensis>`): that compiles the script with warnings as errors, which checks it, but cannot run it.
 
 `bin\xournal-qt-cli.exe` is the command line tool (`xournal-qt-cli file.xopp --create-pdf=out.pdf`, as upstream's
 `xournalpp --create-pdf`); it runs in a terminal.

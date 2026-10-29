@@ -1,5 +1,6 @@
 # xournal-qt for Windows: build the Qt frontend in MSYS2 UCRT64 (upstream Xournal++'s Windows toolchain) and
-# publish a portable folder as the artifact "xournal-qt-windows-x64" (downloaded as xournal-qt-windows-x64.zip).
+# publish a portable folder as the artifact "xournal-qt-windows-x64" (downloaded as xournal-qt-windows-x64.zip) and
+# the installer as "xournal-qt-windows-setup-x64".
 # See qt/docs/development/windows.md. Runs only when asked, or for pushes to the qt/windows-build branch.
 name: xournal-qt Windows
 
@@ -7,7 +8,7 @@ on:
   workflow_dispatch:
   workflow_call:  # (the release workflow builds it for every release)
   push:
-    branches: [qt/windows-build, qt/windows-feel]  # (qt/windows-feel: work done on the Surface)
+    branches: [qt/windows-build, qt/windows-feel, qt/windows-installer]  # (qt/windows-feel: work done on the Surface)
 
 concurrency:
   group: xqt-windows-${{ github.ref }}
@@ -124,6 +125,27 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+      # The installer (qt/packaging/windows/xournal-qt.nsi) from the same folder. The runners have NSIS; installed
+      # with Chocolatey should an image ever lack it.
+      - name: NSIS
+        shell: pwsh
+        run: |
+          $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if (-not (Test-Path $nsis)) { choco install nsis -y --no-progress }
+          & $nsis -VERSION
+
+      - name: Installer (xournal-qt-<version>-windows-setup-x64.exe)
+        run: |
+          set -euo pipefail
+          bash qt/scripts/windows-installer.sh dist/xournal-qt installer
+
+      - name: Publish the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: xournal-qt-windows-setup-x64
+          path: installer/*.exe
+          if-no-files-found: error
+
       - name: Smoke test (CLI exports, the app off-screen, recording, handwriting; gdb backtraces of what fails)
         timeout-minutes: 45
         run: |
@@ -136,6 +158,21 @@ jobs:
         with:
           name: smoke-test
           path: smoke/
+          if-no-files-found: ignore
+
+      # Install, open a .xopp by its file type, update, refuse a downgrade and an update while the app runs, uninstall
+      - name: Try the installer
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          bash qt/scripts/windows-installer-test.sh installer/xournal-qt-*-windows-setup-x64.exe installer-test
+
+      - name: Keep the installer test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-test
+          path: installer-test/
           if-no-files-found: ignore
 
       - name: Keep the build logs of a failed run

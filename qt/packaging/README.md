@@ -1,5 +1,8 @@
 # Packaging
 
+Windows (the installer and the portable zip): [windows.md](../docs/development/windows.md), its files in
+[windows/](windows/); macOS: [macos.md](../docs/development/macos.md). Linux:
+
 Following upstream Xournal++'s packaging (`readme/LinuxBuild.md`: CPack), a `.deb`:
 
 ```sh
