@@ -147,11 +147,18 @@ Remove the different cases to handle, just always on. If power consumption reall
   `AdaptiveLayoutTest.theHomeScreensPlusAndViewMenusWork`, every time: at 412×915, after "Open a file…" the star
   does not switch Recent to the library's favourites (`page` stays 1); the off-screen file dialog likely still takes
   the click. Also logged there and on 6.9: `StickerPicker.qml:46/47` "Cannot read property 'width'/'height' of null".
-- [ ] Nothing runs the tests on the Qt the Android APK ships (6.11.2): the Back key bug fixed for 0.9.0 (Qt 6.11
-  lists the Back key under `QKeySequence::Back`) showed only there. A CI job (conda-forge's Qt 6.11 or aqt) for the
-  `ui` and `shell` labels would catch the next one.
+- [x] Nothing ran the tests on the Qt the Android APK ships (6.11.2): since 0.13.0 the CI's Ubuntu 22.04 job runs the
+  full suite on Qt 6.11.2 from qt.io (`qt/scripts/linux-qt.sh`), as the AppImage ships it. There (first run, in a
+  4-CPU container) `AdaptiveLayoutTest.theHomeScreensPlusAndViewMenusWork` passed.
 
 ## Flaky tests
+- [ ] **Qt 6.11.2 from qt.io on Ubuntu 22.04** (the first full run, 4 CPUs, 2026-10-29): all 2048 passed with the
+  CI's repeat, but four UI/shell tests segfaulted once in their first 0.15 s with nothing logged
+  (`LibraryHandwritingTest.aDocumentSavedBeforeItsHandwritingIsReadIsFoundInTheLibrary`,
+  `ReferenceMode.theSameDocumentBesideItselfPopsOutIntoItsOwnTab`, `Sketches.aSharpThumbnailGivesThePageItsSketch`,
+  `Sketches.theyGetSmallerWhenManyPagesAreOpen`), three `Sketches.*` waited 20 s for a sketch, and
+  `TextPdf.picturesAreCarriedInsideAPdfTextDocument` once did not resolve its picture. Each passed on the next try.
+  The crashes at start look alike: get a backtrace (`ci-container.sh jammy`, gdb) before calling them flakes.
 - [ ] Under heavy load (four agents building, 2026-10-07) `StickerToolTest.theSelectionBecomesAStickerOfTheLibraryAndIsOnTheClipboard`,
   `ToolboxTest.aToolHeldThenMovedIsCarriedToAnotherPlace`, `AdaptiveLayoutTest.theHomeScreensPlusAndViewMenusWork` and
   `ColorChooserTest.theHighlighterTakesHighlightColors` failed once each in a full suite; all pass alone.

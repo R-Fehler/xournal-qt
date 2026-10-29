@@ -28,12 +28,13 @@ $SUDO apt-get install -y --no-install-recommends \
     libxml2-dev libzip-dev zlib1g-dev libjpeg-dev
 if [ "$download_qt" = 1 ]; then
     # Qt from qt.io brings its own libraries, but not what they link against on the system: OpenGL and EGL (also
-    # their headers: Qt's CMake files look for them), fontconfig, D-Bus, the X11/XCB libraries of the xcb platform,
-    # PulseAudio (Qt Multimedia), and Python for aqtinstall (qt/scripts/linux-qt.sh)
+    # their headers: Qt's CMake files look for them), fontconfig, D-Bus, CUPS (the print plugin), PulseAudio and
+    # XRandR (Qt Multimedia and its FFmpeg plugin), the X11/XCB libraries of the xcb platform, and Python for
+    # aqtinstall (qt/scripts/linux-qt.sh). The AppImage takes them from here.
     $SUDO apt-get install -y --no-install-recommends \
         python3 python3-venv xz-utils \
         libgl-dev libegl-dev libopengl-dev libglx-dev libgl1 libegl1 \
-        libfontconfig1 libfreetype6 libdbus-1-3 libpulse0 \
+        libfontconfig1 libfreetype6 libdbus-1-3 libcups2 libpulse0 libxrandr2 \
         libx11-xcb1 libxcb1 libxcb-cursor0 libxcb-glx0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
         libxcb-render-util0 libxcb-shape0 libxcb-shm0 libxcb-sync1 libxcb-xfixes0 libxcb-xkb1 libxkbcommon-x11-0
 else

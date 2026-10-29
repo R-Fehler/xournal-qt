@@ -54,7 +54,9 @@ if [ ! -f "$qt/lib/cmake/KF6SyntaxHighlighting/KF6SyntaxHighlightingConfig.cmake
     "$cmake" -S "$work/extra-cmake-modules-$kf_version" -B "$work/ecm-build" -DCMAKE_INSTALL_PREFIX="$work/ecm" \
         -DBUILD_TESTING=OFF -DBUILD_DOC=OFF -DBUILD_HTML_DOCS=OFF -DBUILD_MAN_DOCS=OFF -DBUILD_QTHELP_DOCS=OFF
     "$cmake" --install "$work/ecm-build"
+    # (into Qt's lib/, not KDE's Debian default lib/x86_64-linux-gnu/: linuxdeploy and the check above look there)
     "$cmake" -S "$sh" -B "$work/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$qt" \
+        -DKDE_INSTALL_LIBDIR=lib \
         -DCMAKE_PREFIX_PATH="$qt" -DECM_DIR="$work/ecm/share/ECM/cmake" -DBUILD_TESTING=OFF \
         -DKF_SKIP_PO_PROCESSING=ON -DCMAKE_DISABLE_FIND_PACKAGE_Python=ON -DCMAKE_DISABLE_FIND_PACKAGE_XercesC=ON \
         -DCMAKE_DISABLE_FIND_PACKAGE_Qt6Quick=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6PrintSupport=ON
