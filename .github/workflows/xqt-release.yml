@@ -4,11 +4,11 @@
 # macOS (an unsigned .dmg for Apple Silicon) by their own workflows, called from here.
 #
 # Qt 6.5 or newer is needed, which the runners' own Ubuntu 24.04 does not have (6.4), so every job builds in a
-# container: one on Ubuntu 22.04 with KDE neon's packages (Qt 6.7, as on the author's machine), one on Debian 13
-# (Qt 6.8), one on Ubuntu 26.04 (Qt 6.10). A .deb installs only on the system it was built on: it depends on that
-# system's exact Qt version (the QML compiled ahead of time uses Qt's private API, so dpkg-shlibdeps adds
-# qt6-*-private-abi (= <version>)) and on its library package names (Debian's libjpeg62-turbo and libxml2 are
-# Ubuntu 26.04's libjpeg-turbo8 and libxml2-16).
+# container: the .debs on Debian 13 (Qt 6.8) and Ubuntu 26.04 (Qt 6.10), with the system's Qt; the AppImage on Ubuntu
+# 22.04 with Qt from qt.io (qt/scripts/linux-qt.sh), which it carries with it. A .deb installs only on the system it
+# was built on: it depends on that system's exact Qt version (the QML compiled ahead of time uses Qt's private API, so
+# dpkg-shlibdeps adds qt6-*-private-abi (= <version>)) and on its library package names (Debian's libjpeg62-turbo and
+# libxml2 are Ubuntu 26.04's libjpeg-turbo8 and libxml2-16).
 name: xournal-qt release
 
 on:
@@ -28,18 +28,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: KDE neon / Ubuntu 22.04
-            container: ubuntu:22.04
-            suffix: neon-jammy
-            neon: '1'
           - name: Debian 13
             container: debian:trixie
             suffix: debian13
-            neon: '0'
           - name: Ubuntu 26.04
             container: ubuntu:26.04
             suffix: ubuntu26.04
-            neon: '0'
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 1500M
@@ -53,8 +47,6 @@ jobs:
 
       - name: Install the build dependencies
         run: bash qt/scripts/linux-deps.sh
-        env:
-          XQT_NEON: ${{ matrix.neon }}
 
       # (a second release run of the same version, after a fix, rebuilds only what changed)
       - name: Compiler cache
@@ -112,23 +104,70 @@ jobs:
           QT_QPA_PLATFORM=offscreen xournal-qt --hwr-info
 
   appimage:
-    name: AppImage (Ubuntu 22.04 and newer)
-    runs-on: ubuntu-22.04
-    # The first one: it runs everywhere from Ubuntu 22.04 on, but the recipe is new - a release does not wait for it.
-    continue-on-error: true
+    name: Ubuntu 22.04 (Qt from qt.io), AppImage
+    runs-on: ubuntu-latest
+    # Ubuntu 22.04: the AppImage runs on the systems with this glibc or a newer one. Its Qt (6.2) is too old, so Qt
+    # comes from qt.io (qt/scripts/linux-qt.sh) and goes into the AppImage.
+    container: ubuntu:22.04
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1500M
+      XQT_QT_VERSION: 6.11.2
+      QT_PREFIX: /opt/qt/6.11.2/gcc_64
     steps:
+      - name: What the checkout needs in the container
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates ccache
+
       - uses: actions/checkout@v4
 
-      - name: Install the build dependencies
+      - name: Install the build dependencies (without the system's Qt)
         run: bash qt/scripts/linux-deps.sh
         env:
-          XQT_NEON: '1'
+          XQT_QT_DOWNLOAD: '1'
 
-      - name: Build and install into an AppDir
+      - name: Qt cache
+        uses: actions/cache@v4
+        with:
+          path: /opt/qt
+          key: xqt-linux-qt-${{ env.XQT_QT_VERSION }}-${{ hashFiles('qt/scripts/linux-qt.sh') }}
+
+      - name: Qt from qt.io and KSyntaxHighlighting
+        run: |
+          bash qt/scripts/linux-qt.sh /opt/qt
+          # (its CMake: Ubuntu 22.04's is too old for KDE's CMake files; the app is built with the same one)
+          echo /opt/qt/tools/bin >> "$GITHUB_PATH"
+
+      - name: Compiler cache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: xqt-release-ccache-jammy-qtio-${{ github.sha }}
+          restore-keys: xqt-release-ccache-jammy-qtio-
+
+      - name: The tag and the version of the project must say the same
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="$(sed -n 's/^project(xournal-qt VERSION \([0-9.]*\).*/\1/p' qt/CMakeLists.txt)"
+          tag="${GITHUB_REF_NAME#v}"
+          echo "project ${version}, tag ${tag}"
+          [ "$version" = "$tag" ] || { echo "::error::the tag says ${tag}, qt/CMakeLists.txt says ${version}"; exit 1; }
+
+      - name: Configure
         run: |
           cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DXQT_BUILD_SPIKES=OFF \
-                -DCMAKE_INSTALL_PREFIX=/usr
-          cmake --build build -j "$(nproc)"
+                -DCMAKE_PREFIX_PATH="$QT_PREFIX" -DCMAKE_INSTALL_PREFIX=/usr
+
+      - name: Build
+        run: cmake --build build -j "$(nproc)"
+
+      - name: Test
+        # (as in the packages above)
+        run: ctest --test-dir build -j "$(nproc)" --output-on-failure --timeout 300 --repeat until-pass:3
+
+      - name: Install into an AppDir
+        run: |
           DESTDIR="$PWD/AppDir" cmake --install build
           # The handwriting search: ONNX Runtime beside the program (usr/lib/xournal-qt; the models came with the install)
           bash qt/scripts/linux-onnxruntime.sh "$PWD/AppDir/usr"
@@ -142,7 +181,10 @@ jobs:
           curl -fsSLO "$plugin/linuxdeploy-plugin-qt-x86_64.AppImage"
           chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
           export QML_SOURCES_PATHS="$PWD/qt/src/app/qml"
-          export QMAKE="$(command -v qmake6 || command -v qmake)"  # how the Qt plugin finds Qt
+          export QMAKE="$QT_PREFIX/bin/qmake"  # how the Qt plugin finds Qt
+          # (the installed program has no rpath into Qt's folder: this is how linuxdeploy finds Qt's libraries and
+          # KSyntaxHighlighting)
+          export LD_LIBRARY_PATH="$QT_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           version="$(sed -n 's/^project(xournal-qt VERSION \([0-9.]*\).*/\1/p' qt/CMakeLists.txt)"
           case "$GITHUB_REF_NAME" in v*) export VERSION="${GITHUB_REF_NAME#v}" ;; *) export VERSION="$version" ;; esac
           export OUTPUT="xournal-qt-$VERSION-x86_64.AppImage"  # else it is named after the desktop entry

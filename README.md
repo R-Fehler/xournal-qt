@@ -97,7 +97,7 @@ markup tools (stamps, measurements).
 
 ## Getting it
 
-Releases have packages for Linux (`.deb` for KDE neon / Ubuntu 22.04, Debian 13 and Ubuntu 26.04, an AppImage),
+Releases have packages for Linux (`.deb` for Debian 13 and Ubuntu 26.04, an AppImage for Ubuntu 22.04 and newer),
 Windows (a portable zip), Android 9 and newer (an APK) and macOS 15 on Apple Silicon (an unsigned `.dmg`):
 [releases](https://github.com/R-Fehler/xournal-qt/releases), and
 [qt/docs/development/releasing.md](qt/docs/development/releasing.md) for which one fits. From source (Linux, Qt 6.5 or newer):

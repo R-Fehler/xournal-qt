@@ -22,8 +22,8 @@ block. This page is what the integrator hands every block agent (point it here i
 - QML items a test needs carry an `objectName`.
 - Every new cache has an owner and a limit; background work at idle priority; never hold the document lock while
   drawing a PDF.
-- Use no Qt API newer than **6.7** (the oldest Qt a release is built with: KDE neon) and no QML property names that are
-  JS globals (`console`, …). E.g. `AbstractButton.click()` is 6.8: tests emit `clicked`/`triggered` instead.
+- Use no Qt API newer than **6.8** (the oldest Qt a release is built with: Debian 13) and no QML property names that
+  are JS globals (`console`, …).
 - A refactoring changes structure, not behaviour: the tests that pass before pass after (except tests that only pin
   removed behaviour, which go with them). Keep the objectNames tests use.
 - A block that adds, moves or removes a module, a CMake target or a key class updates

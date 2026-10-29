@@ -14,13 +14,12 @@ What the CI does on every push, the block tests and how to reproduce a CI failur
    git push origin master-qt vx.y.z
    ```
 5. Watch the run. It produces:
-   - `xournal-qt_x.y.z_amd64_neon-jammy.deb` — built on Ubuntu 22.04 with KDE neon's packages (Qt 6.7). For KDE
-     neon and other Ubuntu 22.04 systems that have Qt 6.5 or newer.
    - `xournal-qt_x.y.z_amd64_debian13.deb` — built on Debian 13 (Qt 6.8). For Debian 13 only.
    - `xournal-qt_x.y.z_amd64_ubuntu26.04.deb` — built on Ubuntu 26.04 (Qt 6.10). For Ubuntu 26.04 and its flavours
      (Kubuntu, …).
-   - `xournal-qt-x.y.z-x86_64.AppImage` — runs from Ubuntu 22.04 on, whatever Qt the system has; it carries Qt and
-     the QML modules with it (about 80 MB), which linuxdeploy and its Qt plugin put there. Those two are tools, they
+   - `xournal-qt-x.y.z-x86_64.AppImage` — built on Ubuntu 22.04 with Qt from qt.io (`qt/scripts/linux-qt.sh`, the
+     version is `XQT_QT_VERSION` in the workflow) after the full test suite; runs from Ubuntu 22.04 on, whatever Qt
+     the system has; it carries Qt and the QML modules with it, which linuxdeploy and its Qt plugin put there. Those two are tools, they
      are AppImages themselves, and they do not belong in the release.
 6. Install a package and try it, then write the notes and publish the draft on GitHub.
 
@@ -52,7 +51,7 @@ Ubuntu 26.04. Until 0.12.0 the releases said the Debian 13 package was also for 
 
 | System | What to use |
 | --- | --- |
-| KDE neon (Ubuntu 22.04 base) | the `neon-jammy` package |
+| Ubuntu 22.04, KDE neon | the AppImage (until 0.12.1 there was a `neon-jammy` package, built with KDE neon's Qt 6.7 for Ubuntu 22.04; KDE neon's archive for Ubuntu 22.04 broke the release of 0.13.0) |
 | Debian 13 | the `debian13` package |
 | Ubuntu 26.04, Kubuntu 26.04 | the `ubuntu26.04` package |
 | Ubuntu 24.04 (Qt 6.4 only), 25.04, 25.10 | the AppImage, or build from source |

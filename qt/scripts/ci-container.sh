@@ -3,7 +3,7 @@
 # jobs of xqt-release.yml), to see a failure of GitHub's runners on this machine.
 #
 #   qt/scripts/ci-container.sh debian build [targets…]   # Debian 13 (Qt 6.8); no target: everything, as the CI does
-#   qt/scripts/ci-container.sh neon test -R AdaptiveLayoutTest.menusAreSheetsOnPhones   # Ubuntu 22.04 + KDE neon (Qt 6.7)
+#   qt/scripts/ci-container.sh jammy test -R AdaptiveLayoutTest.menusAreSheetsOnPhones  # Ubuntu 22.04, Qt 6.11 from qt.io
 #   qt/scripts/ci-container.sh debian run build/xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.*'
 #   qt/scripts/ci-container.sh debian shell | clean     # a shell in the container; delete its build folder
 #
@@ -22,8 +22,8 @@ name="$1"
 what="$2"
 shift 2
 case "$name" in
-    debian) base=docker.io/library/debian:trixie neon=0 ;;
-    neon) base=docker.io/library/ubuntu:22.04 neon=1 ;;
+    debian) base=docker.io/library/debian:trixie download=0 ;;
+    jammy) base=docker.io/library/ubuntu:22.04 download=1 ;;
     *) usage ;;
 esac
 
@@ -42,15 +42,25 @@ else
 fi
 mkdir -p "$work"
 
-# The image: the base of the CI with what linux-deps.sh installs (rebuilt when the script changes), plus ccache
+# The image: the base of the CI with what linux-deps.sh installs (rebuilt when the script changes), plus ccache, and
+# for jammy Qt from qt.io (linux-qt.sh, in /opt/qt as on GitHub)
 ctx="$(mktemp -d)"
 trap 'rm -rf "$ctx"' EXIT
-cp "$here/linux-deps.sh" "$ctx/"
+cp "$here/linux-deps.sh" "$here/linux-qt.sh" "$ctx/"
+qt_version="$(sed -n 's/^version="\${XQT_QT_VERSION:-\([0-9.]*\)}"$/\1/p' "$here/linux-qt.sh")"
+qt_step="true"
+prefix_env=()
+if [ "$download" = 1 ]; then
+    qt_step="bash /linux-qt.sh /opt/qt"
+    # (and the CMake of linux-qt.sh: Ubuntu 22.04's is too old for KDE's CMake files)
+    prefix_env=(-e "CMAKE_PREFIX_PATH=/opt/qt/$qt_version/gcc_64"
+        -e "PATH=/opt/qt/tools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
+fi
 cat >"$ctx/Dockerfile" <<EOF
 FROM $base
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git ca-certificates ccache
-COPY linux-deps.sh /linux-deps.sh
-RUN XQT_NEON=$neon bash /linux-deps.sh && apt-get clean
+COPY linux-deps.sh linux-qt.sh /
+RUN XQT_QT_DOWNLOAD=$download bash /linux-deps.sh && $qt_step && apt-get clean
 EOF
 # (the host's network: a bridge has no name server on some machines)
 "$engine" build -q --network=host -t "$image" "$ctx" >/dev/null
@@ -65,7 +75,7 @@ tty=()
 in_container() {
     "$engine" run --rm "${tty[@]}" "${limits[@]}" --network=host \
         -v "$src:$checkout:$mode" -v "$work:/work" -w "$checkout" \
-        -e CI=true -e HOME=/github/home -e CCACHE_DIR=/work/ccache \
+        -e CI=true -e HOME=/github/home -e CCACHE_DIR=/work/ccache ${prefix_env[@]+"${prefix_env[@]}"} \
         "$image" bash -c "mkdir -p \$HOME && $1" bash "${@:2}"
 }
 

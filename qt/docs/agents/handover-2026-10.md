@@ -55,8 +55,8 @@ and everything under "Only the author can do this".
 
 1. **Get the code and the Qt you need.**
    - Clone the repository and check out the integration branch, or `master-qt` once the author has merged it.
-   - Use Debian 13 (Qt 6.8) or KDE neon / Ubuntu 22.04 with `XQT_NEON=1` (Qt 6.7). `qt/scripts/linux-deps.sh`
-     installs the packages.
+   - Use Debian 13 (Qt 6.8), or Ubuntu 22.04 with Qt from qt.io (`XQT_QT_DOWNLOAD=1 qt/scripts/linux-deps.sh`, then
+     `qt/scripts/linux-qt.sh`). `qt/scripts/linux-deps.sh` installs the packages.
    - On another distribution, use one of these:
      - `qt/scripts/ci-container.sh` builds and tests in the CI's own containers;
      - `qt/scripts/cloud-env.sh` sets up Qt from conda-forge.
