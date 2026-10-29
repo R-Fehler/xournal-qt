@@ -91,6 +91,8 @@ jobs:
         run: |
           bash qt/scripts/linux-qt.sh /opt/qt
           echo "CMAKE_PREFIX_PATH=/opt/qt/${XQT_QT_VERSION}/gcc_64" >> "$GITHUB_ENV"
+          # (its CMake: Ubuntu 22.04's is too old for KDE's CMake files; the app is built with the same one)
+          echo /opt/qt/tools/bin >> "$GITHUB_PATH"
         env:
           XQT_QT_VERSION: ${{ matrix.qt_version }}
 

@@ -134,7 +134,10 @@ jobs:
           key: xqt-linux-qt-${{ env.XQT_QT_VERSION }}-${{ hashFiles('qt/scripts/linux-qt.sh') }}
 
       - name: Qt from qt.io and KSyntaxHighlighting
-        run: bash qt/scripts/linux-qt.sh /opt/qt
+        run: |
+          bash qt/scripts/linux-qt.sh /opt/qt
+          # (its CMake: Ubuntu 22.04's is too old for KDE's CMake files; the app is built with the same one)
+          echo /opt/qt/tools/bin >> "$GITHUB_PATH"
 
       - name: Compiler cache
         uses: actions/cache@v4

@@ -31,7 +31,7 @@ if [ "$download_qt" = 1 ]; then
     # their headers: Qt's CMake files look for them), fontconfig, D-Bus, the X11/XCB libraries of the xcb platform,
     # PulseAudio (Qt Multimedia), and Python for aqtinstall (qt/scripts/linux-qt.sh)
     $SUDO apt-get install -y --no-install-recommends \
-        python3 python3-venv \
+        python3 python3-venv xz-utils \
         libgl-dev libegl-dev libopengl-dev libglx-dev libgl1 libegl1 \
         libfontconfig1 libfreetype6 libdbus-1-3 libpulse0 \
         libx11-xcb1 libxcb1 libxcb-cursor0 libxcb-glx0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \

@@ -16,7 +16,8 @@ cmake --build build-qt -j$(nproc) --target <what you need>  # e.g. xournal-qt, x
   (Ubuntu 26.04) and 6.11 (Ubuntu 22.04 with Qt from qt.io, the AppImage). **Use no Qt API newer than 6.8** in C++ or
   QML, and no QML property named like a JS global (`console`, …). Ubuntu 24.04's own Qt (6.4) and Ubuntu 22.04's
   (6.2) are too old: there `XQT_QT_DOWNLOAD=1 qt/scripts/linux-deps.sh` installs the rest without Qt, then
-  `qt/scripts/linux-qt.sh /opt/qt` downloads Qt from qt.io (aqtinstall) and builds KSyntaxHighlighting against it;
+  `qt/scripts/linux-qt.sh /opt/qt` downloads Qt from qt.io (aqtinstall) and a newer CMake (22.04's 3.22 is too old
+  for KDE's CMake files) and builds KSyntaxHighlighting against that Qt; put `/opt/qt/tools/bin` first on `PATH` and
   configure with `-DCMAKE_PREFIX_PATH=/opt/qt/<version>/gcc_64`.
 - **qpdf** is built with the app (`qt/cmake/XqtQpdf.cmake` downloads its pinned source when the build is configured);
   `-DXQT_SYSTEM_QPDF=ON` takes the system's (12 or newer).

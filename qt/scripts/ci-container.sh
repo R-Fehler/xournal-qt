@@ -51,8 +51,10 @@ qt_version="$(sed -n 's/^version="\${XQT_QT_VERSION:-\([0-9.]*\)}"$/\1/p' "$here
 qt_step="true"
 prefix_env=()
 if [ "$download" = 1 ]; then
-    qt_step="bash /linux-qt.sh /opt/qt && rm -rf /opt/qt/aqt-venv"
-    prefix_env=(-e "CMAKE_PREFIX_PATH=/opt/qt/$qt_version/gcc_64")
+    qt_step="bash /linux-qt.sh /opt/qt"
+    # (and the CMake of linux-qt.sh: Ubuntu 22.04's is too old for KDE's CMake files)
+    prefix_env=(-e "CMAKE_PREFIX_PATH=/opt/qt/$qt_version/gcc_64"
+        -e "PATH=/opt/qt/tools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
 fi
 cat >"$ctx/Dockerfile" <<EOF
 FROM $base
