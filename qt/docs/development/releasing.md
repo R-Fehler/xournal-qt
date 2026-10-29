@@ -59,7 +59,7 @@ Ubuntu 26.04. Until 0.12.0 the releases said the Debian 13 package was also for 
 
 ## Windows and macOS
 
-Since 0.4.0 every release also carries the **Windows** portable zip (since 0.13.0 also the installer) and the
+Since 0.4.0 every release also carries the **Windows** portable zip (since 0.13.1 also the installer) and the
 **Android** APK: the release workflow calls `xqt-windows.yml` and `xqt-android.yml` (both also run by hand) and puts
 `xournal-qt-<version>-windows-x64.zip`, `xournal-qt-<version>-windows-setup-x64.exe` and `xournal-qt-<version>-android-arm64.apk` (signed with the release key from the repository secrets; Android 9 or
 newer, arm64) into the draft, and (also since 0.4.0) the unsigned **macOS** `.dmg` from `xqt-macos.yml`:
@@ -72,7 +72,7 @@ newer, arm64) into the draft, and (also since 0.4.0) the unsigned **macOS** `.dm
   Developer ID certificate and an App Store Connect API key as secrets, see macos.md), an Intel build (Homebrew has
   no Intel bottles any more), and a try on a real Mac.
 - **Windows** (`xqt-windows.yml`, [windows.md](windows.md)): MSYS2 (UCRT64) packages,
-  `windeployqt --qmldir qt/src/app/qml`, a portable zip and, since 0.13.0, an installer
+  `windeployqt --qmldir qt/src/app/qml`, a portable zip and, since 0.13.1, an installer
   (`xournal-qt-<version>-windows-setup-x64.exe`: per user, updates the installed version,
   [windows.md](windows.md#the-installer)), both unsigned.
 - **Recording** ([audio.md](../features/audio.md), "Platforms"; since `qt/audio-platforms`): every package offers it. Windows,

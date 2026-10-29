@@ -147,7 +147,7 @@ Remove the different cases to handle, just always on. If power consumption reall
   `AdaptiveLayoutTest.theHomeScreensPlusAndViewMenusWork`, every time: at 412×915, after "Open a file…" the star
   does not switch Recent to the library's favourites (`page` stays 1); the off-screen file dialog likely still takes
   the click. Also logged there and on 6.9: `StickerPicker.qml:46/47` "Cannot read property 'width'/'height' of null".
-- [x] Nothing ran the tests on the Qt the Android APK ships (6.11.2): since 0.13.0 the CI's Ubuntu 22.04 job runs the
+- [x] Nothing ran the tests on the Qt the Android APK ships (6.11.2): since 0.13.1 the CI's Ubuntu 22.04 job runs the
   full suite on Qt 6.11.2 from qt.io (`qt/scripts/linux-qt.sh`), as the AppImage ships it. There (first run, in a
   4-CPU container) `AdaptiveLayoutTest.theHomeScreensPlusAndViewMenusWork` passed.
 
