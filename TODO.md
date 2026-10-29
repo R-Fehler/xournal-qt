@@ -156,8 +156,10 @@ Remove the different cases to handle, just always on. If power consumption reall
   CI's repeat, but four UI/shell tests segfaulted once in their first 0.15 s with nothing logged
   (`LibraryHandwritingTest.aDocumentSavedBeforeItsHandwritingIsReadIsFoundInTheLibrary`,
   `ReferenceMode.theSameDocumentBesideItselfPopsOutIntoItsOwnTab`, `Sketches.aSharpThumbnailGivesThePageItsSketch`,
-  `Sketches.theyGetSmallerWhenManyPagesAreOpen`), three `Sketches.*` waited 20 s for a sketch, and
-  `TextPdf.picturesAreCarriedInsideAPdfTextDocument` once did not resolve its picture. Each passed on the next try.
+  `Sketches.theyGetSmallerWhenManyPagesAreOpen`), and `TextPdf.picturesAreCarriedInsideAPdfTextDocument` once did
+  not resolve its picture. Each passed on the next try. (`Sketches.*` also waited 20 s for their sketches there, and
+  on GitHub 3 of 3 tries: their workers run at SCHED_IDLE, Qt 6.8 as 6.11, and get no CPU beside the UI tests. They
+  run alone now, `RUN_SERIAL`.)
   The crashes at start look alike: get a backtrace (`ci-container.sh jammy`, gdb) before calling them flakes.
 - [ ] Under heavy load (four agents building, 2026-10-07) `StickerToolTest.theSelectionBecomesAStickerOfTheLibraryAndIsOnTheClipboard`,
   `ToolboxTest.aToolHeldThenMovedIsCarriedToAnotherPlace`, `AdaptiveLayoutTest.theHomeScreensPlusAndViewMenusWork` and

@@ -95,6 +95,9 @@ with `XQT_FAST_DEV` that halved the time of a short test.
   purpose without a C++ member goes into its allowlist with the reason.
 - **Only Qt ≤ 6.8 API**, in tests as in the app (the oldest Qt of the CI: Debian 13). No QML property names that
   are JS globals (`console`, …).
+- **A test that waits for work at idle priority** (the image workers, the background renders: `SCHED_IDLE` on
+  Linux) gets nothing done while `ctest -j$(nproc)` keeps every core busy. Register its suite with `RUN_SERIAL`
+  (`XQT_SHELL_IDLE_SUITES` in `qt/cmake/XqtApp.cmake`: the page sketches) rather than waiting longer.
 - Fixture files a test needs are written into a `QTemporaryDir` (or read from `qt/tests/<label>/` data folders);
   never write next to the sources.
 

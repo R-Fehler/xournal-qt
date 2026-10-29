@@ -619,6 +619,12 @@ if(XQT_BUILD_TESTS)
     target_link_libraries(xqt-shell-tests PRIVATE xqt-shell xqt-test-support Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-shell-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-shell-tests PRIVATE "${TEST_CONFIG_DIR}")
-    gtest_discover_tests(xqt-shell-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS shell
-        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    # The page sketches are drawn at idle priority (ImageWorkers: SCHED_IDLE on Linux), which gets no CPU while every
+    # core is busy: with `ctest -j$(nproc)` and the UI tests beside them they waited 20 s and failed (the CI's Ubuntu
+    # 22.04 job, 3 of 3 tries). They run alone (RUN_SERIAL), so a core is free for their workers.
+    set(XQT_SHELL_IDLE_SUITES "Sketches.*")
+    gtest_discover_tests(xqt-shell-tests DISCOVERY_TIMEOUT 30 TEST_FILTER "${XQT_SHELL_IDLE_SUITES}"
+        PROPERTIES LABELS shell ENVIRONMENT "QT_QPA_PLATFORM=offscreen" RUN_SERIAL TRUE)
+    gtest_discover_tests(xqt-shell-tests DISCOVERY_TIMEOUT 30 TEST_FILTER "-${XQT_SHELL_IDLE_SUITES}"
+        PROPERTIES LABELS shell ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
