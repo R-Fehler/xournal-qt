@@ -295,10 +295,11 @@ while IFS= read -r -d '' f; do
 done < <(find "$dist" -type f \( -iname '*.exe' -o -iname '*.dll' \) -print0)
 
 cat > "$dist/README.txt" << 'EOF'
-Xournal Qt for Windows (a test build, not an installer)
+Xournal Qt for Windows
 
-Start bin\xournal-qt.exe. Keep the folders together: the program finds its Qt libraries, page templates, palettes
-and icons relative to bin\.
+Installed by xournal-qt-<version>-windows-setup-x64.exe: start it from the Start menu; the next version's installer
+updates it, Apps -> Installed apps uninstalls it. From the portable zip: start bin\xournal-qt.exe. Keep the folders
+together: the program finds its Qt libraries, page templates, palettes and icons relative to bin\.
 
 Settings are kept in %LOCALAPPDATA%\xournal-qt, caches in %LOCALAPPDATA%\cache\xournal-qt. The default library is
 Documents\Xournal_Libraries\Default.

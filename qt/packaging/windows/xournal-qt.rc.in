@@ -1,0 +1,32 @@
+// The resources of xournal-qt.exe (configured by qt/cmake/XqtApp.cmake). Explorer, the taskbar and the installer's
+// entries name an icon by its position: 0 is the program, 1 the .xopp / .xoj document (xournal-qt.nsi).
+#include <winver.h>
+
+1 ICON "@XQT_WINDOWS_PACKAGING_DIR@/xournal-qt.ico"
+2 ICON "@XQT_WINDOWS_PACKAGING_DIR@/xournal-qt-document.ico"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+PRODUCTVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "xournal-qt"
+            VALUE "FileDescription", "Xournal Qt"
+            VALUE "FileVersion", "@PROJECT_VERSION@"
+            VALUE "InternalName", "xournal-qt"
+            VALUE "LegalCopyright", "GPL-2.0-or-later, the Xournal++ and xournal-qt authors"
+            VALUE "OriginalFilename", "xournal-qt.exe"
+            VALUE "ProductName", "Xournal Qt"
+            VALUE "ProductVersion", "@PROJECT_VERSION@"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

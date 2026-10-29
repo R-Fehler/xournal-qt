@@ -33,29 +33,27 @@ observed (O) on a machine or expected (E) from the code and the research in `../
 
 ## Installer and updates
 
-- (E) **Installer**: upstream's NSIS script (`windows-setup/xournalpp.nsi`, `FileAssociation.nsh`) builds from the
-  same folder layout (`bin/`, `share/`) and can be adapted: per-user install into `%LOCALAPPDATA%\Programs` (no admin
-  rights), Start menu entry, uninstaller. Alternatives: Inno Setup (simpler scripts), MSIX (Store, clean install and
-  removal, but sandboxed file access and package identity to handle).
-- (E) **Updates**: none yet; a check against the GitHub releases would do at first.
+- **Installer**: done, per user, NSIS, adapted from upstream's ([windows.md](windows.md#the-installer)); it updates an
+  installed version in place. Later perhaps MSIX (the Store, clean install and removal, but sandboxed file access and
+  package identity to handle).
+- (E) **Update check in the app**: none yet. A look at the GitHub releases (at most daily, off in Settings), then
+  download the new `…-windows-setup-x64.exe` and run it with `/S` after the app quit; the installer already updates
+  silently and refuses to while the app runs.
 - (E) **Size**: the folder carries all of Qt Quick Controls' styles and every image format plugin; trim to what the
   app uses (Material, Basic, SVG, PNG, JPEG) once it runs.
-- (E) **The release workflow** (`xqt-release.yml`) should attach the zip (and later the installer) to the draft
-  release, next to the Linux packages.
 
 ## Signing and trust
 
 - (E) **Code signing**: unsigned programs get SmartScreen's "Windows protected your PC". Options: an OV/EV
   certificate, Azure Trusted Signing (cheap, needs an identity check), or SignPath's free offer for open source
-  projects. Sign the `.exe`, the DLLs of our own and the installer in CI.
+  projects. Sign the `.exe`, the DLLs of our own, the installer and its uninstaller in CI (NSIS: `!uninstfinalize`
+  signs the uninstaller while the installer is built).
 
 ## Integration with Windows
 
-- (E) **File associations**: `.xopp`, `.xoj` (and optionally `.pdf`, `.md`) opened with the app, with the file type
-  icons of upstream (`ui/pixmaps/application-x-xopp.svg` as `.ico`). Done by the installer; the single-instance
-  logic already hands files to the running window of their library.
-- (E) **Program icon**: a `.rc` file with an `.ico` (generated from `qt/packaging/xournal-qt.svg`) so that Explorer,
-  the taskbar and Alt+Tab show it before the window sets its own.
+- **File associations and the program icon**: done by the installer and `xournal-qt.rc.in`
+  ([windows.md](windows.md#the-installer)). Open: `.md` files (the app opens them; not registered yet), and a
+  "Set as default PDF app" in the app's settings (the same Settings page as the installer's component).
 - (E) **Application manifest**: `activeCodePage` UTF-8 (then the ANSI APIs that libraries use take UTF-8 too, not
   only the C library, see WindowsSetup.cpp), `longPathAware`, and the supported OS versions. MinGW links a default
   manifest, which must be replaced rather than doubled.

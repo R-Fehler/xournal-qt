@@ -60,9 +60,9 @@ Ubuntu 26.04. Until 0.12.0 the releases said the Debian 13 package was also for 
 
 ## Windows and macOS
 
-Since 0.4.0 every release also carries the **Windows** portable zip and the **Android** APK: the release workflow
-calls `xqt-windows.yml` and `xqt-android.yml` (both also run by hand) and puts `xournal-qt-<version>-windows-x64.zip`
-and `xournal-qt-<version>-android-arm64.apk` (signed with the release key from the repository secrets; Android 9 or
+Since 0.4.0 every release also carries the **Windows** portable zip (since 0.13.0 also the installer) and the
+**Android** APK: the release workflow calls `xqt-windows.yml` and `xqt-android.yml` (both also run by hand) and puts
+`xournal-qt-<version>-windows-x64.zip`, `xournal-qt-<version>-windows-setup-x64.exe` and `xournal-qt-<version>-android-arm64.apk` (signed with the release key from the repository secrets; Android 9 or
 newer, arm64) into the draft, and (also since 0.4.0) the unsigned **macOS** `.dmg` from `xqt-macos.yml`:
 
 - **macOS**: a first build exists (`xqt-macos.yml`, [macos.md](macos.md)): Homebrew's libraries and Qt on GitHub's
@@ -72,9 +72,10 @@ newer, arm64) into the draft, and (also since 0.4.0) the unsigned **macOS** `.dm
   Missing: Apple's signing and notarization (a
   Developer ID certificate and an App Store Connect API key as secrets, see macos.md), an Intel build (Homebrew has
   no Intel bottles any more), and a try on a real Mac.
-- **Windows**: a first build exists (`xqt-windows.yml`, [windows.md](windows.md)): MSYS2 (UCRT64) packages,
-  `windeployqt --qmldir qt/src/app/qml`, a portable zip, no installer yet. Upstream's `windows-setup/` builds an
-  NSIS installer that can be reused ([windows-roadmap.md](windows-roadmap.md)).
+- **Windows** (`xqt-windows.yml`, [windows.md](windows.md)): MSYS2 (UCRT64) packages,
+  `windeployqt --qmldir qt/src/app/qml`, a portable zip and, since 0.13.0, an installer
+  (`xournal-qt-<version>-windows-setup-x64.exe`: per user, updates the installed version,
+  [windows.md](windows.md#the-installer)), both unsigned.
 - **Recording** ([audio.md](../features/audio.md), "Platforms"; since `qt/audio-platforms`): every package offers it. Windows,
   macOS and Android are built with Qt Multimedia (`mingw-w64-ucrt-x86_64-qt6-multimedia`, Homebrew `qtmultimedia`,
   aqt `-m qtmultimedia`) and configured with `-DXQT_REQUIRE_AUDIO=ON`, so a Qt without it fails the job. What each

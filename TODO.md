@@ -352,7 +352,8 @@ the core part done")
   share sheet for a shared zip (today "Save a copy…"); exporting pictures into a `content://` folder; no zip password
   (Android's libzip has no crypto); after the move on the Fold 7, switch to the release-signed APK.
 - [ ] Windows ([roadmap](qt/docs/development/windows-roadmap.md)): a pressure calibration in Settings → Pen; an
-  installer; the author's `qt/windows-feel` on the Surface.
+  update check in the app (the installer updates silently already); signing the installer and the program; the
+  author's `qt/windows-feel` on the Surface.
 - [ ] Platform builds run only at release: a weekly `schedule:` or a `master-qt` push filter (infra §8).
 
 ## Not started (decide before building)
