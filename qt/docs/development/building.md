@@ -6,16 +6,18 @@ leaves untouched and does not use).
 ## On a Linux machine
 
 ```sh
-qt/scripts/linux-deps.sh                                   # Debian, Ubuntu, KDE neon: the packages the build needs
+qt/scripts/linux-deps.sh                                   # Debian, Ubuntu: the packages the build needs
 cmake -S qt -B build-qt -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DXQT_FAST_DEV=ON
 cmake --build build-qt -j$(nproc) --target <what you need>  # e.g. xournal-qt, xqt-canvas-tests
 ./build-qt/xournal-qt
 ```
 
-- **Qt**: `find_package(Qt6 6.5)` is declared, but the CI and the releases build with Qt 6.7 (KDE neon,
-  `XQT_NEON=1 qt/scripts/linux-deps.sh` on Ubuntu 22.04) and 6.8 (Debian 13). **Use no Qt API newer than 6.7** in
-  C++ or QML (e.g. `AbstractButton.click()` is 6.8), and no QML property named like a JS global (`console`, …).
-  Ubuntu 24.04's own Qt (6.4) is too old.
+- **Qt**: `find_package(Qt6 6.5)` is declared, but the CI and the releases build with Qt 6.8 (Debian 13), 6.10
+  (Ubuntu 26.04) and 6.11 (Ubuntu 22.04 with Qt from qt.io, the AppImage). **Use no Qt API newer than 6.8** in C++ or
+  QML, and no QML property named like a JS global (`console`, …). Ubuntu 24.04's own Qt (6.4) and Ubuntu 22.04's
+  (6.2) are too old: there `XQT_QT_DOWNLOAD=1 qt/scripts/linux-deps.sh` installs the rest without Qt, then
+  `qt/scripts/linux-qt.sh /opt/qt` downloads Qt from qt.io (aqtinstall) and builds KSyntaxHighlighting against it;
+  configure with `-DCMAKE_PREFIX_PATH=/opt/qt/<version>/gcc_64`.
 - **qpdf** is built with the app (`qt/cmake/XqtQpdf.cmake` downloads its pinned source when the build is configured);
   `-DXQT_SYSTEM_QPDF=ON` takes the system's (12 or newer).
 - **`XQT_FAST_DEV=ON`** is for development builds only (CI and releases leave it off): QML is not compiled ahead of
@@ -67,8 +69,8 @@ when ctest runs (`PRE_TEST` discovery), and a `ctest` of another CMake version a
 
 ## The CI's containers on a desktop
 
-`qt/scripts/ci-container.sh` builds and tests in the CI's containers (Debian 13 with Qt 6.8, or KDE neon with Qt
-6.7), to reproduce a failure that shows only on GitHub: [ci.md](ci.md).
+`qt/scripts/ci-container.sh` builds and tests in the CI's containers (Debian 13 with Qt 6.8, or Ubuntu 22.04 with Qt
+6.11 from qt.io), to reproduce a failure that shows only on GitHub: [ci.md](ci.md).
 
 ## Other platforms
 

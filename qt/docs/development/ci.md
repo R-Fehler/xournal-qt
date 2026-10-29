@@ -6,7 +6,7 @@ folder stay dormant here: they only run for pull requests to `master` or carry
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `xqt-build.yml` | a push to `master-qt` or `claude/**` that touches `qt/`, `src/`, `test/`, `cmake/` or the workflow; pull requests to `master-qt`; by hand | **Doc links**: `qt/scripts/check-doc-links.py` (below). **Architecture overview**: `qt/scripts/architecture/generate.py --check` (below). **Linux**: the release configuration (QML compiled ahead of time) in two containers, Debian 13 (Qt 6.8) and Ubuntu 22.04 with KDE neon (Qt 6.7), the full suite in each, and veraPDF on the archive PDFs the tests write |
+| `xqt-build.yml` | a push to `master-qt` or `claude/**` that touches `qt/`, `src/`, `test/`, `cmake/` or the workflow; pull requests to `master-qt`; by hand | **Doc links**: `qt/scripts/check-doc-links.py` (below). **Architecture overview**: `qt/scripts/architecture/generate.py --check` (below). **Linux**: the release configuration (QML compiled ahead of time) in two containers, Debian 13 (Qt 6.8) and Ubuntu 22.04 with Qt 6.11 from qt.io (`qt/scripts/linux-qt.sh`, cached), the full suite in each, and veraPDF on the archive PDFs the tests write |
 | `xqt-block-tests.yml` | every push to a block branch `qt/**` (no path filter) and to `master-qt`; by hand | **Block tests**: one development build (`XQT_FAST_DEV`, Debian 13, Qt 6.8), then the full suite in four shards side by side (`ctest -I <shard>,,4`) |
 | `xqt-release.yml` | a tag `v1.2.3`; by hand | builds, tests, packages, and opens a **draft** release with the packages ([releasing.md](releasing.md)) |
 | `xqt-android.yml` | by hand, a push to `qt/android-build`, the release | the APK ([android.md](android.md)) |
@@ -75,7 +75,7 @@ any branch, and its links (relative) lead into the source. The page also works o
 ## A test that fails only on GitHub
 
 Run it in the same container: `qt/scripts/ci-container.sh` builds and tests like the CI does, in `debian` (Debian 13,
-Qt 6.8) or `neon` (Ubuntu 22.04 with KDE neon, Qt 6.7): root, C locale, the fonts the packages bring, the checkout
+Qt 6.8) or `jammy` (Ubuntu 22.04 with Qt 6.11 from qt.io): root, C locale, the fonts the packages bring, the checkout
 mounted read-only, the build folder in `~/.cache/xqt-ci/<name>`. Docker if it runs, else podman; the container gets 3
 CPUs and 4 GB, and on a shared machine it goes through `qt/scripts/build-slot.sh` as well.
 
@@ -83,7 +83,7 @@ CPUs and 4 GB, and on a shared machine it goes through `qt/scripts/build-slot.sh
 qt/scripts/build-slot.sh qt/scripts/ci-container.sh debian build xqt-ui-tests     # about 30 min the first time
 qt/scripts/build-slot.sh qt/scripts/ci-container.sh debian test -R 'AdaptiveLayoutTest\.menus' --repeat until-fail:3
 qt/scripts/ci-container.sh debian run build/xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.*'
-qt/scripts/ci-container.sh neon shell            # look around; `clean` deletes the build folder
+qt/scripts/ci-container.sh jammy shell           # look around; `clean` deletes the build folder
 ```
 
 What makes tests fail there and not on a desktop: other fonts (other text widths, so a menu a fraction of a pixel
@@ -97,8 +97,8 @@ as an artifact first, so it can be looked at):
 
 | Job | What |
 | --- | --- |
-| `xqt-release.yml`, `.deb` (every container: KDE neon, Debian 13, Ubuntu 26.04) | installs the package in the container (`apt-get install ./…deb`); handwriting: every model of `qt/resources/hwr/` in `/usr/share/xournal-qt/hwr-models/` (`qt/scripts/hwr-package-check.sh models`), `/usr/lib/xournal-qt/libonnxruntime.so.1`, `xournal-qt --hwr-info` |
-| `xqt-release.yml`, AppImage | the models in the AppDir, then the AppImage itself: `--hwr-info` (off-screen) |
+| `xqt-release.yml`, `.deb` (every container: Debian 13, Ubuntu 26.04) | installs the package in the container (`apt-get install ./…deb`); handwriting: every model of `qt/resources/hwr/` in `/usr/share/xournal-qt/hwr-models/` (`qt/scripts/hwr-package-check.sh models`), `/usr/lib/xournal-qt/libonnxruntime.so.1`, `xournal-qt --hwr-info` |
+| `xqt-release.yml`, AppImage (Ubuntu 22.04, Qt from qt.io; built and fully tested in the same job) | the models in the AppDir, then the AppImage itself: `--hwr-info` (off-screen) |
 | `xqt-windows.yml` | `qt/scripts/windows-smoke.sh`: CLI exports, the app, recording (`--audio-info`), handwriting (`onnxruntime.dll` and its Visual C++ DLLs in `bin\`, the models, `--hwr-info`) |
 | `xqt-macos.yml` | `qt/scripts/macos-smoke.sh`, with Homebrew hidden: CLI exports, the app, recording, handwriting (`Frameworks/libonnxruntime.1.dylib`, the models, `--hwr-info`) |
 | `xqt-android.yml` | no device: `qt/scripts/hwr-package-check.sh apk` looks into the APK for `lib/arm64-v8a/libonnxruntime.so`, ONNX Runtime's licence files and the model files |

@@ -16,8 +16,8 @@ ctest --test-dir build-qt -j8              # the full suite: about 1900 tests
 ```
 
 - `XQT_FAST_DEV=ON` is for development builds only (QML not compiled ahead of time, `-g1`, lld); CI and releases
-  leave it off. The CI builds with Qt 6.7 (KDE neon) and 6.8 (Debian 13): **no Qt API newer than 6.7** in C++ or QML
-  (e.g. `AbstractButton.click()` is 6.8), and no QML property named like a JS global.
+  leave it off. The CI builds with Qt 6.8 (Debian 13) and 6.11 (Ubuntu 22.04, Qt from qt.io): **no Qt API newer than
+  6.8** in C++ or QML (look at the "since" line of Qt's docs), and no QML property named like a JS global.
 - **Tiers**: while working, only the labels or `-R` filters of what changed, and only the targets you need; the full
   suite of a block on GitHub (push `qt/<block>`: `xqt-block-tests.yml`) or locally on a big machine
   (`ctest -j$(nproc)`); both Linux Qt versions with QML compiled (`xqt-build.yml`) on `master-qt` and `claude/**`.

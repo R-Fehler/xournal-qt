@@ -40,8 +40,8 @@ build-qt/xqt-ui-tests --gtest_filter='ToolboxTest.*'          # one binary direc
 2. **Before a block is merged**: the full suite once, on GitHub (push `qt/<block>`: `xqt-block-tests.yml` runs it in
    four shards, [ci.md](../development/ci.md)) or locally on a big machine (`ctest --test-dir build-qt -j$(nproc)`),
    and the UI tests of popups, keys and window states also on Qt 6.8 (below).
-3. **The CI** (`.github/workflows/xqt-build.yml`) builds and runs everything on Debian 13 (Qt 6.8) and KDE neon
-   (Qt 6.7) on every push of `master-qt` and `claude/**`. A test that fails only there: reproduce it in the same
+3. **The CI** (`.github/workflows/xqt-build.yml`) builds and runs everything on Debian 13 (Qt 6.8) and Ubuntu 22.04
+   with Qt 6.11 from qt.io on every push of `master-qt` and `claude/**`. A test that fails only there: reproduce it in the same
    container with `qt/scripts/ci-container.sh` ([ci.md](../development/ci.md)).
 4. **The author** runs the long suites and tests by hand on the devices ([device checklist](device-checklist.md)).
 
@@ -93,8 +93,8 @@ with `XQT_FAST_DEV` that halved the time of a short test.
   a renamed `AppController` member, or one of a sub-object (`app.library.x`, `app.reference.edit.x`), or a name a
   pill reads from its `target` missing on `CanvasActions`, fails there instead of reading `undefined` at run time. A name reached on
   purpose without a C++ member goes into its allowlist with the reason.
-- **Only Qt ≤ 6.7 API**, in tests as in the app: e.g. `AbstractButton.click()` is 6.8, so tests emit
-  `clicked`/`triggered` instead. No QML property names that are JS globals (`console`, …).
+- **Only Qt ≤ 6.8 API**, in tests as in the app (the oldest Qt of the CI: Debian 13). No QML property names that
+  are JS globals (`console`, …).
 - Fixture files a test needs are written into a `QTemporaryDir` (or read from `qt/tests/<label>/` data folders);
   never write next to the sources.
 

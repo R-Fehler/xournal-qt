@@ -46,8 +46,9 @@ jobs:
   linux:
     name: ${{ matrix.name }}
     runs-on: ubuntu-latest
-    # Qt 6.5 or newer is needed: Ubuntu 24.04 (the runner's own system) has 6.4. Both Qt versions the release packages
-    # are built with: Debian 13 (Qt 6.8) and Ubuntu 22.04 with KDE neon's packages (Qt 6.7).
+    # Qt 6.5 or newer is needed: Ubuntu 24.04 (the runner's own system) has 6.4. The oldest and the newest Qt the
+    # Linux releases are built with: Debian 13 (Qt 6.8, the system's) and Ubuntu 22.04 with Qt from qt.io (6.11, as the
+    # AppImage: qt/scripts/linux-qt.sh).
     container: ${{ matrix.container }}
     strategy:
       fail-fast: false
@@ -55,12 +56,13 @@ jobs:
         include:
           - name: Debian 13 (Qt 6.8)
             container: debian:trixie
-            neon: '0'
             key: debian13
-          - name: KDE neon / Ubuntu 22.04 (Qt 6.7)
+            qt_download: '0'
+          - name: Ubuntu 22.04 (Qt 6.11 from qt.io)
             container: ubuntu:22.04
-            neon: '1'
-            key: neon-jammy
+            key: jammy-qtio
+            qt_download: '1'
+            qt_version: 6.11.2
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 1500M
@@ -75,7 +77,22 @@ jobs:
       - name: Install the build dependencies
         run: bash qt/scripts/linux-deps.sh
         env:
-          XQT_NEON: ${{ matrix.neon }}
+          XQT_QT_DOWNLOAD: ${{ matrix.qt_download }}
+
+      - name: Qt cache
+        if: matrix.qt_download == '1'
+        uses: actions/cache@v4
+        with:
+          path: /opt/qt
+          key: xqt-linux-qt-${{ matrix.qt_version }}-${{ hashFiles('qt/scripts/linux-qt.sh') }}
+
+      - name: Qt from qt.io and KSyntaxHighlighting
+        if: matrix.qt_download == '1'
+        run: |
+          bash qt/scripts/linux-qt.sh /opt/qt
+          echo "CMAKE_PREFIX_PATH=/opt/qt/${XQT_QT_VERSION}/gcc_64" >> "$GITHUB_ENV"
+        env:
+          XQT_QT_VERSION: ${{ matrix.qt_version }}
 
       # The compiler cache of the last run of this container (CMake uses ccache when it is installed): a build that
       # changed a few files takes minutes instead of a quarter of an hour
@@ -99,7 +116,7 @@ jobs:
         run: ctest --test-dir build -j "$(nproc)" --output-on-failure --timeout 300 --repeat until-pass:3
 
       - name: Validate archive PDFs with veraPDF
-        if: matrix.neon == '0'
+        if: matrix.key == 'debian13'
         # Archive PDFs (qt/docs/features/hybrid-pdf.md, "Archive PDF") must be PDF/A-3b. veraPDF, the reference
         # validator, is a test tool only: the app never runs it. The tests write their archive PDFs that claim PDF/A
         # into a folder (also one saved incrementally three times, qt/pdf-incremental).

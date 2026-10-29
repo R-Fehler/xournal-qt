@@ -55,7 +55,7 @@ since) is in git: `git show 5c6402d:qt/docs/testing/device-checklist.md`.
 
 ## Linux
 
-- [ ] The `.deb` (neon and Debian 13) and the AppImage install and start; the launcher's right-click "Quick note"
+- [ ] The `.deb` (Debian 13, Ubuntu 26.04) and the AppImage (also on Ubuntu 22.04 / KDE neon) install and start; the launcher's right-click "Quick note"
       ([quick-note.md](../features/quick-note.md#on-the-device)).
 - [ ] Opening a file from the file manager while the app runs opens it as a tab of the running window.
 - [ ] Printing on a real printer: page range, copies, landscape pages turned onto the sheet.
