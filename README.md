@@ -111,8 +111,7 @@ Markdown source.
 | Platforms | Linux, Windows, macOS, Android | Linux, Windows, macOS | Apple; Windows and Android versions | Windows |
 | Price | free, GPL | free, GPL | free tier, then paid | free tier, then subscription |
 
-GoodNotes is the more polished iPad app (there is no iOS version here yet), and Drawboard PDF has more PDF markup
-tools.
+GoodNotes is the more polished iPad app (there is no iOS version here yet).
 
 ## Getting it
 
