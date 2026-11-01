@@ -3,7 +3,8 @@
 # xournal-qt
 
 **Write on your PDFs with a pen — and keep them yours.** Handwritten notes, PDF annotation and Markdown in one free
-app, on Linux, Windows, macOS and Android, from a desktop to a pen tablet to a phone. A Qt 6 fork of
+app for Linux, Windows, macOS and Android, from a desktop to a pen tablet to a phone. Your handwriting is searchable,
+your notes stay in ordinary PDF files, and nothing needs an account or a cloud. A Qt 6 fork of
 [Xournal++](https://github.com/xournalpp/xournalpp).
 
 <br clear="left">
@@ -13,94 +14,121 @@ app, on Linux, Windows, macOS and Android, from a desktop to a pen tablet to a p
 > **Developers:** the docs start at [qt/docs/README.md](qt/docs/README.md) (the repository's layout, building,
 > testing, the features, the decisions); agents read [AGENTS.md](AGENTS.md) first.
 
-<img src="qt/docs/screenshots/adaptive.png" width="100%" alt="The same page of notes on a desktop (with the page sidebar), an upright tablet (two rows of tools) and a phone (a top bar and a tool dock)">
+<img src="qt/docs/screenshots/slides.png" width="100%" alt="Lecture slides about Fourier series, open as a PDF, with handwritten notes in red and blue, highlighted lines and a circled overshoot; the pages of the lecture beside them and the user's pens on the rail at the right">
+
+> **Status:** alpha (0.13). Every release runs the full test suite on Linux and smoke tests of its packages on every
+> platform, but a lot has only been tried on a few devices so far: expect rough edges, and see the "Known limits" of
+> the [latest release](https://github.com/R-Fehler/xournal-qt/releases).
 
 ## Why
 
 Lecture slides, papers, contracts, textbooks, your own notes: most knowledge work today happens on documents, and a
 pen is still the best way to think on them. Yet the notes we write on our devices mostly end up locked away — in an
 app's private library, behind a subscription, synced only through its maker's cloud, readable only on the platforms it
-chose to support. Drawboard PDF, for years the one app that simply let you write on a PDF and kept it a PDF, has
-turned towards business customers and subscriptions. On Linux and Android there is hardly anything that takes a pen
-seriously at all.
+chose to support. On Linux and Android there is hardly anything that takes a pen seriously at all.
 
-[Xournal++](https://github.com/xournalpp/xournalpp) has been the free answer for a decade: a wonderful project,
-open files, a drawing core that feels right under a pen, built by volunteers. xournal-qt stands on that core
-unchanged — its documents *are* Xournal++ documents — and adds what it takes to live in it every day, on every
-device.
-
-Your notes should outlive the app you wrote them with.
+[Xournal++](https://github.com/xournalpp/xournalpp) has been the free answer for a decade: open files and a drawing
+core that feels right under a pen, built by volunteers. xournal-qt keeps that core unchanged — its documents *are*
+Xournal++ documents — and builds a new, touch-first interface around it, with what it takes to live in it every day,
+on every device. Your notes should outlive the app you wrote them with.
 
 ## Your notes are PDFs
 
 - **A document is a PDF.** Write on a lecture's slides or a paper and save: the ink goes into the PDF itself as
-  standard PDF annotations, drawn exactly as you see it. Every PDF viewer shows it — a browser, Preview, Acrobat,
-  Okular, the viewer on your phone — so you can send the file to anyone, and it opens.
-- **The editable original travels inside.** The full notes (every stroke still editable, layers, Markdown, page
-  backgrounds) are embedded in that same PDF; open it here again and nothing was flattened. A text document carries
-  its plain Markdown source and its pictures as attachments, which any PDF viewer can save
-  ([how](qt/docs/user/markdown-from-pdf.md)).
-- **Quick saves, clean files.** Saving appends your changes to the PDF instead of writing it anew; once the additions
-  grow past a quarter of the file, and always before you share it (so deleted ink does not linger in older
-  revisions), it is written in one clean piece again.
-- **Made to last.** "Export for the archive" writes PDF/A-3b — the ISO standard made for keeping documents readable
-  for decades, checked with veraPDF — for one document or a whole library, folders and links included.
+  standard annotations, drawn exactly as you see it. Every PDF viewer shows it — a browser, Preview, Acrobat, Okular,
+  the viewer on your phone — so you can send the file to anyone.
+- **The editable original travels inside.** Every stroke stays editable: the full notes (layers, Markdown, recordings,
+  page backgrounds) are embedded in the same PDF, and open here again with nothing flattened.
+- **Your handwriting is in the PDF's text, too.** What the handwriting search reads goes into an invisible text layer,
+  so other PDF apps find and select the words you wrote by hand.
+- **Versions, passwords, archives.** Earlier versions are kept inside the PDF and can be compared side by side;
+  PDFs can be protected with a password; "Export for the archive" writes PDF/A-3b, checked with veraPDF.
+- **Notes from other apps become yours.** Ink, highlights, text boxes and sticky notes that GoodNotes, Drawboard or
+  Preview wrote into a PDF open as editable strokes and boxes here.
 - **No lock-in anywhere.** Documents are files in your own folders (PDF, `.xopp`, `.md`); a library is just a folder,
-  synced with whatever you already use. The app is free software (GPL). If xournal-qt disappeared tomorrow, every
-  note would still open everywhere.
+  synced with whatever you already use. Prefer Xournal++'s own format? Pick "Xournal++ files" at the first start, and
+  a `.xopp` written here opens in Xournal++ and the other way round.
 
-Prefer Xournal++'s own format? Pick "Xournal++ files" at the first start: a `.xopp` written here opens in Xournal++
-and the other way round ([FORK.md](FORK.md) explains how the two share one tree).
+## Every screen, every input
 
-## What it adds to Xournal++
+<img src="qt/docs/screenshots/adaptive.png" width="100%" alt="The same handwritten lab journal on a desktop with the page sidebar, an upright tablet and a phone with a tool dock at the bottom">
 
-- **One interface for every screen.** It lays itself out for a wide desktop, an upright 2-in-1 or Surface (two rows
-  of tools, the A4 page keeps its width), a foldable, and a phone (a top bar, a tool dock within thumb reach, sheets
-  instead of menus). Pen, finger and mouse are told apart: the pen writes with your hand on the screen, a finger
-  scrolls and zooms.
-- **Tabs, an overview and a reference view.** Several documents at once, a grid of all of them, and a second document
-  (or the same one) beside or above the one you write in.
-- **A library that is just folders.** Point it at a folder: previews, favourites, page bookmarks, reading positions.
-  Nothing is imported; sync the folder with whatever you already use.
-- **Search on three levels.** This document, all open documents, or the whole library, including the text of PDFs you
-  have not opened in months. Hits are shown on the pages, not as a list of file names; fuzzy search if you want it.
-- **Markdown on the page.** Write Markdown on a page (or a sticky note) and see it formatted as you type: formulas
-  (`$…$`, no LaTeX installation needed), pictures, tables, code, check lists, with a formatting bar for those who do
-  not know the syntax. Plain `.md` files open as documents of their own.
-- **Built for slides and papers.** Space for notes beside slides; all annotations of a document in one list,
-  exportable as Markdown.
-- **Sticky notes, bookmarks, citations.** Notes that hold ink, text and pictures and can cover an answer for
-  self-testing; bookmarks that other PDF viewers show; Scholar and arXiv lookups for a selected reference (network
-  use is opt-in, and every address is shown first).
-- **Fast on big documents.** Pages are drawn ahead of where you read, within a memory limit you set; a 500-page PDF
-  scrolls without blank pages, and an A0 poster zooms without running out of memory.
+- **One interface that lays itself out** for a wide desktop, an upright 2-in-1 or Surface, a foldable, and a phone
+  (a top bar, a tool dock within thumb reach, sheets instead of menus).
+- **Pen, finger and mouse are told apart.** The pen writes with your hand resting on the screen; a finger scrolls,
+  zooms and turns the canvas. Hold the pen still to straighten a line, scratch out to erase.
+- **Your own toolbox.** The pens, highlighters, shapes and erasers you use sit on a rail beside the page, in your
+  order and your colors; drag them, group them, carry them to the top bar. **Zen** hides everything but the page.
+- **Tabs, an overview and a reference view.** Several documents at once, a grid of all of them and their pages, and
+  a second document (or the same one) beside the one you write in.
 
-Not there yet: searching handwriting, audio recording, and Xournal++'s plugins and LaTeX tool.
+## Find anything, even what you wrote by hand
 
-<img src="qt/docs/screenshots/markdown.png" width="100%" alt="Markdown written directly on a page and formatted as it is typed: headings, formulas, a check list, a quote, code and a table, with the formatting bar above the page">
+<img src="qt/docs/screenshots/search.png" width="100%" alt="Ctrl+F for filter in a handwritten lab journal: the handwritten words anti-aliasing filter are marked as the first of two hits">
+
+- **Handwriting search** reads your notes in the background with a model built into the app (English and German),
+  on your device: no download, no cloud. Ctrl+F marks the words on the ink, and handwriting can be copied as text.
+- **Search on three levels:** this document, all open documents, or the whole library, including the text of PDFs
+  you have not opened in months. Hits are shown on the pages; fuzzy search if you want it.
+- **A library that is just folders.** Point it at any folder: covers, favourites, page bookmarks, `#tags`, to-dos
+  collected from all your notes, links between documents. Nothing is imported or moved; share a folder as one zip.
+
+<img src="qt/docs/screenshots/library.png" width="100%" alt="The library: folders for lectures and papers, and the covers of a handwritten exercise, the lab journal and two Markdown notes with their tags">
+
+## Markdown on the page
+
+<img src="qt/docs/screenshots/markdown.png" width="100%" alt="Markdown written on a page and formatted as it is typed: headings, formulas, a check list, a quote, code and a table, with the formatting bar above the page">
+
+Write Markdown on a page or a sticky note and see it formatted as you type: formulas (`$…$`, no LaTeX installation
+needed), pictures, tables, highlighted code and check lists, with a formatting bar for those who do not know the
+syntax. Plain `.md` files open as documents of their own, and a text document can be kept as a PDF that carries its
+Markdown source.
+
+## Teaching, presenting, studying
+
+- **Present on a second screen:** the projector shows only the slide; your laptop shows it with your tools and a
+  timer, and you can zoom in to write while the audience keeps the whole slide. A laser pointer, a **curtain** that
+  uncovers a calculation step by step, and a **spotlight**.
+- **Space for notes beside slides**, page templates, and **stickers**: your own, and built-in ones for circuits,
+  logic gates, 3D solids and lab glassware.
+- **Recordings tied to your notes:** record a lecture while you write, then play it from any stroke to hear what was
+  said as you wrote it.
+  **Replay** shows how a page was written, with its recordings, on a play bar.
+- **Sticky notes** that hold ink, text and pictures and can cover an answer for self-testing; Scholar and arXiv
+  lookups for a selected reference (network use is opt-in, and every address is shown first).
+- **Plugins in JavaScript**, each in a sandbox, with a **function plotter** built in: type a function, see it on the
+  page, insert it as ink with its formula as a label.
+
+<img src="qt/docs/screenshots/plot.png" width="100%" alt="The function plotter: the sum of three harmonics of a square wave plotted on a lined page from minus two pi to two pi, with the plotter's dialog beside it">
 
 ## Compared with other note apps
 
 |  | xournal-qt | Xournal++ | GoodNotes | Drawboard PDF |
 | --- | --- | --- | --- | --- |
-| Notes on a PDF | **saved in the PDF** (standard annotations, editable original inside) | a `.xopp` beside the PDF; export as a new PDF | imported into the app; export as a new PDF | saved in the PDF |
-| Platforms | Linux, Windows, macOS, Android; iOS planned | Linux, Windows, macOS | iPad, iPhone, Mac; Windows and Android versions | Windows |
-| Price, license | free, GPL | free, GPL | free tier, then paid | free tier, then subscription |
-| Where your notes live | files in your folders (`.xopp`, PDF, `.md`) | files | the app's own library | PDF files |
-| Sync | any folder sync (Nextcloud, Syncthing, OneDrive, …) | any | iCloud | cloud storage of your choice |
-| Adapts to phone and tablet | yes | desktop layout | yes | tablet and desktop |
-| Typed text | live Markdown with formulas, on the page | text boxes, LaTeX tool | text boxes | text annotations |
-| Search | all your documents, PDF text included | the open document | all notebooks, **handwriting too** | PDF text |
+| Notes on a PDF | **saved in the PDF**, editable original inside | a `.xopp` beside the PDF | imported into the app | saved in the PDF |
+| Your notes | files in your folders, any sync | files | the app's own library, iCloud | PDF files |
+| Handwriting search | **yes, on the device** | no | yes | no |
+| Platforms | Linux, Windows, macOS, Android | Linux, Windows, macOS | Apple; Windows and Android versions | Windows |
+| Price | free, GPL | free, GPL | free tier, then paid | free tier, then subscription |
 
-Where others are ahead: GoodNotes searches handwriting and is the more polished iPad app; Drawboard PDF has more PDF
-markup tools (stamps, measurements).
+GoodNotes is the more polished iPad app (there is no iOS version here yet), and Drawboard PDF has more PDF markup
+tools.
 
 ## Getting it
 
-Releases have packages for Linux (`.deb` for Debian 13 and Ubuntu 26.04, an AppImage for Ubuntu 22.04 and newer),
-Windows (a portable zip), Android 9 and newer (an APK) and macOS 15 on Apple Silicon (an unsigned `.dmg`):
-[releases](https://github.com/R-Fehler/xournal-qt/releases), and
-[qt/docs/development/releasing.md](qt/docs/development/releasing.md) for which one fits. From source (Linux, Qt 6.5 or newer):
+Download from the [releases](https://github.com/R-Fehler/xournal-qt/releases):
+
+| System | File |
+| --- | --- |
+| Debian 13 | `xournal-qt_<version>_amd64_debian13.deb` |
+| Ubuntu 26.04, Kubuntu 26.04 | `xournal-qt_<version>_amd64_ubuntu26.04.deb` |
+| Any Linux from Ubuntu 22.04 on (KDE neon, Ubuntu 24.04, Fedora, …) | `xournal-qt-<version>-x86_64.AppImage` (carries its own Qt) |
+| Windows 10 and 11 | `xournal-qt-<version>-windows-setup-x64.exe` (no administrator rights needed; the next version's installer updates it in place), or the portable `…-windows-x64.zip` |
+| macOS 15 or newer, Apple Silicon | `xournal-qt-<version>-macos-arm64.dmg` (not signed yet: [how to open it](qt/docs/development/macos.md)) |
+| Android 9 or newer (64-bit ARM) | `xournal-qt-<version>-android-arm64.apk` |
+
+Which package fits which system: [qt/docs/development/releasing.md](qt/docs/development/releasing.md#which-package-for-which-system).
+From source (Linux, Qt 6.5 or newer):
 
 ```sh
 qt/scripts/linux-deps.sh                                          # Debian / Ubuntu: what the build needs
@@ -109,10 +137,10 @@ cmake --build build-qt
 ./build-qt/xournal-qt
 ```
 
-More: [the developer docs](qt/docs/README.md) · [how it came to be](qt/docs/history/README.md) ·
-[the adaptive layout](qt/docs/features/adaptive-layout.md) · [Markdown](qt/docs/features/md-editor.md) ·
-[the library](qt/docs/features/library.md) · [Android](qt/docs/development/android.md) ·
-[macOS](qt/docs/development/macos.md) · [how the fork is kept](FORK.md)
+More: [the developer docs](qt/docs/README.md) · [the features](qt/docs/features/README.md) ·
+[how it came to be](qt/docs/history/README.md) · [Android](qt/docs/development/android.md) ·
+[Windows](qt/docs/development/windows.md) · [macOS](qt/docs/development/macos.md) ·
+[how the fork is kept](FORK.md)
 
 ---
 
