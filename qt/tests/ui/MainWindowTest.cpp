@@ -1427,7 +1427,37 @@ TEST_F(ReadmeShots, theLibrary) {
     window->resize(1440, 900);
     lecture();  // (the lecture is a PDF with notes, as in the other pictures)
     click(find<QQuickItem>("homeTab"));
-    settle(15000);  // (the covers are drawn at idle priority, one after the other)
+    // Until every card's cover is shown: the covers are drawn at idle priority, one after the other
+    auto* grid = find<QQuickItem>("libraryGrid");
+    ASSERT_NE(grid, nullptr);
+    // (the cards are delegates of the grid: in its tree of items, not among its QObject children)
+    std::function<void(QQuickItem*, std::vector<QQuickItem*>&)> coversUnder = [&](QQuickItem* item,
+                                                                                 std::vector<QQuickItem*>& out) {
+        const QUrl source = item->inherits("QQuickImage") ? item->property("source").toUrl() : QUrl();
+        if (source.scheme() == "image" && source.host() == "cover") {
+            out.push_back(item);
+        }
+        for (QQuickItem* child: item->childItems()) {
+            coversUnder(child, out);
+        }
+    };
+    auto coversShown = [&] {
+        std::vector<QQuickItem*> covers;
+        coversUnder(grid, covers);
+        return covers.size() >= 4 &&  // (the two handwritten documents and the two Markdown notes)
+               std::all_of(covers.begin(), covers.end(),
+                           [](QQuickItem* c) { return c->property("status").toInt() == 1; });  // (Image.Ready)
+    };
+    for (int waited = 0; waited < 120000 && !coversShown(); waited += 250) {
+        nextFrame();
+        wait(250);
+    }
+    EXPECT_TRUE(coversShown()) << "the covers did not come";
+    settle(1500);
+    // (the pointer below the cards: over a card it shows the card's select and star buttons)
+    QTest::mouseMove(window, QPoint(window->width() / 2, window->height() - 60));
+    wait(300);
+    nextFrame();
     saveShot(window, "library");
 }
 
