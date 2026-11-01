@@ -255,9 +255,8 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
             this->laserPointer->onButtonPressEvent(pos, zoom);
         }
     } else if (h->getToolType() == TOOL_ERASER) {
-        if (eraserInNote(x, y)) {
-            this->eraser->erase(x, y);
-        }
+        eraserAt.reset();  // (the trail starts here: nothing is erased behind the first point)
+        eraseAlong(x, y);
         this->inEraser = true;
     } else if (h->getToolType() == TOOL_SELECT_RECT || h->getToolType() == TOOL_SELECT_REGION ||
                h->getToolType() == TOOL_SELECT_MULTILAYER_RECT || h->getToolType() == TOOL_SELECT_MULTILAYER_REGION) {
@@ -541,11 +540,7 @@ bool CanvasPage::onMotionNotifyEvent(const PositionInputData& pos) {
                                                                 h->getToolType() == TOOL_TEXT && currentSequenceDeviceId) {
         editor->mouseMoved(x, y);  // drag: select text
     } else if (h->getToolType() == TOOL_ERASER && h->getEraserType() != ERASER_TYPE_WHITEOUT && this->inEraser) {
-        double ex = x;
-        double ey = y;
-        if (eraserInNote(ex, ey)) {
-            this->eraser->erase(ex, ey);
-        }
+        eraseAlong(x, y);
     }
     return false;
 }
@@ -568,7 +563,11 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
         this->laserPointer->onButtonReleaseEvent(pos, getZoom());
     }
     if (this->inEraser) {
+        // The last move may be far from where the pen was let go (a quick wipe: its last piece would be skipped)
+        const double zoom = getZoom();
+        eraseAlong(pos.x / zoom, pos.y / zoom);
         this->inEraser = false;
+        this->eraserAt.reset();  // (a new press starts a new trail)
         Document* doc = control.getDocument();
         doc->lock();
         this->eraser->finalize();
@@ -730,6 +729,7 @@ void CanvasPage::onSequenceCancelEvent(DeviceId deviceId) {
     if (this->inEraser) {
         // xournal-qt: keep what was erased so far (the erase is undoable), like a release.
         this->inEraser = false;
+        this->eraserAt.reset();
         Document* doc = view.getSession().getDocument();
         doc->lock();
         this->eraser->finalize();
@@ -898,6 +898,38 @@ bool CanvasPage::eraserInNote(double& x, double& y) const {
     x = std::clamp(x, r.x + margin, r.x + r.width - margin);
     y = std::clamp(y, r.y + margin, r.y + r.height - margin);
     return true;
+}
+
+void CanvasPage::eraseAlong(double x, double y) {
+    const std::optional<xoj::util::Point<double>> from = eraserAt;
+    eraserAt = xoj::util::Point<double>(x, y);
+    const double reach = view.getSession().getToolHandler()->getThickness();  // (the eraser's box reaches this far)
+    double ex = x;
+    double ey = y;
+    if (!eraserInNote(ex, ey)) {
+        return;  // (the note is too small to erase in)
+    }
+    if (from) {
+        const double dx = x - from->x;
+        const double dy = y - from->y;
+        const double distance = std::hypot(dx, dy);
+        // Half the eraser's reach apart: two boxes overlap by half at least, so nothing between them is skipped
+        const double step = std::max(reach * 0.5, 0.5);  // (never a stall: at least half a point)
+        const double wanted = std::ceil(distance / step);
+        // Too far for a wipe (a jump to another page, a device glitch): its ends only, rather than a stretched step
+        // that would skip ink again, and rather than a stall on hundreds of thousands of points
+        if (wanted <= MAX_ERASE_STEPS) {
+            const int steps = static_cast<int>(wanted);
+            for (int i = 1; i < steps; ++i) {  // (the last one is the point itself, below)
+                double px = from->x + dx * i / steps;
+                double py = from->y + dy * i / steps;
+                if (eraserInNote(px, py)) {
+                    this->eraser->erase(px, py);
+                }
+            }
+        }
+    }
+    this->eraser->erase(ex, ey);
 }
 
 // --- display -----------------------------------------------------------------------------------------------------

@@ -17,6 +17,7 @@
 #include "control/settings/ButtonConfig.h"
 #include "control/settings/Settings.h"
 #include "control/settings/SettingsEnums.h"
+#include "session/ButtonWidths.h"
 
 namespace xqt::hover {
 
@@ -62,7 +63,8 @@ void setPointerSetting(Settings& settings, Pointer pointer) {
 std::optional<EraserMark> eraserMark(ToolHandler& tools, Settings& settings, bool eraserEnd, double zoom) {
     if (eraserEnd) {
         // The eraser end takes its button's tool when it touches (CanvasInput::changeTool): until then the active
-        // tool is still the pen's. Its eraser has the tool bar eraser's size and kind ("no change" in the settings).
+        // tool is still the pen's. Its eraser has the button's own width when one is set for it (Settings → Pen →
+        // Buttons and eraser, ButtonWidths.h), and the tool bar eraser's width and kind besides ("no change").
         const ButtonConfig* cfg = settings.getButtonConfig(static_cast<unsigned int>(Button::BUTTON_ERASER));
         const ToolType action = cfg ? cfg->getAction() : TOOL_NONE;
         if (action != TOOL_NONE && action != TOOL_ERASER) {
@@ -70,11 +72,16 @@ std::optional<EraserMark> eraserMark(ToolHandler& tools, Settings& settings, boo
         }
         if (action == TOOL_ERASER && tools.getToolType() != TOOL_ERASER) {
             const Tool& eraser = tools.getTool(TOOL_ERASER);
+            const EraserType kind = eraser.getEraserType();
+            // The button's own width when it has one, else the tool bar eraser's (ButtonWidths.h)
+            if (const double own = buttonwidths::width(settings, Button::BUTTON_ERASER); own > 0) {
+                return markOf(own, kind, zoom);
+            }
             const double custom = tools.getCustomThickness(TOOL_ERASER);
             const double thickness = tools.isCustomThicknessActive(TOOL_ERASER) && custom > 0
                                              ? custom
                                              : eraser.getThickness(eraser.getSize());
-            return markOf(thickness, eraser.getEraserType(), zoom);
+            return markOf(thickness, kind, zoom);
         }
     }
     if (tools.getToolType() != TOOL_ERASER) {

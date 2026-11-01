@@ -63,6 +63,10 @@ public:
     ToolType getAction() const;
     /// xournal-qt: the tool of the button (TOOL_NONE: the button does not change the tool)
     void setAction(ToolType action);
+    /// xournal-qt: the size of the button's tool; TOOL_SIZE_NONE: "no change" (the tool bar's size and width on every
+    /// touch, ButtonConfig::applyNoChangeSettings). A button with a width of its own has a size, so that "no change"
+    /// does not take that width away (qt/src/session/ButtonWidths.h).
+    void setSize(ToolSize size);
     bool getDisableDrawing() const;
     DrawingType getDrawingType() const;
 
