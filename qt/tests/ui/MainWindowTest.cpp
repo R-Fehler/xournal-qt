@@ -106,6 +106,9 @@
 #include "shell/SystemApps.h"
 #include "shell/TabManager.h"
 #include "shell/PageSketches.h"
+#include "hwr/HandwritingSearch.h"
+#include "hwr/InkTextIndexer.h"
+#include "hwr/HwrInfo.h"
 #include "shell/Thumbnails.h"
 #include "shell/ToolboxModel.h"
 #include "util/PathUtil.h"
@@ -1284,8 +1287,9 @@ TEST_F(MainWindowTest, holdingAPageInTheSidebarSelectsIt) {
     EXPECT_FALSE(sidebar->property("selectionMode").toBool());
 }
 
-// XQT_SHOTS=<folder>: writes the pictures for the README (off-screen, so no display is needed).
-//   XQT_SHOTS=/tmp/shots ./xqt-ui-tests --gtest_filter='*shot*:ShotOfTheCanvas.*'
+// XQT_SHOTS=<folder>: writes the pictures for the README (off-screen, so no display is needed); with
+// XQT_SHOTS_DEMO=<the demo library of qt/docs/screenshots/demo/make-demo.sh> also those of ReadmeShots below.
+// qt/docs/screenshots/README.md says how they are made: qt/docs/screenshots/make-shots.sh.
 namespace {
 bool wantShots() { return qEnvironmentVariableIsSet("XQT_SHOTS"); }
 
@@ -1305,90 +1309,157 @@ void restPointer(QQuickWindow* window) {
         QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
     }
 }
-
-/// A curve as a hand draws it, from `origin` to the right
-void drawCurve(QQuickWindow* window, QPoint origin, int width, int height, double turns) {
-    auto at = [&](double t) {
-        return origin + QPoint(static_cast<int>(t * width),
-                               static_cast<int>(-std::sin(t * turns * 2 * M_PI) * height / 2 * (1 - 0.6 * t)));
-    };
-    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, at(0));
-    for (int i = 1; i <= 60; ++i) {
-        QTest::mouseMove(window, at(static_cast<double>(i) / 60));
-    }
-    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, at(1));
-}
+QString qs(const fs::path& p) { return QString::fromStdString(p.string()); }
 }  // namespace
 
-// A page of notes: Markdown written on the page, a curve drawn by hand, the pages beside it - on a desktop, an upright
-// Surface (two rows of tools) and a phone (the app bar and the dock): the README's picture of the adaptive layout.
+// The README's pictures of the app at work, on the demo library (qt/docs/screenshots/demo: lecture slides with
+// handwritten notes, a paper, a handwritten lab journal, a Markdown note), copied into a folder of its own.
 namespace {
-class ShotOfTheCanvas: public MainWindowTest {
+class ReadmeShots: public MainWindowTest {
 protected:
-    void canvasShot(int w, int h, const char* name) {
-        window->resize(w, h);
-        restPointer(window);  // (no tool tip of a hovered button in the picture)
-        wait(200);
-        ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
-        if (w >= 1280) {
-            QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, true));  // (a binding: shown by its button)
+    QTemporaryDir dir;
+    fs::path library;
+
+    static bool wanted() { return wantShots() && qEnvironmentVariableIsSet("XQT_SHOTS_DEMO"); }
+    void SetUp() override {
+        if (wanted()) {
+            // (the app's own recogniser, as main.cpp sets it; the UI tests have none of their own)
+            xqt::hwr::HandwritingSearch::setFactory(&xqt::hwr::onnxRecognizerFor);
         }
-        controller->goToPage(7);  // squared paper
-        wait(600);
-
-        // The note where the page is seen, and the curve under it
-        auto* panel = find<QQuickItem>("markdownPanel");
-        ASSERT_NE(panel, nullptr);
-        QMetaObject::invokeMethod(panel, "openBox", Q_ARG(QVariant, 7), Q_ARG(QVariant, 60.0), Q_ARG(QVariant, 300.0));
-        wait(200);
-        find<QQuickItem>("markdownArea")
-                ->setProperty("text", QStringLiteral("## Damped oscillation\n\n"
-                                                     "Measured on the shaker at 12 Hz. The envelope follows `exp(-t/tau)`, "
-                                                     "with tau about 0.8 s.\n\n"
-                                                     "- [x] set up the sensor\n- [ ] repeat it with the heavier mass\n"));
-        wait(500);
-        QMetaObject::invokeMethod(panel, "close", Q_ARG(QVariant, true));
-        wait(1200);  // (closing puts the zoom back to what it was before it opened)
-        controller->goToPage(7);
-        wait(600);
-
-        auto* canvas = findItem("canvas");
-        ASSERT_NE(canvas, nullptr);
-        // (in the page's points: above the note, the same on every size)
-        xqt::CanvasView* view = controller->tabManager().currentView();
-        const double zoom = view->getViewController().zoom();
-        const QPointF page = view->pageViewRect(7).topLeft();
-        auto onPage = [&](double x, double y) { return canvas->mapToScene(page + QPointF(x, y) * zoom).toPoint(); };
-        const QPoint origin = onPage(190, 190);
-        const int width = static_cast<int>(320 * zoom);
-        drawCurve(window, origin, width, static_cast<int>(110 * zoom), 2.5);
-        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, onPage(170, 190));  // the axis
-        QTest::mouseMove(window, onPage(530, 190));
-        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, onPage(530, 190));
+        MainWindowTest::SetUp();
+    }
+    void TearDown() override {
+        MainWindowTest::TearDown();
+        xqt::hwr::HandwritingSearch::setFactory(nullptr);
+    }
+    void prepareController() override {
+        if (!wanted()) {
+            return;
+        }
+        ASSERT_TRUE(dir.isValid());
+        library = fs::path(dir.path().toStdString()) / "Library";
+        fs::copy(qEnvironmentVariable("XQT_SHOTS_DEMO").toStdString(), library, fs::copy_options::recursive);
+        controller->setLibraryRoot(library);
+        qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();  // (tests share the config folder)
+    }
+    void closeAll() {
+        while (controller->tabCount() > 0) {
+            controller->closeTab(0);
+            wait(50);
+        }
+    }
+    /// The lecture as a PDF with notes, as the app saves it (made once from the demo's .xopp, which then goes)
+    fs::path lecture() {
+        const fs::path folder = library / "Lectures";
+        const fs::path pdf = folder / "Fourier series.pdf", xopp = folder / "Fourier series.xopp";
+        if (!fs::exists(pdf)) {
+            EXPECT_TRUE(controller->openPath(qs(xopp)));
+            EXPECT_TRUE(controller->saveAsHybridInBackground(QUrl::fromLocalFile(qs(pdf)), QJSValue(), "keep"));
+            EXPECT_TRUE(until([&] { return !controller->anySaving() && fs::exists(pdf); }, 30000));
+            closeAll();
+            fs::remove(xopp);
+            fs::remove(folder / "Fourier series.xopp.bg.pdf");
+        }
+        return pdf;
+    }
+    /// Until the pages' thumbnails and the documents' covers are drawn, and the pointer rests on the page
+    void settle(int ms = 1500) {
         restPointer(window);
-        wait(900);  // (the thumbnails of the pages follow)
-        saveShot(window, name);
+        // (then on the page: at the bottom of a phone is its dock, where a resting pointer shows a tool's name)
+        QTest::mouseMove(window, QPoint(window->width() * 11 / 20, window->height() * 9 / 20));
+        until([] { return xqt::PageSketches::instance().idle(); }, 20000);
+        // (frames go on while the pictures come: a picture that arrives is shown on the next frame)
+        for (int waited = 0; waited < ms; waited += 250) {
+            nextFrame();
+            wait(250);
+        }
+    }
+    void open(const fs::path& file, int page, bool sidebar) {
+        ASSERT_TRUE(controller->openPath(qs(file)));
+        // (a binding: shown by its button)
+        QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, sidebar));
+        wait(300);
+        controller->goToPage(page);
     }
 };
 }  // namespace
 
-TEST_F(ShotOfTheCanvas, onADesktop) {
-    if (!wantShots()) {
-        GTEST_SKIP() << "set XQT_SHOTS";
+// The README's first picture: lecture slides with handwritten notes, highlights and arrows, the pages beside them
+TEST_F(ReadmeShots, slidesWithNotes) {
+    if (!wanted()) {
+        GTEST_SKIP() << "set XQT_SHOTS and XQT_SHOTS_DEMO";
     }
-    canvasShot(1440, 900, "canvas");
+    window->resize(1440, 900);
+    const fs::path pdf = lecture();
+    open(pdf, 2, true);
+    controller->fitPage();
+    settle(2500);
+    saveShot(window, "slides");
 }
-TEST_F(ShotOfTheCanvas, onAnUprightTablet) {
-    if (!wantShots()) {
-        GTEST_SKIP() << "set XQT_SHOTS";
+
+// The same notes on a desktop, an upright tablet (a 2-in-1 at 200 %) and a phone: the README's picture of the
+// adaptive layout (make-shots.sh puts the three side by side)
+TEST_F(ReadmeShots, onEveryScreen) {
+    if (!wanted()) {
+        GTEST_SKIP() << "set XQT_SHOTS and XQT_SHOTS_DEMO";
     }
-    canvasShot(960, 1392, "canvas-tablet");
+    struct Size {
+        int w, h;
+        bool sidebar;
+        const char* name;
+    };
+    for (const Size& size: {Size{1440, 900, true, "screen-desktop"}, Size{960, 1392, false, "screen-tablet"},
+                            Size{412, 915, false, "screen-phone"}}) {
+        window->resize(size.w, size.h);
+        wait(300);
+        open(library / "Lab journal.xopp", 0, size.sidebar);
+        settle(20000);  // (the thumbnails of handwritten pages take a while)
+        saveShot(window, size.name);
+        closeAll();
+    }
 }
-TEST_F(ShotOfTheCanvas, onAPhone) {
-    if (!wantShots()) {
-        GTEST_SKIP() << "set XQT_SHOTS";
+
+// The library: the home screen on the demo library, with the documents' covers
+TEST_F(ReadmeShots, theLibrary) {
+    if (!wanted()) {
+        GTEST_SKIP() << "set XQT_SHOTS and XQT_SHOTS_DEMO";
     }
-    canvasShot(412, 915, "canvas-phone");
+    window->resize(1440, 900);
+    lecture();  // (the lecture is a PDF with notes, as in the other pictures)
+    click(find<QQuickItem>("homeTab"));
+    settle(15000);  // (the covers are drawn at idle priority, one after the other)
+    saveShot(window, "library");
+}
+
+// Handwriting found by the search: Ctrl+F in the handwritten lab journal, the hits marked on the ink. Needs the
+// built-in model and ONNX Runtime (XQT_ONNXRUNTIME=<libonnxruntime.so.1> when the build has none of its own).
+TEST_F(ReadmeShots, handwritingFound) {
+    if (!wanted()) {
+        GTEST_SKIP() << "set XQT_SHOTS and XQT_SHOTS_DEMO";
+    }
+    window->resize(1440, 900);
+    controller->handwritingSettings()->setProperty("enabled", true);
+    open(library / "Lab journal.xopp", 0, false);
+    // (read in the background, a page after the other)
+    auto read = [&] {
+        xqt::DocumentSession* s = controller->tabManager().currentSession();
+        auto* indexer = s ? controller->services().handwriting().indexerOf(s) : nullptr;
+        if (!indexer) {
+            return false;
+        }
+        const auto pages = indexer->pages();
+        return indexer->done() && !pages.empty() &&
+               std::all_of(pages.begin(), pages.end(), [](const auto& p) { return p.complete; });
+    };
+    const bool wasRead = until(read, 120000);
+    ASSERT_TRUE(wasRead) << "the handwriting was not read (ONNX Runtime: XQT_ONNXRUNTIME)";
+    key(Qt::Key_F, Qt::ControlModifier);
+    type("filter");
+    key(Qt::Key_Return);
+    ASSERT_TRUE(until([&] { return controller->searchHitCount() >= 2 && !controller->searchRunning(); }, 20000))
+            << controller->searchHitCount() << " hits";
+    settle(3000);
+    saveShot(window, "search");
 }
 
 // Markdown written on a page, formatted while it is typed (the block with the cursor shows its marks), with the

@@ -1,0 +1,83 @@
+<!doctype html>
+<!-- xournal-qt: the lecture slides of the README's pictures (make-demo.sh prints them as "Fourier series.pdf") -->
+<html><head><meta charset="utf-8"><style>
+@page { size: 1280px 720px; margin: 0; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "DejaVu Sans", "Noto Sans", sans-serif; color: #1d2433; }
+section { width: 1280px; height: 720px; padding: 56px 72px; position: relative; page-break-after: always; overflow: hidden; }
+section::after { content: attr(data-n); position: absolute; right: 40px; bottom: 26px; font-size: 18px; color: #8a93a6; }
+.bar { position: absolute; left: 0; top: 0; width: 100%; height: 10px; background: #2b4c9b; }
+h1 { font-size: 46px; margin: 0 0 18px; color: #2b4c9b; }
+h2 { font-size: 36px; margin: 0 0 26px; color: #2b4c9b; }
+p, li { font-size: 25px; line-height: 1.45; }
+ul { padding-left: 30px; margin: 0; } li { margin-bottom: 12px; }
+.small { font-size: 20px; color: #5b6478; }
+math { font-size: 30px; } .big math { font-size: 38px; }
+.box { border: 2px solid #c9d3ea; background: #f3f6fc; border-radius: 10px; padding: 18px 26px; margin: 18px 0; }
+.cols { display: flex; gap: 40px; } .cols > div { flex: 1; }
+.title { display: flex; flex-direction: column; justify-content: center; height: 100%; }
+</style></head><body>
+
+<section data-n="1"><div class="bar"></div><div class="title">
+  <p class="small">Signals and Systems · Lecture 7</p>
+  <h1 style="font-size:64px">Fourier series</h1>
+  <p style="font-size:28px">Periodic signals as sums of sines and cosines</p>
+  <p class="small" style="margin-top:60px">Winter term · Dr. A. Weber</p>
+</div></section>
+
+<section data-n="2"><div class="bar"></div>
+  <h2>A periodic signal as a sum of harmonics</h2>
+  <div class="cols"><div style="flex:1.25">
+    <p>A signal with period <math><mi>T</mi></math> and <math><msub><mi>ω</mi><mn>0</mn></msub><mo>=</mo><mfrac><mrow><mn>2</mn><mi>π</mi></mrow><mi>T</mi></mfrac></math>:</p>
+    <div class="box big"><math display="block"><mi>x</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mo>−</mo><mi>∞</mi></mrow><mi>∞</mi></munderover><msub><mi>c</mi><mi>k</mi></msub><mspace width="4px"/><msup><mi>e</mi><mrow><mi>j</mi><mi>k</mi><msub><mi>ω</mi><mn>0</mn></msub><mi>t</mi></mrow></msup></math></div>
+    <p>with the coefficients</p>
+    <div class="box big"><math display="block"><msub><mi>c</mi><mi>k</mi></msub><mo>=</mo><mfrac><mn>1</mn><mi>T</mi></mfrac><msubsup><mo>∫</mo><mn>0</mn><mi>T</mi></msubsup><mi>x</mi><mo>(</mo><mi>t</mi><mo>)</mo><mspace width="4px"/><msup><mi>e</mi><mrow><mo>−</mo><mi>j</mi><mi>k</mi><msub><mi>ω</mi><mn>0</mn></msub><mi>t</mi></mrow></msup><mspace width="4px"/><mi>d</mi><mi>t</mi></math></div>
+  </div><div style="flex:0.75"></div></div>
+</section>
+
+<section data-n="3"><div class="bar"></div>
+  <h2>Example: the square wave</h2>
+  <div class="cols"><div>
+    <svg width="620" height="330" viewBox="0 0 620 330">
+      <line x1="20" y1="165" x2="610" y2="165" stroke="#9aa3b5" stroke-width="2"/>
+      <line x1="40" y1="20" x2="40" y2="310" stroke="#9aa3b5" stroke-width="2"/>
+      <path d="M40 75 H175 V255 H310 V75 H445 V255 H580 V75 H600" fill="none" stroke="#1d2433" stroke-width="3"/>
+      <path id="p3" fill="none" stroke="#d0661c" stroke-width="3"/>
+      <text x="585" y="190" font-size="20" fill="#5b6478">t</text>
+    </svg>
+    <p class="small">orange: the sum of the first three harmonics</p>
+  </div><div>
+    <p>Only odd harmonics:</p>
+    <div class="box big"><math display="block"><mi>x</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><mfrac><mn>4</mn><mi>π</mi></mfrac><munder><mo>∑</mo><mrow><mi>k</mi><mtext> odd</mtext></mrow></munder><mfrac><mrow><mi>sin</mi><mo>(</mo><mi>k</mi><msub><mi>ω</mi><mn>0</mn></msub><mi>t</mi><mo>)</mo></mrow><mi>k</mi></mfrac></math></div>
+    <ul><li>coefficients fall off as <math><mn>1</mn><mo>/</mo><mi>k</mi></math></li><li>the jumps need infinitely many terms</li></ul>
+  </div></div>
+<script>
+  // the partial sum of the square wave (period 270 px, amplitude 90 px)
+  const T = 270, A = 90; let d = "";
+  for (let x = 0; x <= 560; x += 2) {
+    let s = 0; for (const k of [1, 3, 5]) s += Math.sin(k * 2 * Math.PI * x / T) / k;
+    d += (x ? " L" : "M") + (40 + x) + " " + (165 - A * 4 / Math.PI * s);
+  }
+  document.getElementById("p3").setAttribute("d", d);
+</script>
+</section>
+
+<section data-n="4"><div class="bar"></div>
+  <h2>Convergence and the Gibbs phenomenon</h2>
+  <ul>
+    <li>For finite energy over one period the partial sums converge <b>in the mean</b> (Parseval).</li>
+    <li>At a jump they overshoot by about 9 % of the jump, however many terms are taken.</li>
+    <li>Between jumps they converge pointwise to <math><mi>x</mi><mo>(</mo><mi>t</mi><mo>)</mo></math>.</li>
+  </ul>
+  <div class="box big" style="width:640px"><math display="block"><mfrac><mn>1</mn><mi>T</mi></mfrac><msubsup><mo>∫</mo><mn>0</mn><mi>T</mi></msubsup><msup><mrow><mo>|</mo><mi>x</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>|</mo></mrow><mn>2</mn></msup><mi>d</mi><mi>t</mi><mo>=</mo><munder><mo>∑</mo><mi>k</mi></munder><msup><mrow><mo>|</mo><msub><mi>c</mi><mi>k</mi></msub><mo>|</mo></mrow><mn>2</mn></msup></math></div>
+</section>
+
+<section data-n="5"><div class="bar"></div>
+  <h2>Exercises for Thursday</h2>
+  <ul>
+    <li>7.1 The coefficients of the triangle wave. How fast do they fall off?</li>
+    <li>7.2 Show that a real signal has <math><msub><mi>c</mi><mrow><mo>−</mo><mi>k</mi></mrow></msub><mo>=</mo><msubsup><mi>c</mi><mi>k</mi><mo>*</mo></msubsup></math>.</li>
+    <li>7.3 Plot the partial sums of the square wave for 1, 3 and 15 terms.</li>
+  </ul>
+</section>
+</body></html>

@@ -478,6 +478,40 @@ TEST_F(PluginsUiTest, plotGallery) {
     window->grabWindow().save(folder + "/curve-params.png");
 }
 
+// The README's picture of the function plotter (XQT_SHOTS=<folder>, qt/docs/screenshots/README.md; skipped otherwise):
+// the sum of the first three harmonics of a square wave, with π steps, while the dialog is open. The dialog's fields
+// are given the same values, so that they show the function that is drawn.
+TEST_F(PluginsUiTest, readmeShotOfAPlot) {
+    const QString folder = qEnvironmentVariable("XQT_SHOTS");
+    if (folder.isEmpty()) {
+        GTEST_SKIP() << "XQT_SHOTS not set";
+    }
+    window->resize(1440, 900);
+    wait(300);
+    host().setGrant("org.xournalqt.function-plotter", "edit", "allow");
+    ASSERT_TRUE(controller->pluginControl()->run("plugin:org.xournalqt.function-plotter/plot"));
+    auto* canvas = find<DocumentCanvasItem>("canvas");
+    ASSERT_TRUE(until([&] { return canvas->pluginPreviewShown().shown; }));
+    auto* plugins = controller->pluginControl();
+    QVariantMap v = plugins->liveSpec().value("values").toMap();
+    v["f0_expr"] = "sin(x) + sin(3x)/3 + sin(5x)/5";
+    v["xMin"] = "-2pi";
+    v["xMax"] = "2pi";
+    v["piTicks"] = true;
+    auto* fields = find<QObject>("pluginLiveFields");
+    ASSERT_NE(fields, nullptr);
+    fields->setProperty("values", v);
+    plugins->liveEdited(v, "");
+    wait(800);
+    for (const QPoint& p: {QPoint(300, 860), QPoint(320, 870)}) {  // (no tool tip in the picture)
+        QTest::mouseMove(window, p);
+    }
+    wait(500);
+    nextFrame();
+    QDir().mkpath(folder);
+    ASSERT_TRUE(window->grabWindow().save(folder + "/plot.png"));
+}
+
 namespace {
 /// The same window at a phone's size (the phone classes: the live dialog is a bottom sheet)
 class PluginsPhoneTest: public PluginsUiTest {

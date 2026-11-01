@@ -1,0 +1,39 @@
+<!doctype html>
+<!-- xournal-qt: a paper for the README's library (make-demo.sh prints it as "Sampling and aliasing.pdf") -->
+<html><head><meta charset="utf-8"><style>
+@page { size: A4; margin: 22mm 20mm; }
+body { font-family: "DejaVu Serif", "Noto Serif", serif; font-size: 10.5pt; line-height: 1.45; color: #111; }
+h1 { font-size: 20pt; text-align: center; margin: 0 0 6pt; } .auth { text-align: center; font-size: 11pt; margin-bottom: 14pt; }
+.abs { margin: 0 8% 14pt; font-size: 9.5pt; } h2 { font-size: 12pt; margin: 12pt 0 4pt; }
+.cols { column-count: 2; column-gap: 8mm; text-align: justify; } figure { margin: 8pt 0; text-align: center; font-size: 9pt; }
+</style></head><body>
+<h1>Sampling and aliasing in practice</h1>
+<div class="auth">M. Keller · J. Duarte<br><small>Institute for Signal Processing</small></div>
+<div class="abs"><b>Abstract.</b> We revisit the sampling theorem with measurements from low-cost data loggers and show
+how anti-aliasing filters of modest order already keep the aliasing error below the quantisation noise. A simple rule
+for choosing the sampling rate from the filter's order is derived and checked on three data sets.</div>
+<div class="cols">
+<h2>1 Introduction</h2>
+<p>A band-limited signal is determined by its samples when it is sampled at more than twice its highest frequency.
+In practice signals are never strictly band-limited, and the question is not whether aliasing occurs but how much of
+it can be tolerated. This paper looks at that question with the instruments found in teaching laboratories.</p>
+<p>Section 2 recalls the theorem and the effect of a non-ideal anti-aliasing filter. Section 3 describes the data
+sets, and Section 4 compares the measured aliasing error with the prediction.</p>
+<h2>2 The sampling theorem</h2>
+<p>Let x(t) have the spectrum X(f), and let it be sampled every T seconds. The spectrum of the samples is the sum of
+copies of X(f) shifted by multiples of 1/T. When X(f) vanishes above 1/(2T), the copies do not overlap and x(t) is
+recovered by an ideal low-pass filter.</p>
+<figure><svg width="300" height="110" viewBox="0 0 300 110"><line x1="10" y1="95" x2="290" y2="95" stroke="#333"/>
+<path d="M40 95 Q80 10 120 95" fill="#cfd8ee" stroke="#2b4c9b"/><path d="M110 95 Q150 10 190 95" fill="#f2d6c4" stroke="#d0661c"/>
+<path d="M180 95 Q220 10 260 95" fill="#cfd8ee" stroke="#2b4c9b"/></svg><br>Figure 1: overlapping copies of the spectrum.</figure>
+<p>A real filter of order n attenuates by about 6n dB per octave above its cut-off. The copies therefore overlap a
+little, and the overlap folds back into the band of interest as aliasing error.</p>
+<h2>3 Data sets</h2>
+<p>We recorded vibration, audio and temperature signals with three loggers sampling at 1, 8 and 48 kHz, each with
+and without an analogue filter in front of the converter. Every set was also recorded at a rate eight times higher
+as a reference.</p>
+<h2>4 Results</h2>
+<p>With a fourth-order filter the aliasing error stayed below the quantisation noise of a 12-bit converter whenever
+the sampling rate was at least 2.6 times the cut-off frequency. Without a filter, the error reached 4 % of the
+signal's power for the vibration data.</p>
+</div></body></html>
